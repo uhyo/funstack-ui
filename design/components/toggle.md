@@ -535,9 +535,8 @@ The reason is in react-dom: `useOptimistic` setters enqueue on `SyncLane`, and t
 calls `startViewTransition` when every committed lane is a transition, retry or idle lane
 (`(committedLanes & 0x13FFFF00) === committedLanes` in 19.3.1). The optimistic render is
 therefore an urgent commit with no view transition, and by the time the transition-lane commit
-arrives the `aria-pressed` mutation has already happened. This contradicts the sentence in
-conventions 5.1 that the optimistic feedback "animates through the same boundary"; see
-Conventions feedback #1.
+arrives the `aria-pressed` mutation has already happened. Conventions 5.1 and 3.2 record this
+(updated 2026-10-15 from Conventions feedback #1 below).
 
 Consequences for Toggle's docs:
 
@@ -725,11 +724,9 @@ Toggle.displayName = "Toggle";
   so that every component's async behaviour is the same code. Toggle is the first consumer of
   the hook and its tests (rows 8 to 13, 17) double as the hook's tests until a second component
   lands.
-- **Hook signature detail**: the conventions sketch takes `transitionType: (next, prev) =>
-  string | undefined`. Toggle needs two types per dispatch (`fsui-toggle` and the press/release
-  one). Either the hook takes `transitionTypes: (next, prev) => readonly string[]` as above, or it
-  takes `component: "toggle"` and a change-type function and prefixes itself. Implementation's
-  choice; conventions 3.4 says the final signature belongs to the implementation.
+- **Hook signature detail**: Toggle needs two types per dispatch (`fsui-toggle` and the
+  press/release one), so the hook takes `transitionTypes: (next, prev) => readonly string[]` as
+  above (conventions 3.4 sketch, updated 2026-10-15).
 - **`!optimistic` from the render closure** is correct because the optimistic update is a sync
   lane render: by the time a second click handler runs, the component has re-rendered with the
   new optimistic value. The hook's `latest` ref does the ordering; the component does not need a
@@ -753,6 +750,9 @@ re-checked in real browsers. That page is the only place ViewTransition behaviou
 ---
 
 ## Conventions feedback
+
+All five items below were applied to `design/conventions.md` on 2026-10-15 by the conventions
+architect (uncommitted at the time of writing). They are kept here as the record of why.
 
 1. **Optimistic updates do not activate `<ViewTransition>`** (section 7.2, verified). Conventions
    5.1 says "the optimistic feedback, the eventual commit, and a rollback all animate through the
