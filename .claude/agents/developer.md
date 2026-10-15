@@ -1,7 +1,7 @@
 ---
 name: developer
 description: Implements @funstack/ui components, infrastructure, and tests according to design documents. Use for any coding task — scaffolding, components, tests, tooling, docs site.
-model: fable
+model: opus
 tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch
 ---
 

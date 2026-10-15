@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews implemented components for accessibility (WAI-ARIA APG, keyboard, AT), conformance to the Async React principles in docs/vision.md, API consistency with design docs, and test quality. Read-only — reports findings, does not fix.
-model: fable
+model: opus
 tools: Read, Bash, Glob, Grep, WebSearch, WebFetch
 ---
 

@@ -26,3 +26,4 @@
 - Running: review-toggle (reviewer), impl-accordion (#12, worktree), infra-browser-mode (#18, worktree).
 - Lesson: never run `pnpm format` at root while agent worktrees exist under .claude/worktrees (it reformatted the worktree's docs; reverted).
 - Toggle review: acceptable w/ minor fixes. Notable: (a) Action return type must be `unknown`; (b) React swallows a superseded overlapping action's rejection → PO decision: hook stores & rethrows from render; (c) merge-props had element/pass-through precedence backwards. Fixes dispatched to impl-toggle; doc fixes to architect.
+- 2026-10-16: usage limit hit overnight. User: only decision-making agents stay Fable → developer, reviewer, platform-researcher switched to opus. architect + product-owner remain fable.

@@ -1,7 +1,7 @@
 ---
 name: platform-researcher
 description: Researches modern HTML/CSS/React platform features (browser support, semantics, accessibility implications) and writes research documents that implementation bets are based on. Use before committing to a platform feature for a component.
-model: fable
+model: opus
 tools: Read, Write, Edit, Bash, WebSearch, WebFetch, Glob, Grep
 ---
 
