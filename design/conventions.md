@@ -273,10 +273,7 @@ What a consumer can rely on:
    against the **optimistic** value, not the committed one: clicking the Tab that is already
    optimistically selected calls nothing, but clicking back to the committed tab while another is
    pending is a real dispatch that replaces the in-flight intent (section 2.5).
-8. **Parts are never natively disabled while pending.** Latest-dispatch-wins already handles
-   repeated interaction, and a natively disabled button drops keyboard focus. Consumers who want
-   to block input during pending use CSS (`[data-pending] { pointer-events: none }`) or
-   `aria-busy` via `render`. (Product-owner decision, 2026-10-15.)
+8. **Parts are never disabled while pending.** See section 3.6.
 
 ### 2.4 Errors
 
