@@ -1,0 +1,21 @@
+{
+  "name": "funstack-ui-monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "test:run": "turbo run test:run",
+    "typecheck": "turbo run typecheck",
+    "lint": "oxlint",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "devDependencies": {
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
+    "turbo": "^2.11.8"
+  },
+  "packageManager": "pnpm@10.30.1"
+}
