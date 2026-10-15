@@ -1,7 +1,9 @@
 # @funstack/ui API conventions
 
 Status: **accepted** (2026-10-15, GitHub issue #5; open questions resolved by the product owner
-with the user, see the end of this document). Binding for every component design in
+with the user, see the end of this document; amended 2026-10-15 after the Toggle design, #6, with
+the ViewTransition correction in 5.1, the pending-is-never-disabled rule in 3.6, and the Server
+Function note in 2.4). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -212,6 +214,19 @@ common case stays short:
 
 Return values are ignored; only the promise is awaited. v0 has no `cancel()` on `details`.
 
+**Server Functions as action props are under research** (issue #17,
+`docs/research/server-function-action-props.md`, pending). A Server Function receiving
+`(next, details)` would have to serialise the DOM `Event` in `details`. Until that research lands
+the v0 shape is a thin client wrapper that forwards only `next`; the `details` design is not
+changed pre-emptively.
+
+```tsx
+"use client";
+export function SaveToggle({ action }: { action: (pressed: boolean) => Promise<void> }) {
+  return <Toggle pressedChangeAction={(next) => action(next)}>Save</Toggle>;
+}
+```
+
 ### 2.3 Execution contract
 
 The library wraps every action like this (shared hook, section 3.4):
@@ -254,8 +269,10 @@ What a consumer can rely on:
    valueChangeAction={async (next) => { await saveSelection(next); }}
    ```
 6. **Disabled parts never dispatch.** A disabled Tab does not call `valueChangeAction`.
-7. **No-op interactions do not dispatch** unless the component says otherwise (clicking the
-   already-selected Tab calls nothing).
+7. **No-op interactions do not dispatch** unless the component says otherwise. "No-op" is judged
+   against the **optimistic** value, not the committed one: clicking the Tab that is already
+   optimistically selected calls nothing, but clicking back to the committed tab while another is
+   pending is a real dispatch that replaces the in-flight intent (section 2.5).
 8. **Parts are never natively disabled while pending.** Latest-dispatch-wins already handles
    repeated interaction, and a natively disabled button drops keyboard focus. Consumers who want
    to block input during pending use CSS (`[data-pending] { pointer-events: none }`) or
@@ -398,7 +415,7 @@ export function useControllableAction<T>(options: {
   controlled: T | undefined;
   defaultValue: T;
   action: ChangeAction<T> | undefined;
-  transitionTypes?: (next: T, prev: T) => readonly string[];
+  transitionTypes?: (next: T, prev: T, details: ActionDetails) => readonly string[];
 }) {
   const [internal, setInternal] = useState(options.defaultValue);
   const isControlled = options.controlled !== undefined;
@@ -411,7 +428,7 @@ export function useControllableAction<T>(options: {
     const prev = committed;
     const id = ++latest.current;
     startOwnTransition(async () => {
-      for (const type of options.transitionTypes?.(next, prev) ?? []) addTransitionType(type);
+      for (const type of options.transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
       setOptimistic(next);
       await options.action?.(next, details);
       if (!isControlled && id === latest.current) {
@@ -423,6 +440,11 @@ export function useControllableAction<T>(options: {
   return { committed, optimistic, pending, dispatch };
 }
 ```
+
+`transitionTypes` receives `details` so a component can derive direction from the dispatching
+element (Tabs computes `fsui-tabs-next` / `fsui-tabs-prev` from the DOM order of
+`details.event.currentTarget` relative to the previously selected tab). `prev` is the committed
+value at dispatch time, not the optimistic one.
 
 The reducer form of `useOptimistic` is mandatory so that stacked optimistic updates are re-based
 onto a changed `committed` value. For single-value states the reducer is `(_, next) => next`;
@@ -468,6 +490,30 @@ Rules:
 where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs), the
 part sets `aria-disabled` instead. In both cases the part emits `data-disabled` and never
 dispatches.
+
+**A part is never disabled while pending** (product-owner decision, library-wide). The library
+does not set `disabled`, `aria-disabled` or `inert` on a trigger because its action is in flight:
+native `disabled` drops keyboard focus, and the latest-intent rule (section 2.5) already makes
+repeated activation safe. Consumers who want to block re-activation do it with CSS
+(`[data-pending] { pointer-events: none }`) or announce it with `aria-busy` through pass-through;
+the library emits `data-pending` and nothing else.
+
+### 3.7 `keepMounted` on content regions
+
+Content regions whose visibility is driven by library state (`Tabs.Panel`, `Accordion.Panel`)
+share one prop shape:
+
+```ts
+keepMounted?: boolean | "until-found";
+```
+
+| Value | Hidden panel is | Notes |
+| --- | --- | --- |
+| `false` (default) | not rendered | Matches ecosystem expectations; no hidden `<video>` surprises. |
+| `true` | rendered inside `<Activity mode="hidden">` | DOM and state preserved, effects torn down, pre-rendered at low priority. The mode change happens inside the library's transition so nested `<ViewTransition>` boundaries get enter/exit. |
+| `"until-found"` | rendered with `hidden="until-found"` | Find-in-page and text fragments reveal it; the `beforematch` event dispatches the matching change action. Uses the ref-based upgrade from section 7.4 because react-dom serialises `hidden` as a boolean. Incompatible with `<Activity>` on the same element, hence a separate value rather than a second boolean. |
+
+Tabs defines the semantics first; Accordion reuses the prop unchanged.
 
 ---
 
@@ -554,10 +600,22 @@ Because library state changes are transitions, the commit that ends the action a
 animate through this boundary with no extra code. **The optimistic commit does not animate**: it
 is a sync-lane render, and react-dom starts a view transition only when every committed lane is a
 transition, retry or idle lane (verified on 19.3.1; see `design/components/toggle.md` section 7.2).
-So a trigger's own flip (`data-pressed`, `data-selected`, a `Tabs.Indicator` keyed on optimistic
-selection) is a CSS `transition` job on the attribute change, while `<ViewTransition>` is for what
-changes when the action settles: content keyed on committed state, the pending indicator leaving,
-a snap-back.
+What this means per kind of part:
+
+| Part renders | Animate with | Why |
+| --- | --- | --- |
+| Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, a `Tabs.Indicator` that follows optimistic selection) | CSS `transition` on the data attribute (`[data-pressed]`, `[data-selected]`, `--active-tab-left` style variables) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
+| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop (`<ViewTransition>`) | The swap lands in the transition-lane commit that settles the action. |
+| `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
+
+A `Tabs.Indicator` therefore gets two documented modes: follow optimistic selection and animate
+with CSS (moves on click, snaps back on rejection), or follow committed selection and animate with
+`<ViewTransition>` (moves when the panel does). The component design picks the default. Any part
+that keys a `<ViewTransition>` on optimistic state is a bug, not a style choice.
+
+Product-owner decision: `transition` stays on Toggle in v0 even though its own flip cannot use it,
+documented honestly (it animates the end of the action and content keyed on `pending`), so the
+"every animatable part has `transition`" rule has no exceptions.
 
 ### 5.2 Consumer API: the `transition` prop
 
@@ -941,12 +999,17 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 6. **Transition entanglement**: being re-verified by the React researcher and recorded in
    `docs/research/react-async-apis.md`. Guidance "await only what the UI must wait for" stands.
 7. **No hover/focus data attributes**; consumers use CSS pseudo-classes.
+8. **Never natively disabled while pending** (section 3.6): the library emits `data-pending` only;
+   latest-intent covers repeated activation; CSS or `aria-busy` are the consumer's escape hatches.
+9. **`transition` stays on Toggle in v0** (section 5.1), documented as animating the settling of
+   the action, not the optimistic flip.
 
 ## Open questions
 
-1. **Server Functions as actions and `details.event`** (raised by the Toggle design, #6). A Server
-   Function receiving `(next, details)` would serialise a DOM `Event`. Options: (a) document a thin
-   client wrapper forwarding only `next` as the supported shape (current stance); (b) make `event`
-   a non-enumerable property so the reply serialiser skips it, at the cost of a subtle object;
-   (c) detect server references and pass `(next)` only, which public APIs do not allow. Needs a
-   probe with a Flight client before deciding; (a) is safe for v0.
+1. **Server Functions as actions and `details.event`** (raised by the Toggle design, #6; research
+   tracked as #17, `docs/research/server-function-action-props.md`). A Server Function receiving
+   `(next, details)` would serialise a DOM `Event`. Options: (a) document a thin client wrapper
+   forwarding only `next` as the supported shape (v0 interim, section 2.2); (b) make `event` a
+   non-enumerable property so the reply serialiser skips it, at the cost of a subtle object;
+   (c) detect server references and pass `(next)` only, which public APIs do not allow. Decision
+   waits for #17; `details` is not redesigned before then.
