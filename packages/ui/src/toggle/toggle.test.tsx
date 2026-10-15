@@ -503,10 +503,9 @@ describe("Toggle", () => {
 
       await user.click(el);
       expect(order).toEqual(["element", "library"]);
-      expect(action).toHaveBeenCalledWith(
-        true,
-        expect.objectContaining({ event: expect.any(Event) }),
-      );
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls[0]?.[0]).toBe(true);
+      expect(action.mock.calls[0]?.[1].event).toBeInstanceOf(Event);
       expect(el).toHaveAttribute("aria-pressed", "true");
       expect(el).toHaveAttribute("data-pressed", "");
     });
@@ -698,6 +697,40 @@ describe("Toggle", () => {
       const user = setupUser();
       await user.click(button());
       expect(action).toHaveBeenCalledWith(true, expect.anything());
+      expect(button()).toHaveAttribute("aria-pressed", "true");
+    });
+  });
+
+  describe("details (row 21)", () => {
+    it("exposes `event` as a virtual, non-own property", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Toggle pressedChangeAction={action}>Favorite</Toggle>);
+      const user = setupUser();
+
+      await user.click(button());
+      const details = action.mock.calls[0]![1];
+      expect(details.event).toBeInstanceOf(window.Event);
+      expect(details.event?.type).toBe("click");
+      expect("event" in details).toBe(true);
+      expect(Object.keys(details)).not.toContain("event");
+      expect({ ...details }).not.toHaveProperty("event");
+      expect(JSON.stringify(details)).toBe(JSON.stringify({}));
+      expect(Object.isExtensible(details)).toBe(true);
+    });
+
+    it("can be passed straight to a Server-Function-shaped action", async () => {
+      // A Server Function is just an async function to the library; it receives `(next, details)`
+      // and the serialiser only ever sees the real fields.
+      const serverFn = vi.fn(async (_next: boolean, _details: TogglePressedChangeDetails) => {});
+      render(<Toggle pressedChangeAction={serverFn}>Favorite</Toggle>);
+      const user = setupUser();
+
+      await user.click(button());
+      expect(serverFn).toHaveBeenCalledTimes(1);
+      const [next, details] = serverFn.mock.calls[0]!;
+      expect(next).toBe(true);
+      expect(details.event).toBeInstanceOf(window.Event);
+      expect(JSON.parse(JSON.stringify([next, details]))).toEqual([true, {}]);
       expect(button()).toHaveAttribute("aria-pressed", "true");
     });
   });

@@ -59,4 +59,9 @@ Implementation of `design/components/toggle.md` plus the shared internals it nee
 - `pnpm format:check` is red at the root because `design/*.md` (already at HEAD) and another
   agent's worktree under `.claude/worktrees/` are unformatted. Not my files; `design/` is not in
   oxfmt `ignorePatterns` while `docs/` and `memo/` are. Reported to the lead.
-- Server Functions as actions: nothing special done (#17).
+- Server Functions as actions (#17): the design landed (commit bc89308) while the Toggle was being
+  built, so `internal/action-details.ts` (`createActionDetails`) was added and Toggle uses it;
+  test row 21 covers the virtual `event`. The file carries no `"use client"` (conventions 7.1:
+  no client-only API; a directive-free file is importable from anywhere), although the sketch in
+  conventions 2.2 shows one. `expect.objectContaining({ event })` does not see a Proxy-served
+  property; tests read `details.event` directly.

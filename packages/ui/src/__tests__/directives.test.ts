@@ -17,7 +17,7 @@ const clientFiles = [
   "internal/use-render.mjs",
 ];
 
-const directiveFreeFiles = ["index.mjs", "toggle/index.mjs"];
+const directiveFreeFiles = ["index.mjs", "toggle/index.mjs", "internal/action-details.mjs"];
 
 function startsWithUseClient(file: string): boolean {
   const path = resolve(dist, file);

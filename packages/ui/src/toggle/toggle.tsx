@@ -7,6 +7,7 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
+import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
@@ -110,7 +111,7 @@ export function Toggle({
         // Native buttons do not fire `click` when disabled; the guard covers `render` elements
         // that do not honour `disabled`.
         if (disabled) return;
-        dispatch(!optimistic, { event: event.nativeEvent });
+        dispatch(!optimistic, createActionDetails(event.nativeEvent, {}));
       },
     },
   });
