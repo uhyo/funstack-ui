@@ -89,8 +89,8 @@ export function FavoriteButton({ id, favorited }: { id: string; favorited: boole
 }
 ```
 
-See section 9 for why the thin client wrapper is the recommended shape rather than passing the
-Server Function directly from a Server Component.
+The wrapper is optional: it only drops `details` and binds `id`. Section 9 shows the direct form
+from a Server Component.
 
 ### 2.3 Controlled, local state
 
@@ -588,13 +588,12 @@ import { setFavorite } from "./actions"; // "use server"; signature (id, next, d
 </Toggle>
 ```
 
-Caveat, not verified in this repo (no `react-server-dom-*` installed): the library calls the
-action as `(next, details)` and `details.event` is a DOM `Event`. React's reply serialiser accepts
-only plain objects; a DOM event nested in the arguments is expected to log "Only plain objects can
-be passed to Server Functions" in development and serialise to `{ isTrusted }` in production.
-Until that is settled (Conventions feedback #2), the documented shape is the thin client wrapper
-of 2.2, which drops `details` before calling the Server Function. Function-form `className`,
-`style`, `children` and `render` are not serializable and are client-only by nature.
+The library calls the action as `(next, details)`. Per conventions 2.2 (decided by research #17,
+`docs/research/server-function-action-props.md`), `details` is a plain serialisable object and
+`details.event` is a virtual property served by a Proxy trap, so the Server Function receives
+`(id, next, details)` with `details.event === undefined`, no dev warning, in every RSC framework.
+The thin client wrapper of 2.2 is optional. Function-form `className`, `style`, `children` and
+`render` are not serializable and are client-only by nature.
 
 ---
 
@@ -629,7 +628,7 @@ are on the DOM only.
 | 3 | Roles and ARIA | Native pass-through: `aria-label`, `id`, `form`, `onPointerDown` land on the button; `type` cannot be overridden through props (type-level test). |
 | 4 | Keyboard | Focus the button, press Space: dispatches once with `next === true`. Press Enter: dispatches again with `false`. `details.event.type === "click"`. |
 | 5 | Keyboard | Disabled button is not in the tab order and Space/Enter do not dispatch. |
-| 6 | Sync action (both) | Click calls `pressedChangeAction(true, { event })` once; `event` is the native event (`instanceof window.Event`, `isTrusted` not asserted); after `act`, `aria-pressed="true"` and no `data-pending`. Second click dispatches `false`. |
+| 6 | Sync action (both) | Click calls `pressedChangeAction` once with `(true, details)`; `details.event` is the native event (`instanceof window.Event`, asserted via `details.event`, never `toEqual`); after `act`, `aria-pressed="true"` and no `data-pending`. Second click dispatches `false`. |
 | 7 | Sync action (both) | `disabled` never dispatches, even when clicked programmatically through `ref`. |
 | 8 | Async action (both) | With a `deferred` action: immediately after click, `aria-pressed="true"`, `data-pressed=""`, `expectPending(button)`; a sibling element reading the wrapper's committed value still shows the old value. After `resolve()`: `expectNotPending`, `aria-pressed="true"`, sibling updated. |
 | 9 | Rejection (both) | `reject(err)` inside `<ErrorCatcher>`: the catcher records `err`, the Toggle is replaced by the marker, the wrapper's committed value is unchanged. |
@@ -644,6 +643,7 @@ are on the DOM only.
 | 18 | `transition` prop | Renders identically with `transition` unset, `"fsui-fade"`, and a type map (jsdom has no `startViewTransition`; this only guards the wiring). |
 | 19 | Dev warnings | `pressed` together with `defaultPressed` warns once; switching `pressed` from `undefined` to a boolean warns once. |
 | 20 | Directive | `dist/toggle/toggle.mjs` starts with `"use client"`; `dist/toggle/index.mjs` does not (shared script over `dist`). |
+| 21 | `details.event` is virtual | After a click, `details.event instanceof window.Event`, `"event" in details` is true, `Object.keys(details)` does not include `"event"`, `JSON.stringify(details)` equals the JSON of the real fields, and `{ ...details }` has no `event`. Asserts via `details.event`, never `toEqual({ event })`. A fake Server Function (plain async spy) receives `(true, details)` with the same shape. |
 
 Rows 8, 9, 13 and 17 are the ones that prove the Async React model; if the shared hook changes,
 these are the tests expected to break first.
@@ -762,14 +762,8 @@ architect (uncommitted at the time of writing). They are kept here as the record
    optimistic selection will not get a view transition on click; the `Tabs.Panel` swap (committed)
    will. Worth a line in 3.2 as well, since it is the second concrete cost of "triggers render
    optimistic state".
-2. **`details.event` and Server Functions** (section 9). Conventions 7.1 says a Server Component
-   "passes a Server Function" as the action, but the `(next, details)` signature puts a DOM
-   `Event` into the serialised arguments. Options, for the product owner: (a) document the thin
-   client wrapper as the only supported shape; (b) make `event` a non-enumerable property of
-   `details` so `JSON.stringify` (which React's reply serialiser uses) skips it, keeping the type
-   unchanged, at the cost of a subtle object; (c) pass `(next)` only to actions the library can
-   recognise as server references (not possible with public APIs). Needs a probe with
-   `react-server-dom-webpack` or similar before deciding.
+2. **`details.event` and Server Functions** (section 9). Resolved by research #17: `event` is a
+   virtual Proxy-served property (conventions 2.2); Server Functions are passed directly.
 3. **Boolean data attribute emission**: conventions 4.1's example `data-pending={pending ||
    undefined}` renders `data-pending="true"`, but the helper table and the prose specify
    `data-pending=""`. The example should read `data-pending={pending ? "" : undefined}`.
@@ -783,7 +777,7 @@ architect (uncommitted at the time of writing). They are kept here as the record
 
 1. Section 6.6: confirm "never disabled while pending" as the library-wide stance for triggers
    (it will come up again for Tabs and Accordion).
-2. Conventions feedback #2: which Server Function shape to document for v0.
+2. (Resolved by #17.) Server Functions are passed directly; see conventions 2.2.
 3. Section 7: given that the flip itself cannot be view-transitioned, is a `transition` prop on
    Toggle worth keeping in v0 for consistency, or should Toggle ship without it until a component
    where it clearly pays off (Tabs.Panel) exists? Recommendation: keep it, documented honestly as

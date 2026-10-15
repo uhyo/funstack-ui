@@ -219,18 +219,49 @@ common case stays short:
 
 Return values are ignored; only the promise is awaited. v0 has no `cancel()` on `details`.
 
-**Server Functions as action props are under research** (issue #17,
-`docs/research/server-function-action-props.md`, pending). A Server Function receiving
-`(next, details)` would have to serialise the DOM `Event` in `details`. Until that research lands
-the v0 shape is a thin client wrapper that forwards only `next`; the `details` design is not
-changed pre-emptively.
+**`details` is serialisable; `event` is virtual.** Decided from issue #17
+(`docs/research/server-function-action-props.md`): React's reply serialiser rejects a DOM `Event`
+as an own property (throws without a temporary-reference set, opaque `$T` reference with one), a
+non-enumerable `event` triggers a misleading dev warning on every call, and a Server Function
+cannot be detected on the client. So:
+
+1. `details` is always a **plain, extensible object of serialisable fields** (strings, numbers,
+   booleans, `undefined`). Component-specific fields such as `reason` are ordinary own
+   properties.
+2. `event` is a **virtual, non-own property** served by a `Proxy` `get`/`has` trap. The internal
+   helper `createActionDetails(event, fields)` is the only way the library builds `details`:
+   ```ts
+   // packages/ui/src/internal/action-details.ts ("use client")
+   export function createActionDetails<T extends object>(event: Event | undefined, fields: T): T & ActionDetails {
+     return new Proxy(fields, {
+       get: (target, key, receiver) => (key === "event" ? event : Reflect.get(target, key, receiver)),
+       has: (target, key) => key === "event" || Reflect.has(target, key),
+     }) as T & ActionDetails;
+   }
+   ```
+   `details.event` and `"event" in details` work; `Object.keys(details)`, `{ ...details }`,
+   `JSON.stringify(details)` and React's serialiser see only the real fields. The
+   `ActionDetails` type and the `(next, details)` signature are unchanged.
+3. Therefore **a Server Function may be passed directly to any action prop**, from a Server
+   Component or a Client Component, in every RSC framework surveyed, with no dev warning. It
+   receives `(next, details)` with `details.event === undefined` and every other field intact.
+   A thin client wrapper is optional, useful only to drop or reshape arguments.
 
 ```tsx
-"use client";
-export function SaveToggle({ action }: { action: (pressed: boolean) => Promise<void> }) {
-  return <Toggle pressedChangeAction={(next) => action(next)}>Save</Toggle>;
-}
+// Server Component
+import { Toggle } from "@funstack/ui/toggle";
+import { setFavorite } from "./actions"; // "use server"; (id, next, details) => Promise<void>
+
+<Toggle defaultPressed={post.favorited} pressedChangeAction={setFavorite.bind(null, post.id)}>
+  Favorite
+</Toggle>
 ```
+
+Costs, documented wherever `details` is: devtools shows `Proxy(Object) { reason: "click" }`
+without `event`; `expect(details).toEqual({ event })` fails, so tests assert `details.event`
+directly; `structuredClone(details)` throws `DataCloneError`; the Proxy target must stay
+extensible (readonly-ness comes from the type, never `Object.freeze`); and the library must not
+rely on Next.js's unused-argument omission, which is bundler-specific.
 
 ### 2.3 Execution contract
 
@@ -749,10 +780,9 @@ src/accordion/
 A Server Component may render any part: the namespace object is a plain object of client
 references. It may pass only serializable props, so **a Server Component cannot pass a plain
 function as an action**; it passes a Server Function (`"use server"`) or renders the component
-from its own client component. Component docs state this. Note that the `(next, details)`
-signature puts a DOM `Event` into `details`, which a Server Function call would try to serialise;
-how actions reach Server Functions is an open question below, and until it is settled the
-documented shape is a thin client wrapper that forwards only `next`.
+from its own client component. Because `details.event` is virtual (section 2.2), the Server
+Function receives `(next, details)` with `event` absent and every serialisable field intact;
+no wrapper is needed.
 
 ### 7.2 Build: unbundled, directive-preserving
 
@@ -1042,12 +1072,11 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 12. **All Accordion parts are client modules** (section 7.3). Server Components render them and
     the native toggle works before hydration; directive-free variants are a later concern (#19).
 
+13. **`details.event` is a virtual Proxy-served property** (raised by the Toggle design, #6;
+    resolved by research #17, `docs/research/server-function-action-props.md`, option (e), see
+    section 2.2). Server Functions may be passed directly to any action prop; the thin client
+    wrapper is optional.
+
 ## Open questions
 
-1. **Server Functions as actions and `details.event`** (raised by the Toggle design, #6; research
-   tracked as #17, `docs/research/server-function-action-props.md`). A Server Function receiving
-   `(next, details)` would serialise a DOM `Event`. Options: (a) document a thin client wrapper
-   forwarding only `next` as the supported shape (v0 interim, section 2.2); (b) make `event` a
-   non-enumerable property so the reply serialiser skips it, at the cost of a subtle object;
-   (c) detect server references and pass `(next)` only, which public APIs do not allow. Decision
-   waits for #17; `details` is not redesigned before then.
+None at present.
