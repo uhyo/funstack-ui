@@ -1,13 +1,14 @@
-import { VERSION } from "@funstack/ui";
+import { ToggleDemo } from "./toggle-demo";
 
 export function App() {
   return (
     <main>
       <h1>FUNSTACK UI Playground</h1>
       <p>
-        <code>@funstack/ui</code> version <code>{VERSION}</code>. Components will show up here as
-        they are implemented.
+        Each demo below exercises one component of <code>@funstack/ui</code>. Open the console to
+        follow the fake backend calls.
       </p>
+      <ToggleDemo />
     </main>
   );
 }

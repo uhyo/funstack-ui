@@ -1,0 +1,126 @@
+/* Toggle demo: data attributes are the styling hook; interaction state comes from pseudo-classes. */
+
+.demo section {
+  margin-block: 1.5rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.4em 0.9em;
+  border: 1px solid #888;
+  border-radius: 999px;
+  background: white;
+  color: #222;
+  font: inherit;
+  cursor: pointer;
+  /* The optimistic flip is a sync commit: animate it with a plain CSS transition. */
+  transition:
+    background-color 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+.chip[data-pressed] {
+  background: #c2410c;
+  border-color: #c2410c;
+  color: white;
+}
+
+.chip[data-pending] {
+  cursor: progress;
+  opacity: 0.8;
+}
+
+.chip[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Platform pseudo-classes, not data attributes, for interaction state. */
+.chip:hover:not([data-disabled]) {
+  filter: brightness(1.08);
+}
+.chip:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.chip:active:not([data-disabled]) {
+  transform: scale(0.97);
+}
+
+.star {
+  inline-size: 1.2em;
+  text-align: center;
+}
+
+.spinner {
+  inline-size: 1em;
+  block-size: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.readout {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.inline-error {
+  color: #b91c1c;
+}
+
+.error-box {
+  padding: 0.75rem 1rem;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+/* View transition for the commit that ends an action (`transition="fsui-fade"`). */
+::view-transition-old(.fsui-fade) {
+  animation: 160ms ease-in both fade-out;
+}
+::view-transition-new(.fsui-fade) {
+  animation: 160ms ease-out both fade-in;
+}
+:root:active-view-transition-type(fsui-toggle-press) ::view-transition-new(.fsui-fade) {
+  animation-name: pop-in;
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
