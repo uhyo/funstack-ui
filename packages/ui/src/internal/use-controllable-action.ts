@@ -19,8 +19,11 @@ export interface UseControllableActionOptions<T, Details extends ActionDetails> 
   initialValue: T;
   /** The `xChangeAction` prop. Awaited inside this hook's transition. */
   action: ChangeAction<T, Details> | undefined;
-  /** View Transition types to attach to the commit that ends a dispatch. */
-  transitionTypes?: (next: T, prev: T) => readonly string[];
+  /**
+   * View Transition types to attach to the commit that ends a dispatch. Receives the previous
+   * committed value and the details object (Tabs derives next/prev direction from them).
+   */
+  transitionTypes?: (next: T, prev: T, details: Details) => readonly string[];
   /** Names used in development warnings. */
   warn?: { readonly component: string; readonly prop: string };
 }
@@ -67,7 +70,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
     const prev = committed;
     const id = ++latest.current;
     startOwnTransition(async () => {
-      for (const type of transitionTypes?.(next, prev) ?? []) addTransitionType(type);
+      for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
       setOptimistic(next);
       await action?.(next, details);
       if (!isControlled && id === latest.current) {
