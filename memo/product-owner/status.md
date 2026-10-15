@@ -22,3 +22,6 @@
 - Questions batched for user: (none yet)
 - #17 resolved: details.event served via Proxy (virtual, non-own) so Server Functions can be passed directly. Decided autonomously.
 - Questions batched for user: (1) confirm the Proxy-based details.event design (alternative: no event in details at all, React-action style; or plain {event} that only works accidentally via temporaryReferences).
+- Toggle (#10) implemented & pushed (ed6a1e2..589150b), 50 tests. CI was red on format (design/*.md) → fixed ignore globs (f67f405), gitignored .claude/worktrees.
+- Running: review-toggle (reviewer), impl-accordion (#12, worktree), infra-browser-mode (#18, worktree).
+- Lesson: never run `pnpm format` at root while agent worktrees exist under .claude/worktrees (it reformatted the worktree's docs; reverted).
