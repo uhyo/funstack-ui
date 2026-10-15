@@ -256,6 +256,10 @@ What a consumer can rely on:
 6. **Disabled parts never dispatch.** A disabled Tab does not call `valueChangeAction`.
 7. **No-op interactions do not dispatch** unless the component says otherwise (clicking the
    already-selected Tab calls nothing).
+8. **Parts are never natively disabled while pending.** Latest-dispatch-wins already handles
+   repeated interaction, and a natively disabled button drops keyboard focus. Consumers who want
+   to block input during pending use CSS (`[data-pending] { pointer-events: none }`) or
+   `aria-busy` via `render`. (Product-owner decision, 2026-10-15.)
 
 ### 2.4 Errors
 
@@ -362,8 +366,10 @@ the fallback whenever the new panel loads data. Keying it off committed state ke
 visible, marks the tab `data-pending`, and swaps when the data is ready. That is the
 Suspense-native behaviour the vision asks for.
 
-Consequence to document on every trigger part: content rendered from a trigger's state (its
-`children` function) must not suspend, or must have its own Suspense boundary.
+Two consequences to document on every trigger part: content rendered from a trigger's state (its
+`children` function) must not suspend, or must have its own Suspense boundary; and the optimistic
+flip never gets a view transition (section 5.1), so trigger visuals animate with CSS transitions
+on the data attribute, not with the `transition` prop.
 
 ### 3.3 When uncontrolled state is committed
 
@@ -392,7 +398,7 @@ export function useControllableAction<T>(options: {
   controlled: T | undefined;
   defaultValue: T;
   action: ChangeAction<T> | undefined;
-  transitionType?: (next: T, prev: T) => string | undefined;
+  transitionTypes?: (next: T, prev: T) => readonly string[];
 }) {
   const [internal, setInternal] = useState(options.defaultValue);
   const isControlled = options.controlled !== undefined;
@@ -405,8 +411,7 @@ export function useControllableAction<T>(options: {
     const prev = committed;
     const id = ++latest.current;
     startOwnTransition(async () => {
-      const type = options.transitionType?.(next, prev);
-      if (type !== undefined) addTransitionType(type);
+      for (const type of options.transitionTypes?.(next, prev) ?? []) addTransitionType(type);
       setOptimistic(next);
       await options.action?.(next, details);
       if (!isControlled && id === latest.current) {
@@ -487,9 +492,12 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
 their value. Negative pairs (`data-closed`, `data-unchecked`) are not emitted; use `:not([data-open])`.
+React stringifies a boolean `true` on `data-*` attributes as `"true"`, so the value must be `""`
+(never `pending || undefined`); the internal `dataAttr(flag)` helper is the only place this is
+spelled out.
 
 ```tsx
-<button data-pending={pending || undefined} data-selected={selected || undefined}>
+<button data-pending={pending ? "" : undefined} data-selected={selected ? "" : undefined}>
 ```
 
 ```css
@@ -542,8 +550,14 @@ return (
 );
 ```
 
-Because library state changes are transitions, the optimistic feedback, the eventual commit, and a
-rollback all animate through the same boundary with no extra code.
+Because library state changes are transitions, the commit that ends the action and any rollback
+animate through this boundary with no extra code. **The optimistic commit does not animate**: it
+is a sync-lane render, and react-dom starts a view transition only when every committed lane is a
+transition, retry or idle lane (verified on 19.3.1; see `design/components/toggle.md` section 7.2).
+So a trigger's own flip (`data-pressed`, `data-selected`, a `Tabs.Indicator` keyed on optimistic
+selection) is a CSS `transition` job on the attribute change, while `<ViewTransition>` is for what
+changes when the action settles: content keyed on committed state, the pending indicator leaving,
+a snap-back.
 
 ### 5.2 Consumer API: the `transition` prop
 
@@ -584,6 +598,12 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
 prefix are collected into the same transition.
+
+Types are attached only to the commit that ends a dispatched action. A controlled snap-back (the
+parent did not adopt the value) and a boundary swap after a rejection carry **no** `fsui-*` types,
+so a type-map `transition` needs a `default` entry if rollbacks should animate; with
+`default: "none"` they do not. Overlapping dispatches contribute all of their types to the single
+commit that ends them.
 
 ### 5.4 Reduced motion
 
@@ -654,7 +674,10 @@ src/accordion/
 A Server Component may render any part: the namespace object is a plain object of client
 references. It may pass only serializable props, so **a Server Component cannot pass a plain
 function as an action**; it passes a Server Function (`"use server"`) or renders the component
-from its own client component. Component docs state this.
+from its own client component. Component docs state this. Note that the `(next, details)`
+signature puts a DOM `Event` into `details`, which a Server Function call would try to serialise;
+how actions reach Server Functions is an open question below, and until it is settled the
+documented shape is a thin client wrapper that forwards only `next`.
 
 ### 7.2 Build: unbundled, directive-preserving
 
@@ -918,3 +941,12 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 6. **Transition entanglement**: being re-verified by the React researcher and recorded in
    `docs/research/react-async-apis.md`. Guidance "await only what the UI must wait for" stands.
 7. **No hover/focus data attributes**; consumers use CSS pseudo-classes.
+
+## Open questions
+
+1. **Server Functions as actions and `details.event`** (raised by the Toggle design, #6). A Server
+   Function receiving `(next, details)` would serialise a DOM `Event`. Options: (a) document a thin
+   client wrapper forwarding only `next` as the supported shape (current stance); (b) make `event`
+   a non-enumerable property so the reply serialiser skips it, at the cost of a subtle object;
+   (c) detect server references and pass `(next)` only, which public APIs do not allow. Needs a
+   probe with a Flight client before deciding; (a) is safe for v0.
