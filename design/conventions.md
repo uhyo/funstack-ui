@@ -102,10 +102,15 @@ Rules for the element passed to `render` (same as Base UI):
 - `className`: the library's and the element's are concatenated. `style`: merged, element wins.
 - Event handlers the library installs (for example `onClick` on a `Tab`): both run, the element's
   first, then the library's. v0 provides no way to cancel the library's handler from there.
-- Library-controlled attributes (`role`, `aria-*` state, `id` wiring, `data-*` state) win over the
-  element's, with one carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`,
-  `aria-controls`, `aria-owns`) are **merged as token lists**, the element's tokens first, so a
-  trigger can be described by more than its tooltip. Everything else, the element wins.
+- Library-controlled attributes (`role`, `aria-*` *state* the part computes such as
+  `aria-pressed` / `aria-selected`, `id` wiring, `data-*` state) win over the element's, with one
+  carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`, `aria-controls`,
+  `aria-owns`) are **merged as token lists**, the element's tokens first, so a trigger can be
+  described by more than its tooltip. **Everything else, the element wins**, including `aria-*`
+  and `data-*` props that merely pass through the part from its own props: a `render` element's
+  `aria-label` beats `<Tabs.Tab aria-label>`; only attributes the part itself computes are
+  library-controlled. Merge order is therefore: part pass-through props, then the `render`
+  element's props, then library-controlled attributes on top.
 
 Rejected alternatives:
 
@@ -197,7 +202,7 @@ Every component has **no `on*` props of its own**. The library never names a pro
 // packages/ui/src/internal/types.ts (re-exported from the root entry)
 
 /** A callback the library runs inside a Transition. May be sync or async. */
-export type Action<Args extends readonly unknown[] = []> = (...args: Args) => void | Promise<void>;
+export type Action<Args extends readonly unknown[] = []> = (...args: Args) => unknown;
 
 export interface ActionDetails {
   /** The DOM event that caused the action, or undefined for programmatic changes. */
@@ -217,7 +222,10 @@ common case stays short:
 <Tabs.Root valueChangeAction={setTab}>...</Tabs.Root>
 ```
 
-Return values are ignored; only the promise is awaited. v0 has no `cancel()` on `details`.
+The return type is `unknown`, not `void | Promise<void>`: TypeScript's void-return leniency does
+not apply to unions, so `(next) => save(next)` with `save` returning `Promise<Response>` would be
+a type error, and Server Functions usually return data. The library `await`s whatever comes back
+(a thenable is awaited; anything else is ignored). v0 has no `cancel()` on `details`.
 
 **`details` is serialisable; `event` is virtual.** Decided from issue #17
 (`docs/research/server-function-action-props.md`): React's reply serialiser rejects a DOM `Event`
@@ -231,7 +239,7 @@ cannot be detected on the client. So:
 2. `event` is a **virtual, non-own property** served by a `Proxy` `get`/`has` trap. The internal
    helper `createActionDetails(event, fields)` is the only way the library builds `details`:
    ```ts
-   // packages/ui/src/internal/action-details.ts ("use client")
+   // packages/ui/src/internal/action-details.ts (directive-free: no client-only API, section 7.1)
    export function createActionDetails<T extends object>(event: Event | undefined, fields: T): T & ActionDetails {
      return new Proxy(fields, {
        get: (target, key, receiver) => (key === "event" ? event : Reflect.get(target, key, receiver)),
@@ -259,9 +267,14 @@ import { setFavorite } from "./actions"; // "use server"; (id, next, details) =>
 
 Costs, documented wherever `details` is: devtools shows `Proxy(Object) { reason: "click" }`
 without `event`; `expect(details).toEqual({ event })` fails, so tests assert `details.event`
-directly; `structuredClone(details)` throws `DataCloneError`; the Proxy target must stay
-extensible (readonly-ness comes from the type, never `Object.freeze`); and the library must not
-rely on Next.js's unused-argument omission, which is bundler-specific.
+directly; `structuredClone(details)` throws `DataCloneError`; and the library must not rely on
+Next.js's unused-argument omission, which is bundler-specific. The target should stay an
+extensible plain object (readonly-ness comes from the type, not `Object.freeze`); this is a
+recommendation, not an invariant: a frozen target still answers `"event" in details` with `true`
+(verified), because the Proxy invariants only constrain `has` returning `false` for
+non-configurable properties and the `getOwnPropertyDescriptor` / `ownKeys` traps. The helper also
+installs `set` and `defineProperty` traps that reject `"event"`, so `details.event = x` cannot
+create an own enumerable property that would then be serialised.
 
 ### 2.3 Execution contract
 
@@ -313,9 +326,26 @@ What a consumer can rely on:
 
 ### 2.4 Errors
 
-An action that throws or rejects propagates to the **nearest Error Boundary above the library
-component that owns the transition** (the `Root`, or the component itself). The library does not
-catch, log, or swallow. There is no `errorAction` prop in v0.
+An action that throws or rejects reaches the **nearest Error Boundary above the library
+component that owns the transition** (the `Root`, or the component itself). The library never
+swallows an error. There is no `errorAction` prop in v0.
+
+React alone does not guarantee this when dispatches overlap. `useTransition` stores one thenable
+per `startTransition` call as a state update and only the newest is ever unwrapped, so an older
+action's rejection is dropped entirely: no boundary, no `reportError`, no `unhandledrejection`
+(verified by the reviewer on 19.3.1, both resolution orders, both modes). The library closes that
+gap (product-owner decision): the shared hook attaches a rejection handler to every dispatch it
+is not the latest for, stores the first such error in state, and **throws it from render** on the
+next commit, so a superseded action's failure reaches the same nearest boundary as a latest one.
+Contract:
+
+- The latest dispatch's rejection propagates through React's own path (nothing is caught).
+- A superseded dispatch's rejection is caught by the hook, stored, and rethrown from render inside
+  a transition-free update so the boundary sees it on the next render of the owner.
+- Only the first superseded error is kept; later ones are reported through `reportError` to avoid
+  a cascade of boundary resets. Which error wins when both the latest and a superseded dispatch
+  reject is not defined.
+- A consumer who catches inside the action is unaffected, as before.
 
 Optimistic state reverts automatically. Uncontrolled committed state is written only after the
 action resolves, so a rejected action leaves it untouched (section 3.3). A controlled parent gets
@@ -348,7 +378,8 @@ React neither cancels nor orders overlapping actions. The library's stance:
 - **Single-shot components (Toggle, Tabs, Accordion): latest intent wins.** The optimistic reducer
   already shows the most recent dispatch; the library commits uncontrolled state only for the most
   recently dispatched action, ignoring earlier ones that resolve later. (Verified: without this
-  guard the slowest promise wins.)
+  guard the slowest promise wins.) An earlier action's *rejection* is not ignored: the hook
+  surfaces it to the boundary itself, because React would drop it (section 2.4).
 - **No queueing in the library.** Components that need ordered, result-threaded actions (forms,
   counters) use `useActionState` internally and document that. None of the initial four do.
 - Consumers who need abort semantics implement them in the action (`AbortController` captured in
@@ -461,6 +492,8 @@ export function useControllableAction<T>(options: {
   const [optimistic, setOptimistic] = useOptimistic(committed, (_prev: T, next: T) => next);
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
+  const [supersededError, setSupersededError] = useState<unknown>(undefined);
+  if (supersededError !== undefined) throw supersededError; // reaches the same boundary
 
   function dispatch(next: T, details: ActionDetails): void {
     const prev = committed;
@@ -468,7 +501,13 @@ export function useControllableAction<T>(options: {
     startOwnTransition(async () => {
       for (const type of options.transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
       setOptimistic(next);
-      await options.action?.(next, details);
+      try {
+        await options.action?.(next, details);
+      } catch (error) {
+        if (id === latest.current) throw error;   // React routes the latest dispatch's error
+        setSupersededError((prev) => prev ?? error); // React would drop this one (section 2.4)
+        return;
+      }
       if (!isControlled && id === latest.current) {
         startTransition(() => setInternal(next));
       }
@@ -1013,6 +1052,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Async action (both) | While the promise is unresolved: `data-pending` on owner and trigger, optimistic state on the trigger, committed state unchanged on content. After resolve: `data-pending` gone, content updated. |
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
 | Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled). |
+| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. |
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |

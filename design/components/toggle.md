@@ -23,7 +23,7 @@ called out.
 | 3 | What the element shows | Optimistic `pressed` (Toggle is both owner and trigger). `pending` from the component's own `useTransition`. No committed value is exposed on the element. |
 | 4 | Next value | `next = !optimistic`, not `!committed`, so a second click while pending reverses the first (verified). |
 | 5 | Disabled while pending | **No.** The button stays enabled; repeated clicks are latest-wins. Consumers who want it use `render` or CSS (section 6.6). |
-| 6 | Errors | Propagate to the nearest Error Boundary above the `Toggle`. Optimistic state reverts; uncontrolled committed state untouched. |
+| 6 | Errors | Reach the nearest Error Boundary above the `Toggle`; for a superseded (non-latest) dispatch the shared hook rethrows from render because React would drop it (conventions 2.4). Optimistic state reverts; uncontrolled committed state untouched. |
 | 7 | ViewTransition | `<ViewTransition default={transition ?? "none"}>` outermost; types `fsui-toggle` plus `fsui-toggle-press` / `fsui-toggle-release`. It animates the *settling* of an action and rollbacks, **not the optimistic flip** (section 7, verified). |
 | 8 | ARIA | `aria-pressed="true" \| "false"` only; never `"mixed"`. Native Space/Enter. Accessible name must stay stable across states. |
 | 9 | Forms | `type="button"` always; no `name`/`value` submission in v0. |
@@ -276,7 +276,8 @@ Notes on the omissions from the native prop set:
 
 Everything else on `<button>` passes through: `id`, `aria-label`, `aria-labelledby`,
 `aria-describedby`, `form`, `name`, `autoFocus`, `title`, `onPointerDown`, `onKeyDown`,
-`commandfor`/`command` (lowercase, typed via the platform augmentation), and so on. `ref` is an
+`commandfor`/`command` (lowercase; a type error until the platform augmentation file lands with
+Tooltip, conventions 7.4), and so on. `ref` is an
 ordinary prop attached to the `<button>` and merged with the library's internal ref.
 
 `pressed` and `defaultPressed` both set, or `pressed` flipping between `undefined` and a boolean
@@ -464,6 +465,13 @@ Verified in both resolution orders. Properties:
   an `AbortController` held in a ref inside the action (conventions 2.5).
 - Both dispatches' transition types are collected into the one final commit
   (`fsui-toggle`, `fsui-toggle-press`, `fsui-toggle-release` all present).
+- **If action 1 rejects**, React drops the rejection: `useTransition` keeps only the newest
+  thenable, so nothing reaches a boundary, `reportError` or `unhandledrejection` (verified by the
+  reviewer, both orders, both modes). The shared hook catches rejections of non-latest dispatches,
+  stores the first, and throws it from render so it reaches the boundary above the Toggle exactly
+  as a latest-dispatch rejection would (conventions 2.4). Action 2's outcome is unaffected: if it
+  resolved, `false` was committed and then the boundary fallback replaces the Toggle; if it is still
+  pending, the boundary fallback appears while it is in flight.
 
 ### 6.6 Decision: not disabled while pending
 
@@ -625,7 +633,7 @@ are on the DOM only.
 | --- | --- | --- |
 | 1 | Roles and ARIA | Renders `<button type="button">` with `aria-pressed="false"`; `defaultPressed` gives `"true"`; `aria-pressed` is never `"mixed"` or absent. |
 | 2 | Roles and ARIA | `data-pressed`, `data-pending`, `data-disabled` are absent when false and `""` when true; `disabled` renders the native attribute and `data-disabled`. |
-| 3 | Roles and ARIA | Native pass-through: `aria-label`, `id`, `form`, `onPointerDown` land on the button; `type` cannot be overridden through props (type-level test). |
+| 3 | Roles and ARIA | Native pass-through: `aria-label`, `id`, `form`, `onPointerDown` land on the button; `type="submit"` and `aria-pressed="mixed"` passed through props are overridden at runtime (the library spreads its own attributes last). No type-level test: TypeScript skips excess-property checks for hyphenated JSX attributes, so `Omit` cannot exclude `aria-pressed`; the runtime override is the guarantee. |
 | 4 | Keyboard | Focus the button, press Space: dispatches once with `next === true`. Press Enter: dispatches again with `false`. `details.event.type === "click"`. |
 | 5 | Keyboard | Disabled button is not in the tab order and Space/Enter do not dispatch. |
 | 6 | Sync action (both) | Click calls `pressedChangeAction` once with `(true, details)`; `details.event` is the native event (`instanceof window.Event`, asserted via `details.event`, never `toEqual`); after `act`, `aria-pressed="true"` and no `data-pending`. Second click dispatches `false`. |
@@ -635,6 +643,8 @@ are on the DOM only.
 | 10 | Rejection (both) | Caught-inside variant: action resolves; uncontrolled commits `true`; the controlled "veto" wrapper ends with `aria-pressed="false"` and no `data-pending`. |
 | 11 | Overlap | Two clicks with two deferreds; action receives `true` then `false`; during flight `aria-pressed="false"` and pending. Resolve 2 then 1: final `"false"`, not pending. Repeat resolving 1 then 2: same final state. |
 | 12 | Overlap | After resolving only the second of two deferreds, `data-pending` is still present (pending covers all in-flight actions). |
+| 12a | Superseded rejection (both) | Two clicks, two deferreds. Resolve 2, then reject 1: `<ErrorCatcher>` records the error (React alone would drop it) and the wrapper's committed value is `false`. |
+| 12b | Superseded rejection (both) | Two clicks; reject 1 while 2 is still pending: the catcher records the error; resolving 2 afterwards does not throw again or change the recorded error. |
 | 13 | Suspending content (both) | Wrapper renders `<Suspender key={value}>` under a `<Suspense fallback>` above the Toggle. Click: old content stays, fallback not shown, `data-pending` on. Resolve the suspender: new content, pending gone. |
 | 14 | Function props | `className`, `style`, `children` each receive `{ pressed, pending, disabled }`; while a deferred action is pending they see `pressed: true, pending: true` and the attributes agree. |
 | 15 | `render` element | `render={<MyButton className="x" style={{ color: "red" }} />}` renders MyButton's button, merges class (`"x"` plus the Toggle's), keeps the element's style, forwards `ref` to the real `<button>`, and clicking still dispatches. |

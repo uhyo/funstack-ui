@@ -187,8 +187,13 @@ depending on an undocumented framework behaviour and on the Server Function neve
 
 ## 6. Caveats
 
-- The Proxy must target an **extensible** plain object. A frozen target breaks the `has` trap
-  invariant for `event`. Readonly-ness comes from the TypeScript type, not `Object.freeze`.
+- The Proxy should target an **extensible** plain object; readonly-ness comes from the
+  TypeScript type, not `Object.freeze`. Correction (2026-10-16, reviewer probe): a frozen target
+  does **not** break the `has` trap for `event` (`"event" in frozenDetails` is `true`, no throw).
+  The Proxy invariants only constrain `has` returning `false` for non-configurable properties and
+  the `getOwnPropertyDescriptor` / `ownKeys` traps. Without `set` / `defineProperty` traps,
+  `details.event = x` would create an own enumerable `event` that then serialises, so the library
+  helper adds both traps rejecting `"event"`.
 - If a future react-server-dom version inspected `[[Get]]` for non-own keys the rule would
   change; `JSON.stringify` semantics (own enumerable keys only) are spec-stable, and the dev
   checks only use `getOwnPropertyNames` / `getOwnPropertySymbols`, so this is low risk.
