@@ -16,7 +16,7 @@ find-in-page, `interpolate-size`, `@starting-style`), probes in `memo/architect/
 | 3 | Value type | Discriminated on `exclusive`: `exclusive` → `string \| null`; otherwise `string[]`. |
 | 4 | Pending UI | Trigger and Item: `data-open` (optimistic) and `data-pending`. The `<details open>` attribute, `:open`, `::details-content` and the native marker follow committed state. Consumers draw their own chevron from `data-open`. |
 | 5 | Platform-initiated opens | Find-in-page and text fragments open a closed `<details>` natively in all engines. Library mode listens to `toggle`, dispatches `valueChangeAction` with `reason: "platform"`, and re-applies committed state to the DOM once the action settles. No `hidden="until-found"` needed. |
-| 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item, Trigger and Panel in library mode for layout/cross-fade of the whole list; not both on the same change. `experimental_interpolateSize` on Root. |
+| 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item, Trigger and Panel in library mode, animating only the settling commit (layout/cross-fade of the whole list); the optimistic `data-open` flip is a CSS transition; not both on the same change. No `keepMounted`: `<details>` keeps content mounted and auto-opens on find-in-page natively. `experimental_interpolateSize` on Root. |
 | 7 | Keyboard | Enter/Space native on `<summary>`. Up/Down/Home/End between triggers is implemented by Root in both modes (APG: optional; we ship it). No `focusgroup` flag (it would collapse the Tab stops). |
 | 8 | RSC | All four parts are `"use client"` files (Flight cannot read context in a Server Component, see notes). A Server Component renders them freely; JS-free mode needs no interaction JS, works before hydration and with JS off, but the parts' code is in the client bundle. This contradicts the conventions' sketch of a directive-free `accordion-static.tsx`; escalated. |
 
@@ -438,6 +438,15 @@ That is the point of the primitive: closed answers are server-rendered, indexabl
 find-in-page. So **Panel children are always mounted** and the library adds no `<Activity>` or
 unmount prop in v0.
 
+No `keepMounted` prop, deliberately. Tabs offers `keepMounted: boolean | "until-found"` because a
+`tabpanel` is a plain `div` that the library must hide, and `hidden="until-found"` needs the
+shared `use-until-found.ts` hook (ref-based attribute upgrade plus a `beforematch` listener) to
+keep find-in-page working. `<details>` gives both halves natively: closed content is kept in the
+DOM under `content-visibility: hidden`, and the browser opens the item itself on a find-in-page
+match (then fires `toggle`, section 2.3). The until-found hook is therefore moot here, and the
+`"always mounted"` default is the only mode. Should a future need for `<Activity>`-style
+unmounting appear, the prop must reuse the Tabs shape and name.
+
 The Suspense-native path is the Panel's function form on committed state:
 
 ```tsx
@@ -603,6 +612,22 @@ the `<summary>`, the Panel's wraps its `<div>`; none of them adds DOM, so the su
 first child of the details). Transition types per the conventions: `fsui-accordion`,
 `fsui-accordion-expand`, `fsui-accordion-collapse`.
 
+**Only the settling commit animates** (conventions 5.1). The optimistic flip of `data-open` on
+Trigger and Item is a sync-lane commit and never starts a view transition, on click or on
+rollback; it is a CSS job:
+
+```css
+.trigger::after { transition: rotate 150ms; }
+.trigger[data-open]::after { rotate: 90deg; }
+```
+
+What `<ViewTransition>` sees is the transition-lane commit that ends the action: the `open`
+attribute flip on the Item (Item boundary: `update`, the box grows or shrinks), the Panel content
+that mounts or changes in that commit (Panel boundary), and `pending` leaving on the Trigger.
+So `transition` on the Trigger animates only the end of the action (a spinner rendered from
+`pending` disappearing); it is kept for parity with Toggle and documented as such, not as the
+chevron animation.
+
 ```tsx
 <Accordion.Item value="a" transition="fsui-grow">
 ```
@@ -620,8 +645,8 @@ What `<ViewTransition>` adds over the CSS in 8.1, and when to use which:
   default recommendation.
 - `transition` on Items animates **each item's box as a whole**, so the items below the opening one
   slide instead of jumping, and (exclusive mode) the closing and opening items animate in the same
-  snapshot. A rollback after a rejected action animates back through the same boundary. CSS cannot
-  move siblings.
+  snapshot. CSS cannot move siblings. (A rejected action has nothing to animate at the Item level:
+  the `open` attribute never changed; only the Trigger's `data-open` snaps back, by CSS.)
 - Do not combine both for the same change: the ViewTransition snapshots the "new" state at the
   moment the attribute flips, which is the start of the CSS transition, so the panel would appear
   collapsed in the new snapshot and then pop. Either `::details-content` transitions **or**
@@ -642,8 +667,10 @@ Setup: exclusive, uncontrolled, `defaultValue={null}`, `valueChangeAction={async
 1. **Action resolves.** Click A → `preventDefault` → dispatch: types added, optimistic `{a}`,
    `save("a")` awaited. Same tick: A's Trigger/Item get `data-open` + `data-pending`, Root
    `data-pending`; `<details>` still closed. Resolve → `startTransition(() => setInternal("a"))`
-   → commit: `open` attribute set, `::details-content` CSS transition runs (or the ViewTransition
-   animates), `data-pending` gone, Panel `state.open` true.
+   → commit: `open` attribute set, `::details-content` CSS transition runs (or, with `transition`
+   on the Item, this transition-lane commit is the one the ViewTransition animates), `data-pending`
+   gone, Panel `state.open` true. The earlier `data-open` flip on the Trigger was a sync-lane
+   commit: CSS only.
 2. **Action rejects.** Same as 1 until the rejection. The error propagates to the Error Boundary
    nearest the Root; optimistic `{a}` reverts; `setInternal` never ran; the `<details>` never
    opened, so there is no DOM to roll back. Caught-inside variant: resolves, commits `"a"`.
@@ -784,6 +811,7 @@ and controlled wrappers (controlled follows update-on-success). Library mode unl
 | Directive | Every file under `src/accordion/` except `index.ts` begins with `"use client"` (there is no directive-free part; see Conventions feedback). |
 | Platform path | `details.setAttribute("open", "")` (jsdom fires `toggle`) dispatches with `reason: "platform"`; controlled parent that ignores it → attribute removed after settle; parent that accepts → stays open; walkthrough 9.6; disabled item re-closes without dispatching. |
 | Mode guard | Changing Root from JS-free to library mode after mount warns. |
+| `transition` smoke | Item, Trigger and Panel render with and without `transition`; JS-free mode warns. Animation itself is an example-app check (jsdom has no `startViewTransition`). |
 
 jsdom facts the tests rely on (verified against jsdom 29.1.1, the version `packages/ui` resolves
 today; the manifest asks for `^30.1.3`, re-check after the lockfile moves):
