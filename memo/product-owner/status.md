@@ -25,3 +25,4 @@
 - Toggle (#10) implemented & pushed (ed6a1e2..589150b), 50 tests. CI was red on format (design/*.md) → fixed ignore globs (f67f405), gitignored .claude/worktrees.
 - Running: review-toggle (reviewer), impl-accordion (#12, worktree), infra-browser-mode (#18, worktree).
 - Lesson: never run `pnpm format` at root while agent worktrees exist under .claude/worktrees (it reformatted the worktree's docs; reverted).
+- Toggle review: acceptable w/ minor fixes. Notable: (a) Action return type must be `unknown`; (b) React swallows a superseded overlapping action's rejection → PO decision: hook stores & rethrows from render; (c) merge-props had element/pass-through precedence backwards. Fixes dispatched to impl-toggle; doc fixes to architect.
