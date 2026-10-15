@@ -19,6 +19,14 @@ release note.
    `use()` fetch starts early.
 4. `csstype` 3.2.3 (installed) types `anchorName` and `positionAnchor`, so the Indicator's inline
    styles need no augmentation.
+5. **Optimistic Indicator never gets a view transition** (`memo/architect/probes/tabs-indicator-viewtransition.mjs`,
+   same `startViewTransition` stub as the lead's Toggle probe). Indicator keyed on `optimistic`:
+   `position-anchor` changed on click with `vt=0`; one `startViewTransition` on settle, touching
+   only `data-pending`. Keyed on `useDeferredValue(optimistic)`: identical, the deferred render
+   also committed without a view transition while the action was pending. Sync action: no view
+   transition at all because the settle commit changed nothing inside the boundary. Conclusion:
+   Indicator slides via CSS `transition` on anchored insets (Blink/WebKit interpolate `anchor()`,
+   Gecko does not per the popover research), and has no `transition` prop.
 
 ## Decisions I went back and forth on
 
@@ -37,8 +45,9 @@ release note.
 - **Panel registry for `aria-controls`.** Rejected; dangling `aria-controls` is harmless and a
   registry costs a render. Ids derive from `rootId + slug(value)`.
 - **Indicator positioning.** CSS Anchor Positioning (per-tab `anchor-name`, Indicator
-  `position-anchor`) plus ViewTransition `update` for the slide. No ResizeObserver. Anchor must
-  precede the positioned element in tree order, so Indicator goes last in List.
+  `position-anchor`) plus a CSS `transition` on the insets for the slide (ViewTransition was the
+  first draft; dropped after probe 5). No ResizeObserver, no Gecko fallback. Anchor must precede
+  the positioned element in tree order, so Indicator goes last in List.
 - **`keepMounted` shape.** `boolean | "until-found"` rather than a three-value enum
   (`inactive="unmount" | "hidden" | "until-found"`). Boolean reads best for the common case and
   the conventions already use the word. Flagged as a naming choice in the report.

@@ -25,7 +25,7 @@ conventions' state model rather than being special-cased.
 | 6 | Keyboard | APG: orientation-aware arrows, Home/End, Tab into the panel. Roving `tabindex` derived from optimistic selection (no focus-tracking state). `experimental_focusgroup` on `List` hands arrows to the browser where supported. |
 | 7 | Disabled tabs | Focusable (`aria-disabled`), reachable with arrows, never dispatch. |
 | 8 | Transition types | `fsui-tabs`, plus `fsui-tabs-next` / `fsui-tabs-prev` by DOM order relative to the committed tab. |
-| 9 | Indicator | Positioned by CSS Anchor Positioning (each Tab gets an `anchor-name`; the Indicator sets `position-anchor` to the optimistic tab). Slides via its own `<ViewTransition>` `update`. No measurement code. |
+| 9 | Indicator | Positioned by CSS Anchor Positioning (each Tab gets an `anchor-name`; the Indicator sets `position-anchor` to the optimistic tab). Slides via a plain CSS `transition` on the anchored insets, **not** `<ViewTransition>`: optimistic commits are sync and never start a view transition. No measurement code. |
 | 10 | No-op rule | A dispatch is skipped when the target equals the **optimistic** value, so clicking back to the committed tab while another selection is pending is a real dispatch (it cancels the intent). |
 
 ---
@@ -75,7 +75,8 @@ Rendered DOM for the example (ids come from `useId` on the Root; see section 8):
 | `Indicator` | `span` | none (`aria-hidden`) | **optimistic** value | Optional. Must come after the Tabs inside `List`. |
 
 Every part renders exactly one element (or nothing), with `<ViewTransition>` as the outermost node
-where the conventions require it (`Tab`, `Panel`, `Indicator`).
+on `Panel` and `Tab`. `Indicator` has none: it changes only in optimistic (sync) commits, which do
+not start view transitions (section 10.1), so it animates with CSS transitions instead.
 
 ## 2. States
 
@@ -193,7 +194,10 @@ export interface TabsTabProps
   value: string;
   /** Focusable but inert: `aria-disabled="true"`, never dispatches. */
   disabled?: boolean;
-  /** Forwarded to the Tab's `<ViewTransition default>`. Default "none". */
+  /**
+   * Forwarded to the Tab's `<ViewTransition default>`. Default "none". Fires only on the commit
+   * that settles the action (or rolls it back), never on the optimistic click (section 10.1).
+   */
   transition?: TransitionProp;
   className?: StateValue<string | undefined, TabsTabState>;
   style?: StateValue<CSSProperties | undefined, TabsTabState>;
@@ -253,8 +257,6 @@ export interface TabsIndicatorState {
 
 export interface TabsIndicatorProps
   extends Omit<ComponentPropsWithRef<"span">, "hidden" | "className" | "style" | "children"> {
-  /** Forwarded to the Indicator's `<ViewTransition default>`. Default "none". */
-  transition?: TransitionProp;
   className?: StateValue<string | undefined, TabsIndicatorState>;
   style?: StateValue<CSSProperties | undefined, TabsIndicatorState>;
   children?: StateValue<ReactNode, TabsIndicatorState>;
@@ -554,19 +556,49 @@ special code.
 
 ## 10. ViewTransition
 
-### 10.1 Wiring
+### 10.1 What animates when
+
+Verified on React 19.3.1 (team lead's probe `memo/architect/probes/toggle-viewtransition-optimistic.mjs`,
+and `memo/architect/tabs-notes.md` probe 5): `useOptimistic` updates render on the sync lane, and
+react-dom calls `startViewTransition` only when every lane in the commit is a transition, retry or
+idle lane. So:
+
+| Commit | Lane | `<ViewTransition>` fires? | What changes in Tabs |
+| --- | --- | --- | --- |
+| Optimistic click / arrow press | sync | **No** | Tab `aria-selected`, `data-selected`, `data-pending`, `tabindex`; Indicator `position-anchor`; Root `data-pending` |
+| Action settles (success) | transition | Yes | Panel swap (exit + enter), `data-pending` removed; Indicator unchanged (already moved) |
+| Action rejects or parent vetoes (snap-back) | transition | Yes | Tab attributes revert, Indicator `position-anchor` reverts |
+| `value` prop changes from outside (controlled, in a transition) | transition | Yes | Everything |
+| Suspense reveal inside a panel | retry | Yes | Panel content |
+
+Consequences, stated so nobody is surprised:
+
+- **Panels animate through `<ViewTransition>`.** They render committed state, which only changes
+  in transition commits. The `transition` prop on `Panel` is the main consumer API.
+- **The Indicator animates through CSS transitions, not `<ViewTransition>`.** Its move happens in
+  the optimistic commit. A view transition would run only on snap-back, which would double-animate
+  against the CSS transition, so `Indicator` takes no `transition` prop and renders no boundary.
+- **`Tab` keeps a `<ViewTransition>` and a `transition` prop** for parity with Toggle, but it fires
+  only on the settle commit (a spinner in `children` disappearing) and on snap-back. Styling that
+  must react to the click uses CSS transitions on `[data-selected]` / `[data-pending]`.
+- `useDeferredValue(optimistic)` does not rescue the Indicator: probed, the deferred render also
+  commits without a view transition while an action is pending.
+
+### 10.2 Wiring
 
 - `Panel`: when rendered, `<ViewTransition default={transition ?? "none"}><div …/></ViewTransition>`.
   In the default (unmount) mode the whole boundary mounts and unmounts, so a switch is one
   `exit` and one `enter`. In `keepMounted` mode the boundary sits inside `<Activity>`, and the
   mode flip inside the library's transition yields the same `exit` / `enter`. In `"until-found"`
   mode the boundary persists and the attribute flip is an `update` on both panels.
-- `Indicator`: `<ViewTransition default={transition ?? "none"}><span …/></ViewTransition>`. The
-  `position-anchor` style change is a DOM mutation inside the boundary, so React fires `update`,
-  and the browser animates the group from the old tab's geometry to the new one. That is the
-  sliding indicator, with zero measurement code.
-- `Tab`: `<ViewTransition default={transition ?? "none"}><button …/></ViewTransition>` because its
-  children function can change content with `selected` / `pending`.
+- `Indicator`: a bare `<span>`. The `position-anchor` inline style follows the optimistic tab;
+  the consumer's CSS `transition` on `left` / `width` (or `top` / `height`) animates the move
+  because the anchored inset's used value changes. Blink and WebKit interpolate `anchor()` /
+  `anchor-size()` values (WPT `anchor-transition-default.html`); Gecko does not yet
+  (`docs/research/popover-anchor-tooltip.md`), so in Firefox the indicator jumps. That is a
+  missing animation, not a broken feature, and the library ships no JS measurement fallback.
+- `Tab`: `<ViewTransition default={transition ?? "none"}><button …/></ViewTransition>`; see 10.1
+  for when it fires.
 
 Types added per dispatch: `fsui-tabs`, and `fsui-tabs-next` or `fsui-tabs-prev` when both the
 committed tab and the target tab are in the DOM (compared with `compareDocumentPosition`). The
@@ -574,14 +606,14 @@ base for direction is the **committed** value because the panel is what the dire
 overlapping dispatches in opposite directions collect both types, and the consumer's type map
 should then list `"fsui-tabs-next"` first or map both to the same class.
 
-### 10.2 Consumer usage
+### 10.3 Consumer usage
 
 ```tsx
 <Tabs.Root defaultValue="general">
   <Tabs.List aria-label="Settings">
     <Tabs.Tab value="general">General</Tabs.Tab>
     <Tabs.Tab value="billing">Billing</Tabs.Tab>
-    <Tabs.Indicator transition="tabs-indicator" />
+    <Tabs.Indicator />
   </Tabs.List>
   <Tabs.Panel value="general" transition={{ "fsui-tabs-next": "slide-left", "fsui-tabs-prev": "slide-right", default: "fade" }}>…</Tabs.Panel>
   <Tabs.Panel value="billing" transition={{ "fsui-tabs-next": "slide-left", "fsui-tabs-prev": "slide-right", default: "fade" }}>…</Tabs.Panel>
@@ -589,7 +621,7 @@ should then list `"fsui-tabs-next"` first or map both to the same class.
 ```
 
 ```css
-/* Indicator: anchor positioning places it, the view transition slides it. */
+/* Indicator: anchor positioning places it, a CSS transition slides it (Blink, WebKit). */
 .list { position: relative; }
 .indicator {
   position: absolute;
@@ -598,8 +630,13 @@ should then list `"fsui-tabs-next"` first or map both to the same class.
   width: anchor-size(width);
   height: 2px;
   background: var(--accent);
+  transition: left 200ms ease-out, width 200ms ease-out;
 }
-::view-transition-group(.tabs-indicator) { animation-duration: 200ms; animation-timing-function: ease-out; }
+.indicator[data-pending] { animation: fsui-pulse 1s infinite; }
+
+/* Tab feedback on click is CSS too; the view transition only covers the settle commit. */
+.tab { transition: color 120ms; }
+.tab[data-selected] { color: var(--accent); }
 
 /* Panels: cross-fade by default, directional slide when the type says so. */
 ::view-transition-old(.fade) { animation: 120ms ease-in both fsui-fade-out; }
@@ -610,13 +647,14 @@ should then list `"fsui-tabs-next"` first or map both to the same class.
 
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .indicator, .tab { transition: none; }
 }
 ```
 
-Because optimistic feedback, commit and rollback are all transition commits, the Indicator
-animates forward on click and back on rejection through the same boundary. Panels never animate
-optimistically (they render committed state), so a rejected action produces no panel animation at
-all, which is the right outcome.
+On click the Indicator and Tab styling move at once through CSS transitions; on rejection the
+same CSS transitions carry them back. Panels never change optimistically (they render committed
+state), so a rejected action produces no panel animation at all, and a successful one produces
+exactly one exit/enter pair.
 
 The release-post pattern `<ViewTransition update="auto" default="none"><Suspense>` is the
 consumer's to use **inside** a panel when they key a boundary there: the fallback appears without
@@ -759,16 +797,17 @@ controlled wrapper.
 | Overlap | Dispatch b then c, resolve b last: optimistic shows c throughout, final committed is c. Section 9.4: dispatch b, then a (the committed one): panel a never leaves, final committed a. |
 | Suspending content (both) | Panel b renders `<Suspender />`. Select b: old panel stays, boundary above shows no fallback, `data-pending` on. Resolve: panel b shown, pending off. Keyed inner boundary variant: fallback shown at once, pending off. |
 | `keepMounted` | `true`: inactive panel present with `display: none`; child state survives a round trip; a suspending hidden panel does not block the visible one. `"until-found"`: inactive panel has `hidden="until-found"` after mount; dispatching `beforematch` on it selects the tab with `reason: "find"`; after a rejected action the attribute is re-asserted. |
-| Indicator | `hidden` when `value` is `null`; `position-anchor` style names the optimistic tab and moves before the action resolves; placed after the tabs. |
+| Indicator | `hidden` when `value` is `null`; `position-anchor` style names the optimistic tab and moves before the action resolves and reverts on rejection; renders no `view-transition-name`; placed after the tabs. |
 | Function props | `className`, `style`, `children`, `render` on every part receive the documented state; attributes agree (Tab `selected` optimistic, Panel `selected` committed). |
 | `render` element | Tab as `<a>`: role and aria win, `className` concatenated, Space selects, `ref` forwarded. Panel and Indicator with custom elements. |
 | Post-await rule | Controlled wrapper that awaits then `startTransition(setTab)` works end to end. |
-| `transition` prop | Each part renders with and without `transition` (jsdom has no `startViewTransition`). |
+| `transition` prop | `Tab` and `Panel` render with and without `transition` (jsdom has no `startViewTransition`); `Indicator` has no such prop. |
 | `experimental_focusgroup` | Attribute rendered with the expected tokens for each orientation and `loop`; JS arrows still work in jsdom (no `focusgroup` in prototype). |
 | Directive | Built `dist/tabs/*.mjs` for Root, List, Tab, Panel, Indicator and context begin with `"use client"`; `tabs-ids.mjs` does not. |
 
 Browser-only checks (example app, not automated in v0): panel cross-fade and slide,
-Indicator slide via anchor positioning, `focusgroup` in Chromium 150+, find-in-page reveal.
+Indicator CSS slide via anchor positioning in Blink and WebKit (and the jump in Gecko),
+`focusgroup` in Chromium 150+, find-in-page reveal.
 
 ## 13. Implementation notes
 
@@ -862,7 +901,7 @@ One context; every part re-renders on a dispatch anyway (attributes change).
 ### 13.7 Indicator
 
 - `value = optimistic`; `hidden={value === null}`; `style` merges `{ positionAnchor: anchorName(rootId, value) }`.
-- Output: `<ViewTransition default={transition ?? "none"}><span aria-hidden …/></ViewTransition>`.
+- Output: a bare `<span aria-hidden …/>`. No `<ViewTransition>` (section 10.1).
 - Docs: must be a later sibling of the Tabs inside `List` (anchor must precede the positioned
   element in tree order); `List` needs `position: relative` and the Indicator `position: absolute`
   plus `anchor()` insets. Ships no CSS.
@@ -892,7 +931,12 @@ inline styles need no augmentation. `focusgroup` is untyped and goes in
    shape should be used there, and the conventions vocabulary table could list it.
 4. **Exposure table.** `data-orientation` is listed for Root, List and Tab; this design follows
    that and does not emit it on Panel. Confirm this is intended rather than an omission.
-5. **No-op rule precision.** Section 2.3 item 7 says "clicking the already-selected Tab calls
+5. **Optimistic parts and `<ViewTransition>`.** Given the lead's finding that optimistic commits
+   never start a view transition, this design drops the boundary and the `transition` prop from
+   `Indicator` and documents `Tab`'s as settle/snap-back only. If the corrected section 5 removes
+   `transition` from trigger parts altogether, `Tab` should follow; if it keeps it for Toggle,
+   `Tab` stays as designed.
+6. **No-op rule precision.** Section 2.3 item 7 says "clicking the already-selected Tab calls
    nothing". This design reads "selected" as the optimistic value, which makes clicking back to the
    committed tab a cancelling dispatch (section 9.4). Worth stating in the conventions so every
    single-shot component does the same.
