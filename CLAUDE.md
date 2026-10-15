@@ -22,24 +22,32 @@ This is a pnpm monorepo managed with Turbo:
 - `pnpm build` - Build all packages
 - `pnpm dev` - Build all packages in watch mode
 - `pnpm test` - Run tests in watch mode
-- `pnpm test:run` - Run tests once
+- `pnpm test:run` - Run all tests once (jsdom and browser projects)
+- `pnpm test:jsdom` - Run only the jsdom tests
+- `pnpm test:browser` - Run only the browser tests (headless Chromium via Playwright)
 - `pnpm typecheck` - Type check all packages
 - `pnpm lint` - Lint code with oxlint
 - `pnpm format` - Format code with oxfmt
 - `pnpm format:check` - Check formatting
 
-All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and `pnpm build` must pass before committing. CI runs the same commands.
+All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and `pnpm build` must pass before committing. CI runs the same commands (with `test:run` split into `test:jsdom` and `test:browser`).
 
 ### Package-specific commands
 
 - `pnpm --filter @funstack/ui build` - Build the ui package
 - `pnpm --filter @funstack/ui test` - Test the ui package
+- `pnpm --filter @funstack/ui test:browser:dev` - Browser tests in watch mode with a visible Chromium window
+- `pnpm --filter @funstack/ui exec playwright install chromium` - One-time download of the Chromium build the browser tests need (CI adds `--with-deps`)
 - `pnpm --filter funstack-ui-example dev` - Run the playground dev server
+
+### Browser tests
+
+`packages/ui/vitest.config.ts` defines two vitest projects. `*.test.tsx` files run in the `jsdom` project; `*.browser.test.tsx` files run in the `browser` project, which uses `@vitest/browser-playwright` in headless Chromium. Both share `src/__tests__/vitest.setup.ts` and Testing Library. Use a browser test only for behaviour jsdom cannot observe (Popover API and `:popover-open`, CSS anchor positioning, `interestfor`, ViewTransition); keep everything else in jsdom, which is much faster. Firefox and WebKit instances are configured but off by default: `BROWSERS=chromium,firefox,webkit pnpm --filter @funstack/ui test:browser` after `pnpm --filter @funstack/ui exec playwright install firefox webkit`.
 
 ## Tooling
 
 - TypeScript (strict, `verbatimModuleSyntax`), built with tsdown to ESM only
-- vitest with jsdom and Testing Library; `@testing-library/jest-dom` matchers are set up in `packages/ui/src/__tests__/vitest.setup.ts`
+- vitest with jsdom and Testing Library, plus vitest browser mode (Playwright, Chromium) for `*.browser.test.tsx`; `@testing-library/jest-dom` matchers are set up in `packages/ui/src/__tests__/vitest.setup.ts`
 - oxlint for linting, oxfmt for formatting (`docs/`, `memo/`, and `.claude/agents/` are excluded from formatting)
 - React `>=19.3` is a peer dependency; the library relies on React 19.3 features such as `<ViewTransition>`
 

@@ -979,8 +979,10 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). Tests only assert that components render with and without `transition`
 set; animation behaviour is checked in the example app. When a component depends on platform APIs
-jsdom lacks (Popover, anchor positioning), its test file notes which rows need browser mode;
-adding vitest browser mode is a separate decision.
+jsdom lacks (Popover, anchor positioning), the rows that need them go in a sibling
+`foo.browser.test.tsx`, which vitest runs in headless Chromium (browser mode, see `CLAUDE.md`);
+the jsdom file notes which rows moved there. Browser tests are slower, so they cover only what
+jsdom cannot observe.
 
 ### 10.2 Shared helpers (`src/__tests__/helpers.tsx`)
 
