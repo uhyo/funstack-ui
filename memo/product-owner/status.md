@@ -16,3 +16,7 @@
 - Dependabot PR #15 merged (user approved). PR merges need user approval in this environment.
 - Wave 2 running: #6 toggle, #7 tabs, #8 accordion, #9 tooltip designs (4 architects in parallel); research-react re-verifying transition entanglement.
 - Next: review designs → implement Toggle (#10) first as proving ground → reviewer → then Tabs/Accordion/Tooltip.
+- All four designs done (#6–#9). User agreed v0 does not target fully-no-JS (#19 deferred).
+- User is away (going to bed, 2026-10-15 evening JST). HOLD QUESTIONS until they return; decide autonomously, log decisions here, batch questions for next check-in.
+- Plan while away: Toggle impl (#10) → reviewer → fix; then Tabs (#11), Accordion (#12) impls (parallel, separate dirs); #18 browser mode infra; then Tooltip (#13); #17 result → conventions update; docs site (#14) once ≥2 components exist.
+- Questions batched for user: (none yet)
