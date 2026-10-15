@@ -29,6 +29,8 @@ or wrong, say so in your report instead of silently deviating.
 - Commit directly to `master` (no pull requests in this repo). Commit only the files you changed
   (`git add <paths>`, never `git add -A`), because other agents may be working in the same checkout.
   End commit messages with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- **Push to `origin master` after each commit** (`git pull --rebase` first if the push is rejected) so
+  finished work is never lost.
 - Keep personal working notes in `memo/developer/` (create it if missing).
 
 ## Report

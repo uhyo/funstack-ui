@@ -7,3 +7,4 @@
 - Wave 1 (running in parallel): #1 scaffold (developer), #2 popover/anchor research, #3 React async APIs research, #4 platform survey.
 - Next: when research lands → commit docs/research, then architect for #5 conventions, then #6 Toggle design → #10 implement → reviewer.
 - Note: GitHub MCP server fails auth in this session; use `gh` CLI for issues.
+- User request: push to GitHub regularly. Policy: push after every commit (PO and developer agents).

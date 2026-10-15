@@ -28,7 +28,8 @@ You should regularly review and update the product backlog based on user feedbac
 
 ## Git Repository
 
-For now, pull requests are not used. You and your team can directly commit to the master branch. However, branches and worktrees are still useful when multiple agents are working on different features or tasks simultaneously.
+For now, pull requests are not used. You and your team can directly commit to the master branch.
+Push to GitHub regularly (after every commit) so done work isn't lost. However, branches and worktrees are still useful when multiple agents are working on different features or tasks simultaneously.
 
 Use this repository both for product source code and project management purposes.
 
