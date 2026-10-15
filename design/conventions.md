@@ -103,7 +103,9 @@ Rules for the element passed to `render` (same as Base UI):
 - Event handlers the library installs (for example `onClick` on a `Tab`): both run, the element's
   first, then the library's. v0 provides no way to cancel the library's handler from there.
 - Library-controlled attributes (`role`, `aria-*` state, `id` wiring, `data-*` state) win over the
-  element's. Everything else, the element wins.
+  element's, with one carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`,
+  `aria-controls`, `aria-owns`) are **merged as token lists**, the element's tokens first, so a
+  trigger can be described by more than its tooltip. Everything else, the element wins.
 
 Rejected alternatives:
 
@@ -147,8 +149,11 @@ Parts that render no DOM (`Tooltip.Root`) do not accept `ref`.
 ### 1.5 Native prop pass-through
 
 A part's props type is the rendered element's props (`ComponentPropsWithRef<"button">`) minus the
-props the part owns. The library's own event handlers are **omitted from the type** so that a
-consumer cannot silently clobber them:
+props the part owns. The library's own **prop-form** event handlers are **omitted from the type**
+so that a consumer cannot silently clobber them. A part that attaches its listeners through
+`addEventListener` on its ref instead (section 7.4; Tooltip does this because its hover/focus
+handlers are feature-detected away when `interestfor` is native) omits nothing, and the consumer's
+`on*` props for those events pass through and run independently:
 
 ```ts
 export interface TabsTabProps
@@ -529,7 +534,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
 | `expanded` | boolean | Accordion trigger/panel | As above. |
-| `open` | boolean | Popup, Trigger | Platform or library open state. |
+| `open` | boolean | Popup, Trigger | Library-owned open state only. Browser-owned open state (top layer popovers, `<details>`) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
 | `checked` | boolean | future Checkbox/Switch | |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
@@ -583,6 +588,12 @@ Every part whose mount, unmount or content is driven by library state (Panel, Po
 Toggle's own element when its children can change) renders a `<ViewTransition>` as the **outermost
 node of its output**, before any DOM element, with `default="none"`. Nothing animates unless the
 consumer opts in, and when it is `"none"` React does not even assign a name, so the cost is nil.
+
+Parts whose visibility is **browser-owned** (section 3.5: Tooltip's `Popup` in the top layer, the
+static Accordion's `<details>`) render no `<ViewTransition>` and have **no `transition` prop**;
+their open/close happens outside any React transition and animates with `@starting-style` and
+`transition-behavior: allow-discrete` in CSS. "Every animatable part has `transition`" means every
+part whose mount, unmount or content is driven by library state.
 
 ```tsx
 // inside Tabs.Panel
@@ -710,8 +721,11 @@ Every `transition` example in the docs carries this block. No JS-level `matchMed
 
 `"use client"` goes at the top of **each source file that uses a client-only API** (hooks other
 than `use`/`useId`, `createContext`, `startTransition`, DOM access, event props) and nowhere
-else. Files without the directive must not import from files with it, except `index.ts` files,
-which only re-export.
+else. Files without the directive must not import from files with it, with two exceptions:
+`index.ts` files, which only re-export, and the React 19.3 pattern of a directive-free file
+*rendering* a context provider imported from a client module (`<TabsContext value={...}>`), which
+is allowed because Server Components may render client-created contexts. No initial component
+needs the second exception; a component that does says so in its design doc.
 
 ```
 src/tabs/
@@ -798,10 +812,12 @@ notes"):
 | Attribute untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`) | One module augmentation file, `src/internal/platform-attributes.d.ts`, augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs. The file is shipped in `dist` and referenced from the root `.d.mts` so consumers get the same types. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6). |
+| Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
 | Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
 
 Rules of thumb: platform attribute names in source are the HTML spelling; the augmentation file
-is the only place `declare module "react"` appears; and every workaround for a react-dom
+is the only place any `declare module` appears (`"react"` for attributes, `"csstype"` for
+properties such as `interest-delay-start` / `interest-delay-end`); and every workaround for a react-dom
 limitation links the upstream issue (filed by us if none exists, as the survey recommends for
 `hidden="until-found"`).
 
@@ -941,7 +957,10 @@ The part components keep their long names (`TabsRoot`) as `displayName` and in s
 ### 10.1 Required coverage per component
 
 Every component's test file has, at minimum, one test for each row. Rows marked "both" run
-against controlled and uncontrolled mode via `describe.each`.
+against controlled and uncontrolled mode via `describe.each`. Rows that cannot apply to a
+component with no action props (sync action, async action, rejection, overlap, post-await rule,
+controlled/uncontrolled parity) are listed as N/A in a comment at the top of the test file, with
+the reason (for example: "Tooltip: open state is browser-owned, no action props").
 
 | Area | What the test proves |
 | --- | --- |
@@ -1000,6 +1019,13 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
    latest-intent covers repeated activation; CSS or `aria-busy` are the consumer's escape hatches.
 9. **`transition` stays on Toggle in v0** (section 5.1), documented as animating the settling of
    the action, not the optimistic flip.
+10. **`Arrow` part held for v0** (from the Tooltip design). Popups ship without an `Arrow` part
+    until a component shows it cannot be done in CSS on the popup itself.
+11. **`provides="description" | "name"`** is the convention for any part whose content labels or
+    describes another element (Tooltip's `Popup`, future `Label`/`Description` parts):
+    `"description"` wires `aria-describedby`, `"name"` wires `aria-labelledby`. The component picks
+    the default (Tooltip: `"description"`, switching to `"name"` when the trigger has no accessible
+    name of its own), and the prop name is shared across components.
 
 ## Open questions
 
