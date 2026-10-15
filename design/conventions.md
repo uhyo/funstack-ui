@@ -1,7 +1,8 @@
 # @funstack/ui API conventions
 
-Status: **proposed** (2026-10-15, GitHub issue #5). Binding for every component design in
-`design/components/` once accepted. `docs/vision.md` wins over this document; this document wins
+Status: **accepted** (2026-10-15, GitHub issue #5; open questions resolved by the product owner
+with the user, see the end of this document). Binding for every component design in
+`design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
 Inputs: `docs/vision.md`, `docs/research/react-async-apis.md`, `docs/research/popover-anchor-tooltip.md`,
@@ -15,12 +16,12 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
 | 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. No `on*` handlers in the library API. |
-| 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. |
+| 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | Every animatable part wraps its output in `<ViewTransition default="none">`; a `transition` prop forwards React's own `default` shape. Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
-| 7 | RSC | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); JS-free primitives live in directive-free files and are exported from the same namespaces. |
-| 8 | Experimental | `experimental_<feature>` props on the part that uses the feature; whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
+| 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); JS-free primitives (`<details>` Accordion, `commandfor` triggers) live in directive-free files and are exported from the same namespaces. Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
+| 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
 
@@ -375,8 +376,8 @@ been dispatched since (latest intent wins). This gives:
 - Controlled/uncontrolled parity when the controlled parent follows the "update on success"
   pattern.
 
-Supersedes implication #4 of `docs/research/react-async-apis.md` with the same outcome and a
-more precise reason.
+Matches implication #4 of `docs/research/react-async-apis.md` (updated 2026-10-15 to this rule
+after the probes in `memo/architect/conventions-notes.md`).
 
 ### 3.4 The shared hook
 
@@ -426,18 +427,35 @@ Library state never lives in `useSyncExternalStore`: a store mutation during a t
 blocking re-render and defeats both fallback avoidance and ViewTransition. Reading
 `matchMedia` for display only is fine.
 
-### 3.5 Platform-owned state
+### 3.5 Library-owned vs. browser-owned state
 
-Some states are owned by the browser, not React: a popover's open state (top layer), `<details
-open>`, `<dialog open>`. For these:
+"Transition by default" is a statement about **library-owned state**: state that lives in React
+and that the library changes in response to the user. Some state is **browser-owned** instead: a
+popover's open state (top layer), `<details open>`, `<dialog open>`, a `<select>`'s value picked
+through the native picker. The browser changes it before React hears about it, and no transition
+can delay or roll it back. The boundary:
 
-- The uncontrolled form is the platform's own and needs no JS; it can be a Server Component.
-- The library *observes* the state through the platform event (`toggle`) and dispatches
-  `xChangeAction` from it, inside a transition, with the DOM as the optimistic source.
-- The controlled form re-syncs the DOM to React's value after the action resolves. `xChangeAction`
-  cannot delay a platform-initiated open or close; it can only follow it.
+| | Library-owned | Browser-owned |
+| --- | --- | --- |
+| Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in the static Accordion, `<dialog open>` |
+| Who changes it | The library, inside its transition | The browser (top layer, light dismiss, `interestfor`, find-in-page) |
+| Optimistic source | `useOptimistic` | The DOM itself |
+| `xChangeAction` | Can be awaited; the UI waits for it | Notification: dispatched from the platform event (`toggle`) inside a transition, after the fact |
+| Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
+| Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
+| Server Components | Only through Server Functions as actions | Uncontrolled form needs no JS; the part can be a Server Component |
 
-Per-component designs say which of their states are platform-owned.
+Rules:
+
+- A component prefers browser-owned state when the platform offers it (Popover API over a React
+  `open` boolean, `<details>` over a JS disclosure). That is principle 5 of the vision, and it is
+  the only way a primitive can be JS-free.
+- A component never mirrors browser-owned state into React state as the source of truth. It reads
+  the DOM (`matches(":popover-open")`, `details.open`) when it needs the value for attributes.
+- `<ViewTransition>` does not apply to browser-owned open/close (the browser performs it outside
+  a React transition). Those parts animate with `@starting-style` and
+  `transition-behavior: allow-discrete` in CSS, and the component docs show the CSS.
+- Per-component designs list every state and label it library-owned or browser-owned.
 
 ### 3.6 `disabled`
 
@@ -658,10 +676,56 @@ export default defineConfig({
 
 ### 7.3 JS-free primitives
 
-A primitive that needs no JS (static Accordion on `<details>`, `commandfor`-driven triggers) lives
-in a directive-free file and is exported from the same namespace as its client siblings (for
-example `Accordion.Static` next to `Accordion.Root`), so consumers discover both in one place. Its
-test asserts that the built file does not start with `"use client"` (section 10).
+A primitive that needs no JS lives in a directive-free file and is exported from the same
+namespace as its client siblings, so consumers discover both in one place. Its test asserts that
+the built file does not start with `"use client"` (section 10).
+
+The concrete first case is Accordion. `<details>`/`<summary>` is a zero-JS disclosure in all three
+engines (exclusive groups via `name`, find-in-page reveal, `::details-content`, `:open`), so the
+uncontrolled Accordion is plain markup renderable from a Server Component, and only the controlled
+or animated variant needs a client file:
+
+```tsx
+// app/faq.tsx — a Server Component, no client JS for the accordion itself
+import { Accordion } from "@funstack/ui/accordion";
+
+export function Faq({ items }) {
+  return (
+    <Accordion.Root exclusive>
+      {items.map((item) => (
+        <Accordion.Item key={item.id} value={item.id}>
+          <Accordion.Trigger>{item.question}</Accordion.Trigger>
+          <Accordion.Panel>{item.answer}</Accordion.Panel>
+        </Accordion.Item>
+      ))}
+    </Accordion.Root>
+  );
+}
+```
+
+Which part is directive-free and which is client is an implementation detail of the component
+(the namespace shape stays the same); the component design doc records it, and passing any
+action prop or `value` to such a part from a Server Component is a type error unless the action
+is a Server Function.
+
+### 7.4 Attributes and events React cannot express
+
+The platform moves faster than react-dom and `@types/react`. Conventions for the gap, with the
+cases known on 2026-10-15 (`docs/research/modern-platform-survey.md`, "React 19.3 integration
+notes"):
+
+| Gap | Convention |
+| --- | --- |
+| Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). |
+| Attribute untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`) | One module augmentation file, `src/internal/platform-attributes.d.ts`, augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs. The file is shipped in `dist` and referenced from the root `.d.mts` so consumers get the same types. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
+| Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
+| Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6). |
+| Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
+
+Rules of thumb: platform attribute names in source are the HTML spelling; the augmentation file
+is the only place `declare module "react"` appears; and every workaround for a react-dom
+limitation links the upstream issue (filed by us if none exists, as the survey recommends for
+`hidden="until-found"`).
 
 ---
 
@@ -684,6 +748,20 @@ a flag (`docs/vision.md`). Mechanism:
    reaches all engines the prop is removed and the behaviour becomes default; the removal is a type
    error that tells every consumer exactly where to delete it.
 
+   First customers, per the research docs:
+
+   | Feature | Missing in | Likely prop | Effect when on |
+   | --- | --- | --- | --- |
+   | `popover="hint"` | Safari 27.0 (TP only) | `Tooltip.Popup experimental_hint` | Popup renders `popover="hint"` instead of the baseline type plus JS Escape/outside-click handling. |
+   | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor` | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
+   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup` | Native roving focus; JS arrow-key handling skipped where supported. |
+   | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Panel experimental_interpolateSize` | Panel height animates to `auto` natively. |
+   | `<dialog closedby>` | WebKit (TP) | `Dialog.Root experimental_closedby` | Native light dismiss instead of JS. |
+   | Customizable `<select>` | Gecko (pref) | `Select.Root experimental_baseAppearance` | `appearance: base-select` markup; degrades to the native picker elsewhere. |
+
+   Two flags with the same graduation path go on the same part as separate props, not one
+   object, so each can be removed independently.
+
 2. **Whole component that cannot exist without a flagged feature: the `@funstack/ui/experimental`
    subpath**, same namespace shape, documented as unstable. Nothing in the initial four needs this
    (each has a non-flagged baseline per the research docs).
@@ -693,8 +771,12 @@ a flag (`docs/vision.md`). Mechanism:
 
 When the flagged path is a strict superset of the baseline (Chromium's `interestfor` tooltip
 versus the JS fallback), the component may feature-detect at runtime *only when the flag is on*;
-with the flag off it runs the baseline everywhere. Flags never change markup between server and
-client renders.
+with the flag off it runs the baseline everywhere. Feature detection reads a prototype property
+(`"interestForElement" in HTMLButtonElement.prototype`, `"focusgroup" in HTMLElement.prototype`)
+inside an effect or `use(browser())`, never during render, so flags never change markup between
+server and client renders. A flagged feature that silently does nothing in unsupported engines
+(`interestfor`) must keep the baseline JS path active underneath unless the flag's docs say the
+consumer has accepted Chromium-only behaviour.
 
 ---
 
@@ -819,28 +901,20 @@ never on internal hook state.
 
 ---
 
-## Open questions for the product owner
+## Resolved questions (2026-10-15)
 
-1. **Action naming: `<state>ChangeAction` (chosen) vs. a bare `changeAction` for the primary
-   state.** `changeAction` reads shorter at the call site (`<Toggle changeAction>`), and the vision
-   lists it as an example, but it breaks the mechanical `x` / `defaultX` / `xChangeAction` triple
-   the moment a component has two states (Combobox: value and open). I recommend keeping the
-   triple; please confirm.
-2. **Urgent opt-out placeholder.** v0 provides nothing and leaves native pass-through/`ref` as an
-   unsupported path. Alternative: strip *all* `on*` props from part types so the only escape is
-   `ref`. The stricter option is a cleaner story but makes harmless things (`onPointerEnter` for
-   analytics) awkward. Decide which message the first release should send.
-3. **Swallowed errors count as success in uncontrolled mode** (section 2.4). Accepting this keeps
-   the action contract simple ("resolve = done"). The alternative is a `details.cancel()` or a
-   `false` return value to veto; I recommend deferring until a real case appears.
-4. **Root entry plus subpaths** (chosen) vs. subpaths only like Base UI. The root entry costs
-   nothing with an unbundled build but gives bundlers without good tree-shaking a bigger graph.
-5. **`experimental_` prop prefix** vs. a `experimental={{ interestFor: true }}` object prop per
-   part. The prefix is uglier but each flag is independently typed and documented.
-6. **Transition entanglement guidance** (section 2.3 item 5). The finding that any pending async
-   action holds all transitions app-wide is React behaviour, not ours, but it affects what we tell
-   consumers to `await`. Worth raising with the React researcher so `react-async-apis.md` records
-   it, and worth a note in the FUNSTACK Router docs if the user agrees.
-7. **Dropping hover/focus data attributes** (section 4.2) is a deliberate divergence from React
-   Aria and Headless UI. Confirm that CSS pseudo-classes are an acceptable answer for the target
-   audience.
+Decided by the product owner, items 1, 2 and 5 confirmed with the user:
+
+1. **Action naming**: keep the `x` / `defaultX` / `xChangeAction` triple (`pressedChangeAction`,
+   `valueChangeAction`, `openChangeAction`). No bare `changeAction`.
+2. **Urgent opt-out placeholder**: v0 provides no mechanism. Native `on*` props the library does not
+   use pass through to the element as an unsupported escape hatch; library-used handlers are removed
+   from part prop types.
+3. **Swallowed errors count as success** in uncontrolled mode. No veto mechanism until a real case
+   appears.
+4. **Root entry plus per-component subpaths.**
+5. **`experimental_<feature>` props** per part; `@funstack/ui/experimental` subpath only for whole
+   components that cannot exist without a flagged feature.
+6. **Transition entanglement**: being re-verified by the React researcher and recorded in
+   `docs/research/react-async-apis.md`. Guidance "await only what the UI must wait for" stands.
+7. **No hover/focus data attributes**; consumers use CSS pseudo-classes.
