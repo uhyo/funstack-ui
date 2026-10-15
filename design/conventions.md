@@ -22,7 +22,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | Every animatable part wraps its output in `<ViewTransition default="none">`; a `transition` prop forwards React's own `default` shape. Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
-| 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); JS-free primitives (`<details>` Accordion, `commandfor` triggers) live in directive-free files and are exported from the same namespaces. Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
+| 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc, and none of the initial four has one (directive-free variants tracked in #19). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
@@ -219,18 +219,49 @@ common case stays short:
 
 Return values are ignored; only the promise is awaited. v0 has no `cancel()` on `details`.
 
-**Server Functions as action props are under research** (issue #17,
-`docs/research/server-function-action-props.md`, pending). A Server Function receiving
-`(next, details)` would have to serialise the DOM `Event` in `details`. Until that research lands
-the v0 shape is a thin client wrapper that forwards only `next`; the `details` design is not
-changed pre-emptively.
+**`details` is serialisable; `event` is virtual.** Decided from issue #17
+(`docs/research/server-function-action-props.md`): React's reply serialiser rejects a DOM `Event`
+as an own property (throws without a temporary-reference set, opaque `$T` reference with one), a
+non-enumerable `event` triggers a misleading dev warning on every call, and a Server Function
+cannot be detected on the client. So:
+
+1. `details` is always a **plain, extensible object of serialisable fields** (strings, numbers,
+   booleans, `undefined`). Component-specific fields such as `reason` are ordinary own
+   properties.
+2. `event` is a **virtual, non-own property** served by a `Proxy` `get`/`has` trap. The internal
+   helper `createActionDetails(event, fields)` is the only way the library builds `details`:
+   ```ts
+   // packages/ui/src/internal/action-details.ts ("use client")
+   export function createActionDetails<T extends object>(event: Event | undefined, fields: T): T & ActionDetails {
+     return new Proxy(fields, {
+       get: (target, key, receiver) => (key === "event" ? event : Reflect.get(target, key, receiver)),
+       has: (target, key) => key === "event" || Reflect.has(target, key),
+     }) as T & ActionDetails;
+   }
+   ```
+   `details.event` and `"event" in details` work; `Object.keys(details)`, `{ ...details }`,
+   `JSON.stringify(details)` and React's serialiser see only the real fields. The
+   `ActionDetails` type and the `(next, details)` signature are unchanged.
+3. Therefore **a Server Function may be passed directly to any action prop**, from a Server
+   Component or a Client Component, in every RSC framework surveyed, with no dev warning. It
+   receives `(next, details)` with `details.event === undefined` and every other field intact.
+   A thin client wrapper is optional, useful only to drop or reshape arguments.
 
 ```tsx
-"use client";
-export function SaveToggle({ action }: { action: (pressed: boolean) => Promise<void> }) {
-  return <Toggle pressedChangeAction={(next) => action(next)}>Save</Toggle>;
-}
+// Server Component
+import { Toggle } from "@funstack/ui/toggle";
+import { setFavorite } from "./actions"; // "use server"; (id, next, details) => Promise<void>
+
+<Toggle defaultPressed={post.favorited} pressedChangeAction={setFavorite.bind(null, post.id)}>
+  Favorite
+</Toggle>
 ```
+
+Costs, documented wherever `details` is: devtools shows `Proxy(Object) { reason: "click" }`
+without `event`; `expect(details).toEqual({ event })` fails, so tests assert `details.event`
+directly; `structuredClone(details)` throws `DataCloneError`; the Proxy target must stay
+extensible (readonly-ness comes from the type, never `Object.freeze`); and the library must not
+rely on Next.js's unused-argument omission, which is bundler-specific.
 
 ### 2.3 Execution contract
 
@@ -390,6 +421,11 @@ Two consequences to document on every trigger part: content rendered from a trig
 flip never gets a view transition (section 5.1), so trigger visuals animate with CSS transitions
 on the data attribute, not with the `transition` prop.
 
+One platform-forced exception: where the platform owns the ARIA state and forbids overriding it
+(`<summary>` may not carry `aria-expanded`; its expanded state comes from `<details open>`),
+optimistic state is **visual only** (`data-open`, `state.open`) and assistive technology hears
+the committed state when it lands. The component doc says so explicitly.
+
 ### 3.3 When uncontrolled state is committed
 
 After the action resolves, inside a re-wrapped `startTransition`, and only if no later action has
@@ -466,13 +502,14 @@ can delay or roll it back. The boundary:
 
 | | Library-owned | Browser-owned |
 | --- | --- | --- |
-| Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in the static Accordion, `<dialog open>` |
+| Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in Accordion's static (JS-free) mode, `<dialog open>` |
 | Who changes it | The library, inside its transition | The browser (top layer, light dismiss, `interestfor`, find-in-page) |
 | Optimistic source | `useOptimistic` | The DOM itself |
 | `xChangeAction` | Can be awaited; the UI waits for it | Notification: dispatched from the platform event (`toggle`) inside a transition, after the fact |
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
-| Server Components | Only through Server Functions as actions | Uncontrolled form needs no JS; the part can be a Server Component |
+| Server Components | Only through Server Functions as actions | Uncontrolled form needs no behaviour JS; the part may still be a client module (section 7.3) |
+| Residual browser path | A library-owned state the browser can also change (find-in-page revealing `<details>` or `hidden="until-found"`, pre-hydration clicks on `<summary>`) is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event, then re-applying committed state to the DOM after the action settles | n/a |
 
 Rules:
 
@@ -533,8 +570,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
-| `expanded` | boolean | Accordion trigger/panel | As above. |
-| `open` | boolean | Popup, Trigger | Library-owned open state only. Browser-owned open state (top layer popovers, `<details>`) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
+| `open` | boolean | Popup, Trigger, Accordion item/trigger/panel | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
 | `checked` | boolean | future Checkbox/Switch | |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
@@ -590,7 +626,7 @@ node of its output**, before any DOM element, with `default="none"`. Nothing ani
 consumer opts in, and when it is `"none"` React does not even assign a name, so the cost is nil.
 
 Parts whose visibility is **browser-owned** (section 3.5: Tooltip's `Popup` in the top layer, the
-static Accordion's `<details>`) render no `<ViewTransition>` and have **no `transition` prop**;
+Accordion's `<details>` in static mode) render no `<ViewTransition>` and have **no `transition` prop**;
 their open/close happens outside any React transition and animates with `@starting-style` and
 `transition-behavior: allow-discrete` in CSS. "Every animatable part has `transition`" means every
 part whose mount, unmount or content is driven by library state.
@@ -736,17 +772,17 @@ src/tabs/
   tabs-panel.tsx    # "use client"
 src/accordion/
   index.ts
-  accordion-static.tsx   # no directive: <details>/<summary> markup only; Server Component capable
-  accordion-root.tsx     # "use client": controlled / exclusive / animated variant
+  accordion-context.ts   # "use client": Item/Trigger/Panel read Root's context
+  accordion-root.tsx     # "use client": renders <details>/<summary>; no behaviour JS for the
+  ...                    # uncontrolled toggle, but context makes every part a client module
 ```
 
 A Server Component may render any part: the namespace object is a plain object of client
 references. It may pass only serializable props, so **a Server Component cannot pass a plain
 function as an action**; it passes a Server Function (`"use server"`) or renders the component
-from its own client component. Component docs state this. Note that the `(next, details)`
-signature puts a DOM `Event` into `details`, which a Server Function call would try to serialise;
-how actions reach Server Functions is an open question below, and until it is settled the
-documented shape is a thin client wrapper that forwards only `next`.
+from its own client component. Because `details.event` is virtual (section 2.2), the Server
+Function receives `(next, details)` with `event` absent and every serialisable field intact;
+no wrapper is needed.
 
 ### 7.2 Build: unbundled, directive-preserving
 
@@ -768,17 +804,19 @@ export default defineConfig({
 
 ### 7.3 JS-free primitives
 
-A primitive that needs no JS lives in a directive-free file and is exported from the same
-namespace as its client siblings, so consumers discover both in one place. Its test asserts that
-the built file does not start with `"use client"` (section 10).
+"JS-free" is a statement about **behaviour**, not about module boundaries: no JavaScript runs for
+the interaction, and the markup is complete and functional before hydration. Whether a part's
+source file carries `"use client"` is a separate, per-component fact recorded in the component's
+design doc; the Directive test row (section 10.1) asserts whatever that doc says.
 
-The concrete first case is Accordion. `<details>`/`<summary>` is a zero-JS disclosure in all three
-engines (exclusive groups via `name`, find-in-page reveal, `::details-content`, `:open`), so the
-uncontrolled Accordion is plain markup renderable from a Server Component, and only the controlled
-or animated variant needs a client file:
+The two are separate because of a Flight constraint, verified while designing Accordion: a Server
+Component cannot read context ("Cannot read a Client Context from a Server Component"), and the
+parts of a compound component need context to find their Root (there is no HTML inheritance for
+`<details name>`). So every part of Accordion is a client module even though the uncontrolled
+accordion toggles with zero behaviour JS:
 
 ```tsx
-// app/faq.tsx — a Server Component, no client JS for the accordion itself
+// app/faq.tsx — a Server Component. Renders client parts; the toggle works before hydration.
 import { Accordion } from "@funstack/ui/accordion";
 
 export function Faq({ items }) {
@@ -795,10 +833,15 @@ export function Faq({ items }) {
 }
 ```
 
-Which part is directive-free and which is client is an implementation detail of the component
-(the namespace shape stays the same); the component design doc records it, and passing any
-action prop or `value` to such a part from a Server Component is a type error unless the action
-is a Server Function.
+What a consumer gets from this: `<details>`/`<summary>` markup in the HTML, native open/close,
+find-in-page reveal and exclusive groups via `name` with no hydration required; the part code is
+in the client bundle and hydrates to add the action props, controlled mode and animation. What
+they do not get: a directive-free module. Truly directive-free variants (parts that take their
+wiring as props instead of context) are tracked in issue #19 and are not part of the initial
+four. Passing any action prop to a part from a Server Component is a type error unless the action
+is a Server Function (section 2.2).
+
+---
 
 ### 7.4 Attributes and events React cannot express
 
@@ -834,7 +877,7 @@ a flag (`docs/vision.md`). Mechanism:
    ```tsx
    <Tooltip.Trigger experimental_interestFor>Save</Tooltip.Trigger>
    <Tabs.List experimental_focusgroup>...</Tabs.List>
-   <Accordion.Panel experimental_interpolateSize>...</Accordion.Panel>
+   <Accordion.Root experimental_interpolateSize>...</Accordion.Root>
    ```
 
    The prefix follows React's own naming for unstable APIs. It is greppable, visible at the call
@@ -849,7 +892,7 @@ a flag (`docs/vision.md`). Mechanism:
    | `popover="hint"` | Safari 27.0 (TP only) | `Tooltip.Popup experimental_hint` | Popup renders `popover="hint"` instead of the baseline type plus JS Escape/outside-click handling. |
    | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor` | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
    | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup` | Native roving focus; JS arrow-key handling skipped where supported. |
-   | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Panel experimental_interpolateSize` | Panel height animates to `auto` natively. |
+   | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
    | `<dialog closedby>` | WebKit (TP) | `Dialog.Root experimental_closedby` | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | `Select.Root experimental_baseAppearance` | `appearance: base-select` markup; degrades to the native picker elsewhere. |
 
@@ -974,7 +1017,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` works end to end (guards the documented pattern). |
-| Directive | The built file for each client part begins with `"use client"`; each JS-free part's file does not (script over `dist`, run in `test:run` after `build`). |
+| Directive | Each built part file starts with `"use client"` or not, exactly as the component's design doc records (script over `dist`, run in `test:run` after `build`). |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). Tests only assert that components render with and without `transition`
@@ -1028,13 +1071,14 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `"description"` wires `aria-describedby`, `"name"` wires `aria-labelledby`. The component picks
     the default (Tooltip: `"description"`, switching to `"name"` when the trigger has no accessible
     name of its own), and the prop name is shared across components.
+12. **All Accordion parts are client modules** (section 7.3). Server Components render them and
+    the native toggle works before hydration; directive-free variants are a later concern (#19).
+
+13. **`details.event` is a virtual Proxy-served property** (raised by the Toggle design, #6;
+    resolved by research #17, `docs/research/server-function-action-props.md`, option (e), see
+    section 2.2). Server Functions may be passed directly to any action prop; the thin client
+    wrapper is optional.
 
 ## Open questions
 
-1. **Server Functions as actions and `details.event`** (raised by the Toggle design, #6; research
-   tracked as #17, `docs/research/server-function-action-props.md`). A Server Function receiving
-   `(next, details)` would serialise a DOM `Event`. Options: (a) document a thin client wrapper
-   forwarding only `next` as the supported shape (v0 interim, section 2.2); (b) make `event` a
-   non-enumerable property so the reply serialiser skips it, at the cost of a subtle object;
-   (c) detect server references and pass `(next)` only, which public APIs do not allow. Decision
-   waits for #17; `details` is not redesigned before then.
+None at present.

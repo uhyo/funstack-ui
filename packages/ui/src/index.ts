@@ -1,7 +1,16 @@
 /**
- * FUNSTACK UI — headless UI library for React.
+ * FUNSTACK UI — headless UI library for React, Async React-native.
  *
- * Components are not implemented yet. This placeholder export proves the
- * package pipeline (build, types, tests) works end to end.
+ * Every component is also available from its own subpath (`@funstack/ui/toggle`), which is the
+ * documented form.
  */
-export const VERSION: string = "0.0.0";
+export { Toggle } from "./toggle/index.js";
+export type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./toggle/index.js";
+
+export type {
+  Action,
+  ActionDetails,
+  ChangeAction,
+  RenderProp,
+  StateValue,
+} from "./internal/types.js";

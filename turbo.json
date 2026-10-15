@@ -15,11 +15,11 @@
       "persistent": true
     },
     "test:run": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "outputs": []
     },
     "test:jsdom": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "outputs": []
     },
     "test:browser": {

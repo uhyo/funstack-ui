@@ -1,0 +1,101 @@
+react-server-dom-webpack 19.3.1 NODE_ENV= production
+
+[1 plain {event: MouseEvent}] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[1 plain {event: MouseEvent}] temporaryReferences=true
+  OK   wire=[true,{"event":"$T"}]  result={"next":true,"detailsKeys":["event"],"typeofEvent":"function"}
+
+[1b server fn reads details.event.shiftKey] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[1b server fn reads details.event.shiftKey] temporaryReferences=true
+  FAIL Cannot access shiftKey on the server. You cannot dot into a temporary client reference from a server component
+
+[1c Node global Event] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[1c Node global Event] temporaryReferences=true
+  OK   wire=[true,{"event":"$T"}]  result={"next":true,"detailsKeys":["event"],"typeofEvent":"function"}
+
+[2 event non-enumerable data prop] temporaryReferences=false
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[2 event non-enumerable data prop] temporaryReferences=true
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[3 event enumerable getter] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[3 event enumerable getter] temporaryReferences=true
+  OK   wire=[true,{"event":"$T"}]  result={"next":true,"detailsKeys":["event"],"typeofEvent":"function"}
+
+[3b event non-enumerable getter] temporaryReferences=false
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[3b event non-enumerable getter] temporaryReferences=true
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[4 class instance] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[4 class instance] temporaryReferences=true
+  FAIL Cannot access event on the server. You cannot dot into a temporary client reference from a server component. Y
+
+[4b class instance, no fields] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[4b class instance, no fields] temporaryReferences=true
+  FAIL Cannot access event on the server. You cannot dot into a temporary client reference from a server component. Y
+
+[5 plain serializable only] temporaryReferences=false
+  OK   wire=[true,{"reason":"click","shiftKey":true}]  result={"next":true,"detailsKeys":["reason","shiftKey"],"typeofEvent":"undefined"}
+
+[5 plain serializable only] temporaryReferences=true
+  OK   wire=[true,{"reason":"click","shiftKey":true}]  result={"next":true,"detailsKeys":["reason","shiftKey"],"typeofEvent":"undefined"}
+
+[6 {event: undefined}] temporaryReferences=false
+  OK   wire=[true,{"event":"$undefined"}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[6 {event: undefined}] temporaryReferences=true
+  OK   wire=[true,{"event":"$undefined"}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[7 symbol-keyed event] temporaryReferences=false
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[7 symbol-keyed event] temporaryReferences=true
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[8 event as 3rd positional arg] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[8 event as 3rd positional arg] temporaryReferences=true
+  OK   wire=[true,{},"$T"]  result=3
+
+[9 Proxy over {} with get/has traps] temporaryReferences=false
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[9 Proxy over {} with get/has traps] temporaryReferences=true
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[10 null-prototype object] temporaryReferences=false
+  FAIL Minified React error #499; visit https://react.dev/errors/499?args[]= for the full message or use the non-mini
+
+[10 null-prototype object] temporaryReferences=true
+  FAIL Cannot access event on the server. You cannot dot into a temporary client reference from a server component. Y
+
+[11 details frozen plain object] temporaryReferences=false
+  OK   wire=[true,{"reason":"click"}]  result={"next":true,"detailsKeys":["reason"],"typeofEvent":"undefined"}
+
+[11 details frozen plain object] temporaryReferences=true
+  OK   wire=[true,{"reason":"click"}]  result={"next":true,"detailsKeys":["reason"],"typeofEvent":"undefined"}
+
+[12 WeakMap side channel (details = {})] temporaryReferences=false
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[12 WeakMap side channel (details = {})] temporaryReferences=true
+  OK   wire=[true,{}]  result={"next":true,"detailsKeys":[],"typeofEvent":"undefined"}
+
+[detection] own props: [ 'length', 'name', 'prototype' ] name: action length: 0 $$typeof: undefined $$id: undefined bind own? false 
+  toString: function action() {
+[detection] bound: own props: [ 'length', 'name' ] name: bound action

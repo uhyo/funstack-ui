@@ -3,5 +3,6 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error"
-  }
+  },
+  "ignorePatterns": ["**/memo/**", "**/.claude/**", "**/dist/**"]
 }

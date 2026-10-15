@@ -20,3 +20,8 @@
 - User is away (going to bed, 2026-10-15 evening JST). HOLD QUESTIONS until they return; decide autonomously, log decisions here, batch questions for next check-in.
 - Plan while away: Toggle impl (#10) → reviewer → fix; then Tabs (#11), Accordion (#12) impls (parallel, separate dirs); #18 browser mode infra; then Tooltip (#13); #17 result → conventions update; docs site (#14) once ≥2 components exist.
 - Questions batched for user: (none yet)
+- #17 resolved: details.event served via Proxy (virtual, non-own) so Server Functions can be passed directly. Decided autonomously.
+- Questions batched for user: (1) confirm the Proxy-based details.event design (alternative: no event in details at all, React-action style; or plain {event} that only works accidentally via temporaryReferences).
+- Toggle (#10) implemented & pushed (ed6a1e2..589150b), 50 tests. CI was red on format (design/*.md) → fixed ignore globs (f67f405), gitignored .claude/worktrees.
+- Running: review-toggle (reviewer), impl-accordion (#12, worktree), infra-browser-mode (#18, worktree).
+- Lesson: never run `pnpm format` at root while agent worktrees exist under .claude/worktrees (it reformatted the worktree's docs; reverted).
