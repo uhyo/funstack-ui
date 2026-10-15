@@ -18,6 +18,14 @@
       "dependsOn": ["^build", "build"],
       "outputs": []
     },
+    "test:jsdom": {
+      "dependsOn": ["^build", "build"],
+      "outputs": []
+    },
+    "test:browser": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": ["^build"],
       "outputs": []

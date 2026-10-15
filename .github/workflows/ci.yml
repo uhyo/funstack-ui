@@ -34,8 +34,14 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
-      - name: Run tests
-        run: pnpm run test:run
+      - name: Run tests (jsdom)
+        run: pnpm run test:jsdom
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @funstack/ui exec playwright install --with-deps chromium
+
+      - name: Run tests (browser)
+        run: pnpm run test:browser
 
       - name: Build
         run: pnpm run build
