@@ -1,0 +1,67 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+FUNSTACK UI (`@funstack/ui`) is a headless UI component library for React and the first UI library that is Async React-native: Suspense-native, transition-by-default, action props instead of event handlers, `<ViewTransition>` built in, and greedy adoption of modern HTML/CSS. It is part of the FUNSTACK family alongside [FUNSTACK Router](https://github.com/uhyo/funstack-router) and [FUNSTACK Static](https://github.com/uhyo/funstack-static). **`docs/vision.md` is the source of truth for principles, browser support policy, and scope**; read it before designing or implementing anything.
+
+The project is experimental.
+
+## Monorepo Structure
+
+This is a pnpm monorepo managed with Turbo:
+
+- `packages/ui` - The main `@funstack/ui` package
+- `packages/example` - Vite + React playground that consumes `@funstack/ui` via `workspace:*`
+- `docs/` - Vision, design documents, and research notes (markdown)
+- `memo/<role>/` - Working notes kept by each agent role (see Conventions)
+
+## Commands
+
+- `pnpm build` - Build all packages
+- `pnpm dev` - Build all packages in watch mode
+- `pnpm test` - Run tests in watch mode
+- `pnpm test:run` - Run tests once
+- `pnpm typecheck` - Type check all packages
+- `pnpm lint` - Lint code with oxlint
+- `pnpm format` - Format code with oxfmt
+- `pnpm format:check` - Check formatting
+
+All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and `pnpm build` must pass before committing. CI runs the same commands.
+
+### Package-specific commands
+
+- `pnpm --filter @funstack/ui build` - Build the ui package
+- `pnpm --filter @funstack/ui test` - Test the ui package
+- `pnpm --filter funstack-ui-example dev` - Run the playground dev server
+
+## Tooling
+
+- TypeScript (strict, `verbatimModuleSyntax`), built with tsdown to ESM only
+- vitest with jsdom and Testing Library; `@testing-library/jest-dom` matchers are set up in `packages/ui/src/__tests__/vitest.setup.ts`
+- oxlint for linting, oxfmt for formatting (`docs/`, `memo/`, and `.claude/agents/` are excluded from formatting)
+- React `>=19.3` is a peer dependency; the library relies on React 19.3 features such as `<ViewTransition>`
+
+## Conventions
+
+### Code
+
+- TypeScript strict mode with `verbatimModuleSyntax`: use explicit `import type` for types.
+- Relative imports inside `packages/ui` use explicit `.js` extensions (`moduleResolution: nodenext`).
+- Tests are colocated with the code they test (`foo.tsx` next to `foo.test.tsx`).
+- Follow the principles in `docs/vision.md`: action props (`fooAction`) rather than `onFoo` handlers, transitions by default, pending state exposed, accessibility per WAI-ARIA Authoring Practices.
+
+### Commit Messages
+
+- Use conventional commits format: `type(scope): description`.
+- Scopes: `ui` for the core package (may also be left unscoped), `example` for the playground, `docs` for documentation.
+  - `feat(ui): add Toggle component`
+  - `fix(example): update dependencies`
+  - `docs: clarify transition principle`
+- Commit directly to `master`; this repo does not use pull requests.
+- Stage only the files you changed with `git add <paths>`. Never use `git add -A` or `git add .`, because other agents may be working in the same checkout concurrently.
+
+### Agent memos
+
+Agents keep personal working notes in `memo/<role>/` (for example `memo/developer/`, `memo/product-owner/`). Create the directory if it does not exist. Do not edit another role's memos.
