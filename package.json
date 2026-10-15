@@ -7,6 +7,8 @@
     "dev": "turbo run dev",
     "test": "turbo run test",
     "test:run": "turbo run test:run",
+    "test:jsdom": "turbo run test:jsdom",
+    "test:browser": "turbo run test:browser",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint",
     "format": "oxfmt .",

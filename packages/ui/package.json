@@ -33,6 +33,9 @@
     "dev": "tsdown --watch",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:jsdom": "vitest run --project jsdom",
+    "test:browser": "vitest run --project browser",
+    "test:browser:dev": "vitest --project browser --browser.headless=false",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -42,12 +45,14 @@
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitest/browser-playwright": "^5.0.5",
     "jsdom": "^30.1.3",
+    "playwright": "^1.63.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.5"
   },
   "peerDependencies": {
     "react": ">=19.3.0",
