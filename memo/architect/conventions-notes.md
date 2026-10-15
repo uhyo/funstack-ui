@@ -52,7 +52,10 @@ added to the repo. Re-run them in a browser before relying on them for a release
 
 ## Things to raise later (not blocking)
 
-- Ask research-react to add note 4 (global entanglement of transitions during an async action)
-  to react-async-apis.md; the current text implies 19.3 renders transitions independently.
+- Done 2026-10-15: research-react confirmed note 4 against ReactFiberAsyncAction.js (all transition
+  updates during an async action are entangled into one scope; PR #37290 only de-entangles render
+  work between lanes) and updated react-async-apis.md sections 2 and 3, replaced implication #4
+  with write-after-await plus a latest-dispatch guard, and switched type names to hyphens.
+  conventions.md section 3.3 can now cite the research doc instead of "supersedes" wording.
 - `vitest` browser mode will be needed once components rely on Popover/anchor APIs that jsdom
   lacks; jsdom tests cover the React semantics only.

@@ -124,6 +124,56 @@ The docs are currently out of sync with the 19.3 implementation, so both are rec
   `enableParallelTransitions` on by default; the author noted it "has been on in production at
   Meta").
 
+**Precisely what is and is not entangled in React 19.3.1.** Verified against the `v19.3.0`
+source, the shipped `react-dom-client.development.js` 19.3.1, and two jsdom probes
+(`memo/platform-researcher/probes/`), which reproduce the architect's findings in
+`memo/architect/conventions-notes.md`.
+
+What `enableParallelTransitions` (true since 19.3.0, PR #37290) changes: in
+`ReactFiberLane.js` `getHighestPriorityLanes`, a pending transition *update* lane used to return
+`lanes & TransitionUpdateLanes` (every pending transition lane, rendered as one batch); it now
+returns `getHighestPriorityLane(lanes)` (one lane). The shipped build has `return lanes & -lanes`
+in that branch. So transitions from **different events that touch different state** render and
+commit in separate passes. Probe 2 confirms: a sync transition whose render suspends inside an
+already revealed boundary (so it waits rather than showing a fallback) no longer holds sibling
+transitions started in later events; they committed while it was still pending.
+
+What is **still entangled** (unchanged by 19.3):
+
+1. **Everything started inside one browser event.** `requestTransitionLane` hands out one
+   `currentEventTransitionLane` per event, so all transition updates in the same event share a
+   lane and commit together.
+2. **Every transition update started anywhere while any async action is pending.** React keeps an
+   "async action scope" (`ReactFiberAsyncAction.js`): "If there are multiple, concurrent async
+   actions, they are entangled. All transition updates that occur while the async action is still
+   in progress are treated as part of the action." ... "we can't tell which action an update
+   corresponds to. So instead, we entangle them all into one." In the shipped build,
+   `requestTransitionLane` returns `currentEntangledLane` whenever it is non-zero, i.e. the
+   action scope's lane. The scope's `useTransition` pending state is a thenable
+   (`chainThenableValue`) unwrapped while rendering that lane, so the lane cannot complete until
+   the last action resolves; everything assigned to it commits together. Probe 1: component A ran
+   `start(async () => { setN(1); await deferred; })`; a sibling's standalone
+   `startTransition(() => setM(1))` in a later event did not commit until `deferred` resolved,
+   then both committed in one pass. An urgent `setState` in a third sibling committed immediately.
+3. **Transition updates to the same state hook.** `entangleTransitionUpdate` merges a new
+   transition lane with the queue's other pending transition lanes and calls
+   `markRootEntangled`, so two transitions that update the same `useState` always render together.
+
+Urgent (sync/default lane) updates are never held by any of the three.
+
+Corollaries for a library:
+
+- A component awaiting a slow consumer action holds **every** transition in the app, including
+  unrelated components whose `useTransition` has no pending flag to show for it. Await only what
+  the UI must wait for; run background work fire-and-forget outside the awaited chain.
+- A transition-lane `setState` placed *before* the `await` inside an async action is on the
+  action-scope lane and is held until the action settles (architect's note 2). Writing before or
+  after the `await` has the same visible timing; the difference is that a pre-`await` write still
+  commits when the action throws and is caught, while a post-`await` write is skipped.
+- The docs' caveat "React currently batches them together" is still accurate for cases 1 to 3,
+  and the changelog's "render independently" is accurate only for different-event,
+  different-state transitions with no async action in flight.
+
 What is stable regardless of version:
 
 - Starting a second Transition does **not** cancel or abort the first Action. The async function
@@ -139,9 +189,12 @@ What is stable regardless of version:
   handling the input update."
 
 Implication: a component that fires one action per click (Toggle, TabButton) must tolerate
-out-of-order completion. Where a last-write-wins result is the intent, a reducer-based
-`useOptimistic` plus the parent's real state is enough; where sequencing matters (forms,
-counters) use `useActionState`.
+out-of-order completion. The architect's probe (note 5) shows the concrete failure: with two
+overlapping actions on one `useTransition`, a reducer-based `useOptimistic` shows the latest intent
+throughout, but post-`await` writes land in *completion* order, so the earlier action's write won
+because its promise resolved last. A sequence guard ("only the latest dispatch commits its
+post-`await` write") is needed for latest-intent-wins. Where strict sequencing matters (forms,
+counters) use `useActionState`, which queues.
 
 ### Error handling
 
@@ -260,6 +313,19 @@ function handleDelete(id) {
   showing until *all* pending Actions that updated it have finished, and prefer reducers so that
   stacked updates stay consistent with the latest base value.
 
+### Optimistic updates render at sync priority, so they can show a Suspense fallback
+
+Not stated on the reference page, but visible in `react-dom-client.development.js`:
+`dispatchOptimisticSetState` enqueues the update with `lane: SyncLane` and
+`revertLane: requestTransitionLane()`. The optimistic render is therefore an *urgent* render, not
+a Transition render. The architect's probe (note 1) confirms the consequence: if content keyed off
+the optimistic value suspends, the nearest Suspense fallback is shown (already visible content is
+replaced), whereas content keyed off the committed transition value keeps the old content.
+
+Rule for the library: **render optimistic state only in trigger parts** (the pressed button, the
+selected tab, `data-pending`), and **render content regions from committed state**. Never derive
+"which panel to mount" from `useOptimistic`.
+
 ### Must be inside a Transition or Action
 
 Warning text when violated: "An optimistic state update occurred outside a Transition or Action.
@@ -302,8 +368,12 @@ function Toggle({ pressed, defaultPressed = false, changeAction, children }) {
 
 If `changeAction` rejects, `optimistic` reverts to `value`; in controlled mode `value` is whatever
 the parent chose, so a parent that only updates on success gets automatic rollback. In
-uncontrolled mode `setInternal(next)` has already committed, so the library must decide whether
-uncontrolled state should also roll back on rejection (see "Implications" below).
+uncontrolled mode the `setInternal(next)` above is held until the action settles (entanglement,
+§2) and commits even if the action rejects. Moving it after the `await` gives rollback for free,
+because a rejection skips the write. The architect's adopted shape is write-after-`await` plus a
+latest-dispatch guard; `aria-pressed` above reads `optimistic`, so the trigger still flips
+immediately while any suspending content elsewhere reads committed `value` (see §3, sync
+priority).
 
 ## 4. `useActionState`
 
@@ -480,9 +550,10 @@ Recommendation:
    props (`"auto"`, `"none"`, class string, or a type-map object) and is spread into
    `enter`/`exit`/`update` (or one prop per trigger if a component needs it). This keeps React's
    documented semantics without inventing new ones.
-3. The library calls `addTransitionType('fsui:<component>:<direction>')` inside its own
+3. The library calls `addTransitionType('fsui-<component>-<direction>')` inside its own
    `startTransition` so consumers can key animations on direction (`next`/`prev`, `open`/`close`)
-   via the type-map form or `:active-view-transition-type()`.
+   via the type-map form or `:active-view-transition-type()`. Use hyphens, not colons: a colon
+   would need escaping inside the `:active-view-transition-type()` selector.
 4. Ship optional CSS presets as View Transition Classes, with a `prefers-reduced-motion` block.
 5. Never call `document.startViewTransition` directly; never use `flushSync` in a component that
    contains a `<ViewTransition>`.
@@ -638,21 +709,23 @@ Rules for a library that wants some primitives usable as Server Components:
    error hook in stable React. Decide per component whether to additionally expose an optional
    `errorAction`-style prop; default should be "let it propagate". Optimistic state rolls back on
    its own either way.
-4. **Rejection in uncontrolled mode is an open design question.** React only rolls back optimistic
-   state; the library's own `useState` write has already committed. Options: (a) write internal
-   state only after the action resolves, showing the optimistic value meanwhile; (b) commit
-   immediately and leave it. Option (a) matches "value changes on success" semantics and makes
-   controlled and uncontrolled behave the same; recommend (a).
-5. **Overlapping actions are neither cancelled nor ordered.** Design single-shot components
-   (Toggle, TabButton) so last-commit-wins is acceptable, use reducer-form `useOptimistic` so stacked
-   optimistic updates rebase onto the latest `value`, and reserve `useActionState` for components
-   that need a queue.
+4. **Trigger parts render optimistic state; content regions render committed state.** Optimistic
+   updates render at sync priority, so suspending content keyed off them shows a fallback. For
+   uncontrolled state, write after the `await` (same visible timing as before it, because
+   transition writes are held until the action settles anyway) so a rejection skips the write and
+   controlled and uncontrolled roll back the same way. This is the rule the architect adopted in
+   `design/conventions.md`.
+5. **Overlapping actions are neither cancelled nor ordered, and async actions entangle every
+   transition in the app.** Design single-shot components (Toggle, TabButton) for latest-intent-
+   wins with a sequence guard on the post-`await` write, use reducer-form `useOptimistic` so stacked
+   optimistic updates rebase onto the latest `value`, await only what the UI must wait for, and
+   reserve `useActionState` for components that need a queue.
 6. **Never hold library state in `useSyncExternalStore`.** Store mutations during a Transition
    force a blocking re-render and defeat both fallback avoidance and ViewTransition.
 7. **ViewTransition wiring**: `<ViewTransition default="none">` placed before any DOM node, a
    `transition`-style prop that forwards React's own class/type-map shapes, library-emitted
-   transition types via `addTransitionType`, optional CSS presets with reduced-motion handling, and
-   no `flushSync` anywhere near it.
+   hyphenated transition types via `addTransitionType`, optional CSS presets with reduced-motion
+   handling, and no `flushSync` anywhere near it.
 8. **Suspense boundaries belong to consumers.** Library components should not wrap children in
    `<Suspense>` by default; because library updates are Transitions, suspending children already
    keep the old content visible and surface as `data-pending`.
@@ -670,6 +743,8 @@ Rules for a library that wants some primitives usable as Server Components:
 - React 19 release post (Actions): https://react.dev/blog/2024/12/05/react-19
 - CHANGELOG: https://github.com/facebook/react/blob/main/CHANGELOG.md
 - Parallel transitions PR #37290: https://github.com/facebook/react/pull/37290
+- Async action entanglement: https://github.com/facebook/react/blob/main/packages/react-reconciler/src/ReactFiberAsyncAction.js
+- Architect's jsdom probes on 19.3.1 (entanglement, optimistic sync lane, ordering): `memo/architect/conventions-notes.md`
 - `useTransition`: https://react.dev/reference/react/useTransition
 - `startTransition`: https://react.dev/reference/react/startTransition
 - `useOptimistic`: https://react.dev/reference/react/useOptimistic
