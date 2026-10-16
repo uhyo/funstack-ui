@@ -24,7 +24,7 @@ thin, feature-detected shim for the trigger that steps aside wherever the browse
 | 5   | Name vs description   | Explicit `provides="description" \| "name"` on `Root` (default `description`). `name` sets `aria-labelledby`, `description` sets `aria-describedby`; never both.                                                                                                                                                                           |
 | 6   | Delays                | `delay` (250 ms) and `closeDelay` (150 ms) on `Root`, matching Chromium's `interest-delay` defaults. Native path: inline `interest-delay-start/end` on the trigger. JS path: timers. Same delay for hover and keyboard focus. No "skip delay" group in v0.                                                                                 |
 | 7   | Positioning           | `side` (`top`) and `align` (`center`) on `Popup` set inline `position-area` and `position-try-fallbacks`. `side={null}` emits nothing so a stylesheet can take over.                                                                                                                                                                       |
-| 8   | Animation             | CSS only (`@starting-style`, `transition-behavior: allow-discrete`). No `<ViewTransition>` and no `transition` prop on any Tooltip part (conventions 3.5).                                                                                                                                                                                 |
+| 8   | Animation             | CSS only (`@starting-style`, `transition-behavior: allow-discrete`, `overlay` required for Chromium's exit). Exit fade is progressive enhancement (none in Firefox); the library never waits on it. No `<ViewTransition>` and no `transition` prop on any Tooltip part (conventions 3.5).                                                                                                                                                                                 |
 | 9   | Directives            | Every file is `"use client"`. No directive-free part is possible because the trigger/popup id link needs context and only Client Components read context. "Zero-JS" here means no runtime behaviour JS on the native path, not no hydration.                                                                                               |
 | 10  | Touch                 | JS path ignores `pointerType === "touch"`; no long-press in v0. Chromium's native long-press works on the native path. Tooltip content must never be the only place information lives.                                                                                                                                                     |
 
@@ -555,7 +555,8 @@ The animation is CSS, shown in the docs with the reduced-motion block:
     opacity 120ms,
     translate 120ms,
     display 120ms allow-discrete,
-    overlay 120ms allow-discrete;
+    overlay 120ms allow-discrete; /* required in Chromium: without it the popup leaves the top
+                                     layer on close and fades out under z-indexed content */
 }
 .tip:popover-open {
   opacity: 1;
@@ -572,8 +573,21 @@ The animation is CSS, shown in the docs with the reduced-motion block:
 }
 ```
 
-`overlay` is Chromium-only and harmless elsewhere (survey). Note for Firefox: `anchor()` values
-cannot be animated there, so animate `translate`/`opacity`, never the anchor insets.
+The **entry** fade works in all three engines. The **exit** fade is progressive enhancement
+(`docs/research/popover-anchor-tooltip.md`, correction of 2026-10-16, screenshot-probed on
+Chromium 156 and Firefox 157):
+
+- Chromium **requires** `overlay … allow-discrete` in the transition list; without it the popup
+  leaves the top layer the moment it closes and fades out underneath z-indexed page content.
+  `overlay` is ignored by Gecko and WebKit, so it stays in every documented snippet.
+- Firefox hides the popover instantly on close: Gecko cannot transition `display`, so no exit
+  animation runs there. WebKit animates the exit (Safari 27.0 fixed the closing-animation bug).
+
+Consequence for the component and its tests: nothing may wait on the exit animation. `hidePopover()`
+is final the moment it is called; the library never listens for `transitionend` or inspects
+`getAnimations()` before, during or after a close, and the Chromium browser tests assert the
+closed state, not the fade. Note for Firefox: `anchor()` values cannot be animated there either,
+so animate `translate`/`opacity`, never the anchor insets.
 
 ---
 

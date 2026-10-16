@@ -317,7 +317,8 @@ is n/a; use `data-*` attributes.
 - `interpolate-size` / `calc-size()`: Chrome 129 only. Safari TP 254 implements both and WebKit's
   position is "support"; Firefox has "positive" position and an open bug. Flag.
 - `overlay`: Chrome 117 only, never implemented elsewhere, and Chromium has a "deprecate and
-  remove" chromestatus entry. Do not depend on it. Listing it in `transition` is harmless.
+  remove" chromestatus entry. Do not depend on it for layout, but list it in `transition`:
+  Chromium requires it for a correct exit fade (see the correction below); other engines ignore it.
 - **Correction (2026-10-16):** exit animations of top-layer elements (popover, dialog) are
   **progressive enhancement**, not cross-engine. Verified by screenshot probes
   (`memo/platform-researcher/probes/04-dialog/exit-anim.mjs`, `entry-anim.mjs`):
