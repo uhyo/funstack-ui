@@ -890,7 +890,14 @@ The state object given to function props on the owner includes `pending`; on tri
 Every part whose mount, unmount or content is driven by library state (Panel, library-driven
 Popup, Toggle's own element when its children can change) renders a `<ViewTransition>` as the **outermost
 node of its output**, before any DOM element, with `default="none"`. Nothing animates unless the
-consumer opts in, and when it is `"none"` React does not even assign a name, so the cost is nil.
+consumer opts in, and when it is `"none"` React does not assign the boundary a name, so an
+*update* inside it costs nothing. One cost remains (found by the Dialog implementation, issue
+#35): a `<ViewTransition>` that **mounts** in a transition commit makes React call
+`document.startViewTransition` even with `default="none"`, which runs the browser's root
+cross-fade (about 250 ms) and holds the next commit until it finishes. It affects parts that mount
+with their content (Dialog's children, a conditionally rendered Panel), not parts that are always
+mounted. Mitigation is pending research under #35; until then component docs note it where a
+part mounts inside a transition.
 
 Parts whose visibility is **browser-owned** (section 3.5: Tooltip's `Popup` in the top layer, the
 Accordion's `<details>` in static mode) render no `<ViewTransition>` and have **no `transition` prop**;
