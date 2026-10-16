@@ -22,7 +22,8 @@
     "directory": "packages/ui"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "type": "module",
   "sideEffects": false,
