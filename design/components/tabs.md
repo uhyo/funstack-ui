@@ -409,7 +409,7 @@ Per APG Tabs pattern.
 | Part | Attributes |
 | --- | --- |
 | `Root` | `data-pending`, `data-orientation`, `data-disabled` |
-| `List` | `role="tablist"`, `aria-orientation` (always set), `data-orientation`, `data-disabled`, `tabindex="0"` only while `value` is `null` (section 8); with `experimental_focusgroup`: `focusgroup="tablist inline wrap"` (`block` for vertical, `nowrap` when `loop={false}`) |
+| `List` | `role="tablist"`, `aria-orientation` (always set), `data-orientation`, `data-disabled`, `tabindex="0"` only while the List is the tab stop: `value` is `null`, or a controlled `value` matches no `Tabs.Tab` (section 8); with `experimental_focusgroup`: `focusgroup="tablist inline wrap"` (`block` for vertical, `nowrap` when `loop={false}`) |
 | `Tab` | `type="button"` (only when the rendered element is a `<button>`; `render={<a />}` gets no `type`, conventions 1.2), `role="tab"`, `id`, `aria-selected` (optimistic), `aria-controls` (always set, see below), `aria-disabled="true"` when disabled, `tabindex` (`0` on the optimistic tab, else `-1`), `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, `style="anchor-name: …"` |
 | `Panel` | `role="tabpanel"`, `id`, `aria-labelledby`, `tabindex="0"` (overridable), `data-selected` (committed); `hidden` in `"until-found"` mode |
 | `Indicator` | `aria-hidden="true"`, `hidden` when no optimistic selection, `data-selected` when there is one, `data-pending`, `style="position-anchor: …"` |

@@ -607,8 +607,8 @@ the library emits `data-pending` and nothing else.
 
 ### 3.7 `keepMounted` on content regions
 
-Content regions whose visibility is driven by library state (`Tabs.Panel`, `Accordion.Panel`)
-share one prop shape:
+Content regions whose visibility is driven by library state (`Tabs.Panel` today) share one prop
+shape:
 
 ```ts
 keepMounted?: boolean | "until-found";
@@ -620,7 +620,10 @@ keepMounted?: boolean | "until-found";
 | `true` | rendered inside `<Activity mode="hidden">` | DOM and state preserved, effects torn down, pre-rendered at low priority. The mode change happens inside the library's transition so nested `<ViewTransition>` boundaries get enter/exit. |
 | `"until-found"` | rendered with `hidden="until-found"` | Find-in-page and text fragments reveal it; the `beforematch` event dispatches the matching change action. Uses the ref-based upgrade from section 7.4 because react-dom serialises `hidden` as a boolean. Incompatible with `<Activity>` on the same element, hence a separate value rather than a second boolean. |
 
-Tabs defines the semantics first; Accordion reuses the prop unchanged.
+Tabs defines the semantics. Accordion has no `keepMounted`: its Panel is always mounted because
+`<details>` keeps its content in the DOM and reveals it on find-in-page natively
+(`design/components/accordion.md` 4.4). Future content regions that hide content via library
+state reuse the prop unchanged.
 
 ---
 
@@ -638,7 +641,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
-| `open` | boolean | Popup, Trigger, Accordion item/trigger/panel | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
 | `checked` | boolean | future Checkbox/Switch | |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
