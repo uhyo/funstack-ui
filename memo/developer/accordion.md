@@ -87,3 +87,12 @@ controls, browser tests), f1ddb5c (chevron CSS).
 - `experimental_interpolateSize` is observable in jsdom only through `render`'s `props.style`.
 - Dynamic boolean `exclusive={flag}` typechecks only without a value (the union needs a static
   discriminant once `value` / `defaultValue` / `valueChangeAction` is present).
+
+## 2026-10-16 — flaky "sync action (uncontrolled)" tests (fixed in 5fbaa51)
+
+Root cause was in the tests: RTL's asyncWrapper runs user-event with IS_REACT_ACT_ENVIRONMENT off, so the
+click's transition (and the post-await `startTransition(setCommitted)`) rendered on the real time-sliced
+Scheduler and could land after `user.click` returned on a cold start. Fix: a file-local `setupUser` that
+runs click/keyboard inside one async `act` (asyncWrapper swapped for a pass-through meanwhile). The shared
+`helpers.tsx` `setupUser` has the same latent race for suites that assert synchronously right after a
+user-event call into a transition — move the wrapper there if another suite flakes the same way.
