@@ -31,3 +31,10 @@ export const checkedMatchesWhileIndeterminate = (() => {
   el.indeterminate = true;
   return el.matches(":checked");
 })();
+
+/**
+ * `<dialog closedby>` (light dismiss and close-request control). Chromium 134+ and Firefox 141+;
+ * Safari 27.0 lacks it (Technology Preview only), so the Dialog's JS baseline runs there.
+ */
+export const supportsDialogClosedBy =
+  typeof HTMLDialogElement !== "undefined" && "closedBy" in HTMLDialogElement.prototype;

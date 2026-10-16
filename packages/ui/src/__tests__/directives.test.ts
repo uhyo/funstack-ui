@@ -42,6 +42,15 @@ const clientFiles = [
   "checkbox/checkbox.mjs",
   "internal/use-form-reset.mjs",
   "internal/use-native-checked.mjs",
+  // Every Dialog part and its context are client modules (design/components/dialog.md, 14).
+  "dialog/dialog-context.mjs",
+  "dialog/dialog-root.mjs",
+  "dialog/dialog-trigger.mjs",
+  "dialog/dialog-popup.mjs",
+  "dialog/dialog-close.mjs",
+  "dialog/dialog-form.mjs",
+  "dialog/dialog-title.mjs",
+  "dialog/dialog-description.mjs",
   // TODO(RadioGroup): add "internal/use-native-group-reconciliation.mjs" once RadioGroup.Root
   // imports it; the unbundled build only emits files reachable from an entry.
 ];
@@ -56,6 +65,7 @@ const directiveFreeFiles = [
   "tooltip/index.mjs",
   "switch/index.mjs",
   "checkbox/index.mjs",
+  "dialog/index.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

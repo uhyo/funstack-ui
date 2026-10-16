@@ -9,6 +9,7 @@ export default defineConfig({
     "src/tooltip/index.ts",
     "src/switch/index.ts",
     "src/checkbox/index.ts",
+    "src/dialog/index.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives

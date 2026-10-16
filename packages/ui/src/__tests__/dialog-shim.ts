@@ -1,0 +1,188 @@
+// Test-only `<dialog>` shim for jsdom (design/components/dialog.md, 13.1). jsdom 30 has
+// `HTMLDialogElement` with an `open` that reflects the attribute, but no `show`, `showModal`,
+// `close`, `requestClose`, `returnValue`, no `toggle` / `beforetoggle` / `cancel` / `close` events,
+// no Invoker Commands and no `getAnimations`. Installed only where `showModal` is missing, so the
+// browser project keeps the real implementation.
+//
+// It follows the platform where the Dialog can observe the difference:
+// - `show()` / `showModal()`: throw `InvalidStateError` when disconnected or open in the other
+//   mode; dispatch a cancelable `beforetoggle` synchronously; set `open`; mark the element modal
+//   (`matches(":modal")`); queue `toggle`; run a minimal focusing step (`[autofocus]` descendant,
+//   else the first focusable descendant, else the dialog).
+// - `close(v)`: a non-cancelable `beforetoggle` synchronously, removes `open` and the modal mark,
+//   sets `returnValue` when `v` is given, restores focus to the element focused at open (for a
+//   non-modal dialog only when focus is inside), queues `toggle` and `close` as tasks.
+// - `requestClose(v)`: a cancelable `cancel`, then `close(v)` unless it was prevented.
+// - `closedBy` is deliberately NOT defined, so the Dialog's feature detection for
+//   `experimental_closedBy` stays false and the JS baseline is what jsdom tests.
+// - Invoker Commands: a click on `button[commandfor][command]` that nobody cancelled dispatches a
+//   cancelable `command` event (with `command` and `source`) at the target and, unless that is
+//   cancelled, runs `show-modal`, `close` or `request-close` with the button's `value`. A submit
+//   button in a form does not invoke (the button's activation behaviour submits instead).
+// - `<form method="dialog">` (or a submitter with `formmethod="dialog"`): a submit that nobody
+//   cancelled closes the nearest dialog with the submitter's `value`, and is then cancelled so
+//   jsdom does not attempt a navigation.
+// - `getAnimations()` returns `[]` (the deferred unmount is a browser-mode test).
+// Events queued "as tasks" use `setTimeout(0)`, so fake timers flush them deterministically.
+
+const modalDialogs = new WeakSet<HTMLDialogElement>();
+const returnValues = new WeakMap<HTMLDialogElement, string>();
+const previousFocus = new WeakMap<HTMLDialogElement, Element | null>();
+
+const FOCUSABLE =
+  "button:not([disabled]), input:not([disabled]), select:not([disabled]), " +
+  "textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])";
+
+function toggleEvent(type: string, oldState: string, newState: string, cancelable: boolean): Event {
+  const event = new Event(type, { cancelable });
+  return Object.assign(event, { oldState, newState });
+}
+
+function queue(element: HTMLDialogElement, event: Event): void {
+  setTimeout(() => element.dispatchEvent(event), 0);
+}
+
+function focusingSteps(dialog: HTMLDialogElement): void {
+  const target =
+    dialog.querySelector<HTMLElement>("[autofocus]") ??
+    dialog.querySelector<HTMLElement>(FOCUSABLE) ??
+    dialog;
+  target.focus();
+}
+
+function open(dialog: HTMLDialogElement, modal: boolean): void {
+  if (dialog.open) {
+    if (modalDialogs.has(dialog) === modal) return;
+    throw new DOMException("The dialog is already open in the other mode.", "InvalidStateError");
+  }
+  if (!dialog.isConnected) {
+    throw new DOMException("The dialog is not connected.", "InvalidStateError");
+  }
+  const before = toggleEvent("beforetoggle", "closed", "open", true);
+  dialog.dispatchEvent(before);
+  if (before.defaultPrevented || dialog.open) return;
+  previousFocus.set(dialog, dialog.ownerDocument.activeElement);
+  dialog.setAttribute("open", "");
+  if (modal) modalDialogs.add(dialog);
+  queue(dialog, toggleEvent("toggle", "closed", "open", false));
+  focusingSteps(dialog);
+}
+
+function close(dialog: HTMLDialogElement, returnValue: string | undefined): void {
+  if (!dialog.open) return;
+  dialog.dispatchEvent(toggleEvent("beforetoggle", "open", "closed", false));
+  if (!dialog.open) return;
+  const wasModal = modalDialogs.has(dialog);
+  dialog.removeAttribute("open");
+  modalDialogs.delete(dialog);
+  if (returnValue !== undefined) returnValues.set(dialog, returnValue);
+  const doc = dialog.ownerDocument;
+  const previous = previousFocus.get(dialog);
+  previousFocus.delete(dialog);
+  const focusInside = doc.activeElement !== null && dialog.contains(doc.activeElement);
+  if (previous instanceof HTMLElement && previous.isConnected && (wasModal || focusInside)) {
+    previous.focus();
+  }
+  queue(dialog, toggleEvent("toggle", "open", "closed", false));
+  queue(dialog, new Event("close"));
+}
+
+function requestClose(dialog: HTMLDialogElement, returnValue: string | undefined): void {
+  if (!dialog.open) return;
+  const cancel = new Event("cancel", { cancelable: true });
+  dialog.dispatchEvent(cancel);
+  if (!cancel.defaultPrevented) close(dialog, returnValue);
+}
+
+/** Whether the shim considers `dialog` modal (jsdom only). Same as `matches(":modal")`. */
+export function isModal(dialog: Element): boolean {
+  return modalDialogs.has(dialog as HTMLDialogElement) && (dialog as HTMLDialogElement).open;
+}
+
+/** Dispatches a `command` event the way an invoker would (tests drive foreign invokers). */
+export function dispatchCommand(
+  target: Element,
+  command: string,
+  source: Element | null = null,
+): Event {
+  const event = Object.assign(new Event("command", { cancelable: true }), { command, source });
+  target.dispatchEvent(event);
+  return event;
+}
+
+if (typeof HTMLDialogElement !== "undefined" && !("showModal" in HTMLDialogElement.prototype)) {
+  const proto = HTMLDialogElement.prototype;
+  Object.defineProperty(proto, "returnValue", {
+    configurable: true,
+    get(this: HTMLDialogElement) {
+      return returnValues.get(this) ?? "";
+    },
+    set(this: HTMLDialogElement, value: string) {
+      returnValues.set(this, String(value));
+    },
+  });
+  Object.assign(proto, {
+    show(this: HTMLDialogElement) {
+      open(this, false);
+    },
+    showModal(this: HTMLDialogElement) {
+      open(this, true);
+    },
+    close(this: HTMLDialogElement, returnValue?: string) {
+      close(this, returnValue);
+    },
+    requestClose(this: HTMLDialogElement, returnValue?: string) {
+      requestClose(this, returnValue);
+    },
+  });
+
+  if (!("getAnimations" in Element.prototype)) {
+    Object.assign(Element.prototype, {
+      getAnimations() {
+        return [];
+      },
+    });
+  }
+
+  const matches = Element.prototype.matches;
+  Element.prototype.matches = function (this: Element, selector: string): boolean {
+    if (selector === ":modal") return isModal(this);
+    return matches.call(this, selector);
+  } as typeof matches;
+
+  // Invoker Commands: the command runs as the button's activation behaviour, after the click
+  // has been dispatched and only if it was not cancelled.
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented) return;
+    const button = event.target instanceof Element ? event.target.closest("button") : null;
+    if (button === null || button.disabled) return;
+    if (button.type === "submit" && button.form !== null) return;
+    const id = button.getAttribute("commandfor");
+    const command = button.getAttribute("command")?.toLowerCase();
+    if (id === null || command === undefined) return;
+    const target = button.ownerDocument.getElementById(id);
+    if (!(target instanceof HTMLDialogElement)) return;
+    const commandEvent = dispatchCommand(target, command, button);
+    if (commandEvent.defaultPrevented) return;
+    if (command === "show-modal") target.showModal();
+    else if (command === "close") target.close(button.value);
+    else if (command === "request-close") target.requestClose(button.value);
+  });
+
+  // `<form method="dialog">`: after the submit event, if nobody cancelled it.
+  document.addEventListener("submit", (event) => {
+    if (event.defaultPrevented) return;
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    const submitter = (event as SubmitEvent).submitter as
+      | HTMLButtonElement
+      | HTMLInputElement
+      | null;
+    const formMethod = submitter?.getAttribute("formmethod");
+    const method = formMethod != null ? formMethod.toLowerCase() : form.method;
+    if (method !== "dialog") return;
+    event.preventDefault();
+    const dialog = form.closest("dialog");
+    if (dialog !== null) close(dialog, submitter?.value ?? "");
+  });
+}

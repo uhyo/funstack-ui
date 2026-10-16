@@ -66,6 +66,26 @@ export type {
   CheckboxCheckedChangeDetails,
 } from "./checkbox/index.js";
 
+export { Dialog } from "./dialog/index.js";
+export type {
+  DialogRootProps,
+  DialogRootState,
+  DialogOpenChangeDetails,
+  DialogTriggerProps,
+  DialogTriggerState,
+  DialogPopupProps,
+  DialogPopupState,
+  DialogCloseProps,
+  DialogCloseState,
+  DialogCloseDetails,
+  DialogFormProps,
+  DialogFormState,
+  DialogTitleProps,
+  DialogTitleState,
+  DialogDescriptionProps,
+  DialogDescriptionState,
+} from "./dialog/index.js";
+
 export type {
   Action,
   ActionDetails,

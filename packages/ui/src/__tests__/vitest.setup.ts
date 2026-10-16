@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import "./popover-shim.js";
+import "./dialog-shim.js";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 import { settleOpenDeferreds } from "./helpers.js";
