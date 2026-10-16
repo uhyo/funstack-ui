@@ -25,7 +25,7 @@ This is a pnpm monorepo managed with Turbo:
 - `pnpm test` - Run tests in watch mode
 - `pnpm test:run` - Run all tests once (jsdom and browser projects)
 - `pnpm test:jsdom` - Run only the jsdom tests
-- `pnpm test:browser` - Run only the browser tests (headless Chromium via Playwright)
+- `pnpm test:browser` - Run only the browser tests (headless Chromium, Firefox and WebKit via Playwright; see Browser tests)
 - `pnpm typecheck` - Type check all packages
 - `pnpm lint` - Lint code with oxlint
 - `pnpm format` - Format code with oxfmt
@@ -38,7 +38,7 @@ All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and 
 - `pnpm --filter @funstack/ui build` - Build the ui package
 - `pnpm --filter @funstack/ui test` - Test the ui package
 - `pnpm --filter @funstack/ui test:browser:dev` - Browser tests in watch mode with a visible Chromium window
-- `pnpm --filter @funstack/ui exec playwright install chromium` - One-time download of the Chromium build the browser tests need (CI adds `--with-deps`)
+- `pnpm --filter @funstack/ui exec playwright install chromium firefox webkit` - One-time download of the engine builds the browser tests use (add `--with-deps` to install their system libraries; WebKit needs it on most Linux machines)
 - `pnpm --filter funstack-ui-example dev` - Run the playground dev server
 
 ### Docs site
@@ -53,12 +53,14 @@ All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and 
 
 ### Browser tests
 
-`packages/ui/vitest.config.ts` defines two vitest projects. `*.test.tsx` files run in the `jsdom` project; `*.browser.test.tsx` files run in the `browser` project, which uses `@vitest/browser-playwright` in headless Chromium. Both share `src/__tests__/vitest.setup.ts` and Testing Library. Use a browser test only for behaviour jsdom cannot observe (Popover API and `:popover-open`, CSS anchor positioning, `interestfor`, ViewTransition); keep everything else in jsdom, which is much faster. Firefox and WebKit instances are configured but off by default: `BROWSERS=chromium,firefox,webkit pnpm --filter @funstack/ui test:browser` after `pnpm --filter @funstack/ui exec playwright install firefox webkit`.
+`packages/ui/vitest.config.ts` defines two vitest projects. `*.test.tsx` files run in the `jsdom` project; `*.browser.test.tsx` files run in the `browser` project, which uses `@vitest/browser-playwright` with one instance per engine (Chromium, Firefox, WebKit). Both share `src/__tests__/vitest.setup.ts` and Testing Library. Use a browser test only for behaviour jsdom cannot observe (Popover API and `:popover-open`, CSS anchor positioning, `interestfor`, ViewTransition); keep everything else in jsdom, which is much faster.
+
+Engine selection: `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) picks engines explicitly and fails if one is missing; with it unset, CI (`CI` set) runs all three and a local run uses Chromium plus every other engine whose Playwright build is installed and passed Playwright's host-dependency check. CI runs one job per engine. Browser tests must pass on all three: where engines legitimately differ (`interestfor` is Chromium-only, Safari 27.0 lacks `popover="hint"`), branch on the feature checks in `src/__tests__/engine.ts` and assert the documented degraded behaviour rather than skipping; `server.browser` from `vitest/browser` names the engine when no feature check fits. Findings are in `memo/developer/cross-engine.md`.
 
 ## Tooling
 
 - TypeScript (strict, `verbatimModuleSyntax`), built with tsdown to ESM only
-- vitest with jsdom and Testing Library, plus vitest browser mode (Playwright, Chromium) for `*.browser.test.tsx`; `@testing-library/jest-dom` matchers are set up in `packages/ui/src/__tests__/vitest.setup.ts`
+- vitest with jsdom and Testing Library, plus vitest browser mode (Playwright: Chromium, Firefox, WebKit) for `*.browser.test.tsx`; `@testing-library/jest-dom` matchers are set up in `packages/ui/src/__tests__/vitest.setup.ts`
 - oxlint for linting, oxfmt for formatting (`docs/`, `memo/`, and `.claude/agents/` are excluded from formatting)
 - React `>=19.3` is a peer dependency; the library relies on React 19.3 features such as `<ViewTransition>`
 
