@@ -31,8 +31,21 @@ export function ActionPropsPage() {
           ["Tabs", "`value` / `defaultValue`", "`valueChangeAction`"],
           ["Accordion", "`value` / `defaultValue`", "`valueChangeAction`"],
           ["Tooltip", "open state is browser-owned", "none"],
+          [
+            "Dialog",
+            "`open` / `defaultOpen`",
+            "`openChangeAction` (awaited on open, a notification on close)",
+          ],
+          ["Switch, Checkbox", "`checked` / `defaultChecked`", "`checkedChangeAction`"],
+          ["RadioGroup", "`value` / `defaultValue`", "`valueChangeAction`"],
         ]}
       />
+      <p>
+        A part that performs one task rather than changing a state takes a plain <code>action</code>{" "}
+        (<code>Dialog.Close action</code>: run this, then close). A state that the consumer derives
+        and the library only mirrors is a controlled-only prop with no default and no action (
+        <code>Checkbox indeterminate</code>).
+      </p>
       <p>
         <code>undefined</code> always means "uncontrolled"; "nothing selected" is <code>null</code>.
         Switching between controlled and uncontrolled after mount is not supported (development
@@ -52,13 +65,48 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
       <p>
         The first argument is the next value, so the common case stays short. The second is a{" "}
         <code>details</code> object with the native DOM event (not React's synthetic one) and any
-        component-specific fields, such as <code>reason</code> on Tabs and Accordion. The return
-        type is <code>unknown</code>: return a promise and the component awaits it, return anything
-        else and it is ignored. That means a function that returns data (a Server Function, a{" "}
-        <code>fetch</code>) type-checks without wrapping.
+        component-specific fields, such as <code>reason</code> (below) or Dialog's{" "}
+        <code>returnValue</code>. The return type is <code>unknown</code>: return a promise and the
+        component awaits it, return anything else and it is ignored. That means a function that
+        returns data (a Server Function, a <code>fetch</code>) type-checks without wrapping.
       </p>
       <CodeBlock>{`<Toggle pressedChangeAction={(pressed) => api.setFavorite(id, pressed)}>Favorite</Toggle>
 <Tabs.Root defaultValue="general" valueChangeAction={(tab) => analytics.track(tab)}>...</Tabs.Root>`}</CodeBlock>
+
+      <h3>
+        <code>details.reason</code>
+      </h3>
+      <p>
+        Components that can change for more than one reason say why, with one library-wide
+        vocabulary (the public type <code>ChangeReason</code>):
+      </p>
+      <Table
+        head={["reason", "Meaning", "details.event"]}
+        rows={[
+          [
+            '`"activate"`',
+            "The user acted on one of the component's parts: a click, Enter or Space, focus in automatic activation, a Dialog Close button or form submit.",
+            "The native `click`, `keydown` or `focusin` event. For checkboxes and radios always the `click`, including Space and arrow keys.",
+          ],
+          [
+            '`"platform"`',
+            "The browser changed the state by itself: find-in-page, a form reset, or an interaction before hydration found on mount. Never a user gesture.",
+            "The platform event (`beforematch`, `toggle`, `reset`), or `undefined` on mount.",
+          ],
+          [
+            '`"dismiss"`',
+            "The user closed the component without one of its parts: Escape, Android back, an assistive-technology dismiss, a click outside.",
+            "The platform's `close` event.",
+          ],
+        ]}
+      />
+      <p>
+        Tabs, Accordion, Switch, Checkbox and RadioGroup dispatch <code>"activate"</code> and{" "}
+        <code>"platform"</code>; Dialog uses all three. A <code>"platform"</code> dispatch goes
+        through the same action as a user one, so a controlled parent hears about a form reset and
+        decides whether to adopt it. See{" "}
+        <a href="/concepts/browser-owned-state">Browser-owned state</a>.
+      </p>
 
       <h3>What happens on a click</h3>
       <p>The component does, in one transition of its own:</p>
@@ -81,8 +129,10 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
           is a transition update.
         </li>
         <li>
-          <strong>Disabled parts never dispatch</strong>, and no-op interactions (clicking the tab
-          that is already selected) do not dispatch either.
+          <strong>Disabled parts never dispatch</strong> for user interaction, and no-op
+          interactions (clicking the tab that is already selected) do not dispatch either. (A form
+          reset still reaches a disabled Switch, Checkbox or RadioGroup: the browser resets disabled
+          inputs too, and the form's author asked for it.)
         </li>
         <li>
           <strong>Parts are never disabled while pending.</strong> The library only sets{" "}
@@ -177,6 +227,39 @@ import { setFavorite } from "./actions"; // "use server"
           <code>details.event</code> directly rather than <code>toEqual({"{ event }"})</code>.
         </p>
       </Callout>
+
+      <h3>Form actions are a separate channel</h3>
+      <p>
+        <code>&lt;form action&gt;</code>, <code>useFormStatus</code> and React's automatic form
+        reset are React's form channel. A control's change action is per control and runs in the
+        control's own transition. The two are independent:
+      </p>
+      <ul>
+        <li>
+          A Switch, Checkbox or RadioGroup inside <code>&lt;form action={"{serverFn}"}&gt;</code>{" "}
+          needs no change action: with a <code>name</code> it posts its value like any native input,
+          and <code>useFormStatus().pending</code> covers the submit.
+        </li>
+        <li>
+          A control never folds <code>useFormStatus</code> into its own <code>pending</code>: that
+          would mark every control in the form pending during a submit. Read{" "}
+          <code>useFormStatus</code> in your own <code>className</code> function, or style{" "}
+          <code>form:has(...)</code>.
+        </li>
+        <li>
+          "Autosave on change" is <code>checkedChangeAction={"{saveSetting}"}</code>; "submit on
+          change" is <code>checkedChangeAction={"{() => formRef.current?.requestSubmit()}"}</code>.
+        </li>
+        <li>
+          A part may observe the form channel for a platform side effect: <code>Dialog.Form</code>{" "}
+          closes its dialog once the form action has settled. It never wraps your action, so a
+          Server Function keeps React's progressive enhancement.
+        </li>
+        <li>
+          While a form action is pending, a control's transition is entangled with it, and the
+          reverse: React commits them together.
+        </li>
+      </ul>
 
       <h3>What about native handlers?</h3>
       <p>

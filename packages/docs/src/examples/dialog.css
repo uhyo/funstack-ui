@@ -1,0 +1,127 @@
+/* Dialog: the Popup is the <dialog> itself. Open state is `:open` / `:modal` on it (exact in
+   both modes); the Trigger carries `data-open` / `data-pending` in library mode only. */
+
+/* CSS-only scroll lock, keyed on :modal: covers dialogs opened before hydration and nested ones. */
+html:has(.demo-dialog:modal) {
+  overflow: hidden;
+}
+
+.demo-dialog {
+  inline-size: min(28rem, calc(100vw - 32px));
+  padding: 20px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
+  overscroll-behavior: contain;
+}
+
+.demo-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.demo-dialog h2 {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  font-size: 1.2rem;
+}
+
+.demo-dialog p {
+  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Enter and exit with CSS, both modes. Enter works everywhere; the exit animates in Chromium
+   (with `overlay`) and Safari and is instant in Firefox. */
+.demo-dialog,
+.demo-dialog::backdrop {
+  opacity: 0;
+  transition:
+    opacity 150ms,
+    translate 150ms,
+    display 150ms allow-discrete,
+    overlay 150ms allow-discrete;
+}
+
+.demo-dialog {
+  translate: 0 8px;
+}
+
+.demo-dialog:open,
+.demo-dialog:open::backdrop {
+  opacity: 1;
+  translate: 0 0;
+}
+
+@starting-style {
+  .demo-dialog:open,
+  .demo-dialog:open::backdrop {
+    opacity: 0;
+  }
+  .demo-dialog:open {
+    translate: 0 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-dialog,
+  .demo-dialog::backdrop {
+    transition: none;
+  }
+}
+
+.demo-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.demo-dialog-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.demo-dialog-form input {
+  padding: 0.35em 0.6em;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.demo-dialog-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.demo-dialog-details dd {
+  margin: 0;
+}
+
+/* The Trigger in library mode: optimistic open and pending. */
+.demo-button[data-open] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.demo-button[data-pending] {
+  cursor: progress;
+}
+
+ul.demo-list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+ul.demo-list .demo-row {
+  justify-content: space-between;
+  max-inline-size: 20rem;
+  padding-block: 4px;
+}

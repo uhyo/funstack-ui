@@ -49,12 +49,18 @@ export function ExperimentalPage() {
             '`popover="hint"`',
             "Native light dismiss; a tooltip can open over an open menu without closing it. Engines that do not know `hint` treat it as `manual` and the JS handling stays.",
           ],
+          [
+            "`Dialog.Popup experimental_closedBy`",
+            "`closedby`",
+            'Renders `closedby="any"` (with `lightDismiss`) or `"closerequest"`; where the browser implements it (Chromium, Firefox), the platform handles Escape and outside clicks and the JS listeners are skipped. Safari keeps the JS.',
+          ],
         ]}
       />
       <CodeBlock>{`<Tabs.List experimental_focusgroup aria-label="Settings">...</Tabs.List>
 <Accordion.Root experimental_interpolateSize>...</Accordion.Root>
 <Tooltip.Trigger experimental_interestFor>Save</Tooltip.Trigger>
-<Tooltip.Popup experimental_hint>Saves the document</Tooltip.Popup>`}</CodeBlock>
+<Tooltip.Popup experimental_hint>Saves the document</Tooltip.Popup>
+<Dialog.Popup lightDismiss experimental_closedBy>...</Dialog.Popup>`}</CodeBlock>
 
       <h3>Rules</h3>
       <ul>

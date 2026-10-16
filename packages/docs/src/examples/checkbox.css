@@ -1,0 +1,78 @@
+/* Checkbox: the input is the box; ::before draws the check (clip-path) or the dash.
+   Selectors use [data-checked] rather than :checked because Chromium does not match :checked on
+   a box that is both checked and indeterminate. [data-indeterminate] also works before
+   hydration, where the DOM property (and :indeterminate) cannot be set yet. */
+.demo-checkbox {
+  appearance: none;
+  flex: none;
+  margin: 0;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  border: 2px solid var(--color-text-secondary);
+  border-radius: 0.25em;
+  display: inline-grid;
+  place-content: center;
+  color: var(--color-on-primary);
+  cursor: inherit;
+  transition:
+    background-color 120ms,
+    border-color 120ms;
+}
+
+.demo-checkbox::before {
+  content: "";
+  inline-size: 0.7em;
+  block-size: 0.7em;
+  background: currentColor;
+  scale: 0;
+  transition: scale 100ms;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.demo-checkbox:is([data-checked], [data-indeterminate]) {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.demo-checkbox[data-checked]::before {
+  scale: 1;
+}
+
+.demo-checkbox[data-indeterminate]::before {
+  scale: 1;
+  clip-path: none;
+  block-size: 0.18em;
+}
+
+.demo-checkbox[data-pending] {
+  opacity: 0.6;
+}
+
+.demo-checkbox:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.demo-checkbox:disabled {
+  opacity: 0.5;
+}
+
+.demo-checkbox:user-invalid {
+  border-color: #dc2626;
+}
+
+.demo-nested {
+  margin-inline-start: 1.6em;
+}
+
+.demo-options {
+  margin-top: 16px;
+  font-size: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-checkbox,
+  .demo-checkbox::before {
+    transition: none;
+  }
+}

@@ -42,3 +42,42 @@ Tooltip) merged in before the docs commits.
   explicit `provides` default.
 - tabs.md section 6 says the List is a tab stop only while `value` is null; section 8 and the code
   also cover a value that matches no tab.
+
+## Wave 2 pages (#32), 2026-10-16
+
+Branch `worktree-agent-a8f5c68aadcab75ea` (not pushed). Written from the code at master 07f8cc9;
+Dialog and RadioGroup reviews were still running, so props tables may need a touch-up after them.
+
+- Pages: `DialogPage`, `SwitchPage`, `CheckboxPage`, `RadioGroupPage` (+ routes in `App.tsx`,
+  nav in `navigation.ts`). Concepts updated: Action props (reason table incl. `"dismiss"`, form
+  channel section, naming rows), Browser-owned state (Dialog per-direction table, native inputs =
+  optimistic DOM as a correctness requirement, residual paths, consumer-owned mirrored
+  `indeterminate`), Server Components (before-hydration rows, JS-free dialog example), plus the
+  Transitions types table and the Experimental flags table (`experimental_closedBy`). Home and
+  Roadmap (Deferred: #19/#20/#21; Next: #33, #35; Upstream: #16, #34).
+- Examples: `DialogConfirm` (no "use client", JS-free), `DialogOrders`, `DialogProfile`,
+  `SwitchSettings`, `SwitchForm`, `CheckboxSelectAll`, `CheckboxForm`, `RadioGroupTheme`,
+  `RadioGroupRtl`, `RadioGroupForm`; CSS `dialog.css`, `switch.css`, `checkbox.css`,
+  `radio-group.css`. Shared bits moved to `demo.css` (`.demo-button` is now inline-flex,
+  `.demo-primary`, `.demo-danger`, `.demo-stack`, `.demo-field`).
+- `Table` `head` cells are plain strings (no `inline()`): no backticks there.
+- `.learn-content ul/p/h2` (0,1,1) beat a single example class; use `ul.demo-list` or rely on
+  the examples' CSS being imported after `pages.css` for equal specificity.
+
+### Verification notes
+
+- Playwright scratch script (deleted): all 18 pages load with no console errors/warnings; Dialog
+  JS-free confirm (open, Cancel, Delete returnValue), library mode (pending trigger while the
+  content suspends, opens complete, initialFocus, Escape -> `reason="dismiss"`, focus return,
+  cached re-open, backdrop light dismiss), Form (rejection inside the dialog keeps it open,
+  success closes); Switch autosave/rollback/form submit + auto reset + Reset; Checkbox mixed
+  parent (dash suspended while pending, rollback restores it), required/:user-invalid; RadioGroup
+  pending on Root+Item, arrows, RTL ArrowLeft, required, reset log `"m" (platform, reset)`.
+- **JS disabled does not show page content on this site**: `defer()` streams each page into
+  `<div hidden id="S:0">` revealed by React's inline `$RC` script. JS-free demos therefore need
+  JS enabled here (not the library's). Pre-hydration was tested by aborting `/assets/*.js`
+  instead (inline scripts still run): JS-free Dialog and a native Switch work. Server Components
+  page wording fixed accordingly.
+- Async entanglement is visible in the docs: an RTL radio's controlled readout lags while another
+  example's 800 ms save is pending (React commits entangled transitions together).
+- Screens are in light and dark mode via `--color-*`; the dialog uses `var(--color-bg)`.

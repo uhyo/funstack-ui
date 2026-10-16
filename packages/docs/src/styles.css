@@ -12,3 +12,7 @@
 @import "./examples/tabs.css";
 @import "./examples/accordion.css";
 @import "./examples/tooltip.css";
+@import "./examples/dialog.css";
+@import "./examples/switch.css";
+@import "./examples/checkbox.css";
+@import "./examples/radio-group.css";

@@ -24,7 +24,7 @@ const principles = [
   },
   {
     title: "Greedy about the platform",
-    body: "Popover API, CSS Anchor Positioning, <details name>, hidden=until-found, ::details-content, interestfor. Where HTML can do the job, it does.",
+    body: "Popover API, CSS Anchor Positioning, <dialog> with Invoker Commands, native form controls, <details name>, hidden=until-found, ::details-content, interestfor. Where HTML can do the job, it does.",
   },
   {
     title: "Accessibility is not optional",
@@ -123,10 +123,14 @@ export function HomePage() {
 
       <h2>Components</h2>
       <p>
-        The first four primitives settle the API conventions:{" "}
+        The first four primitives settled the API conventions:{" "}
         <a href="/components/toggle">Toggle</a>, <a href="/components/tabs">Tabs</a>,{" "}
         <a href="/components/accordion">Accordion</a> and <a href="/components/tooltip">Tooltip</a>.
-        A larger set follows; see the <a href="/roadmap">roadmap</a>.
+        The second wave brings overlays and native form controls:{" "}
+        <a href="/components/dialog">Dialog</a>, <a href="/components/switch">Switch</a>,{" "}
+        <a href="/components/checkbox">Checkbox</a> and{" "}
+        <a href="/components/radio-group">RadioGroup</a>. A larger set follows; see the{" "}
+        <a href="/roadmap">roadmap</a>.
       </p>
       <CodeBlock language="bash">{`npm install @funstack/ui`}</CodeBlock>
     </div>

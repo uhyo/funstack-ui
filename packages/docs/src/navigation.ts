@@ -29,6 +29,10 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/tabs", label: "Tabs" },
   { path: "/components/accordion", label: "Accordion" },
   { path: "/components/tooltip", label: "Tooltip" },
+  { path: "/components/dialog", label: "Dialog" },
+  { path: "/components/switch", label: "Switch" },
+  { path: "/components/checkbox", label: "Checkbox" },
+  { path: "/components/radio-group", label: "RadioGroup" },
 ];
 
 // Site-wide documentation navigation, rendered by the sidebar and the mobile menu.
