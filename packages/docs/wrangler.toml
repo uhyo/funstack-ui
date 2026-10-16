@@ -1,0 +1,10 @@
+#:schema node_modules/wrangler/config-schema.json
+# Deployment is not configured yet. `name` is a placeholder and no account is set: add
+# `wrangler` as a devDependency, set the account (CLOUDFLARE_ACCOUNT_ID in CI, not committed) and
+# the custom domain before the first `wrangler deploy`.
+name = "funstack-ui"
+compatibility_date = "2026-10-16"
+
+[assets]
+directory = "./dist/public"
+not_found_handling = "404-page"

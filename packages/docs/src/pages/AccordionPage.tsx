@@ -1,0 +1,352 @@
+import { CodeBlock } from "../components/CodeBlock.js";
+import { Callout, Example } from "../components/Example.js";
+import { PageHead } from "../components/PageHead.js";
+import { PropsTable, Table } from "../components/Tables.js";
+import { AccordionFaq } from "../examples/AccordionFaq.js";
+import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
+import { AccordionThreads } from "../examples/AccordionThreads.js";
+import accordionThreadsSource from "../examples/AccordionThreads.tsx?raw";
+import accordionCss from "../examples/accordion.css?raw";
+import { functionProps, renderProp } from "./shared-props.js";
+
+export function AccordionPage() {
+  return (
+    <div className="learn-content">
+      <PageHead
+        title="Accordion"
+        description="An accordion built on <details>/<summary>: JS-free when you need no state, a transition-driven state owner with optimistic data-open when you do."
+      />
+      <h2>Accordion</h2>
+      <p className="page-intro">
+        Built on <code>&lt;details&gt;</code> and <code>&lt;summary&gt;</code>. Without value props
+        it needs no JavaScript at all; with them it becomes a regular FUNSTACK UI state owner with
+        actions, optimistic <code>data-open</code> and Suspense-friendly panels.
+      </p>
+
+      <Example
+        source={accordionFaqSource}
+        fileName="AccordionFaq.tsx"
+        css={accordionCss}
+        cssFileName="accordion.css"
+      >
+        <AccordionFaq />
+      </Example>
+
+      <h3>Anatomy</h3>
+      <CodeBlock>{`import { Accordion } from "@funstack/ui/accordion";
+
+<Accordion.Root>                     {/* div: state, keyboard navigation */}
+  <Accordion.Item value="shipping">  {/* details */}
+    <Accordion.Trigger>              {/* summary: must be the Item's first child */}
+      <h3>Shipping</h3>
+    </Accordion.Trigger>
+    <Accordion.Panel>                {/* div: the content */}
+      We ship worldwide.
+    </Accordion.Panel>
+  </Accordion.Item>
+</Accordion.Root>`}</CodeBlock>
+      <p>
+        There is no Header part: the only valid place for a heading is inside the{" "}
+        <code>&lt;summary&gt;</code>, so put it in the Trigger. If you use <code>render</code>, the
+        Item must still render a <code>&lt;details&gt;</code> and the Trigger a{" "}
+        <code>&lt;summary&gt;</code> (development warning otherwise).
+      </p>
+
+      <h3>Two modes</h3>
+      <Table
+        head={["", "JS-free mode", "Library mode"]}
+        rows={[
+          [
+            "Selected when",
+            "Root has none of `value`, `defaultValue`, `valueChangeAction`",
+            "Root has any of them",
+          ],
+          ["Open state owner", "the browser", "React (committed state)"],
+          ["Initial open", "`Item defaultOpen`", "`Root defaultValue` / `value`"],
+          ["`exclusive`", "native `<details name>` group", "the library keeps at most one value"],
+          [
+            "`data-open`, `data-pending`",
+            "not emitted; style with `:open`",
+            "emitted (optimistic)",
+          ],
+          ["Works before hydration", "yes, fully", "yes; reconciled on mount"],
+          [
+            "`transition`",
+            "no effect (development warning)",
+            "animates the commit that ends an action",
+          ],
+        ]}
+      />
+      <p>
+        See <a href="/concepts/browser-owned-state">Browser-owned state</a> for the reasoning.
+        Switching modes after mount is not supported.
+      </p>
+
+      <h3>Props</h3>
+      <h4>
+        <code>Accordion.Root</code>
+      </h4>
+      <PropsTable
+        rows={[
+          {
+            name: "exclusive",
+            type: "boolean",
+            default: "false",
+            description:
+              "At most one item open. Also decides the value type: string | null when exclusive, string[] otherwise.",
+          },
+          {
+            name: "value",
+            type: "string[]  |  string | null (exclusive)",
+            description:
+              "Controlled open items. undefined means uncontrolled; [] or null means none open. Selects library mode.",
+          },
+          {
+            name: "defaultValue",
+            type: "string[]  |  string | null (exclusive)",
+            description: "Initial open items in uncontrolled library mode. Selects library mode.",
+          },
+          {
+            name: "valueChangeAction",
+            type: "ChangeAction<string[] | string | null, AccordionValueChangeDetails>",
+            description: (
+              <>
+                Called with the next open items on every change, inside the Root's transition. Sync,
+                async or a Server Function. <code>details</code>: <code>reason</code> (
+                <code>"activate"</code> or <code>"platform"</code>), <code>item</code> (the item
+                that changed) and <code>open</code> (its new state). In multiple mode the array
+                lists items in the order they mounted. Selects library mode.
+              </>
+            ),
+          },
+          {
+            name: "disabled",
+            type: "boolean",
+            default: "false",
+            description: 'Disables every item: triggers get aria-disabled="true" and never toggle.',
+          },
+          {
+            name: "experimental_interpolateSize",
+            type: "boolean",
+            default: "false",
+            description: (
+              <>
+                Sets <code>interpolate-size: allow-keywords</code> on the root so{" "}
+                <code>::details-content</code> can transition <code>height</code> to{" "}
+                <code>auto</code>. Chromium only today; merged under your <code>style</code>.
+              </>
+            ),
+          },
+          ...functionProps("AccordionRootState"),
+          renderProp("div", "AccordionRootState"),
+        ]}
+      />
+      <p>
+        <code>AccordionRootState</code>: <code>{"{ pending, disabled }"}</code>. The Root owns{" "}
+        <code>onKeyDown</code>.
+      </p>
+
+      <h4>
+        <code>Accordion.Item</code>
+      </h4>
+      <PropsTable
+        rows={[
+          {
+            name: "value",
+            type: "string",
+            description: "Required in both modes. Identifies the item in the Root's value.",
+          },
+          {
+            name: "defaultOpen",
+            type: "boolean",
+            default: "false",
+            description:
+              "JS-free mode only: renders the initial open attribute. Ignored in library mode (development warning).",
+          },
+          {
+            name: "disabled",
+            type: "boolean",
+            default: "false",
+            description:
+              "The Trigger gets aria-disabled and never toggles. Enforced by a click handler, so in JS-free mode it does not hold before hydration.",
+          },
+          {
+            name: "transition",
+            type: "ViewTransitionClass",
+            default: '"none"',
+            description:
+              "Library mode only. Forwarded to the <ViewTransition> around the <details>; animates the open/close commit.",
+          },
+          ...functionProps("AccordionItemState"),
+          renderProp("details", "AccordionItemState"),
+        ]}
+      />
+      <p>
+        <code>AccordionItemState</code>: <code>{"{ value, open, pending, disabled }"}</code>.{" "}
+        <code>open</code> is optimistic, and <code>undefined</code> in JS-free mode (the browser
+        owns it). <code>open</code>, <code>name</code> and <code>onToggle</code> are owned by the
+        library.
+      </p>
+
+      <h4>
+        <code>Accordion.Trigger</code>
+      </h4>
+      <PropsTable
+        rows={[
+          {
+            name: "transition",
+            type: "ViewTransitionClass",
+            default: '"none"',
+            description:
+              "Library mode only. Animates the commit that ends an action (for example a spinner disappearing), not the optimistic data-open flip.",
+          },
+          ...functionProps(
+            "AccordionTriggerState",
+            "Rendered from optimistic state; must not suspend. A heading inside is recommended.",
+          ),
+          renderProp("summary", "AccordionTriggerState"),
+        ]}
+      />
+      <p>
+        <code>AccordionTriggerState</code> is the Item's state. The Trigger owns{" "}
+        <code>onClick</code> in library mode (and on disabled items). There, links and form controls
+        inside the summary keep their own behaviour and do not toggle the item.
+      </p>
+
+      <h4>
+        <code>Accordion.Panel</code>
+      </h4>
+      <PropsTable
+        rows={[
+          {
+            name: "transition",
+            type: "ViewTransitionClass",
+            default: '"none"',
+            description:
+              "Library mode only. Animates content that mounts or changes in the commit that ends an action.",
+          },
+          ...functionProps(
+            "AccordionPanelState",
+            "Always mounted. The function form receives committed open: use it to mount content lazily.",
+          ),
+          renderProp("div", "AccordionPanelState"),
+        ]}
+      />
+      <p>
+        <code>AccordionPanelState</code>: <code>{"{ value, open, disabled }"}</code>, where{" "}
+        <code>open</code> is committed (<code>undefined</code> in JS-free mode). Panels have no{" "}
+        <code>keepMounted</code>: closed content is always in the DOM, which keeps it searchable.
+      </p>
+
+      <h3>Data attributes and pseudo-classes</h3>
+      <Table
+        head={["Hook", "On", "Meaning"]}
+        rows={[
+          ["`:open`", "Item (`details`)", "Committed open state, both modes."],
+          ["`data-open`", "Item, Trigger", "Optimistic open state (library mode only)."],
+          ["`data-pending`", "Root", "An action is in flight."],
+          ["`data-pending`", "Item, Trigger", "This item's open state is changing."],
+          ["`data-disabled`", "Root, Item, Trigger, Panel", "Disabled by prop or by the Root."],
+          ["`aria-disabled`", "Trigger", '`"true"` when disabled.'],
+          ["`::details-content`", "Item", "The native content slot: animate it."],
+        ]}
+      />
+      <CodeBlock language="css">{`.trigger { list-style: none; }                 /* hide the UA marker */
+.trigger::-webkit-details-marker { display: none; }
+.trigger::before { content: "▸"; }
+.item:open > .trigger:not([data-pending])::before,
+.trigger[data-open]::before { content: "▾"; }  /* flips at once in library mode */
+
+/* Open/close animation, every engine, both modes */
+.item::details-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease, content-visibility 200ms allow-discrete;
+}
+.item:open::details-content { grid-template-rows: 1fr; }
+.panel { min-height: 0; overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .item::details-content { transition: none; }
+}`}</CodeBlock>
+
+      <h3>Keyboard and ARIA</h3>
+      <Table
+        head={["Key", "Behaviour"]}
+        rows={[
+          ["Enter / Space on a trigger", "Toggles the item (native)."],
+          ["Tab / Shift+Tab", "Every trigger is a tab stop."],
+          [
+            "ArrowDown / ArrowUp",
+            "Next / previous trigger in the same Root, wrapping, skipping disabled triggers.",
+          ],
+          ["Home / End", "First / last enabled trigger."],
+        ]}
+      />
+      <ul>
+        <li>
+          The summary's disclosure role and expanded state are native. No <code>aria-*</code> is
+          added except <code>aria-disabled</code>.
+        </li>
+        <li>
+          HTML forbids <code>aria-expanded</code> on a summary, so assistive technology hears the
+          committed state; <code>data-open</code> is visual only. For an audible pending state,
+          render an <code>aria-live</code> region from the Trigger's state.
+        </li>
+        <li>Disabled triggers stay focusable. Focus never moves on open or close.</li>
+      </ul>
+
+      <h3>Async walkthrough (library mode)</h3>
+      <Example
+        source={accordionThreadsSource}
+        fileName="AccordionThreads.tsx"
+        css={accordionCss}
+        cssFileName="accordion.css"
+      >
+        <AccordionThreads />
+      </Example>
+      <ol>
+        <li>
+          Click a trigger: the click is intercepted, the chevron flips (<code>data-open</code>), the
+          item and trigger get <code>data-pending</code>, and{" "}
+          <code>valueChangeAction(next, {'{ reason: "activate", item, open: true }'})</code> runs.
+        </li>
+        <li>
+          The commit renders the Panel's function child with <code>open: true</code>; the replies
+          suspend, so React holds the commit. The <code>&lt;details&gt;</code> stays closed.
+        </li>
+        <li>
+          The data arrives: the item opens with its content in one commit, and{" "}
+          <code>data-pending</code> goes.
+        </li>
+        <li>
+          If the action rejects, <code>data-open</code> reverts, the item never opens, and the error
+          goes to the nearest Error Boundary.
+        </li>
+      </ol>
+      <Callout title="Find-in-page in library mode">
+        <p>
+          The browser opens a closed item when find-in-page or a text fragment matches its content.
+          The Accordion dispatches that as <code>reason: "platform"</code> with the{" "}
+          <code>toggle</code> event. If a controlled parent does not adopt the change, the item is
+          closed again when the action settles. Disabled items are re-closed without dispatching.
+        </p>
+      </Callout>
+
+      <h3>Recipes</h3>
+      <h4>Persist open sections with a Server Function</h4>
+      <CodeBlock>{`// Server Component
+<Accordion.Root defaultValue={user.openSections} valueChangeAction={saveOpenSections}>
+  ...
+</Accordion.Root>`}</CodeBlock>
+      <h4>Animate item boxes with ViewTransition</h4>
+      <CodeBlock>{`<Accordion.Root exclusive defaultValue={null} valueChangeAction={save}>
+  <Accordion.Item value="a" transition="grow">...</Accordion.Item>
+</Accordion.Root>`}</CodeBlock>
+      <p>
+        Use either the <code>transition</code> prop or a <code>::details-content</code> CSS
+        transition for a given change, not both.
+      </p>
+    </div>
+  );
+}
