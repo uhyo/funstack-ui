@@ -490,10 +490,14 @@ export function useControllableAction<T>(options: {
   const isControlled = options.controlled !== undefined;
   const committed = isControlled ? (options.controlled as T) : internal;
   const [optimistic, setOptimistic] = useOptimistic(committed, (_prev: T, next: T) => next);
+  const [supersededError, setSupersededError] = useState<unknown>(undefined);
+  // Throw BEFORE useTransition(): when a render throws, React retries with all pending lanes,
+  // and in that retry useTransition would unwrap the still-pending newer action's thenable and
+  // suspend, holding the boundary's fallback commit until that action settles (verified by the
+  // developer). Throwing first lets the boundary commit immediately.
+  if (supersededError !== undefined) throw supersededError; // reaches the same boundary
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
-  const [supersededError, setSupersededError] = useState<unknown>(undefined);
-  if (supersededError !== undefined) throw supersededError; // reaches the same boundary
 
   function dispatch(next: T, details: ActionDetails): void {
     const prev = committed;
