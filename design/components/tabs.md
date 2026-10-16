@@ -112,7 +112,7 @@ export interface TabsValueChangeDetails extends ActionDetails {
    * find-in-page or a text fragment (`details.event` is the `beforematch` event), or interaction
    * before hydration.
    */
-  readonly reason: "activate" | "platform";
+  readonly reason: ChangeReason; // shared public type, conventions 2.2
 }
 
 export interface TabsRootState {

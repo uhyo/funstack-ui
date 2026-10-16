@@ -12,8 +12,8 @@ import { startTransition, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
 import type { SwitchCheckedChangeDetails, SwitchProps } from "../switch/switch.js";
+import { user } from "./browser-user.js";
 import { deferred } from "./helpers.js";
 
 type Details = SwitchCheckedChangeDetails;
@@ -38,7 +38,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       input().focus();
       expect(input()).toHaveFocus();
 
-      await userEvent.keyboard(" ");
+      await user.keyboard(" ");
       await flush();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe(true);
@@ -47,7 +47,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       expect(input().matches(":checked")).toBe(true);
       expect(input()).toHaveAttribute("data-checked", "");
 
-      await userEvent.keyboard("{Enter}");
+      await user.keyboard("{Enter}");
       await flush();
       expect(action).toHaveBeenCalledTimes(1);
       expect(input().matches(":checked")).toBe(true);
@@ -62,7 +62,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
           Airplane mode
         </label>,
       );
-      await userEvent.click(screen.getByText("Airplane mode"));
+      await user.click(screen.getByText("Airplane mode"));
       expect(action).toHaveBeenCalledTimes(1);
       expect(input().matches(":checked")).toBe(true);
       expect(input()).toHaveAttribute("data-pending", "");
@@ -76,7 +76,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
     it("a controlled veto rolls the DOM back after settle", async () => {
       const d = deferred();
       render(<Control aria-label="Wi-Fi" checked={false} checkedChangeAction={() => d.promise} />);
-      await userEvent.click(input());
+      await user.click(input());
       expect(input().matches(":checked")).toBe(true);
       await act(async () => {
         d.resolve();
@@ -95,7 +95,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
           onClick={(e) => e.preventDefault()}
         />,
       );
-      await userEvent.click(input());
+      await user.click(input());
       await flush();
       expect(action).not.toHaveBeenCalled();
       expect(input().checked).toBe(false);
@@ -117,7 +117,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
           }}
         />,
       );
-      await userEvent.click(input());
+      await user.click(input());
       await flush();
       expect(input().checked).toBe(false);
       expect(input()).toHaveAttribute("data-checked", "");
@@ -127,8 +127,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
         d.resolve();
       });
       expect(input().checked).toBe(true);
-      // `userEvent` from vitest/browser is not wrapped in `act`, so React's act warnings land in
-      // the same spy; count only the library's warning.
+      // Count only the library's warning.
       const warnings = consoleError.mock.calls.filter(([m]) =>
         String(m).startsWith(`${name}: \`preventDefault()\``),
       );
@@ -153,9 +152,9 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
         );
       }
       render(<ProfileForm />);
-      await userEvent.click(input());
+      await user.click(input());
       expect(input().matches(":checked")).toBe(true);
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
       await act(async () => {
         d.resolve();
       });
@@ -164,7 +163,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       expect(input().matches(":checked")).toBe(false);
       expect(input()).not.toHaveAttribute("data-checked");
       // Still in sync: the next click turns it on.
-      await userEvent.click(input());
+      await user.click(input());
       expect(input().matches(":checked")).toBe(true);
       expect(input()).toHaveAttribute("data-checked", "");
     });
@@ -188,9 +187,9 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
         );
       }
       render(<Settings />);
-      await userEvent.click(input());
+      await user.click(input());
       expect(input().checked).toBe(false);
-      await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+      await user.click(screen.getByRole("button", { name: "Reset" }));
       await flush();
       expect(actions).toEqual([
         [false, "activate", "click"],
@@ -207,7 +206,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       document.body.append(container);
       container.innerHTML = renderToString(ui);
       const server = container.querySelector("input")!;
-      await userEvent.click(server);
+      await user.click(server);
       expect(server.checked).toBe(true);
 
       render(ui, { container, hydrate: true });

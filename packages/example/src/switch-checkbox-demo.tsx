@@ -1,4 +1,4 @@
-import { Component, startTransition, useRef, useState } from "react";
+import { Component, startTransition, useOptimistic, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Checkbox } from "@funstack/ui/checkbox";
@@ -197,19 +197,43 @@ const rows = [
   { id: "c", title: "Invoice #1003" },
 ];
 
+/** One selection change: a row toggled, or "select all" set. */
+type SelectionChange = { readonly id: string; readonly next: boolean } | { readonly all: boolean };
+
+function applyChange(selection: ReadonlySet<string>, change: SelectionChange): ReadonlySet<string> {
+  if ("all" in change) return new Set(change.all ? rows.map((r) => r.id) : []);
+  const s = new Set(selection);
+  if (change.next) s.add(change.id);
+  else s.delete(change.id);
+  return s;
+}
+
 function SelectAllDemo() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set(["b"]));
+  // Every pending change, applied on top of the committed selection: the parent box derives from
+  // what the rows show, so it is never "all" while a row's uncheck is still saving.
+  const [optimisticSelected, addOptimistic] = useOptimistic(selected, applyChange);
   const [failNext, setFailNext] = useState(false);
+  const failNextRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const all = selected.size === rows.length;
-  const some = selected.size > 0 && !all;
+  const all = optimisticSelected.size === rows.length;
+  const some = optimisticSelected.size > 0 && !all;
 
-  /** Saves the whole selection, then adopts it ("update on success"). */
-  async function save(next: ReadonlySet<string>) {
+  /**
+   * Runs inside the Checkbox's transition: shows the change optimistically, saves it, then adopts
+   * it with an updater ("update on success"), so overlapping saves never close over a stale set.
+   */
+  async function save(change: SelectionChange) {
+    addOptimistic(change);
     setError(null);
+    const fail = failNextRef.current;
+    if (fail) {
+      failNextRef.current = false;
+      setFailNext(false);
+    }
     try {
-      await fakeSave("selection", [...next], { fail: failNext });
-      startTransition(() => setSelected(next));
+      await fakeSave("selection", change, { fail });
+      startTransition(() => setSelected((prev) => applyChange(prev, change)));
     } catch (e) {
       startTransition(() => setError(e instanceof Error ? e.message : String(e)));
     }
@@ -220,12 +244,20 @@ function SelectAllDemo() {
       <h3>Tri-state "select all" (indeterminate, by hand)</h3>
       <p>
         The parent box is controlled: <code>checked</code> when every row is selected,{" "}
-        <code>indeterminate</code> when some are. Clicking the mixed box selects all. While the save
-        is pending the dash is hidden (<code>indeterminate &amp;&amp; !pending</code>); when the
-        save fails the selection rolls back and the dash returns.
+        <code>indeterminate</code> when some are, both derived from the rows' optimistic state (
+        <code>useOptimistic</code>). Clicking the mixed box selects all. While the save is pending
+        the dash is hidden (<code>indeterminate &amp;&amp; !pending</code>); when the save fails the
+        selection rolls back and the dash returns.
       </p>
       <label className="row">
-        <input type="checkbox" checked={failNext} onChange={(e) => setFailNext(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={failNext}
+          onChange={(e) => {
+            failNextRef.current = e.target.checked;
+            setFailNext(e.target.checked);
+          }}
+        />
         Make the next save fail
       </label>
       <div className="stack select-all">
@@ -234,7 +266,7 @@ function SelectAllDemo() {
             className="sc-checkbox"
             checked={all}
             indeterminate={some}
-            checkedChangeAction={(next) => save(next ? new Set(rows.map((r) => r.id)) : new Set())}
+            checkedChangeAction={(next) => save({ all: next })}
           />
           Select all
         </label>
@@ -242,13 +274,8 @@ function SelectAllDemo() {
           <label key={row.id} className="row nested">
             <Checkbox
               className="sc-checkbox"
-              checked={selected.has(row.id)}
-              checkedChangeAction={(next) => {
-                const s = new Set(selected);
-                if (next) s.add(row.id);
-                else s.delete(row.id);
-                return save(s);
-              }}
+              checked={optimisticSelected.has(row.id)}
+              checkedChangeAction={(next) => save({ id: row.id, next })}
             />
             {row.title}
           </label>

@@ -40,6 +40,11 @@ native-input machinery of conventions 3.8.
 - **`defaultChecked` is written before `checked`** in the re-apply effect: after a reset the
   dirty-checkedness flag is clear, and writing the `checked` content attribute (which is what
   `defaultChecked` reflects) then moves `checked` too; writing `checked` afterwards settles it.
+  Only reachable through React's automatic form reset: react-dom's `updateInput` writes
+  `el.checked` on every update of the input (setting the dirty flag), and the auto reset runs in
+  the form's mutation effects, after the inputs' and before layout effects. A plain
+  `form.reset()` followed by a re-render does not distinguish the orders. Test: "re-apply order"
+  in `use-native-checked.test.tsx` (verified failing with the order swapped).
 - **`guardCheckableChange` takes a third, optional `component` argument** for the warning prefix
   (the design's signature has two). "Once per instance" is implemented as once per input element
   (a module-level `WeakSet` keyed by `event.target`), since a plain function has no instance.
@@ -81,3 +86,43 @@ native-input machinery of conventions 3.8.
   that way (hydration, StrictMode, reset to a value and to `null`, cancelled reset).
 - Add `internal/use-native-group-reconciliation.mjs` to the directive test's client list.
 - `guardCheckableChange(event, dispatch, "RadioGroup.Item")` for the click guard and warning.
+
+## Review fixes (2026-10-16, memo/reviewer/switch-checkbox.md)
+
+- **M1 late group members.** `useNativeGroupReconciliation` now returns
+  `{ onItemMounted }` (stable). `useNativeChecked` takes `onItemMounted` and, with `group: true`,
+  calls it from a `[]` layout effect (Effect Event). The adapter ignores calls before its own mount
+  reconciliation ran (members of the Root's commit run their effects first; the flag is reset in
+  the effect cleanup so StrictMode's re-run behaves the same), otherwise queues one microtask per
+  commit that compares `readCurrent()` with `base()` and dispatches `platform` with no event. The
+  microtask reads the latest options from a ref updated in a layout effect (an Effect Event cannot
+  be called from a callback). RadioGroup: Root puts `onItemMounted` in context; Items pass
+  `onItemMounted: ctx.onItemMounted`.
+  - Known limit: if the value changes programmatically (not by a click) while BOTH the old and the
+    new radio are in a still-dehydrated boundary, the DOM keeps the server's checked radio and the
+    late reconciliation reads it as a user change (dispatches the old value). Telling the two
+    apart needs history (e.g. a native `change` listener on the fieldset for clicks on
+    unregistered members). Not done; edge on an edge.
+  - `Object.is` comparison: a future CheckboxGroup (array value) needs an `equals` option.
+- **M2** `deferred()` registers in a module-level set (removed on settle); `createSuspender`
+  entries are deferreds too. `vitest.setup.ts` `afterEach`: `cleanup()`, then
+  `settleOpenDeferreds()` resolves leftovers inside `act`. `src/__tests__/helpers.test.tsx` proves
+  it (fails without the hook).
+- **L2** `disabled` moved to the owned layer in Switch, Checkbox and Toggle. Tabs and Accordion
+  have no native `disabled` (they own `aria-disabled`), nothing to fix.
+- **L6** `src/__tests__/browser-user.ts`: `user.click` / `user.keyboard` wrap vitest/browser's
+  `userEvent` in an async `act`. Switch/Checkbox browser suites: 130 act warnings to 0. Tabs and
+  Accordion browser tests still log 62 (not converted: they rely on async native `toggle` events
+  and ViewTransition timing; left to their owners). Browser console output only shows with
+  `--silent=false` or on failure.
+  `optimizeDeps.include` added to the browser project. Six cold runs (`rm -rf node_modules/.vite`)
+  all logged "the scanner found every used dependency"; no import failure. The original flake did
+  not reproduce before the change either (one cold run), so the fix is preventive.
+- **L7** example select-all: `useOptimistic(selected, applyChange)` in the parent; rows and the
+  parent box derive from it; changes are `{ id, next }` / `{ all }` applied with an updater on
+  success; "Make the next save fail" clears itself after one save (ref + state). Checked with a
+  Playwright script on the dev server.
+- Seen during the cold runs: jsdom `accordion.test.tsx` "sync action (uncontrolled) > click
+  dispatches ... and opens" fails ~1 in 6 full cold runs (`open` attribute missing right after
+  the click). Happens with the original `vitest.setup.ts` too (baseline run), so it is a
+  pre-existing load-dependent flake (jsdom `toggle` via `setImmediate`), not caused by these fixes.

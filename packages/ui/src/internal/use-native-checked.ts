@@ -26,6 +26,12 @@ export interface UseNativeCheckedOptions {
    * `useNativeGroupReconciliation`. Default `false`: the hook reports both paths itself.
    */
   readonly group?: boolean | undefined;
+  /**
+   * Group members only: the Root's `onItemMounted` from `useNativeGroupReconciliation`. Called
+   * from this member's mount layout effect so that a member mounting after the Root (a Suspense
+   * boundary that hydrates later) still gets the group reconciled. Ignored without `group`.
+   */
+  readonly onItemMounted?: (() => void) | undefined;
   /** From `useControllableAction`: the value the DOM is compared against on the residual paths. */
   readonly latestInFlight?: (() => { readonly next: boolean } | null) | undefined;
   /**
@@ -95,6 +101,16 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
     reconcileMount();
   }, []);
 
+  // 2b. Group members tell the Root they mounted; the Root reconciles the group again if its own
+  //     mount reconciliation already ran (a member mounting later), which covers the `checked`
+  //     write this member skips in its mount commit (below).
+  const notifyMounted = useEffectEvent(() => {
+    if (group) options.onItemMounted?.();
+  });
+  useLayoutEffect(() => {
+    notifyMounted();
+  }, []);
+
   // 3. Re-apply after every commit (rule 8). `checked` is skipped in the mount commit (including
   //    StrictMode's re-run of it, which closes over the same render): React has just written it
   //    from the prop, or kept the hydrated DOM value for the residual path to read. That matters
@@ -105,8 +121,14 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
     if (mountToken.current === null) mountToken.current = renderToken;
     const el = node.current;
     if (el === null) return;
-    // `defaultChecked` first: after a reset the dirty-checkedness flag is clear, so writing the
-    // default can move `checked`; the `checked` write below then settles it.
+    // The order defaultChecked -> checked -> indeterminate is load-bearing for the first two.
+    // React's automatic reset after a <form action> runs in the mutation phase, after react-dom
+    // wrote `checked` and before this effect, and clears the dirty-checkedness flag; writing
+    // `defaultChecked` (a new default from the same transition) then moves `checked` too, and the
+    // `checked` write that follows restores the intended value. The other way round, the `checked`
+    // write is skipped (it still matches) and the DOM ends up on the new default.
+    // `indeterminate` is independent of both writes and goes last. Tested in
+    // use-native-checked.test.tsx ("re-apply order").
     if (defaultChecked !== undefined && el.defaultChecked !== defaultChecked) {
       el.defaultChecked = defaultChecked;
     }

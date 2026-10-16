@@ -101,9 +101,12 @@ export function Toggle({
     children,
     // Pass-through layer: a `render` element's own props win over these (its `type` included).
     // `type="button"` only on a real button; an `<a>` or a component element does not get it.
-    props: rendersButton(render) ? { ...rest, type: "button", disabled } : { ...rest, disabled },
+    props: rendersButton(render) ? { ...rest, type: "button" } : rest,
     // Library-controlled layer: wins over a `render` element's props.
     libraryProps: {
+      // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
+      // `render` element cannot re-enable (`disabled={false}`) or disable the button on its own.
+      disabled,
       "aria-pressed": optimistic,
       "data-pressed": dataAttr(optimistic),
       "data-pending": dataAttr(pending),

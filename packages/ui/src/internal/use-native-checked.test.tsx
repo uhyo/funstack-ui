@@ -1,5 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
-import { StrictMode, useState } from "react";
+import { StrictMode, startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -122,6 +122,80 @@ describe("useNativeChecked", () => {
       );
       expect(probe().defaultChecked).toBe(true);
       expect(probe().checked).toBe(false);
+    });
+
+    it("re-apply order: defaultChecked before checked, for React's reset inside the same commit", async () => {
+      // React's automatic reset after a <form action> runs in the commit's mutation phase, after
+      // react-dom wrote `checked` and before this hook's layout effect. The reset clears the
+      // dirty-checkedness flag, so the hook's `defaultChecked` write (the new default, changed in
+      // the same transition) also moves `checked`. Only a `checked` write after it restores the
+      // intended value; with `checked` first, that write is skipped (it still matches) and the DOM
+      // ends up on the new default. Fails if the order in the re-apply effect changes.
+      function SettingsForm() {
+        const [def, setDef] = useState(false);
+        return (
+          <form
+            action={async () => {
+              await Promise.resolve();
+              startTransition(() => setDef(true));
+            }}
+          >
+            <Probe checked={false} defaultChecked={def} group />
+            <button type="submit">Save</button>
+          </form>
+        );
+      }
+      render(<SettingsForm />);
+      await act(async () => {
+        screen.getByRole("button", { name: "Save" }).click();
+      });
+      await flush();
+      expect(probe().defaultChecked).toBe(true);
+      expect(probe().checked).toBe(false);
+    });
+
+    it("re-apply order: indeterminate survives the checked and defaultChecked writes", () => {
+      const { rerender } = render(
+        <form>
+          <Probe checked={false} defaultChecked={false} indeterminate />
+        </form>,
+      );
+      probe().form!.reset();
+      rerender(
+        <form>
+          <Probe checked defaultChecked indeterminate tick={1} />
+        </form>,
+      );
+      expect(probe().checked).toBe(true);
+      expect(probe().defaultChecked).toBe(true);
+      expect(probe().indeterminate).toBe(true);
+    });
+  });
+
+  describe("group members: onItemMounted", () => {
+    it("is called once from the mount commit with group: true, not on later commits", () => {
+      const onItemMounted = vi.fn();
+      const { rerender } = render(<Probe group onItemMounted={onItemMounted} />);
+      expect(onItemMounted).toHaveBeenCalledTimes(1);
+      rerender(<Probe group onItemMounted={onItemMounted} checked tick={1} />);
+      expect(onItemMounted).toHaveBeenCalledTimes(1);
+    });
+
+    it("is called again for StrictMode's re-run of the mount effects", () => {
+      // The group adapter dedupes; see use-native-group-reconciliation.test.tsx.
+      const onItemMounted = vi.fn();
+      render(
+        <StrictMode>
+          <Probe group onItemMounted={onItemMounted} />
+        </StrictMode>,
+      );
+      expect(onItemMounted).toHaveBeenCalledTimes(2);
+    });
+
+    it("is never called for a single control", () => {
+      const onItemMounted = vi.fn();
+      render(<Probe onItemMounted={onItemMounted} />);
+      expect(onItemMounted).not.toHaveBeenCalled();
     });
   });
 

@@ -170,8 +170,11 @@ Receives `(task.id, next, { reason: "activate" })`; `details.event` is virtual (
 ```
 
 `[data-indeterminate]` is listed next to `:indeterminate` on purpose: before hydration only the
-attribute exists (section 4). For the minimal case, `accent-color` alone recolours the native
-check and dash in every engine.
+attribute exists (section 4). One engine caveat for the `.cb:checked` rules: Chromium 156 does
+not match `:checked` on a box that is both checked and indeterminate (Firefox does), so a
+stylesheet that must handle `checked={true} indeterminate` selects on `[data-checked]` instead
+(conventions 4.2). For the minimal case, `accent-color` alone recolours the native check and dash
+in every engine.
 
 ### 2.7 A sibling indicator without a library part
 

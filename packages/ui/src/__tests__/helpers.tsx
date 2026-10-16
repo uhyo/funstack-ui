@@ -2,6 +2,7 @@ import { Component, use } from "react";
 import type { ReactNode } from "react";
 import { expect, describe } from "vitest";
 import { userEvent } from "@testing-library/user-event";
+import { act } from "@testing-library/react";
 
 /** A promise whose settlement the test controls. */
 export interface Deferred<T> {
@@ -10,14 +11,48 @@ export interface Deferred<T> {
   readonly reject: (reason?: unknown) => void;
 }
 
+/**
+ * Every deferred created by the current test that has not settled yet. A test that fails (or
+ * forgets) before settling its deferred would leave an async action pending, and React entangles
+ * every later transition in the same file with it: later tests' actions would stay pending. The
+ * `afterEach` in vitest.setup.ts settles the leftovers with `settleOpenDeferreds()`.
+ */
+const openDeferreds = new Set<() => void>();
+
 export function deferred<T = void>(): Deferred<T> {
-  let resolve!: Deferred<T>["resolve"];
-  let reject!: Deferred<T>["reject"];
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
+  let res!: Deferred<T>["resolve"];
+  let rej!: Deferred<T>["reject"];
+  const promise = new Promise<T>((resolve, reject) => {
+    res = resolve;
+    rej = reject;
   });
-  return { promise, resolve, reject };
+  const settleLeftover = () => res(undefined as T);
+  openDeferreds.add(settleLeftover);
+  return {
+    promise,
+    resolve: (value) => {
+      openDeferreds.delete(settleLeftover);
+      res(value);
+    },
+    reject: (reason) => {
+      openDeferreds.delete(settleLeftover);
+      rej(reason);
+    },
+  };
+}
+
+/**
+ * Resolves every deferred (and `createSuspender` entry) still open, with `undefined`, inside
+ * `act()` so that the async actions waiting on them finish and leave no entangled transition
+ * behind. Called by vitest.setup.ts after each test, after `cleanup()`.
+ */
+export async function settleOpenDeferreds(): Promise<void> {
+  if (openDeferreds.size === 0) return;
+  const open = [...openDeferreds];
+  openDeferreds.clear();
+  await act(async () => {
+    for (const settle of open) settle();
+  });
 }
 
 interface TrackedPromise<T> extends Promise<T> {
