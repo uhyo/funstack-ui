@@ -37,3 +37,5 @@
 - Batched for user: (2) release plan / npm publish of @funstack/ui 0.0.1? (3) docs deployment target (Cloudflare like siblings?).
 - 2026-10-16 ~10:20 JST MILESTONE: v0 scope complete — Toggle, Tabs, Accordion, Tooltip implemented + reviewed + review-fixed; docs site merged (#14). 409 tests (jsdom + Chromium). Open: #16 upstream, #19/#20/#21 deferred, #23 cross-engine.
 - Started #23 (opus, worktree). Batched for user: Proxy details.event confirm; release plan; docs deployment; manual find-in-page check; #16 upstream filing.
+- 2026-10-16 user decisions: (1) Proxy-served details.event CONFIRMED — Server Functions passed directly is an important feature. (2) release-funstack skill OK. (3) docs deploy to ui.funstack.work (Cloudflare). (4) Upstream issues (#16) are a HUMAN task — never file autonomously.
+- release-setup (opus) running: publish.yml, deploy-docs.yml, wrangler, skill, package metadata.
