@@ -65,3 +65,39 @@ Implementation of `design/components/toggle.md` plus the shared internals it nee
   no client-only API; a directive-free file is importable from anywhere), although the sketch in
   conventions 2.2 shows one. `expect.objectContaining({ event })` does not see a Proxy-served
   property; tests read `details.event` directly.
+
+## Review fixes (2026-10-16, from `memo/reviewer/toggle.md`)
+
+- `Action` returns `unknown` (conventions 2.2). `internal/types.test.ts` holds the `expectTypeOf`
+  checks; `toggle.test.tsx` row 8 also renders a `(next) => save(next)` action returning
+  `Promise<{ ok }>` and a sync action returning a number.
+- **Superseded rejections** (conventions 2.4, 3.4): the hook wraps the `await` in try/catch. Latest
+  dispatch rethrows (React's path); otherwise the first error is stored in `useState` and thrown
+  from render; later ones go to `reportError` (fallback `console.error`); after unmount they are
+  ignored (a `mounted` ref set in an effect). Tests: rows 12a/12b in both modes, a three-click
+  burst (first error to the boundary, second to `reportError`, deterministic because the two
+  catches run before React's microtask flush), and an unmount smoke test.
+  - **Gotcha found while implementing**: the `throw` must come *before* `useTransition()` in the
+    hook. When a render throws, React retries with `root.pendingLanes` (all of them), and in that
+    retry `useTransition` unwraps the still-pending action thenable and suspends
+    (`SuspendedOnAction`), so the boundary commit is held until the newer action settles. With the
+    throw first, the retry never reaches `useTransition` and the boundary commits at once. The
+    same holding happens to React's own latest-dispatch rejection when *another* component has a
+    pending action; nothing to do about that in the library.
+- **`mergeProps`** now takes three layers `(partProps, elementProps, libraryProps)` and
+  `useRender` gained a `libraryProps` option. Toggle puts `...rest`, `type`, `disabled` in `props`
+  (element wins, including `type`, per design section 3) and `aria-pressed`, `data-*` state and
+  `onClick` in `libraryProps`. Handlers run element, part, library. The four ARIA id-list
+  attributes are token-merged at every layer, element tokens first, deduped.
+- **`createActionDetails`** has `set`/`defineProperty` traps for `event`: dev throws `TypeError`;
+  prod `set` returns `true` (silently ignored; returning `false` would throw in strict-mode code),
+  prod `defineProperty` returns `false` (`Object.defineProperty` throws natively,
+  `Reflect.defineProperty` returns `false`; returning `true` for a non-configurable descriptor
+  would violate a Proxy invariant anyway). `isDev()` is read per call so the prod branch is
+  testable with `vi.stubEnv`.
+- Row 17 uses a `useLayoutEffect` recorder rendered through `children`; it reads the button via
+  its own span's `closest("button")` because a child's layout effect runs before the parent's
+  `ref` is attached in the same commit.
+- Rows 1/2 use fresh renders instead of rerendering across modes (no mode-switch warning in
+  stderr). The unmount-while-pending test is named as a smoke test.
+- Example veto demo uses a `useRef` call counter so every second save really fails.
