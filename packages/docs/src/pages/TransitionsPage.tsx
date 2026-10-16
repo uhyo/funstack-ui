@@ -21,12 +21,21 @@ export function TransitionsPage() {
         The <code>transition</code> prop
       </h3>
       <p>
-        Each part whose mount, unmount or content is driven by library state renders a{" "}
-        <code>&lt;ViewTransition default="none"&gt;</code> as the outermost node of its output. It
-        adds no DOM, and with <code>"none"</code> nothing animates and React does not even assign a
-        view-transition name. The <code>transition</code> prop is forwarded as <code>default</code>,
-        with exactly React's type: <code>"auto"</code>, <code>"none"</code>, a View Transition
-        class, or a map from transition type to class.
+        Each part whose mount, unmount or content is driven by library state has a{" "}
+        <code>transition</code> prop. When you pass it, the part renders a{" "}
+        <code>&lt;ViewTransition default=&#123;transition&#125;&gt;</code> as the outermost node of
+        its output; without it, the part renders no boundary at all. The value has exactly React's
+        type: <code>"auto"</code>, <code>"none"</code>, a View Transition class, or a map from
+        transition type to class.
+      </p>
+      <p>
+        Treat <code>transition</code> as static. Changing it between <code>undefined</code> and a
+        value remounts the part (development warns); switching between <code>"none"</code> and a
+        class does not. Any value, <code>"none"</code> and a type map that does not match included,
+        has a cost: when the part mounts or is revealed in a transition (a tab switch with{" "}
+        <code>keepMounted</code> <code>false</code> or <code>true</code>, a part inside a dialog
+        that opens), React starts a document view transition. The browser then cross-fades the whole
+        page for 250 ms, and the next transition commit waits for it.
       </p>
       <CodeBlock>{`<Tabs.Panel value="billing" transition="fade">...</Tabs.Panel>
 
@@ -48,6 +57,17 @@ export function TransitionsPage() {
         The library ships no animation, so there is nothing to turn off for reduced motion; keep the
         media query above in your own stylesheet.
       </p>
+      <p>
+        If you want only your own named animations, you can opt out of the page cross-fade with the
+        CSS below. It is optional and applies to every view transition on the page, including your
+        router's. The last rule keeps clicks working during a transition in Firefox, which otherwise
+        suppresses hit testing.
+      </p>
+      <CodeBlock language="css">{`::view-transition-old(root),
+::view-transition-new(root) { animation: none; }
+/* or: :root { view-transition-name: none; } */
+
+::view-transition { pointer-events: none; }`}</CodeBlock>
 
       <h3>Transition types</h3>
       <p>

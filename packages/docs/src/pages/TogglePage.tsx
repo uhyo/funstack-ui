@@ -76,7 +76,6 @@ export function TogglePage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
             description: (
               <>
                 Forwarded to the Toggle's <code>&lt;ViewTransition default&gt;</code>. Animates the
