@@ -1,0 +1,2 @@
+chromium 156.0.8078.4 {"afterClick":{"checked":true,"indeterminate":false},"afterCanceledClick":{"checked":false,"indeterminate":true}} appearance:none ::before renders = true
+firefox 157.0 {"afterClick":{"checked":true,"indeterminate":false},"afterCanceledClick":{"checked":false,"indeterminate":true}} appearance:none ::before renders = true

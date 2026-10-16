@@ -1,0 +1,45 @@
+
+== 1 native event order (no React)
+preventDefault=false: click(checked=true) -> input(checked=true) -> change(checked=true) -> after-dispatch(checked=true)
+preventDefault=true: click(checked=true) -> after-dispatch(checked=false)
+
+== 2 controlled checked, state set in a transition (no optimistic)
+async=false: DOM right after click=false, after tick=true, final=true
+    render checked=false pending=false | onChange event.type=click target.checked=true | render checked=false pending=true | render checked=true pending=false
+async=true: DOM right after click=false, after tick=false, final=true
+    render checked=false pending=false | onChange event.type=click target.checked=true | render checked=false pending=true | render checked=true pending=false
+
+== 3 checked={optimistic}, async action, resolve / reject(swallowed)
+resolve: DOM right after click=true; while pending=true pending=true; settled DOM=true committed=true optimistic=true
+reject: DOM right after click=true; while pending=true pending=true; settled DOM=false committed=false optimistic=false
+
+== 4 preventDefault() on the React onChange event (= native click), with optimistic
+DOM after click=false; after tick DOM=false optimistic=true; native input/change fired: []
+after resolve: DOM=true committed=true
+
+== 5 radio group (same name), controlled
+optimistic=false: after click=a--, pending=a--, settled=-b-
+optimistic=true: after click=-b-, pending=-b-, settled=-b-
+
+== 6 indeterminate as a React prop
+client: attr=null prop=false matches(:indeterminate)=false
+server: <input type="checkbox" readOnly=""/>
+server aria-checked=mixed on input: <input type="checkbox" aria-checked="mixed" readOnly=""/>
+dev errors: [
+  'Received `%s` for a non-boolean attribute `%s`.\n' +
+    '\n' +
+    'If you want to write it to the DOM, pass a string i',
+  'Received `%s` for a non-boolean attribute `%s`.\n' +
+    '\n' +
+    'If you want to write it to the DOM, pass a string i'
+]
+
+== 7 form reset / FormData
+initial: controlled.defaultChecked=true hasAttr(checked)=true
+FormData: [["controlled","on"],["uncontrolled","on"],["withvalue","yes"]]
+after clicks: controlled DOM=false state=false; uncontrolled DOM=false
+after form.reset(): controlled DOM=true state=false (desync if differ); uncontrolled DOM=true
+
+== 8 hydration when the user clicked before hydration
+after hydrate: DOM=true state=false onChange calls=[] hydration errors=0
+after next click: DOM=false state=false onChange calls=[false]

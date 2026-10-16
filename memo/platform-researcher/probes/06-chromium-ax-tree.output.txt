@@ -1,0 +1,19 @@
+checkbox     name="plain checkbox" {"invalid":"false","focusable":true,"checked":"false"}
+checkbox     name="indeterminate checkbox" {"invalid":"false","focusable":true,"checked":"mixed"}
+checkbox     name="aria-checked=mixed on input" {"invalid":"false","focusable":true,"checked":"false"}
+switch       name="input role=switch" {"invalid":"false","focusable":true,"checked":"true"}
+checkbox     name="input switch attr" {"invalid":"false","focusable":true,"checked":"false"}
+switch       name="button role=switch" {"invalid":"false","focusable":true,"checked":"true"}
+checkbox     name="button role=checkbox mixed" {"invalid":"false","focusable":true,"checked":"mixed"}
+group        name="Fruit" {"invalid":"false"}
+radiogroup   name="custom group" {"required":true}
+checkbox     name="required checkbox" {"invalid":"true","focusable":true,"checked":"false"}
+group        name="Req" {"invalid":"false"}
+Legend       name="" {}
+radio        name="apple" {"invalid":"false","focusable":true,"checked":"true"}
+radio        name="pear" {"invalid":"false","focusable":true,"checked":"false"}
+radio        name="g1" {"invalid":"false","focusable":true,"checked":"false"}
+Legend       name="" {}
+radio        name="h1" {"invalid":"true","focusable":true,"checked":"false"}
+radio        name="h2" {"invalid":"true","focusable":true,"checked":"false"}
+chromium 156.0.8078.4

@@ -1,0 +1,2 @@
+listenReset=false: FormData=[["c","on"]] useFormStatus.pending during=true; after action: DOM=false state=true 
+listenReset=true: FormData=[["c","on"]] useFormStatus.pending during=true; after action: DOM=false state=false reset event; scheduling re-sync / after reset DOM=false
