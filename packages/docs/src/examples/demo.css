@@ -9,6 +9,9 @@
 }
 
 .demo-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
   padding: 0.35em 0.9em;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -16,6 +19,37 @@
   color: var(--color-text);
   font: inherit;
   cursor: pointer;
+}
+
+.demo-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.demo-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+/* A vertical list of form controls, each in its own <label>. */
+.demo-stack {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+}
+
+.demo-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.demo-field:has([data-pending]) {
+  cursor: progress;
 }
 
 .demo-readout {

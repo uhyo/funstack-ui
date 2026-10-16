@@ -1,0 +1,97 @@
+/* RadioGroup: the Root is a <fieldset>, the Label its <legend>, each Item the visible radio
+   (appearance: none + ::before). `:checked` and `[data-checked]` agree: the DOM `checked` is the
+   optimistic value. */
+.demo-radio-group {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+  margin: 0;
+  padding: 0.5rem 1rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.demo-radio-group legend {
+  padding-inline: 0.3rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.demo-radio-group[data-pending] {
+  cursor: progress;
+}
+
+.demo-radio-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+.demo-radio {
+  appearance: none;
+  flex: none;
+  margin: 0;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  border: 2px solid var(--color-text-secondary);
+  border-radius: 50%;
+  display: inline-grid;
+  place-content: center;
+  cursor: inherit;
+  transition: border-color 120ms;
+}
+
+.demo-radio::before {
+  content: "";
+  inline-size: 0.6em;
+  block-size: 0.6em;
+  border-radius: 50%;
+  background: var(--color-primary);
+  scale: 0;
+  transition: scale 120ms;
+}
+
+.demo-radio:checked {
+  border-color: var(--color-primary);
+}
+
+/* Optimistic: flips on click, reverts on rejection or veto. */
+.demo-radio:checked::before {
+  scale: 1;
+}
+
+.demo-radio:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.demo-radio:user-invalid {
+  border-color: #dc2626;
+}
+
+.demo-field:has(.demo-radio:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The row spinner shows only next to the radio the user is waiting on. */
+.demo-radio-spinner {
+  display: none;
+}
+
+.demo-field:has(.demo-radio[data-pending]) .demo-radio-spinner {
+  display: inline-block;
+}
+
+.demo-radio-saving {
+  font-weight: normal;
+  font-size: 0.85em;
+  color: var(--color-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-radio,
+  .demo-radio::before {
+    transition: none;
+  }
+}

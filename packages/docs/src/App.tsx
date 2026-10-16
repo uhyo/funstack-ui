@@ -39,6 +39,10 @@ const TogglePage = lazyPage(() => import("./pages/TogglePage.js"), "TogglePage")
 const TabsPage = lazyPage(() => import("./pages/TabsPage.js"), "TabsPage");
 const AccordionPage = lazyPage(() => import("./pages/AccordionPage.js"), "AccordionPage");
 const TooltipPage = lazyPage(() => import("./pages/TooltipPage.js"), "TooltipPage");
+const DialogPage = lazyPage(() => import("./pages/DialogPage.js"), "DialogPage");
+const SwitchPage = lazyPage(() => import("./pages/SwitchPage.js"), "SwitchPage");
+const CheckboxPage = lazyPage(() => import("./pages/CheckboxPage.js"), "CheckboxPage");
+const RadioGroupPage = lazyPage(() => import("./pages/RadioGroupPage.js"), "RadioGroupPage");
 const RoadmapPage = lazyPage(() => import("./pages/RoadmapPage.js"), "RoadmapPage");
 const NotFoundPage = lazyPage(() => import("./pages/NotFoundPage.js"), "NotFoundPage");
 
@@ -116,6 +120,10 @@ export const routes = [
                   page("/tabs", "/components/tabs", TabsPage, "TabsPage"),
                   page("/accordion", "/components/accordion", AccordionPage, "AccordionPage"),
                   page("/tooltip", "/components/tooltip", TooltipPage, "TooltipPage"),
+                  page("/dialog", "/components/dialog", DialogPage, "DialogPage"),
+                  page("/switch", "/components/switch", SwitchPage, "SwitchPage"),
+                  page("/checkbox", "/components/checkbox", CheckboxPage, "CheckboxPage"),
+                  page("/radio-group", "/components/radio-group", RadioGroupPage, "RadioGroupPage"),
                 ],
               }),
               page("/roadmap", "/roadmap", RoadmapPage, "RoadmapPage"),
