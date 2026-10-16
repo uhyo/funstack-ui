@@ -66,6 +66,16 @@ export type {
   CheckboxCheckedChangeDetails,
 } from "./checkbox/index.js";
 
+export { RadioGroup } from "./radio-group/index.js";
+export type {
+  RadioGroupRootProps,
+  RadioGroupRootState,
+  RadioGroupValueChangeDetails,
+  RadioGroupLabelProps,
+  RadioGroupItemProps,
+  RadioGroupItemState,
+} from "./radio-group/index.js";
+
 export type {
   Action,
   ActionDetails,
