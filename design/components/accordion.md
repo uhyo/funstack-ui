@@ -181,7 +181,7 @@ onClick={(event) => {
   if (isNestedInteractive(event)) return;      // a link inside the summary: native rule, no toggle
   event.preventDefault();                       // the browser does not touch `open`
   if (disabled) return;
-  item.dispatch(!item.optimisticOpen, { event: event.nativeEvent, reason: "trigger" });
+  item.dispatch(!item.optimisticOpen, { event: event.nativeEvent, reason: "activate" });
 }}
 ```
 
@@ -324,8 +324,8 @@ export interface AccordionRootState {
 }
 
 export interface AccordionValueChangeDetails extends ActionDetails {
-  /** "trigger": the user activated a Trigger. "platform": the browser changed `open` (find-in-page, pre-hydration click). */
-  readonly reason: "trigger" | "platform";
+  /** Library-wide vocabulary (conventions 2.2). "activate": the user activated a Trigger. "platform": the browser changed `open` (find-in-page, pre-hydration click). */
+  readonly reason: "activate" | "platform";
   /** The item whose open state changed. */
   readonly item: string;
   /** That item's new open state. */
@@ -828,7 +828,7 @@ and controlled wrappers (controlled follows update-on-success). Library mode unl
 | --- | --- |
 | Roles and ARIA | Default elements are `div > details > summary + div`; no ARIA added except `aria-disabled`; `exclusive` in JS-free mode renders the same `name` on every details and none in library mode; `defaultOpen` renders `open` in JS-free mode and warns in library mode. |
 | Keyboard | ArrowDown/ArrowUp wrap, Home/End, disabled triggers skipped, nested Root does not steal keys. Enter/Space toggling is **not** testable in jsdom (no synthesized click on summary; see below); covered by the click path plus a browser-mode note. |
-| Sync action (both) | Click dispatches `(next, { event, reason: "trigger", item, open })`; `event` is the native `MouseEvent`; disabled items never dispatch and the click is default-prevented; clicking a link inside the summary neither toggles nor dispatches; multiple vs exclusive compute `next` correctly. |
+| Sync action (both) | Click dispatches `(next, { event, reason: "activate", item, open })`; `event` is the native `MouseEvent`; disabled items never dispatch and the click is default-prevented; clicking a link inside the summary neither toggles nor dispatches; multiple vs exclusive compute `next` correctly. |
 | Async action (both) | While unresolved: `data-pending` on Root, Item, Trigger; `data-open` on Trigger/Item; `details.open` false; Panel `state.open` false. After resolve: `open` true, `data-pending` gone. |
 | Rejection (both) | `ErrorCatcher` receives the error; `data-open` gone; `details.open` still false; uncontrolled value unchanged. Caught-inside: commits. |
 | Overlap | Walkthrough 9.3 with `deferred()` resolved out of order; final `open` attributes match the latest dispatch; action called twice. |

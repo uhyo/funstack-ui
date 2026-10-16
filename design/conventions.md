@@ -222,7 +222,17 @@ export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Act
 
 `details` is the native DOM event (not React's synthetic one) plus component-specific fields,
 typed per component as `<Component><State>ChangeDetails` (for example `TabsValueChangeDetails`
-may add `reason: "activate" | "fallback"`). The first argument is always the next value, so the
+adds `reason`).
+
+**`details.reason` vocabulary is library-wide** (product-owner decision): a component that
+exposes `reason` uses exactly these values and no synonyms:
+
+| `reason` | Meaning | `details.event` |
+| --- | --- | --- |
+| `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). |
+| `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), or interaction before hydration reconciled at mount. | The platform event, or `undefined` for mount reconciliation. |
+
+Adding a third value is a change to this document, not to one component. The first argument is always the next value, so the
 common case stays short:
 
 ```tsx
@@ -573,6 +583,8 @@ Rules:
   a React transition). Those parts animate with `@starting-style` and
   `transition-behavior: allow-discrete` in CSS, and the component docs show the CSS.
 - Per-component designs list every state and label it library-owned or browser-owned.
+- Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
+  dispatches use `"activate"`.
 
 ### 3.6 `disabled`
 
@@ -903,7 +915,7 @@ notes"):
 | Gap | Convention |
 | --- | --- |
 | Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). |
-| Attribute untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`) | One module augmentation file, `src/internal/platform-attributes.d.ts`, augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs. The file is shipped in `dist` and referenced from the root `.d.mts` so consumers get the same types. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
+| Attribute untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`) | One module augmentation **`.ts` module**, `src/internal/platform-attributes.ts`, imported from the package entry, augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs. It must be a `.ts` file that the entry imports, not a `.d.ts`: tsdown emits declarations only for reachable `.ts` sources, so a `.d.ts` is typecheck-only and never reaches `dist` (observed with Tabs' `focusgroup`). Whether the dts build then ships the augmentation as expected is pending the reviewer's confirmation. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
@@ -1130,6 +1142,9 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     resolved by research #17, `docs/research/server-function-action-props.md`, option (e), see
     section 2.2). Server Functions may be passed directly to any action prop; the thin client
     wrapper is optional.
+14. **`details.reason` vocabulary unified** to `"activate"` | `"platform"` (section 2.2); Tabs'
+    `"find"` and Accordion's `"trigger"` are renamed.
+15. **Tabs warns in development** when neither `value` nor `defaultValue` is given.
 
 ## Open questions
 
