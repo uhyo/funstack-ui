@@ -41,3 +41,4 @@
 - release-setup (opus) running: publish.yml, deploy-docs.yml, wrangler, skill, package metadata.
 - #23 merged; CI green on chromium/firefox/webkit (run 38835425057). Release/deploy setup done (user must add secrets, npm trusted publisher, CF custom domain). v0 backlog empty except deferred #19/#20/#21 and human #16.
 - Next: propose roadmap for the next component wave to user.
+- WAVE 2 approved by user: Dialog + Switch + Checkbox/Radio, fully autonomous pipeline. Issues #24–#32. Research first (opus), then designs (fable architect), impl/review (opus).
