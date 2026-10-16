@@ -8,7 +8,7 @@ Function note in 2.4). Binding for every component design in
 over any individual component design.
 
 Inputs: `docs/vision.md`, `docs/research/react-async-apis.md`, `docs/research/popover-anchor-tooltip.md`,
-`docs/research/modern-platform-survey.md`, prior art (Base UI, React Aria Components, Radix,
+`docs/research/modern-platform-survey.md`, `docs/research/form-controls.md` (wave 2), prior art (Base UI, React Aria Components, Radix,
 Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 `memo/architect/conventions-notes.md`.
 
@@ -99,6 +99,12 @@ Rules for the element passed to `render` (same as Base UI):
 
 - A custom component must accept `ref` as a prop (React 19; no `forwardRef`) and spread the
   received props onto its DOM node.
+- A part whose default element is a **native input** (`Checkbox`, `Switch`, `RadioGroup.Item`)
+  must stay an `<input>` of the same `type`: `render` may substitute a styled input or a wrapper
+  component that renders one, never a `<button>` or `<div>`. The input is a void element, so it
+  has no children; visual indicators are **sibling parts** (`Indicator`) that receive the same
+  state attributes. Replacing the element would lose form participation, validation, reset, label
+  activation, native radio keyboard handling and RTL mirroring (`docs/research/form-controls.md`).
 - `className`: the library's and the element's are concatenated. `style`: merged, element wins.
 - Event handlers the library installs (for example `onClick` on a `Tab`): both run, the element's
   first, then the library's. v0 provides no way to cancel the library's handler from there.
@@ -232,7 +238,7 @@ exposes `reason` uses exactly these values and no synonyms:
 
 | `reason` | Meaning | `details.event` |
 | --- | --- | --- |
-| `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). |
+| `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). For native checkbox and radio inputs it is always the `click` `PointerEvent`, including Space and radio arrow keys, because React's `onChange` for them is click-driven. |
 | `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), or interaction before hydration reconciled at mount. | The platform event, or `undefined` for mount reconciliation. |
 
 Adding a third value is a change to this document, not to one component. The first argument is always the next value, so the
@@ -318,7 +324,14 @@ What a consumer can rely on:
    promise settles *and* the resulting render has committed (including any Suspense wait on
    already-visible content).
 3. **The synchronous prefix runs during the DOM event dispatch.** `details.event.preventDefault()`
-   works there, and any `setState` in the prefix is a Transition update.
+   works there, and any `setState` in the prefix is a Transition update. It is **not a veto**: the
+   action still runs and still commits. On a checkable native input (`Checkbox`, `Switch`,
+   `RadioGroup.Item`) it is **unsupported**: cancelling the `click` makes the browser restore the
+   DOM `checked` *after* React has restored it to the optimistic value, and suppresses `input` and
+   `change`, so the DOM shows the old value while `optimistic` and `data-checked` say the new one
+   for as long as the action is pending (`docs/research/form-controls.md` §2). The library logs a
+   dev warning when `details.event.defaultPrevented` is true after the sync prefix. Vetoing is
+   done with controlled mode: the parent simply does not adopt the change (section 2.4).
 4. **`setState` after the consumer's own `await` is not a Transition** (React limitation). Wrap it:
    ```tsx
    valueChangeAction={async (next) => {
@@ -422,6 +435,25 @@ genuinely needs it (text input in Combobox). Until then the stance is: a consume
 urgent update from a FUNSTACK interaction attaches a native handler through pass-through or `ref`,
 and that path is unsupported and undocumented. Flagged for the product owner (open question 2).
 
+### 2.7 Form-level actions are a separate channel
+
+`<form action>`, `useFormStatus` and React's automatic form reset are React's form channel. A
+control's `<state>ChangeAction` is per-control and runs in the control's own transition. The two
+are independent and the library does not couple them:
+
+- A control inside `<form action={serverFn}>` with no change action is an uncontrolled native
+  input that posts `name=value` with the form; `useFormStatus().pending` covers the submit.
+- A control **must not** fold `useFormStatus` into its own `pending`: that would mark every
+  control in the form pending during a submit. A consumer who wants that reads `useFormStatus`
+  in their own `className` function or styles `form:has(...)`.
+- "Autosave on change" is `checkedChangeAction={saveSetting}` (a Server Function may be passed
+  directly, section 2.2); "submit on change" is
+  `checkedChangeAction={() => formRef.current?.requestSubmit()}`.
+- Entanglement (item 5 above) applies across the channels: while a form action is pending a
+  control's transition is entangled with it, and the reverse.
+- React's reset after a successful form action is a residual browser path for controlled native
+  inputs (section 3.5).
+
 ---
 
 ## 3. State model
@@ -467,6 +499,16 @@ render that suspends shows the Suspense fallback. Keying a panel off optimistic 
 the fallback whenever the new panel loads data. Keying it off committed state keeps the old panel
 visible, marks the tab `data-pending`, and swaps when the data is ready. That is the
 Suspense-native behaviour the vision asks for.
+
+For **controlled native inputs** (`<input type="checkbox">` in Checkbox and Switch,
+`<input type="radio">` in RadioGroup) rendering optimistic state on the trigger is a correctness
+requirement, not a visual nicety. At the end of every event react-dom restores a controlled
+input's DOM `checked` to its current prop after flushing sync work; only the SyncLane optimistic
+update is flushed before that restore. `checked={optimistic}` (radios:
+`checked={optimistic === item.value}`) therefore keeps the DOM, the attributes and the
+accessibility tree in sync, and a rejection rolls the DOM back when optimistic reverts. A native
+input driven by transition-lane state alone snaps back on click and stays stale until the action
+settles (verified in jsdom, Chromium and Firefox; `docs/research/form-controls.md` §2).
 
 Two consequences to document on every trigger part: content rendered from a trigger's state (its
 `children` function) must not suspend, or must have its own Suspense boundary; and the optimistic
@@ -575,7 +617,7 @@ can delay or roll it back. The boundary:
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
 | Server Components | Only through Server Functions as actions | Uncontrolled form needs no behaviour JS; the part may still be a client module (section 7.3) |
-| Residual browser path | A library-owned state the browser can also change (find-in-page revealing `<details>` or `hidden="until-found"`, pre-hydration clicks on `<summary>`) is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event, then re-applying committed state to the DOM after the action settles | n/a |
+| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event | n/a |
 
 Rules:
 
@@ -642,7 +684,8 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
 | `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
-| `checked` | boolean | future Checkbox/Switch | |
+| `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` is an exact equivalent. |
+| `indeterminate` | boolean | Checkbox (controlled-only prop; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after the action settles, since the browser clears it on every click. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
@@ -672,6 +715,19 @@ exists to smooth over device differences; the library's browser policy (latest e
 that unnecessary, and leaving it out keeps every part free of pointer tracking code. Platform
 pseudo-classes for state (`:open`, `:popover-open`, `:disabled`) are documented next to the
 equivalent data attribute where both apply.
+
+For native inputs the equivalence is exact, because the DOM holds the optimistic state:
+
+| On the input | Data attribute | Note |
+| --- | --- | --- |
+| `:checked` | `data-checked` | Identical except under the unsupported `preventDefault()` misuse (2.3). |
+| `:indeterminate` | `data-indeterminate` | Only the attribute works before hydration; `:indeterminate` also matches every radio in a group with no selection. |
+| `:disabled` | `data-disabled` | Only the pseudo-class sees `<fieldset disabled>` inheritance. |
+| `:user-invalid`, `:required` | none | Platform only; no attribute. |
+
+The data attributes are still emitted, because sibling or wrapper parts (an `Indicator`, a label
+Root) cannot use `:checked` on themselves; `:has(:checked)` on a wrapper is the zero-JS
+alternative.
 
 ### 4.3 Where `data-pending` lands
 
@@ -910,7 +966,8 @@ find-in-page reveal and exclusive groups via `name` with no hydration required; 
 in the client bundle and hydrates to add the action props, controlled mode and animation. What
 they do not get: a directive-free module. Truly directive-free variants (parts that take their
 wiring as props instead of context) are tracked in issue #19 and are not part of the initial
-four. Passing any action prop to a part from a Server Component is a type error unless the action
+four; action-less Checkbox, Switch and RadioGroup are the strongest candidates there, since a
+native input already works without JS. Passing any action prop to a part from a Server Component is a type error unless the action
 is a Server Function (section 2.2).
 
 ---
