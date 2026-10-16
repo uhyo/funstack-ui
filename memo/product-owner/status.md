@@ -51,3 +51,4 @@
   - Human tasks: jsdom checkbox canceled-activation bug (report upstream); find-in-page manual check; release/deploy secrets.
 - 2026-10-16 resumed. Running: review-switch-checkbox (opus), radio-group-impl (#31, opus, worktree), dialog-impl (#29, opus, worktree), architect doc follow-ups (dismiss reason etc.). User away; proceed autonomously.
 - Dialog (#29) merged aed025c (846 tests). Switch/Checkbox fixes landed (onItemMounted API). Running: review-dialog, radio-group-impl merging master, accordion-flake fix, research-vt-mount (#35), architect doc updates.
+- RadioGroup (#31) merged 07f8cc9 (959 tests). All wave-2 components on master. Running: review-dialog, review-radio-group, accordion-flake, research-vt-mount (#35), docs-wave2 (#32, worktree), architect doc updates.
