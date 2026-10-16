@@ -49,11 +49,24 @@ All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and 
 - `pnpm --filter docs build` - Static build into `packages/docs/dist/public` (root `pnpm build` includes it)
 - Live examples are files in `src/examples/` that render the real `@funstack/ui` (`workspace:*`) with fake async actions; pages show their source through Vite `?raw` imports, so the code shown is the code running. Examples without `"use client"` (the JS-free Accordion, the Tooltip toolbar) are deliberately Server Components.
 - Props tables are written by hand from the TypeScript declarations in `packages/ui`: update the component page whenever a public prop, state field, data attribute or default changes.
-- Deployment is not configured yet (`wrangler.toml` has a placeholder name); CI only builds the site.
+- Deployed to Cloudflare Workers (worker `funstack-ui`, `packages/docs/wrangler.toml`) at https://ui.funstack.work by `.github/workflows/deploy-docs.yml` on every GitHub release, or manually via `workflow_dispatch`. CI on push only builds the site.
 
 ### Browser tests
 
 `packages/ui/vitest.config.ts` defines two vitest projects. `*.test.tsx` files run in the `jsdom` project; `*.browser.test.tsx` files run in the `browser` project, which uses `@vitest/browser-playwright` in headless Chromium. Both share `src/__tests__/vitest.setup.ts` and Testing Library. Use a browser test only for behaviour jsdom cannot observe (Popover API and `:popover-open`, CSS anchor positioning, `interestfor`, ViewTransition); keep everything else in jsdom, which is much faster. Firefox and WebKit instances are configured but off by default: `BROWSERS=chromium,firefox,webkit pnpm --filter @funstack/ui test:browser` after `pnpm --filter @funstack/ui exec playwright install firefox webkit`.
+
+## Release
+
+Releases are made with the `release-funstack` skill (`.claude/skills/release-funstack/SKILL.md`): bump `version` in `packages/ui/package.json`, commit `chore: bump version to x.y.z`, then create a GitHub release with tag `x.y.z` (no `v` prefix). Creating the release triggers two workflows:
+
+- `.github/workflows/publish.yml` builds and publishes `@funstack/ui` to npm. Versions containing `-` (for example `0.1.0-alpha.0`) are published under the prerelease name as the dist-tag; others under `latest`.
+- `.github/workflows/deploy-docs.yml` builds `packages/docs` and runs `wrangler deploy` to https://ui.funstack.work.
+
+Never publish or deploy from a local machine. One-time setup outside the repo:
+
+- npm trusted publishing must be configured on npmjs.com for `@funstack/ui`, pointing at the GitHub repository `uhyo/funstack-ui` and workflow `publish.yml`. The workflow authenticates through OIDC (`id-token: write`) and needs no npm token.
+- GitHub repository secrets `CLOUDFLARE_API_TOKEN` (a token allowed to edit Workers) and `CLOUDFLARE_ACCOUNT_ID`.
+- The custom domain `ui.funstack.work` attached to the `funstack-ui` worker in Cloudflare.
 
 ## Tooling
 

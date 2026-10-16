@@ -4,7 +4,17 @@
 
 Headless UI library for React — the first Async React-native UI library. Part of the FUNSTACK family.
 
+Documentation: https://ui.funstack.work
+
 See [docs/vision.md](./docs/vision.md) for the principles behind the project.
+
+## Installation
+
+```sh
+npm install @funstack/ui
+```
+
+React 19.3 or later is required (`react` and `react-dom` are peer dependencies).
 
 ## Packages
 
