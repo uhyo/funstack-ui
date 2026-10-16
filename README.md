@@ -10,6 +10,7 @@ See [docs/vision.md](./docs/vision.md) for the principles behind the project.
 
 - `packages/ui` — the `@funstack/ui` library
 - `packages/example` — a Vite playground that consumes the library
+- `packages/docs` — the documentation site (`pnpm --filter docs dev`)
 
 ## Development
 
