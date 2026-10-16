@@ -29,7 +29,7 @@ export interface TabsPanelProps extends Omit<
    *   are stopped, content is pre-rendered at low priority. Not part of server-rendered HTML.
    * - `"until-found"`: rendered with `hidden="until-found"`: DOM, state and effects stay live,
    *   the content is in server-rendered HTML, and find-in-page or a text fragment selects the
-   *   tab (`details.reason === "find"`).
+   *   tab (`details.reason === "platform"`).
    */
   keepMounted?: boolean | "until-found";
   /** Forwarded to the Panel's `<ViewTransition default>`. Default `"none"`. */
@@ -90,8 +90,11 @@ function PanelElement({
   ...rest
 }: PanelElementProps) {
   const untilFoundRef = useUntilFound<HTMLDivElement>({
-    active: untilFound && !selected,
-    onMatch: (event) => ctx.select(value, event, "find"),
+    // Not while this panel is the optimistic target: the browser has revealed it (or the user
+    // selected its tab) and the action is pending; re-hiding it would undo the reveal. A
+    // rejection or veto reverts the optimistic value, which re-activates the hook.
+    active: untilFound && !selected && ctx.optimistic !== value,
+    onMatch: (event) => ctx.select(value, event, "platform"),
   });
 
   const state: TabsPanelState = { value, selected, orientation: ctx.orientation };

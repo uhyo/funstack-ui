@@ -11,7 +11,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { rendersButton, resolveStateValue, useRender } from "../internal/use-render.js";
 import { useTabsContext } from "./tabs-context.js";
 import type { TabsOrientation } from "./tabs-context.js";
 import { anchorName, panelId, tabId } from "./tabs-ids.js";
@@ -56,6 +56,13 @@ function isActivationKey(event: KeyboardEvent): boolean {
   );
 }
 
+/** Focus came from another element inside the tab's own tablist (not from the list itself). */
+function movedWithinList(event: FocusEvent<HTMLElement>): boolean {
+  const list = event.currentTarget.closest('[role="tablist"]');
+  const from = event.relatedTarget;
+  return list !== null && from instanceof Node && from !== list && list.contains(from);
+}
+
 /**
  * A `button[role=tab]`. Renders the optimistic selection (`aria-selected`, `data-selected`,
  * roving `tabindex`) and carries `anchor-name` for the Indicator.
@@ -96,10 +103,8 @@ export function TabsTab({
     // `anchor-name` sits under the consumer's style: the consumer wins (design 13.5).
     style: (s) => ({ anchorName: anchor, ...resolveStateValue(style, s) }),
     children,
-    props: {
-      ...rest,
-      type: "button",
-    },
+    // `type="button"` only on a real button (no form submission); an `<a>` must not get it.
+    props: rendersButton(render) ? { ...rest, type: "button" } : rest,
     libraryProps: {
       role: "tab",
       id: tabId(ctx.rootId, value),
@@ -123,10 +128,14 @@ export function TabsTab({
         if (disabled) return;
         ctx.select(value, event.nativeEvent, "activate");
       },
-      // Automatic activation is selection-follows-focus (design 4.1): the arrow-key path, the
-      // native `focusgroup` path, Tab into the list and programmatic focus all end here.
+      // Automatic activation is selection-follows-focus (design 4.1), but only for focus that
+      // moves between tabs inside this list (the arrow-key path, the native `focusgroup` path,
+      // programmatic movement). Focus entering from outside never selects: the Tab key, window
+      // re-activation, focus restore, `autoFocus`, and the List's own redirect when no tab is the
+      // tab stop. A click still selects through `onClick`.
       onFocus: (event: FocusEvent<HTMLButtonElement>) => {
         if (ctx.activationMode !== "automatic" || disabled || selected) return;
+        if (!movedWithinList(event)) return;
         ctx.select(value, event.nativeEvent, "activate");
       },
     },
