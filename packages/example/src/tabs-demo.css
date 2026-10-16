@@ -140,6 +140,29 @@
   }
 }
 
+/*
+ * Optional page policy (off by default; issue #35). Any `transition` value, "none" included, makes
+ * a part that mounts or is revealed in a transition start a document view transition, and the
+ * browser then cross-fades the whole page for 250 ms (the UA `root` snapshot) while later
+ * transition commits wait. A page that wants only its own named animations can opt out of the
+ * root cross-fade, and keep pointer input working during a transition (Firefox suppresses hit
+ * testing otherwise). This is the consumer's choice and affects every view transition on the
+ * page, including a router's. Uncomment one of the first two rules to try it:
+ *
+ *   ::view-transition-old(root),
+ *   ::view-transition-new(root) {
+ *     animation: none;
+ *   }
+ *
+ *   :root {
+ *     view-transition-name: none;
+ *   }
+ *
+ *   ::view-transition {
+ *     pointer-events: none;
+ *   }
+ */
+
 /* Panel view transitions: cross-fade by default, directional slide by transition type. */
 ::view-transition-old(.tabs-fade) {
   animation: 150ms ease-in both tabs-fade-out;
