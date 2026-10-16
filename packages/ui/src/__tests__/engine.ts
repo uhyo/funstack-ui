@@ -19,3 +19,15 @@ export const supportsPopoverHint = (() => {
 /** Interest Invokers (`interestfor`); Chromium only as of 2026-10. */
 export const supportsInterestFor =
   typeof HTMLButtonElement !== "undefined" && "interestForElement" in HTMLButtonElement.prototype;
+
+/**
+ * `:checked` matches a checked checkbox whose `indeterminate` flag is also set. False in Chromium
+ * 156 (the mixed state hides `:checked`), true in Firefox 157 (memo/developer/switch-checkbox.md).
+ */
+export const checkedMatchesWhileIndeterminate = (() => {
+  const el = document.createElement("input");
+  el.type = "checkbox";
+  el.checked = true;
+  el.indeterminate = true;
+  return el.matches(":checked");
+})();

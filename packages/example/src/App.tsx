@@ -2,6 +2,7 @@ import { AccordionDemo } from "./accordion-demo";
 import { ToggleDemo } from "./toggle-demo";
 import { TabsDemo } from "./tabs-demo";
 import { TooltipDemo } from "./tooltip-demo";
+import { SwitchCheckboxDemo } from "./switch-checkbox-demo";
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
       <AccordionDemo />
       <TabsDemo />
       <TooltipDemo />
+      <SwitchCheckboxDemo />
     </main>
   );
 }

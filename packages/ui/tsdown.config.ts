@@ -7,6 +7,8 @@ export default defineConfig({
     "src/accordion/index.ts",
     "src/tabs/index.ts",
     "src/tooltip/index.ts",
+    "src/switch/index.ts",
+    "src/checkbox/index.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives
