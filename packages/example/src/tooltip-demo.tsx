@@ -22,14 +22,16 @@ function ItalicIcon() {
   );
 }
 
+const supportsInterestFor =
+  typeof HTMLButtonElement !== "undefined" && "interestForElement" in HTMLButtonElement.prototype;
+
 interface Flags {
   interestFor: boolean;
   hint: boolean;
 }
 
 function FlagsToggle({ flags, setFlags }: { flags: Flags; setFlags: (f: Flags) => void }) {
-  const nativeInterest =
-    typeof HTMLButtonElement !== "undefined" && "interestForElement" in HTMLButtonElement.prototype;
+  const nativeInterest = supportsInterestFor;
   return (
     <fieldset className="tooltip-flags">
       <legend>Experimental flags</legend>
@@ -98,13 +100,15 @@ function Toolbar({ flags }: { flags: Flags }) {
 
 function SaveButton({ flags }: { flags: Flags }) {
   const [saved, setSaved] = useState(0);
+  const native = flags.interestFor && supportsInterestFor;
   return (
     <section>
       <h3>Text button: the tooltip is a description</h3>
       <p>
-        The default <code>provides="description"</code> wires <code>aria-describedby</code>.
-        Clicking the button closes the tooltip; it stays closed until the pointer leaves and
-        re-enters.
+        The default <code>provides="description"</code> wires <code>aria-describedby</code>.{" "}
+        {native
+          ? "With interestfor the browser owns the interaction: clicking the button does not close the tooltip; moving the pointer away or Escape does."
+          : "Clicking the button closes the tooltip; it stays closed until the pointer leaves and re-enters."}
       </p>
       <Tooltip.Root>
         <Tooltip.Trigger
@@ -195,6 +199,32 @@ function Placement({ flags }: { flags: Flags }) {
   );
 }
 
+function InMenu({ flags }: { flags: Flags }) {
+  return (
+    <section>
+      <h3>Inside a menu</h3>
+      <p>
+        The tooltip opens over a <code>popover="auto"</code> menu without closing it. On the JS path
+        the first Escape closes only the tooltip and the second closes the menu (the same holds
+        inside a modal <code>&lt;dialog&gt;</code>).
+      </p>
+      <button type="button" className="tooltip-btn" popoverTarget="tooltip-demo-menu">
+        Open menu
+      </button>
+      <div id="tooltip-demo-menu" popover="auto" className="tooltip-menu">
+        <Tooltip.Root>
+          <Tooltip.Trigger className="tooltip-btn" experimental_interestFor={flags.interestFor}>
+            Archive
+          </Tooltip.Trigger>
+          <Tooltip.Popup className="tip" side="right" experimental_hint={flags.hint}>
+            Moves the document to the archive
+          </Tooltip.Popup>
+        </Tooltip.Root>
+      </div>
+    </section>
+  );
+}
+
 export function TooltipDemo() {
   const [flags, setFlags] = useState<Flags>({ interestFor: false, hint: false });
   return (
@@ -209,6 +239,7 @@ export function TooltipDemo() {
       <Toolbar flags={flags} />
       <SaveButton flags={flags} />
       <Placement flags={flags} />
+      <InMenu flags={flags} />
     </article>
   );
 }
