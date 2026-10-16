@@ -76,6 +76,23 @@ export default defineConfig({
         },
       },
       {
+        // Pre-bundle everything the browser tests import up front. A dependency Vite discovers
+        // only at runtime (React's entry points are reached through Testing Library and
+        // `react-dom/server` through a few suites) triggers a re-optimisation mid-run on a cold
+        // cache; files already loaded keep the old `?v=` hash and fail to import.
+        optimizeDeps: {
+          include: [
+            "react",
+            "react/jsx-dev-runtime",
+            "react/jsx-runtime",
+            "react-dom",
+            "react-dom/client",
+            "react-dom/server",
+            "@testing-library/react",
+            "@testing-library/user-event",
+            "@testing-library/jest-dom/vitest",
+          ],
+        },
         test: {
           name: "browser",
           include: ["src/**/*.browser.test.{ts,tsx}"],

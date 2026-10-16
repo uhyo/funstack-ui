@@ -2,8 +2,8 @@
 // Switch rows 4b, 21b, 26 and C6, `:indeterminate` matching).
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { userEvent } from "vitest/browser";
 import { describeCheckableInputInBrowser } from "../__tests__/checkable-input-browser-suite.js";
+import { user } from "../__tests__/browser-user.js";
 import { checkedMatchesWhileIndeterminate } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Checkbox } from "./index.js";
@@ -26,7 +26,7 @@ describe("Checkbox indeterminate (browser)", () => {
     expect(box().matches(":indeterminate")).toBe(true);
     expect(box().matches(":checked")).toBe(false);
 
-    await userEvent.click(box());
+    await user.click(box());
     expect(box().matches(":indeterminate")).toBe(false);
     expect(box().matches(":checked")).toBe(true);
     expect(box()).not.toHaveAttribute("data-indeterminate");
@@ -54,7 +54,7 @@ describe("Checkbox indeterminate (browser)", () => {
     );
     expect(box().matches(":indeterminate")).toBe(true);
     box().focus();
-    await userEvent.keyboard(" ");
+    await user.keyboard(" ");
     await act(async () => {});
     expect(next).toEqual([true]);
     // Uncontrolled: committed `true`; the parent still says mixed, so the dash is back too.
