@@ -65,3 +65,39 @@ time; the "dismiss" reason was added to `ChangeReason` as instructed).
   (no AX tree access in vitest browser mode; VT capture is a manual check in the example).
 - Backdrop click in Playwright: `userEvent.click(dialog, { position: { x: -20, y: -20 }, force:
   true })` hits the `::backdrop` (target = the dialog, outside its box) in both engines.
+
+## Review fixes (memo/reviewer/dialog.md), 2026-10-16
+
+- **H1 nested confirm.** Final pattern (for design 11.10 / 12.5 and the docs): no action awaits
+  user input. The outer "Discard…" button is the `Dialog.Trigger` of a nested **JS-free** confirm
+  Dialog (native command: opens synchronously in the click, no transition). The confirm's
+  "Discard" is a `Dialog.Close action={async () => { await discard(); startTransition(() =>
+  setOpen(false)); }}` and the outer Root is controlled (`open` + `openChangeAction={(next) =>
+  setOpen(next)}`). "Keep editing" / Escape close the confirm only. The outer close is the
+  parent's (apply effect `close()`), so the outer `openChangeAction(false)` is not called for it
+  and `returnValue` is `""`; consumers record the outcome in the Close action. Verified in the
+  example with Playwright (Chromium, Firefox): inner `:modal` true synchronously after `click()`.
+  jsdom has a characterisation test that the old shape holds every transition (flags a React
+  change). The reviewer's alternative, `setTimeout(() => setConfirming(true))`, also works but
+  keeps an action awaiting input, and every transition in the app is held until the user answers.
+- **M1** press-and-click rule: `pointerdown` records "outside" (modal: on the dialog outside its
+  rect; non-modal: document capture, outside dialog and Trigger), `click` closes only if both.
+  Keyboard-synthesised clicks no longer dismiss (no press), same as native. Real-drag browser row
+  uses `user.dragAndDrop(input, popup, { targetPosition: {x:-20,y:-20}, force: true })`; it fails
+  without the fix in Chromium only (Firefox never fired the click).
+- **M2** non-modal Escape: skipped (not prevented) when the target is inside an open nested dialog
+  or open auto/hint popover, or when any open auto/hint popover is inside the dialog (close
+  watchers are per document, not per focus). `manual` popovers (and `hint` where the engine maps
+  it to manual, read through the `popover` IDL attribute) do not take Escape.
+- **M3** `Dialog.Form closeOnSettle` (default true). **L4** `method` passes through only with a
+  string `action`.
+- **L2** Trigger `pending` is now `root.pending` (design 4.2 said `pending && O !== C`; that hid
+  the re-open window where both are `true`). Form: a `close` of the dialog after the last submit
+  blocks the settle close (fixes the reviewer's 5-step variant).
+- **L1** `disabled` owned on Trigger and Close.
+- **L3** Browser tests use `user` (added optional click options and `dragAndDrop` to
+  browser-user.ts); exit-animation row awaits the captured animations inside `act`: 0 act
+  warnings. Shim: invalid commands fire no `command` event (`show-modal` on an open dialog,
+  close / request-close on a closed one); custom `--x` commands fire and do nothing.
+- Docs page (packages/docs DialogPage) updated for the props and the Escape callout; the
+  design text (11.10, 12.5, 4.2, 8.1, 9) still describes the old behaviour, for the architect.
