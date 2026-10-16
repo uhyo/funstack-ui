@@ -3,3 +3,4 @@ dist
 .turbo
 __screenshots__
 .claude/worktrees/
+.vitest/
