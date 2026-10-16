@@ -29,3 +29,5 @@
 - 2026-10-16: usage limit hit overnight. User: only decision-making agents stay Fable → developer, reviewer, platform-researcher switched to opus. architect + product-owner remain fable.
 - 2026-10-16 morning: #18 browser mode merged (c8f848a) and closed; doc corrections from Toggle review committed. Running (opus): toggle-fixes (master), accordion-impl (worktree agent-aa1eb49fd5259ba32). Tabs (#11) starts after toggle-fixes lands to avoid shared-internal churn.
 - Accordion (#12) merged c66167e (161 tests total); review-accordion running (opus). tabs-impl running (opus, worktree). Next: Tooltip (#13) after Tabs; docs site (#14).
+- Tabs (#11) merged (284 tests total). Accordion review fixes landed (owned keys in mergeProps; latestInFlight() on hook). Next: review Tabs (opus) → fixes; then Tooltip (#13); docs site (#14).
+- Decision: reason vocabulary unified — "activate" (user) / "platform" (browser-initiated: find-in-page, pre-hydration). Tabs' "find" → "platform".
