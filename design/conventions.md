@@ -111,6 +111,14 @@ Rules for the element passed to `render` (same as Base UI):
   `aria-label` beats `<Tabs.Tab aria-label>`; only attributes the part itself computes are
   library-controlled. Merge order is therefore: part pass-through props, then the `render`
   element's props, then library-controlled attributes on top.
+- **Library-controlled keys are owned, not merely preferred** (product-owner decision): a key the
+  part computes always wins *even when its computed value is `undefined`*, in which case the
+  attribute is removed rather than falling back to the element's value. A `render` element can
+  therefore never re-introduce `name`, `data-open`, `aria-disabled`, `aria-pressed` and the like.
+  Rationale: a second writer for a state attribute would leave stale ARIA that keyboard and AT
+  navigation read (an `aria-disabled="true"` from the element outliving the library's
+  `undefined`), and `name` on `<details>` would silently change exclusive-group membership.
+  The part's documentation lists its owned keys.
 
 Rejected alternatives:
 
@@ -1056,7 +1064,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Async action (both) | While the promise is unresolved: `data-pending` on owner and trigger, optimistic state on the trigger, committed state unchanged on content. After resolve: `data-pending` gone, content updated. |
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
 | Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled). |
-| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. |
+| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. |
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |

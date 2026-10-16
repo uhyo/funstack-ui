@@ -153,6 +153,23 @@ FUNSTACK state owner: `useControllableAction` from the conventions with a set-va
 >
 ```
 
+Caveat for **multiple mode**: `next` is the whole set, and a parent that writes `setOpen(next)`
+after its own `await` lands those writes in *completion* order, so two overlapping actions (open
+A, then open B) can end with the slower one's stale set winning and a change lost. Prefer a
+functional update keyed by the item that changed, or stay uncontrolled (where the hook's
+latest-dispatch guard already handles this):
+
+```tsx
+valueChangeAction={async (_next, details) => {
+  await save(details.item, details.open);
+  startTransition(() =>
+    setOpen((prev) =>
+      details.open ? [...new Set([...prev, details.item])] : prev.filter((v) => v !== details.item),
+    ),
+  );
+}}
+```
+
 How the click is intercepted. The `<summary>` activation behaviour (toggle `open`) runs after the
 `click` event finishes dispatching and only if the event was not cancelled. Enter and Space on a
 focused summary synthesize that same `click`. So one handler covers mouse, touch and keyboard, in
@@ -228,11 +245,20 @@ Handling, in `Item`:
 />
 ```
 
-`dispatchFromDom` recomputes `next` from the DOM state of every registered item. Exclusive mode
-takes the toggled item if it is now open, else the first open item in document order (so a
-find-in-page reveal wins over an item that was already open; walkthrough 9.6). It skips the
-dispatch if `next` already equals the optimistic value, and otherwise runs the normal dispatch
-with `reason: "platform"`. A layout effect in Item
+`dispatchFromDom` computes `next` from the **optimistic (last-dispatched) set**, not from DOM
+state: the DOM lacks pending optimistic opens, so reading it would silently drop an in-flight
+click. The toggled item is added to or removed from that set; in multiple mode `next` is kept in
+**document order**; exclusive mode takes the toggled item if it is now open, else the first open
+item in document order (so a find-in-page reveal wins over an item that was already open;
+walkthrough 9.6). It skips the dispatch if `next` already equals the optimistic value, and
+otherwise runs the normal dispatch with `reason: "platform"`.
+
+The DOM is read only for **mount reconciliation**, and only once: a Root layout effect at mount
+compares every registered item's `open` with the initial value and, if they differ (clicks before
+hydration), issues a single dispatch with `reason: "platform"` and `event: undefined`, so several
+pre-hydration clicks yield one dispatch rather than one per item. `<details>` carries
+`suppressHydrationWarning` in both modes because the server-rendered `open` may legitimately
+differ from the client's first render after such clicks. After mount, a layout effect in Item
 re-applies committed state once the Root is no longer pending:
 
 ```ts
@@ -546,7 +572,9 @@ The library ships no CSS. The hooks are, in both modes:
 Library mode adds optimistic and pending hooks:
 
 ```css
-.trigger[data-open]::after { content: "▾"; }         /* flips immediately on click */
+.item:open > .trigger:not([data-pending])::after,
+.trigger[data-open]::after { content: "▾"; }         /* flips immediately on click; `:open` alone
+                                                        still matches during a pending close */
 .trigger[data-pending] { cursor: progress; }
 .root[data-pending] .panel { opacity: 0.6; }
 .trigger[data-disabled] { color: GrayText; }
