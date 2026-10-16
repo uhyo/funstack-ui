@@ -29,7 +29,7 @@ form reset). Read this document before the Checkbox one.
 | 6 | Next value | `next = !optimistic`, as in Toggle; equal to the DOM's post-click value in every supported case. |
 | 7 | Disabled while pending | **No** (conventions 3.6). Native `disabled` only from the prop. |
 | 8 | `preventDefault()` | Not a veto and **unsupported** on checkable inputs: it desyncs the DOM while the action is pending. Dev warning. Veto = controlled mode. |
-| 9 | ViewTransition | `<ViewTransition default={transition ?? "none"}>` outermost; types `fsui-switch` plus `fsui-switch-on` / `fsui-switch-off`. Animates the settling of an action, never the optimistic flip (conventions 5.1). |
+| 9 | ViewTransition | `<ViewTransition default={transition}>` outermost, only when `transition` is given (conventions 5.1, #35); types `fsui-switch` plus `fsui-switch-on` / `fsui-switch-off`. Animates the settling of an action, never the optimistic flip (conventions 5.1). |
 | 10 | ARIA | `role="switch"` on the input; the native `checked` state is the ARIA state. `aria-checked` is **owned and always removed** (forbidden on native inputs by ARIA in HTML). No key handling: native Space. |
 | 11 | `render` | Must keep an `<input type="checkbox">`; `type`, `checked`, `role`, `onChange` and the state attributes are owned. Dev warning when the mounted node is anything else. |
 | 12 | `switch` attribute | Not used (WebKit-only). Reserved as `experimental_switch` for when Chromium ships it. |
@@ -40,7 +40,7 @@ form reset). Read this document before the Checkbox one.
 ## 1. Anatomy
 
 ```
-<ViewTransition default="none">                       React boundary, no DOM
+<ViewTransition default={transition}>                 React boundary, no DOM; only when `transition` is set
   <input type="checkbox" role="switch" checked …>     the only element
 ```
 
@@ -706,11 +706,9 @@ The hook does not know about transitions, `reason` values or dispatch; the part 
 ## 8. ViewTransition
 
 ```tsx
-return (
-  <ViewTransition default={transition ?? "none"}>
-    {element /* the <input> */}
-  </ViewTransition>
-);
+return transition === undefined
+  ? element /* the <input> */
+  : <ViewTransition default={transition}>{element}</ViewTransition>; // conventions 5.1 (#35)
 ```
 
 Types added on every dispatch (`"activate"` and `"platform"` alike): `fsui-switch` and
@@ -719,8 +717,9 @@ the platform's words for a switch are on/off, where Toggle's are press/release.
 
 What animates is exactly Toggle's table (its 7.2): the settling commit, a controlled snap-back
 (no types), a boundary swap (no types); never the optimistic flip. The product-owner decision that
-`transition` stays on Toggle (conventions 5.1) applies unchanged: the prop costs nothing when
-unset and keeps the "every animatable part" rule without exceptions. Honest expectation setting
+`transition` stays on Toggle (conventions 5.1) applies unchanged: with the prop unset no boundary
+is rendered (so a Switch mounting in a transition starts no document view transition), and the
+"every animatable part" rule keeps no exceptions. Honest expectation setting
 in the docs: on a bare input the visible effect of `transition` is limited to cross-fading the
 input's own rendering when `data-pending` leaves; the `render` function form with siblings (2.6)
 is where it does visible work.
@@ -803,7 +802,7 @@ verified (probe 04), so most rows stay there.
 | 15 | `render` element | jsdom | `render={<MyInput className="x" style={{…}} />}` renders MyInput's input, merges class, keeps the element's style, forwards `ref`, keeps `type="checkbox"` and `role="switch"`, and clicking still dispatches. A `render` element with `checked`, `defaultChecked` or `aria-checked` has them removed. |
 | 16 | `render` function | jsdom | Function form receives `(props, state)`; rendering `<><input {...props}/><span/></>` works and the sibling can read `state.pending`. Rendering a `<button>` logs the dev warning. |
 | 17 | Post-await rule | jsdom | Controlled parent that `await`s then `startTransition(() => setChecked(next))`: `checked` and `data-pending` converge in one state. |
-| 18 | `transition` prop | jsdom | Renders identically with `transition` unset, `"fsui-fade"`, and a type map (wiring only). |
+| 18 | `transition` prop | jsdom | Renders identically with `transition` unset, `"fsui-fade"`, and a type map (wiring only). Browser row: a Switch mounted in a `startTransition` with `transition` absent calls `document.startViewTransition` zero times; with `"none"` once. |
 | 19 | Dev warnings | jsdom | `checked` with `defaultChecked` warns once; mode switch warns once; `preventDefault()` in the action's sync prefix warns once and leaves `el.checked === false` while pending (documents the desync), in sync after settle; a pass-through `onClick` that cancels the click neither dispatches nor warns (row 26). |
 | 20 | Platform: form reset (both) | jsdom | Inside `<form>` with `<button type="reset">`: after a click (committed `true`), reset → action called with `(false, { reason: "platform" })`, `details.event.type === "reset"`; uncontrolled: `el.checked` false after settle; controlled parent that refuses: `el.checked` true again after settle; parent that accepts: false. A listener that cancels `reset` → no dispatch, DOM unchanged. |
 | 21 | Platform: React automatic reset | jsdom | `<form action={async () => {}}>` containing an uncontrolled Switch with no action: click (true), submit; after the action resolves the DOM and `data-checked` are back to `defaultChecked` (false) with no desync. Variant: the parent re-renders with `defaultChecked={true}` inside the action's transition → the Switch ends `checked` true (reset target follows the latest prop). |
@@ -904,7 +903,7 @@ export function Switch({
     },
   });
 
-  return <ViewTransition default={transition ?? "none"}>{element}</ViewTransition>;
+  return transition === undefined ? element : <ViewTransition default={transition}>{element}</ViewTransition>;
 }
 Switch.displayName = "Switch";
 ```

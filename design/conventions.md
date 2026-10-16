@@ -20,7 +20,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. No `on*` handlers in the library API. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
-| 5 | ViewTransition | Every animatable part wraps its output in `<ViewTransition default="none">`; a `transition` prop forwards React's own `default` shape. Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
+| 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
 | 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc, and none of the initial four has one (directive-free variants tracked in #19). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
@@ -895,31 +895,54 @@ The state object given to function props on the owner includes `pending`; on tri
 ### 5.1 Default wiring
 
 Every part whose mount, unmount or content is driven by library state (Panel, library-driven
-Popup, Toggle's own element when its children can change) renders a `<ViewTransition>` as the **outermost
-node of its output**, before any DOM element, with `default="none"`. Nothing animates unless the
-consumer opts in, and when it is `"none"` React does not assign the boundary a name, so an
-*update* inside it costs nothing. One cost remains (found by the Dialog implementation, issue
-#35): a `<ViewTransition>` that **mounts** in a transition commit makes React call
-`document.startViewTransition` even with `default="none"`, which runs the browser's root
-cross-fade (about 250 ms) and holds the next commit until it finishes. It affects parts that mount
-with their content (Dialog's children, a conditionally rendered Panel), not parts that are always
-mounted. Mitigation is pending research under #35; until then component docs note it where a
-part mounts inside a transition.
+Popup, Toggle's own element when its children can change) renders
+`<ViewTransition default={transition}>` as the **outermost node of its output**, before any DOM
+element, **only when `transition !== undefined`**. With the prop absent the part renders no
+boundary at all (decision for issue #35, `docs/research/view-transition-mount-cost.md`).
+
+Why: react-dom 19.3.1 starts a document view transition whenever a `<ViewTransition>` **mounts**
+in a transition-lane commit or is **revealed by `<Activity>`**, regardless of what `default`,
+`enter`, or a type map resolves to (`trackEnterViewTransitions` checks only the fiber tag; the
+`"none"` check runs inside the already-started transition and decides only whether a name is
+assigned). The browser then plays its UA root cross-fade (`::view-transition-old(root)`, 250 ms)
+and React holds every later transition-lane commit until it finishes: measured 265 to 280 ms of
+added latency per tab switch or dialog open, in Chromium and Firefox. Exits and updates of a
+`"none"` boundary are free; a boundary that mounts under a *new* DOM element is shielded. So the
+only free "no animation" is no boundary.
+
+Rules:
+
+- `transition` is **static**: the part reads it as a render-time switch, and toggling it between
+  `undefined` and a value changes the element type at the root of the part, so React remounts
+  the part's subtree (DOM and state lost). Development warns once when that happens.
+- An explicit `transition="none"` **keeps the boundary**, so a consumer who switches between
+  `"none"` and a class at runtime does so without a remount, and accepts the mount cost.
+- Server rendering is unaffected: the decision is a pure function of props on both sides.
+- Any `transition` value, including a type map whose types do not match the commit, makes
+  **mounts and reveals** of that part run the page cross-fade (rollbacks and snap-backs that carry
+  no `fsui-*` types included). The consumer docs for `transition` say so and show the opt-in
+  page-policy CSS, which is the consumer's choice, never shipped by the library:
+
+  ```css
+  /* No page-wide cross-fade for any view transition on this page. */
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  /* or */ :root { view-transition-name: none; }
+  /* Keep clicks working during the transition in Firefox (hit testing is suppressed otherwise). */
+  ::view-transition { pointer-events: none; }
+  ```
 
 Parts whose visibility is **browser-owned** (section 3.5: Tooltip's `Popup` in the top layer, the
-Accordion's `<details>` in static mode) render no `<ViewTransition>` and have **no `transition` prop**;
-their open/close happens outside any React transition and animates with `@starting-style` and
+Accordion's `<details>` in static mode) render no `<ViewTransition>` in any case and have **no
+`transition` prop** (Accordion's static mode ignores it with a dev warning); their open/close
+happens outside any React transition and animates with `@starting-style` and
 `transition-behavior: allow-discrete` in CSS. "Every animatable part has `transition`" means every
 part whose mount, unmount or content is driven by library state.
 
 ```tsx
 // inside Tabs.Panel (mount strategy per `keepMounted`, section 3.7: not rendered, <Activity>,
-// or hidden="until-found"; the boundary is the outermost node in every strategy)
-return (
-  <ViewTransition default={transition ?? "none"}>
-    <div role="tabpanel" ...>{children}</div>
-  </ViewTransition>
-);
+// or hidden="until-found"; when present, the boundary is the outermost node in every strategy)
+const panel = <div role="tabpanel" ...>{children}</div>;
+return transition === undefined ? panel : <ViewTransition default={transition}>{panel}</ViewTransition>;
 ```
 
 Because library state changes are transitions, the commit that ends the action and any rollback
@@ -931,8 +954,9 @@ What this means per kind of part:
 | Part renders | Animate with | Why |
 | --- | --- | --- |
 | Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
-| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop (`<ViewTransition>`) | The swap lands in the transition-lane commit that settles the action. |
+| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop (`<ViewTransition>`, rendered only because the prop is set) | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`, Dialog's Popup children) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. |
 | `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
+| Any part with `transition` absent | nothing (no boundary rendered) | Baseline timing; a switch or open calls no `startViewTransition`. |
 
 `Tabs.Indicator` therefore follows optimistic selection, renders no `<ViewTransition>` and has no
 `transition` prop: it is positioned by CSS Anchor Positioning on the optimistic tab and slides via
@@ -941,7 +965,8 @@ part that keys a `<ViewTransition>` on optimistic state is a bug, not a style ch
 
 Product-owner decision: `transition` stays on Toggle in v0 even though its own flip cannot use it,
 documented honestly (it animates the end of the action and content keyed on `pending`), so the
-"every animatable part has `transition`" rule has no exceptions.
+"every animatable part has `transition`" rule has no exceptions. Since a part without the prop
+renders no boundary, keeping the prop on such parts costs nothing for consumers who do not set it.
 
 ### 5.2 Consumer API: the `transition` prop
 
@@ -1009,6 +1034,9 @@ Every `transition` example in the docs carries this block. No JS-level `matchMed
 
 - Never call `document.startViewTransition`; never use `flushSync` in a component that contains a
   `<ViewTransition>`.
+- Render the boundary conditionally on `transition !== undefined` (5.1); never render
+  `<ViewTransition default="none">` as a fallback, and never wrap a part that mounts in a
+  transition commit in a boundary the consumer did not ask for.
 - `<ViewTransition>` renders no DOM and is safe in server-rendered trees; hydration is not a
   transition, so there is no enter animation on first paint. Streamed Suspense reveals inside a
   boundary may animate; this is unverified and not documented as a feature until a demo confirms it.
@@ -1322,8 +1350,12 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Platform path (both) | Required for every component with a residual browser path (section 3.5): mount reconciliation (`renderToString`, change the DOM before `hydrateRoot`, exactly one dispatch with `reason: "platform"` and `event === undefined`, StrictMode still one) and, for native form controls, form reset through `<button type="reset">`, `form.reset()` and React's automatic reset after a successful `<form action>` (one dispatch per state owner with the `reset` event; a cancelled `reset` dispatches nothing; a controlled parent that refuses gets the DOM re-synced after settle). |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
-falls back silently). Tests only assert that components render with and without `transition`
-set; animation behaviour is checked in the example app. When a component depends on platform APIs
+falls back silently). jsdom tests assert that components render with and without `transition`
+set; animation behaviour is checked in the example app. **Every mount-prone part** (a part that
+mounts or is revealed in a transition commit: `Tabs.Panel`, `Accordion.Panel`, Dialog's Popup
+children, and any single-element part the test conditionally renders) also gets a **browser-mode
+row**: with `transition` absent, a switch or open calls `document.startViewTransition` zero times
+(spy on it before the interaction); with `transition="none"` it is called (the boundary exists). When a component depends on platform APIs
 jsdom lacks (Popover, anchor positioning), the rows that need them go in a sibling
 `foo.browser.test.tsx`, which vitest runs in headless Chromium (browser mode, see `CLAUDE.md`);
 the jsdom file notes which rows moved there. Browser tests are slower, so they cover only what
@@ -1366,6 +1398,10 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
    latest-intent covers repeated activation; CSS or `aria-busy` are the consumer's escape hatches.
 9. **`transition` stays on Toggle in v0** (section 5.1), documented as animating the settling of
    the action, not the optimistic flip.
+23. **Conditional `<ViewTransition>` boundary** (issue #35, 2026-10-16): a part renders the
+    boundary only when `transition` is given; the prop is static; `"none"` keeps the boundary;
+    static-mode Accordion renders none; page-policy CSS is the consumer's choice; mount-prone parts
+    get a browser test row asserting no `startViewTransition` call without the prop.
 10. **`Arrow` part held for v0** (from the Tooltip design). Popups ship without an `Arrow` part
     until a component shows it cannot be done in CSS on the popup itself.
 11. **`provides="description" | "name"`** is the convention for any part whose content labels or

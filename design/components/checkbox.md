@@ -36,7 +36,7 @@ Function channels, no `useFormStatus`) is identical to Switch and is not restate
 ## 1. Anatomy
 
 ```
-<ViewTransition default="none">
+<ViewTransition default={transition}>                         only when `transition` is set (conventions 5.1)
   <input type="checkbox" checked … data-indeterminate?>     the only element
 ```
 
@@ -412,7 +412,8 @@ Owned keys: `type`, `checked`, `defaultChecked`, `indeterminate` (stripped), `ar
 ## 8. ViewTransition
 
 `fsui-checkbox` plus `fsui-checkbox-check` / `fsui-checkbox-uncheck` on every dispatch. Same
-settle-only semantics and the same honest expectation as Switch section 8.
+settle-only semantics, the same conditional boundary (rendered only when `transition` is given,
+conventions 5.1) and the same honest expectation as Switch section 8.
 
 ---
 

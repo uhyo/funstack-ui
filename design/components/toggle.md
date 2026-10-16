@@ -24,7 +24,7 @@ called out.
 | 4 | Next value | `next = !optimistic`, not `!committed`, so a second click while pending reverses the first (verified). |
 | 5 | Disabled while pending | **No.** The button stays enabled; repeated clicks are latest-wins. Consumers who want it use `render` or CSS (section 6.6). |
 | 6 | Errors | Reach the nearest Error Boundary above the `Toggle`; for a superseded (non-latest) dispatch the shared hook rethrows from render because React would drop it (conventions 2.4). Optimistic state reverts; uncontrolled committed state untouched. |
-| 7 | ViewTransition | `<ViewTransition default={transition ?? "none"}>` outermost; types `fsui-toggle` plus `fsui-toggle-press` / `fsui-toggle-release`. It animates the *settling* of an action and rollbacks, **not the optimistic flip** (section 7, verified). |
+| 7 | ViewTransition | `<ViewTransition default={transition}>` outermost, **only when `transition` is given** (conventions 5.1, #35); no boundary otherwise; types `fsui-toggle` plus `fsui-toggle-press` / `fsui-toggle-release`. It animates the *settling* of an action and rollbacks, **not the optimistic flip** (section 7, verified). |
 | 8 | ARIA | `aria-pressed="true" \| "false"` only; never `"mixed"`. Native Space/Enter. Accessible name must stay stable across states. |
 | 9 | Forms | `type="button"` always; no `name`/`value` submission in v0. |
 | 10 | Files | `src/toggle/{index.ts,toggle.tsx,toggle.test.tsx}`; `toggle.tsx` is `"use client"`. Exports `Toggle`, `ToggleProps`, `ToggleState`, `TogglePressedChangeDetails`. |
@@ -34,7 +34,7 @@ called out.
 ## 1. Anatomy
 
 ```
-<ViewTransition default="none">          React boundary, no DOM
+<ViewTransition default={transition}>    React boundary, no DOM; rendered only when `transition` is set
   <button type="button" aria-pressed>    the only element; consumer's children inside
 ```
 
@@ -523,11 +523,10 @@ Consumers who want it anyway have two supported spellings:
 ### 7.1 Wiring
 
 ```tsx
-return (
-  <ViewTransition default={transition ?? "none"}>
-    {element /* the <button> */}
-  </ViewTransition>
-);
+// conventions 5.1 (#35): no boundary unless the consumer asked for one
+return transition === undefined
+  ? element /* the <button> */
+  : <ViewTransition default={transition}>{element}</ViewTransition>;
 ```
 
 Types added on every dispatch: `fsui-toggle` and `fsui-toggle-press` (`next === true`) or
@@ -563,7 +562,10 @@ Consequences for Toggle's docs:
   `pending`, not on `pressed`.
 - Type-map users must supply a `default` entry if they want rollbacks animated, because the
   snap-back commit carries no types.
-- With `transition` unset nothing changes: `default="none"` assigns no name and costs nothing.
+- With `transition` unset no boundary is rendered, so nothing changes and no document view
+  transition can start, even when the Toggle itself mounts in a transition (`{show && <Toggle/>}`).
+  With any value set, such a mount runs the page cross-fade (conventions 5.1); `transition` is
+  static (switching between unset and set remounts the button).
 
 ### 7.3 Reduced motion
 
@@ -657,7 +659,7 @@ are on the DOM only.
 | 15 | `render` element | `render={<MyButton className="x" style={{ color: "red" }} />}` renders MyButton's button, merges class (`"x"` plus the Toggle's), keeps the element's style, forwards `ref` to the real `<button>`, and clicking still dispatches. |
 | 16 | `render` function | Function form receives `(props, state)`; spreading `props` yields a working, correctly attributed toggle. |
 | 17 | Post-await rule | Controlled parent that `await`s then calls `startTransition(() => setPressed(next))`: `aria-pressed` and `data-pending` converge in one state (no intermediate `aria-pressed="false"` without pending after resolve). |
-| 18 | `transition` prop | Renders identically with `transition` unset, `"fsui-fade"`, and a type map (jsdom has no `startViewTransition`; this only guards the wiring). |
+| 18 | `transition` prop | Renders identically with `transition` unset, `"fsui-fade"`, and a type map (jsdom has no `startViewTransition`; this only guards the wiring). Browser row: `{show && <Toggle />}` mounted in a `startTransition` with `transition` absent calls `document.startViewTransition` zero times; with `transition="none"` it is called once (conventions 10.1). |
 | 19 | Dev warnings | `pressed` together with `defaultPressed` warns once; switching `pressed` from `undefined` to a boolean warns once. |
 | 20 | Directive | `dist/toggle/toggle.mjs` starts with `"use client"`; `dist/toggle/index.mjs` does not (shared script over `dist`). |
 | 21 | `details.event` is virtual | After a click, `details.event instanceof window.Event`, `"event" in details` is true, `Object.keys(details)` does not include `"event"`, `JSON.stringify(details)` equals the JSON of the real fields, and `{ ...details }` has no `event`. Asserts via `details.event`, never `toEqual({ event })`. A fake Server Function (plain async spy) receives `(true, details)` with the same shape. |
@@ -728,7 +730,7 @@ export function Toggle({
     },
   });
 
-  return <ViewTransition default={transition ?? "none"}>{element}</ViewTransition>;
+  return transition === undefined ? element : <ViewTransition default={transition}>{element}</ViewTransition>;
 }
 Toggle.displayName = "Toggle";
 ```
@@ -798,4 +800,5 @@ architect (uncommitted at the time of writing). They are kept here as the record
 3. Section 7: given that the flip itself cannot be view-transitioned, is a `transition` prop on
    Toggle worth keeping in v0 for consistency, or should Toggle ship without it until a component
    where it clearly pays off (Tabs.Panel) exists? Recommendation: keep it, documented honestly as
-   in 2.8; it costs nothing when unset and keeps the "every animatable part" rule simple.
+   in 2.8; it keeps the "every animatable part" rule simple, and since #35 an unset prop renders
+   no boundary, so it is free for consumers who do not use it. (Resolved: kept.)

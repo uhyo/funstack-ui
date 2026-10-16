@@ -1039,9 +1039,12 @@ touch-scroll leak through `overflow: hidden` on the root is a known platform iss
 
 ### 10.3 `transition` (ViewTransition, library mode only)
 
-Popup renders `<ViewTransition default={transition ?? "none"}>` as the outermost node of its
-output, around the `<dialog>`. Types per the conventions: `fsui-dialog`, `fsui-dialog-open`,
-`fsui-dialog-close`.
+Popup renders `<ViewTransition default={transition}>` as the outermost node of its output,
+around the `<dialog>`, **only when `transition` is given** (conventions 5.1, #35); otherwise no
+boundary. This is the component where the finding came from: the Popup's children mount in the
+opening transition, and a boundary there starts the browser's root cross-fade on every open and
+holds the next commit for about 250 ms (nested dialogs saw it as a delayed inner open). Types per
+the conventions: `fsui-dialog`, `fsui-dialog-open`, `fsui-dialog-close`.
 
 What the boundary sees, and does not:
 
@@ -1056,8 +1059,9 @@ What the boundary sees, and does not:
 Top-layer elements inside a React view transition are **unverified** (research, "Animation").
 Until the example app confirms that Chromium captures the dialog's `update` through the top-layer
 promotion, the docs present the CSS form as the default and `transition` as the way to animate
-content swaps while open. If the capture does not work, the boundary stays (it costs nothing
-with `"none"`) and the opening row is documented as "CSS only".
+content swaps while open. If the capture does not work, the boundary is still rendered for
+consumers who set `transition` (they asked for it and accept the mount cost) and the opening row
+is documented as "CSS only".
 
 ```tsx
 <Dialog.Popup transition={{ "fsui-dialog-open": "fsui-dialog-in", default: "none" }}>
@@ -1335,7 +1339,7 @@ update-on-success). Library mode unless stated.
 | Light dismiss (baseline) | With `lightDismiss`: a `click` on the dialog with coordinates outside `getBoundingClientRect()` (mocked) calls `requestClose`; inside, or on a descendant, does not; without the prop nothing. Non-modal: document click outside closes. |
 | Focus | `initialFocus` ref/selector: the element has `autofocus=""` when `showModal` is called (spy inspects the DOM) and not afterwards; missing target warns. Opener removed: after `close`, if `activeElement` is inside the dialog the Trigger is focused when connected. |
 | Mode guard | Changing Root from JS-free to library mode after mount warns; `transition` / `keepMounted={false}` in JS-free mode warn. |
-| `transition` smoke | Popup renders with and without `transition`. |
+| `transition` smoke | Popup renders with and without `transition`. **Browser:** opening with `transition` absent calls `document.startViewTransition` zero times; with `transition="none"` it is called once per open (conventions 10.1). |
 
 ### 13.3 Browser mode (`dialog.browser.test.tsx`, Chromium, Firefox, WebKit)
 
@@ -1416,10 +1420,10 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
 - **Popup, effects.** (1) Mount reconciliation layout effect (2.4), once. (2) The apply effect
   (2.5) after every commit. (3) `initialFocus` write inside (2) right before `show*()`, removal
   right after. (4) The listener effect above, re-subscribed when the element changes.
-- **Popup, rendering.** `<ViewTransition default={isLibrary ? (transition ?? "none") : "none"}>
-  <dialog id … aria-labelledby aria-describedby closedby={flag ? (lightDismiss ? "any" :
-  "closerequest") : undefined} data-modal suppressHydrationWarning>{content}</dialog>
-  </ViewTransition>` where `content` is: static mode → children; library `keepMounted` →
+- **Popup, rendering.** `<dialog id … aria-labelledby aria-describedby closedby={flag ?
+  (lightDismiss ? "any" : "closerequest") : undefined} data-modal
+  suppressHydrationWarning>{content}</dialog>`, wrapped in `<ViewTransition default={transition}>`
+  only when `isLibrary && transition !== undefined` (conventions 5.1), where `content` is: static mode → children; library `keepMounted` →
   `<Activity mode={committed || exiting ? "visible" : "hidden"}>{children}</Activity>`; library
   default → `committed || exiting ? children : null`. `closedby` is typed in `@types/react` 19.3 (research)
   and needs no augmentation; `commandfor` / `command` on the buttons are already in

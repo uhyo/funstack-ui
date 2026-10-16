@@ -659,9 +659,10 @@ What animates when, applying conventions 5.1 and the Tabs 10.1 table:
 - **The check itself is CSS.** `.radio:checked::before { scale: 1 }` with a CSS `transition`
   animates on click and back on rejection. Any `<ViewTransition>` keyed on optimistic state is a
   bug (conventions 5.1).
-- **`Item` keeps a `<ViewTransition default={transition ?? "none"}>` and a `transition` prop** for
-  parity with Toggle and Tabs (product-owner decision), documented as animating the settle commit
-  only. On a radio with no children that is the `data-pending` attribute leaving and the rollback
+- **`Item` keeps a `transition` prop** for parity with Toggle and Tabs (product-owner decision),
+  rendering `<ViewTransition default={transition}>` only when the prop is given (conventions 5.1,
+  #35; a group whose Items are inserted by an action would otherwise start a page cross-fade per
+  insertion), documented as animating the settle commit only. On a radio with no children that is the `data-pending` attribute leaving and the rollback
   write; most consumers will never set it.
 - **Dependent content is the consumer's boundary.** The library adds `fsui-radio-group` to every
   dispatch, so a consumer's own `<ViewTransition default={{ "fsui-radio-group": "fade", default: "none" }}>`
@@ -814,7 +815,7 @@ controlled wrapper.
 | Function props | `className` / `style` on Root, Label, Item receive the documented state (`checked` optimistic, `pending` per Item); `children` on Root and Label receive Root state; Item has no `children`. |
 | `render` element | `render={<input id="x" className="y" />}` on Item keeps `type="radio"`, `name`, `checked` and the library's handler, concatenates `className`, forwards `ref`; `render={<fieldset />}` on Root; dev warning when the mounted tag is not `INPUT` / `FIELDSET`. |
 | Post-await rule | Controlled wrapper that awaits then `startTransition(setValue)` works end to end. |
-| `transition` prop | Item renders with and without `transition`; Root and Label have none. |
+| `transition` prop | Item renders with and without `transition`; Root and Label have none. Browser: an Item mounted in a `startTransition` with `transition` absent calls `document.startViewTransition` zero times. |
 | Directive | Built `dist/radio-group/*.mjs` for Root, Label, Item and context begin with `"use client"`. |
 | Dev warnings | `value` together with `defaultValue`, and switching `value` between `undefined` and a value, warn once each (shared hook). **No** warning when neither is given. |
 
@@ -917,7 +918,7 @@ is not in the context: no part renders it.
   `type: "radio"`, `name: ctx.name`, `value`, `checked`, `form: ctx.form`, `required: ctx.required`,
   `data-checked`, `data-pending`, `data-disabled`, `onChange: (e) => ctx.select(value, e.nativeEvent)`.
   Dev warning when the mounted `tagName` is not `INPUT`.
-- Output: `<ViewTransition default={transition ?? "none"}>{element}</ViewTransition>`.
+- Output: `element`, wrapped in `<ViewTransition default={transition}>` only when `transition` is given.
 - Owned keys: `type`, `name`, `value`, `checked`, `form`, `required`, `data-checked`,
   `data-pending`, `data-disabled`, `onChange`.
 - No `defaultChecked` is ever rendered as a prop (react-dom derives the mount-time value from the

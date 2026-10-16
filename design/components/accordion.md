@@ -634,10 +634,13 @@ inherited declaration on the Root covers every item.
 
 ### 8.3 `transition` (ViewTransition, library mode only)
 
-Item, Trigger and Panel each render `<ViewTransition default={transition ?? "none"}>` as the
-outermost node of their output (so the Item's boundary wraps the `<details>`, the Trigger's wraps
-the `<summary>`, the Panel's wraps its `<div>`; none of them adds DOM, so the summary stays the
-first child of the details). Transition types per the conventions: `fsui-accordion`,
+Item, Trigger and Panel each render `<ViewTransition default={transition}>` as the outermost
+node of their output **only when `transition` is given** (conventions 5.1, #35; the Item's
+boundary wraps the `<details>`, the Trigger's wraps the `<summary>`, the Panel's wraps its
+`<div>`; none of them adds DOM, so the summary stays the first child of the details). Static mode
+renders no boundary at all. Without the prop a Panel mounting in a transition, or an Item inserted
+by an action, starts no document view transition; with it, every such mount runs the page
+cross-fade (see the conventions for the consumer-side CSS). Transition types per the conventions: `fsui-accordion`,
 `fsui-accordion-expand`, `fsui-accordion-collapse`.
 
 **Only the settling commit animates** (conventions 5.1). The optimistic flip of `data-open` on
@@ -839,7 +842,7 @@ and controlled wrappers (controlled follows update-on-success). Library mode unl
 | Directive | Every file under `src/accordion/` except `index.ts` begins with `"use client"` (there is no directive-free part; see Conventions feedback). |
 | Platform path | `details.setAttribute("open", "")` (jsdom fires `toggle`) dispatches with `reason: "platform"`; controlled parent that ignores it → attribute removed after settle; parent that accepts → stays open; walkthrough 9.6; disabled item re-closes without dispatching. |
 | Mode guard | Changing Root from JS-free to library mode after mount warns. |
-| `transition` smoke | Item, Trigger and Panel render with and without `transition`; JS-free mode warns. Animation itself is an example-app check (jsdom has no `startViewTransition`). |
+| `transition` smoke | Item, Trigger and Panel render with and without `transition`; JS-free mode warns and renders no boundary. Animation itself is an example-app check (jsdom has no `startViewTransition`). **Browser:** expanding an item with `transition` absent calls `document.startViewTransition` zero times; with `transition="none"` on the Panel it is called (conventions 10.1). |
 
 jsdom facts the tests rely on (verified against jsdom 29.1.1, the version `packages/ui` resolves
 today; the manifest asks for `^30.1.3`, re-check after the lockfile moves):
@@ -887,7 +890,7 @@ packages/ui/src/accordion/
 - **Registry.** `registerTrigger(el) => cleanup` through a callback ref in Trigger; Root keeps a
   `Set<HTMLElement>` in a ref and sorts by `compareDocumentPosition` inside the keydown handler
   (`useEffectEvent` is unnecessary; the handler reads refs).
-- **Item.** Renders `<ViewTransition default={transition ?? "none"}><details open={committedOpen}
+- **Item.** Renders `<details open={committedOpen}` (wrapped in `<ViewTransition default={transition}>` only in library mode with `transition` given)
   name={staticExclusiveName} onToggle={…} data-open={optimisticOpen || undefined} …>`. In static
   mode the `open` prop is the value of `defaultOpen` captured on the first render (`useState(() =>
   defaultOpen)`), so later re-renders pass the same prop and React never rewrites the attribute the
@@ -895,7 +898,8 @@ packages/ui/src/accordion/
 - **Trigger.** `onClick` per 2.2; `isNestedInteractive` = `event.target` has an ancestor matching
   `a[href], button, input, select, textarea, [contenteditable]` below the summary. Renders
   `aria-disabled` and `data-*`. Registers with Root.
-- **Panel.** Reads `ItemContext`, renders `<ViewTransition><div data-disabled …>`.
+- **Panel.** Reads `ItemContext`, renders `<div data-disabled …>`, wrapped in a boundary only
+  when `transition` is given in library mode.
 - **Ids.** `useId()` only in Root, only consumed for `name` in static exclusive mode.
 - **Transition types** added in Root's dispatch, before `setOptimistic`.
 - **Dev warnings:** mode change after mount; `defaultOpen` in library mode; `transition` in static

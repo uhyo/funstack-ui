@@ -617,10 +617,21 @@ Consequences, stated so nobody is surprised:
   must react to the click uses CSS transitions on `[data-selected]` / `[data-pending]`.
 - `useDeferredValue(optimistic)` does not rescue the Indicator: probed, the deferred render also
   commits without a view transition while an action is pending.
+- **No `transition`, no boundary** (conventions 5.1, #35). A `<ViewTransition>` that mounts or is
+  revealed in a transition commit starts the browser's 250 ms root cross-fade even with
+  `"none"`, and the next commit waits for it; measured on this very component at about 300 ms per
+  tab switch with `keepMounted={false}` or `true`. So `Panel` and `Tab` render the boundary only
+  when `transition` is set, and the prop is static (toggling it remounts the part). Consumers who
+  set `transition` on a Panel accept the page cross-fade on every switch unless they add the
+  page-policy CSS from conventions 5.1.
 
 ### 10.2 Wiring
 
-- `Panel`: when rendered, `<ViewTransition default={transition ?? "none"}><div …/></ViewTransition>`.
+- `Panel`: when rendered, `<div …/>` wrapped in `<ViewTransition default={transition}>` **only
+  when `transition` is given** (conventions 5.1, #35). This matters most here: a Panel with
+  `keepMounted={false}` mounts on every switch and one with `keepMounted` is revealed by
+  `<Activity>` on every switch; either would start the page cross-fade (measured about 300 ms per
+  switch) if a boundary were present, so without the prop none is.
   In the default (unmount) mode the whole boundary mounts and unmounts, so a switch is one
   `exit` and one `enter`. In `keepMounted` mode the boundary sits inside `<Activity>`, and the
   mode flip inside the library's transition yields the same `exit` / `enter`. In `"until-found"`
@@ -631,8 +642,8 @@ Consequences, stated so nobody is surprised:
   `anchor-size()` values (WPT `anchor-transition-default.html`); Gecko does not yet
   (`docs/research/popover-anchor-tooltip.md`), so in Firefox the indicator jumps. That is a
   missing animation, not a broken feature, and the library ships no JS measurement fallback.
-- `Tab`: `<ViewTransition default={transition ?? "none"}><button …/></ViewTransition>`; see 10.1
-  for when it fires.
+- `Tab`: `<button …/>`, wrapped in `<ViewTransition default={transition}>` only when `transition`
+  is given; see 10.1 for when it fires.
 
 Types added per dispatch: `fsui-tabs`, and `fsui-tabs-next` or `fsui-tabs-prev` when both the
 committed tab and the target tab are in the DOM. Root's `transitionTypes(next, prev)` looks both
@@ -840,7 +851,7 @@ controlled wrapper.
 | Function props | `className`, `style`, `children`, `render` on every part receive the documented state; attributes agree (Tab `selected` optimistic, Panel `selected` committed). |
 | `render` element | Tab as `<a>`: role and aria win, `className` concatenated, Space selects, `ref` forwarded. Panel and Indicator with custom elements. |
 | Post-await rule | Controlled wrapper that awaits then `startTransition(setTab)` works end to end. |
-| `transition` prop | `Tab` and `Panel` render with and without `transition` (jsdom has no `startViewTransition`); `Indicator` has no such prop. |
+| `transition` prop | `Tab` and `Panel` render with and without `transition` (jsdom has no `startViewTransition`); `Indicator` has no such prop. **Browser:** with `transition` absent, a tab switch (`keepMounted` false and true) calls `document.startViewTransition` zero times; with `transition="none"` on the Panel it is called once per switch (conventions 10.1). |
 | `experimental_focusgroup` | Attribute rendered with the expected tokens for each orientation and `loop`; JS arrows still work in jsdom (no `focusgroup` in prototype). |
 | Directive | Built `dist/tabs/*.mjs` for Root, List, Tab, Panel, Indicator and context begin with `"use client"`; `tabs-ids.mjs` does not. |
 | Dev warnings | Neither `value` nor `defaultValue` given warns once (product-owner decision, resolved question 2); `value` together with `defaultValue`, and switching `value` between `undefined` and a string, warn once each. |
@@ -928,7 +939,7 @@ One context; every part re-renders on a dispatch anyway (attributes change).
   outside React, so nothing can go stale when a selection later appears.
 - `style`: merge `{ anchorName: anchorName(rootId, value) }` under the consumer's style (consumer
   wins, per conventions section 1.2).
-- Output: `<ViewTransition default={transition ?? "none"}><button …/></ViewTransition>`.
+- Output: `<button …/>`, wrapped in `<ViewTransition default={transition}>` only when `transition` is given.
 
 ### 13.6 Panel
 
