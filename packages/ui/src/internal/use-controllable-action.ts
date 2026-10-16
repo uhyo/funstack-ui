@@ -43,6 +43,12 @@ export interface ControllableAction<T, Details extends ActionDetails> {
   readonly pending: boolean;
   /** Runs the action inside the hook's transition with optimistic feedback. */
   readonly dispatch: (next: T, details: Details) => void;
+  /**
+   * The `next` of the most recent dispatch while any dispatch's action is still unsettled, else
+   * `null`. Lets a component with a browser-owned path (Accordion's find-in-page reveal) build on
+   * what the user already intends instead of on the DOM. Read it from handlers and effects only.
+   */
+  readonly latestInFlight: () => { readonly next: T } | null;
 }
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -93,6 +99,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   );
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
+  const inFlight = useRef<{ count: number; next: T | undefined }>({ count: 0, next: undefined });
   const mounted = useRef(false);
 
   useDevWarnings(isControlled, defaultValue !== undefined, warn);
@@ -107,12 +114,15 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   function dispatch(next: T, details: Details): void {
     const prev = committed;
     const id = ++latest.current;
+    inFlight.current.count += 1;
+    inFlight.current.next = next;
     startOwnTransition(async () => {
       for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
       setOptimistic({ next, details });
       try {
         await action?.(next, details);
       } catch (error) {
+        settle();
         // The latest dispatch's rejection takes React's own route to the boundary.
         if (id === latest.current) throw error;
         // Nothing to throw to once unmounted (React drops its own thenables the same way).
@@ -128,13 +138,24 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
         setSupersededError({ error });
         return;
       }
+      settle();
       if (!isControlled && id === latest.current) {
         startTransition(() => setInternal(next));
       }
     });
   }
 
-  return { committed, optimistic, pending, dispatch };
+  function settle(): void {
+    inFlight.current.count -= 1;
+    if (inFlight.current.count === 0) inFlight.current.next = undefined;
+  }
+
+  function latestInFlight(): { readonly next: T } | null {
+    const { count, next } = inFlight.current;
+    return count > 0 ? { next: next as T } : null;
+  }
+
+  return { committed, optimistic, pending, dispatch, latestInFlight };
 }
 
 function useDevWarnings(

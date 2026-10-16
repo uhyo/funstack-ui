@@ -1,5 +1,13 @@
 "use client";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffectEvent,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -110,12 +118,18 @@ function toSet(value: AccordionValue): OpenSet {
   return typeof value === "string" ? new Set([value]) : new Set(value);
 }
 
-function fromSet(set: OpenSet, exclusive: boolean): AccordionValue {
+/**
+ * Converts the open set back to the public value. Multiple mode lists the items in registration
+ * order (the order the Items mounted, which is document order for a list rendered top to bottom),
+ * not in the order they were opened; unregistered values keep their insertion order at the end.
+ */
+function fromSet(set: OpenSet, exclusive: boolean, order: readonly string[]): AccordionValue {
   if (exclusive) {
     const [first] = set;
     return first ?? null;
   }
-  return [...set];
+  const index = new Map(order.map((v, i) => [v, i] as const));
+  return [...set].sort((a, b) => (index.get(a) ?? Infinity) - (index.get(b) ?? Infinity));
 }
 
 /** The optimistic reducer of design 4.1: add/remove one item, or replace when exclusive. */
@@ -142,6 +156,11 @@ function byDocumentOrder<T extends Node>(a: T, b: T): number {
 }
 
 const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
+
+/** Writes `open` to the DOM; it fires `toggle`, whose handler sees DOM === committed and returns. */
+function applyOpen(element: HTMLDetailsElement, open: boolean): void {
+  if (element.open !== open) element.open = open;
+}
 
 function isEnabledTrigger(el: HTMLElement): boolean {
   return el.getAttribute("aria-disabled") !== "true";
@@ -207,28 +226,29 @@ export function AccordionRoot(props: AccordionRootProps) {
   // only re-bases when the controlled value really changed.
   const controlledSet = useMemo(() => (value === undefined ? undefined : toSet(value)), [value]);
 
-  const { committed, optimistic, pending, dispatch } = useControllableAction<
+  const items = useRef(new Map<HTMLDetailsElement, string>());
+  const triggers = useRef(new Set<HTMLElement>());
+  const registeredValues = () => [...items.current.values()];
+
+  const { committed, optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     OpenSet,
     AccordionValueChangeDetails
   >({
     controlled: controlledSet,
     defaultValue: defaultValue === undefined ? undefined : toSet(defaultValue),
     initialValue: EMPTY,
-    action: action && ((next, details) => action(fromSet(next, exclusive), details)),
+    action:
+      action && ((next, details) => action(fromSet(next, exclusive, registeredValues()), details)),
     transitionTypes: (_next, _prev, details) =>
       transitionTypes("accordion", details.open ? "expand" : "collapse"),
-    reducer: (prev, _next, details) => reduce(prev, details.item, details.open, exclusive),
+    // One item per dispatch, re-based on the committed set, except the mount reconciliation
+    // (reason "platform", no event), which folds every pre-hydration click into one `next`.
+    reducer: (prev, next, details) =>
+      details.reason === "platform" && details.event === undefined
+        ? next
+        : reduce(prev, details.item, details.open, exclusive),
     warn: { component: "Accordion.Root", prop: "value" },
   });
-
-  const items = useRef(new Map<HTMLDetailsElement, string>());
-  const triggers = useRef(new Set<HTMLElement>());
-  // The most recently dispatched `next` while an action is in flight; lets the platform path skip
-  // a dispatch that would repeat the one just made (two items reconciled in the same commit).
-  const lastDispatched = useRef<OpenSet | null>(null);
-  useEffect(() => {
-    if (!pending) lastDispatched.current = null;
-  }, [pending]);
 
   const registerItem = useCallback((itemValue: string, element: HTMLDetailsElement) => {
     items.current.set(element, itemValue);
@@ -244,37 +264,79 @@ export function AccordionRoot(props: AccordionRootProps) {
     };
   }, []);
 
-  function dispatchChange(
-    next: OpenSet,
-    item: string,
-    open: boolean,
-    reason: AccordionChangeReason,
-    event: Event | undefined,
-  ): void {
-    lastDispatched.current = next;
-    dispatch(next, createActionDetails(event, { reason, item, open }));
-  }
+  const dispatchChange = useCallback(
+    (
+      next: OpenSet,
+      item: string,
+      open: boolean,
+      reason: AccordionChangeReason,
+      event: Event | undefined,
+    ): void => {
+      dispatch(next, createActionDetails(event, { reason, item, open }));
+    },
+    [dispatch],
+  );
 
-  const dispatchFromTrigger: AccordionRootContextValue["dispatch"] = (item, open, event) => {
-    // `next` comes from the optimistic set: what the user sees and intends (design 2.2).
-    dispatchChange(reduce(optimistic, item, open, exclusive), item, open, "trigger", event);
-  };
+  const dispatchFromTrigger = useCallback<AccordionRootContextValue["dispatch"]>(
+    (item, open, event) => {
+      // `next` comes from the optimistic set: what the user sees and intends (design 2.2).
+      dispatchChange(reduce(optimistic, item, open, exclusive), item, open, "trigger", event);
+    },
+    // `dispatchChange` closes over the hook's `dispatch`, which is new on every render.
+    [dispatchChange, optimistic, exclusive],
+  );
 
-  const dispatchFromDom: AccordionRootContextValue["dispatchFromDom"] = (item, open, event) => {
-    // Recompute `next` from the DOM state of every registered item (design 2.3). Exclusive mode:
-    // the toggled item wins when it is open, otherwise the first open item in document order.
-    const entries = [...items.current].sort(([a], [b]) => byDocumentOrder(a, b));
-    const openItems = entries.filter(([el]) => el.open).map(([, v]) => v);
-    let next: OpenSet;
-    if (exclusive) {
-      const first = open ? item : openItems[0];
-      next = first === undefined ? EMPTY : new Set([first]);
-    } else {
-      next = new Set(openItems);
+  const dispatchFromDom = useCallback<AccordionRootContextValue["dispatchFromDom"]>(
+    (item, open, event) => {
+      // The browser flipped one item (design 2.3). `next` builds on what the user already
+      // intends (the latest in-flight dispatch, else the optimistic set), never on the DOM: a
+      // pending optimistic open would otherwise be lost to latest-wins. Exclusive mode therefore
+      // lets the toggled item win when it opened (walkthrough 9.6).
+      const base = latestInFlight()?.next ?? optimistic;
+      const next = reduce(base, item, open, exclusive);
+      if (setsEqual(next, base)) return;
+      dispatchChange(next, item, open, "platform", event);
+    },
+    [dispatchChange, latestInFlight, optimistic, exclusive],
+  );
+
+  const isLibrary = mode === "library";
+
+  // Mount reconciliation (design 2.3): clicks before hydration left some `<details open>` out of
+  // step with committed state. Every mismatch is folded into ONE dispatch with reason "platform"
+  // and no event; disabled items are simply put back. Runs once per mount; the StrictMode re-run
+  // is deduplicated against the dispatch just made.
+  const reconcileOnMount = useEffectEvent(() => {
+    const base = latestInFlight()?.next ?? optimistic;
+    const mismatches: { item: string; open: boolean }[] = [];
+    for (const [element, item] of items.current) {
+      const want = committed.has(item);
+      if (element.open === want) continue;
+      if (element.hasAttribute("data-disabled")) applyOpen(element, want);
+      else mismatches.push({ item, open: element.open });
     }
-    if (setsEqual(next, lastDispatched.current ?? optimistic)) return;
-    dispatchChange(next, item, open, "platform", event);
-  };
+    if (mismatches.length === 0) return;
+    // Exclusive mode: the first opened item in registration order wins (the others are re-closed
+    // by the re-apply effect); otherwise fold every flip onto the base.
+    const opened = exclusive ? mismatches.find((m) => m.open) : undefined;
+    const chosen = opened ?? mismatches[0]!;
+    const next = opened
+      ? new Set([opened.item])
+      : mismatches.reduce((set, m) => reduce(set, m.item, m.open, exclusive), base);
+    if (setsEqual(next, base)) return;
+    dispatchChange(next, chosen.item, chosen.open, "platform", undefined);
+  });
+  useLayoutEffect(() => {
+    if (isLibrary) reconcileOnMount();
+  }, [isLibrary]);
+
+  // Re-apply committed state to the DOM once nothing is in flight: closes what find-in-page
+  // revealed and the parent refused, or what a rejected action left open. Writing `open` fires
+  // `toggle`, whose handler sees DOM === committed and does nothing.
+  useLayoutEffect(() => {
+    if (!isLibrary || pending || latestInFlight() !== null) return;
+    for (const [element, item] of items.current) applyOpen(element, committed.has(item));
+  }, [isLibrary, pending, committed, latestInFlight]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (!NAV_KEYS.has(event.key)) return;
@@ -290,17 +352,24 @@ export function AccordionRoot(props: AccordionRootProps) {
   }
 
   const id = useId();
-  const isLibrary = mode === "library";
+  const name = !isLibrary && exclusive ? id : undefined;
   const state: AccordionRootState = { pending: isLibrary && pending, disabled };
+  const rootPending = state.pending;
+  const contextCommitted = isLibrary ? committed : EMPTY;
+  const contextOptimistic = isLibrary ? optimistic : EMPTY;
 
+  // Not memoised, deliberately: `dispatchChange` closes over the hook's `dispatch`, which is a
+  // new function on every render of the Root, so a `useMemo` here (design 12) could never reuse
+  // its value and the React Compiler lint flags it as unpreservable. Parts re-render with the
+  // Root, which is what happens today anyway whenever its state changes.
   const context: AccordionRootContextValue = {
     mode,
     exclusive,
-    name: !isLibrary && exclusive ? id : undefined,
+    name,
     disabled,
-    pending: state.pending,
-    committed: isLibrary ? committed : EMPTY,
-    optimistic: isLibrary ? optimistic : EMPTY,
+    pending: rootPending,
+    committed: contextCommitted,
+    optimistic: contextOptimistic,
     dispatch: dispatchFromTrigger,
     dispatchFromDom,
     registerItem,

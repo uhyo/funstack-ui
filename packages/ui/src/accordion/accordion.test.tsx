@@ -11,8 +11,9 @@
 //   which makes jsdom fire `toggle` on a macrotask exactly like a browser does.
 // - ViewTransition: jsdom has no `startViewTransition`, so `transition` is smoke-tested only.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Suspense, startTransition, useState } from "react";
+import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
@@ -1256,6 +1257,59 @@ describe("Accordion", () => {
       expect(committed()).toEqual(["b"]);
     });
 
+    renderBoth("platform/user race", (mode) => {
+      it("multiple: a platform open while a click is pending keeps both intents", async () => {
+        const d = deferred();
+        const action = vi.fn<ActionFn>(() => d.promise);
+        render(<Harness mode={mode} action={action} />);
+        const user = setupUser();
+
+        await user.click(trigger("a"));
+        expectPending(trigger("a"));
+        act(() => {
+          item("b").setAttribute("open", "");
+        });
+        await flushToggle();
+        expect(action.mock.calls.map(([next, details]) => [next, details.reason])).toEqual([
+          [["a"], "trigger"],
+          [["a", "b"], "platform"],
+        ]);
+        expect(trigger("a")).toHaveAttribute("data-open", "");
+        expect(trigger("b")).toHaveAttribute("data-open", "");
+
+        await act(async () => {
+          d.resolve();
+        });
+        expect(item("a").open).toBe(true);
+        expect(item("b").open).toBe(true);
+        expect(committed()).toEqual(["a", "b"]);
+        expectNotPending(root());
+      });
+
+      it("exclusive: the platform-opened item wins over the pending click", async () => {
+        const d = deferred();
+        const action = vi.fn<ActionFn>(() => d.promise);
+        render(<Harness mode={mode} exclusive action={action} />);
+        const user = setupUser();
+
+        await user.click(trigger("a"));
+        act(() => {
+          item("b").setAttribute("open", "");
+        });
+        await flushToggle();
+        expect(action.mock.calls.map(([next]) => next)).toEqual(["a", "b"]);
+        expect(trigger("a")).not.toHaveAttribute("data-open");
+        expect(trigger("b")).toHaveAttribute("data-open", "");
+
+        await act(async () => {
+          d.resolve();
+        });
+        expect(item("a").open).toBe(false);
+        expect(item("b").open).toBe(true);
+        expect(committed()).toBe("b");
+      });
+    });
+
     it("a disabled item is re-closed without dispatching", async () => {
       const action = vi.fn<ActionFn>();
       render(
@@ -1285,6 +1339,156 @@ describe("Accordion", () => {
       await flushToggle();
       expect(item("a").open).toBe(true);
       expect(consoleError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("hydration: clicks before hydration (design 2.3)", () => {
+    /** Server-renders `ui`, "clicks" the given items before hydration, then hydrates. */
+    async function hydrate(ui: ReactNode, preOpen: readonly string[]) {
+      const container = document.createElement("div");
+      container.innerHTML = renderToString(ui);
+      document.body.append(container);
+      for (const v of preOpen) {
+        container.querySelector(`[data-testid="item-${v}"]`)!.setAttribute("open", "");
+      }
+      // The clicks' `toggle` events fire long before hydration in a browser; let jsdom's queued
+      // ones go by too, so they are not mistaken for new platform events after hydration.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const result = render(ui, { container, hydrate: true });
+      return { ...result, container };
+    }
+
+    afterEach(() => {
+      document.body.innerHTML = "";
+    });
+
+    renderBoth("library mode", (mode) => {
+      it("reconciles every pre-opened item in ONE dispatch with reason 'platform' and no event", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const action = vi.fn<ActionFn>();
+        await act(async () => {
+          await hydrate(<Harness mode={mode} action={action} />, ["a", "b"]);
+        });
+        expect(action).toHaveBeenCalledTimes(1);
+        const [next, details] = action.mock.calls[0]!;
+        expect(next).toEqual(["a", "b"]);
+        expect(details.reason).toBe("platform");
+        expect(details.event).toBeUndefined();
+        expect(details.item).toBe("a");
+        expect(details.open).toBe(true);
+        expect(item("a").open).toBe(true);
+        expect(item("b").open).toBe(true);
+        expect(item("c").open).toBe(false);
+        expect(committed()).toEqual(["a", "b"]);
+        expectNotPending(root());
+        // No hydration-mismatch warning: `suppressHydrationWarning` covers the `open` attribute.
+        expect(consoleError).not.toHaveBeenCalled();
+      });
+    });
+
+    it("exclusive: the first pre-opened item in document order wins", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const action = vi.fn<ActionFn>();
+      await act(async () => {
+        await hydrate(<Harness mode="uncontrolled" exclusive action={action} />, ["b", "c"]);
+      });
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls[0]?.[0]).toBe("b");
+      expect(item("b").open).toBe(true);
+      expect(item("c").open).toBe(false);
+    });
+
+    it("a pre-opened disabled item is put back without dispatching", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const action = vi.fn<ActionFn>();
+      await act(async () => {
+        await hydrate(
+          <Harness mode="uncontrolled" action={action} items={[{ value: "a", disabled: true }]} />,
+          ["a"],
+        );
+      });
+      expect(action).not.toHaveBeenCalled();
+      expect(item("a").open).toBe(false);
+    });
+
+    it("JS-free mode: the browser's state stays and nothing warns", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const ui = (
+        <Accordion.Root exclusive>
+          <Accordion.Item value="a" data-testid="item-a">
+            <Accordion.Trigger data-testid="trigger-a">A</Accordion.Trigger>
+          </Accordion.Item>
+          <Accordion.Item value="b" data-testid="item-b">
+            <Accordion.Trigger data-testid="trigger-b">B</Accordion.Trigger>
+          </Accordion.Item>
+        </Accordion.Root>
+      );
+      await act(async () => {
+        await hydrate(ui, ["b"]);
+      });
+      await flushToggle();
+      expect(item("b").open).toBe(true);
+      expect(item("a").open).toBe(false);
+      expect(item("b")).not.toHaveAttribute("data-open");
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it("StrictMode: a pre-opened item stays open through the double effect run and a slow accept", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const d = deferred();
+      const action = vi.fn<ActionFn>(() => d.promise);
+      function Parent() {
+        const [value, setValue] = useState<string[]>([]);
+        return (
+          <Accordion.Root
+            value={value}
+            valueChangeAction={async (next, details) => {
+              await action(next, details);
+              startTransition(() => setValue(next));
+            }}
+            data-testid="root"
+          >
+            <Accordion.Item value="a" data-testid="item-a">
+              <Accordion.Trigger data-testid="trigger-a">A</Accordion.Trigger>
+            </Accordion.Item>
+          </Accordion.Root>
+        );
+      }
+      const flips: boolean[] = [];
+      await act(async () => {
+        const { container } = await hydrate(
+          <StrictMode>
+            <Parent />
+          </StrictMode>,
+          ["a"],
+        );
+        new MutationObserver(() => {
+          flips.push(container.querySelector("details")!.open);
+        }).observe(container.querySelector("details")!, { attributeFilter: ["open"] });
+      });
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(item("a").open).toBe(true);
+      expectPending(root());
+      await act(async () => {
+        d.resolve();
+      });
+      expect(item("a").open).toBe(true);
+      expectNotPending(root());
+      // The attribute never flipped off: no dev-only flash.
+      expect(flips.every(Boolean)).toBe(true);
+    });
+  });
+
+  describe("multiple-mode value order", () => {
+    it("lists open items in document order, not in the order they were opened", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" action={action} />);
+      const user = setupUser();
+      await user.click(trigger("c"));
+      await user.click(trigger("a"));
+      await user.click(trigger("b"));
+      expect(action.mock.calls.map(([next]) => next)).toEqual([["c"], ["a", "c"], ["a", "b", "c"]]);
+      expect(committed()).toEqual(["a", "b", "c"]);
     });
   });
 

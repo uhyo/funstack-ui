@@ -1,13 +1,5 @@
 "use client";
-import {
-  use,
-  useCallback,
-  useEffectEvent,
-  useLayoutEffect,
-  useRef,
-  useState,
-  ViewTransition,
-} from "react";
+import { use, useCallback, useState, ViewTransition } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -101,7 +93,6 @@ export function AccordionItem({
       "outside any React transition. Animate `::details-content` with CSS instead.",
   );
 
-  const ref = useRef<HTMLDetailsElement | null>(null);
   const registerItem = root?.registerItem;
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
@@ -111,38 +102,16 @@ export function AccordionItem({
             "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>.",
         );
       }
-      ref.current = element;
       const unregister = registerItem?.(value, element);
       return () => {
-        ref.current = null;
         unregister?.();
       };
     },
     [registerItem, value],
   );
 
-  // Platform path (design 2.3): the DOM differs from committed state on mount (a click before
-  // hydration) → dispatch with reason "platform"; after the action settles (or when nothing is
-  // pending) → re-apply committed state to the DOM.
-  const dispatchFromDom = root?.dispatchFromDom;
-  const reconcileOnMount = useEffectEvent((element: HTMLDetailsElement) => {
-    if (disabled || dispatchFromDom === undefined) {
-      element.open = committedOpen === true;
-      return;
-    }
-    dispatchFromDom(value, element.open, undefined);
-  });
-  const mounted = useRef(false);
-  useLayoutEffect(() => {
-    if (!isLibrary || committedOpen === undefined) return;
-    const element = ref.current;
-    const first = !mounted.current;
-    mounted.current = true;
-    if (element === null || element.open === committedOpen || rootPending) return;
-    if (first) reconcileOnMount(element);
-    else element.open = committedOpen; // fires `toggle`; the handler sees DOM === committed
-  }, [isLibrary, committedOpen, rootPending]);
-
+  // Platform path (design 2.3): the Root reconciles pre-hydration clicks on mount and re-applies
+  // committed state once nothing is in flight; this handler reports the browser's own flips.
   const onToggle = isLibrary
     ? (event: SyntheticEvent<HTMLDetailsElement>) => {
         const element = event.currentTarget;
@@ -150,7 +119,7 @@ export function AccordionItem({
         if (element.open === committedOpen) return; // our own commit echoing back
         if (disabled) {
           // A disabled item cannot be opened by the browser either; close it again now or, while
-          // an action is in flight, when the transition ends (layout effect above).
+          // an action is in flight, when the Root re-applies committed state.
           if (!rootPending) element.open = committedOpen === true;
           return;
         }
@@ -180,6 +149,9 @@ export function AccordionItem({
     // least one mode, so a `render` element cannot override them either (conventions 1.2).
     libraryProps: {
       open: isLibrary ? committedOpen : staticOpen,
+      // A click before hydration changes `open` under React's feet in both modes; the mismatch is
+      // expected and reconciled (library mode) or the browser's business (JS-free mode).
+      suppressHydrationWarning: true,
       // Owned in both modes: in library mode there is one writer of `open`, so a render element's
       // `name` (a second, platform-level writer) is removed.
       name: !isLibrary ? root?.name : undefined,
