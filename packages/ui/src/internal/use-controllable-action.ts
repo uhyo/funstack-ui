@@ -24,6 +24,12 @@ export interface UseControllableActionOptions<T, Details extends ActionDetails> 
    * committed value and the details object (Tabs derives next/prev direction from them).
    */
   transitionTypes?: (next: T, prev: T, details: Details) => readonly string[];
+  /**
+   * Optimistic reducer (conventions 3.4). Default: replace the value with `next`. Multi-item
+   * states (Accordion's open set) pass a reducer keyed by item, reading the item from `details`,
+   * so stacked optimistic patches re-base onto a changed committed value.
+   */
+  reducer?: (prev: T, next: T, details: Details) => T;
   /** Names used in development warnings. */
   warn?: { readonly component: string; readonly prop: string };
 }
@@ -60,7 +66,8 @@ function report(error: unknown): void {
 export function useControllableAction<T, Details extends ActionDetails = ActionDetails>(
   options: UseControllableActionOptions<T, Details>,
 ): ControllableAction<T, Details> {
-  const { controlled, defaultValue, initialValue, action, transitionTypes, warn } = options;
+  const { controlled, defaultValue, initialValue, action, transitionTypes, reducer, warn } =
+    options;
 
   // React keeps only the newest thenable per `useTransition`, so a rejection from a dispatch that
   // was superseded by a later one would be dropped entirely (no boundary, no `reportError`). The
@@ -79,7 +86,11 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   );
   const isControlled = controlled !== undefined;
   const committed = isControlled ? controlled : internal;
-  const [optimistic, setOptimistic] = useOptimistic(committed, (_prev: T, next: T) => next);
+  const [optimistic, setOptimistic] = useOptimistic(
+    committed,
+    (prev: T, patch: { next: T; details: Details }) =>
+      reducer ? reducer(prev, patch.next, patch.details) : patch.next,
+  );
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
   const mounted = useRef(false);
@@ -98,7 +109,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
     const id = ++latest.current;
     startOwnTransition(async () => {
       for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
-      setOptimistic(next);
+      setOptimistic({ next, details });
       try {
         await action?.(next, details);
       } catch (error) {
