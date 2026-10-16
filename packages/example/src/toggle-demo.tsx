@@ -1,4 +1,4 @@
-import { Component, startTransition, useState } from "react";
+import { Component, startTransition, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Toggle } from "@funstack/ui/toggle";
 import "./toggle-demo.css";
@@ -102,20 +102,23 @@ function ControlledDemo() {
 function ControlledVetoDemo() {
   const [favorite, setFavorite] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saves = useRef(0);
   return (
     <section>
       <h3>Controlled, update on success (veto)</h3>
       <p>
         The parent writes its state only after the save succeeds. Every second save fails and is
-        caught inside the action, so the button snaps back and stays mounted with an inline error.
+        caught inside the action, so the button snaps back and stays mounted with an inline error;
+        the saves in between succeed and the parent adopts the value.
       </p>
       <Toggle
         className="chip"
         pressed={favorite}
         pressedChangeAction={async (next) => {
           setError(null);
+          const fail = ++saves.current % 2 === 0;
           try {
-            await fakeSave("veto", next, { fail: next });
+            await fakeSave("veto", next, { fail });
             startTransition(() => setFavorite(next));
           } catch (e) {
             startTransition(() => setError(e instanceof Error ? e.message : String(e)));
