@@ -38,13 +38,23 @@ export interface AccordionTriggerProps extends Omit<
 const isDev = process.env.NODE_ENV !== "production";
 
 const NESTED_INTERACTIVE =
-  "a[href], button, input, select, textarea, [contenteditable]:not([contenteditable='false'])";
+  "a[href], button, label, input, select, textarea, [contenteditable]:not([contenteditable='false'])";
 
-/** A click on an interactive descendant of the summary (a link in the heading) must not toggle. */
-function isNestedInteractive(target: EventTarget | null, summary: HTMLElement): boolean {
-  if (!(target instanceof Element) || target === summary) return false;
+/**
+ * Nested controls with an activation behaviour of their own. The browser runs theirs instead of
+ * the summary's (no toggle), so their click must keep its default: navigation, check, submit.
+ */
+const SELF_ACTIVATING =
+  "a[href], button, label, input:is([type='button'], [type='submit'], [type='reset'], " +
+  "[type='image'], [type='checkbox'], [type='radio'], [type='file'], [type='color'])";
+
+/** The interactive descendant of the summary that was clicked (a link in the heading), if any. */
+function nestedInteractive(target: EventTarget | null, summary: HTMLElement): Element | null {
+  if (!(target instanceof Element) || target === summary) return null;
   const interactive = target.closest(NESTED_INTERACTIVE);
-  return interactive !== null && interactive !== summary && summary.contains(interactive);
+  return interactive !== null && interactive !== summary && summary.contains(interactive)
+    ? interactive
+    : null;
 }
 
 /**
@@ -103,7 +113,15 @@ export function AccordionTrigger({
   const onClick =
     isLibrary || item.disabled
       ? (event: MouseEvent<HTMLElement>) => {
-          if (isNestedInteractive(event.target, event.currentTarget)) return;
+          const nested = nestedInteractive(event.target, event.currentTarget);
+          if (nested !== null) {
+            // A nested control never toggles. Controls without their own activation behaviour
+            // (text input, select, textarea, contenteditable) would let the click fall through to
+            // the summary's toggle, so cancel it; focus and pickers happen on mousedown and are
+            // unaffected. Self-activating controls already pre-empt the summary's behaviour.
+            if (!nested.matches(SELF_ACTIVATING)) event.preventDefault();
+            return;
+          }
           // Cancelling the click is what keeps the browser from touching `open`.
           event.preventDefault();
           if (item.disabled || !isLibrary) return;

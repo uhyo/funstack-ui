@@ -162,10 +162,14 @@ const panel = (v: string) => screen.getByTestId(`panel-${v}`);
 const panelOpen = (v: string) => screen.getByTestId(`panel-open-${v}`);
 const committed = () => JSON.parse(screen.getByTestId("committed").textContent ?? "null");
 
-/** `toggle` is dispatched from a queued task (browser and jsdom alike); run it inside `act`. */
+/**
+ * `toggle` is dispatched from a queued task (browser and jsdom alike); run it inside `act`. jsdom
+ * queues it with `setImmediate`, which a `setTimeout(0)` can race, so wait for an immediate: they
+ * run in FIFO order, after the ones jsdom queued.
+ */
 const flushToggle = () =>
   act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
 function expectOpenAttr(el: Element, open: boolean) {
@@ -218,8 +222,23 @@ describe("Accordion", () => {
       expect(item("a")).not.toHaveAttribute("data-open");
       expect(trigger("a")).not.toHaveAttribute("data-open");
 
-      await user.click(trigger("a"));
+      // No click handler: the click is not default-prevented (the native toggle runs).
+      const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+      act(() => {
+        trigger("a").dispatchEvent(click);
+      });
+      expect(click.defaultPrevented).toBe(false);
       expect(item("a").open).toBe(false);
+
+      // No toggle handler: a platform flip is left alone (nothing re-applied, nothing emitted).
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      act(() => {
+        item("a").setAttribute("open", "");
+      });
+      await flushToggle();
+      expect(item("a").open).toBe(true);
+      expect(item("a")).not.toHaveAttribute("data-open");
+      expect(consoleError).not.toHaveBeenCalled();
     });
 
     it("JS-free `exclusive` renders the same `name` on every details; library mode renders none", () => {
@@ -530,6 +549,38 @@ describe("Accordion", () => {
       expect(action).toHaveBeenCalledTimes(1);
     });
 
+    it("clicking a form control inside the summary neither toggles nor dispatches", async () => {
+      const action = vi.fn<ActionFn>();
+      render(
+        <Accordion.Root defaultValue={[]} valueChangeAction={action} data-testid="root">
+          <Accordion.Item value="a" data-testid="item-a">
+            <Accordion.Trigger data-testid="trigger-a">
+              A
+              <select data-testid="select" aria-label="pick">
+                <option>one</option>
+              </select>
+              <textarea data-testid="textarea" aria-label="notes" />
+              <span contentEditable data-testid="editable" suppressContentEditableWarning>
+                edit me
+              </span>
+              <input data-testid="text" aria-label="text" />
+              <input type="checkbox" data-testid="checkbox" aria-label="check" />
+            </Accordion.Trigger>
+          </Accordion.Item>
+        </Accordion.Root>,
+      );
+      const user = setupUser();
+      for (const id of ["select", "textarea", "editable", "text", "checkbox"]) {
+        await user.click(screen.getByTestId(id));
+        await flushToggle();
+        expect(item("a").open, id).toBe(false);
+        expect(action, id).not.toHaveBeenCalled();
+      }
+      // Controls with their own activation behaviour keep it.
+      expect(screen.getByTestId("checkbox")).toBeChecked();
+      void mode;
+    });
+
     it("clicking a link inside the summary neither toggles nor dispatches", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} items={[{ value: "a", link: true }]} />);
@@ -737,6 +788,98 @@ describe("Accordion", () => {
       });
       expectNotPending(root());
       expect(item("b").open).toBe(true);
+    });
+  });
+
+  describe("overlapping actions (uncontrolled, multiple)", () => {
+    it.each([
+      ["A then B", [0, 1]],
+      ["B then A", [1, 0]],
+    ] as const)("both opens survive when resolved %s", async (_label, order) => {
+      const deferreds = [deferred(), deferred()];
+      let calls = 0;
+      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      render(<Harness mode="uncontrolled" action={action} />);
+      const user = setupUser();
+
+      await user.click(trigger("a"));
+      await user.click(trigger("b"));
+      expect(action.mock.calls.map(([next]) => next)).toEqual([["a"], ["a", "b"]]);
+      expect(trigger("a")).toHaveAttribute("data-open", "");
+      expect(trigger("b")).toHaveAttribute("data-open", "");
+
+      for (const i of order) {
+        await act(async () => {
+          deferreds[i]!.resolve();
+        });
+      }
+      expect(item("a").open).toBe(true);
+      expect(item("b").open).toBe(true);
+      expectNotPending(root());
+      // Not asserted: the harness mirror writes in completion order (a controlled parent using
+      // "update on success" with a whole-set `next` has the same property; see the memo).
+    });
+  });
+
+  renderBoth("superseded rejection", (mode) => {
+    function renderTwoClicks(onError: (error: unknown) => void) {
+      const deferreds = [deferred(), deferred()];
+      let calls = 0;
+      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      render(<Harness mode={mode} action={action} boundary={onError} />);
+      return { deferreds, action };
+    }
+
+    it("reaches the boundary when the older action rejects after the newer resolved", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const onError = vi.fn();
+      const { deferreds, action } = renderTwoClicks(onError);
+      const user = setupUser();
+
+      await user.click(trigger("a"));
+      await user.click(trigger("b"));
+      expect(action.mock.calls.map(([next]) => next)).toEqual([["a"], ["a", "b"]]);
+
+      await act(async () => {
+        deferreds[1]!.resolve();
+      });
+      expect(onError).not.toHaveBeenCalled();
+
+      const err = new Error("older save failed");
+      await act(async () => {
+        deferreds[0]!.reject(err);
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(err);
+      expect(screen.queryByTestId("root")).not.toBeInTheDocument();
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
+      // The newer action's outcome was unaffected.
+      expect(committed()).toEqual(["a", "b"]);
+    });
+
+    it("reaches the boundary when the older action rejects while the newer is pending", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const onError = vi.fn();
+      const { deferreds } = renderTwoClicks(onError);
+      const user = setupUser();
+
+      await user.click(trigger("a"));
+      await user.click(trigger("b"));
+      expectPending(root());
+
+      const err = new Error("older save failed");
+      await act(async () => {
+        deferreds[0]!.reject(err);
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(err);
+      expect(screen.queryByTestId("root")).not.toBeInTheDocument();
+
+      await act(async () => {
+        deferreds[1]!.resolve();
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
     });
   });
 
@@ -1353,7 +1496,7 @@ describe("Accordion", () => {
       }
       // The clicks' `toggle` events fire long before hydration in a browser; let jsdom's queued
       // ones go by too, so they are not mistaken for new platform events after hydration.
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setImmediate(resolve));
       const result = render(ui, { container, hydrate: true });
       return { ...result, container };
     }
