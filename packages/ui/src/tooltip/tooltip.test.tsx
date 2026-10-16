@@ -901,6 +901,7 @@ describe("render element", () => {
     const link = screen.getByRole("link", { name: "Docs" });
     expect(link).toHaveAttribute("aria-describedby", popup().id);
     expect(link).toHaveClass("link");
+    expect(link).not.toHaveAttribute("type");
     await user.hover(link);
     advance(250);
     expect(showSpy).toHaveBeenCalledWith({ source: link });

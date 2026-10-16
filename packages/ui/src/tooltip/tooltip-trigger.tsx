@@ -3,7 +3,7 @@ import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { rendersButton, resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useTooltipContext } from "./tooltip-context.js";
 
@@ -82,10 +82,9 @@ export function TooltipTrigger({
         })
       : style,
     children,
-    props: {
-      type: "button",
-      ...rest,
-    },
+    // `type="button"` only on a real button (the consumer may override it); a link or a
+    // component element does not get it.
+    props: rendersButton(render) ? { type: "button", ...rest } : rest,
     libraryProps,
     ref: ctx.setTriggerElement,
   });
