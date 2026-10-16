@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useId, useRef } from "react";
+import { useCallback, useId, useLayoutEffect, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -50,7 +50,16 @@ export interface RadioGroupRootProps extends Omit<
   | "disabled"
   | "form"
 > {
-  /** Controlled checked value. `null` checks nothing; `undefined` means uncontrolled. */
+  /**
+   * Controlled checked value. `null` checks nothing; `undefined` means uncontrolled.
+   *
+   * A form reset returns each radio to the `checked` it had when *that radio* mounted (React sets
+   * `defaultChecked` once, from the initial `checked`). An Item added on the client while `value`
+   * equals its value therefore also gets `defaultChecked`, so two radios may carry it and the
+   * reset target is not necessarily the group's mount-time value. The reset is offered to
+   * `valueChangeAction` as usual; for a stable target remount the group with a `key` or use
+   * `defaultValue`, whose latest value every Item mirrors.
+   */
   value?: string | null;
   /**
    * Initial value in uncontrolled mode. Defaults to `null` (nothing checked). Also the value a
@@ -77,7 +86,11 @@ export interface RadioGroupRootProps extends Omit<
   name?: string;
   /** The `form` attribute, applied to the fieldset and to every radio. */
   form?: string;
-  /** Marks every radio `required`, which makes the group required (one checked radio satisfies it). */
+  /**
+   * Marks every radio `required`, which makes the group required (one checked radio satisfies it),
+   * and renders `aria-required="true"` on the fieldset so the radiogroup itself is exposed as
+   * required.
+   */
   required?: boolean;
   /** Renders `<fieldset disabled>`: every radio is disabled, unfocusable and skipped by arrows. */
   disabled?: boolean;
@@ -110,7 +123,14 @@ function readGroup(
  * the form-reset listener and the mount reconciliation (design/components/radio-group.md 13.3).
  * Carries `data-pending` while `valueChangeAction` is in flight.
  *
- * Owned keys (conventions 1.2): `role`, `disabled`, `form`, `data-pending`, `data-disabled`.
+ * Owned keys (conventions 1.2): `role`, `aria-required`, `disabled`, `form`, `data-pending`,
+ * `data-disabled`.
+ *
+ * Keep every Item in the same Suspense boundary as its Root when server rendering. Partial
+ * hydration of a group (a boundary between Root and Items that stays dehydrated while the user
+ * interacts) is not supported by React: clicking a hydrated radio while same-`name` siblings are
+ * still dehydrated makes react-dom throw "Mixing React and non-React radio inputs with the same
+ * `name` is not supported". Development warns when Items hydrate after their Root.
  */
 export function RadioGroupRoot({
   value,
@@ -163,6 +183,43 @@ export function RadioGroupRoot({
       dispatch(next, createActionDetails(event, { reason: "platform" })),
   });
 
+  // Dev-only partial-hydration detection. The radios present in the fieldset when the Root
+  // mounts are either mounted in the Root's commit or still dehydrated server HTML. An Item that
+  // mounts later on one of those elements hydrated after the Root (an Item created on the client
+  // gets a new element). Items of the Root's own commit run their mount effect before this one,
+  // while the snapshot is still `null`; StrictMode's re-run finds it reset by the cleanup.
+  const serverRadios = useRef<ReadonlySet<Element> | null>(null);
+  const warnedPartialHydration = useRef(false);
+  useLayoutEffect(() => {
+    if (!isDev) return;
+    const el = fieldsetRef.current;
+    serverRadios.current = new Set(el === null ? [] : el.querySelectorAll('input[type="radio"]'));
+    return () => {
+      serverRadios.current = null;
+    };
+  }, []);
+  const onItemMountedWithCheck = useCallback(
+    (element?: Element | null) => {
+      if (
+        isDev &&
+        !warnedPartialHydration.current &&
+        element != null &&
+        serverRadios.current?.has(element) === true
+      ) {
+        warnedPartialHydration.current = true;
+        console.error(
+          `RadioGroup.Item: an Item hydrated after its RadioGroup.Root (a Suspense boundary ` +
+            `between them). Partial hydration of a radio group is not supported by React: ` +
+            `clicking a hydrated radio while same-name radios are still dehydrated makes ` +
+            `react-dom throw "Mixing React and non-React radio inputs with the same name is not ` +
+            `supported". Keep every Item in the same Suspense boundary as its Root.`,
+        );
+      }
+      onItemMounted(element);
+    },
+    [onItemMounted],
+  );
+
   const libraryRef = useCallback((el: HTMLFieldSetElement) => {
     fieldsetRef.current = el;
     if (isDev && !warnedElement.current && el.tagName !== "FIELDSET") {
@@ -186,7 +243,7 @@ export function RadioGroupRoot({
     pending,
     disabled,
     defaultValue: value === undefined ? (defaultValue ?? null) : undefined,
-    onItemMounted,
+    onItemMounted: onItemMountedWithCheck,
     select: (next, event) => {
       // No-op rule against the optimistic value (conventions 2.3 item 7, design 4.2).
       if (next === optimistic) return;
@@ -206,6 +263,7 @@ export function RadioGroupRoot({
     props: rest,
     libraryProps: {
       role: "radiogroup",
+      "aria-required": required ? "true" : undefined,
       disabled,
       form,
       "data-pending": dataAttr(pending),

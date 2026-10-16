@@ -233,6 +233,40 @@ describe("RadioGroup", () => {
       }
     });
 
+    it("Root required renders aria-required on the fieldset, owned against a render element", () => {
+      const first = render(
+        <RadioGroup.Root aria-label="Plan" required>
+          <RadioGroup.Item value="free" aria-label="free" />
+        </RadioGroup.Root>,
+      );
+      expect(group()).toHaveAttribute("aria-required", "true");
+      expect(group()).toBeRequired();
+      first.unmount();
+
+      const second = render(
+        <RadioGroup.Root aria-label="Plan">
+          <RadioGroup.Item value="free" aria-label="free" />
+        </RadioGroup.Root>,
+      );
+      expect(group()).not.toHaveAttribute("aria-required");
+      second.unmount();
+
+      const third = render(
+        <RadioGroup.Root aria-label="Plan" required render={<fieldset aria-required="false" />}>
+          <RadioGroup.Item value="free" aria-label="free" />
+        </RadioGroup.Root>,
+      );
+      expect(group()).toHaveAttribute("aria-required", "true");
+      third.unmount();
+
+      render(
+        <RadioGroup.Root aria-label="Plan" render={<fieldset aria-required="true" />}>
+          <RadioGroup.Item value="free" aria-label="free" />
+        </RadioGroup.Root>,
+      );
+      expect(group()).not.toHaveAttribute("aria-required");
+    });
+
     it("Root disabled renders <fieldset disabled>; Item disabled renders on the input", () => {
       const rootDisabled = render(
         <RadioGroup.Root aria-label="Plan" disabled>
@@ -847,16 +881,18 @@ describe("RadioGroup", () => {
       gate,
       mode,
       action,
+      initial = "a",
     }: {
       gate: Promise<void>;
       mode: ControlMode;
       action: ActionFn;
+      initial?: string;
     }) {
-      const [value, setValue] = useState<string | null>("a");
+      const [value, setValue] = useState<string | null>(initial);
       return (
         <RadioGroup.Root
           aria-label="Fruit"
-          {...(mode === "controlled" ? { value } : { defaultValue: "a" })}
+          {...(mode === "controlled" ? { value } : { defaultValue: initial })}
           valueChangeAction={async (next, details) => {
             await action(next, details);
             startTransition(() => setValue(next));
@@ -910,11 +946,101 @@ describe("RadioGroup", () => {
         expect(radio("c")).toBe(c);
         expect(checkedValues()).toEqual(["c"]);
         expect(dataChecked()).toEqual(["c"]);
-        expect(consoleError).not.toHaveBeenCalled();
+        // The only console output is the dev warning about partial hydration, once per group.
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        expect(consoleError.mock.calls[0]?.[0]).toMatch(
+          /RadioGroup\.Item: an Item hydrated after its RadioGroup\.Root.*Partial hydration/s,
+        );
+      });
+
+      // Pins a React limitation (react-dom 19.3.1, design 5.1 "Unsupported: partial hydration").
+      // If React stops throwing here, revisit the design note, the dev warning and this test.
+      it("a click on a hydrated radio while siblings are dehydrated: react-dom throws; the state is consistent after hydration", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const action = vi.fn<ActionFn>();
+        const container = document.createElement("div");
+        document.body.append(container);
+        container.innerHTML = renderToString(
+          <LateGroup gate={fulfilled()} mode={mode} action={action} initial="b" />,
+        );
+        const g = gate();
+        await act(async () => {
+          render(<LateGroup gate={g.promise} mode={mode} action={action} initial="b" />, {
+            container,
+            hydrate: true,
+          });
+        });
+
+        // react-dom's restoreStateOfTarget finds the dehydrated same-name radios (no fiber) after
+        // the event and throws; the error escapes the event listener as an uncaught error.
+        const uncaught: unknown[] = [];
+        const onError = (e: ErrorEvent) => {
+          uncaught.push(e.error);
+          e.preventDefault();
+        };
+        window.addEventListener("error", onError);
+        try {
+          await act(async () => {
+            container.querySelector<HTMLInputElement>('input[value="a"]')!.click();
+          });
+        } finally {
+          window.removeEventListener("error", onError);
+        }
+        expect(uncaught).toHaveLength(1);
+        expect(String(uncaught[0])).toMatch(
+          /Mixing React and non-React radio inputs with the same `name` is not supported/,
+        );
+        // The action still ran, once, with the user's radio.
+        expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["a", "activate"]]);
+
+        await act(async () => {
+          g.open();
+        });
+        await flush();
+
+        // After the boundary hydrates: no platform dispatch, and `data-checked` agrees with
+        // `:checked` (hydration alone would keep the server's `data-checked` on "b").
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(checkedValues()).toEqual(["a"]);
+        expect(dataChecked()).toEqual(["a"]);
+        expect(dataPending()).toEqual([]);
+        expect(
+          consoleError.mock.calls.filter(([m]) =>
+            /Partial hydration of a radio group/.test(String(m)),
+          ),
+        ).toHaveLength(1);
       });
     });
 
+    it("a group hydrated in one boundary does not warn about partial hydration (StrictMode)", async () => {
+      // Any Suspense boundary between Root and Items hydrates in a later commit, even one that
+      // never suspends (react-dom 19.3.1), so only a group without one is quiet.
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const action = vi.fn<ActionFn>();
+      const ui = (
+        <StrictMode>
+          <Suspense fallback={null}>
+            <RadioGroup.Root aria-label="Fruit" defaultValue="a" valueChangeAction={action}>
+              <RadioGroup.Item value="a" aria-label="a" />
+              <RadioGroup.Item value="b" aria-label="b" />
+            </RadioGroup.Root>
+          </Suspense>
+        </StrictMode>
+      );
+      const container = document.createElement("div");
+      document.body.append(container);
+      container.innerHTML = renderToString(ui);
+      await act(async () => {
+        render(ui, { container, hydrate: true });
+      });
+      await flush();
+      expect(screen.getAllByRole("radio")).toHaveLength(2);
+      expect(action).not.toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
     it("late items mounted by createRoot do not dispatch", async () => {
+      const consoleError = vi.spyOn(console, "error");
       const action = vi.fn<ActionFn>();
       const g = gate();
       await act(async () => {
@@ -928,6 +1054,8 @@ describe("RadioGroup", () => {
       expect(screen.getAllByRole("radio")).toHaveLength(3);
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["a"]);
+      // Client-created Items are not partial hydration.
+      expect(consoleError).not.toHaveBeenCalled();
     });
   });
 
@@ -1035,6 +1163,45 @@ describe("RadioGroup", () => {
       ]);
       expect(checkedValues()).toEqual(["a"]);
       expect(committed()).toHaveTextContent("a");
+    });
+  });
+
+  renderBoth("platform: base comparison (conventions 3.8 rule 1)", (mode) => {
+    // Guards the explicit null check in the Root's `base()`: with `?.next ?? optimistic` the
+    // second reset would read the stale optimistic "c" and dispatch `null` again.
+    it("two synchronous form.reset() calls while a reset to null is pending dispatch once", async () => {
+      const d = deferred();
+      const actions: [string | null, string][] = [];
+      render(
+        <Harness
+          mode={mode}
+          initial={null}
+          inForm
+          action={(next, details) => {
+            actions.push([next, details.reason]);
+            return d.promise;
+          }}
+        />,
+      );
+      const user = setupUser();
+      await user.click(radio("c"));
+      expect(checkedValues()).toEqual(["c"]);
+      await act(async () => {
+        form().reset();
+        form().reset();
+      });
+      expect(actions).toEqual([
+        ["c", "activate"],
+        [null, "platform"],
+      ]);
+      expect(checkedValues()).toEqual([]);
+      await act(async () => {
+        d.resolve();
+      });
+      await flush();
+      expect(actions).toHaveLength(2);
+      expect(checkedValues()).toEqual([]);
+      expect(committed()).toHaveTextContent("null");
     });
   });
 

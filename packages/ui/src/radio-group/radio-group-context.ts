@@ -26,9 +26,10 @@ export interface RadioGroupContextValue {
   /**
    * Called by each Item from its mount layout effect. An Item that mounts after the Root (under a
    * Suspense boundary, selective hydration) asks the Root to reconcile the group again, so a click
-   * made before that Item hydrated is reported once (deduped by the Root's hook).
+   * made before that Item hydrated is reported once (deduped by the Root's hook). Receives the
+   * Item's element, which the Root uses for the dev-only partial-hydration warning.
    */
-  readonly onItemMounted: () => void;
+  readonly onItemMounted: (element: HTMLInputElement | null) => void;
 }
 
 export const RadioGroupContext = createContext<RadioGroupContextValue | null>(null);

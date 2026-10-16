@@ -10,7 +10,12 @@ export interface UseNativeGroupReconciliationOptions<T> {
   readonly readCurrent: () => T;
   /** The value the browser resets the group to (`defaultChecked` of the members, rule 5). */
   readonly readDefault: () => T;
-  /** What the user intends: `latestInFlight()?.next ?? optimistic` (rule 1). */
+  /**
+   * What the user intends (rule 1): the latest in-flight dispatch's `next`, else the optimistic
+   * value. Use an explicit null check, `const f = latestInFlight(); return f === null ?
+   * optimistic : f.next;`, not `?.next ?? optimistic`, which drops an in-flight dispatch of a
+   * nullish value (a pending reset to "nothing checked").
+   */
   readonly base: () => T;
   /**
    * The browser changed the group's value on a residual path and it differs from `base()`.
@@ -35,8 +40,9 @@ export interface UseNativeGroupReconciliationResult {
    * RadioGroup wiring: `const { onItemMounted } = useNativeGroupReconciliation(...)` in the Root,
    * put `onItemMounted` in the group context, and in each Item
    * `useNativeChecked({ type: "radio", group: true, onItemMounted: ctx.onItemMounted, ... })`.
+   * The member's element argument is not used here; the Root may use it (dev warnings).
    */
-  readonly onItemMounted: () => void;
+  readonly onItemMounted: (element?: Element | null) => void;
 }
 
 /**

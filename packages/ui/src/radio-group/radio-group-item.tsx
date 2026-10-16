@@ -62,6 +62,11 @@ export interface RadioGroupItemProps extends Omit<
  * `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`,
  * `data-checked`, `data-pending`, `data-disabled`. `onChange` is merged: a `render` element's own
  * handler runs first, then the library's.
+ *
+ * Form reset in controlled mode: React sets an input's `defaultChecked` once, from its initial
+ * `checked`. An Item added on the client while the Root's `value` equals its value gets
+ * `defaultChecked` too, so two radios may carry it and a reset does not necessarily return to
+ * the group's mount-time value (see `RadioGroup.Root` `value`).
  */
 export function RadioGroupItem({
   value,
@@ -85,7 +90,18 @@ export function RadioGroupItem({
     component: "RadioGroup.Item",
     checked,
     group: true,
-    onItemMounted: ctx.onItemMounted,
+    onItemMounted: (el) => {
+      // Hydration keeps server attributes that differ from the client render (React only warns).
+      // An Item hydrating after its Root (partial hydration, Root JSDoc) can render a different
+      // `checked` than the server did, e.g. after a click on an already hydrated radio, and a
+      // stale `data-checked` would then stay until the prop changes again.
+      if (el !== null) {
+        syncPresence(el, "data-checked", checked);
+        syncPresence(el, "data-pending", pending);
+        syncPresence(el, "data-disabled", disabled);
+      }
+      ctx.onItemMounted(el);
+    },
     defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value,
   });
 
@@ -129,3 +145,10 @@ export function RadioGroupItem({
 }
 
 RadioGroupItem.displayName = "RadioGroupItem";
+
+function syncPresence(el: Element, name: string, present: boolean): void {
+  if (el.hasAttribute(name) !== present) {
+    if (present) el.setAttribute(name, "");
+    else el.removeAttribute(name);
+  }
+}

@@ -29,9 +29,10 @@ export interface UseNativeCheckedOptions {
   /**
    * Group members only: the Root's `onItemMounted` from `useNativeGroupReconciliation`. Called
    * from this member's mount layout effect so that a member mounting after the Root (a Suspense
-   * boundary that hydrates later) still gets the group reconciled. Ignored without `group`.
+   * boundary that hydrates later) still gets the group reconciled. Receives the member's element
+   * (`null` if the ref is not attached). Ignored without `group`.
    */
-  readonly onItemMounted?: (() => void) | undefined;
+  readonly onItemMounted?: ((element: HTMLInputElement | null) => void) | undefined;
   /** From `useControllableAction`: the value the DOM is compared against on the residual paths. */
   readonly latestInFlight?: (() => { readonly next: boolean } | null) | undefined;
   /**
@@ -105,7 +106,7 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
   //     mount reconciliation already ran (a member mounting later), which covers the `checked`
   //     write this member skips in its mount commit (below).
   const notifyMounted = useEffectEvent(() => {
-    if (group) options.onItemMounted?.();
+    if (group) options.onItemMounted?.(node.current);
   });
   useLayoutEffect(() => {
     notifyMounted();
