@@ -22,8 +22,14 @@ export interface UseRenderOptions<Props extends ElementLikeProps, State> {
   className: StateValue<string | undefined, State> | undefined;
   style: StateValue<CSSProperties | undefined, State> | undefined;
   children: StateValue<ReactNode, State> | undefined;
-  /** The library's props for the element: pass-through props plus library-controlled attributes. */
+  /** The part's pass-through props for the element. A `render` element's own props win over these. */
   props: Omit<Props, "className" | "style" | "children"> & DataAttributes;
+  /**
+   * Library-controlled attributes the part computes (`role`, `aria-*` state, id wiring, `data-*`
+   * state, the library's own event handlers). These win over a `render` element's props
+   * (conventions 1.2).
+   */
+  libraryProps?: Partial<Omit<Props, "className" | "style" | "children">> & DataAttributes;
   /** The library's own ref, if the part needs the DOM node. */
   ref?: Ref<unknown> | undefined;
 }
@@ -39,7 +45,8 @@ export function resolveStateValue<T, State>(value: StateValue<T, State>, state: 
 export function useRender<Props extends ElementLikeProps, State>(
   options: UseRenderOptions<Props, State>,
 ): ReactNode {
-  const { defaultElement, render, state, className, style, children, props, ref } = options;
+  const { defaultElement, render, state, className, style, children, props, libraryProps, ref } =
+    options;
 
   const consumerRef = (props as ElementLikeProps).ref;
   const renderElement = isValidElement<ElementLikeProps>(render) ? render : undefined;
@@ -51,23 +58,26 @@ export function useRender<Props extends ElementLikeProps, State>(
     [ref, consumerRef, elementRef],
   );
 
-  const resolved = {
+  const partProps = {
     ...props,
     ref: mergedRef,
     className: resolveStateValue(className, state),
     style: resolveStateValue(style, state),
     children: resolveStateValue(children, state),
-  } as Props;
+  } as Record<string, unknown>;
+  const controlled = (libraryProps ?? {}) as Record<string, unknown>;
 
-  if (typeof render === "function") {
-    return render(resolved, state);
-  }
   if (renderElement !== undefined) {
+    // The element's ref is already part of `mergedRef`.
     const { ref: _ignored, ...elementProps } = renderElement.props as Record<string, unknown>;
     return cloneElement(
       renderElement,
-      mergeProps(resolved as unknown as Record<string, unknown>, elementProps) as Partial<Props>,
+      mergeProps(partProps, elementProps, controlled) as Partial<Props>,
     );
+  }
+  const resolved = mergeProps(partProps, {}, controlled) as unknown as Props;
+  if (typeof render === "function") {
+    return render(resolved, state);
   }
   return createElement(defaultElement, resolved);
 }

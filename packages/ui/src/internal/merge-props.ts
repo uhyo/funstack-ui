@@ -3,11 +3,18 @@ import type { CSSProperties, Ref, RefCallback } from "react";
 type AnyProps = Record<string, unknown>;
 
 /**
- * Attribute names the library controls. When a `render` element also sets them, the library's
- * value wins (conventions 1.2): `role`, `aria-*` state and `data-*` state.
+ * ARIA id-reference lists are merged as token lists rather than overridden (conventions 1.2), so
+ * a trigger can be described by more than the element the library wires it to.
  */
-function isLibraryControlled(key: string): boolean {
-  return key === "role" || key.startsWith("aria-") || key.startsWith("data-");
+const ID_REFERENCE_LISTS = new Set([
+  "aria-labelledby",
+  "aria-describedby",
+  "aria-controls",
+  "aria-owns",
+]);
+
+function isIdReferenceList(key: string): boolean {
+  return ID_REFERENCE_LISTS.has(key);
 }
 
 function isEventHandler(key: string, value: unknown): value is (...args: unknown[]) => void {
@@ -47,51 +54,89 @@ export function mergeRefs<T>(...refs: readonly (Ref<T> | undefined)[]): RefCallb
   };
 }
 
+/** Joins two space-separated id lists, `first` tokens first, without duplicates. */
+export function mergeTokenLists(first: unknown, second: unknown): string {
+  const tokens: string[] = [];
+  for (const list of [first, second]) {
+    if (typeof list !== "string") continue;
+    for (const token of list.split(/\s+/)) {
+      if (token !== "" && !tokens.includes(token)) tokens.push(token);
+    }
+  }
+  return tokens.join(" ");
+}
+
 /**
- * Merges the library's props for an element with the props of a `render` element.
+ * Layers `over` onto `under`, with the rules shared by every layer of the merge:
  *
- * - `className`: both are kept (library first, element second).
- * - `style`: merged, the element's properties win.
- * - Event handlers: both run, the element's first, then the library's.
- * - `ref`: both are attached.
- * - `role`, `aria-*`, `data-*`: the library wins.
- * - Everything else: the element wins when it defines the prop.
+ * - `className`: concatenated (`under` first).
+ * - `style`: merged, `over` wins per property.
+ * - `ref`: both attached.
+ * - Event handlers: both run; `overFirst` says whether `over`'s runs before `under`'s.
+ * - ARIA id-reference lists: token-merged; `overFirst` says whose tokens come first.
+ * - Everything else: `over` wins when it defines the prop (`undefined` is "not defined").
  */
-export function mergeProps<P extends AnyProps>(libraryProps: P, elementProps: AnyProps): P {
-  const result: AnyProps = { ...libraryProps };
+function layer(under: AnyProps, over: AnyProps, overFirst: boolean): AnyProps {
+  const result: AnyProps = { ...under };
 
-  for (const key of Object.keys(elementProps)) {
-    const elementValue = elementProps[key];
-    const libraryValue = libraryProps[key];
+  for (const key of Object.keys(over)) {
+    const overValue = over[key];
+    const underValue = under[key];
 
-    if (elementValue === undefined) continue;
+    if (overValue === undefined) continue;
 
     if (key === "className") {
       result[key] =
-        typeof libraryValue === "string" && libraryValue !== ""
-          ? `${libraryValue} ${String(elementValue)}`
-          : elementValue;
+        typeof underValue === "string" && underValue !== ""
+          ? `${underValue} ${String(overValue)}`
+          : overValue;
     } else if (key === "style") {
       result[key] = {
-        ...(libraryValue as CSSProperties | undefined),
-        ...(elementValue as CSSProperties),
+        ...(underValue as CSSProperties | undefined),
+        ...(overValue as CSSProperties),
       };
     } else if (key === "ref") {
       result[key] =
-        libraryValue === undefined || libraryValue === null
-          ? elementValue
-          : mergeRefs(libraryValue as Ref<unknown>, elementValue as Ref<unknown>);
-    } else if (isEventHandler(key, elementValue) && isEventHandler(key, libraryValue)) {
+        underValue === undefined || underValue === null
+          ? overValue
+          : mergeRefs(underValue as Ref<unknown>, overValue as Ref<unknown>);
+    } else if (isEventHandler(key, overValue) && isEventHandler(key, underValue)) {
+      const [first, second] = overFirst ? [overValue, underValue] : [underValue, overValue];
       result[key] = (...args: unknown[]) => {
-        elementValue(...args);
-        libraryValue(...args);
+        first(...args);
+        second(...args);
       };
-    } else if (isLibraryControlled(key) && libraryValue !== undefined) {
-      // library wins; keep result[key] as is
+    } else if (isIdReferenceList(key) && typeof underValue === "string") {
+      result[key] = overFirst
+        ? mergeTokenLists(overValue, underValue)
+        : mergeTokenLists(underValue, overValue);
     } else {
-      result[key] = elementValue;
+      result[key] = overValue;
     }
   }
 
-  return result as P;
+  return result;
+}
+
+/**
+ * Merges the props for a part's element in the order of conventions 1.2: the part's pass-through
+ * props, then the `render` element's props, then the library-controlled attributes on top.
+ *
+ * - The `render` element wins over pass-through props (`aria-label`, `data-*` from the part's own
+ *   props, `type`, ...); the library-controlled attributes (`role`, computed `aria-*` state, id
+ *   wiring, `data-*` state, the library's handlers) win over the element.
+ * - `className` is concatenated (part, element), `style` merged with the element winning.
+ * - Event handlers all run: the element's first, then the part's pass-through one, then the
+ *   library's.
+ * - `aria-labelledby` / `aria-describedby` / `aria-controls` / `aria-owns` are merged as token
+ *   lists, the element's tokens first.
+ * - `ref`s are all attached.
+ */
+export function mergeProps<P extends AnyProps>(
+  partProps: P,
+  elementProps: AnyProps,
+  libraryProps: AnyProps = {},
+): P {
+  // The render element's handlers and tokens come first in both layers.
+  return layer(layer(partProps, elementProps, true), libraryProps, false) as P;
 }

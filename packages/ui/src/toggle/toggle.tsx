@@ -99,10 +99,14 @@ export function Toggle({
     className,
     style,
     children,
+    // Pass-through layer: a `render` element's own props win over these (its `type` included).
     props: {
       ...rest,
       type: "button",
       disabled,
+    },
+    // Library-controlled layer: wins over a `render` element's props.
+    libraryProps: {
       "aria-pressed": optimistic,
       "data-pressed": dataAttr(optimistic),
       "data-pending": dataAttr(pending),
