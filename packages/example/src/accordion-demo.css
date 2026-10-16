@@ -40,7 +40,9 @@
 }
 
 /* Chevron. Committed state (`:open`) works in both modes; `[data-open]` (optimistic) flips at
-   once in library mode and is a sync-lane commit, so it animates with a CSS transition. */
+   once in library mode and is a sync-lane commit, so it animates with a CSS transition. While an
+   item is pending, the optimistic attribute alone decides, so that closing an open item flips the
+   chevron immediately instead of waiting for `:open` to go. */
 .acc-trigger::before {
   content: "";
   inline-size: 0.5em;
@@ -50,7 +52,7 @@
   rotate: -45deg;
   transition: rotate 150ms;
 }
-.acc-item:open > .acc-trigger::before,
+.acc-item:open > .acc-trigger:not([data-pending])::before,
 .acc-trigger[data-open]::before {
   rotate: 45deg;
 }
