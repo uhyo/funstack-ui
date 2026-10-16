@@ -263,9 +263,9 @@ describe("library mode (browser)", () => {
     await flush();
     await userEvent.click(screen.getByTestId("inner-trigger"));
     const inner = screen.getByTestId("inner") as HTMLDialogElement;
-    // React waits for the view transition of the outer open (started by the Popup's
-    // `<ViewTransition>`, even with "none") before it commits the inner open.
-    await expect.poll(() => inner.open, { timeout: 2000 }).toBe(true);
+    // No `transition`, so the inner Popup renders no `<ViewTransition>` and the outer open starts
+    // no view transition that would hold the inner open (#35, transition-boundary.browser.test).
+    await expect.poll(() => inner.open).toBe(true);
     expect(popup().open).toBe(true);
     await userEvent.keyboard("{Escape}");
     expect(inner.open).toBe(false);
