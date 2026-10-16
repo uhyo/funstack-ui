@@ -56,10 +56,21 @@ export type {
   TooltipAlign,
 } from "./tooltip/index.js";
 
+export { Switch } from "./switch/index.js";
+export type { SwitchProps, SwitchState, SwitchCheckedChangeDetails } from "./switch/index.js";
+
+export { Checkbox } from "./checkbox/index.js";
+export type {
+  CheckboxProps,
+  CheckboxState,
+  CheckboxCheckedChangeDetails,
+} from "./checkbox/index.js";
+
 export type {
   Action,
   ActionDetails,
   ChangeAction,
+  ChangeReason,
   RenderProp,
   StateValue,
 } from "./internal/types.js";

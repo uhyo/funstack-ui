@@ -36,6 +36,14 @@ const clientFiles = [
   "tooltip/tooltip-trigger.mjs",
   "tooltip/tooltip-popup.mjs",
   "tooltip/use-tooltip-interaction.mjs",
+  // Switch, Checkbox and the shared native-input machinery (design/components/switch.md row 25,
+  // checkbox.md C10, conventions 3.8).
+  "switch/switch.mjs",
+  "checkbox/checkbox.mjs",
+  "internal/use-form-reset.mjs",
+  "internal/use-native-checked.mjs",
+  // TODO(RadioGroup): add "internal/use-native-group-reconciliation.mjs" once RadioGroup.Root
+  // imports it; the unbundled build only emits files reachable from an entry.
 ];
 
 const directiveFreeFiles = [
@@ -46,6 +54,8 @@ const directiveFreeFiles = [
   "tabs/index.mjs",
   "tabs/tabs-ids.mjs",
   "tooltip/index.mjs",
+  "switch/index.mjs",
+  "checkbox/index.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {
