@@ -59,6 +59,10 @@ function isActivationKey(event: KeyboardEvent): boolean {
 /**
  * A `button[role=tab]`. Renders the optimistic selection (`aria-selected`, `data-selected`,
  * roving `tabindex`) and carries `anchor-name` for the Indicator.
+ *
+ * Owned keys (conventions 1.2): `role`, `id`, `aria-selected`, `aria-controls` (token-merged),
+ * `aria-disabled`, `tabIndex`, `data-selected`, `data-pending`, `data-disabled`,
+ * `data-orientation`, `onClick`, `onKeyDown`, `onFocus`.
  */
 export function TabsTab({
   value,

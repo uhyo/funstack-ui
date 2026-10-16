@@ -31,6 +31,8 @@ export interface TabsIndicatorProps extends Omit<
  * slides it. It must come after the Tabs inside `Tabs.List` (an anchor must precede the
  * positioned element in tree order). No `<ViewTransition>`: it changes only in optimistic (sync)
  * commits, which never start a view transition (design 10.1).
+ *
+ * Owned keys (conventions 1.2): `aria-hidden`, `hidden`, `data-selected`, `data-pending`.
  */
 export function TabsIndicator({ className, style, children, render, ...rest }: TabsIndicatorProps) {
   const ctx = useTabsContext("Tabs.Indicator");

@@ -70,6 +70,10 @@ function focusTab(tab: HTMLElement): void {
 /**
  * The `role="tablist"` container. Owns arrow-key / Home / End navigation between Tabs: it only
  * moves focus; automatic activation happens in the Tab's focus handler.
+ *
+ * Owned keys (a `render` element cannot override them, conventions 1.2): `role`,
+ * `aria-orientation`, `data-orientation`, `data-disabled`, `tabIndex`, `onKeyDown`, `onFocus`,
+ * and `focusgroup` when `experimental_focusgroup` is on.
  */
 export function TabsList({
   experimental_focusgroup = false,
@@ -159,7 +163,9 @@ export function TabsList({
       "data-orientation": orientation,
       "data-disabled": dataAttr(disabled),
       tabIndex: optimistic === null ? 0 : undefined,
-      focusgroup,
+      // Owned only while the flag is on; otherwise the key is omitted, not `undefined`, so it is not
+      // owned (conventions 1.2).
+      ...(focusgroup !== undefined && { focusgroup }),
       onKeyDown,
       onFocus,
     },

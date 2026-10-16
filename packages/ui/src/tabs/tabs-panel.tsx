@@ -43,6 +43,9 @@ export interface TabsPanelProps extends Omit<
 /**
  * A `div[role=tabpanel]`. Renders the **committed** selection, so a newly selected panel that
  * suspends keeps the current panel on screen while the Root shows `data-pending`.
+ *
+ * Owned keys (conventions 1.2): `role`, `id`, `aria-labelledby` (token-merged), `data-selected`,
+ * `hidden`.
  */
 export function TabsPanel(props: TabsPanelProps) {
   const ctx = useTabsContext("Tabs.Panel");
