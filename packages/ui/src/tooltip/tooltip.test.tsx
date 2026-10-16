@@ -10,13 +10,15 @@
 // Overlapping *interactions* (hover then focus, trigger to popup) are covered under "Hover".
 //
 // jsdom has no Popover API: `src/__tests__/popover-shim.ts` (loaded from vitest.setup.ts) adds
-// `showPopover` / `hidePopover` / `togglePopover` that fire `beforetoggle` and `toggle`. These
-// tests therefore assert on calls and on the shim's open set, not on visibility.
+// `showPopover` / `hidePopover` / `togglePopover` and `:popover-open`. Like browsers, it fires
+// `beforetoggle` synchronously and queues `toggle` as a task (a 0 ms timer, flushed by `advance`),
+// and throws on a disconnected element. These tests assert on calls and on the shim's open state,
+// not on visibility.
 //
 // Moved to tooltip.browser.test.tsx (real Chromium): actual visibility and `:popover-open`,
-// anchor placement next to the trigger, the native `interestfor` path. Not covered anywhere
-// automated: the `@starting-style` animation, Safari's `hint` -> `manual` degradation and `hint`
-// stacking over an `auto` menu (demonstrated in the example app).
+// anchor placement next to the trigger, the native `interestfor` path, Escape inside a modal
+// `<dialog>` and a `popover="auto"` menu, `hint` stacking over an `auto` menu. Not covered anywhere
+// automated: the `@starting-style` animation and Safari's `hint` -> `manual` degradation.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { Suspense, useState } from "react";
@@ -129,6 +131,14 @@ function advance(ms: number): void {
   act(() => {
     vi.advanceTimersByTime(ms);
   });
+}
+
+function escape(target: Element = document.activeElement ?? document.body): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  return event;
 }
 
 function pointer(
@@ -413,6 +423,36 @@ describe("Keyboard", () => {
     expect(hideSpy).not.toHaveBeenCalled();
   });
 
+  it("Escape that closes the tooltip is preventDefault()ed, so an enclosing dialog stays open", () => {
+    setupTimers();
+    render(<Harness />);
+    pointer("pointerenter", trigger());
+    advance(250);
+    expect(isPopoverOpen(popup())).toBe(true);
+
+    const first = escape(trigger());
+    expect(hideSpy).toHaveBeenCalledTimes(1);
+    expect(first.defaultPrevented).toBe(true);
+
+    // Closed now: the next Escape passes through untouched (it reaches the dialog).
+    advance(0);
+    const second = escape(trigger());
+    expect(second.defaultPrevented).toBe(false);
+    expect(hideSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("Escape while closed is never preventDefault()ed, even before the toggle task runs", () => {
+    setupTimers();
+    render(<Harness />);
+    expect(escape().defaultPrevented).toBe(false);
+
+    pointer("pointerenter", trigger());
+    advance(250);
+    act(() => popup().hidePopover());
+    // The `toggle` task is still queued, so the document listener is still attached.
+    expect(escape().defaultPrevented).toBe(false);
+  });
+
   it("Escape before the delay elapses cancels the pending open", async () => {
     const user = setupTimers();
     render(<Harness />);
@@ -558,13 +598,44 @@ describe("Hover", () => {
     render(<Harness />);
     await user.hover(trigger());
     advance(250);
+    const removeSpy = vi.spyOn(document, "removeEventListener");
     // The browser closes a `hint` popover itself on light dismiss.
     act(() => popup().hidePopover());
     expect(hideSpy).toHaveBeenCalledTimes(1);
-    // The document listeners are gone: Escape and pointerdown call nothing more.
+    // `toggle` is a queued task: the document listeners go when it runs.
+    expect(removeSpy).not.toHaveBeenCalled();
+    advance(0);
+    expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith("pointerdown", expect.any(Function), true);
+    // Escape and pointerdown call nothing more.
     await user.keyboard("{Escape}");
     pointer("pointerdown", document.body);
     expect(hideSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("listens for dismissal right after showPopover, before the toggle task runs", () => {
+    setupTimers();
+    render(<Harness />);
+    pointer("pointerenter", trigger());
+    advance(249);
+    // Runs only the open timer; the shim's `toggle` task stays queued.
+    act(() => {
+      vi.advanceTimersToNextTimer();
+    });
+    expect(showSpy).toHaveBeenCalledTimes(1);
+    pointer("pointerdown", document.body);
+    expect(hideSpy).toHaveBeenCalledTimes(1);
+    expect(isPopoverOpen(popup())).toBe(false);
+
+    pointer("pointerleave", trigger());
+    pointer("pointerenter", trigger());
+    advance(249);
+    act(() => {
+      vi.advanceTimersToNextTimer();
+    });
+    expect(showSpy).toHaveBeenCalledTimes(2);
+    expect(escape().defaultPrevented).toBe(true);
+    expect(hideSpy).toHaveBeenCalledTimes(2);
   });
 
   it("reads the latest delay without re-subscribing", () => {
@@ -597,7 +668,10 @@ describe("Hover", () => {
     const { unmount } = render(<Harness />);
     await user.hover(trigger());
     advance(250);
+    const removeSpy = vi.spyOn(document, "removeEventListener");
     unmount();
+    expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith("pointerdown", expect.any(Function), true);
     advance(1000);
     expect(() => {
       document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
@@ -670,6 +744,17 @@ describe("Native step-aside (experimental_interestFor)", () => {
     await user.hover(trigger());
     advance(250);
     expect(showSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("becoming disabled while open hides the popup on the native path too", () => {
+    const { rerender } = render(<Harness trigger={{ experimental_interestFor: true }} />);
+    // The browser opened it (interest shown).
+    act(() => popup().showPopover());
+    hideSpy.mockClear();
+    rerender(<Harness root={{ disabled: true }} trigger={{ experimental_interestFor: true }} />);
+    expect(trigger()).not.toHaveAttribute("interestfor");
+    expect(hideSpy).toHaveBeenCalledTimes(1);
+    expect(isPopoverOpen(popup())).toBe(false);
   });
 
   it("a flagged but disabled tooltip runs neither path", async () => {
@@ -755,6 +840,12 @@ describe("Disabled", () => {
     rerender(<Harness root={{ disabled: true }} />);
     expect(hideSpy).toHaveBeenCalledTimes(1);
     expect(isPopoverOpen(popup())).toBe(false);
+  });
+
+  it("becoming disabled while closed calls nothing", () => {
+    const { rerender } = render(<Harness />);
+    rerender(<Harness root={{ disabled: true }} />);
+    expect(hideSpy).not.toHaveBeenCalled();
   });
 
   it("a pending open timer does nothing once disabled", () => {
@@ -979,5 +1070,36 @@ describe("Dev warnings", () => {
       </Tooltip.Root>,
     );
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("Popover shim (jsdom) fidelity", () => {
+  it("queues toggle as a task and coalesces changes made before it runs", () => {
+    setupTimers();
+    render(<Harness />);
+    const events: string[] = [];
+    popup().addEventListener("beforetoggle", (e) => {
+      events.push(`before:${(e as ToggleEvent).newState}`);
+    });
+    popup().addEventListener("toggle", (e) => {
+      const t = e as ToggleEvent;
+      events.push(`toggle:${t.oldState}->${t.newState}`);
+    });
+    act(() => {
+      popup().showPopover();
+      popup().hidePopover();
+    });
+    expect(events).toEqual(["before:open", "before:closed"]);
+    expect(popup().matches(":popover-open")).toBe(false);
+    advance(0);
+    expect(events).toEqual(["before:open", "before:closed", "toggle:closed->closed"]);
+  });
+
+  it("throws on a state change of a disconnected element, like browsers", () => {
+    const el = document.createElement("div");
+    el.setAttribute("popover", "manual");
+    expect(() => el.showPopover()).toThrow(expect.objectContaining({ name: "InvalidStateError" }));
+    // Already closed: a redundant hide returns silently.
+    expect(() => el.hidePopover()).not.toThrow();
   });
 });
