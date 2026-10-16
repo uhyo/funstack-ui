@@ -67,3 +67,27 @@ from Switch/Checkbox (#30). No shared hook was changed.
   resolves (even a plain `<Suspense>`); render inside `await act(async () => ...)`.
 - Item `disabled` (own prop only) is now an owned key, as in Switch/Checkbox after the review.
 - Browser tests use `__tests__/browser-user.ts` (`user.click` / `user.keyboard` inside `act`).
+
+## After the RadioGroup review (memo/reviewer/radio-group.md), d416152
+
+- M1 partial hydration: react-dom throws "Mixing React and non-React radio inputs..." on a click
+  on a hydrated radio while same-name siblings are dehydrated. Reproduces in jsdom too (uncaught
+  window `error`, caught with a listener + `preventDefault`); pinned by a test so a React change is
+  noticed. Not worked around.
+- Stale attributes: hydration keeps server attributes that differ from the client render. Each
+  Item now syncs `data-checked` / `data-pending` / `data-disabled` presence to its rendered state
+  in its `onItemMounted` call (mount layout effect). Done per Item, not in the Root's microtask:
+  the Item knows its own rendered state. Verified load-bearing (without it: `data-checked` on a
+  and b, as the reviewer saw).
+- Dev warning: `onItemMounted(element)` now passes the input (shared hook signature change). The
+  Root snapshots the fieldset's radios in a mount layout effect (dev only, reset in cleanup for
+  StrictMode); an Item mounting later on one of those elements hydrated after the Root -> warn
+  once per Root. Client-created late Items have new elements and do not warn.
+- **Fact:** with react-dom 19.3.1 *any* Suspense boundary between Root and Items hydrates in a
+  later commit than the Root, even one that never suspends (`use()` of a fulfilled promise). So
+  the warning fires for every such topology, which matches the design's "keep every Item in the
+  same Suspense boundary as its Root". Only a group without an inner boundary is quiet.
+- No URL in the warning: issue #34 is the general upstream list (titled about jsdom checkbox), a
+  misleading link from a user-facing message.
+- L1 test verified: replacing `base()` with `?.next ?? optimistic` fails it in both modes.
+- L3: `aria-required` owned; a `render` element's own `aria-required` is overridden both ways.
