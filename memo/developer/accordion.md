@@ -1,60 +1,89 @@
 # Developer memo: Accordion (#12), 2026-10-16
 
 Implementation of `design/components/accordion.md`. Started by a previous agent (parts, context,
-`use-dev-warning`, `reducer` option on `useControllableAction`); finished here (tests, example,
-two fixes). Branch `worktree-agent-aa1eb49fd5259ba32`, not pushed or merged.
+`use-dev-warning`, `reducer` option on `useControllableAction`); finished and then reworked after
+the review (`memo/reviewer/accordion.md`). Landed on master: c66167e (merge), 2e0ed5d
+(libraryProps), 63bf685 (owned keys), 7162774 (platform path / hydration), 5b69d59 (nested
+controls, browser tests), f1ddb5c (chevron CSS).
 
-## What landed
+## What is where
 
 - `packages/ui/src/accordion/`: `accordion-root.tsx`, `accordion-item.tsx`,
   `accordion-trigger.tsx`, `accordion-panel.tsx`, `accordion-context.ts` (all `"use client"`),
-  `index.ts` (directive-free namespace + flat types), `accordion.test.tsx` (68 tests).
-- Shared internals (kept minimal):
-  - `use-controllable-action.ts`: optional `reducer(prev, next, details)` for the optimistic
-    reducer form; the optimistic patch is `{ next, details }` so the reducer can key by item.
-    Default behaviour (replace) unchanged.
-  - `use-dev-warning.ts` (new, `"use client"`): `useDevWarning(condition, message)`, once per
-    instance, in an effect.
-- Root entry and `@funstack/ui/accordion` subpath; `tsdown` entry; `directives.test.ts` covers
-  every part file plus `use-dev-warning`.
-- `packages/example/src/accordion-demo.tsx` + `.css`, wired into `App.tsx`.
+  `index.ts` (directive-free), `accordion.test.tsx` (jsdom), `accordion.browser.test.tsx`
+  (Chromium, issue #22), `accordion.types.test.tsx` (`expectTypeOf` for the `exclusive`
+  discrimination).
+- Shared internals touched: `use-controllable-action.ts` (`reducer` option; `latestInFlight()`
+  in the return value), `use-dev-warning.ts` (new), `merge-props.ts` (owned library keys).
+- Example: `packages/example/src/accordion-demo.tsx` + `.css`.
 
-## Fixes made to the inherited code
+## How the platform path works now (review fix 1 and 2)
 
-- Trigger's callback ref returned `undefined` when there was no Root (standalone Item), so
-  `mergeRefs` called it back with `null` on unmount and crashed on `tagName`. It now always
-  returns a cleanup.
-- Root memoises `toSet(value)` on `value` so the committed set keeps its identity between renders
-  of a controlled parent (otherwise `useOptimistic` re-based on every render).
+- `dispatchFromDom(item, open, event)` never reads the DOM. `next = reduce(base, item, open)`
+  with `base = latestInFlight()?.next ?? optimistic`, so a pending optimistic open survives a
+  find-in-page reveal of another item (race test, both modes, multiple and exclusive).
+- `latestInFlight()` lives in the shared hook: the `next` of the most recent dispatch while any
+  action is unsettled, else `null`. The Root also uses it to gate the re-apply effect. It is read
+  from handlers and effects only (oxlint's React rules flag ref reads in render, and flag ref
+  *mutation* in a closure passed to a hook, which is why the counter could not live in the Root).
+- Mount reconciliation is one Root `useLayoutEffect([])` behind a `useEffectEvent`: it walks the
+  registered `<details>` in registration order, puts disabled mismatches back, folds the others
+  into ONE dispatch (`reason: "platform"`, `event: undefined`, `details.item`/`open` from the
+  first mismatch; exclusive: the first *opened* mismatch wins). The optimistic reducer applies
+  that whole `next` for this one case (it is keyed by `details.item` otherwise), so the queued
+  `toggle` events of the pre-clicked items find nothing new. StrictMode's second run is
+  deduplicated by `latestInFlight()` (the first dispatch's `next` equals the recomputed one).
+- A second Root layout effect `[committed, pending]` re-applies committed state to every item
+  once `!pending && latestInFlight() === null`. Item has no effect of its own any more.
+- `<details>` renders `suppressHydrationWarning` in both modes.
+- The hydration tests use `renderToString` + `render(ui, { container, hydrate: true })`, set
+  `open` on the server HTML, and **await a `setImmediate` before hydrating**: jsdom queues
+  `toggle` through `setImmediate`, and in a browser those events fired long before hydration. The
+  same reason `flushToggle()` awaits `setImmediate`, not `setTimeout(0)`: the two race under load
+  (this showed up as a flake in the full run only).
+
+## Owned library keys (review fix 3)
+
+- `mergeProps` library layer: a key present with `undefined` sets an explicit own `undefined`
+  (not a `delete`: `cloneElement` layers the merged props over the render element's original
+  props, so only an own `undefined` wins there).
+- Call sites: Item installs `onToggle` only in library mode (`...(isLibrary && { onToggle })`),
+  Trigger `onClick` only when it has one, so JS-free render elements keep their own handlers.
+  `name` is owned in both modes (removes a render element's second writer of `open`).
+- Toggle unaffected (its handler and `aria-pressed` are always defined).
+
+## Nested controls in the Trigger (review item 5, verified in Chromium)
+
+- Chromium: clicks on a nested `select` / `textarea` / text `input` did **not** toggle the
+  details; a nested `contenteditable` **did** (and then went through the platform path). jsdom:
+  a nested `select` toggles. One rule covers all engines: for a nested interactive element
+  without its own activation behaviour, `preventDefault()` the click (focus/pickers happen on
+  mousedown, unaffected); for self-activating ones (`a[href]`, `button`, `label`, button-like /
+  checkbox / radio / file / color inputs) do nothing, the browser already skips the summary.
+  Never dispatch for either. JS-free mode attaches no handler, so a nested contenteditable there
+  toggles natively; left as is (the design says nothing runs in JS-free mode).
+
+## Browser tests
+
+- `import { userEvent } from "vitest/browser"` gives Playwright-driven keys and clicks.
+  First run of a new browser file may fail with "Cannot read properties of null (reading
+  'useState')" while Vite re-optimises deps (`[vitest] Vite unexpectedly reloaded a test`);
+  the second run is fine.
+- Failure screenshots go to `packages/ui/.vitest/attachments/`, now gitignored.
 
 ## Decisions / gotchas
 
-- jsdom 30.1.3: `summary.click()` toggles synchronously, a default-prevented click does not;
-  `toggle` fires from a queued task on any `open` change including `setAttribute`; `:open`
-  matches; summaries are focusable; `name` exclusivity is not implemented; Enter/Space on a
-  summary do not synthesize a click. `flushToggle()` in the test file is
-  `act(async () => { await setTimeout(0) })` so the toggle handler's dispatch runs inside act.
-- Verified in real Chromium (Playwright 1.63, scratch script, not committed): click and Enter
-  interception on a real `<summary>`, `name` exclusivity, `::details-content` grid animation, the
-  platform path (`details.open = true` from script → `reason: "platform"` → re-closed when the
-  parent refuses, exactly one dispatch), optimistic flip starts no view transition while the
-  settling commit does with `["fsui-accordion", "fsui-accordion-expand"]`, no console errors.
-  A proper `accordion.browser.test.tsx` is the follow-up now that master has browser mode.
-- `AccordionRootBaseProps` also omits the native `defaultValue` from `ComponentPropsWithRef<"div">`
-  (HTMLAttributes types it as `string | number | readonly string[]`, which would clash). The
-  design's omit list does not mention it.
-- `transition` is typed `ViewTransitionClass` like Toggle, not `ViewTransitionProps["default"]`
-  as the design writes; same type in practice.
-- `experimental_interpolateSize` is observable in jsdom only through the `render` function's
-  `props.style` (jsdom's CSSStyleDeclaration drops the unknown property); the browser check
-  confirms the attribute `interpolate-size: allow-keywords;` is rendered.
-- Superseded-rejection rows (added to the conventions on master after this branch forked) are not
-  in `accordion.test.tsx`; they come for free once the shared hook change lands on master.
-
-## Branch state
-
-Forked from `f67f405`; master has since gained browser mode (`vitest.config.ts` projects,
-`test:jsdom` / `test:browser`), the Toggle review corrections to the conventions, and is about to
-gain the shared-internal fixes. Expected merge conflicts: `packages/ui/package.json` (exports vs
-scripts, trivially both), possibly `use-controllable-action.ts` if the other developer's change
-touches the `useOptimistic` line.
+- Context value is **not** `useMemo`'d (design 12): the hook's `dispatch` is a new function every
+  render, so the memo could never hold, and oxlint's `react(preserve-manual-memoization)` flags
+  it. A stable `dispatch` in the shared hook would be the prerequisite.
+- Multiple-mode `next` is listed in registration order (document order for a list rendered top
+  to bottom), computed in `fromSet` from the Item registry.
+- Controlled "update on success" with a whole-set `next` writes in completion order, so an
+  overlapping A-then-B whose B resolves first ends with `["a"]` in the parent (reviewer probe 6).
+  Uncontrolled is latest-wins and ends A+B open. The overlap tests therefore assert the DOM, not
+  the harness mirror.
+- `AccordionRootBaseProps` omits the native `defaultValue` (type clash). `transition` is typed
+  `ViewTransitionClass` like Toggle.
+- `experimental_interpolateSize` is observable in jsdom only through `render`'s `props.style`.
+- Dynamic boolean `exclusive={flag}` typechecks only without a value (the union needs a static
+  discriminant once `value` / `defaultValue` / `valueChangeAction` is present).
