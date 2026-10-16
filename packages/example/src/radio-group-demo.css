@@ -1,0 +1,153 @@
+/* RadioGroup demo: the input is the visible control (appearance: none + ::before). :checked and
+   [data-checked] agree because the DOM state is the optimistic state. */
+
+.rg-stack {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.rg-group {
+  display: grid;
+  gap: 0.375rem;
+  justify-items: start;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem 0.75rem;
+}
+
+.rg-group.rg-inline {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.rg-group[data-pending] {
+  cursor: progress;
+}
+
+.rg-group legend {
+  font-weight: 600;
+  padding-inline: 0.25rem;
+}
+
+.rg-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.rg-option:has(.rg-radio:checked) {
+  font-weight: 600;
+}
+
+.rg-option:has(.rg-radio:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rg-radio {
+  appearance: none;
+  margin: 0;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  border: 2px solid #666;
+  border-radius: 50%;
+  display: inline-grid;
+  place-content: center;
+  cursor: inherit;
+  transition: border-color 120ms;
+}
+
+.rg-radio::before {
+  content: "";
+  inline-size: 0.6em;
+  block-size: 0.6em;
+  border-radius: 50%;
+  background: #2563eb;
+  scale: 0;
+  transition: scale 120ms;
+}
+
+.rg-radio:checked {
+  border-color: #2563eb;
+}
+
+/* Optimistic: flips on click, reverts on rejection or veto. */
+.rg-radio:checked::before {
+  scale: 1;
+}
+
+.rg-radio[data-pending] {
+  animation: rg-pulse 0.8s ease-in-out infinite alternate;
+}
+
+.rg-radio:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.rg-radio:user-invalid {
+  border-color: #b91c1c;
+}
+
+.rg-spinner {
+  display: none;
+  inline-size: 0.8em;
+  block-size: 0.8em;
+  border: 2px solid #2563eb;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: rg-spin 0.7s linear infinite;
+}
+
+.rg-option:has(.rg-radio[data-pending]) .rg-spinner {
+  display: inline-block;
+}
+
+.rg-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rg-readout {
+  display: block;
+  margin-block-start: 0.5rem;
+}
+
+.rg-inline-error {
+  color: #b91c1c;
+}
+
+.rg-error-box {
+  border: 1px solid #b91c1c;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  color: #b91c1c;
+}
+
+@keyframes rg-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.4;
+  }
+}
+
+@keyframes rg-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rg-radio,
+  .rg-radio::before {
+    transition: none;
+  }
+  .rg-radio[data-pending],
+  .rg-spinner {
+    animation: none;
+  }
+}

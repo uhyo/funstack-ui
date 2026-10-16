@@ -3,6 +3,7 @@ import { ToggleDemo } from "./toggle-demo";
 import { TabsDemo } from "./tabs-demo";
 import { TooltipDemo } from "./tooltip-demo";
 import { SwitchCheckboxDemo } from "./switch-checkbox-demo";
+import { RadioGroupDemo } from "./radio-group-demo";
 
 export function App() {
   return (
@@ -17,6 +18,7 @@ export function App() {
       <TabsDemo />
       <TooltipDemo />
       <SwitchCheckboxDemo />
+      <RadioGroupDemo />
     </main>
   );
 }
