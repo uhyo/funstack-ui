@@ -51,8 +51,13 @@ const clientFiles = [
   "dialog/dialog-form.mjs",
   "dialog/dialog-title.mjs",
   "dialog/dialog-description.mjs",
-  // TODO(RadioGroup): add "internal/use-native-group-reconciliation.mjs" once RadioGroup.Root
-  // imports it; the unbundled build only emits files reachable from an entry.
+  "internal/use-native-group-reconciliation.mjs",
+  // Every RadioGroup part and its context are client modules (design/components/radio-group.md,
+  // decision 12 and 13.1).
+  "radio-group/radio-group-context.mjs",
+  "radio-group/radio-group-root.mjs",
+  "radio-group/radio-group-label.mjs",
+  "radio-group/radio-group-item.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -66,6 +71,7 @@ const directiveFreeFiles = [
   "switch/index.mjs",
   "checkbox/index.mjs",
   "dialog/index.mjs",
+  "radio-group/index.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

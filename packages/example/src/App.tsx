@@ -4,6 +4,7 @@ import { TabsDemo } from "./tabs-demo";
 import { TooltipDemo } from "./tooltip-demo";
 import { SwitchCheckboxDemo } from "./switch-checkbox-demo";
 import { DialogDemo } from "./dialog-demo";
+import { RadioGroupDemo } from "./radio-group-demo";
 
 export function App() {
   return (
@@ -19,6 +20,7 @@ export function App() {
       <TooltipDemo />
       <SwitchCheckboxDemo />
       <DialogDemo />
+      <RadioGroupDemo />
     </main>
   );
 }
