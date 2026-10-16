@@ -1,0 +1,2 @@
+chromium {"afterEscape":true,"afterRequestClose":false,"afterCommand":false,"log":["cancel","close","cancel","close"]}
+firefox {"afterEscape":true,"afterRequestClose":false,"afterCommand":false,"log":["cancel","close","cancel","close"]}

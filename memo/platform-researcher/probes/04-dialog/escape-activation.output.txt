@@ -1,0 +1,2 @@
+chromium 156.0.8078.4 {"dialogRes":{"activeBefore":true,"open":false,"log":["dialog cancel cancelable=true hasBeenActive=true","dialog cancel cancelable=false hasBeenActive=true"]},"cw":["cw cancel cancelable=true","cw cancel cancelable=false","cw close"]}
+firefox 157.0 {"dialogRes":{"activeBefore":true,"open":false,"log":["dialog cancel cancelable=true hasBeenActive=true","dialog cancel cancelable=false hasBeenActive=true"]},"cw":["cw cancel cancelable=true","cw cancel cancelable=false","cw close"]}

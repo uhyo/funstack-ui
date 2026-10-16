@@ -1,0 +1,2 @@
+chromium {"openRightAfterClick":false,"openLater":[true,"x"],"afterEsc":[false,"t"],"log":["command show-modal cancelable=true source=t","toggle open source=null","cancel cancelable=true","toggle closed source=null"]}
+firefox {"openRightAfterClick":false,"openLater":[true,"x"],"afterEsc":[false,"t"],"log":["command show-modal cancelable=true source=t","toggle open source=null","cancel cancelable=true","toggle closed source=null"]}

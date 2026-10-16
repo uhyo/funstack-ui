@@ -1,0 +1,6 @@
+chromium none {"wheelOverBackdrop":600,"wheelOverDialog":600,"pageDownFocusInDialog":525,"layoutShiftWidth":600}
+chromium dialog overscroll-behavior:contain {"wheelOverBackdrop":600,"wheelOverDialog":0,"pageDownFocusInDialog":0,"layoutShiftWidth":600}
+chromium html:has(dialog:modal){overflow:hidden} {"wheelOverBackdrop":0,"wheelOverDialog":0,"pageDownFocusInDialog":0,"layoutShiftWidth":600}
+firefox none {"wheelOverBackdrop":562,"wheelOverDialog":562,"pageDownFocusInDialog":562,"layoutShiftWidth":600}
+firefox dialog overscroll-behavior:contain {"wheelOverBackdrop":562,"wheelOverDialog":562,"pageDownFocusInDialog":562,"layoutShiftWidth":600}
+firefox html:has(dialog:modal){overflow:hidden} {"wheelOverBackdrop":0,"wheelOverDialog":0,"pageDownFocusInDialog":0,"layoutShiftWidth":600}

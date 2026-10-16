@@ -1,0 +1,6 @@
+chromium transition no-overlay {"open":["red(dialog)","green(backdrop)"],"during":["rgb(127,23,151)","rgb(127,127,255)"],"displayDuring":"block"}
+chromium transition +overlay {"open":["red(dialog)","green(backdrop)"],"during":["red(dialog)","green(backdrop)"],"displayDuring":"block"}
+chromium keyframes no-overlay {"open":["red(dialog)","green(backdrop)"],"during":["rgb(127,26,154)","rgb(127,127,255)"],"displayDuring":"block"}
+firefox transition no-overlay {"open":["red(dialog)","green(backdrop)"],"during":["rgb(127,127,255)","rgb(127,127,255)"],"displayDuring":"none"}
+firefox transition +overlay {"open":["red(dialog)","green(backdrop)"],"during":["rgb(127,127,255)","rgb(127,127,255)"],"displayDuring":"none"}
+firefox keyframes no-overlay {"open":["red(dialog)","green(backdrop)"],"during":["rgb(127,127,255)","rgb(127,127,255)"],"displayDuring":"none"}

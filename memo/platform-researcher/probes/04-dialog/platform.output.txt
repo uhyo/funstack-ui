@@ -1,0 +1,372 @@
+
+##### chromium 156.0.8078.4
+features {
+ "closedbyProp": true,
+ "requestClose": true,
+ "commandForElement": true,
+ "CloseWatcher": true,
+ "overlay": true,
+ "startingStyle": true,
+ "openPseudo": true,
+ "modalPseudo": true,
+ "interpolateSize": true,
+ "scrollbarGutter": true
+}
+toggleEvents {
+ "log": [
+  "beforetoggle:open:closed:cancelable=true:ToggleEvent",
+  "toggle:open:closed:cancelable=false:ToggleEvent",
+  "beforetoggle:closed:open:cancelable=false:ToggleEvent",
+  "toggle:closed:open:cancelable=false:ToggleEvent",
+  "close:::cancelable=false:Event",
+  "beforetoggle:open:closed:cancelable=true:ToggleEvent",
+  "beforetoggle:open:closed:cancelable=true:ToggleEvent",
+  "toggle:open:closed:cancelable=false:ToggleEvent",
+  "cancel:::cancelable=true:Event",
+  "cancel:::cancelable=true:Event",
+  "cancel:::cancelable=true:Event",
+  "beforetoggle:closed:open:cancelable=false:ToggleEvent",
+  "toggle:closed:open:cancelable=false:ToggleEvent",
+  "close:::cancelable=false:Event"
+ ],
+ "openedAfterPrevent": false,
+ "openAfterRCprevent": true,
+ "openAfterRCprevent2": true,
+ "returnValue": "rv2",
+ "openEnd": false
+}
+initialFocus {
+ "noFocusable/showModal": "d",
+ "noFocusable/show": "d",
+ "tabindexMinus1First/showModal": "t",
+ "tabindexMinus1First/show": "t",
+ "autofocusInside/showModal": "i",
+ "autofocusInside/show": "i",
+ "autofocusOnDialog/showModal": "a",
+ "autofocusOnDialog/show": "a",
+ "firstButton/showModal": "a",
+ "firstButton/show": "a",
+ "linkFirst/showModal": "l",
+ "linkFirst/show": "l",
+ "scrollableNoFocusable/showModal": "d",
+ "scrollableNoFocusable/show": "d"
+}
+focusRestore {
+ "showModal/focus-inside-at-close": "opener",
+ "showModal/focus-outside-at-close": "opener",
+ "show/focus-inside-at-close": "opener",
+ "show/focus-outside-at-close": "other",
+ "showModal/opener-removed": "in"
+}
+escapeAndActivation {
+ "after1": true,
+ "after2": true,
+ "log": [
+  "cancel cancelable=true",
+  "cancel cancelable=true"
+ ]
+}
+programmaticOpenNoActivationEscape {
+ "open": true,
+ "log": [
+  "cancel cancelable=true"
+ ]
+}
+nestedModals {
+ "both": {
+  "d1": true,
+  "d2": true,
+  "active": "in2"
+ },
+ "afterEsc1": {
+  "d1": true,
+  "d2": false,
+  "active": "o2"
+ },
+ "afterEsc2": {
+  "d1": false,
+  "d2": false,
+  "active": "opener"
+ },
+ "groupedOneEscape": {
+  "d1": true,
+  "d2": false
+ }
+}
+backgroundScroll {
+ "yWheelBackdrop": 800,
+ "yPageDown": 630,
+ "yWheelWithCssLock": 0
+}
+lightDismiss {
+ "closedByReflect": "any",
+ "afterInsideClick": true,
+ "afterClickPopoverInsideDialogDOM": [
+  true,
+  true
+ ],
+ "poutOpen": true,
+ "afterClickPopoverOutsideDialogDOM": [
+  false,
+  false
+ ],
+ "afterBackdropClick": false,
+ "noClosedbyAfterBackdropClick": true
+}
+popoverInteraction {
+ "outsideDialogClosesPopover": true,
+ "dialogInsidePopover_popoverStillOpen": true,
+ "escWithPopoverInDialog": {
+  "dialog": true,
+  "popover": false
+ }
+}
+exitAnimationTopLayer {
+ "noOverlay": {
+  "before": "d",
+  "during": {
+   "hit": "cover",
+   "display": "block",
+   "opacity": "0.814504",
+   "modal": false
+  }
+ },
+ "withOverlay": {
+  "before": "d",
+  "during": {
+   "hit": "cover",
+   "display": "block",
+   "opacity": "0.779408",
+   "modal": false
+  }
+ }
+}
+formMethodDialog {
+ "open": false,
+ "log": [
+  "submit submitter=ok",
+  "close:ok"
+ ]
+}
+invokerCommands {
+ "afterShow": [
+  true,
+  "rc"
+ ],
+ "afterRequestClose": false,
+ "activeAfterClose": "show",
+ "log": [
+  "command:show-modal",
+  "toggle",
+  "command:request-close",
+  "cancel",
+  "close:rcv",
+  "toggle",
+  "command:show-modal",
+  "toggle",
+  "command:close",
+  "close:cv",
+  "toggle"
+ ],
+ "ariaSnapshot": "- button \"show\""
+}
+removeOpenAttr {
+ "modal": true,
+ "openProp": false,
+ "display": "none",
+ "bodyInertProbe": "HTML",
+ "log": [
+  "toggle"
+ ],
+ "reShowModal": "ok"
+}
+a11y {
+ "modal": "- button \"open\"\n- dialog \"Title\":\n  - heading \"Title\" [level=2]\n  - button \"x\"",
+ "nonModal": "- button \"open\"\n- dialog \"NM\":\n  - button \"y\""
+}
+
+##### firefox 157.0
+features {
+ "closedbyProp": true,
+ "requestClose": true,
+ "commandForElement": true,
+ "CloseWatcher": true,
+ "overlay": false,
+ "startingStyle": true,
+ "openPseudo": true,
+ "modalPseudo": true,
+ "interpolateSize": false,
+ "scrollbarGutter": true
+}
+toggleEvents {
+ "log": [
+  "beforetoggle:open:closed:cancelable=true:ToggleEvent",
+  "toggle:open:closed:cancelable=false:ToggleEvent",
+  "beforetoggle:closed:open:cancelable=false:ToggleEvent",
+  "toggle:closed:open:cancelable=false:ToggleEvent",
+  "close:::cancelable=false:Event",
+  "beforetoggle:open:closed:cancelable=true:ToggleEvent",
+  "beforetoggle:open:closed:cancelable=true:ToggleEvent",
+  "toggle:open:closed:cancelable=false:ToggleEvent",
+  "cancel:::cancelable=true:Event",
+  "cancel:::cancelable=true:Event",
+  "cancel:::cancelable=true:Event",
+  "beforetoggle:closed:open:cancelable=false:ToggleEvent",
+  "toggle:closed:open:cancelable=false:ToggleEvent",
+  "close:::cancelable=false:Event"
+ ],
+ "openedAfterPrevent": false,
+ "openAfterRCprevent": true,
+ "openAfterRCprevent2": true,
+ "returnValue": "rv2",
+ "openEnd": false
+}
+initialFocus {
+ "noFocusable/showModal": "d",
+ "noFocusable/show": "d",
+ "tabindexMinus1First/showModal": "b",
+ "tabindexMinus1First/show": "b",
+ "autofocusInside/showModal": "i",
+ "autofocusInside/show": "i",
+ "autofocusOnDialog/showModal": "d",
+ "autofocusOnDialog/show": "d",
+ "firstButton/showModal": "a",
+ "firstButton/show": "a",
+ "linkFirst/showModal": "l",
+ "linkFirst/show": "l",
+ "scrollableNoFocusable/showModal": "d",
+ "scrollableNoFocusable/show": "d"
+}
+focusRestore {
+ "showModal/focus-inside-at-close": "opener",
+ "showModal/focus-outside-at-close": "opener",
+ "show/focus-inside-at-close": "opener",
+ "show/focus-outside-at-close": "other",
+ "showModal/opener-removed": "in"
+}
+escapeAndActivation {
+ "after1": true,
+ "after2": true,
+ "log": [
+  "cancel cancelable=true",
+  "cancel cancelable=true"
+ ]
+}
+programmaticOpenNoActivationEscape {
+ "open": true,
+ "log": [
+  "cancel cancelable=true"
+ ]
+}
+nestedModals {
+ "both": {
+  "d1": true,
+  "d2": true,
+  "active": "in2"
+ },
+ "afterEsc1": {
+  "d1": true,
+  "d2": false,
+  "active": "o2"
+ },
+ "afterEsc2": {
+  "d1": false,
+  "d2": false,
+  "active": "opener"
+ },
+ "groupedOneEscape": {
+  "d1": true,
+  "d2": false
+ }
+}
+backgroundScroll {
+ "yWheelBackdrop": 682,
+ "yPageDown": 682,
+ "yWheelWithCssLock": 0
+}
+lightDismiss {
+ "closedByReflect": "any",
+ "afterInsideClick": true,
+ "afterClickPopoverInsideDialogDOM": [
+  true,
+  true
+ ],
+ "poutOpen": true,
+ "afterClickPopoverOutsideDialogDOM": [
+  false,
+  false
+ ],
+ "afterBackdropClick": false,
+ "noClosedbyAfterBackdropClick": true
+}
+popoverInteraction {
+ "outsideDialogClosesPopover": true,
+ "dialogInsidePopover_popoverStillOpen": true,
+ "escWithPopoverInDialog": {
+  "dialog": true,
+  "popover": false
+ }
+}
+exitAnimationTopLayer {
+ "noOverlay": {
+  "before": "d",
+  "during": {
+   "hit": "cover",
+   "display": "none",
+   "opacity": "0",
+   "modal": false
+  }
+ },
+ "withOverlay": {
+  "before": "d",
+  "during": {
+   "hit": "cover",
+   "display": "none",
+   "opacity": "0",
+   "modal": false
+  }
+ }
+}
+formMethodDialog {
+ "open": false,
+ "log": [
+  "submit submitter=ok",
+  "close:ok"
+ ]
+}
+invokerCommands {
+ "afterShow": [
+  true,
+  "rc"
+ ],
+ "afterRequestClose": false,
+ "activeAfterClose": "show",
+ "log": [
+  "command:show-modal",
+  "toggle",
+  "command:request-close",
+  "cancel",
+  "toggle",
+  "close:rcv",
+  "command:show-modal",
+  "toggle",
+  "command:close",
+  "toggle",
+  "close:cv"
+ ],
+ "ariaSnapshot": "- button \"show\""
+}
+removeOpenAttr {
+ "modal": true,
+ "openProp": false,
+ "display": "none",
+ "bodyInertProbe": "HTML",
+ "log": [
+  "toggle"
+ ],
+ "reShowModal": "ok"
+}
+a11y {
+ "modal": "- button \"open\"\n- dialog \"Title\":\n  - heading \"Title\" [level=2]\n  - button \"x\"",
+ "nonModal": "- button \"open\"\n- dialog \"NM\":\n  - button \"y\""
+}

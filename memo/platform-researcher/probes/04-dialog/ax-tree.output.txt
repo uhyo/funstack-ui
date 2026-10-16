@@ -1,0 +1,10 @@
+--- closed
+RootWebArea "" focusable=true focused=true url="about:blank"
+button "Open" invalid="false" focusable=true
+paragraph "" 
+button "Pop" invalid="false" focusable=true expanded=false
+--- after command=show-modal
+RootWebArea "" focusable=true focused=true url="about:blank"
+dialog "Title" focusable=true modal=true labelledby=undefined
+heading "Title" level=2
+button "Close" invalid="false" focusable=true focused=true

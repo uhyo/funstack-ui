@@ -1,0 +1,2 @@
+chromium {"dialogEntryAt500of2000ms":"255,146,146","popoverOpen":"255,0,0","popoverExitAt500of2000ms":"255,113,113"}
+firefox {"dialogEntryAt500of2000ms":"255,130,130","popoverOpen":"255,0,0","popoverExitAt500of2000ms":"255,255,255"}
