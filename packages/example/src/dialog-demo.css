@@ -1,0 +1,178 @@
+/* Dialog demo. The library ships no CSS; this is the starter stylesheet from the design
+   (design/components/dialog.md, section 10). Open state is `:open` / `:modal` on the <dialog>;
+   the Trigger carries `data-open` / `data-pending` in library mode. */
+
+/* 10.2 Scroll lock: CSS only. Keyed on :modal, so it also covers dialogs opened before hydration
+   and nested dialogs. */
+html {
+  scrollbar-gutter: stable;
+}
+html:has(dialog:modal) {
+  overflow: hidden;
+}
+
+.dlg {
+  border: 0;
+  border-radius: 8px;
+  padding: 24px;
+  inline-size: min(32rem, calc(100vw - 32px));
+  overscroll-behavior: contain;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.3);
+  color: #111827;
+  background: #fff;
+}
+.dlg::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+.dlg h2 {
+  margin-block: 0 8px;
+  font-size: 1.25rem;
+}
+
+/* 10.1 Enter and exit. Enter works everywhere; the exit animates in Chromium (with `overlay`)
+   and Safari, and is instant in Firefox. */
+.dlg,
+.dlg::backdrop {
+  opacity: 0;
+  transition:
+    opacity 150ms,
+    translate 150ms,
+    display 150ms allow-discrete,
+    overlay 150ms allow-discrete;
+}
+.dlg {
+  translate: 0 8px;
+}
+.dlg:open,
+.dlg:open::backdrop {
+  opacity: 1;
+  translate: 0 0;
+}
+@starting-style {
+  .dlg:open,
+  .dlg:open::backdrop {
+    opacity: 0;
+  }
+  .dlg:open {
+    translate: 0 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dlg,
+  .dlg::backdrop {
+    transition: none;
+  }
+}
+
+/* A non-modal panel: no backdrop, pinned to a corner. */
+.dlg-panel:not([data-modal]) {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  inline-size: 20rem;
+}
+.dlg-small {
+  inline-size: min(22rem, calc(100vw - 32px));
+}
+
+/* Dim the dialog while a Close action runs (the Close button carries data-pending). */
+.dlg:has(.dlg-actions [data-pending]) {
+  opacity: 0.85;
+}
+
+.dlg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-block-start: 16px;
+}
+
+.dlg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-block-size: 2rem;
+  padding: 4px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.dlg-btn[data-open] {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+.dlg-btn[data-pending] {
+  cursor: progress;
+}
+.dlg-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+.dlg-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.dlg-spinner {
+  inline-size: 0.9em;
+  block-size: 0.9em;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: dlg-spin 0.8s linear infinite;
+}
+@keyframes dlg-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+.dlg-list {
+  list-style: none;
+  padding: 0;
+}
+.dlg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-inline-size: 20rem;
+  padding-block: 4px;
+}
+.dlg-order {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+}
+.dlg-order dd {
+  margin: 0;
+}
+
+.dlg-form label {
+  display: grid;
+  gap: 4px;
+}
+.dlg-form input,
+.dlg-textarea {
+  font: inherit;
+  padding: 4px 8px;
+}
+.dlg-textarea {
+  inline-size: 100%;
+  min-block-size: 6rem;
+}
+
+.dlg-error {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.dlg-flags {
+  display: grid;
+  gap: 4px;
+}
