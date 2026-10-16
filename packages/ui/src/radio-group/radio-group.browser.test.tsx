@@ -11,7 +11,7 @@ import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { user } from "../__tests__/browser-user.js";
 import { deferred } from "../__tests__/helpers.js";
 import { RadioGroup } from "./index.js";
 import type { RadioGroupValueChangeDetails } from "./index.js";
@@ -59,21 +59,21 @@ describe("RadioGroup (browser)", () => {
       render(<Fruits action={action} />);
       radio("a").focus();
 
-      await userEvent.keyboard("{ArrowDown}");
+      await user.keyboard("{ArrowDown}");
       await flush();
       expect(radio("b")).toHaveFocus();
-      await userEvent.keyboard("{ArrowRight}");
+      await user.keyboard("{ArrowRight}");
       await flush();
       expect(radio("c")).toHaveFocus();
-      await userEvent.keyboard("{ArrowDown}");
-      await userEvent.keyboard("{ArrowDown}");
+      await user.keyboard("{ArrowDown}");
+      await user.keyboard("{ArrowDown}");
       await flush();
       // Wrapped from d to a.
       expect(radio("a")).toHaveFocus();
-      await userEvent.keyboard("{ArrowUp}");
+      await user.keyboard("{ArrowUp}");
       await flush();
       expect(radio("d")).toHaveFocus();
-      await userEvent.keyboard("{ArrowLeft}");
+      await user.keyboard("{ArrowLeft}");
       await flush();
       expect(radio("c")).toHaveFocus();
 
@@ -88,15 +88,15 @@ describe("RadioGroup (browser)", () => {
       const action = vi.fn<ActionFn>();
       render(<Fruits action={action} dir="rtl" defaultValue="b" />);
       radio("b").focus();
-      await userEvent.keyboard("{ArrowRight}");
+      await user.keyboard("{ArrowRight}");
       await flush();
       expect(radio("a")).toHaveFocus();
-      await userEvent.keyboard("{ArrowLeft}");
-      await userEvent.keyboard("{ArrowLeft}");
+      await user.keyboard("{ArrowLeft}");
+      await user.keyboard("{ArrowLeft}");
       await flush();
       expect(radio("c")).toHaveFocus();
       // Up / Down are not mirrored.
-      await userEvent.keyboard("{ArrowDown}");
+      await user.keyboard("{ArrowDown}");
       await flush();
       expect(radio("d")).toHaveFocus();
       expect(action.mock.calls.map(([n]) => n)).toEqual(["a", "b", "c", "d"]);
@@ -107,7 +107,7 @@ describe("RadioGroup (browser)", () => {
       const action = vi.fn<ActionFn>();
       const { unmount } = render(<Fruits action={action} disabled={["b", "c"]} />);
       radio("a").focus();
-      await userEvent.keyboard("{ArrowDown}");
+      await user.keyboard("{ArrowDown}");
       await flush();
       expect(radio("d")).toHaveFocus();
       expect(action.mock.calls.map(([n]) => n)).toEqual(["d"]);
@@ -123,7 +123,7 @@ describe("RadioGroup (browser)", () => {
         </>,
       );
       screen.getByRole("button", { name: "before" }).focus();
-      await userEvent.keyboard("{Tab}");
+      await user.keyboard("{Tab}");
       expect(screen.getByRole("button", { name: "after" })).toHaveFocus();
       expect(action).toHaveBeenCalledTimes(1);
     });
@@ -132,25 +132,25 @@ describe("RadioGroup (browser)", () => {
       const action = vi.fn<ActionFn>();
       render(<Fruits action={action} defaultValue="c" />);
       screen.getByRole("button", { name: "before" }).focus();
-      await userEvent.keyboard("{Tab}");
+      await user.keyboard("{Tab}");
       expect(radio("c")).toHaveFocus();
-      await userEvent.keyboard("{Tab}");
+      await user.keyboard("{Tab}");
       expect(screen.getByRole("button", { name: "after" })).toHaveFocus();
-      await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+      await user.keyboard("{Shift>}{Tab}{/Shift}");
       expect(radio("c")).toHaveFocus();
 
-      await userEvent.keyboard("{Home}");
-      await userEvent.keyboard("{End}");
+      await user.keyboard("{Home}");
+      await user.keyboard("{End}");
       await flush();
       expect(radio("c")).toHaveFocus();
       expect(action).not.toHaveBeenCalled();
 
       // Space on the checked radio does nothing; on another radio it checks it.
-      await userEvent.keyboard(" ");
+      await user.keyboard(" ");
       await flush();
       expect(action).not.toHaveBeenCalled();
       radio("a").focus();
-      await userEvent.keyboard(" ");
+      await user.keyboard(" ");
       await flush();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe("a");
@@ -163,7 +163,7 @@ describe("RadioGroup (browser)", () => {
     const d = deferred();
     const action = vi.fn<ActionFn>(() => d.promise);
     render(<Fruits action={action} />);
-    await userEvent.click(screen.getByText("b"));
+    await user.click(screen.getByText("b"));
     expect(action).toHaveBeenCalledTimes(1);
     expect(checkedValues()).toEqual(["b"]);
     expect(radio("b")).toHaveAttribute("data-pending", "");
@@ -183,7 +183,7 @@ describe("RadioGroup (browser)", () => {
         <RadioGroup.Item value="b" aria-label="b" />
       </RadioGroup.Root>,
     );
-    await userEvent.click(radio("b"));
+    await user.click(radio("b"));
     expect(checkedValues()).toEqual(["b"]);
     await act(async () => {
       d.resolve();
@@ -201,7 +201,7 @@ describe("RadioGroup (browser)", () => {
         <RadioGroup.Item value="b" aria-label="b" onClick={(e) => e.preventDefault()} />
       </RadioGroup.Root>,
     );
-    await userEvent.click(radio("b"));
+    await user.click(radio("b"));
     await flush();
     expect(action).not.toHaveBeenCalled();
     expect(checkedValues()).toEqual(["a"]);
@@ -225,10 +225,10 @@ describe("RadioGroup (browser)", () => {
     );
     expect(radio("free").matches(":indeterminate")).toBe(true);
     expect(radio("free").matches(":user-invalid")).toBe(false);
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
     expect(radio("free").matches(":user-invalid")).toBe(true);
     expect(radio("pro").matches(":user-invalid")).toBe(true);
-    await userEvent.click(radio("pro"));
+    await user.click(radio("pro"));
     expect(radio("free").matches(":indeterminate")).toBe(false);
     expect(radio("free").matches(":user-invalid")).toBe(false);
   });
@@ -247,7 +247,7 @@ describe("RadioGroup (browser)", () => {
     document.body.append(container);
     container.innerHTML = renderToString(ui);
     const serverC = container.querySelector<HTMLInputElement>('input[value="c"]')!;
-    await userEvent.click(serverC);
+    await user.click(serverC);
     expect(serverC.checked).toBe(true);
 
     render(ui, { container, hydrate: true });
@@ -295,9 +295,9 @@ describe("RadioGroup (browser)", () => {
         );
       }
       render(<PlanForm />);
-      await userEvent.click(radio("pro"));
+      await user.click(radio("pro"));
       expect(checkedValues()).toEqual(["pro"]);
-      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
       await act(async () => {
         d.resolve();
       });
@@ -316,7 +316,7 @@ describe("RadioGroup (browser)", () => {
           .map((r) => (r as HTMLInputElement).value),
       ).toEqual(expected);
       // Still in sync: the next click checks again.
-      await userEvent.click(radio("pro"));
+      await user.click(radio("pro"));
       expect(checkedValues()).toEqual(["pro"]);
     },
   );
@@ -343,9 +343,9 @@ describe("RadioGroup (browser)", () => {
       );
     }
     render(<Settings />);
-    await userEvent.click(radio("b"));
+    await user.click(radio("b"));
     expect(checkedValues()).toEqual(["b"]);
-    await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+    await user.click(screen.getByRole("button", { name: "Reset" }));
     await flush();
     expect(actions).toEqual([
       ["b", "activate", "click"],

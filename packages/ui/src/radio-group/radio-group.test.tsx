@@ -10,7 +10,7 @@
 // adopt the value (veto, or an error caught inside the action), which is the same optimistic
 // revert and the same settle commit.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, useLayoutEffect, useState } from "react";
+import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -299,10 +299,18 @@ describe("RadioGroup", () => {
           <RadioGroup.Item
             value="b"
             aria-label="b"
-            render={<input type="checkbox" name="y" value="zzz" checked={false} readOnly />}
+            render={
+              <input type="checkbox" name="y" value="zzz" checked={false} readOnly disabled />
+            }
           />
+          <RadioGroup.Item value="c" aria-label="c" disabled render={<input disabled={false} />} />
         </RadioGroup.Root>,
       );
+      // `disabled` is owned: a render element can neither disable nor re-enable the radio.
+      expect(radio("b")).not.toBeDisabled();
+      expect(radio("b")).not.toHaveAttribute("data-disabled");
+      expect(radio("c")).toBeDisabled();
+      expect(radio("c")).toHaveAttribute("data-disabled", "");
       expect(group()).toHaveAttribute("role", "radiogroup");
       for (const v of ["a", "b"]) {
         expect(radio(v)).toHaveAttribute("type", "radio");
@@ -806,6 +814,120 @@ describe("RadioGroup", () => {
       await flush();
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["b"]);
+    });
+  });
+
+  describe("platform: items that mount after the Root (Suspense between Root and Items)", () => {
+    /** A promise `use()` reads synchronously (already fulfilled), as React expects. */
+    function fulfilled(): Promise<void> {
+      const p = Promise.resolve() as Promise<void> & { status?: string; value?: unknown };
+      p.status = "fulfilled";
+      p.value = undefined;
+      return p;
+    }
+    /** A pending gate; `open()` marks it fulfilled the way React's `use` expects, then resolves. */
+    function gate() {
+      const d = deferred();
+      const p = d.promise as Promise<void> & { status?: string; value?: unknown };
+      p.status = "pending";
+      return {
+        promise: d.promise,
+        open() {
+          p.status = "fulfilled";
+          p.value = undefined;
+          d.resolve();
+        },
+      };
+    }
+    function Gate({ promise, children }: { promise: Promise<void>; children: ReactNode }) {
+      use(promise);
+      return children;
+    }
+    function LateGroup({
+      gate,
+      mode,
+      action,
+    }: {
+      gate: Promise<void>;
+      mode: ControlMode;
+      action: ActionFn;
+    }) {
+      const [value, setValue] = useState<string | null>("a");
+      return (
+        <RadioGroup.Root
+          aria-label="Fruit"
+          {...(mode === "controlled" ? { value } : { defaultValue: "a" })}
+          valueChangeAction={async (next, details) => {
+            await action(next, details);
+            startTransition(() => setValue(next));
+          }}
+        >
+          <RadioGroup.Item value="a" aria-label="a" />
+          <Suspense fallback={null}>
+            <Gate promise={gate}>
+              <RadioGroup.Item value="b" aria-label="b" />
+              <RadioGroup.Item value="c" aria-label="c" />
+            </Gate>
+          </Suspense>
+        </RadioGroup.Root>
+      );
+    }
+
+    renderBoth("late hydration", (mode) => {
+      it("a pre-hydration click on a late item dispatches exactly once when it hydrates", async () => {
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const action = vi.fn<ActionFn>();
+        const container = document.createElement("div");
+        document.body.append(container);
+        container.innerHTML = renderToString(
+          <LateGroup gate={fulfilled()} mode={mode} action={action} />,
+        );
+
+        // The Root hydrates; the boundary around b and c stays dehydrated until `gate` resolves.
+        const g = gate();
+        // Inside an async `act`: a render that suspends in a sync `act` never retries in jsdom.
+        await act(async () => {
+          render(<LateGroup gate={g.promise} mode={mode} action={action} />, {
+            container,
+            hydrate: true,
+          });
+        });
+        expect(action).not.toHaveBeenCalled();
+
+        // The user checks "c" while its boundary is still dehydrated: React sees nothing.
+        const c = container.querySelector<HTMLInputElement>('input[value="c"]')!;
+        c.checked = true;
+        await act(async () => {
+          g.open();
+        });
+        await flush();
+
+        expect(action).toHaveBeenCalledTimes(1);
+        const [next, details] = action.mock.calls[0]!;
+        expect(next).toBe("c");
+        expect(details.reason).toBe("platform");
+        expect(details.event).toBeUndefined();
+        expect(radio("c")).toBe(c);
+        expect(checkedValues()).toEqual(["c"]);
+        expect(dataChecked()).toEqual(["c"]);
+        expect(consoleError).not.toHaveBeenCalled();
+      });
+    });
+
+    it("late items mounted by createRoot do not dispatch", async () => {
+      const action = vi.fn<ActionFn>();
+      const g = gate();
+      await act(async () => {
+        render(<LateGroup gate={g.promise} mode="uncontrolled" action={action} />);
+      });
+      expect(screen.getAllByRole("radio")).toHaveLength(1);
+      await act(async () => {
+        g.open();
+      });
+      await flush();
+      expect(screen.getAllByRole("radio")).toHaveLength(3);
+      expect(action).not.toHaveBeenCalled();
+      expect(checkedValues()).toEqual(["a"]);
     });
   });
 

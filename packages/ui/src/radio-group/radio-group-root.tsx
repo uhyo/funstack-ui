@@ -152,8 +152,9 @@ export function RadioGroupRoot({
     return inFlight === null ? optimistic : inFlight.next;
   };
 
-  // The residual browser paths (design section 5): one dispatch per group, from here.
-  useNativeGroupReconciliation<string | null>({
+  // The residual browser paths (design section 5): one dispatch per group, from here. Items that
+  // mount after the Root report through `onItemMounted` so the group is reconciled again.
+  const { onItemMounted } = useNativeGroupReconciliation<string | null>({
     element: fieldsetRef,
     readCurrent: () => readGroup(fieldsetRef.current, name, "checked"),
     readDefault: () => readGroup(fieldsetRef.current, name, "defaultChecked"),
@@ -185,6 +186,7 @@ export function RadioGroupRoot({
     pending,
     disabled,
     defaultValue: value === undefined ? (defaultValue ?? null) : undefined,
+    onItemMounted,
     select: (next, event) => {
       // No-op rule against the optimistic value (conventions 2.3 item 7, design 4.2).
       if (next === optimistic) return;

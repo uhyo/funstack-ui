@@ -53,8 +53,10 @@ export interface RadioGroupItemProps extends Omit<
  * (`checked={optimistic === value}`): react-dom restores a controlled input to its props after
  * every event, and only the sync-lane optimistic value survives that restore.
  *
- * Owned keys (conventions 1.2): `type`, `name`, `value`, `checked`, `defaultChecked` (never
- * rendered), `form`, `required`, `data-checked`, `data-pending`, `data-disabled`, `onChange`.
+ * Owned keys (conventions 1.2; a `render` element's value is overridden): `type`, `name`,
+ * `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`,
+ * `data-checked`, `data-pending`, `data-disabled`. `onChange` is merged: a `render` element's own
+ * handler runs first, then the library's.
  */
 export function RadioGroupItem({
   value,
@@ -70,12 +72,15 @@ export function RadioGroupItem({
   const pending = ctx.pending && checked;
   const disabled = ctx.disabled || disabledProp;
 
-  // Group mode: element check and re-apply only; the Root reports the residual paths once.
+  // Group mode: element check and re-apply only; the Root reports the residual paths once. The
+  // hook calls `onItemMounted` at mount so that an Item mounting after its Root (a Suspense
+  // boundary that hydrates later) still gets the group reconciled.
   const inputRef = useNativeChecked({
     type: "radio",
     component: "RadioGroup.Item",
     checked,
     group: true,
+    onItemMounted: ctx.onItemMounted,
     defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value,
   });
 
@@ -89,15 +94,17 @@ export function RadioGroupItem({
     style,
     children: undefined,
     ref: inputRef,
-    // Pass-through layer: a `render` element's own props win over these. `Root disabled` reaches
-    // the radio through the fieldset, so only the Item's own prop is rendered.
-    props: { ...rest, disabled: disabledProp },
+    // Pass-through layer: a `render` element's own props win over these.
+    props: rest,
     libraryProps: {
       type: "radio",
       name: ctx.name,
       value,
       checked,
       defaultChecked: undefined,
+      // Owned (Switch precedent) so that native disabledness, `data-disabled` and the click guard
+      // agree. Only the Item's own prop: `Root disabled` reaches the radio through the fieldset.
+      disabled: disabledProp,
       form: ctx.form,
       required: ctx.required,
       "data-checked": dataAttr(checked),

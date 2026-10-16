@@ -55,3 +55,15 @@ from Switch/Checkbox (#30). No shared hook was changed.
   too.
 - WebKit could not launch locally (host libraries, `browser-mode.md`); CI covers it. Unverified
   there: RTL arrow mirroring, `:user-invalid` after a submit attempt, Tab into radios.
+
+## After the Switch/Checkbox review merge (master 8407753)
+
+- Late members (reviewer M1): Root takes `onItemMounted` from `useNativeGroupReconciliation` and
+  puts it in context; each Item passes it to `useNativeChecked({ group: true, onItemMounted })`.
+  jsdom test: Suspense between Root and Items, Root hydrated, "c" checked in the dehydrated HTML,
+  boundary resolves -> exactly one platform dispatch (both modes); createRoot late items -> none.
+  Verified load-bearing (fails without the wiring).
+- jsdom fact: a render that suspends inside RTL's sync `act` never retries after the promise
+  resolves (even a plain `<Suspense>`); render inside `await act(async () => ...)`.
+- Item `disabled` (own prop only) is now an owned key, as in Switch/Checkbox after the review.
+- Browser tests use `__tests__/browser-user.ts` (`user.click` / `user.keyboard` inside `act`).
