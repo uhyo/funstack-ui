@@ -629,6 +629,16 @@ describe("Tabs", () => {
       expect(list()).not.toHaveAttribute("tabindex");
     });
 
+    it("value=null: clicking empty tablist space focuses the first enabled tab without selecting", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" initial={null} action={action} disabledValues={["a"]} />);
+      const user = setupUser();
+      await user.click(list());
+      expect(tab("B")).toHaveFocus();
+      expect(action).not.toHaveBeenCalled();
+      expect(list()).toHaveAttribute("tabindex", "0");
+    });
+
     it("value=null: tabbing into the list focuses the first tab without selecting (manual)", async () => {
       const action = vi.fn<ActionFn>();
       render(
