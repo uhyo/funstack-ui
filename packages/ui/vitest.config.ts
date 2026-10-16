@@ -1,14 +1,63 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { playwright } from "@vitest/browser-playwright";
+import { chromium, firefox, webkit } from "playwright";
 import { configDefaults, defineConfig } from "vitest/config";
 
-const allBrowsers = ["chromium", "firefox", "webkit"] as const;
+const browserTypes = { chromium, firefox, webkit } as const;
+type BrowserName = keyof typeof browserTypes;
+const allBrowsers = Object.keys(browserTypes) as BrowserName[];
 
-// Chromium is always required. Set BROWSERS=chromium,firefox,webkit to run the browser project
-// against Firefox and WebKit as well (run `pnpm exec playwright install firefox webkit` first).
-const requestedBrowsers = new Set((process.env["BROWSERS"] ?? "chromium").split(","));
-const browserInstances = allBrowsers
-  .filter((browser) => requestedBrowsers.has(browser))
-  .map((browser) => ({ browser }));
+/**
+ * Whether Playwright's build of `name` is downloaded and its host dependencies passed
+ * Playwright's validation. `playwright install` writes `INSTALLATION_COMPLETE` into the build
+ * directory after a download and `DEPENDENCIES_VALIDATED` once the host libraries check out, so a
+ * build whose system libraries are missing (WebKit on a machine without `--with-deps`) is not
+ * picked up by default.
+ */
+function isInstalled(name: BrowserName): boolean {
+  let executable: string;
+  try {
+    executable = browserTypes[name].executablePath();
+  } catch {
+    return false;
+  }
+  if (!existsSync(executable)) return false;
+  if (process.platform !== "linux") return true;
+  for (let dir = dirname(executable); dir !== dirname(dir); dir = dirname(dir)) {
+    if (existsSync(join(dir, "INSTALLATION_COMPLETE"))) {
+      return existsSync(join(dir, "DEPENDENCIES_VALIDATED"));
+    }
+  }
+  return true;
+}
+
+/**
+ * Engines for the browser project.
+ * - `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) selects them explicitly; a missing
+ *   build then fails loudly.
+ * - In CI (`CI` set) all three run.
+ * - Locally, every engine whose Playwright build is installed runs; Chromium always does.
+ */
+function selectBrowsers(): BrowserName[] {
+  const requested = process.env["FUNSTACK_BROWSERS"];
+  if (requested) {
+    const names = requested
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+    for (const name of names) {
+      if (!allBrowsers.includes(name as BrowserName)) {
+        throw new Error(
+          `FUNSTACK_BROWSERS: unknown browser "${name}" (expected ${allBrowsers.join(", ")})`,
+        );
+      }
+    }
+    return allBrowsers.filter((name) => names.includes(name));
+  }
+  if (process.env["CI"]) return allBrowsers;
+  return allBrowsers.filter((name) => name === "chromium" || isInstalled(name));
+}
 
 export default defineConfig({
   test: {
@@ -36,7 +85,7 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            instances: browserInstances,
+            instances: selectBrowsers().map((browser) => ({ browser })),
           },
         },
       },

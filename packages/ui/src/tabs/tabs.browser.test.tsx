@@ -131,14 +131,20 @@ describe("Tabs pointer activation", () => {
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe("b");
 
-      // Focus moves from B to C on mousedown: in automatic mode the focus handler dispatches and
-      // the click is a no-op; in manual mode the click dispatches. Either way exactly once.
+      // Where mousedown focuses a button, focus moves from B to C before the click: in automatic
+      // mode the focus handler dispatches and the click is a no-op; in manual mode the click
+      // dispatches. Where it does not (WebKit on macOS follows the platform and leaves buttons
+      // unfocused), the click dispatches in both modes. Either way exactly once.
+      let focusedBeforeClick = false;
+      let clicked = false;
+      tab("C").addEventListener("focus", () => (focusedBeforeClick ||= !clicked));
+      tab("C").addEventListener("click", () => (clicked = true), { capture: true });
       await userEvent.click(tab("C"));
       await expect.poll(() => tab("C").getAttribute("aria-selected")).toBe("true");
       expect(action).toHaveBeenCalledTimes(2);
       expect(action.mock.calls[1]?.[0]).toBe("c");
       expect(action.mock.calls[1]?.[1].event?.type).toBe(
-        activationMode === "automatic" ? "focusin" : "click",
+        activationMode === "automatic" && focusedBeforeClick ? "focusin" : "click",
       );
     },
   );

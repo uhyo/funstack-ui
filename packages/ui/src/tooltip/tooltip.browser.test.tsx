@@ -8,11 +8,9 @@ import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
+import { supportsInterestFor, supportsPopoverHint } from "../__tests__/engine.js";
 import { Tooltip } from "./index.js";
 import type { TooltipPopupProps, TooltipTriggerProps } from "./index.js";
-
-const supportsInterestFor =
-  typeof HTMLButtonElement !== "undefined" && "interestForElement" in HTMLButtonElement.prototype;
 
 function Harness({
   trigger,
@@ -62,12 +60,20 @@ describe("JS path (baseline) in a real browser", () => {
     render(<Harness delay={150} closeDelay={100} />);
     expect(isOpen()).toBe(false);
     expect(popup()).not.toBeVisible();
+    // Timestamps rather than "still closed after sleep(50)": with three engines running files in
+    // parallel, a 50 ms sleep can overrun the 150 ms delay (seen on Firefox).
+    let enteredAt = Number.NaN;
+    let openedAt = Number.NaN;
+    trigger().addEventListener("pointerenter", () => (enteredAt = performance.now()));
+    popup().addEventListener("beforetoggle", (event) => {
+      if ((event as ToggleEvent).newState === "open") openedAt = performance.now();
+    });
 
     await userEvent.hover(trigger());
-    await sleep(50);
-    expect(isOpen()).toBe(false);
     await expect.poll(isOpen, { timeout: 2000 }).toBe(true);
     expect(popup()).toBeVisible();
+    // Timer clamping can fire a few ms early relative to `performance.now()`.
+    expect(openedAt - enteredAt).toBeGreaterThanOrEqual(145);
 
     await userEvent.hover(screen.getByRole("button", { name: "Elsewhere" }));
     await expect.poll(isOpen, { timeout: 2000 }).toBe(false);
@@ -189,7 +195,10 @@ describe("JS path (baseline) in a real browser", () => {
 
   it('experimental_hint renders a real popover="hint" that the JS path drives', async () => {
     render(<Harness delay={0} popup={{ experimental_hint: true }} />);
-    expect(popup().popover).toBe("hint");
+    expect(popup()).toHaveAttribute("popover", "hint");
+    // Without `hint` support (Safari 27.0) the invalid value reflects as "manual"; the JS path
+    // still opens it and closes it on Escape (design section 2.2).
+    expect(popup().popover).toBe(supportsPopoverHint ? "hint" : "manual");
     await userEvent.hover(trigger());
     await expect.poll(isOpen).toBe(true);
     await userEvent.keyboard("{Escape}");
@@ -274,6 +283,8 @@ it('a "hint" tooltip whose trigger sits outside an open "auto" menu opens withou
   );
   const menu = screen.getByTestId("menu");
   expect(menu.matches(":popover-open")).toBe(true);
+  // Where `hint` is unsupported (Safari 27.0) the popup is a `manual` popover, which never closes
+  // an `auto` one either, so the expectations are the same on every engine.
   // The pointer reaches the trigger without a pointerdown, so the menu is not light-dismissed.
   await userEvent.hover(trigger());
   await expect.poll(isOpen).toBe(true);
@@ -284,6 +295,33 @@ it('a "hint" tooltip whose trigger sits outside an open "auto" menu opens withou
   expect(menu.matches(":popover-open")).toBe(true);
   act(() => menu.hidePopover());
 });
+
+describe.runIf(!supportsInterestFor)(
+  "experimental_interestFor without Interest Invokers (Firefox, WebKit)",
+  () => {
+    it("the trigger keeps the attribute and the JS path opens and closes the popup", async () => {
+      render(
+        <Harness
+          delay={0}
+          closeDelay={50}
+          trigger={{ experimental_interestFor: true }}
+          popup={{ experimental_hint: true }}
+        />,
+      );
+      expect(trigger()).toHaveAttribute("interestfor", popup().id);
+      expect("interestForElement" in trigger()).toBe(false);
+      const show = vi.spyOn(HTMLElement.prototype, "showPopover");
+
+      await userEvent.hover(trigger());
+      await expect.poll(isOpen).toBe(true);
+      // The library opened it: the engine ignored `interestfor`.
+      expect(show).toHaveBeenCalledTimes(1);
+
+      await userEvent.hover(screen.getByRole("button", { name: "Elsewhere" }));
+      await expect.poll(isOpen).toBe(false);
+    });
+  },
+);
 
 describe.skipIf(!supportsInterestFor)(
   "native interestfor path (Chromium with Interest Invokers)",
