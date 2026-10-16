@@ -1,3 +1,6 @@
+// Ships the platform attribute typings with this subpath (conventions 7.4). Type-only: the
+// built JS has no import of it.
+import "../internal/platform-attributes.js";
 import { TabsIndicator } from "./tabs-indicator.js";
 import { TabsList } from "./tabs-list.js";
 import { TabsPanel } from "./tabs-panel.js";

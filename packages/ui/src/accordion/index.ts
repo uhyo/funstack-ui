@@ -1,3 +1,6 @@
+// Ships the platform attribute typings with this subpath (conventions 7.4). Type-only: the
+// built JS has no import of it.
+import "../internal/platform-attributes.js";
 import { AccordionItem } from "./accordion-item.js";
 import { AccordionPanel } from "./accordion-panel.js";
 import { AccordionRoot } from "./accordion-root.js";
