@@ -1,4 +1,4 @@
-import { Component, Fragment, startTransition, use, useRef, useState } from "react";
+import { Component, startTransition, use, useState } from "react";
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Dialog } from "@funstack/ui/dialog";
@@ -283,96 +283,77 @@ function DismissDemo() {
   );
 }
 
-/* 5. Nested confirm from a Close action ---------------------------------------------------- */
+/* 5. Nested confirm ------------------------------------------------------------------------ */
 
-class Cancelled extends Error {}
+async function discardDraft(): Promise<void> {
+  console.log("[editor] discarding draft");
+  await sleep(700);
+  console.log("[editor] draft discarded");
+}
 
 function NestedDemo() {
-  const pending = useRef<{ resolve: () => void; reject: (e: Error) => void } | null>(null);
-  const [confirming, setConfirming] = useState(false);
-
-  const confirmDiscard = () =>
-    new Promise<void>((resolve, reject) => {
-      pending.current = { resolve, reject };
-      startTransition(() => setConfirming(true));
-    }).finally(() => {
-      pending.current = null;
-    });
-
+  const [open, setOpen] = useState(false);
+  const [last, setLast] = useState("(none yet)");
   return (
     <section>
       <h3>Nested: confirm before discarding</h3>
       <p>
-        The outer Discard button is a <code>Dialog.Close</code> with an <code>action</code> that
-        opens an inner controlled dialog and waits for its answer. The inner modal stacks on top;
-        Escape closes only the inner one. "Keep editing" rejects with a handled error, so the outer
-        dialog stays open.
+        No action waits for the user. "Discard…" is the Trigger of a JS-free confirm dialog, which
+        opens at once on top of the editor; Escape or "Keep editing" closes only the confirm. The
+        confirm's "Discard" is a <code>Dialog.Close</code> whose action discards the draft and then
+        closes the editor, which is controlled (<code>open</code>). Do not write a Close action that
+        awaits the inner dialog's answer: React holds every transition started while an async action
+        is pending, the inner open included, so it would never open.
       </p>
-      <Dialog.Root defaultOpen={false} openChangeAction={logChange("editor")}>
+      <p>
+        Last result: <code>{last}</code>
+      </p>
+      <Dialog.Root
+        open={open}
+        openChangeAction={(next, details) => {
+          logChange("editor")(next, details);
+          setOpen(next);
+          if (!next) setLast(`closed: returnValue="${details.returnValue}"`);
+        }}
+      >
         <Dialog.Trigger className="dlg-btn">Open editor</Dialog.Trigger>
         <Dialog.Popup className="dlg">
           <Dialog.Title>Editor</Dialog.Title>
           <textarea className="dlg-textarea" defaultValue="Unsaved notes…" />
           <div className="dlg-actions">
-            <SwallowCancelled>
-              <Dialog.Close className="dlg-btn" value="discard" action={confirmDiscard}>
-                {({ pending: busy }) => (busy ? "Waiting for confirmation…" : "Discard")}
-              </Dialog.Close>
-            </SwallowCancelled>
+            <Dialog.Close className="dlg-btn" value="close">
+              Close
+            </Dialog.Close>
+            {/* The inner Root starts here: its parts bind to the confirm dialog. */}
+            <Dialog.Root>
+              <Dialog.Trigger className="dlg-btn dlg-danger">Discard…</Dialog.Trigger>
+              <Dialog.Popup className="dlg dlg-small" role="alertdialog">
+                <Dialog.Title>Discard changes?</Dialog.Title>
+                <div className="dlg-actions">
+                  <Dialog.Close className="dlg-btn" value="keep">
+                    Keep editing
+                  </Dialog.Close>
+                  <Dialog.Close
+                    className="dlg-btn dlg-danger"
+                    value="discard"
+                    action={async () => {
+                      await discardDraft();
+                      startTransition(() => {
+                        setOpen(false);
+                        setLast("discarded");
+                      });
+                    }}
+                  >
+                    {({ pending }) => (pending ? <Spinner /> : "Discard")}
+                  </Dialog.Close>
+                </div>
+              </Dialog.Popup>
+            </Dialog.Root>
           </div>
-
-          <Dialog.Root
-            open={confirming}
-            openChangeAction={(next) => {
-              if (!next) {
-                pending.current?.reject(new Cancelled("Kept editing"));
-                setConfirming(false);
-              }
-            }}
-          >
-            <Dialog.Popup className="dlg dlg-small" role="alertdialog">
-              <Dialog.Title>Discard changes?</Dialog.Title>
-              <div className="dlg-actions">
-                <Dialog.Close className="dlg-btn" value="keep">
-                  Keep editing
-                </Dialog.Close>
-                <Dialog.Close
-                  className="dlg-btn dlg-danger"
-                  value="discard"
-                  action={() => {
-                    pending.current?.resolve();
-                  }}
-                >
-                  Discard
-                </Dialog.Close>
-              </div>
-            </Dialog.Popup>
-          </Dialog.Root>
         </Dialog.Popup>
       </Dialog.Root>
     </section>
   );
-}
-
-let resets = 0;
-
-/**
- * Remounts the Close button after the handled "keep editing" rejection (a rejected action reaches
- * the nearest boundary; the button then starts fresh). Any other error is rethrown.
- */
-class SwallowCancelled extends Component<{ children: ReactNode }, { key: number; error: unknown }> {
-  state = { key: 0, error: undefined as unknown };
-
-  static getDerivedStateFromError(error: unknown) {
-    return { key: ++resets, error };
-  }
-
-  render() {
-    if (this.state.error !== undefined && !(this.state.error instanceof Cancelled)) {
-      throw this.state.error;
-    }
-    return <Fragment key={this.state.key}>{this.props.children}</Fragment>;
-  }
 }
 
 export function DialogDemo() {
