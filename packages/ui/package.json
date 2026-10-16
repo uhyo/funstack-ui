@@ -10,6 +10,10 @@
     "transitions",
     "ui"
   ],
+  "homepage": "https://ui.funstack.work/",
+  "bugs": {
+    "url": "https://github.com/uhyo/funstack-ui/issues"
+  },
   "license": "MIT",
   "author": "uhyo <uhyo@uhy.ooo>",
   "repository": {
