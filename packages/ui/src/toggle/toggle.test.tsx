@@ -674,6 +674,31 @@ describe("Toggle", () => {
       expect(button()).toHaveAttribute("id", "mine");
     });
 
+    it("element form cannot re-introduce an owned attribute the library left off", async () => {
+      const d = deferred();
+      render(
+        <Toggle
+          pressedChangeAction={() => d.promise}
+          render={<button data-pressed="nope" data-pending="nope" data-disabled="nope" />}
+        >
+          Favorite
+        </Toggle>,
+      );
+      const user = setupUser();
+      // Library-controlled keys are owned (conventions 1.2): absent, not "nope".
+      expect(button()).not.toHaveAttribute("data-pressed");
+      expect(button()).not.toHaveAttribute("data-pending");
+      expect(button()).not.toHaveAttribute("data-disabled");
+
+      await user.click(button());
+      expect(button()).toHaveAttribute("data-pressed", "");
+      expectPending(button());
+      await act(async () => {
+        d.resolve();
+      });
+      expect(button()).not.toHaveAttribute("data-pending");
+    });
+
     it("element form lets the element win over pass-through props and merges id lists", () => {
       render(
         <Toggle
