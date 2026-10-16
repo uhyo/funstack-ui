@@ -26,7 +26,7 @@ Implementation of `design/components/tabs.md` on branch `worktree-agent-a7c499e7
   name; with React 19.3 ids (`_r_1_`) anchor name is exactly `--fsui-tab-<tab id>`.
 - Direction types: computed in Root's `transitionTypes(next, prev)` by looking both tabs up by id
   in `rootRef.current.getRootNode()` (works in shadow DOM). No need to thread the dispatching
-  element through `select`; also works for `reason: "find"` (dispatched from the panel).
+  element through `select`; also works for `reason: "platform"` (dispatched from the panel).
 - React's `onFocus` is `focusin`, so automatic-mode `details.event.type` is `"focusin"` (a
   `FocusEvent`), not `"focus"` as the test plan said.
 - List focus redirect (value null) only when focus comes from outside the list; otherwise
@@ -43,8 +43,31 @@ Implementation of `design/components/tabs.md` on branch `worktree-agent-a7c499e7
   committed mirror until every dispatch settled.
 - Modifier keys (Alt/Ctrl/Meta) are ignored by both arrow navigation and Enter/Space.
 
+## Review fixes (2026-10-16, after memo/reviewer/tabs.md)
+
+- until-found: hook `active = untilFound && !selected && optimistic !== value`. The Panel's boolean
+  `hidden` prop stays `!selected`, so React never touches the attribute while pending; the hook
+  re-hides once optimistic reverts. A *real* rejection cannot show the re-hide: the error is
+  thrown from the Root's render, so the boundary above it replaces the whole Tabs. Tests cover the
+  re-hide through a controlled veto and a caught error instead, and the real rejection only up to
+  "stays revealed while pending, reaches the boundary". Test helper `reveal()` fires
+  `beforematch` first, then removes `hidden` (spec order).
+- Unmatched value: List layout effect (deps `[optimistic, children, unmatched]`; oxlint rejects a
+  no-deps effect that sets state) reads `tabsOf(list)` for a `tabindex="0"`; state `unmatched`
+  makes the List the tab stop. A Tab added by a child that re-renders on its own is only seen on
+  the List's next render.
+- Automatic focus dispatch: only when `relatedTarget` is inside the tab's own tablist and is not
+  the List itself. So the List redirect (value null / unmatched) never selects; design 4.1 updated
+  to match (2dc8b5b).
+- `rendersButton(render)` in `internal/use-render.tsx`: true for no `render`, an intrinsic
+  `<button>` element, and the **function form** (it receives button props and decides; Toggle's
+  existing function-form test expects `type: "button"`). Design only says "a button / an `<a>`".
+- Reasons: Tabs `"platform"`, Accordion `"activate"`.
+- Browser tests: spy on `document.startViewTransition` and call through; React passes
+  `{ update, types }`. `userEvent` from `vitest/browser`.
+- Example: Tabs demo uses its own `.tabs-demo`, `.tabs-error-box`, `@keyframes tabs-spin`.
+
 ## Not done / open
 
-- Dev warning when neither `value` nor `defaultValue` is passed (design open question 2) not added.
-- `platform-attributes.d.ts` not shipped in `dist` (see above).
+- `platform-attributes.d.ts` not shipped in `dist` (Tooltip developer converting it).
 - Example demo verified by `vite build` only, not clicked through in a browser.
