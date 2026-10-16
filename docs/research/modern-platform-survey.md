@@ -245,8 +245,14 @@ blocker.
 
 ### `<dialog>`: `closedby`, `requestClose()`, toggle events, top layer, `inert`
 
-- `requestClose()` (Chrome 134, Safari 18.4, Firefox 139) fires `cancel` and respects
-  `closedby`; use it instead of `close()` for user-initiated closes.
+- `requestClose()` (Chrome 134, Safari 18.4, Firefox 139) fires `cancel` ~~and respects
+  `closedby`~~; use it instead of `close()` for user-initiated closes.
+  **Correction (2026-10-16):** `requestClose()` **ignores** `closedby`. The HTML spec says so
+  explicitly ("even if closedby is set to "none", the same behavior will apply"), and a
+  `closedby="none"` dialog closes on `requestClose()` and on `command="request-close"` in
+  Chromium 156 and Firefox 157 (probe `memo/platform-researcher/probes/04-dialog/requestclose-closedby.mjs`).
+  Only user close requests (Escape, Android back) and light dismiss consult `closedby`. See
+  [dialog.md](./dialog.md).
 - `toggle`/`beforetoggle` on dialog: Chrome 132, Firefox 133, Safari 26. React 19.3 attaches
   `onToggle`/`onBeforeToggle`/`onCancel`/`onClose` on `<dialog>`.
 - `closedby="any|closerequest|none"`: Chrome 134, Firefox 141, Safari TP only (not 27.0).
@@ -312,6 +318,18 @@ is n/a; use `data-*` attributes.
   position is "support"; Firefox has "positive" position and an open bug. Flag.
 - `overlay`: Chrome 117 only, never implemented elsewhere, and Chromium has a "deprecate and
   remove" chromestatus entry. Do not depend on it. Listing it in `transition` is harmless.
+- **Correction (2026-10-16):** exit animations of top-layer elements (popover, dialog) are
+  **progressive enhancement**, not cross-engine. Verified by screenshot probes
+  (`memo/platform-researcher/probes/04-dialog/exit-anim.mjs`, `entry-anim.mjs`):
+  - Firefox closes popovers and dialogs **instantly**: Gecko cannot transition or animate
+    `display` (BCD partial; meta bug 1834877 still NEW, Nightly pref not enabled). Entry
+    animations via `@starting-style` do work.
+  - Chromium animates the exit, but **without `overlay … allow-discrete` in the transition list**
+    the element leaves the top layer at once: it drops under z-indexed page content and
+    `::backdrop` disappears for the whole fade. So `overlay` is not just harmless but required in
+    Chromium for a correct exit (it may become unnecessary if the CSSWG removes the property).
+  - WebKit animates the exit (Safari 27.0 fixed a bug in it); top-layer behaviour without
+    `overlay` not verified. See [dialog.md](./dialog.md) "Animation".
 
 ### Scroll-driven animations, scroll snap, `scroll-state()`, `overscroll-behavior`, `scrollbar-gutter`
 

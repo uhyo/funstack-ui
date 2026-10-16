@@ -34,7 +34,7 @@ by `popovertarget` / `commandfor` / `showPopover({ source })`, and Invoker Comma
 | Feature | Verdict | Reason |
 | --- | --- | --- |
 | Popover API (`popover="auto" \| "manual"`, `popovertarget`, light dismiss, top layer, `:popover-open`) | **Adopt** | Baseline widely available (Chrome 114, Firefox 125, Safari 17). |
-| `@starting-style` + `transition-behavior: allow-discrete` for open/close animation | **Adopt** | Chrome 117, Firefox 129, Safari 17.4/17.5. |
+| `@starting-style` + `transition-behavior: allow-discrete` for open/close animation | **Adopt** (open); close is progressive enhancement, see correction below | Chrome 117, Firefox 129, Safari 17.4/17.5. Firefox does not run exit animations (corrected 2026-10-16). |
 | CSS Anchor Positioning (`anchor-name`, `position-anchor`, `anchor()`, `position-area`, `position-try-fallbacks`, `position-try-order`, `anchor-size()`) | **Adopt** | Chrome 125+, Firefox 147/148, Safari 26.0 (27.0 complete). See caveats for the remaining gaps. |
 | Implicit anchor from `popovertarget` / `commandfor` / `showPopover({ source })` | **Adopt** | Spec'd in HTML (`implicit anchor element`); `source` option in Chrome 137, Firefox 144, Safari 26.0. |
 | Invoker Commands (`commandfor` / `command`) | **Adopt** (not as a tooltip trigger) | Chrome 135, Firefox 144, Safari 26.2. Click-driven, so useful for "click to pin" but not for hover tooltips. |
@@ -96,6 +96,23 @@ stable release listed at the top.
   &:popover-open { opacity: 1; @starting-style { opacity: 0; } }
 }
 ```
+
+**Correction (2026-10-16): the exit half of this animation is progressive enhancement.** Verified
+by screenshot probes on Chromium 156 and Firefox 157
+(`memo/platform-researcher/probes/04-dialog/entry-anim.mjs`, `exit-anim.mjs`):
+
+- **Firefox hides the popover instantly** on close. Gecko cannot transition or animate `display`
+  (BCD marks `transition-behavior` partial; meta bug 1834877 is NEW and the pref is not enabled
+  even on Nightly). The fade-in via `@starting-style` works.
+- **Chromium needs `overlay … allow-discrete`** in the transition list, as in the snippet above.
+  Without it the popover leaves the top layer as soon as it closes and fades out underneath
+  z-indexed page content. Keep `overlay` in every documented snippet.
+- WebKit animates the exit (Safari 27.0 fixed a closing-animation bug for popovers and dialogs).
+
+Consequence for Tooltip: the documented exit fade is cosmetic and must not be load-bearing.
+Nothing in the component may wait for an exit animation (`transitionend`, `getAnimations()`) in
+a way that breaks when Firefox ends it immediately, and tests must not assert an exit animation
+on Gecko. Details in [dialog.md](./dialog.md), "Animation".
 
 What the platform does for free in Chromium: hover and focus show the popover after a delay, moving
 the pointer into the tooltip keeps it open, blur / de-hover hides it after a delay, Escape closes it
