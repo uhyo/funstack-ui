@@ -18,6 +18,17 @@ export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Act
   [next: T, details: Details]
 >;
 
+/**
+ * Why a change action was dispatched (conventions 2.2). One library-wide vocabulary: every
+ * `<Component><State>ChangeDetails` that exposes `reason` declares it with this type.
+ *
+ * - `"activate"`: the user acted on a trigger part (click, Enter/Space, label click, focus in an
+ *   automatic-activation mode). `details.event` is the native event.
+ * - `"platform"`: the browser changed the state itself: find-in-page, a form reset (`event` is
+ *   the `reset` event), or interaction before hydration found at mount (`event` is `undefined`).
+ */
+export type ChangeReason = "activate" | "platform";
+
 /** A prop value that is either a plain value or a function of the part's state. */
 export type StateValue<T, State> = T | ((state: State) => T);
 
