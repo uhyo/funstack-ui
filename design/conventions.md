@@ -69,6 +69,7 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` |
 | `Indicator` | Purely visual element that tracks state (active tab marker). | `span` |
 | `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, future CheckboxGroup) it renders `<legend>` and must be the Root's first child. | `label` / `legend` |
+| `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
 | `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
@@ -234,7 +235,7 @@ export interface ActionDetails {
 export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Action<[next: T, details: Details]>;
 
 /** Why a change action was dispatched; the full vocabulary (section 2.2, "reason" table). */
-export type ChangeReason = "activate" | "platform";
+export type ChangeReason = "activate" | "platform" | "dismiss";
 ```
 
 `ChangeReason` is **one public type**, exported from the root entry; every
@@ -251,9 +252,15 @@ exposes `reason` uses exactly these values and no synonyms:
 | `reason` | Meaning | `details.event` |
 | --- | --- | --- |
 | `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). For native checkbox and radio inputs it is always the `click` `PointerEvent`, including Space and radio arrow keys, because React's `onChange` for them is click-driven. |
-| `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), or interaction before hydration reconciled at mount. | The platform event, or `undefined` for mount reconciliation. |
+| `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), form reset, or interaction before hydration reconciled at mount. Never a user gesture. | The platform event, or `undefined` for mount reconciliation. |
+| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click). A close through a part (`Dialog.Close`, a Form submit) is `"activate"`. | The platform's `close` or `toggle` event. |
 
-Adding a third value is a change to this document, not to one component. The first argument is always the next value, so the
+Components whose close carries a platform result add it as a serialisable field next to
+`reason`: Dialog's `details.returnValue` is `dialog.returnValue` (the `value` of the Close button
+or form submitter, or the string passed to `requestClose()`), `undefined` on open.
+
+Adding a value is a change to this document, not to one component (`"dismiss"` was added
+2026-10-16 for Dialog; Popover and Menu reuse it). The first argument is always the next value, so the
 common case stays short:
 
 ```tsx
@@ -346,7 +353,9 @@ What a consumer can rely on:
    catches a `preventDefault()` in a pass-through `onClick`, which runs before the library's
    `onChange` for the same click. The complementary rule: a click that is **already cancelled**
    when the library's handler runs is not a change and does not dispatch, because the browser
-   reverts the DOM after dispatch and React restores unchanged props. Vetoing is done with
+   reverts the DOM after dispatch and React restores unchanged props. A part that itself cancels
+   the event as part of its mechanism (Dialog's Trigger `preventDefault()`s the click to cancel the
+   `command`) keys the warning on its own flag, not on `defaultPrevented`. Vetoing is done with
    controlled mode: the parent simply does not adopt the change (section 2.4).
 4. **`setState` after the consumer's own `await` is not a Transition** (React limitation). Wrap it:
    ```tsx
@@ -467,6 +476,10 @@ are independent and the library does not couple them:
 - A control **must not** fold `useFormStatus` into its own `pending`: that would mark every
   control in the form pending during a submit. A consumer who wants that reads `useFormStatus`
   in their own `className` function or styles `form:has(...)`.
+- A part may **observe** the form channel to perform a platform side effect after a successful
+  action (`Dialog.Form` closes the dialog once the action's transition settles); it never wraps
+  the action (so a Server Function keeps progressive enhancement) and never reports form pending
+  as its own `pending`.
 - "Autosave on change" is `checkedChangeAction={saveSetting}` (a Server Function may be passed
   directly, section 2.2); "submit on change" is
   `checkedChangeAction={() => formRef.current?.requestSubmit()}`.
@@ -667,6 +680,11 @@ Rules:
   writes to a DOM property it does not own (`Checkbox`'s `indeterminate`, a future Progress
   `value` or Dialog `returnValue`). It has no `defaultX` and no action; the library re-applies it
   after every commit and may suspend it while an action is pending (section 4.1).
+- A state may be **library-owned in one direction and browser-owned in the other** (Dialog's
+  `open`: opening is a transition the library drives and awaits; closing is performed by the
+  browser and reaches the library as a notification with `reason: "dismiss"` or `"activate"`
+  and `details.returnValue`). The component doc says which, and the `xChangeAction` doc comment
+  says so per value.
 
 ### 3.6 `disabled`
 
@@ -701,7 +719,8 @@ keepMounted?: boolean | "until-found";
 Tabs defines the semantics. Accordion has no `keepMounted`: its Panel is always mounted because
 `<details>` keeps its content in the DOM and reveals it on find-in-page natively
 (`design/components/accordion.md` 4.4). Future content regions that hide content via library
-state reuse the prop unchanged.
+state reuse the prop, narrowing the type where a value has no meaning: Dialog accepts `boolean`
+only, because `"until-found"` cannot apply inside a closed `display: none` dialog.
 
 ### 3.8 Native checkable inputs: the shared machinery
 
@@ -727,7 +746,14 @@ Rules the three hooks implement, which component docs may cite instead of restat
 3. **Mount reconciliation** runs in a layout effect at mount, before the re-apply effect, and
    dispatches with `reason: "platform"` and `event: undefined`. It covers clicks before hydration
    and Firefox's form-state restoration (react-dom keeps the DOM `checked` when hydrating, fires no
-   `onChange` and logs no mismatch, so no `suppressHydrationWarning` is needed).
+   `onChange` and logs no mismatch, so no `suppressHydrationWarning` is needed). **Ordering in a
+   group:** React runs children's layout effects before the parent's, so an Item's re-apply
+   effect would overwrite the hydrated DOM `checked` before the Root's `readCurrent()` sees it.
+   `useNativeChecked` therefore does **not** re-apply `checked` in the mount commit, including
+   StrictMode's re-run of the mount effects (detected with a per-render token rather than a
+   `useRef` flag, which StrictMode would reuse); from the second commit on it re-applies after
+   every commit. A single control is unaffected (its own mount reconciliation reads the DOM
+   first), but the rule is uniform so the hook has one behaviour.
 4. **The reset subscription must be stable.** React's automatic reset after a successful
    `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
    the next subscription, so a listener attached in a deps-less effect never sees it (verified,
@@ -768,7 +794,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` is an exact equivalent. |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
@@ -805,7 +831,7 @@ For native inputs the equivalence is exact, because the DOM holds the optimistic
 
 | On the input | Data attribute | Note |
 | --- | --- | --- |
-| `:checked` | `data-checked` | Identical except under the unsupported `preventDefault()` misuse (2.3). |
+| `:checked` | `data-checked` | Identical except under the unsupported `preventDefault()` misuse (2.3) and in one engine quirk: Chromium 156 does **not** match `:checked` on a checkbox that is both checked and indeterminate (Firefox does). Where `indeterminate` is in play, select on `[data-checked]`. |
 | `:indeterminate` | `data-indeterminate` | Only the attribute works before hydration; `:indeterminate` also matches every radio in a group with no selection. |
 | `:disabled` | `data-disabled` | Only the pseudo-class sees `<fieldset disabled>` inheritance. |
 | `:user-invalid`, `:required` | none | Platform only; no attribute. |
@@ -816,7 +842,9 @@ alternative.
 
 ### 4.3 Where `data-pending` lands
 
-- The **owner** (`Root`, or the single component): while its transition is pending.
+- The **owner** (`Root`, or the single component): while its transition is pending. When the
+  owner renders no element (Dialog's Root), `pending` is exposed through its `children` function
+  and on the trigger part only.
 - The **trigger the user acted on**: while the owner is pending and this trigger is the optimistic
   target (for Tabs: `optimistic === tab.value`; for Toggle: always the element).
 - **Panels** do not get `data-pending`; a panel is either committed-visible or not. Consumers who
@@ -1114,7 +1142,7 @@ a flag (`docs/vision.md`). Mechanism:
    | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor` | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
    | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup` | Native roving focus; JS arrow-key handling skipped where supported. |
    | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
-   | `<dialog closedby>` | WebKit (TP) | `Dialog.Root experimental_closedby` | Native light dismiss instead of JS. |
+   | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute; camelCase like `experimental_interestFor`) | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | `Select.Root experimental_baseAppearance` | `appearance: base-select` markup; degrades to the native picker elsewhere. |
    | `<input type="checkbox" switch>` | Blink (proposed), Gecko | `Switch experimental_switch` (future; not added while WebKit-only) | Native switch rendering and semantics; `role="switch"` already gives the semantics everywhere. |
 
@@ -1324,8 +1352,14 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `reset` event (section 3.8 rule 6); resets are never silently ignored.
 18. **`indeterminate` is suspended while pending** (`state.indeterminate = indeterminate &&
     !pending`, section 4.1).
-19. **One public `ChangeReason` type** (`"activate" | "platform"`, section 2.2) replaces the
-    per-component unions.
+19. **One public `ChangeReason` type** (`"activate" | "platform" | "dismiss"`, section 2.2)
+    replaces the per-component unions; `"dismiss"` was added with the Dialog design.
+22. **Dialog (#26)**: the product owner accepted all nine questions as recommended (issue #26
+    comment): `"dismiss"` reason; no Escape disabling in v0; the `open` attribute is never
+    server-rendered; `state.open` is `false` in JS-free mode; `lightDismiss` defaults to `false`;
+    both `Dialog.Close action` and `Dialog.Form` stay; a pre-hydration click opens an empty
+    dialog that fills in after hydration; a refused close re-opens the dialog; the jsdom dialog
+    shim is accepted.
 20. **`CheckboxGroup` is deferred** to its own design (issue #33); Checkbox leaves room for it
     (`design/components/checkbox.md` §10).
 21. **Shared native-input machinery** is the three-hook contract of section 3.8: per-element

@@ -27,7 +27,7 @@ when the content is ready.
 | 1 | Anatomy | `Dialog.Root` (no DOM), `Dialog.Trigger` (`button[commandfor][command="show-modal"]`), `Dialog.Popup` (the `<dialog>`), `Dialog.Close` (`button[commandfor][command="request-close"]`), `Dialog.Form` (`form`, closes on successful submit), `Dialog.Title` (`h2`), `Dialog.Description` (`p`). No Portal, no Backdrop part (`::backdrop` is CSS), no Positioner. |
 | 2 | Two modes, one anatomy | **JS-free mode** (Root has none of `open` / `defaultOpen` / `openChangeAction`): the browser owns everything through Invoker Commands; content is always mounted; works from a Server Component and before hydration. **Library mode** (any of the three present): **open is library-owned** (Trigger click intercepted, `openChangeAction(true)` awaited, content rendered from committed state, `showModal()` in a layout effect), **close is browser-owned** (every close request closes natively and at once; `openChangeAction(false)` is a notification from the `close` event). |
 | 3 | Modal | `modal` on Root, default `true`. `modal={false}` uses `show()`; it needs one click handler because there is no `show` command, so a non-modal dialog is never JS-free. |
-| 4 | Reason vocabulary | `details.reason` is `"activate"` (Trigger, Close, Form submit), `"dismiss"` (Escape, back, light dismiss, assistive-technology dismiss: a close the user requested without a part), or `"platform"` (mount reconciliation of a pre-hydration open). `"dismiss"` is new and is a change to conventions 2.2 (feedback item 1). `details.returnValue` carries `dialog.returnValue` on close. |
+| 4 | Reason vocabulary | `details.reason` is `"activate"` (Trigger, Close, Form submit), `"dismiss"` (Escape, back, light dismiss, assistive-technology dismiss: a close the user requested without a part), or `"platform"` (mount reconciliation of a pre-hydration open). `"dismiss"` is now part of the shared `ChangeReason` (conventions 2.2, accepted 2026-10-16). `details.returnValue` carries `dialog.returnValue` on close. |
 | 5 | Pending UI | Trigger: `data-open` (optimistic) and `data-pending` in library mode. The `<dialog>` emits no `data-open`: `:open` and `:modal` are exact. Root has no DOM, so `pending` lives on the Trigger and in Root's `children(state)`. |
 | 6 | Content mounting | Library mode: Popup children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">` (conventions 3.7, boolean only). Unmount is deferred until the dialog's exit animations finish so a fading dialog is never empty. JS-free mode: always mounted (the markup must be complete before hydration). |
 | 7 | Initial focus | `initialFocus` on Popup (a ref or a selector). The library writes `autofocus` on the resolved element through the DOM right before `showModal()` and lets the platform's dialog focusing steps run; it never calls `.focus()` on open. Return focus is the platform's; the library only handles "the opener is gone". |
@@ -386,8 +386,7 @@ Shared types come from `packages/ui/src/internal/types.ts`. `TransitionProp` is 
 ### 3.1 `Dialog.Root`
 
 ```ts
-export type DialogChangeReason = "activate" | "dismiss" | "platform";
-
+// `ChangeReason` is the shared public type (conventions 2.2): "activate" | "platform" | "dismiss".
 export interface DialogOpenChangeDetails extends ActionDetails {
   /**
    * "activate": the user acted on a part: Trigger (open), Close or Form submit (close).
@@ -395,7 +394,7 @@ export interface DialogOpenChangeDetails extends ActionDetails {
    * technology dismiss gesture, or a click outside (`lightDismiss` / `closedby="any"`).
    * "platform": the dialog was found open on mount (opened before hydration); `event` is undefined.
    */
-  readonly reason: DialogChangeReason;
+  readonly reason: ChangeReason;
   /**
    * On close: `dialog.returnValue`: the `value` of the Close button or the form submitter that
    * closed it, `""` for a dismiss. On open: `undefined`.
@@ -1416,7 +1415,13 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
 
 ---
 
-## Conventions feedback
+## Conventions feedback (applied 2026-10-16)
+
+All eight items below were applied to `design/conventions.md`: `"dismiss"` in `ChangeReason`
+and `details.returnValue` (2.2); per-direction ownership (3.5); observing the form channel and
+the `Form` part (2.7, 1.1); `keepMounted` narrowing (3.7); `pending` on an owner without DOM
+(4.3); `Dialog.Popup experimental_closedBy` (8); the Dialog `open` row (4.1); and the
+part-cancelled-event note for the `preventDefault()` warning (2.3). Kept for the record:
 
 1. **2.2 `reason` vocabulary: add `"dismiss"`.** "The user closed the component without acting
    on one of its parts: Escape, Android back, an assistive-technology dismiss gesture, light
@@ -1456,10 +1461,11 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
    the consumer's sync prefix runs. Worth a sentence so the dev warning for "defaultPrevented
    after the prefix" is not applied to Dialog (or is keyed on a flag the part sets).
 
-## Questions for the product owner
+## Questions for the product owner (all nine accepted as recommended, issue #26 comment)
 
 1. **`"dismiss"` reason** (feedback 1): approve the third value, or fold dismissals into
    `"platform"`? Recommendation: approve; `"platform"` should keep meaning "not the user".
+   Accepted; now in conventions 2.2.
 2. **No way to disable Escape in v0.** The platform allows one veto per activation, which is not
    an API. Options: ship nothing (recommended, documented), or an `experimental_closedBy="none"`
    value that works in Chromium and Firefox only and cannot be emulated in Safari.

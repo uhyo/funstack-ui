@@ -728,7 +728,8 @@ the directive). A directive-free variant is a candidate for issue #19 (research 
   switch>`) for native switch rendering. WebKit 17.4 only; Chromium has an Intent to Prototype
   (2026-07) and no milestone; Gecko no signal. Added as a prop on `Switch` when Chromium ships,
   per conventions 8; the attribute changes only default rendering, which headless consumers
-  replace anyway. The platform-attributes augmentation already lists `switch` (conventions 7.4).
+  replace anyway. The platform-attributes augmentation does not list `switch` yet; it is added
+  together with the prop, since nothing renders the attribute until then (conventions 7.4).
 - **`indeterminate`**: never for Switch (MDN: `:indeterminate` never matches a switch; a switch
   is binary). Checkbox has it.
 - **`Switch.Thumb` / `Switch.Label`**: see section 1; added only if CSS `:has()` and the `render`

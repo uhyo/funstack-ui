@@ -325,7 +325,7 @@ export interface AccordionRootState {
 
 export interface AccordionValueChangeDetails extends ActionDetails {
   /** Library-wide vocabulary (conventions 2.2). "activate": the user activated a Trigger. "platform": the browser changed `open` (find-in-page, pre-hydration click). */
-  readonly reason: "activate" | "platform";
+  readonly reason: ChangeReason; // shared public type, conventions 2.2
   /** The item whose open state changed. */
   readonly item: string;
   /** That item's new open state. */
