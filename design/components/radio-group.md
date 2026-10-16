@@ -607,7 +607,8 @@ Uncontrolled, `defaultValue={null}`, inside `<form action={submitPlan}>`, `name=
    `plan=pro` from the DOM.
 3. The action succeeds; React calls `form.reset()` during commit. The browser restores every radio
    to `defaultChecked`: nothing checked. The Root's `reset` listener schedules a microtask.
-4. Microtask: DOM reads `null`; the base (`latestInFlight()?.next ?? O`) is `"pro"`; dispatch
+4. Microtask: DOM reads `null`; the base (the in-flight dispatch's `next` if any, else `O`; an
+   explicit null check on the dispatch, conventions 3.8 rule 1) is `"pro"`; dispatch
    `null` with `reason: "platform"`, `event` = the `reset` event. `valueChangeAction`, if given,
    is called with `(null, details)`. Uncontrolled: `C=null`. The group shows nothing checked, which
    is what the browser already showed.
@@ -794,11 +795,11 @@ controlled wrapper.
 | Keyboard | Click, Space and arrow keys (user-event emulates native radio walking: next/previous, wrap, disabled skipped) each dispatch once with a native `click` event; Tab enters on the checked radio; `Home`/`End` do nothing. **Browser mode:** RTL mirroring, native wrap, Shift+Tab return, Safari note. |
 | Sync action (both) | `(next, details)` shape; `details.reason === "activate"`; `details.event.type === "click"`; clicking the checked radio, a disabled radio, or any radio under `Root disabled` never dispatches; a click whose `defaultPrevented` is already true (pass-through `onClick`) never dispatches and leaves the DOM on the old radio. |
 | Async action (both) | While unresolved: `data-pending` on Root and the clicked Item only; the clicked input is `checked` in the DOM; `data-checked` moved; other Items unchanged. After resolve: pending gone, value committed (uncontrolled) / parent updated (controlled). |
-| Rejection (both) | `ErrorCatcher` receives the error; the previously checked input is `checked` again in the DOM; `data-checked` reverted; uncontrolled internal value unchanged. Caught-inside variant resolves and (uncontrolled) commits. |
+| Rejection (both) | Uncaught: `ErrorCatcher` above the Root receives the error and the whole group is replaced by the boundary's fallback, so no DOM assertion on the radios; uncontrolled internal value unchanged (re-mount shows the old value). DOM rollback is asserted where the group stays mounted: a controlled parent that catches inside the action and does not update → the previously checked input is `checked` again in the DOM, `data-checked` reverted, no `data-pending`; a controlled veto (9.5) → same; uncontrolled caught-inside variant resolves and commits. |
 | Overlap | Arrow to b then c, resolve b last: DOM and `data-checked` on c throughout, final committed c; walkthrough 9.6 (click back to committed while pending): final committed is the committed value, both actions called. |
 | Superseded rejection (both) | b rejects after c resolved, and while c is pending: error reaches the boundary; c's outcome unaffected. |
 | Suspending content (both) | Dependent `<Suspender />` keyed on the consumer's state updated in the action: old content stays, no fallback from the boundary above, Root `data-pending`; after resolve, new content. |
-| Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; rejection rolls the DOM back to "a". StrictMode: still one dispatch. Late-mounting Item: an Item under a Suspense boundary that resolves after hydration, with its DOM `checked` set before reveal, produces one additional dispatch via `onItemMounted()`; two such Items in one commit produce one. |
+| Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; a controlled parent that refuses the hydration dispatch (or catches a rejection inside the action without updating) → the DOM is back on "a" after settle, group still mounted. StrictMode: still one dispatch. Late-mounting Item: an Item under a Suspense boundary that resolves after hydration, with its DOM `checked` set before reveal, produces one additional dispatch via `onItemMounted()`; two such Items in one commit produce one. |
 | Platform: form reset | Inside a `<form>`: check "b", call `form.reset()` → one dispatch `(a-or-null, { reason: "platform", event: Event("reset") })`, uncontrolled commits it; controlled parent that ignores → DOM re-checks the parent's radio after settle; `<form action>` that succeeds auto-resets and dispatches the same way; a cancelled `reset` event dispatches nothing; `Root disabled` still dispatches on reset; reset whose target equals the optimistic value dispatches nothing. |
 | `preventDefault` warning | `details.event.preventDefault()` inside the action logs the dev warning once; the action still ran. |
 | Platform: reset target by mode | Uncontrolled: after the Root re-renders with a new `defaultValue` (inside a transition), `form.reset()` returns the group to the new default and dispatches it; controlled: reset returns to the mount-time `value` and the parent is notified. |
@@ -868,12 +869,14 @@ is not in the context: no part renders it.
 - `select(value, event)`: return if `event.defaultPrevented` or `value === optimistic`; else
   `dispatch(value, createActionDetails(event, { reason: "activate" }))`; then, in development,
   if `event.defaultPrevented` is now true, warn once (the action's sync prefix cancelled it).
-- `dispatchFromDom(next, event | undefined)`: `base = latestInFlight()?.next ?? optimistic`;
+- `dispatchFromDom(next, event | undefined)`: `const f = latestInFlight(); const base = f === null ? optimistic : f.next;`
+  (an explicit null check: with `T = string | null`, `?.next ?? optimistic` would drop an in-flight
+  dispatch to `null`, conventions 3.8 rule 1);
   return if `next === base`; else `dispatch(next, createActionDetails(event, { reason: "platform" }))`.
 - `readGroup()`: `fieldset.querySelectorAll('input[type="radio"]')`, filter by `.name === name`,
   return the checked one's `.value` or `null`.
 - Residual paths: one call,
-  `useNativeGroupReconciliation({ element: fieldsetRef, readCurrent: readGroup, readDefault: readGroupDefault, base: () => latestInFlight()?.next ?? optimistic, onPlatformChange: dispatchFromDom })`
+  `useNativeGroupReconciliation({ element: fieldsetRef, readCurrent: readGroup, readDefault: readGroupDefault, base: () => { const f = latestInFlight(); return f === null ? optimistic : f.next; }, onPlatformChange: dispatchFromDom })`
   (conventions 3.8). It runs the mount reconciliation once in a layout effect and owns the
   stable `reset` subscription on `fieldsetRef.current.form` via `useFormReset`; a changed `form`
   prop or a moved fieldset re-subscribes because the owner is re-read after every commit.

@@ -752,9 +752,14 @@ This is the one contract both designs implement (reconciled 2026-10-16 from
 Rules the three hooks implement, which component docs may cite instead of restating:
 
 1. **Base comparison.** A residual path dispatches only when the DOM value differs from what the
-   user already intends: `base = latestInFlight()?.next ?? optimistic` (`latestInFlight` comes from
-   `useControllableAction`). Reading the DOM alone would lose a pending optimistic change. This
-   also makes the StrictMode double layout effect dispatch once.
+   user already intends: the latest in-flight dispatch's `next` if there is one, else the
+   optimistic value (`latestInFlight` comes from `useControllableAction`). Spell it with an
+   explicit null check on the *dispatch*, never with `??` on `next`:
+   `const f = latestInFlight(); const base = f === null ? optimistic : f.next;`. For a nullable
+   `T` (RadioGroup's `string | null`) `latestInFlight()?.next ?? optimistic` silently drops an
+   in-flight dispatch *to* `null` (a pending reset to "nothing checked") and would re-dispatch
+   against the stale optimistic value. Reading the DOM alone would lose a pending optimistic
+   change. The comparison also makes the StrictMode double layout effect dispatch once.
 2. **One dispatch per state owner.** A single control dispatches for itself; a group's Root
    dispatches once for the whole group, never once per radio.
 3. **Mount reconciliation** runs in a layout effect at mount, before the re-apply effect, and
