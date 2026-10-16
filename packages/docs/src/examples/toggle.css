@@ -1,0 +1,44 @@
+/* Toggle: data attributes carry library state; :hover / :focus-visible come from the platform. */
+.demo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.4em 0.9em;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  /* The optimistic flip is a sync commit, so it animates with a plain CSS transition. */
+  transition:
+    background-color 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+.demo-toggle[data-pressed] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.demo-toggle[data-pending] {
+  cursor: progress;
+}
+
+.demo-toggle[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demo-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-toggle {
+    transition: none;
+  }
+}

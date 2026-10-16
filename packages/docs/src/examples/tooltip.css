@@ -1,0 +1,61 @@
+/* Tooltip: open state belongs to the browser, so style it with :popover-open and animate it
+   with @starting-style. The library ships no CSS. */
+.demo-tip {
+  margin: 6px; /* gap from the trigger; overrides the UA's margin: auto */
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 0.875rem;
+  max-inline-size: 24rem;
+  opacity: 0;
+  translate: 0 4px;
+  transition:
+    opacity 120ms,
+    translate 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+
+.demo-tip:popover-open {
+  opacity: 1;
+  translate: 0 0;
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-tip {
+    transition: none;
+  }
+}
+
+.demo-toolbar {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.demo-icon-button {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+/* The trigger whose tooltip is open: the popup is the next sibling. */
+.demo-icon-button:has(+ .demo-tip:popover-open),
+.demo-button:has(+ .demo-tip:popover-open) {
+  border-color: var(--color-primary);
+}

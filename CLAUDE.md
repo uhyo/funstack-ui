@@ -14,6 +14,7 @@ This is a pnpm monorepo managed with Turbo:
 
 - `packages/ui` - The main `@funstack/ui` package
 - `packages/example` - Vite + React playground that consumes `@funstack/ui` via `workspace:*`
+- `packages/docs` - The documentation site (package name `docs`), built with FUNSTACK Static
 - `docs/` - Vision, design documents, and research notes (markdown)
 - `memo/<role>/` - Working notes kept by each agent role (see Conventions)
 
@@ -39,6 +40,16 @@ All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and 
 - `pnpm --filter @funstack/ui test:browser:dev` - Browser tests in watch mode with a visible Chromium window
 - `pnpm --filter @funstack/ui exec playwright install chromium` - One-time download of the Chromium build the browser tests need (CI adds `--with-deps`)
 - `pnpm --filter funstack-ui-example dev` - Run the playground dev server
+
+### Docs site
+
+`packages/docs` is the public documentation site, following the FUNSTACK family pattern (same structure as the FUNSTACK Router docs): built with `@funstack/static` (React Server Components, pre-rendered to static HTML with `ssr: true`), client navigation with `@funstack/router`, code highlighted at build time with shiki. Pages are Server Components in `src/pages/`; routes and the sidebar live in `src/App.tsx` and `src/navigation.ts`.
+
+- `pnpm --filter docs dev` - Dev server (build `@funstack/ui` first, or run `pnpm dev` from the root, which also watches the library)
+- `pnpm --filter docs build` - Static build into `packages/docs/dist/public` (root `pnpm build` includes it)
+- Live examples are files in `src/examples/` that render the real `@funstack/ui` (`workspace:*`) with fake async actions; pages show their source through Vite `?raw` imports, so the code shown is the code running. Examples without `"use client"` (the JS-free Accordion, the Tooltip toolbar) are deliberately Server Components.
+- Props tables are written by hand from the TypeScript declarations in `packages/ui`: update the component page whenever a public prop, state field, data attribute or default changes.
+- Deployment is not configured yet (`wrangler.toml` has a placeholder name); CI only builds the site.
 
 ### Browser tests
 
