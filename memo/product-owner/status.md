@@ -31,3 +31,7 @@
 - Accordion (#12) merged c66167e (161 tests total); review-accordion running (opus). tabs-impl running (opus, worktree). Next: Tooltip (#13) after Tabs; docs site (#14).
 - Tabs (#11) merged (284 tests total). Accordion review fixes landed (owned keys in mergeProps; latestInFlight() on hook). Next: review Tabs (opus) → fixes; then Tooltip (#13); docs site (#14).
 - Decision: reason vocabulary unified — "activate" (user) / "platform" (browser-initiated: find-in-page, pre-hydration). Tabs' "find" → "platform".
+- Tabs review: acceptable w/ minor fixes. Decisions: until-found stays revealed while pending; List becomes tab stop when controlled value matches no tab (+dev warning); focus-driven dispatch only when relatedTarget is inside the List; type="button" only on real buttons (Toggle too). tabs-fixes (opus) running on master; tooltip-impl (opus) in worktree; architect patching docs.
+- Manual check needed by user (batched): real find-in-page (Ctrl+F) on the Tabs demo's until-found panel and on Accordion — headless Chromium can't exercise it.
+- Tabs fixes landed (305 tests). docs-site (#14, opus, worktree) started; tooltip-impl (opus, worktree) running. After Tooltip: review → fixes → merge docs → consider first release prep (version 0.0.x, release-funstack skill like siblings) — ask user.
+- Batched for user: (2) release plan / npm publish of @funstack/ui 0.0.1? (3) docs deployment target (Cloudflare like siblings?).

@@ -6,6 +6,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
+import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { TabsContext } from "./tabs-context.js";
 import type {
@@ -22,7 +23,7 @@ export type { TabsActivationMode, TabsOrientation } from "./tabs-context.js";
 export interface TabsValueChangeDetails extends ActionDetails {
   /**
    * `"activate"`: the user selected the tab (click, Enter/Space, or focus in automatic mode).
-   * `"find"`: the browser revealed a `keepMounted="until-found"` panel through find-in-page or a
+   * `"platform"`: the browser revealed a `keepMounted="until-found"` panel through find-in-page or a
    * text fragment (`details.event` is the `beforematch` event).
    */
   readonly reason: TabsChangeReason;
@@ -126,6 +127,13 @@ export function TabsRoot({
     },
     warn: { component: "Tabs.Root", prop: "value" },
   });
+  // `null` is a legitimate default (no panel), but forgetting both props is the likelier cause
+  // of an empty Tabs (design open question 2, product owner decision).
+  useDevWarning(
+    value === undefined && defaultValue === undefined,
+    "Tabs.Root: neither `value` nor `defaultValue` was passed, so no tab is selected and no " +
+      "panel is shown. Pass `defaultValue`, or `defaultValue={null}` to start with no selection.",
+  );
 
   const context: TabsContextValue = {
     rootId,

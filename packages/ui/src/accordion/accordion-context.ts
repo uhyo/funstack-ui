@@ -2,7 +2,7 @@
 import { createContext } from "react";
 
 /** Why a change was dispatched (design 2.2 / 2.3). */
-export type AccordionChangeReason = "trigger" | "platform";
+export type AccordionChangeReason = "activate" | "platform";
 
 /**
  * "static": JS-free mode, the browser owns `open`. "library": `open` is driven by React

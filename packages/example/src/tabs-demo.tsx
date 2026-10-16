@@ -48,7 +48,7 @@ class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
   render() {
     if (this.state.error) {
       return (
-        <div role="alert" className="error-box">
+        <div role="alert" className="tabs-error-box">
           <p>Error Boundary caught: {this.state.error.message}</p>
           <button type="button" onClick={() => this.setState({ error: null })}>
             Reset
@@ -238,7 +238,7 @@ function KeepMountedDemo() {
 
 export function TabsDemo() {
   return (
-    <article className="demo">
+    <article className="tabs-demo">
       <h2>Tabs</h2>
       <SuspendingDemo />
       <ManualAsyncDemo />

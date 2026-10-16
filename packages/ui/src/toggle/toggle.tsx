@@ -12,7 +12,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useRender } from "../internal/use-render.js";
+import { rendersButton, useRender } from "../internal/use-render.js";
 
 export interface ToggleState {
   /** Optimistic pressed state: what the user sees, including an in-flight change. */
@@ -100,11 +100,8 @@ export function Toggle({
     style,
     children,
     // Pass-through layer: a `render` element's own props win over these (its `type` included).
-    props: {
-      ...rest,
-      type: "button",
-      disabled,
-    },
+    // `type="button"` only on a real button; an `<a>` or a component element does not get it.
+    props: rendersButton(render) ? { ...rest, type: "button", disabled } : { ...rest, disabled },
     // Library-controlled layer: wins over a `render` element's props.
     libraryProps: {
       "aria-pressed": optimistic,

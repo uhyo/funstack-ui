@@ -1,4 +1,17 @@
-/* Tabs demo: data attributes are the styling hook; interaction state comes from pseudo-classes. */
+/* Tabs demo: data attributes are the styling hook; interaction state comes from pseudo-classes.
+   Self-contained: no class or keyframes from the other demos' stylesheets. */
+
+.tabs-demo section {
+  margin-block: 1.5rem;
+}
+
+.tabs-error-box {
+  padding: 0.75rem 1rem;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
 
 .tabs-root {
   margin-block: 0.75rem;
@@ -112,7 +125,13 @@
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
-  animation: spin 700ms linear infinite;
+  animation: tabs-spin 700ms linear infinite;
+}
+
+@keyframes tabs-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes tabs-pulse {

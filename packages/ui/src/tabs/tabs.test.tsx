@@ -258,6 +258,66 @@ describe("Tabs", () => {
       expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
     });
 
+    it("a value matching no tab: the List is the tab stop and a dev warning fires once", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const action = vi.fn<ActionFn>();
+      const { rerender } = render(<Harness mode="controlled" initial="zzz" action={action} />);
+      for (const t of allTabs()) {
+        expect(t).toHaveAttribute("aria-selected", "false");
+        expect(t).toHaveAttribute("tabindex", "-1");
+      }
+      expect(list()).toHaveAttribute("tabindex", "0");
+      expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
+      const warnings = () =>
+        error.mock.calls.filter((call) => String(call[0]).includes("matches no Tabs.Tab"));
+      expect(warnings()).toHaveLength(1);
+      expect(String(warnings()[0]?.[0])).toContain('"zzz"');
+      rerender(<Harness mode="controlled" initial="zzz" action={action} />);
+      expect(warnings()).toHaveLength(1);
+
+      // Tab reaches the tablist and lands on the first enabled tab without selecting it.
+      const user = setupUser();
+      await user.tab();
+      expect(tab("A")).toHaveFocus();
+      expect(action).not.toHaveBeenCalled();
+      await user.keyboard("{ArrowRight}");
+      expect(action).toHaveBeenCalledTimes(1);
+      expectSelected("B");
+      expect(list()).not.toHaveAttribute("tabindex");
+      expect(committed()).toHaveTextContent("b");
+    });
+
+    it("a matching value gives the List no tabindex and no warning", () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<Harness mode="controlled" initial="b" />);
+      expect(list()).not.toHaveAttribute("tabindex");
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it("warns once in development when neither value nor defaultValue is passed", () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const tree = (props: Partial<TabsRootProps>) => (
+        <Tabs.Root {...props}>
+          <Tabs.List aria-label="x">
+            <Tabs.Tab value="a">A</Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>
+      );
+      const { rerender, unmount } = render(tree({}));
+      rerender(tree({}));
+      const warnings = () =>
+        error.mock.calls.filter((call) => String(call[0]).includes("neither `value` nor"));
+      expect(warnings()).toHaveLength(1);
+      expect(String(warnings()[0]?.[0])).toContain("Tabs.Root");
+      unmount();
+
+      error.mockClear();
+      for (const props of [{ defaultValue: null }, { defaultValue: "a" }, { value: null }]) {
+        render(tree(props)).unmount();
+      }
+      expect(error).not.toHaveBeenCalled();
+    });
+
     it("throws a helpful error outside Tabs.Root", () => {
       vi.spyOn(console, "error").mockImplementation(() => {});
       expect(() => render(<Tabs.Tab value="x">X</Tabs.Tab>)).toThrow(
@@ -398,6 +458,29 @@ describe("Tabs", () => {
       expect(fireEvent.keyDown(tab("A"), { key: "Enter" })).toBe(false);
     });
 
+    it.each(["altKey", "metaKey", "ctrlKey"] as const)(
+      "ignores arrows, Home, End, Enter and Space with %s",
+      (modifier) => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness mode="uncontrolled" action={action} rootProps={{ activationMode: "manual" }} />,
+        );
+        const a = tab("A");
+        act(() => a.focus());
+        for (const key of ["ArrowRight", "ArrowLeft", "Home", "End"]) {
+          // Not cancelled: the browser / OS shortcut keeps working.
+          expect(fireEvent.keyDown(a, { key, [modifier]: true })).toBe(true);
+          expect(a).toHaveFocus();
+        }
+        act(() => tab("B").focus());
+        for (const key of ["Enter", " "]) {
+          expect(fireEvent.keyDown(tab("B"), { key, [modifier]: true })).toBe(true);
+        }
+        expect(action).not.toHaveBeenCalled();
+        expectSelected("A");
+      },
+    );
+
     it("Tab from a tab lands on the selected panel; Shift+Tab returns to the selected tab", async () => {
       render(
         <>
@@ -437,11 +520,13 @@ describe("Tabs", () => {
       expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel b");
     });
 
-    it("automatic: a programmatic focus dispatches; manual: it does not", async () => {
+    it("automatic: programmatic focus moving from tab to tab dispatches; manual: it does not", async () => {
       const auto = vi.fn<ActionFn>();
       const first = render(<Harness mode="uncontrolled" action={auto} />);
+      await act(async () => tab("A").focus());
       await act(async () => tab("C").focus());
       expect(auto).toHaveBeenCalledTimes(1);
+      expect(auto.mock.calls[0]?.[0]).toBe("c");
       expectSelected("C");
       first.unmount();
 
@@ -449,21 +534,109 @@ describe("Tabs", () => {
       render(
         <Harness mode="uncontrolled" action={manual} rootProps={{ activationMode: "manual" }} />,
       );
+      await act(async () => tab("A").focus());
       await act(async () => tab("C").focus());
       expect(manual).not.toHaveBeenCalled();
       expectSelected("A");
     });
 
-    it("value=null: tabbing into the list focuses the first enabled tab and selects it (automatic)", async () => {
+    it("automatic: focus entering the list from outside never dispatches", async () => {
+      const action = vi.fn<ActionFn>();
+      render(
+        <>
+          <button type="button">before</button>
+          <Harness mode="uncontrolled" action={action} />
+        </>,
+      );
+      // Programmatic focus from outside (focus restore, a skip link).
+      await act(async () => tab("C").focus());
+      expect(action).not.toHaveBeenCalled();
+      expectSelected("A");
+      // From another focusable element outside the list.
+      await act(async () => screen.getByRole("button", { name: "before" }).focus());
+      await act(async () => tab("B").focus());
+      expect(action).not.toHaveBeenCalled();
+      expectSelected("A");
+    });
+
+    it("automatic: window refocus after a controlled veto does not re-dispatch", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="controlled" veto action={action} />);
+      const user = setupUser();
+      await user.tab();
+      await user.keyboard("{ArrowRight}");
+      expect(action).toHaveBeenCalledTimes(1);
+      // The parent ignored the change: A stays selected while focus stays on B.
+      expectSelected("A");
+      expect(tab("B")).toHaveFocus();
+      // Leaving the window and coming back blurs and refocuses B with no relatedTarget.
+      await act(async () => {
+        tab("B").blur();
+        tab("B").focus();
+      });
+      expect(tab("B")).toHaveFocus();
+      expect(action).toHaveBeenCalledTimes(1);
+      expectSelected("A");
+    });
+
+    it("automatic: autoFocus on an unselected tab does not dispatch", async () => {
+      const action = vi.fn<ActionFn>();
+      render(
+        <Tabs.Root defaultValue="a" valueChangeAction={action}>
+          <Tabs.List aria-label="Sections">
+            <Tabs.Tab value="a">A</Tabs.Tab>
+            <Tabs.Tab value="b" autoFocus>
+              B
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      await act(async () => {});
+      expect(tab("B")).toHaveFocus();
+      expect(action).not.toHaveBeenCalled();
+      expectSelected("A");
+    });
+
+    it("automatic: a click dispatches exactly once, from outside or from another tab", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" action={action} />);
+      const user = setupUser();
+      // Focus comes from outside the list: the click handler dispatches.
+      await user.click(tab("B"));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls[0]?.[1].event?.type).toBe("click");
+      expectSelected("B");
+      // Focus moves from B to C on pointerdown: the focus handler dispatches, the click is a no-op.
+      await user.click(tab("C"));
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]?.[0]).toBe("c");
+      expectSelected("C");
+    });
+
+    it("value=null: tabbing into the list focuses the first enabled tab without selecting (automatic)", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode="uncontrolled" initial={null} action={action} disabledValues={["a"]} />);
       const user = setupUser();
       await user.tab();
       expect(tab("B")).toHaveFocus();
+      // Entering from outside never selects, even through the List's redirect.
+      expect(action).not.toHaveBeenCalled();
+      expect(list()).toHaveAttribute("tabindex", "0");
+      await user.keyboard("{ArrowRight}");
       expect(action).toHaveBeenCalledTimes(1);
-      expect(action.mock.calls[0]?.[0]).toBe("b");
-      expectSelected("B");
+      expect(action.mock.calls[0]?.[0]).toBe("c");
+      expectSelected("C");
       expect(list()).not.toHaveAttribute("tabindex");
+    });
+
+    it("value=null: clicking empty tablist space focuses the first enabled tab without selecting", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" initial={null} action={action} disabledValues={["a"]} />);
+      const user = setupUser();
+      await user.click(list());
+      expect(tab("B")).toHaveFocus();
+      expect(action).not.toHaveBeenCalled();
+      expect(list()).toHaveAttribute("tabindex", "0");
     });
 
     it("value=null: tabbing into the list focuses the first tab without selecting (manual)", async () => {
@@ -852,29 +1025,107 @@ describe("Tabs", () => {
       expect(panelOf("C")).toHaveAttribute("hidden", "until-found");
     });
 
+    /** What the browser does on find-in-page: fire `beforematch`, then remove `hidden`. */
+    async function reveal(panel: HTMLElement): Promise<Event> {
+      const event = new Event("beforematch", { bubbles: true });
+      await act(async () => {
+        panel.dispatchEvent(event);
+        panel.removeAttribute("hidden");
+      });
+      return event;
+    }
+
     renderBoth('"until-found" beforematch', (mode) => {
-      it("selects the tab with reason find", async () => {
+      it("selects the tab with reason platform", async () => {
         const action = vi.fn<ActionFn>();
         render(<Harness mode={mode} action={action} panelProps={{ keepMounted: "until-found" }} />);
         const panelB = panelOf("B")!;
-        const event = new Event("beforematch", { bubbles: true });
-        await act(async () => {
-          // The browser removes the attribute itself before firing beforematch.
-          panelB.removeAttribute("hidden");
-          panelB.dispatchEvent(event);
-        });
+        const event = await reveal(panelB);
         expect(action).toHaveBeenCalledTimes(1);
         expect(action.mock.calls[0]?.[0]).toBe("b");
-        expect(action.mock.calls[0]?.[1].reason).toBe("find");
+        expect(action.mock.calls[0]?.[1].reason).toBe("platform");
         expect(action.mock.calls[0]?.[1].event).toBe(event);
         expectSelected("B");
         expect(panelB).not.toHaveAttribute("hidden");
         expect(panelB).toHaveAttribute("data-selected", "");
         expect(panelOf("A")).toHaveAttribute("hidden", "until-found");
       });
+
+      it("a pending find keeps the revealed panel visible across re-renders", async () => {
+        const d = deferred();
+        const props = {
+          mode,
+          action: () => d.promise,
+          panelProps: { keepMounted: "until-found" },
+        } as const;
+        const { rerender } = render(<Harness {...props} />);
+        const panelB = panelOf("B")!;
+        await reveal(panelB);
+        expectPending(root());
+        expectSelected("B");
+        expect(panelB).not.toHaveAttribute("hidden");
+        expect(panelB).not.toHaveAttribute("data-selected");
+        // A re-render unrelated to the action while it is pending must not re-hide B.
+        await act(async () => rerender(<Harness {...props} />));
+        expect(panelB).not.toHaveAttribute("hidden");
+        // The committed panel stays until the action settles; the others stay hidden.
+        expect(panelOf("A")).not.toHaveAttribute("hidden");
+        expect(panelOf("C")).toHaveAttribute("hidden", "until-found");
+
+        await act(async () => d.resolve());
+        expectNotPending(root());
+        expect(panelB).not.toHaveAttribute("hidden");
+        expect(panelB).toHaveAttribute("data-selected", "");
+        expect(panelOf("A")).toHaveAttribute("hidden", "until-found");
+      });
     });
 
-    it('"until-found": the attribute is re-asserted after a rejected find', async () => {
+    it('"until-found": a rejected find stays revealed while pending and reaches the boundary', async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const d = deferred();
+      const onError = vi.fn();
+      const props = {
+        mode: "uncontrolled",
+        action: () => d.promise,
+        boundary: onError,
+        panelProps: { keepMounted: "until-found" },
+      } as const;
+      const { rerender } = render(<Harness {...props} />);
+      const panelB = panelOf("B")!;
+      await reveal(panelB);
+      await act(async () => rerender(<Harness {...props} />));
+      expect(panelB).not.toHaveAttribute("hidden");
+
+      // The boundary sits above the Root (where the rejection is thrown), so it replaces the whole
+      // Tabs; the re-hide itself is observable through the veto paths below.
+      const err = new Error("find rejected");
+      await act(async () => d.reject(err));
+      expect(onError).toHaveBeenCalledWith(err);
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("find rejected");
+      expect(committed()).toHaveTextContent("a");
+    });
+
+    it('"until-found": a find the controlled parent vetoes is hidden again', async () => {
+      const d = deferred();
+      const props = {
+        mode: "controlled",
+        veto: true,
+        action: () => d.promise,
+        panelProps: { keepMounted: "until-found" },
+      } as const;
+      const { rerender } = render(<Harness {...props} />);
+      const panelB = panelOf("B")!;
+      await reveal(panelB);
+      await act(async () => rerender(<Harness {...props} />));
+      expect(panelB).not.toHaveAttribute("hidden");
+
+      await act(async () => d.resolve());
+      expectSelected("A");
+      expect(panelB).toHaveAttribute("hidden", "until-found");
+      expect(panelOf("A")).not.toHaveAttribute("hidden");
+    });
+
+    it('"until-found": a find whose error the controlled parent catches is hidden again', async () => {
       const d = deferred();
       render(
         <Harness
@@ -885,15 +1136,14 @@ describe("Tabs", () => {
         />,
       );
       const panelB = panelOf("B")!;
-      await act(async () => {
-        panelB.removeAttribute("hidden");
-        panelB.dispatchEvent(new Event("beforematch"));
-      });
+      await reveal(panelB);
       expectSelected("B");
+      expect(panelB).not.toHaveAttribute("hidden");
       await act(async () => {
         d.reject(new Error("no"));
       });
       expectSelected("A");
+      expect(screen.getByTestId("error")).toHaveTextContent("no");
       expect(panelB).toHaveAttribute("hidden", "until-found");
       expect(panelOf("A")).not.toHaveAttribute("hidden");
     });
@@ -1129,6 +1379,7 @@ describe("Tabs", () => {
       expect(b.tagName).toBe("A");
       expect(b).toHaveAttribute("data-my-link", "");
       expect(b).toHaveAttribute("href", "#b");
+      expect(b).not.toHaveAttribute("type");
       expect(b).toHaveAttribute("aria-selected", "false");
       expect(b).toHaveClass("tab", "link");
       expect(tabRef.current).toBe(b);
@@ -1142,6 +1393,30 @@ describe("Tabs", () => {
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe("b");
       expect(b).toHaveAttribute("aria-selected", "true");
+    });
+
+    it('type="button" only when the rendered element is a button', () => {
+      render(
+        <Tabs.Root defaultValue="a">
+          <Tabs.List aria-label="x">
+            <Tabs.Tab value="a">A</Tabs.Tab>
+            <Tabs.Tab value="b" render={<a href="#" />}>
+              B
+            </Tabs.Tab>
+            <Tabs.Tab value="c" render={<button />}>
+              C
+            </Tabs.Tab>
+            <Tabs.Tab value="d" render={(props) => <button {...props} />}>
+              D
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      expect(tab("A")).toHaveAttribute("type", "button");
+      expect(tab("B").tagName).toBe("A");
+      expect(tab("B")).not.toHaveAttribute("type");
+      expect(tab("C")).toHaveAttribute("type", "button");
+      expect(tab("D")).toHaveAttribute("type", "button");
     });
 
     it("Panel and Indicator accept custom elements", () => {

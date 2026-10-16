@@ -39,6 +39,17 @@ export function resolveStateValue<T, State>(value: StateValue<T, State>, state: 
 }
 
 /**
+ * Whether a part whose default element is a `<button>` should add `type="button"`: no `render`,
+ * a `render` element whose type is the intrinsic `"button"`, or the function form (it receives
+ * button props and decides itself what to spread). An element of any other type (an `<a>`, a
+ * router `Link`) does not get it: `type` means something else, or nothing, there.
+ */
+export function rendersButton<Props, State>(render: RenderProp<Props, State> | undefined): boolean {
+  if (render === undefined || typeof render === "function") return true;
+  return isValidElement(render) && render.type === "button";
+}
+
+/**
  * Resolves `render` and the function-form `className` / `style` / `children` of a part against
  * its state and produces the element (conventions 1.2, 1.3, 1.4).
  */

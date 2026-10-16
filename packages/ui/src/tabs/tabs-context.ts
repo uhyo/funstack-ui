@@ -5,7 +5,7 @@ export type TabsOrientation = "horizontal" | "vertical";
 export type TabsActivationMode = "automatic" | "manual";
 
 /** Why a Tabs change was dispatched (design section 3.1). */
-export type TabsChangeReason = "activate" | "find";
+export type TabsChangeReason = "activate" | "platform";
 
 export interface TabsContextValue {
   readonly rootId: string;

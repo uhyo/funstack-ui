@@ -726,6 +726,22 @@ describe("Toggle", () => {
       expect(el).toHaveAttribute("type", "submit");
     });
 
+    it('type="button" only when the rendered element is a button', () => {
+      render(
+        <>
+          <Toggle render={<a href="#" />}>Link</Toggle>
+          <Toggle render={<button />}>Button</Toggle>
+          <Toggle render={<span tabIndex={0} />}>Span</Toggle>
+        </>,
+      );
+      const link = screen.getByText("Link");
+      expect(link.tagName).toBe("A");
+      expect(link).not.toHaveAttribute("type");
+      expect(link).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByText("Span")).not.toHaveAttribute("type");
+      expect(screen.getByRole("button", { name: "Button" })).toHaveAttribute("type", "button");
+    });
+
     it("function form receives (props, state) (row 16)", async () => {
       const d = deferred();
       const renderFn = vi.fn((props: ComponentPropsWithRef<"button">, state: ToggleState) => (

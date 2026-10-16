@@ -472,7 +472,7 @@ describe("Accordion", () => {
       expect(action).toHaveBeenCalledTimes(1);
       const [next, details] = action.mock.calls[0]!;
       expect(next).toEqual(["a"]);
-      expect(details.reason).toBe("trigger");
+      expect(details.reason).toBe("activate");
       expect(details.item).toBe("a");
       expect(details.open).toBe(true);
       expect(details.event).toBeInstanceOf(window.Event);
@@ -1414,7 +1414,7 @@ describe("Accordion", () => {
         });
         await flushToggle();
         expect(action.mock.calls.map(([next, details]) => [next, details.reason])).toEqual([
-          [["a"], "trigger"],
+          [["a"], "activate"],
           [["a", "b"], "platform"],
         ]);
         expect(trigger("a")).toHaveAttribute("data-open", "");
@@ -1801,7 +1801,7 @@ describe("Accordion", () => {
       expect("event" in details).toBe(true);
       expect(Object.keys(details)).toEqual(["reason", "item", "open"]);
       expect(JSON.parse(JSON.stringify(details))).toEqual({
-        reason: "trigger",
+        reason: "activate",
         item: "a",
         open: true,
       });

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,6 +9,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { useTabsContext } from "./tabs-context.js";
 import type { TabsOrientation } from "./tabs-context.js";
@@ -93,6 +94,28 @@ export function TabsList({
     nativeFocusgroup.current = experimental_focusgroup && "focusgroup" in HTMLElement.prototype;
   }, [experimental_focusgroup]);
 
+  // A value that matches no Tab (a controlled `value` for a route without a tab, design 11.5)
+  // leaves no tab with tabindex=0, so the List takes over as the tab stop exactly as for `null`.
+  // Read from the DOM (Tabs register nowhere) whenever the value or the List's children change; a
+  // Tab added or removed by a component below that re-renders on its own is picked up on the
+  // List's next render. The state only changes when the answer does.
+  const listRef = useRef<HTMLElement | null>(null);
+  const [unmatched, setUnmatched] = useState(false);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const next =
+      optimistic !== null &&
+      list !== null &&
+      !tabsOf(list).some((tab) => tab.getAttribute("tabindex") === "0");
+    if (next !== unmatched) setUnmatched(next);
+  }, [optimistic, children, unmatched]);
+  useDevWarning(
+    unmatched,
+    `Tabs: the value ${JSON.stringify(optimistic)} matches no Tabs.Tab. No tab is selected; the ` +
+      "tablist itself is the tab stop. Pass null to select nothing on purpose.",
+  );
+  const listIsTabStop = optimistic === null || unmatched;
+
   const state: TabsListState = { orientation, disabled };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -132,12 +155,14 @@ export function TabsList({
     if (next !== undefined && next !== target) focusTab(next);
   };
 
-  // With no selection no Tab has tabindex=0, so the list itself is the tab stop and hands focus
-  // to the first enabled tab (design section 8). Only when focus arrives from outside the list:
-  // Shift+Tab from a tab inside would otherwise bounce straight back.
+  // With no selected tab (value null or matching no Tab) no Tab has tabindex=0, so the list
+  // itself is the tab stop and hands focus to the first enabled tab (design section 8). Only when
+  // focus arrives from outside the list: Shift+Tab from a tab inside would otherwise bounce
+  // straight back. The redirect never selects: the Tab only dispatches on focus that moves
+  // between tabs.
   const onFocus = (event: FocusEvent<HTMLElement>) => {
     const list = event.currentTarget;
-    if (event.target !== list || optimistic !== null) return;
+    if (event.target !== list || !listIsTabStop) return;
     const from = event.relatedTarget;
     if (from instanceof Node && list.contains(from)) return;
     const tabs = tabsOf(list);
@@ -162,13 +187,14 @@ export function TabsList({
       "aria-orientation": orientation,
       "data-orientation": orientation,
       "data-disabled": dataAttr(disabled),
-      tabIndex: optimistic === null ? 0 : undefined,
+      tabIndex: listIsTabStop ? 0 : undefined,
       // Owned only while the flag is on; otherwise the key is omitted, not `undefined`, so it is not
       // owned (conventions 1.2).
       ...(focusgroup !== undefined && { focusgroup }),
       onKeyDown,
       onFocus,
     },
+    ref: listRef,
   });
 }
 

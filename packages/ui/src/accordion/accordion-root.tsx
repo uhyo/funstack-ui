@@ -33,7 +33,7 @@ export interface AccordionRootState {
 /** Details passed as the second argument of `valueChangeAction`. */
 export interface AccordionValueChangeDetails extends ActionDetails {
   /**
-   * `"trigger"`: the user activated a Trigger. `"platform"`: the browser changed `open` itself
+   * `"activate"`: the user activated a Trigger. `"platform"`: the browser changed `open` itself
    * (find-in-page, a text fragment, a click before hydration); `event` is then the `toggle`
    * event, or `undefined` when the mismatch was found on mount.
    */
@@ -280,7 +280,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   const dispatchFromTrigger = useCallback<AccordionRootContextValue["dispatch"]>(
     (item, open, event) => {
       // `next` comes from the optimistic set: what the user sees and intends (design 2.2).
-      dispatchChange(reduce(optimistic, item, open, exclusive), item, open, "trigger", event);
+      dispatchChange(reduce(optimistic, item, open, exclusive), item, open, "activate", event);
     },
     // `dispatchChange` closes over the hook's `dispatch`, which is new on every render.
     [dispatchChange, optimistic, exclusive],
