@@ -28,3 +28,7 @@ and the relevant `design/components/*.md`, then the code and tests under review.
 Report findings ordered by severity, each with file:line, what is wrong, and why it matters. State
 clearly whether the work is acceptable, acceptable with minor fixes, or needs rework. Keep notes in
 `memo/reviewer/` (create it if missing). Do not modify source files.
+
+## External communication
+
+Never file issues, PRs, or comments on external repositories or services (e.g. facebook/react, browser bug trackers) — that is a human task. Record what should be reported in a GitHub issue in this repo instead.

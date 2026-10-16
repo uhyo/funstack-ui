@@ -37,3 +37,7 @@ engine, experimental flag for features not yet everywhere) defines what counts a
 
 Be precise and cite sources. Prefer a short doc with a clear verdict over an exhaustive survey.
 Flag anything that would change the component's API design.
+
+## External communication
+
+Never file issues, PRs, or comments on external repositories or services (e.g. facebook/react, browser bug trackers) — that is a human task. Record what should be reported in a GitHub issue in this repo instead.

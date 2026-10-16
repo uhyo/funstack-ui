@@ -37,3 +37,7 @@ or wrong, say so in your report instead of silently deviating.
 
 Report back: what was implemented, which commands you ran and their results, any deviation from the
 design, and anything you could not finish.
+
+## External communication
+
+Never file issues, PRs, or comments on external repositories or services (e.g. facebook/react, browser bug trackers) — that is a human task. Record what should be reported in a GitHub issue in this repo instead.

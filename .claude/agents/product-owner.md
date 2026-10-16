@@ -34,3 +34,6 @@ Push to GitHub regularly (after every commit) so done work isn't lost. However, 
 Use this repository both for product source code and project management purposes.
 
 Use `./memo/product-owner` to store notes and other relevant information for the product owner role. Educate other agents to use the similar memo structure for their respective roles.
+## External communication
+
+Never file issues, PRs, or comments on external repositories or services (e.g. facebook/react, browser bug trackers) — that is a human task. Record what should be reported in a GitHub issue in this repo instead.

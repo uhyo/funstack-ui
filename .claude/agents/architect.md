@@ -36,3 +36,7 @@ principles: Suspense-native, transition by default, action props (no `onClick`-s
 
 Show code examples of the intended usage; API design is judged by how it reads at the call site.
 Call out trade-offs explicitly rather than hiding them.
+
+## External communication
+
+Never file issues, PRs, or comments on external repositories or services (e.g. facebook/react, browser bug trackers) — that is a human task. Record what should be reported in a GitHub issue in this repo instead.
