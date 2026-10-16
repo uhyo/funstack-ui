@@ -1,6 +1,6 @@
 "use client";
-import { ViewTransition } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -81,8 +81,13 @@ export interface CheckboxProps extends Omit<
   /** Submitted as the input's value when checked. Default `"on"` (platform). */
   value?: string;
   /**
-   * Forwarded as `default` to the Checkbox's `<ViewTransition>`. Default `"none"`. Animates the
+   * Forwarded as `default` to the Checkbox's `<ViewTransition>`. Default: no boundary. Animates the
    * commit that ends an action, not the optimistic flip; animate the flip with CSS on `:checked`.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxState>;
@@ -195,7 +200,7 @@ export function Checkbox({
     },
   });
 
-  return <ViewTransition default={transition ?? "none"}>{element}</ViewTransition>;
+  return useTransitionBoundary("Checkbox", transition, element);
 }
 
 Checkbox.displayName = "Checkbox";

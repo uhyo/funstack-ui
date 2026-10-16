@@ -161,7 +161,6 @@ export function TabsPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
             description:
               "Forwarded to the Tab's <ViewTransition default>. Fires only on the commit that settles the action, never on the optimistic selection.",
           },
@@ -203,7 +202,6 @@ export function TabsPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
             description: "Forwarded to the Panel's <ViewTransition default>; animates the swap.",
           },
           ...functionProps("TabsPanelState"),

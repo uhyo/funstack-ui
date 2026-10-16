@@ -173,7 +173,6 @@ export function AccordionPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
             description:
               "Library mode only. Forwarded to the <ViewTransition> around the <details>; animates the open/close commit.",
           },
@@ -196,7 +195,6 @@ export function AccordionPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
             description:
               "Library mode only. Animates the commit that ends an action (for example a spinner disappearing), not the optimistic data-open flip.",
           },
@@ -221,7 +219,6 @@ export function AccordionPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
             description:
               "Library mode only. Animates content that mounts or changes in the commit that ends an action.",
           },

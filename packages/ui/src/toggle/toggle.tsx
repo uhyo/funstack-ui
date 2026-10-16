@@ -1,5 +1,4 @@
 "use client";
-import { ViewTransition } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -7,6 +6,7 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
+import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -48,9 +48,14 @@ export interface ToggleProps extends Omit<
   /** Renders a native disabled button; never dispatches. Default `false`. */
   disabled?: boolean;
   /**
-   * Forwarded as `default` to the Toggle's `<ViewTransition>`. Default `"none"`. Animates the
+   * Forwarded as `default` to the Toggle's `<ViewTransition>`. Default: no boundary. Animates the
    * commit that ends an action (and rollbacks), not the optimistic flip itself; animate the flip
    * with a CSS `transition` on `[data-pressed]`.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, ToggleState>;
@@ -120,7 +125,7 @@ export function Toggle({
     },
   });
 
-  return <ViewTransition default={transition ?? "none"}>{element}</ViewTransition>;
+  return useTransitionBoundary("Toggle", transition, element);
 }
 
 Toggle.displayName = "Toggle";

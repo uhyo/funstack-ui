@@ -1,5 +1,4 @@
 "use client";
-import { ViewTransition } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,6 +8,7 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
+import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { rendersButton, resolveStateValue, useRender } from "../internal/use-render.js";
@@ -35,9 +35,14 @@ export interface TabsTabProps extends Omit<
   /** Focusable but inert: `aria-disabled="true"`, never dispatches. */
   disabled?: boolean;
   /**
-   * Forwarded to the Tab's `<ViewTransition default>`. Default `"none"`. Fires only on the commit
+   * Forwarded to the Tab's `<ViewTransition default>`. Default: no boundary. Fires only on the commit
    * that settles the action (or rolls it back), never on the optimistic selection; animate the
    * selection itself with a CSS `transition` on `[data-selected]`.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, TabsTabState>;
@@ -141,7 +146,7 @@ export function TabsTab({
     },
   });
 
-  return <ViewTransition default={transition ?? "none"}>{element}</ViewTransition>;
+  return useTransitionBoundary("Tabs.Tab", transition, element);
 }
 
 TabsTab.displayName = "TabsTab";

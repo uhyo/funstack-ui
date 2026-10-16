@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, ViewTransition } from "react";
+import { use, useCallback } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -7,6 +7,7 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
+import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -25,6 +26,11 @@ export interface AccordionTriggerProps extends Omit<
    * Library mode only. Forwarded as `default` to the `<ViewTransition>` around the `<summary>`.
    * Animates only the commit that ends an action (for example a spinner rendered from `pending`
    * disappearing); the optimistic `data-open` flip is a CSS job.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionTriggerState>;
@@ -149,9 +155,7 @@ export function AccordionTrigger({
     },
   });
 
-  return (
-    <ViewTransition default={isLibrary ? (transition ?? "none") : "none"}>{element}</ViewTransition>
-  );
+  return useTransitionBoundary("Accordion.Trigger", isLibrary ? transition : undefined, element);
 }
 
 AccordionTrigger.displayName = "AccordionTrigger";
