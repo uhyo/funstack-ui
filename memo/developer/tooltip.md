@@ -50,10 +50,33 @@ Implementation of `design/components/tooltip.md` on branch `worktree-agent-ae02d
 - A suspending child rendered by plain `render()` never revealed after resolve; render inside
   `await act(async () => render(...))`, then `findByText` (reveal throttle).
 
+## Review fixes (2026-10-16, after memo/reviewer/tooltip.md)
+
+- Escape (JS path): when the popup is open, `hidePopover()` then `event.preventDefault()`, so an
+  enclosing modal `<dialog>` or `popover="auto"` menu stays open; Escape while closed is untouched.
+  Native path (interestfor + hint) attaches nothing: Chromium 153 closes hint and dialog together
+  there, documented in a code comment.
+- Open state is never copied: every decision reads `popup.matches(":popover-open")` (and
+  `isConnected`). Document listeners attach synchronously after `showPopover()` and detach on hide
+  or when `toggle` runs and the DOM says closed (DOM, not `newState`, so a stale task cannot
+  detach). A pointerdown / Escape / cleanup in the same task as the show now hides.
+- `disabled` turning on hides an open popup on both paths (effect start, before the native-path
+  early return).
+- Shim: `beforetoggle` sync, `toggle` queued with `setTimeout(0)` and coalesced like the spec's
+  toggle task tracker; NotSupportedError without `popover`, InvalidStateError when disconnected
+  (after the redundant-call check, as in the spec); patches `matches(":popover-open")` (jsdom
+  parses it but never matches). Fake-timer tests flush `toggle` via `advance`; to stay between
+  show and toggle use `vi.advanceTimersToNextTimer()`.
+- Browser tests added: pointer into popup, pointerdown outside, same-task dismissal (microtask
+  after a wrapped `showPopover`), Escape in modal dialog / auto menu (manual and hint), hint over
+  an auto menu, native-path disable while open. All fail against the pre-fix hook.
+- Example: Save copy depends on whether the native path is active; new minimal "Inside a menu"
+  section (`popover="auto"` opened by `popoverTarget`).
+
 ## Open / not done
 
-- Escape is not `preventDefault`ed: a tooltip inside a modal `<dialog>` closes the dialog too on
-  Escape (JS path). Native `hint` handles this via close watchers. Worth a design decision.
+- Native path: Escape closes an enclosing modal dialog too (Chromium behaviour, not ours).
+- Design text listed in the reviewer memo (2.3 rows, 13 Disabled row) still needs the architect.
 - Conventions resolved question 11 says Tooltip's default "switches to name when the trigger has
   no accessible name of its own"; the design (and this implementation) keeps an explicit prop
   with default `"description"`. Reported as ambiguous.
