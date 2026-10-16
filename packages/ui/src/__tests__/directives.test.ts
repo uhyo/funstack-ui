@@ -30,6 +30,12 @@ const clientFiles = [
   "internal/use-controllable-action.mjs",
   "internal/use-dev-warning.mjs",
   "internal/use-render.mjs",
+  // Every Tooltip part is a client module (design/components/tooltip.md, 2.4 and 12.1).
+  "tooltip/tooltip-context.mjs",
+  "tooltip/tooltip-root.mjs",
+  "tooltip/tooltip-trigger.mjs",
+  "tooltip/tooltip-popup.mjs",
+  "tooltip/use-tooltip-interaction.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -39,6 +45,7 @@ const directiveFreeFiles = [
   "internal/action-details.mjs",
   "tabs/index.mjs",
   "tabs/tabs-ids.mjs",
+  "tooltip/index.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

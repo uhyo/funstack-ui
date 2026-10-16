@@ -27,6 +27,7 @@
     "./accordion": "./dist/accordion/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",
     "./toggle": "./dist/toggle/index.mjs",
+    "./tooltip": "./dist/tooltip/index.mjs",
     "./package.json": "./package.json"
   },
   "scripts": {
