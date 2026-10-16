@@ -40,6 +40,11 @@ Date: 2026-10-16. Branch `worktree-agent-aa29c1d6a29bcf2a9`.
   boundary *inside* the content, such as a nested Dialog's Popup (the issue's case) or any part
   at the top of the content. The design's Dialog 13.2 row ("with `transition="none"` it is called
   once per open") does not match this. My tests assert the nested case.
+- These match the reviewer's numbers in memo/reviewer/dialog.md. Browser rows: a plain open
+  makes 0 calls without `transition` or with "none", and 1 call with "auto". A Dialog.Root
+  inserted by a transition makes 0 calls without `transition`, 1 with "none", and 0 in JS-free
+  mode even when "none" is set, because the prop is ignored there. A nested open with "none" makes
+  at least 1 call, and the inner open lands about 260-280 ms late.
 - `Tabs.Panel` with `keepMounted` false or true: each switch with `"none"` starts one (2 calls
   for 2 switches). `"until-found"` starts none.
 

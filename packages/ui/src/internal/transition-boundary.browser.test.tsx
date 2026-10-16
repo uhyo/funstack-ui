@@ -9,6 +9,7 @@
 // a MutationObserver, outside `act`: `act` would flush React's queue itself and hide exactly the
 // scheduling delay under test. IS_REACT_ACT_ENVIRONMENT is switched off for that reason.
 import { cleanup, render, screen } from "@testing-library/react";
+import { startTransition, useState } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "vitest/browser";
@@ -222,5 +223,61 @@ describe("Dialog open", () => {
     const delay = await run();
     log('Dialog nested transition="none"', delay);
     expect(calls).toBeGreaterThanOrEqual(1);
+  });
+
+  // memo/reviewer/dialog.md: a plain open mounts the content under the always-mounted <dialog>,
+  // which shields it, so even "none" starts nothing; "auto" names the boundary and starts one.
+  it.each<[ViewTransitionClass | undefined, number]>([
+    [undefined, 0],
+    ["none", 0],
+    ["auto", 1],
+  ])("a plain open with transition=%j: %i startViewTransition call(s)", async (transition, n) => {
+    render(
+      <Dialog.Root defaultOpen={false}>
+        <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
+        <Dialog.Popup data-testid="popup" aria-label="plain" transition={transition}>
+          content
+        </Dialog.Popup>
+      </Dialog.Root>,
+    );
+    screen.getByTestId("trigger").click();
+    await when(() => dialog("popup")?.open === true);
+    await (
+      document as Document & { __reactViewTransition?: ViewTransition | null }
+    ).__reactViewTransition?.finished.catch(() => {});
+    expect(calls).toBe(n);
+  });
+
+  /** Inserts its child at the top of a subtree in a transition. */
+  function Inserted({ children }: { children: ReactNode }) {
+    const [show, setShow] = useState(false);
+    return (
+      <div>
+        <button type="button" onClick={() => startTransition(() => setShow(true))}>
+          insert
+        </button>
+        {show && children}
+      </div>
+    );
+  }
+
+  it.each<[string, ViewTransitionClass | undefined, boolean, number]>([
+    ["library, no transition", undefined, true, 0],
+    ['library, transition="none"', "none", true, 1],
+    ['JS-free, transition="none" (ignored)', "none", false, 0],
+  ])("a Dialog.Root inserted by a transition (%s)", async (_label, transition, library, n) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <Inserted>
+        <Dialog.Root {...(library && { defaultOpen: false })}>
+          <Dialog.Popup data-testid="popup" aria-label="inserted" transition={transition}>
+            content
+          </Dialog.Popup>
+        </Dialog.Root>
+      </Inserted>,
+    );
+    screen.getByRole("button", { name: "insert" }).click();
+    await when(() => dialog("popup") !== null);
+    expect(calls).toBe(n);
   });
 });
