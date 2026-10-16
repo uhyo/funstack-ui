@@ -1,15 +1,17 @@
 // Dialog rows that need a real engine (design/components/dialog.md 13.3): real Invoker Commands,
 // `showModal()` with top layer and `:modal`, Escape as a close request, the platform's focusing
 // steps and focus return through a deferred `showModal()`, nested dialogs, native `closedby`
-// light dismiss (with the JS fallback where the engine lacks it), `<form method="dialog">`,
-// exit animations and the deferred unmount (branching on whether the engine animates the exit;
+// light dismiss (with the JS fallback where the engine lacks it) and its press-and-click rule
+// under a real drag, Escape left to a popover inside a non-modal dialog, the nested-confirm
+// pattern (design 11.10 / 12.5 as reworked after the review), `<form method="dialog">`, exit
+// animations and the deferred unmount (branching on whether the engine animates the exit;
 // Firefox does not), and the CSS scroll-lock recipe. Real keyboard and pointer input comes from
-// Playwright through `userEvent` from `vitest/browser`.
+// Playwright through `user` (`userEvent` from `vitest/browser` inside `act`).
 import { act, render, screen } from "@testing-library/react";
-import { Suspense, useRef } from "react";
+import { Suspense, startTransition, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { user } from "../__tests__/browser-user.js";
 import { supportsDialogClosedBy } from "../__tests__/engine.js";
 import { createSuspender, deferred } from "../__tests__/helpers.js";
 import { Dialog } from "./index.js";
@@ -87,12 +89,12 @@ describe("JS-free mode (browser)", () => {
         </Dialog.Popup>
       </Dialog.Root>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     expect(popup().open).toBe(true);
     expect(isModal()).toBe(true);
     // The platform's focusing steps: the first focusable descendant.
     expect(document.activeElement).toHaveAttribute("name", "name");
-    await userEvent.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
     expect(popup().open).toBe(false);
     expect(trigger()).toHaveFocus();
   });
@@ -108,8 +110,8 @@ describe("JS-free mode (browser)", () => {
         </Dialog.Popup>
       </Dialog.Root>,
     );
-    await userEvent.click(trigger());
-    await userEvent.click(screen.getByTestId("close"));
+    await user.click(trigger());
+    await user.click(screen.getByTestId("close"));
     expect(popup().open).toBe(false);
     expect(popup().returnValue).toBe("cancel");
   });
@@ -127,8 +129,8 @@ describe("JS-free mode (browser)", () => {
         </Dialog.Popup>
       </Dialog.Root>,
     );
-    await userEvent.click(trigger());
-    await userEvent.click(screen.getByRole("button", { name: "OK" }));
+    await user.click(trigger());
+    await user.click(screen.getByRole("button", { name: "OK" }));
     expect(popup().open).toBe(false);
     expect(popup().returnValue).toBe("ok");
   });
@@ -139,7 +141,7 @@ describe("library mode (browser)", () => {
     const d = deferred();
     const action = vi.fn<ActionFn>(() => d.promise);
     render(<Library action={action} />);
-    await userEvent.click(trigger());
+    await user.click(trigger());
     expect(action).toHaveBeenCalledTimes(1);
     const details = action.mock.calls[0]![1];
     expect(details.event).toBeInstanceOf(MouseEvent);
@@ -169,7 +171,7 @@ describe("library mode (browser)", () => {
     const foreign = screen.getByTestId("foreign");
     foreign.setAttribute("commandfor", popup().id);
     foreign.setAttribute("command", "show-modal");
-    await userEvent.click(foreign);
+    await user.click(foreign);
     expect(action).toHaveBeenCalledTimes(1);
     const event = action.mock.calls[0]![1].event!;
     expect(event.type).toBe("command");
@@ -187,7 +189,7 @@ describe("library mode (browser)", () => {
         </Library>
       </Suspense>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     expect(popup().open).toBe(false);
     expect(trigger()).toHaveAttribute("data-pending", "");
@@ -200,10 +202,10 @@ describe("library mode (browser)", () => {
   it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
     const action = vi.fn<ActionFn>();
     render(<Library action={action} />);
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     expect(popup().open).toBe(true);
-    await userEvent.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
     expect(popup().open).toBe(false);
     expect(trigger()).toHaveFocus();
     await flush();
@@ -226,11 +228,11 @@ describe("library mode (browser)", () => {
       );
     }
     render(<App />);
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     expect(document.activeElement).toHaveAttribute("name", "email");
     expect(screen.getByRole("textbox")).not.toHaveAttribute("autofocus");
-    await userEvent.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
     expect(trigger()).toHaveFocus();
   });
 
@@ -243,7 +245,7 @@ describe("library mode (browser)", () => {
         <button type="button">Delete</button>
       </Library>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     expect(document.activeElement).toHaveAttribute("data-initial-focus");
   });
@@ -259,20 +261,20 @@ describe("library mode (browser)", () => {
         </Dialog.Root>
       </Library>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
-    await userEvent.click(screen.getByTestId("inner-trigger"));
+    await user.click(screen.getByTestId("inner-trigger"));
     const inner = screen.getByTestId("inner") as HTMLDialogElement;
     // No `transition`, so the inner Popup renders no `<ViewTransition>` and the outer open starts
     // no view transition that would hold the inner open (#35, transition-boundary.browser.test).
     await expect.poll(() => inner.open).toBe(true);
     expect(popup().open).toBe(true);
-    await userEvent.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
     expect(inner.open).toBe(false);
     expect(popup().open).toBe(true);
     expect(screen.getByTestId("inner-trigger")).toHaveFocus();
     await flush();
-    await userEvent.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
     expect(popup().open).toBe(false);
     expect(trigger()).toHaveFocus();
   });
@@ -287,9 +289,9 @@ describe("library mode (browser)", () => {
         </Dialog.Close>
       </Library>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
-    await userEvent.click(screen.getByTestId("delete"));
+    await user.click(screen.getByTestId("delete"));
     expect(popup().open).toBe(true);
     expect(screen.getByTestId("delete")).toHaveAttribute("data-pending", "");
     await act(async () => d.resolve());
@@ -312,9 +314,9 @@ describe("library mode (browser)", () => {
         </Dialog.Form>
       </Library>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
     await flush();
     expect(popup().open).toBe(true);
     await act(async () => save.resolve());
@@ -329,15 +331,15 @@ describe("library mode (browser)", () => {
 describe("light dismiss (browser)", () => {
   /** A real click on the ::backdrop: on the dialog, outside its border box. */
   async function clickBackdrop() {
-    await userEvent.click(popup(), { position: { x: -20, y: -20 }, force: true });
+    await user.click(popup(), { position: { x: -20, y: -20 }, force: true });
   }
 
   it("modal, baseline JS: a backdrop click closes; a click inside does not", async () => {
     const action = vi.fn<ActionFn>();
     render(<Library action={action} popup={{ lightDismiss: true }} />);
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
-    await userEvent.click(screen.getByRole("heading"));
+    await user.click(screen.getByRole("heading"));
     expect(popup().open).toBe(true);
     await clickBackdrop();
     expect(popup().open).toBe(false);
@@ -347,7 +349,7 @@ describe("light dismiss (browser)", () => {
 
   it("modal without lightDismiss: a backdrop click does nothing", async () => {
     render(<Library />);
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     await clickBackdrop();
     expect(popup().open).toBe(true);
@@ -358,7 +360,7 @@ describe("light dismiss (browser)", () => {
     const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
     render(<Library action={action} popup={{ lightDismiss: true, experimental_closedBy: true }} />);
     expect(popup()).toHaveAttribute("closedby", "any");
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     await clickBackdrop();
     expect(popup().open).toBe(false);
@@ -386,13 +388,143 @@ describe("light dismiss (browser)", () => {
         </button>
       </>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     expect(popup().open).toBe(true);
     expect(isModal()).toBe(false);
-    await userEvent.click(screen.getByRole("button", { name: "Inside" }));
+    await user.click(screen.getByRole("button", { name: "Inside" }));
     expect(popup().open).toBe(true);
-    await userEvent.click(screen.getByTestId("outside"));
+    await user.click(screen.getByTestId("outside"));
+    expect(popup().open).toBe(false);
+  });
+});
+
+describe("review rows (browser)", () => {
+  /** Design 12.5 as reworked: no action awaits user input (H1). */
+  function Editor({ discard }: { discard: () => Promise<void> }) {
+    const [open, setOpen] = useState(false);
+    const [count, setCount] = useState(0);
+    return (
+      <div style={{ padding: 40 }}>
+        <Dialog.Root open={open} openChangeAction={(next) => setOpen(next)}>
+          <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Editor">
+            <textarea defaultValue="Unsaved notes" />
+            <Dialog.Root>
+              <Dialog.Trigger data-testid="discard">Discard…</Dialog.Trigger>
+              <Dialog.Popup data-testid="confirm" role="alertdialog" aria-label="Discard?">
+                <Dialog.Close data-testid="keep" value="keep">
+                  Keep editing
+                </Dialog.Close>
+                <Dialog.Close
+                  data-testid="confirm-discard"
+                  value="discard"
+                  action={async () => {
+                    await discard();
+                    startTransition(() => setOpen(false));
+                  }}
+                >
+                  Discard
+                </Dialog.Close>
+              </Dialog.Popup>
+            </Dialog.Root>
+          </Dialog.Popup>
+        </Dialog.Root>
+        <button
+          type="button"
+          data-testid="unrelated"
+          onClick={() => startTransition(() => setCount((c) => c + 1))}
+        >
+          {count}
+        </button>
+      </div>
+    );
+  }
+
+  it("nested confirm: the inner dialog opens at once; the outer closes after the confirm (H1)", async () => {
+    const discarding = deferred();
+    render(<Editor discard={() => discarding.promise} />);
+    await user.click(trigger());
+    await flush();
+    expect(popup().open).toBe(true);
+    const confirm = screen.getByTestId("confirm") as HTMLDialogElement;
+    await user.click(screen.getByTestId("discard"));
+    // A native command: no transition, nothing to wait for.
+    expect(confirm.open).toBe(true);
+    expect(confirm.matches(":modal")).toBe(true);
+    // Escape closes the inner dialog only; focus returns to its opener.
+    await user.keyboard("{Escape}");
+    expect(confirm.open).toBe(false);
+    expect(popup().open).toBe(true);
+    expect(screen.getByTestId("discard")).toHaveFocus();
+    // Confirm: the action runs (pending) and then both dialogs close.
+    await user.click(screen.getByTestId("discard"));
+    await user.click(screen.getByTestId("confirm-discard"));
+    expect(screen.getByTestId("confirm-discard")).toHaveAttribute("data-pending", "");
+    await act(async () => discarding.resolve());
+    await flush();
+    expect(confirm.open).toBe(false);
+    expect(popup().open).toBe(false);
+    expect(trigger()).toHaveFocus();
+    // Nothing stays entangled: an unrelated transition commits.
+    await user.click(screen.getByTestId("unrelated"));
+    await flush();
+    expect(screen.getByTestId("unrelated")).toHaveTextContent("1");
+  });
+
+  it("lightDismiss (JS baseline): a drag from inside that ends on the backdrop does not close (M1)", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library action={action} popup={{ lightDismiss: true }}>
+        <input data-testid="field" defaultValue="Ada Lovelace" />
+      </Library>,
+    );
+    await user.click(trigger());
+    await flush();
+    // Select text in the input and release over the backdrop. Chromium fires `click` on the
+    // common ancestor, the dialog, outside its box; native `closedby="any"` stays open too.
+    await user.dragAndDrop(screen.getByTestId("field"), popup(), {
+      sourcePosition: { x: 4, y: 4 },
+      targetPosition: { x: -20, y: -20 },
+      force: true,
+    });
+    await flush();
+    expect(popup().open).toBe(true);
+    expect(action).toHaveBeenCalledTimes(1);
+    // A real backdrop click still closes.
+    await user.click(popup(), { position: { x: -20, y: -20 }, force: true });
+    expect(popup().open).toBe(false);
+  });
+
+  it("non-modal: Escape inside a popover closes the popover only (M2)", async () => {
+    render(
+      <Dialog.Root defaultOpen={false} modal={false}>
+        <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+        <Dialog.Popup data-testid="popup" aria-label="Help">
+          <button type="button" data-testid="inside">
+            Inside
+          </button>
+          <div popover="auto" data-testid="menu">
+            <button type="button" data-testid="item">
+              Item
+            </button>
+          </div>
+        </Dialog.Popup>
+      </Dialog.Root>,
+    );
+    await user.click(trigger());
+    await flush();
+    expect(popup().open).toBe(true);
+    const menu = screen.getByTestId("menu");
+    act(() => menu.showPopover());
+    screen.getByTestId("item").focus();
+    await user.keyboard("{Escape}");
+    await flush();
+    expect(menu.matches(":popover-open")).toBe(false);
+    expect(popup().open).toBe(true);
+    // With no popover open, Escape inside the dialog closes it.
+    screen.getByTestId("inside").focus();
+    await user.keyboard("{Escape}");
     expect(popup().open).toBe(false);
   });
 });
@@ -414,22 +546,30 @@ describe("exit animation and the deferred unmount (browser)", () => {
         <span data-testid="content">content</span>
       </Library>,
     );
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     await sleep(350); // let the enter transition finish
     expect(popup().open).toBe(true);
     let exitAnimations = -1;
+    let finished: Promise<unknown> = Promise.resolve();
     popup().addEventListener("close", () => {
       void getComputedStyle(popup()).opacity;
-      exitAnimations = popup().getAnimations({ subtree: true }).length;
+      const animations = popup().getAnimations({ subtree: true });
+      exitAnimations = animations.length;
+      finished = Promise.allSettled(animations.map((animation) => animation.finished));
     });
-    await userEvent.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
     await flush();
     expect(exitAnimations).toBeGreaterThanOrEqual(0);
     if (exitAnimations > 0) {
       // Chromium / WebKit: the dialog is still fading out; the content stays.
       expect(screen.queryByTestId("content")).not.toBeNull();
-      await expect.poll(() => screen.queryByTestId("content"), { timeout: 2000 }).toBeNull();
+      // The unmount is a transition the Popup starts when the animations finish: inside `act`.
+      await act(async () => {
+        await finished;
+        await sleep(20);
+      });
+      expect(screen.queryByTestId("content")).toBeNull();
     } else {
       // Firefox: `display` flips at once (bug 1834877); nothing to wait for.
       expect(screen.queryByTestId("content")).toBeNull();
@@ -448,10 +588,10 @@ describe("scroll lock recipe (browser)", () => {
     render(<Library />);
     const html = document.documentElement;
     expect(getComputedStyle(html).overflow).not.toBe("hidden");
-    await userEvent.click(trigger());
+    await user.click(trigger());
     await flush();
     expect(getComputedStyle(html).overflow).toBe("hidden");
-    await userEvent.keyboard("{Escape}");
+    await user.keyboard("{Escape}");
     expect(getComputedStyle(html).overflow).not.toBe("hidden");
   });
 });

@@ -6,13 +6,21 @@
 import { act } from "@testing-library/react";
 import { userEvent } from "vitest/browser";
 
+type ClickOptions = Parameters<typeof userEvent.click>[1];
+type DragAndDropOptions = Parameters<typeof userEvent.dragAndDrop>[2];
+
 export const user = {
-  click: (element: Element) =>
+  click: (element: Element, options?: ClickOptions) =>
     act(async () => {
-      await userEvent.click(element);
+      await userEvent.click(element, options);
     }),
   keyboard: (text: string) =>
     act(async () => {
       await userEvent.keyboard(text);
+    }),
+  /** A real press on `source`, a move, and a release on `target` (Playwright `dragAndDrop`). */
+  dragAndDrop: (source: Element, target: Element, options?: DragAndDropOptions) =>
+    act(async () => {
+      await userEvent.dragAndDrop(source, target, options);
     }),
 };
