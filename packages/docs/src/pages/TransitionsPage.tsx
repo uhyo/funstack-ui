@@ -65,6 +65,10 @@ export function TransitionsPage() {
           ],
           ["Accordion", "`fsui-accordion`, `fsui-accordion-expand`, `fsui-accordion-collapse`"],
           ["Tooltip", "none (no transitions; see below)"],
+          ["Dialog", "`fsui-dialog`, `fsui-dialog-open`, `fsui-dialog-close`"],
+          ["Switch", "`fsui-switch`, `fsui-switch-on`, `fsui-switch-off`"],
+          ["Checkbox", "`fsui-checkbox`, `fsui-checkbox-check`, `fsui-checkbox-uncheck`"],
+          ["RadioGroup", "`fsui-radio-group`"],
         ]}
       />
       <p>

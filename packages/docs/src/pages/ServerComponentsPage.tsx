@@ -4,6 +4,8 @@ import { PageHead } from "../components/PageHead.js";
 import { Table } from "../components/Tables.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
 import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
+import { DialogConfirm } from "../examples/DialogConfirm.js";
+import dialogConfirmSource from "../examples/DialogConfirm.tsx?raw";
 
 export function ServerComponentsPage() {
   return (
@@ -43,10 +45,13 @@ export function Settings() {
   );
 }`}</CodeBlock>
       <p>
-        Every part is a client module today, including the Accordion parts: compound parts find
-        their Root through context, and a Server Component cannot read context. Directive-free
-        variants are tracked in{" "}
-        <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a>.
+        Every part is a client module today, including the Accordion and Dialog parts: compound
+        parts find their Root through context, and a Server Component cannot read context. "JS-free"
+        on this site is a statement about behaviour (no JavaScript runs for the interaction, and it
+        works before hydration), not about module boundaries. Directive-free variants are tracked in{" "}
+        <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a>; action-less Switch,
+        Checkbox and RadioGroup are strong candidates, since a native input already works without
+        JavaScript.
       </p>
 
       <h3>Actions from the server</h3>
@@ -83,14 +88,34 @@ import { saveOpenSections } from "./actions"; // "use server"
             'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML and searchable. Switching tabs needs JavaScript.',
           ],
           ["Toggle", "Markup and ARIA. Pressing needs JavaScript."],
+          [
+            "Dialog, JS-free mode",
+            'Everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in the markup, CSS animation. A `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open.',
+          ],
+          [
+            "Dialog, library mode",
+            'The Trigger opens the dialog natively, but its content is not in the HTML. On hydration the dialog is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.',
+          ],
+          [
+            "Switch, Checkbox, RadioGroup",
+            'They are native inputs: clicking, Space, arrow keys between radios, labels, `required` and form submission all work. On hydration a changed value is reconciled with one action call (`reason: "platform"`, one per group). `Checkbox indeterminate` is drawn from `data-indeterminate` but announced as unchecked until hydration.',
+          ],
         ]}
       />
       <p>
-        This FAQ is rendered by a Server Component in JS-free mode. It opens and closes with
-        JavaScript disabled:
+        This FAQ is rendered by a Server Component in JS-free mode. It opens and closes before the
+        page has hydrated, and in any page that works without JavaScript. (This site streams each
+        page behind a Suspense boundary, which needs a small inline script to reveal it, so here it
+        needs JavaScript enabled, but not the library's.)
       </p>
       <Example source={accordionFaqSource} fileName="AccordionFaq.tsx">
         <AccordionFaq />
+      </Example>
+      <p>
+        So is this confirmation dialog. Every button in it is a native invoker or a form submit:
+      </p>
+      <Example source={dialogConfirmSource} fileName="DialogConfirm.tsx">
+        <DialogConfirm />
       </Example>
     </div>
   );
