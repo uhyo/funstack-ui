@@ -287,17 +287,18 @@ export const Tabs = {
 | Arrow / Home / End | Move focus **and** dispatch `valueChangeAction(next)` | Move focus only |
 | Enter / Space on a focused tab | No-op (already the optimistic selection) | Dispatch |
 | Click | Dispatch through the click handler (when mousedown moves focus from another tab in the list, the `focusin` dispatches first and the click is a no-op) | Dispatch |
-| Tab key into the list | Lands on the optimistic selected tab; never dispatches. With `value` `null`, the List redirects to the first tab, and that redirect originates inside the List, so it dispatches | Same focus targets, never dispatches |
+| Tab key into the list | Lands on the optimistic selected tab; never dispatches. With `value` `null` (or a controlled `value` matching no tab) the List redirects to the first enabled tab **without dispatching**; arrow keys from there select as usual | Same focus targets, never dispatches |
 | Focus entering from outside for any other reason (window re-activation, focus restore after a dialog, `autoFocus`, programmatic `tab.focus()` from elsewhere) | Never dispatches | Nothing |
 
 Implementation (product-owner decision): automatic mode is "selection follows focus **within the
 list**", implemented in the Tab's `focus` handler:
-`if (activationMode === "automatic" && !disabled && optimistic !== value && list.contains(event.relatedTarget)) dispatch`.
-Focus arriving from outside the List never dispatches; a focus change is a selection only when it
-is the user moving between tabs. Clicks dispatch through the click handler regardless of where
+`if (activationMode === "automatic" && !disabled && optimistic !== value && list.contains(event.relatedTarget) && event.relatedTarget !== list) dispatch`.
+Focus arriving from outside the List never dispatches, and neither does the List's own redirect
+(its `relatedTarget` is the List itself); a focus change is a selection only when it is the user
+moving between tabs. This also keeps Tabs-as-links (11.5) from navigating on Tab-key entry. Clicks dispatch through the click handler regardless of where
 focus came from. The arrow-key code in `List` only moves focus; it does not know about
 activation. This keeps the JS roving path and the `experimental_focusgroup` path identical: both
-end in a focus event with `relatedTarget` inside the list.
+end in a focus event whose `relatedTarget` is another tab in the list.
 
 The post-veto case is why the rule exists: after a controlled parent vetoes a change, focus stays
 on the tab that is *not* selected. Without the `relatedTarget` check, re-activating the window or
@@ -476,10 +477,11 @@ Roving tabindex details:
   `tabindex="0"`; instead the `List` itself gets `tabindex="0"` and, on receiving focus **from
   outside the list** (`relatedTarget` not inside it), moves it to the first non-disabled tab
   (first tab if all are disabled). Focus arriving from a tab inside the list is left alone;
-  otherwise Shift+Tab from a tab would bounce back into the list, a trap in manual mode. With
-  `value` `null`: clicking empty tablist space focuses the List and redirects to the first tab,
-  which in automatic mode selects it (the redirect counts as focus moving within the list, 4.1);
-  in manual mode Shift+Tab from a tab stops once on the List and then leaves it (not a trap).
+  otherwise Shift+Tab from a tab would bounce back into the list, a trap in manual mode. The
+  redirect never dispatches in either mode (its `relatedTarget` is the List itself, 4.1): Tab-key
+  entry or a click on empty tablist space focuses the first enabled tab and leaves selection to
+  the next arrow key or click. Shift+Tab from a tab stops once on the List and then leaves it
+  (not a trap).
 - **Controlled `value` that matches no Tab** (product-owner decision; e.g. Tabs-as-links on a
   sub-route, 11.4): no tab has `tabindex="0"`, so without help the Tab key would skip the whole
   tablist. `List` checks in a layout effect whether any registered tab's value equals the
@@ -825,8 +827,8 @@ controlled wrapper.
 | --- | --- |
 | Roles and ARIA | Default elements and roles. `aria-selected`, `aria-controls` ↔ `id`, `aria-labelledby` ↔ `id` resolve. `aria-orientation` and `data-orientation` for both orientations. `aria-disabled` on disabled tabs and under `Root disabled`. Unselected panels absent by default. Panel `tabindex="0"` default and override. Ids are stable across re-renders and safe for `value="a b/c"`. |
 | Keyboard | Matrix: `{horizontal, vertical} × {ArrowRight, ArrowLeft, ArrowDown, ArrowUp, Home, End}` asserting focus target, including the ignored axis. `loop` on and off at both ends. RTL swaps horizontal arrows (set `direction: rtl` via style). Disabled tabs are reachable. Enter/Space select in manual mode, no-op in automatic mode. `preventDefault` called for handled keys. Tab key from a tab lands on the selected panel. |
-| Activation | Automatic: arrow press dispatches with `details.event.type === "focusin"` (React's `onFocus`); manual: arrow press does not dispatch, Enter does. Tabbing into a list with `value={null}` dispatches the first tab in automatic mode only. Focus entering from outside onto an unselected tab (`autoFocus`, `tab.focus()` from outside, focus restore) never dispatches in either mode; after a controlled veto, a `focusin` with `relatedTarget` outside the list does not re-dispatch, an arrow key does. |
-| Tab stop | Controlled `value` matching no tab: the List has `tabindex="0"`, Tab from before the list lands on the first tab, a dev warning fires once. `value={null}`: clicking empty list space selects the first tab in automatic mode; manual mode Shift+Tab from a tab stops once on the List, then leaves. |
+| Activation | Automatic: arrow press dispatches with `details.event.type === "focusin"` (React's `onFocus`); manual: arrow press does not dispatch, Enter does. Tabbing into a list with `value={null}` focuses the first enabled tab without dispatching in either mode; a following arrow key dispatches in automatic mode. Focus entering from outside onto an unselected tab (`autoFocus`, `tab.focus()` from outside, focus restore) never dispatches in either mode; after a controlled veto, a `focusin` with `relatedTarget` outside the list does not re-dispatch, an arrow key does. |
+| Tab stop | Controlled `value` matching no tab: the List has `tabindex="0"`, Tab from before the list lands on the first tab, a dev warning fires once. `value={null}`: clicking empty list space focuses the first enabled tab without dispatching; Shift+Tab from a tab stops once on the List, then leaves. |
 | `render` element type | `render={<a href />}` yields no `type` attribute; `render={<button />}` keeps `type="button"`. |
 | Sync action (both) | `(next, details)` shape, `details.reason === "activate"`, `details.event` is a native event. Clicking the selected tab, a disabled tab, or any tab under `Root disabled` never dispatches. |
 | Async action (both) | While unresolved: `data-pending` on Root and the clicked Tab only, `aria-selected` moved, old panel still in the DOM, new panel absent. After resolve: pending gone, panels swapped. |
@@ -914,7 +916,8 @@ One context; every part re-renders on a dispatch anyway (attributes change).
 - Reads context; `selected = optimistic === value`; `pending = ctx.pending && selected`;
   `disabled = ctx.disabled || props.disabled`.
 - `onFocus`: automatic mode and `!disabled` and `!selected` and `list.contains(event.relatedTarget)`
-  → `select(value, nativeEvent, "activate")` (4.1: focus from outside the list never dispatches).
+  and `event.relatedTarget !== list` → `select(value, nativeEvent, "activate")` (4.1: focus from
+  outside the list, and the List's own redirect, never dispatch).
 - `onClick`: `!disabled` → `select(...)` (no-op guard inside).
 - `onKeyDown`: Enter or Space → `preventDefault()`, then as `onClick`.
 - `tabIndex`: `0` when selected, else `-1`. The `value === null` case is handled by `List`
