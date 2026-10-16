@@ -15,7 +15,7 @@
 // its sync/async/rejection/overlap/parity rows do not apply (it is covered by the ARIA, function
 // props, Close and Form rows).
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, useRef, useState } from "react";
+import { StrictMode, Suspense, startTransition, useActionState, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -688,6 +688,10 @@ describe("Dialog", () => {
         expect(action).toHaveBeenCalledTimes(3);
         expect(action.mock.calls[2]![0]).toBe(true);
         expect(trigger()).toHaveAttribute("data-open", "");
+        // Optimistic and committed are both `true` (the close never committed), yet the Root is
+        // pending and the dialog is closed: the Trigger shows it.
+        expectPending(trigger());
+        expect(popup().open).toBe(false);
         // Resolve out of order: the open first, then the superseded close.
         await act(async () => opening.resolve());
         await act(async () => closing.resolve());
@@ -1330,6 +1334,12 @@ describe("Dialog", () => {
       });
     }
 
+    /** A press and a click at the same point, as a real click on `target` produces. */
+    function pressAndClick(target: Element, point: { clientX: number; clientY: number }) {
+      fireEvent.pointerDown(target, point);
+      fireEvent.click(target, point);
+    }
+
     it("modal: a click on the dialog outside its box closes it with reason 'dismiss'", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
@@ -1337,10 +1347,10 @@ describe("Dialog", () => {
       render(<Harness mode="uncontrolled" action={action} popup={{ lightDismiss: true }} />);
       await openThroughTrigger(user);
       mockRect(popup());
-      fireEvent.click(popup(), { clientX: 150, clientY: 150 }); // inside the box
-      fireEvent.click(screen.getByTestId("content"), { clientX: 10, clientY: 10 }); // descendant
+      pressAndClick(popup(), { clientX: 150, clientY: 150 }); // inside the box
+      pressAndClick(screen.getByTestId("content"), { clientX: 10, clientY: 10 }); // descendant
       expect(requestClose).not.toHaveBeenCalled();
-      fireEvent.click(popup(), { clientX: 10, clientY: 10 }); // the ::backdrop
+      pressAndClick(popup(), { clientX: 10, clientY: 10 }); // the ::backdrop
       expect(requestClose).toHaveBeenCalledTimes(1);
       await flush();
       expect(action.mock.calls[1]![1].reason).toBe("dismiss");
@@ -1373,7 +1383,42 @@ describe("Dialog", () => {
       );
       await openThroughTrigger(user);
       mockRect(popup());
+      pressAndClick(popup(), { clientX: 10, clientY: 10 });
+      expect(popup().open).toBe(false);
+    });
+
+    it("modal: a drag from inside that ends on the backdrop does not close (M1)", async () => {
+      const user = setupUser();
+      const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
+      render(<Harness mode="uncontrolled" popup={{ lightDismiss: true }} />);
+      await openThroughTrigger(user);
+      mockRect(popup());
+      // Selecting text in the content and releasing over the backdrop: the press is inside, the
+      // click lands on the common ancestor (the dialog) outside its box.
+      fireEvent.pointerDown(screen.getByTestId("content"), { clientX: 150, clientY: 150 });
       fireEvent.click(popup(), { clientX: 10, clientY: 10 });
+      expect(requestClose).not.toHaveBeenCalled();
+      expect(popup().open).toBe(true);
+      // A click without any press (keyboard activation, synthetic) is not a dismiss either.
+      fireEvent.click(popup(), { clientX: 10, clientY: 10 });
+      expect(popup().open).toBe(true);
+      // A press on the backdrop that is released inside does not close.
+      fireEvent.pointerDown(popup(), { clientX: 10, clientY: 10 });
+      fireEvent.click(popup(), { clientX: 150, clientY: 150 });
+      expect(popup().open).toBe(true);
+      pressAndClick(popup(), { clientX: 10, clientY: 10 });
+      expect(popup().open).toBe(false);
+    });
+
+    it("non-modal: a drag from inside that ends outside does not close (M1)", async () => {
+      const user = setupUser();
+      render(<Harness mode="uncontrolled" modal={false} popup={{ lightDismiss: true }} />);
+      await openThroughTrigger(user);
+      await flush(); // the `toggle` task attaches the document listeners
+      fireEvent.pointerDown(screen.getByTestId("content"));
+      fireEvent.click(document.body);
+      expect(popup().open).toBe(true);
+      pressAndClick(screen.getByTestId("elsewhere"), { clientX: 0, clientY: 0 });
       expect(popup().open).toBe(false);
     });
   });
@@ -1485,6 +1530,360 @@ describe("Dialog", () => {
       await act(async () => popup().close());
       await flush();
       expect(trigger()).toHaveFocus();
+    });
+  });
+
+  describe("review fixes", () => {
+    it("disabled is owned: a render element cannot re-enable Trigger or Close (L1)", async () => {
+      const user = setupUser();
+      const closeAction = vi.fn();
+      render(
+        <Harness
+          mode="static"
+          trigger={{ disabled: true, render: <button disabled={false} /> }}
+          content={
+            <Dialog.Close
+              data-testid="close"
+              disabled
+              action={closeAction}
+              render={<button disabled={false} />}
+            >
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      expect(trigger()).toBeDisabled();
+      expect(screen.getByTestId("close")).toBeDisabled();
+      await user.click(trigger());
+      expect(popup().open).toBe(false);
+      act(() => popup().showModal());
+      await user.click(screen.getByTestId("close"));
+      expect(closeAction).not.toHaveBeenCalled();
+      expect(popup().open).toBe(true);
+    });
+
+    renderBoth("re-open while a close notification is pending (L2)", (mode) => {
+      it("Escape during a Form save, then the Trigger: pending meanwhile, opens after the save, no extra close", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const saving = deferred();
+        const close = spyClose();
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={
+              <Dialog.Form action={() => saving.promise}>
+                <button type="submit" value="save">
+                  Save
+                </button>
+              </Dialog.Form>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        await user.click(screen.getByRole("button", { name: "Save" }));
+        await flush();
+        // Escape while the save runs: closed natively; the notification is entangled with the
+        // form's async action (React holds it until the save settles).
+        await act(async () => popup().requestClose());
+        await flush();
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(action.mock.calls[1]![0]).toBe(false);
+        expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+        expectPending(trigger());
+        // The user re-opens: still held, and shown as pending.
+        await user.click(trigger());
+        expect(action).toHaveBeenCalledTimes(3);
+        expect(action.mock.calls[2]![0]).toBe(true);
+        expect(trigger()).toHaveAttribute("data-open", "");
+        expectPending(trigger());
+        expect(popup().open).toBe(false);
+        close.mockClear();
+        await act(async () => saving.resolve());
+        await flush();
+        // The save settled: the dialog opens (the user's latest intent) and the Form does not
+        // close it again, because it was closed after the submit.
+        expect(popup().open).toBe(true);
+        expect(close).not.toHaveBeenCalled();
+        expect(action).toHaveBeenCalledTimes(3);
+        expectNotPending(trigger());
+        expect(trigger()).toHaveAttribute("data-open", "");
+      });
+    });
+
+    it("Root state.pending is true during the re-open window (L2)", async () => {
+      const user = setupUser();
+      const closing = deferred();
+      const action = vi.fn<ActionFn>();
+      render(
+        <Dialog.Root defaultOpen={false} openChangeAction={action}>
+          {({ pending, open }) => (
+            <>
+              <output data-testid="root">{`open=${open} pending=${pending}`}</output>
+              <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
+              <Dialog.Popup data-testid="popup" aria-label="x" />
+            </>
+          )}
+        </Dialog.Root>,
+      );
+      await openThroughTrigger(user);
+      action.mockImplementationOnce(() => closing.promise);
+      await act(async () => popup().requestClose());
+      await flush();
+      await user.click(trigger());
+      expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=true");
+      expectPending(trigger());
+      await act(async () => closing.resolve());
+      await flush();
+      expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=false");
+      expect(popup().open).toBe(true);
+    });
+
+    describe("Dialog.Form closeOnSettle (M3)", () => {
+      function ValidatingForm({ closeOnSettle }: { closeOnSettle?: boolean }) {
+        const [error, formAction] = useActionState(
+          async (_previous: string | null, formData: FormData) =>
+            String(formData.get("name")) === "" ? "Name is required" : null,
+          null,
+        );
+        return (
+          <Dialog.Form action={formAction} closeOnSettle={closeOnSettle}>
+            <input name="name" defaultValue="" />
+            {error !== null && <p role="alert">{error}</p>}
+            <button type="submit" value="save">
+              Save
+            </button>
+          </Dialog.Form>
+        );
+      }
+
+      it("default: a non-throwing validation result still closes the dialog", async () => {
+        const user = setupUser();
+        render(<Harness mode="uncontrolled" content={<ValidatingForm />} />);
+        await openThroughTrigger(user);
+        await user.click(screen.getByRole("button", { name: "Save" }));
+        await flush();
+        expect(popup().open).toBe(false);
+      });
+
+      it("closeOnSettle={false}: the dialog stays open with the result; the consumer closes it", async () => {
+        const user = setupUser();
+        const close = spyClose();
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode="uncontrolled"
+            action={action}
+            content={
+              <>
+                <ValidatingForm closeOnSettle={false} />
+                <Dialog.Close data-testid="close" value="cancel">
+                  Cancel
+                </Dialog.Close>
+              </>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        await user.click(screen.getByRole("button", { name: "Save" }));
+        await flush();
+        expect(screen.getByRole("alert")).toHaveTextContent("Name is required");
+        expect(popup().open).toBe(true);
+        expect(close).not.toHaveBeenCalled();
+        await user.click(screen.getByTestId("close"));
+        await flush();
+        expect(popup().open).toBe(false);
+        expect(action.mock.calls[1]![1]).toMatchObject({
+          reason: "activate",
+          returnValue: "cancel",
+        });
+      });
+    });
+
+    it("Dialog.Form keeps `method` with a string action; owns it otherwise (L4)", () => {
+      render(
+        <Harness
+          mode="static"
+          content={
+            <>
+              <Dialog.Form data-testid="navigating" action="/profile" method="post" />
+              <Dialog.Form data-testid="closing" method="post" />
+            </>
+          }
+        />,
+      );
+      expect(screen.getByTestId("navigating")).toHaveAttribute("method", "post");
+      expect(screen.getByTestId("navigating")).toHaveAttribute("action", "/profile");
+      expect(screen.getByTestId("closing")).toHaveAttribute("method", "dialog");
+    });
+
+    it("non-modal: Escape is left to an open popover inside the dialog (M2)", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          mode="uncontrolled"
+          modal={false}
+          content={
+            <>
+              <button type="button" data-testid="inside">
+                Inside
+              </button>
+              <div popover="auto" data-testid="menu">
+                <button type="button" data-testid="item">
+                  Item
+                </button>
+              </div>
+              <div popover="manual" data-testid="toast">
+                <button type="button" data-testid="toast-button">
+                  Undo
+                </button>
+              </div>
+            </>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      const menu = screen.getByTestId("menu");
+      act(() => menu.showPopover());
+      // Focus inside the popover: not the dialog's Escape, and not cancelled.
+      expect(fireEvent.keyDown(screen.getByTestId("item"), { key: "Escape" })).toBe(true);
+      expect(popup().open).toBe(true);
+      // Focus elsewhere in the dialog: the open popover's close watcher still takes Escape.
+      expect(fireEvent.keyDown(screen.getByTestId("inside"), { key: "Escape" })).toBe(true);
+      expect(popup().open).toBe(true);
+      act(() => menu.hidePopover());
+      // A manual popover has no close watcher: Escape inside it closes the dialog.
+      act(() => screen.getByTestId("toast").showPopover());
+      expect(fireEvent.keyDown(screen.getByTestId("toast-button"), { key: "Escape" })).toBe(false);
+      expect(popup().open).toBe(false);
+    });
+
+    describe("nested confirm (H1)", () => {
+      function Unrelated() {
+        const [count, setCount] = useState(0);
+        return (
+          <button
+            type="button"
+            data-testid="unrelated"
+            onClick={() => startTransition(() => setCount((c) => c + 1))}
+          >
+            {count}
+          </button>
+        );
+      }
+
+      /**
+       * The recommended shape: no action awaits user input. The outer "Discard…" button is the
+       * Trigger of a JS-free confirm dialog; the confirm's own Close action does the work and
+       * closes the (controlled) outer dialog.
+       */
+      function Editor({ discard }: { discard: () => Promise<void> }) {
+        const [open, setOpen] = useState(false);
+        return (
+          <>
+            <Dialog.Root open={open} openChangeAction={(next) => setOpen(next)}>
+              <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
+              <Dialog.Popup data-testid="popup" aria-label="Editor">
+                <textarea defaultValue="Unsaved notes" />
+                <Dialog.Root>
+                  <Dialog.Trigger data-testid="discard">Discard…</Dialog.Trigger>
+                  <Dialog.Popup data-testid="confirm" role="alertdialog" aria-label="Discard?">
+                    <Dialog.Close data-testid="keep" value="keep">
+                      Keep editing
+                    </Dialog.Close>
+                    <Dialog.Close
+                      data-testid="confirm-discard"
+                      value="discard"
+                      action={async () => {
+                        await discard();
+                        startTransition(() => setOpen(false));
+                      }}
+                    >
+                      Discard
+                    </Dialog.Close>
+                  </Dialog.Popup>
+                </Dialog.Root>
+              </Dialog.Popup>
+            </Dialog.Root>
+            <Unrelated />
+          </>
+        );
+      }
+
+      const confirm = () => screen.getByTestId("confirm") as HTMLDialogElement;
+
+      it("the recommended pattern opens the confirm at once and never stalls other transitions", async () => {
+        const user = setupUser();
+        const discarding = deferred();
+        render(<Editor discard={() => discarding.promise} />);
+        await user.click(trigger());
+        await flush();
+        expect(popup().open).toBe(true);
+        await user.click(screen.getByTestId("discard"));
+        expect(confirm().open).toBe(true);
+        // While the user decides, nothing is pending: an unrelated transition commits.
+        await user.click(screen.getByTestId("unrelated"));
+        await flush();
+        expect(screen.getByTestId("unrelated")).toHaveTextContent("1");
+        // "Keep editing" closes the confirm only.
+        await user.click(screen.getByTestId("keep"));
+        expect(confirm().open).toBe(false);
+        expect(popup().open).toBe(true);
+        // Confirm: the action runs (pending), then both dialogs close.
+        await user.click(screen.getByTestId("discard"));
+        await user.click(screen.getByTestId("confirm-discard"));
+        expectPending(screen.getByTestId("confirm-discard"));
+        expect(popup().open).toBe(true);
+        await act(async () => discarding.resolve());
+        await flush();
+        expect(popup().open).toBe(false);
+        await user.click(screen.getByTestId("unrelated"));
+        await flush();
+        expect(screen.getByTestId("unrelated")).toHaveTextContent("2");
+      });
+
+      it("characterisation: an action that awaits input arriving through a transition holds every transition", async () => {
+        // The shape the review found deadlocking (React 19.3 puts every transition started
+        // while an async action is pending into that action's lane). Kept to flag a React change.
+        const user = setupUser();
+        const answer = deferred();
+        function Anti() {
+          const [confirming, setConfirming] = useState(false);
+          return (
+            <>
+              <Dialog.Root defaultOpen>
+                <Dialog.Popup data-testid="popup" aria-label="Editor">
+                  <Dialog.Close
+                    data-testid="discard"
+                    action={() => {
+                      startTransition(() => setConfirming(true));
+                      return answer.promise;
+                    }}
+                  >
+                    Discard
+                  </Dialog.Close>
+                </Dialog.Popup>
+              </Dialog.Root>
+              <output data-testid="confirming">{String(confirming)}</output>
+              <Unrelated />
+            </>
+          );
+        }
+        render(<Anti />);
+        await flush();
+        await user.click(screen.getByTestId("discard"));
+        await flush();
+        expect(screen.getByTestId("confirming")).toHaveTextContent("false");
+        await user.click(screen.getByTestId("unrelated"));
+        await flush();
+        expect(screen.getByTestId("unrelated")).toHaveTextContent("0");
+        await act(async () => answer.resolve());
+        await flush();
+        expect(screen.getByTestId("confirming")).toHaveTextContent("true");
+        expect(screen.getByTestId("unrelated")).toHaveTextContent("1");
+      });
     });
   });
 

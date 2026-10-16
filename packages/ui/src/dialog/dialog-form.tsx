@@ -18,11 +18,29 @@ export interface DialogFormProps extends Omit<
   /**
    * React form action (`(formData) => unknown`, may be a Server Function). Passed to the form
    * unwrapped so React's progressive enhancement is kept; the dialog closes with the submitter's
-   * `value` as `returnValue` once the action's transition settles. A rejection leaves the dialog
-   * open. Without `action` the form renders `method="dialog"`: submitting closes the dialog
-   * natively. A string `action` (a URL) is a plain navigating form.
+   * `value` as `returnValue` once the action's transition settles (see `closeOnSettle`). A
+   * rejection leaves the dialog open. Without `action` the form renders `method="dialog"`:
+   * submitting closes the dialog natively. A string `action` (a URL) is a plain navigating form.
    */
   action?: string | ((formData: FormData) => unknown);
+  /**
+   * With a function `action`: close the dialog once the action's transition settles without
+   * throwing. Default `true`.
+   *
+   * Any result that does not throw counts as success, including a `useActionState`-style result
+   * that reports validation errors: with the default the dialog closes and those errors are never
+   * seen. Throw to keep the dialog open, or set `closeOnSettle={false}` and close it yourself:
+   * a `Dialog.Close`, a submitter with `formMethod="dialog"`, or a controlled `open`.
+   *
+   * The dialog is not closed either when it was closed (Escape, a Close part) while the action
+   * ran, also if the user re-opened it meanwhile.
+   */
+  closeOnSettle?: boolean;
+  /**
+   * Only with a string `action` (a navigating form, for example `"post"`). Owned otherwise:
+   * `"dialog"` without `action`, React's own with a function `action`.
+   */
+  method?: ComponentPropsWithRef<"form">["method"];
   className?: StateValue<string | undefined, DialogFormState>;
   style?: StateValue<CSSProperties | undefined, DialogFormState>;
   children?: StateValue<ReactNode, DialogFormState>;
@@ -57,16 +75,19 @@ function FormStatusWatcher({ onPendingChange, onSettled }: FormStatusWatcherProp
  * A form that completes the dialog. Without `action`: `<form method="dialog">`, so a submit
  * closes the dialog natively (JS-free) with the submitter's `value` as `returnValue`. With a
  * function `action`: `<form action={action}>` (React overrides the method) and a status watcher
- * that closes the dialog once the action has settled, with the submitter's `value`.
+ * that closes the dialog once the action has settled, with the submitter's `value`, unless
+ * `closeOnSettle` is `false` or the dialog was closed while the action ran.
  *
  * `DialogFormState.pending` is this form's own status; it is not emitted as `data-pending` and
  * is not folded into any control's `pending` (conventions 2.7). Submit buttons read
  * `useFormStatus()` themselves.
  *
- * Owned keys (conventions 1.2): `method`, `action`.
+ * Owned keys (conventions 1.2): `method` (except with a string `action`), `action`.
  */
 export function DialogForm({
   action,
+  closeOnSettle = true,
+  method,
   className,
   style,
   children,
@@ -77,6 +98,9 @@ export function DialogForm({
   const { dialogRef, recordCloseIntent } = ctx;
   const [pending, setPending] = useState(false);
   const submission = useRef<{ event: Event; returnValue: string } | null>(null);
+  // The dialog closed after the last submit (Escape, a Close part): the settle must not close it
+  // again, also when the user re-opened it meanwhile (the review's walkthrough 11.8 variant).
+  const closedSinceSubmit = useRef(false);
   const watches = typeof action === "function";
 
   // The submitter's `value` comes from the native `submit` event (capture, before React's
@@ -89,19 +113,29 @@ export function DialogForm({
         | HTMLInputElement
         | null;
       submission.current = { event, returnValue: submitter?.value ?? "" };
+      closedSinceSubmit.current = false;
+    };
+    const dialog = form.closest("dialog");
+    const onClose = (event: Event) => {
+      if (event.target === dialog) closedSinceSubmit.current = true;
     };
     form.addEventListener("submit", onSubmit, true);
-    return () => form.removeEventListener("submit", onSubmit, true);
+    dialog?.addEventListener("close", onClose);
+    return () => {
+      form.removeEventListener("submit", onSubmit, true);
+      dialog?.removeEventListener("close", onClose);
+    };
   }, []);
 
   const onSettled = useCallback(() => {
     const dialog = dialogRef.current;
     const submitted = submission.current;
     submission.current = null;
+    if (!closeOnSettle || closedSinceSubmit.current) return;
     if (dialog === null || !dialog.open) return;
     recordCloseIntent({ reason: "activate", event: submitted?.event });
     dialog.close(submitted?.returnValue ?? "");
-  }, [dialogRef, recordCloseIntent]);
+  }, [closeOnSettle, dialogRef, recordCloseIntent]);
 
   const state: DialogFormState = { pending };
 
@@ -119,7 +153,7 @@ export function DialogForm({
     ),
     props: rest,
     libraryProps: {
-      method: action === undefined ? "dialog" : undefined,
+      method: action === undefined ? "dialog" : typeof action === "string" ? method : undefined,
       // React's own type wants `void | Promise<void>`; the library's actions return `unknown`
       // (conventions 2.2) and React ignores the result.
       action: action as ComponentPropsWithRef<"form">["action"],

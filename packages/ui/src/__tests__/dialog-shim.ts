@@ -18,7 +18,10 @@
 // - Invoker Commands: a click on `button[commandfor][command]` that nobody cancelled dispatches a
 //   cancelable `command` event (with `command` and `source`) at the target and, unless that is
 //   cancelled, runs `show-modal`, `close` or `request-close` with the button's `value`. A submit
-//   button in a form does not invoke (the button's activation behaviour submits instead).
+//   button in a form does not invoke (the button's activation behaviour submits instead). As in
+//   the platform, an invalid command (`show-modal` on an open dialog, `close` / `request-close` on
+//   a closed one, an unknown non-custom command) fires no event and does nothing; custom
+//   `--commands` always fire.
 // - `<form method="dialog">` (or a submitter with `formmethod="dialog"`): a submit that nobody
 //   cancelled closes the nearest dialog with the submitter's `value`, and is then cancelled so
 //   jsdom does not attempt a navigation.
@@ -110,6 +113,14 @@ export function dispatchCommand(
   return event;
 }
 
+/** The dialog's "is valid command steps" (HTML): invalid commands fire no `command` event. */
+function isValidDialogCommand(dialog: HTMLDialogElement, command: string): boolean {
+  if (command.startsWith("--")) return true;
+  if (command === "show-modal") return !dialog.open;
+  if (command === "close" || command === "request-close") return dialog.open;
+  return false;
+}
+
 if (typeof HTMLDialogElement !== "undefined" && !("showModal" in HTMLDialogElement.prototype)) {
   const proto = HTMLDialogElement.prototype;
   Object.defineProperty(proto, "returnValue", {
@@ -162,8 +173,10 @@ if (typeof HTMLDialogElement !== "undefined" && !("showModal" in HTMLDialogEleme
     if (id === null || command === undefined) return;
     const target = button.ownerDocument.getElementById(id);
     if (!(target instanceof HTMLDialogElement)) return;
+    if (!isValidDialogCommand(target, command)) return;
     const commandEvent = dispatchCommand(target, command, button);
     if (commandEvent.defaultPrevented) return;
+    if (command.startsWith("--")) return;
     if (command === "show-modal") target.showModal();
     else if (command === "close") target.close(button.value);
     else if (command === "request-close") target.requestClose(button.value);

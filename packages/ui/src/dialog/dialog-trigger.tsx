@@ -10,7 +10,10 @@ import { useDialogContext } from "./dialog-context.js";
 export interface DialogTriggerState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */
   readonly open: boolean;
-  /** The Root is pending and this dialog's optimistic open differs from the committed one. */
+  /**
+   * The Root's transition is pending: an open in flight, a close notification in flight, or a
+   * re-open requested while a close notification is still settling.
+   */
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -38,8 +41,8 @@ const isDev = process.env.NODE_ENV !== "production";
  * `data-pending` until the dialog has opened. Non-modal dialogs have no command and always use a
  * click handler (`show()`).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `commandfor`, `command`,
- * `onClick`, `data-open`, `data-pending`, `data-disabled`.
+ * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
+ * `command`, `onClick`, `data-open`, `data-pending`, `data-disabled`.
  */
 export function DialogTrigger({
   disabled = false,
@@ -55,7 +58,10 @@ export function DialogTrigger({
 
   const state: DialogTriggerState = {
     open: ctx.optimistic,
-    pending: ctx.pending && ctx.optimistic !== ctx.committed,
+    // Every Root dispatch is an open or a close notification and both belong to the Trigger
+    // (design 4.2). Not `optimistic !== committed`: a re-open while a close notification is
+    // still settling has both `true` (the close never committed) and is pending all the same.
+    pending: ctx.pending,
     disabled,
   };
 
@@ -106,6 +112,9 @@ export function DialogTrigger({
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     // `type` only applies to a <button>; on any other element the key is not owned.
     ...(rendersButton(render) && { type: "button" as const }),
+    // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the
+    // browser would run its command).
+    disabled,
     commandfor: modal ? ids.dialog : undefined,
     command: modal ? "show-modal" : undefined,
     // Only owned when installed, so a render element keeps its own `onClick` in modal JS-free
@@ -123,7 +132,7 @@ export function DialogTrigger({
     className,
     style,
     children,
-    props: { ...rest, disabled },
+    props: rest,
     libraryProps,
     ref: libraryRef,
   });

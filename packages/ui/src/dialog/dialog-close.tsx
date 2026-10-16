@@ -48,8 +48,8 @@ const isDev = process.env.NODE_ENV !== "production";
  * transition (`data-pending` on the button) and the dialog closes with `close(value)` once it
  * resolves; a rejection leaves the dialog open.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `commandfor`, `command`, `value`,
- * `onClick` (with `action`), `data-pending`, `data-disabled`.
+ * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
+ * `command`, `value`, `onClick` (with `action`), `data-pending`, `data-disabled`.
  */
 export function DialogClose({
   action,
@@ -102,6 +102,8 @@ export function DialogClose({
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
+    // Owned: a render element must not re-enable a disabled Close.
+    disabled,
     commandfor: ids.dialog,
     command: "request-close",
     value,
@@ -117,7 +119,7 @@ export function DialogClose({
     className,
     style,
     children,
-    props: { ...rest, disabled },
+    props: rest,
     libraryProps,
     ref: devRef,
   });
