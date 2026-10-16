@@ -39,3 +39,5 @@
 - Started #23 (opus, worktree). Batched for user: Proxy details.event confirm; release plan; docs deployment; manual find-in-page check; #16 upstream filing.
 - 2026-10-16 user decisions: (1) Proxy-served details.event CONFIRMED — Server Functions passed directly is an important feature. (2) release-funstack skill OK. (3) docs deploy to ui.funstack.work (Cloudflare). (4) Upstream issues (#16) are a HUMAN task — never file autonomously.
 - release-setup (opus) running: publish.yml, deploy-docs.yml, wrangler, skill, package metadata.
+- #23 merged; CI green on chromium/firefox/webkit (run 38835425057). Release/deploy setup done (user must add secrets, npm trusted publisher, CF custom domain). v0 backlog empty except deferred #19/#20/#21 and human #16.
+- Next: propose roadmap for the next component wave to user.
