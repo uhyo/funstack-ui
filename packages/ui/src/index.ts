@@ -7,6 +7,21 @@
 export { Toggle } from "./toggle/index.js";
 export type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./toggle/index.js";
 
+export { Accordion } from "./accordion/index.js";
+export type {
+  AccordionRootProps,
+  AccordionRootMultipleProps,
+  AccordionRootExclusiveProps,
+  AccordionRootState,
+  AccordionValueChangeDetails,
+  AccordionItemProps,
+  AccordionItemState,
+  AccordionTriggerProps,
+  AccordionTriggerState,
+  AccordionPanelProps,
+  AccordionPanelState,
+} from "./accordion/index.js";
+
 export type {
   Action,
   ActionDetails,

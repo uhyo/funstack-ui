@@ -24,6 +24,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
+    "./accordion": "./dist/accordion/index.mjs",
     "./toggle": "./dist/toggle/index.mjs",
     "./package.json": "./package.json"
   },

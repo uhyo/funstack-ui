@@ -13,11 +13,23 @@ const dist = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist");
 
 const clientFiles = [
   "toggle/toggle.mjs",
+  // Every Accordion part is a client module (design/components/accordion.md, section 12).
+  "accordion/accordion-context.mjs",
+  "accordion/accordion-root.mjs",
+  "accordion/accordion-item.mjs",
+  "accordion/accordion-trigger.mjs",
+  "accordion/accordion-panel.mjs",
   "internal/use-controllable-action.mjs",
+  "internal/use-dev-warning.mjs",
   "internal/use-render.mjs",
 ];
 
-const directiveFreeFiles = ["index.mjs", "toggle/index.mjs", "internal/action-details.mjs"];
+const directiveFreeFiles = [
+  "index.mjs",
+  "toggle/index.mjs",
+  "accordion/index.mjs",
+  "internal/action-details.mjs",
+];
 
 function startsWithUseClient(file: string): boolean {
   const path = resolve(dist, file);
