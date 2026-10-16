@@ -3,6 +3,7 @@
 // a real browser follow this file's naming convention.
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { browserName, supportsInterestFor, supportsPopoverHint } from "./engine.js";
 
 describe("browser test environment", () => {
   it("renders a React element into the real document", () => {
@@ -58,5 +59,16 @@ describe("browser test environment", () => {
   it("supports CSS anchor positioning", () => {
     expect(CSS.supports("anchor-name: --x")).toBe(true);
     expect(CSS.supports("position-area: top")).toBe(true);
+  });
+
+  it("matches the per-engine support recorded in docs/research/popover-anchor-tooltip.md", () => {
+    // `interestfor` is Chromium-only; `popover="hint"` is in Chromium and Firefox. Playwright's
+    // WebKit is a trunk build that may already have `hint` (Safari 27.0 does not), so WebKit's
+    // value is not pinned here: tests branch on `supportsPopoverHint` instead.
+    expect(supportsInterestFor).toBe(browserName === "chromium");
+    if (browserName !== "webkit") expect(supportsPopoverHint).toBe(true);
+    // `<details name>` (exclusive accordions) is everywhere.
+    expect("name" in HTMLDetailsElement.prototype).toBe(true);
+    console.info(`[${browserName}] popover=hint: ${supportsPopoverHint}`);
   });
 });
