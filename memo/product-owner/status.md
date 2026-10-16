@@ -35,3 +35,5 @@
 - Manual check needed by user (batched): real find-in-page (Ctrl+F) on the Tabs demo's until-found panel and on Accordion — headless Chromium can't exercise it.
 - Tabs fixes landed (305 tests). docs-site (#14, opus, worktree) started; tooltip-impl (opus, worktree) running. After Tooltip: review → fixes → merge docs → consider first release prep (version 0.0.x, release-funstack skill like siblings) — ask user.
 - Batched for user: (2) release plan / npm publish of @funstack/ui 0.0.1? (3) docs deployment target (Cloudflare like siblings?).
+- 2026-10-16 ~10:20 JST MILESTONE: v0 scope complete — Toggle, Tabs, Accordion, Tooltip implemented + reviewed + review-fixed; docs site merged (#14). 409 tests (jsdom + Chromium). Open: #16 upstream, #19/#20/#21 deferred, #23 cross-engine.
+- Started #23 (opus, worktree). Batched for user: Proxy details.event confirm; release plan; docs deployment; manual find-in-page check; #16 upstream filing.
