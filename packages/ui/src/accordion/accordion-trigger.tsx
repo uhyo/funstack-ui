@@ -126,7 +126,8 @@ export function AccordionTrigger({
       "data-open": dataAttr(item.optimisticOpen === true),
       "data-pending": dataAttr(item.pending),
       "data-disabled": dataAttr(item.disabled),
-      onClick,
+      // Only owned when installed, so a render element keeps its own `onClick` in JS-free mode.
+      ...(onClick && { onClick }),
     },
   });
 

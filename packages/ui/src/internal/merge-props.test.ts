@@ -29,13 +29,34 @@ describe("mergeProps", () => {
   });
 
   it("keeps a library-controlled attribute even when the element sets it", () => {
-    const result = mergeProps(
-      {},
-      { role: "switch", "aria-pressed": "false", "data-pending": "no" },
-      { role: "button", "aria-pressed": true, "data-pending": undefined },
+    const result = mergeProps<Record<string, unknown>>(
+      { "data-open": "part", name: "part" },
+      {
+        role: "switch",
+        "aria-pressed": "false",
+        "data-pending": "no",
+        "data-open": "el",
+        name: "g",
+      },
+      {
+        role: "button",
+        "aria-pressed": true,
+        "data-pending": undefined,
+        "data-open": undefined,
+        name: undefined,
+      },
     );
-    // An undefined library value does not win: `data-pending` is absent, not "no".
-    expect(result).toEqual({ role: "button", "aria-pressed": true, "data-pending": "no" });
+    // Library-controlled keys are owned: an undefined library value removes the attribute, so
+    // neither the element's nor the pass-through value shows through.
+    expect(result).toEqual({ role: "button", "aria-pressed": true });
+    // Explicit `undefined`, not a deletion, so that `cloneElement` overrides the element's prop.
+    expect(Object.keys(result)).toContain("data-pending");
+    expect(result["data-pending"]).toBeUndefined();
+  });
+
+  it("does not treat undefined as a deletion in the pass-through and element layers", () => {
+    const result = mergeProps({ title: "part", id: undefined }, { title: undefined }, {});
+    expect(result).toEqual({ title: "part", id: undefined });
   });
 
   it("merges ARIA id-reference lists as token lists, element tokens first", () => {

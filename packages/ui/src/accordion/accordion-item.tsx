@@ -180,8 +180,12 @@ export function AccordionItem({
     // least one mode, so a `render` element cannot override them either (conventions 1.2).
     libraryProps: {
       open: isLibrary ? committedOpen : staticOpen,
+      // Owned in both modes: in library mode there is one writer of `open`, so a render element's
+      // `name` (a second, platform-level writer) is removed.
       name: !isLibrary ? root?.name : undefined,
-      onToggle,
+      // Only installed in library mode; owning the key in static mode would strip a render
+      // element's own `onToggle`.
+      ...(isLibrary && { onToggle }),
       "data-open": dataAttr(optimisticOpen === true),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),

@@ -74,16 +74,23 @@ export function mergeTokenLists(first: unknown, second: unknown): string {
  * - `ref`: both attached.
  * - Event handlers: both run; `overFirst` says whether `over`'s runs before `under`'s.
  * - ARIA id-reference lists: token-merged; `overFirst` says whose tokens come first.
- * - Everything else: `over` wins when it defines the prop (`undefined` is "not defined").
+ * - Everything else: `over` wins when it defines the prop. `undefined` is "not given" (JSX
+ *   optional props are routinely `undefined`), except in an `owned` layer, where a key present
+ *   with an `undefined` value removes the prop: the library-controlled layer owns its keys.
  */
-function layer(under: AnyProps, over: AnyProps, overFirst: boolean): AnyProps {
+function layer(under: AnyProps, over: AnyProps, overFirst: boolean, owned: boolean): AnyProps {
   const result: AnyProps = { ...under };
 
   for (const key of Object.keys(over)) {
     const overValue = over[key];
     const underValue = under[key];
 
-    if (overValue === undefined) continue;
+    if (overValue === undefined) {
+      // An explicit `undefined` (not a deletion): `cloneElement` layers the merged props over the
+      // render element's original props, so only an own `undefined` removes the attribute there.
+      if (owned) result[key] = undefined;
+      continue;
+    }
 
     if (key === "className") {
       result[key] =
@@ -125,6 +132,11 @@ function layer(under: AnyProps, over: AnyProps, overFirst: boolean): AnyProps {
  * - The `render` element wins over pass-through props (`aria-label`, `data-*` from the part's own
  *   props, `type`, ...); the library-controlled attributes (`role`, computed `aria-*` state, id
  *   wiring, `data-*` state, the library's handlers) win over the element.
+ * - Library-controlled keys are **owned**: a key present in `libraryProps` with an `undefined`
+ *   value removes the attribute, whatever the element or the pass-through props say, so a
+ *   `render` element can never re-introduce `data-open`, `aria-disabled`, `name`, ... when the
+ *   part computes none. A part that does not own a key in some mode omits the key instead. The
+ *   function form of `render` is the way to override library attributes deliberately.
  * - `className` is concatenated (part, element), `style` merged with the element winning.
  * - Event handlers all run: the element's first, then the part's pass-through one, then the
  *   library's.
@@ -138,5 +150,5 @@ export function mergeProps<P extends AnyProps>(
   libraryProps: AnyProps = {},
 ): P {
   // The render element's handlers and tokens come first in both layers.
-  return layer(layer(partProps, elementProps, true), libraryProps, false) as P;
+  return layer(layer(partProps, elementProps, true, false), libraryProps, false, true) as P;
 }

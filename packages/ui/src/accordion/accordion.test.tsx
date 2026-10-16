@@ -914,16 +914,19 @@ describe("Accordion", () => {
       expect(trigger("a")).toHaveAttribute("data-open", "");
     });
 
-    it("element form: library-controlled attributes win, pass-through props lose to the element", async () => {
+    it("element form: library-controlled keys are owned, pass-through props lose to the element", async () => {
       render(
         <Accordion.Root defaultValue={["a"]}>
           <Accordion.Item
             value="a"
             aria-label="part"
             data-testid="item-a"
-            render={<details data-open="nope" aria-label="element" />}
+            render={<details data-open="nope" data-pending="nope" name="g" aria-label="element" />}
           >
-            <Accordion.Trigger data-testid="trigger-a" render={<summary data-open="nope" />}>
+            <Accordion.Trigger
+              data-testid="trigger-a"
+              render={<summary data-open="nope" aria-disabled="false" />}
+            >
               A
             </Accordion.Trigger>
           </Accordion.Item>
@@ -931,14 +934,37 @@ describe("Accordion", () => {
       );
       const user = setupUser();
       expect(item("a")).toHaveAttribute("data-open", "");
+      expect(item("a")).not.toHaveAttribute("data-pending");
+      // A second writer of `open` (the platform's `name` group) is removed in library mode.
+      expect(item("a")).not.toHaveAttribute("name");
       expect(item("a")).toHaveAttribute("aria-label", "element");
       expect(trigger("a")).toHaveAttribute("data-open", "");
+      expect(trigger("a")).not.toHaveAttribute("aria-disabled");
       // The element cannot take `open` away from the library either.
       await user.click(trigger("a"));
       expect(item("a").open).toBe(false);
-      // Once closed the library's `data-open` is undefined ("not defined" in the merge), so the
-      // element's own value shows through; `:not([data-open])` styling must not rely on it.
-      expect(trigger("a")).toHaveAttribute("data-open", "nope");
+      // Owned key: once closed the attribute is absent, whatever the element says.
+      expect(trigger("a")).not.toHaveAttribute("data-open");
+    });
+
+    it("element form in JS-free mode keeps the element's own onToggle and onClick", async () => {
+      const onToggle = vi.fn();
+      const onClick = vi.fn();
+      render(
+        <Accordion.Root>
+          <Accordion.Item value="a" data-testid="item-a" render={<details onToggle={onToggle} />}>
+            <Accordion.Trigger data-testid="trigger-a" render={<summary onClick={onClick} />}>
+              A
+            </Accordion.Trigger>
+          </Accordion.Item>
+        </Accordion.Root>,
+      );
+      const user = setupUser();
+      await user.click(trigger("a"));
+      await flushToggle();
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(onToggle).toHaveBeenCalledTimes(1);
+      expect(item("a").open).toBe(true);
     });
 
     it("function form receives (props, state)", async () => {
