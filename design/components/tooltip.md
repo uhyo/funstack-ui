@@ -131,9 +131,21 @@ into the popup keeps it open, de-hover and blur hide it after the end delay, Esc
 cancels interest, outside click light-dismisses (`hint`), the popup is implicitly anchored to the
 trigger, Android long-press works, and opening the tooltip never closes an open `auto` popover.
 
-The library's interaction effect checks, at mount, whether the trigger element has the
+Two platform behaviours differ from the JS path and are documented, not corrected
+(product-owner decision: the library attaches nothing on the native path). Verified in
+Chromium 153 by the reviewer:
+
+- **Escape inside a modal `<dialog>` closes the hint and the dialog together** (with or without
+  user activation in the dialog). A hint opened by a `popovertarget` click closes alone; one
+  opened by interest does not. The library has no handler on this path, so it cannot intercept.
+- **A click on the trigger does not close the tooltip**: an invoker click is not light dismiss,
+  so the tooltip stays over the button the user just activated until interest is lost.
+- **`disabled` flipped to true while open removes `interestfor` but does not hide the popup**;
+  the library hides it itself (section 13, Disabled row).
+
+The library's interaction effect checks whether the trigger element has the
 `interestfor` attribute **and** `"interestForElement" in triggerElement`. If both hold it attaches
-no listeners at all. The two flags are designed to be set together; `experimental_interestFor`
+no listeners at all (beyond the `disabled` cleanup above). The two flags are designed to be set together; `experimental_interestFor`
 without `experimental_hint` leaves a `manual` popup driven by interest, which still works in
 Chromium (interest loss and Escape hide it) but has no outside-click dismissal.
 
@@ -150,18 +162,22 @@ omitted from the trigger's prop type and consumer `onPointerEnter` et al. pass t
 | trigger                        | `blur`                                            | start close timer                                                                               |
 | popup                          | `pointerenter`                                    | cancel close timer                                                                              |
 | popup                          | `pointerleave`                                    | start close timer                                                                               |
-| popup                          | `toggle`                                          | record open state (`event.newState === "open"`); install or remove the document listeners below |
-| document (while open)          | `keydown` Escape                                  | hide now                                                                                        |
+| popup                          | `toggle`                                          | reconcile open state (`event.newState === "open"`) for opens and closes the library did not perform; install or remove the document listeners below |
+| document (while open)          | `keydown` Escape                                  | hide now and `preventDefault()` (keeps an enclosing modal `<dialog>` or `auto` menu open; a second Escape closes them) |
 | document (while open, capture) | `pointerdown`                                     | hide now (covers outside click, click on the trigger, and click on the popup)                   |
 
 Open means `popup.showPopover({ source: trigger })`, which creates the same implicit anchor and
-nesting relationship as the declarative path. Close means `popup.hidePopover()`. Both calls are
-guarded by the open state recorded from `toggle`, so they are never called redundantly. A timer
+nesting relationship as the declarative path. Close means `popup.hidePopover()`. The open flag is
+set **immediately** after `showPopover()` / `hidePopover()` and every decision is additionally
+guarded by `popup.matches(":popover-open")`, not only by the asynchronous `toggle` event:
+`toggle` fires in a later task in Chromium, so a pointerdown in the same task as `showPopover()`
+would otherwise find the flag and the document listeners one task behind (reviewer probe). A timer
 that fires after `disabled` became true, or after unmount, does nothing (the effect cleanup
 clears timers and hides an open popup).
 
 Why hover and focus share one delay: Chromium's `interest-delay-start` applies to both, and the
-flags must not change the user-visible behaviour of a page. `delay={0}` opens instantly for
+flags should change the user-visible behaviour of a page as little as possible (the residual
+differences are the platform behaviours listed in 2.1). `delay={0}` opens instantly for
 consumers who prefer that for keyboard users.
 
 Why pointerdown anywhere, not only outside: a tooltip that stays over a button the user just
@@ -170,16 +186,23 @@ light dismiss, so the library has to do this itself anyway. After an Escape or a
 reopens the tooltip until the pointer leaves and re-enters or focus leaves and returns. That
 matches "Escape cancels interest" on the native path without extra state.
 
+Why Escape is `preventDefault()`ed: the document `keydown` bubbles to the library's handler
+*before* the browser's close request reaches a modal `<dialog>` or an `auto` popover, so without
+it one Escape would close the tooltip and the enclosing dialog or menu together (verified in
+Chromium 153: with `hidePopover(); event.preventDefault()` in the same handler the dialog and
+menu stay open and a second Escape closes them). This holds for `manual` and `hint` alike, so
+on `hint` the JS handler is what closes the tooltip, not native light dismiss.
+
 ### 2.3 Behaviour per engine and flag
 
 Stable engines on 2026-10-15: Chrome 155, Firefox 158, Safari 27.0.
 
 | Flags                      | Chromium                                                                                                                                                                                                  | Firefox                        | Safari 27.0                                                                                                               |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| none (baseline)            | `manual` + JS. Escape and any pointerdown handled by JS. Never closes `auto` popovers.                                                                                                                    | same                           | same                                                                                                                      |
-| `experimental_hint`        | `hint`. Native light dismiss (Escape, outside click) and hint stacking (opening one hint closes other non-ancestor hints). JS listeners still installed; their hide calls are no-ops when already closed. | same as Chromium               | `hint` is unknown, treated as `manual`. Identical to baseline; the JS Escape and pointerdown handlers are what closes it. |
-| `experimental_interestFor` | Native trigger. No JS listeners. Popup is `manual`, hidden by interest loss or Escape. Android long-press works.                                                                                          | attribute ignored, baseline JS | attribute ignored, baseline JS                                                                                            |
-| both                       | Fully native.                                                                                                                                                                                             | as `experimental_hint` only    | as baseline                                                                                                               |
+| none (baseline)            | `manual` + JS. Escape (hidden + `preventDefault()`, so an enclosing dialog or `auto` menu stays open) and any pointerdown handled by JS. Opening never closes `auto` popovers.                              | same                           | same                                                                                                                      |
+| `experimental_hint`        | `hint`. Native outside-click dismiss and hint stacking (opening one hint closes other non-ancestor hints). JS listeners still installed; Escape is still handled by the JS keydown (it runs before the native close request) and `preventDefault()`ed. | same as Chromium               | `hint` is unknown, treated as `manual`. Identical to baseline; the JS Escape and pointerdown handlers are what closes it. |
+| `experimental_interestFor` | Native trigger. No JS listeners. Popup is `manual`, hidden by interest loss or Escape. Android long-press works. Trigger click does not close it.                                                           | attribute ignored, baseline JS | attribute ignored, baseline JS                                                                                            |
+| both                       | Fully native. Escape also closes an enclosing modal `<dialog>` (platform behaviour, 2.1).                                                                                                                 | as `experimental_hint` only    | as baseline                                                                                                               |
 
 Graduation: when Safari ships `hint` (STP 249 today), `experimental_hint` is removed and `hint`
 becomes the default type; the JS Escape and pointerdown listeners stay for `interestfor`-less
@@ -419,7 +442,7 @@ Dev warnings (effect in `Root`, development builds only):
 | Popup               | `role="tooltip"`; a `hint` popover has no implicit role, so this is always rendered     |
 | Trigger             | `aria-describedby` or `aria-labelledby` (above); no `aria-expanded`, no `aria-haspopup` |
 | Tab to trigger      | opens after `delay` when focus is `:focus-visible` (pointer focus does not open)        |
-| Escape              | closes; focus stays on the trigger; on the JS path the keydown is `preventDefault()`ed while the tooltip is open so an enclosing modal `<dialog>` does not close too (product-owner decision, mirrors close-watcher semantics for native `hint`; **pending the reviewer's verification in Chromium**). Escape or pointerdown on the trigger before `delay` elapses cancels the pending open |
+| Escape              | closes; focus stays on the trigger; on the JS path the keydown is `preventDefault()`ed while the tooltip is open so an enclosing modal `<dialog>` does not close too (product-owner decision; verified by the reviewer in Chromium 153 for `manual` and `hint`: dialog and `auto` menus stay open, a second Escape closes them). Escape or pointerdown on the trigger before `delay` elapses cancels the pending open |
 | Tab away            | closes after `closeDelay`                                                               |
 | Hover trigger       | opens after `delay`; stays open while the pointer is over the trigger or the popup      |
 | Pointer leaves both | closes after `closeDelay`                                                               |
@@ -852,27 +875,38 @@ export function useTooltipInteraction(
     };
     // show/hide are skipped when the popup is no longer in the document: the passive cleanup
     // runs after DOM removal on unmount, and hidePopover() on a disconnected popover throws.
+    // `open` is set synchronously here; the async `toggle` event only reconciles it afterwards.
+    const isOpen = () => open || popup.matches(":popover-open");
     const show = () => {
       clear();
       timer = setTimeout(() => {
-        if (!open && popup.isConnected) popup.showPopover({ source: trigger });
+        if (!isOpen() && popup.isConnected) {
+          popup.showPopover({ source: trigger });
+          setOpen(true);
+        }
       }, getOptions().delay);
     };
     const hide = () => {
       clear();
       timer = setTimeout(() => {
-        if (open && popup.isConnected) popup.hidePopover();
+        if (isOpen() && popup.isConnected) {
+          popup.hidePopover();
+          setOpen(false);
+        }
       }, getOptions().closeDelay);
     };
     const hideNow = () => {
       clear();
-      if (open && popup.isConnected) popup.hidePopover();
+      if (isOpen() && popup.isConnected) {
+        popup.hidePopover();
+        setOpen(false);
+      }
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Only installed while open: consume the key so a modal <dialog> around the tooltip
-        // does not also close (close-watcher-like; pending reviewer verification in Chromium).
+        // Only installed while open: consume the key so a modal <dialog> or auto popover around
+        // the tooltip does not also close (verified in Chromium 153; works for manual and hint).
         e.preventDefault();
         hideNow();
       }
@@ -883,8 +917,9 @@ export function useTooltipInteraction(
     const onTriggerKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") clear();
     };
-    const onToggle = (e: Event) => {
-      open = (e as ToggleEvent).newState === "open";
+    const setOpen = (next: boolean) => {
+      if (open === next) return;
+      open = next;
       if (open) {
         document.addEventListener("keydown", onKeyDown);
         document.addEventListener("pointerdown", hideNow, true);
@@ -893,6 +928,8 @@ export function useTooltipInteraction(
         document.removeEventListener("pointerdown", hideNow, true);
       }
     };
+    // Reconciles opens and closes the library did not perform (native light dismiss on `hint`).
+    const onToggle = (e: Event) => setOpen((e as ToggleEvent).newState === "open");
     const onEnter = (e: PointerEvent) => {
       if (e.pointerType !== "touch") show();
     };
@@ -918,11 +955,12 @@ export function useTooltipInteraction(
 }
 ```
 
-Open state is a local variable fed by the platform's `toggle` event, never React state
-(conventions 3.5). It also catches opens and closes the library did not perform (native light
-dismiss on `hint`), so the document listeners are always in sync with the top layer. The
-`toggle` event is dispatched asynchronously after `showPopover()`; a second `show` timer cannot
-fire in between because `show` clears the timer first.
+Open state is a local variable, never React state (conventions 3.5). It is set immediately when
+the library calls `showPopover()` / `hidePopover()` and reconciled from the platform's `toggle`
+event for opens and closes the library did not perform (native light dismiss on `hint`), with
+`:popover-open` as the authoritative check, so the document listeners are never a task behind the
+top layer. `toggle` is dispatched asynchronously after `showPopover()` (reviewer probe: a
+pointerdown in the same task would otherwise leave the popup open).
 
 `popup.showPopover` is called with the `source` option in all three engines (Chrome 137, Firefox
 144, Safari 26.0). No feature check.
@@ -990,9 +1028,9 @@ Coverage against conventions 10.1. "both" rows have no controlled mode here.
 | Controlled/uncontrolled parity                    | **N/A**: no controllable state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Native step-aside                                 | Define `interestForElement` on `HTMLButtonElement.prototype` for one test, render with `experimental_interestFor`, hover and advance: `showPopover` **not** called. Without the flag under the same stub: called (flag gates the detection).                                                                                                                                                                                                                                                                                                                   |
 | Positioning                                       | `side`/`align` matrix produces the `position-area` values in section 7.1 and the fallbacks string; `side={null}` emits neither style nor `data-side`; consumer `style.positionArea` wins.                                                                                                                                                                                                                                                                                                                                                                      |
-| Disabled                                          | Hover and focus never call `showPopover`; toggling `disabled` to true while open calls `hidePopover` (effect cleanup).                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Dev warnings                                      | `provides="name"` plus `aria-label` warns; non-focusable trigger warns; interactive popup content warns.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Directive                                         | All six source files in `src/tooltip/` other than `index.ts` begin with `"use client"` in `dist`.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Disabled                                          | Hover and focus never call `showPopover`; toggling `disabled` to true while open hides the popup on **both** paths: JS via the effect cleanup, native by an explicit `hidePopover()` when `interestfor` is removed (the browser does not hide it; reviewer probe).                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Dev warnings                                      | `provides="name"` plus `aria-label`, a non-focusable trigger, and interactive popup content each log one `console.error` per instance.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Directive                                         | All five part files in `src/tooltip/` (`tooltip-context`, `-root`, `-trigger`, `-popup`, `use-tooltip-interaction`; no Arrow in v0) begin with `"use client"` in `dist`; `index.ts` does not.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 Browser mode only (not covered by jsdom; noted at the top of the test file, per conventions
 10.1): actual visibility and `:popover-open`, anchor placement and fallback flips, the
