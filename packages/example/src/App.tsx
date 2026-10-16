@@ -1,3 +1,4 @@
+import { AccordionDemo } from "./accordion-demo";
 import { ToggleDemo } from "./toggle-demo";
 
 export function App() {
@@ -9,6 +10,7 @@ export function App() {
         follow the fake backend calls.
       </p>
       <ToggleDemo />
+      <AccordionDemo />
     </main>
   );
 }

@@ -1,0 +1,139 @@
+/* Accordion demo: data attributes and platform pseudo-classes are the styling hooks. */
+
+.acc {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.acc-item {
+  border-block-end: 1px solid #ddd;
+}
+.acc-item:last-child {
+  border-block-end: none;
+}
+
+.acc-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.6em 0.9em;
+  cursor: pointer;
+  list-style: none; /* hides the UA marker; the chevron below replaces it */
+  user-select: none;
+}
+.acc-trigger::-webkit-details-marker {
+  display: none;
+}
+.acc-trigger h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  flex: 1;
+}
+.acc-trigger:hover:not([data-disabled]) {
+  background: #f5f5f5;
+}
+.acc-trigger:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+/* Chevron. Committed state (`:open`) works in both modes; `[data-open]` (optimistic) flips at
+   once in library mode and is a sync-lane commit, so it animates with a CSS transition. */
+.acc-trigger::before {
+  content: "";
+  inline-size: 0.5em;
+  block-size: 0.5em;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  rotate: -45deg;
+  transition: rotate 150ms;
+}
+.acc-item:open > .acc-trigger::before,
+.acc-trigger[data-open]::before {
+  rotate: 45deg;
+}
+
+.acc-trigger[data-pending] {
+  cursor: progress;
+}
+.acc-trigger[data-disabled] {
+  color: GrayText;
+  cursor: not-allowed;
+}
+.acc[data-pending] .acc-panel {
+  opacity: 0.6;
+}
+
+.acc-panel {
+  padding: 0 0.9em;
+  min-height: 0; /* the grid item */
+  overflow: hidden;
+}
+.acc-panel p,
+.acc-panel ul {
+  margin-block: 0.6em;
+}
+
+/* Open/close animation on ::details-content (grid-rows form, both modes, all engines). */
+.acc-item::details-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 200ms ease,
+    content-visibility 200ms allow-discrete;
+}
+.acc-item:open::details-content {
+  grid-template-rows: 1fr;
+}
+
+/* The ViewTransition section animates the item boxes instead; no ::details-content transition
+   for the same change. */
+.acc-vt .acc-item::details-content {
+  display: block;
+  transition: none;
+}
+::view-transition-group(.fsui-grow) {
+  animation-duration: 250ms;
+}
+
+/* The interpolate-size section transitions height to `auto` (Chromium only today). */
+.acc-interp .acc-item::details-content {
+  display: block;
+  height: 0;
+  overflow: hidden;
+  transition:
+    height 200ms ease,
+    content-visibility 200ms allow-discrete;
+}
+.acc-interp .acc-item:open::details-content {
+  height: auto;
+}
+
+.spinner {
+  inline-size: 1em;
+  block-size: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acc-item::details-content,
+  .acc-trigger::before {
+    transition: none;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
