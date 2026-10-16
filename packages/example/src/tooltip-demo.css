@@ -1,0 +1,109 @@
+/* Tooltip demo. Open state is browser-owned: style it with :popover-open, animate it with
+   @starting-style. The library ships no CSS; this is the starter stylesheet from the design. */
+
+.tip {
+  margin: 6px; /* gap from the trigger; overrides the UA's margin: auto */
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: #1f2937;
+  color: #f9fafb;
+  font-size: 0.875rem;
+  max-inline-size: 24rem;
+  opacity: 0;
+  translate: 0 4px;
+  transition:
+    opacity 120ms,
+    translate 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+
+.tip:popover-open {
+  opacity: 1;
+  translate: 0 0;
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    transition: none;
+  }
+}
+
+/* side={null}: the stylesheet owns placement entirely. */
+.tip-custom {
+  position-area: inline-end;
+  position-try-fallbacks: flip-inline;
+  margin-inline: 14px;
+  background: #c2410c;
+}
+
+.tooltip-toolbar {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.tooltip-icon-btn,
+.tooltip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tooltip-icon-btn {
+  inline-size: 2rem;
+  block-size: 2rem;
+}
+
+.tooltip-btn {
+  padding: 0.4em 0.9em;
+}
+
+/* The trigger whose tooltip is open: the popup is the next sibling. */
+.tooltip-icon-btn:has(+ .tip:popover-open),
+.tooltip-btn:has(+ .tip:popover-open) {
+  border-color: #1f2937;
+}
+
+.tooltip-flags {
+  display: grid;
+  gap: 0.25rem;
+  margin-block: 0.75rem;
+}
+
+.tooltip-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block: 0.5rem;
+}
+
+.tooltip-controls input[type="number"] {
+  inline-size: 5em;
+}
+
+.tooltip-stage {
+  display: grid;
+  place-items: center;
+  block-size: 8rem;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+}
+
+.tooltip-note {
+  color: #555;
+  font-size: 0.875rem;
+}

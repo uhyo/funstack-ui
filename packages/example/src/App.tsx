@@ -1,6 +1,7 @@
 import { AccordionDemo } from "./accordion-demo";
 import { ToggleDemo } from "./toggle-demo";
 import { TabsDemo } from "./tabs-demo";
+import { TooltipDemo } from "./tooltip-demo";
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
       <ToggleDemo />
       <AccordionDemo />
       <TabsDemo />
+      <TooltipDemo />
     </main>
   );
 }
