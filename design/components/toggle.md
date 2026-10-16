@@ -270,7 +270,7 @@ Notes on the omissions from the native prop set:
 | Omitted | Why |
 | --- | --- |
 | `onClick` | The library's own handler (conventions 1.5). Attach anything else through pass-through (`onPointerDown`, `onKeyDown`, ...) or `ref`; that path is unsupported for state changes. |
-| `type` | Always `"button"`. A toggle that submits a form is not a toggle. (In `render` element form the element's own `type` still wins, per conventions 1.2; the library simply does not expose the prop.) |
+| `type` | `"button"` whenever the rendered element is a `<button>`; a `render` element of another type (`<a>`) gets no `type` attribute (conventions 1.2). A toggle that submits a form is not a toggle; the library does not expose the prop. |
 | `aria-pressed` | Library-controlled state attribute. |
 | `className`, `style`, `children` | Re-declared with the function-of-state form. |
 

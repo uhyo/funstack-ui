@@ -102,6 +102,9 @@ Rules for the element passed to `render` (same as Base UI):
 - `className`: the library's and the element's are concatenated. `style`: merged, element wins.
 - Event handlers the library installs (for example `onClick` on a `Tab`): both run, the element's
   first, then the library's. v0 provides no way to cancel the library's handler from there.
+- Element-type-specific attributes are set only when they apply to the rendered element:
+  `type="button"` is emitted for a `<button>` and omitted for `render={<a href />}` or any other
+  element, rather than landing as a meaningless attribute on an anchor.
 - Library-controlled attributes (`role`, `aria-*` *state* the part computes such as
   `aria-pressed` / `aria-selected`, `id` wiring, `data-*` state) win over the element's, with one
   carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`, `aria-controls`,
@@ -283,7 +286,7 @@ import { setFavorite } from "./actions"; // "use server"; (id, next, details) =>
 </Toggle>
 ```
 
-Costs, documented wherever `details` is: devtools shows `Proxy(Object) { reason: "click" }`
+Costs, documented wherever `details` is: devtools shows `Proxy(Object) { reason: "activate" }`
 without `event`; `expect(details).toEqual({ event })` fails, so tests assert `details.event`
 directly; `structuredClone(details)` throws `DataCloneError`; and the library must not rely on
 Next.js's unused-argument omission, which is bundler-specific. The target should stay an
@@ -540,10 +543,12 @@ export function useControllableAction<T>(options: {
 }
 ```
 
-`transitionTypes` receives `details` so a component can derive direction from the dispatching
-element (Tabs computes `fsui-tabs-next` / `fsui-tabs-prev` from the DOM order of
-`details.event.currentTarget` relative to the previously selected tab). `prev` is the committed
-value at dispatch time, not the optimistic one.
+`transitionTypes` receives `details` so a component can take the dispatch's origin into account.
+Note that `details.event.currentTarget` is **not** the dispatching element (for a native event it
+is React's root container by the time the action runs); Tabs derives `fsui-tabs-next` /
+`fsui-tabs-prev` by looking the committed and target tabs up **by id** under the root and
+comparing their DOM order. `prev` is the committed value at dispatch time, not the optimistic
+one.
 
 The reducer form of `useOptimistic` is mandatory so that stacked optimistic updates are re-based
 onto a changed `committed` value. For single-value states the reducer is `(_, next) => next`;
@@ -683,8 +688,8 @@ The state object given to function props on the owner includes `pending`; on tri
 
 ### 5.1 Default wiring
 
-Every part whose mount, unmount or content is driven by library state (Panel, Popup, Indicator,
-Toggle's own element when its children can change) renders a `<ViewTransition>` as the **outermost
+Every part whose mount, unmount or content is driven by library state (Panel, library-driven
+Popup, Toggle's own element when its children can change) renders a `<ViewTransition>` as the **outermost
 node of its output**, before any DOM element, with `default="none"`. Nothing animates unless the
 consumer opts in, and when it is `"none"` React does not even assign a name, so the cost is nil.
 
@@ -695,10 +700,11 @@ their open/close happens outside any React transition and animates with `@starti
 part whose mount, unmount or content is driven by library state.
 
 ```tsx
-// inside Tabs.Panel
+// inside Tabs.Panel (mount strategy per `keepMounted`, section 3.7: not rendered, <Activity>,
+// or hidden="until-found"; the boundary is the outermost node in every strategy)
 return (
   <ViewTransition default={transition ?? "none"}>
-    <div role="tabpanel" hidden={!selected} ...>{children}</div>
+    <div role="tabpanel" ...>{children}</div>
   </ViewTransition>
 );
 ```
@@ -711,14 +717,14 @@ What this means per kind of part:
 
 | Part renders | Animate with | Why |
 | --- | --- | --- |
-| Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, a `Tabs.Indicator` that follows optimistic selection) | CSS `transition` on the data attribute (`[data-pressed]`, `[data-selected]`, `--active-tab-left` style variables) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
+| Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
 | Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop (`<ViewTransition>`) | The swap lands in the transition-lane commit that settles the action. |
 | `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
 
-A `Tabs.Indicator` therefore gets two documented modes: follow optimistic selection and animate
-with CSS (moves on click, snaps back on rejection), or follow committed selection and animate with
-`<ViewTransition>` (moves when the panel does). The component design picks the default. Any part
-that keys a `<ViewTransition>` on optimistic state is a bug, not a style choice.
+`Tabs.Indicator` therefore follows optimistic selection, renders no `<ViewTransition>` and has no
+`transition` prop: it is positioned by CSS Anchor Positioning on the optimistic tab and slides via
+a plain CSS `transition` on the anchored insets (moves on click, snaps back on rejection). Any
+part that keys a `<ViewTransition>` on optimistic state is a bug, not a style choice.
 
 Product-owner decision: `transition` stays on Toggle in v0 even though its own flip cannot use it,
 documented honestly (it animates the end of the action and content keyed on `pending`), so the
@@ -745,9 +751,9 @@ forwarded as `default`, so React's documented resolution rules apply unchanged.
 ```
 
 Per-trigger props (`enter`, `exit`, `update`, `share`) and `name` are not exposed in v0; a single
-class already distinguishes old/new in CSS. A component that needs shared-element transitions
-(Tabs.Indicator) documents its own `transitionName` prop. A future `viewTransition` prop could
-pass the full props object through; it is not designed now.
+class already distinguishes old/new in CSS. No initial component needs shared-element
+transitions (the Indicator moves with CSS, above). A future `viewTransition` prop could pass the
+full props object through; it is not designed now.
 
 ### 5.3 Library-emitted transition types
 
@@ -757,7 +763,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Component | Types |
 | --- | --- |
 | Toggle | `fsui-toggle`, `fsui-toggle-press`, `fsui-toggle-release` |
-| Tabs | `fsui-tabs`, `fsui-tabs-next`, `fsui-tabs-prev` (by index order) |
+| Tabs | `fsui-tabs`, `fsui-tabs-next`, `fsui-tabs-prev` (by DOM order of the target tab relative to the committed tab) |
 | Accordion | `fsui-accordion`, `fsui-accordion-expand`, `fsui-accordion-collapse` |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
@@ -915,7 +921,7 @@ notes"):
 | Gap | Convention |
 | --- | --- |
 | Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). |
-| Attribute untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`) | One module augmentation **`.ts` module**, `src/internal/platform-attributes.ts`, imported from the package entry, augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs. It must be a `.ts` file that the entry imports, not a `.d.ts`: tsdown emits declarations only for reachable `.ts` sources, so a `.d.ts` is typecheck-only and never reaches `dist` (observed with Tabs' `focusgroup`). Whether the dts build then ships the augmentation as expected is pending the reviewer's confirmation. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
+| Attribute untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. Mechanism verified by the reviewer: tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |

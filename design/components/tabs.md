@@ -286,14 +286,23 @@ export const Tabs = {
 | --- | --- | --- |
 | Arrow / Home / End | Move focus **and** dispatch `valueChangeAction(next)` | Move focus only |
 | Enter / Space on a focused tab | No-op (already the optimistic selection) | Dispatch |
-| Click | Dispatch (in engines that focus buttons on mousedown the `focus` event dispatches first; the click is then a no-op) | Dispatch |
-| Tab key into the list | Lands on the optimistic selected tab (no-op), or on the first tab when `value` is `null` (dispatches it) | Same focus target, never dispatches |
-| Programmatic `tab.focus()` | Dispatches | Nothing |
+| Click | Dispatch through the click handler (when mousedown moves focus from another tab in the list, the `focusin` dispatches first and the click is a no-op) | Dispatch |
+| Tab key into the list | Lands on the optimistic selected tab; never dispatches. With `value` `null`, the List redirects to the first tab, and that redirect originates inside the List, so it dispatches | Same focus targets, never dispatches |
+| Focus entering from outside for any other reason (window re-activation, focus restore after a dialog, `autoFocus`, programmatic `tab.focus()` from elsewhere) | Never dispatches | Nothing |
 
-Implementation: automatic mode is "selection follows focus", implemented in the Tab's `focus`
-handler (`if (activationMode === "automatic" && !disabled && optimistic !== value) dispatch`).
-The arrow-key code in `List` only moves focus; it does not know about activation. This keeps the
-JS roving path and the `experimental_focusgroup` path identical: both end in a focus event.
+Implementation (product-owner decision): automatic mode is "selection follows focus **within the
+list**", implemented in the Tab's `focus` handler:
+`if (activationMode === "automatic" && !disabled && optimistic !== value && list.contains(event.relatedTarget)) dispatch`.
+Focus arriving from outside the List never dispatches; a focus change is a selection only when it
+is the user moving between tabs. Clicks dispatch through the click handler regardless of where
+focus came from. The arrow-key code in `List` only moves focus; it does not know about
+activation. This keeps the JS roving path and the `experimental_focusgroup` path identical: both
+end in a focus event with `relatedTarget` inside the list.
+
+The post-veto case is why the rule exists: after a controlled parent vetoes a change, focus stays
+on the tab that is *not* selected. Without the `relatedTarget` check, re-activating the window or
+returning focus from a dialog would fire `focusin` on that tab and dispatch the vetoed value
+again (verified by the reviewer); with it, only an arrow key or click re-dispatches.
 
 Consequence to document: in automatic mode `details.event` is a `FocusEvent` whose `type` is
 `"focusin"` (React's `onFocus` listens to `focusin`, not `focus`) for keyboard selection and, in
@@ -371,9 +380,14 @@ not change selection, so focus and selection diverge until the next enabled tab.
 react-dom 19.3 serialises `hidden="until-found"` as `hidden=""` on both client and server, so the
 Panel follows conventions section 7.4: it renders `hidden={!selected}`, and the internal hook
 `use-until-found.ts` upgrades the attribute to `"until-found"` through the Panel's ref in a layout
-effect, and re-asserts it after **every** render while `selected` is false. The re-assert matters:
-when the browser reveals a panel it removes the attribute itself, and if the resulting action is
-rejected React sees no prop change and would otherwise leave the panel visible.
+effect, and re-asserts it after every render **while `!selected && optimistic !== value`**, i.e.
+while the panel is neither committed nor the optimistic target. The second condition matters:
+after a find-in-page reveal the panel is the optimistic target of the dispatched action, and it
+must stay revealed while that action is pending (re-asserting on every render would re-hide it
+under the user's cursor; verified by the reviewer in Chromium). The re-assert itself matters too:
+when the browser reveals a panel it removes the attribute, and if the resulting action is rejected
+React sees no prop change; because optimistic reverts on rejection, the condition becomes true
+again and the hook re-hides the panel.
 
 The hook also listens for `beforematch` on the panel and dispatches
 `valueChangeAction(value, { event, reason: "platform" })` inside the Root's transition. Between the
@@ -395,7 +409,7 @@ Per APG Tabs pattern.
 | --- | --- |
 | `Root` | `data-pending`, `data-orientation`, `data-disabled` |
 | `List` | `role="tablist"`, `aria-orientation` (always set), `data-orientation`, `data-disabled`, `tabindex="0"` only while `value` is `null` (section 8); with `experimental_focusgroup`: `focusgroup="tablist inline wrap"` (`block` for vertical, `nowrap` when `loop={false}`) |
-| `Tab` | `type="button"`, `role="tab"`, `id`, `aria-selected` (optimistic), `aria-controls` (always set, see below), `aria-disabled="true"` when disabled, `tabindex` (`0` on the optimistic tab, else `-1`), `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, `style="anchor-name: …"` |
+| `Tab` | `type="button"` (only when the rendered element is a `<button>`; `render={<a />}` gets no `type`, conventions 1.2), `role="tab"`, `id`, `aria-selected` (optimistic), `aria-controls` (always set, see below), `aria-disabled="true"` when disabled, `tabindex` (`0` on the optimistic tab, else `-1`), `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, `style="anchor-name: …"` |
 | `Panel` | `role="tabpanel"`, `id`, `aria-labelledby`, `tabindex="0"` (overridable), `data-selected` (committed); `hidden` in `"until-found"` mode |
 | `Indicator` | `aria-hidden="true"`, `hidden` when no optimistic selection, `data-selected` when there is one, `data-pending`, `style="position-anchor: …"` |
 
@@ -462,7 +476,16 @@ Roving tabindex details:
   `tabindex="0"`; instead the `List` itself gets `tabindex="0"` and, on receiving focus **from
   outside the list** (`relatedTarget` not inside it), moves it to the first non-disabled tab
   (first tab if all are disabled). Focus arriving from a tab inside the list is left alone;
-  otherwise Shift+Tab from a tab would bounce back into the list, a trap in manual mode. The user sees the same thing
+  otherwise Shift+Tab from a tab would bounce back into the list, a trap in manual mode. With
+  `value` `null`: clicking empty tablist space focuses the List and redirects to the first tab,
+  which in automatic mode selects it (the redirect counts as focus moving within the list, 4.1);
+  in manual mode Shift+Tab from a tab stops once on the List and then leaves it (not a trap).
+- **Controlled `value` that matches no Tab** (product-owner decision; e.g. Tabs-as-links on a
+  sub-route, 11.4): no tab has `tabindex="0"`, so without help the Tab key would skip the whole
+  tablist. `List` checks in a layout effect whether any registered tab's value equals the
+  committed value (a DOM query, `[role="tab"][data-value]`, no registration state); if none does,
+  the List takes `tabindex="0"` exactly as in the `null` case, redirecting to the first tab, and
+  warns once in development that `value` matches no `Tabs.Tab`. The user sees the same thing
   (Tab key lands on the first tab) and every attribute stays React-owned.
 - Navigation reads the DOM at keydown time: `list.querySelectorAll('[role="tab"]')` filtered to
   tabs whose closest `[role="tablist"]` is this list. Disabled tabs are included (focusable).
@@ -802,7 +825,9 @@ controlled wrapper.
 | --- | --- |
 | Roles and ARIA | Default elements and roles. `aria-selected`, `aria-controls` ↔ `id`, `aria-labelledby` ↔ `id` resolve. `aria-orientation` and `data-orientation` for both orientations. `aria-disabled` on disabled tabs and under `Root disabled`. Unselected panels absent by default. Panel `tabindex="0"` default and override. Ids are stable across re-renders and safe for `value="a b/c"`. |
 | Keyboard | Matrix: `{horizontal, vertical} × {ArrowRight, ArrowLeft, ArrowDown, ArrowUp, Home, End}` asserting focus target, including the ignored axis. `loop` on and off at both ends. RTL swaps horizontal arrows (set `direction: rtl` via style). Disabled tabs are reachable. Enter/Space select in manual mode, no-op in automatic mode. `preventDefault` called for handled keys. Tab key from a tab lands on the selected panel. |
-| Activation | Automatic: arrow press dispatches with `details.event.type === "focusin"` (React's `onFocus`); manual: arrow press does not dispatch, Enter does. Tabbing into a list with `value={null}` dispatches the first tab in automatic mode only. |
+| Activation | Automatic: arrow press dispatches with `details.event.type === "focusin"` (React's `onFocus`); manual: arrow press does not dispatch, Enter does. Tabbing into a list with `value={null}` dispatches the first tab in automatic mode only. Focus entering from outside onto an unselected tab (`autoFocus`, `tab.focus()` from outside, focus restore) never dispatches in either mode; after a controlled veto, a `focusin` with `relatedTarget` outside the list does not re-dispatch, an arrow key does. |
+| Tab stop | Controlled `value` matching no tab: the List has `tabindex="0"`, Tab from before the list lands on the first tab, a dev warning fires once. `value={null}`: clicking empty list space selects the first tab in automatic mode; manual mode Shift+Tab from a tab stops once on the List, then leaves. |
+| `render` element type | `render={<a href />}` yields no `type` attribute; `render={<button />}` keeps `type="button"`. |
 | Sync action (both) | `(next, details)` shape, `details.reason === "activate"`, `details.event` is a native event. Clicking the selected tab, a disabled tab, or any tab under `Root disabled` never dispatches. |
 | Async action (both) | While unresolved: `data-pending` on Root and the clicked Tab only, `aria-selected` moved, old panel still in the DOM, new panel absent. After resolve: pending gone, panels swapped. |
 | Rejection (both) | `ErrorCatcher` receives the error; `aria-selected` reverts; panel unchanged; uncontrolled internal value unchanged. Caught-inside variant resolves and (uncontrolled) commits. |
@@ -888,13 +913,15 @@ One context; every part re-renders on a dispatch anyway (attributes change).
 
 - Reads context; `selected = optimistic === value`; `pending = ctx.pending && selected`;
   `disabled = ctx.disabled || props.disabled`.
-- `onFocus`: automatic mode and `!disabled` and `!selected` → `select(value, nativeEvent, "activate")`.
+- `onFocus`: automatic mode and `!disabled` and `!selected` and `list.contains(event.relatedTarget)`
+  → `select(value, nativeEvent, "activate")` (4.1: focus from outside the list never dispatches).
 - `onClick`: `!disabled` → `select(...)` (no-op guard inside).
 - `onKeyDown`: Enter or Space → `preventDefault()`, then as `onClick`.
 - `tabIndex`: `0` when selected, else `-1`. The `value === null` case is handled by `List`
-  (`tabIndex={optimistic === null ? 0 : undefined}` plus an `onFocus` that, when
+  (`tabIndex={listIsTabStop ? 0 : undefined}` plus an `onFocus` that, when
   `event.target === list` and `event.relatedTarget` is not inside the list, focuses the first
-  non-disabled tab). No DOM attribute is ever written
+  non-disabled tab). `listIsTabStop` is `optimistic === null`, or a layout-effect DOM check found
+  no tab whose value equals the committed `value` (with a one-time dev warning, §8). No DOM attribute is ever written
   outside React, so nothing can go stale when a selection later appears.
 - `style`: merge `{ anchorName: anchorName(rootId, value) }` under the consumer's style (consumer
   wins, per conventions section 1.2).
