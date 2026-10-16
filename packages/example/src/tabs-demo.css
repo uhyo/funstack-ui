@@ -1,0 +1,189 @@
+/* Tabs demo: data attributes are the styling hook; interaction state comes from pseudo-classes. */
+
+.tabs-root {
+  margin-block: 0.75rem;
+}
+
+.tabs-list {
+  /* The Indicator is absolutely positioned against the anchors (the Tabs) inside the list. */
+  position: relative;
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.tabs-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.5em 0.9em;
+  border: none;
+  background: none;
+  color: #555;
+  font: inherit;
+  cursor: pointer;
+  /* Optimistic selection is a sync commit: animate it with a CSS transition, not the
+     `transition` prop. */
+  transition: color 120ms;
+}
+
+.tabs-tab[data-selected] {
+  color: #c2410c;
+}
+.tabs-tab[data-pending] {
+  cursor: progress;
+}
+.tabs-tab[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tabs-tab:hover:not([aria-disabled="true"]) {
+  color: #222;
+}
+.tabs-tab:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+/* Anchor positioning places the indicator; a CSS transition slides it (Blink, WebKit). */
+.tabs-indicator {
+  position: absolute;
+  bottom: -1px;
+  left: anchor(left);
+  width: anchor-size(width);
+  height: 3px;
+  border-radius: 2px;
+  background: #c2410c;
+  transition:
+    left 200ms ease-out,
+    width 200ms ease-out;
+}
+.tabs-indicator[data-pending] {
+  animation: tabs-pulse 900ms ease-in-out infinite;
+}
+
+.tabs-panel {
+  padding: 0.75rem 0.25rem;
+}
+.tabs-panel:focus-visible {
+  outline: 2px solid #2563eb;
+}
+/* The old panel stays while the next one loads; dim it after a short delay. */
+.tabs-root[data-pending] .tabs-panel {
+  opacity: 0.5;
+  transition: opacity 150ms 150ms;
+}
+
+/* Vertical variant. */
+.tabs-vertical {
+  display: flex;
+  gap: 1rem;
+}
+.tabs-vertical .tabs-list {
+  flex-direction: column;
+  border-bottom: none;
+  border-right: 1px solid #ddd;
+}
+.tabs-vertical .tabs-indicator {
+  bottom: auto;
+  left: auto;
+  right: -1px;
+  top: anchor(top);
+  width: 3px;
+  height: anchor-size(height);
+  transition:
+    top 200ms ease-out,
+    height 200ms ease-out;
+}
+
+.tabs-textarea {
+  inline-size: 20rem;
+  block-size: 5rem;
+  font: inherit;
+}
+
+.tabs-skeleton {
+  color: #888;
+}
+
+.tabs-spinner {
+  inline-size: 0.9em;
+  block-size: 0.9em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes tabs-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Panel view transitions: cross-fade by default, directional slide by transition type. */
+::view-transition-old(.tabs-fade) {
+  animation: 150ms ease-in both tabs-fade-out;
+}
+::view-transition-new(.tabs-fade) {
+  animation: 150ms ease-out both tabs-fade-in;
+}
+::view-transition-old(.tabs-slide-next) {
+  animation: 180ms ease-in both tabs-out-left;
+}
+::view-transition-new(.tabs-slide-next) {
+  animation: 180ms ease-out both tabs-in-right;
+}
+::view-transition-old(.tabs-slide-prev) {
+  animation: 180ms ease-in both tabs-out-right;
+}
+::view-transition-new(.tabs-slide-prev) {
+  animation: 180ms ease-out both tabs-in-left;
+}
+
+@keyframes tabs-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes tabs-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes tabs-out-left {
+  to {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+}
+@keyframes tabs-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+}
+@keyframes tabs-out-right {
+  to {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+}
+@keyframes tabs-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  .tabs-indicator,
+  .tabs-tab {
+    transition: none;
+  }
+}
