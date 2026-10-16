@@ -196,10 +196,10 @@ export function DialogPage() {
       />
       <p>
         <code>DialogTriggerState</code>: <code>{"{ open, pending, disabled }"}</code>.{" "}
-        <code>pending</code> is true while the Root is pending and the optimistic open state differs
-        from the committed one (an open, or a close notification, in flight). The Trigger owns{" "}
-        <code>type</code>, <code>commandfor</code>, <code>command</code> and, when it installs one,{" "}
-        <code>onClick</code>.
+        <code>pending</code> is true while the Root is pending: an open or a close notification in
+        flight, or a re-open requested while a close notification is still settling. The Trigger
+        owns <code>type</code>, <code>disabled</code>, <code>commandfor</code>, <code>command</code>{" "}
+        and, when it installs one, <code>onClick</code>.
       </p>
 
       <h4>
@@ -239,7 +239,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Close on a click outside the dialog (the `::backdrop` for a modal). A JS `click` listener; with `experimental_closedBy`, native `closedby="any"`.',
+              'Close on a click outside the dialog (the `::backdrop` for a modal). JS `pointerdown` and `click` listeners: both the press and the click must land outside, so a drag that starts inside (selecting text) never closes. With `experimental_closedBy`, native `closedby="any"`, which behaves the same.',
           },
           {
             name: "experimental_closedBy",
@@ -305,7 +305,8 @@ export function DialogPage() {
       />
       <p>
         <code>DialogCloseState</code>: <code>{"{ pending, disabled }"}</code>. Repeated clicks while
-        pending re-run the action; the first close wins.
+        pending re-run the action; the first close wins. The Close owns <code>disabled</code>, so a{" "}
+        <code>render</code> element cannot re-enable it.
       </p>
 
       <h4>
@@ -322,9 +323,32 @@ export function DialogPage() {
                 closes the dialog natively with the submitter's <code>value</code>. A function (may
                 be a Server Function) is React's form action, passed through unwrapped; the dialog
                 closes once the action's transition has settled, including any Suspense wait it
-                causes. A rejection leaves the dialog open. A string is a plain navigating form.
+                causes (see <code>closeOnSettle</code>). A rejection leaves the dialog open. A
+                string is a plain navigating form.
               </>
             ),
+          },
+          {
+            name: "closeOnSettle",
+            type: "boolean",
+            default: "true",
+            description: (
+              <>
+                With a function <code>action</code>: close the dialog once the action settles
+                without throwing. Any non-throwing result counts, including a{" "}
+                <code>useActionState</code> result that reports validation errors; set{" "}
+                <code>false</code> to keep the dialog open and close it yourself (a{" "}
+                <code>Dialog.Close</code>, a <code>formMethod="dialog"</code> submitter, or a
+                controlled <code>open</code>). The dialog is never closed when it was closed while
+                the action ran, even if the user re-opened it meanwhile.
+              </>
+            ),
+          },
+          {
+            name: "method",
+            type: "string",
+            description:
+              'Only with a string `action` (for example `"post"`). Otherwise owned: `"dialog"` without `action`, React\'s own with a function.',
           },
           ...functionProps("DialogFormState"),
           renderProp("form", "DialogFormState"),
@@ -333,8 +357,8 @@ export function DialogPage() {
       <p>
         <code>DialogFormState</code>: <code>{"{ pending }"}</code>, this form's{" "}
         <code>useFormStatus().pending</code>. It is not emitted as <code>data-pending</code> and not
-        folded into any other part's state. The Form owns <code>method</code> and{" "}
-        <code>action</code>.
+        folded into any other part's state. The Form owns <code>action</code>, and{" "}
+        <code>method</code> unless <code>action</code> is a string.
       </p>
 
       <h4>
@@ -448,8 +472,11 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         <p>
           Browsers honour <code>cancel.preventDefault()</code> only once per user activation, so a{" "}
           <code>closeOnEscape={"{false}"}</code> prop could not keep its promise. Build "unsaved
-          changes" confirmation inside the dialog, for example a nested Dialog opened from a{" "}
-          <code>Dialog.Close action</code>.
+          changes" confirmation inside the dialog: a "Discard…" button that is the Trigger of a
+          nested confirm Dialog, whose own <code>Dialog.Close action</code> does the work and then
+          closes the outer dialog. Never write an action that awaits the user's answer in another
+          dialog: React holds every transition started while an async action is pending, so the
+          confirm would never open.
         </p>
       </Callout>
 
