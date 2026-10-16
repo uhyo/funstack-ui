@@ -419,7 +419,7 @@ Dev warnings (effect in `Root`, development builds only):
 | Popup               | `role="tooltip"`; a `hint` popover has no implicit role, so this is always rendered     |
 | Trigger             | `aria-describedby` or `aria-labelledby` (above); no `aria-expanded`, no `aria-haspopup` |
 | Tab to trigger      | opens after `delay` when focus is `:focus-visible` (pointer focus does not open)        |
-| Escape              | closes; focus stays on the trigger                                                      |
+| Escape              | closes; focus stays on the trigger; on the JS path the keydown is `preventDefault()`ed while the tooltip is open so an enclosing modal `<dialog>` does not close too (product-owner decision, mirrors close-watcher semantics for native `hint`; **pending the reviewer's verification in Chromium**). Escape or pointerdown on the trigger before `delay` elapses cancels the pending open |
 | Tab away            | closes after `closeDelay`                                                               |
 | Hover trigger       | opens after `delay`; stays open while the pointer is over the trigger or the popup      |
 | Pointer leaves both | closes after `closeDelay`                                                               |
@@ -446,7 +446,7 @@ reads them in `Root`'s effect.
 - **Native path**: inline style on the trigger, `interestDelayStart: "<delay>ms"` and
   `interestDelayEnd: "<closeDelay>ms"`, emitted only when `experimental_interestFor` is on so the
   baseline markup is unchanged. React hyphenates them for SSR; in engines without the property the
-  assignment is an inert expando. The properties need a `csstype` augmentation (section 9).
+  assignment is an inert expando. The properties are typed on `React.CSSProperties` (section 9).
 - **JS path**: `setTimeout` with the same values; `useEffectEvent` reads the latest props so
   changing a delay does not tear down the listeners.
 - **No skip-delay group in v0.** Many libraries open a second tooltip instantly when another was
@@ -556,7 +556,7 @@ cannot be animated there, so animate `translate`/`opacity`, never the anchor ins
 
 ## 9. Platform attribute typing
 
-`src/internal/platform-attributes.d.ts` (the one augmentation file, conventions 7.4) gains:
+`src/internal/platform-attributes.ts` (the one augmentation module, conventions 7.4) gains:
 
 ```ts
 declare module "react" {
@@ -569,20 +569,20 @@ declare module "react" {
   interface AreaHTMLAttributes<T> {
     interestfor?: string | undefined;
   }
-}
-declare module "csstype" {
-  interface Properties<TLength, TTime> {
+  interface CSSProperties {
     interestDelay?: string | undefined;
     interestDelayStart?: string | undefined;
     interestDelayEnd?: string | undefined;
   }
 }
+export {};
 ```
 
 `popover` (including `"hint"`) is already typed in `@types/react` 19.3.0, and `csstype` 3.2.3
 already types `positionArea`, `positionTryFallbacks`, `positionAnchor` and `anchorName`, so only
-`interestfor` and `interest-delay-*` need augmenting. The `csstype` augmentation is a second
-`declare module` in the file; see conventions feedback.
+`interestfor` and `interest-delay-*` need augmenting. The CSS properties are added to
+`React.CSSProperties`, **not** via `declare module "csstype"`: `csstype` is not a dependency of
+the package, so under pnpm that augmentation fails with TS2664 and would not reach consumers.
 
 ---
 
@@ -728,9 +728,9 @@ the same markup.
    `<ViewTransition>` and has no `transition` prop, and that this follows from 3.5. The current
    wording "every part whose mount, unmount or content is driven by library state" is correct but
    a reader of 5.1 alone will expect `Popup` to wrap.
-2. **Augmentation file (7.4).** "The augmentation file is the only place `declare module "react"`
-   appears" should become "the only place any `declare module` appears"; Tooltip needs
-   `declare module "csstype"` for `interest-delay-*`.
+2. **Augmentation file (7.4).** Resolved: the CSS properties are augmented on
+   `React.CSSProperties` inside the single `declare module "react"`; a `csstype` augmentation is
+   not possible (not a dependency; TS2664 under pnpm).
 3. **Id-reference merging (1.2).** "Library-controlled attributes (`aria-*` state, `id` wiring)
    win over the element's" should carve out ARIA id-reference lists (`aria-describedby`,
    `aria-labelledby`), which are merged as token lists. A trigger can be described by more than
@@ -832,8 +832,10 @@ message.
 export function useTooltipInteraction(
   trigger: HTMLElement | null,
   popup: HTMLElement | null,
-  options: { delay: number; closeDelay: number; disabled: boolean },
+  options: { delay: number; closeDelay: number; disabled: boolean; interestForRequested: boolean },
 ): void {
+  // `interestForRequested` is reported by the Trigger to the Root (layout effect) so this effect
+  // re-runs and re-detects the native path when `experimental_interestFor` flips after mount.
   const getOptions = useEffectEvent(() => options);
   useEffect(() => {
     if (trigger === null || popup === null || options.disabled) return;
@@ -848,25 +850,38 @@ export function useTooltipInteraction(
         timer = undefined;
       }
     };
+    // show/hide are skipped when the popup is no longer in the document: the passive cleanup
+    // runs after DOM removal on unmount, and hidePopover() on a disconnected popover throws.
     const show = () => {
       clear();
       timer = setTimeout(() => {
-        if (!open) popup.showPopover({ source: trigger });
+        if (!open && popup.isConnected) popup.showPopover({ source: trigger });
       }, getOptions().delay);
     };
     const hide = () => {
       clear();
       timer = setTimeout(() => {
-        if (open) popup.hidePopover();
+        if (open && popup.isConnected) popup.hidePopover();
       }, getOptions().closeDelay);
     };
     const hideNow = () => {
       clear();
-      if (open) popup.hidePopover();
+      if (open && popup.isConnected) popup.hidePopover();
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") hideNow();
+      if (e.key === "Escape") {
+        // Only installed while open: consume the key so a modal <dialog> around the tooltip
+        // does not also close (close-watcher-like; pending reviewer verification in Chromium).
+        e.preventDefault();
+        hideNow();
+      }
+    };
+    // While a show timer is pending (document listeners not yet installed), a click or Escape
+    // on the trigger must cancel it, or the tooltip would open after the user acted.
+    const onTriggerPointerDown = () => clear();
+    const onTriggerKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") clear();
     };
     const onToggle = (e: Event) => {
       open = (e as ToggleEvent).newState === "open";
@@ -889,6 +904,8 @@ export function useTooltipInteraction(
     trigger.addEventListener("pointerleave", hide);
     trigger.addEventListener("focus", onFocus);
     trigger.addEventListener("blur", hide);
+    trigger.addEventListener("pointerdown", onTriggerPointerDown);
+    trigger.addEventListener("keydown", onTriggerKeyDown);
     popup.addEventListener("pointerenter", clear);
     popup.addEventListener("pointerleave", hide);
     popup.addEventListener("toggle", onToggle);
@@ -897,7 +914,7 @@ export function useTooltipInteraction(
       trigger.removeEventListener("pointerenter", onEnter);
       /* ... remove the rest, including the document listeners ... */
     };
-  }, [trigger, popup, options.disabled]);
+  }, [trigger, popup, options.disabled, options.interestForRequested]);
 }
 ```
 
@@ -916,8 +933,9 @@ fire in between because `show` clears the timer first.
   entries only when `experimental_interestFor && !disabled`; `aria-describedby` / `aria-labelledby`
   merged token lists per `provides`; `data-disabled` by presence. No `aria-expanded`.
 - `Popup`: `id={popupId}`, `popover={experimental_hint ? "hint" : "manual"}`, `role="tooltip"`,
-  inline positioning per section 7, `data-side` / `data-align` when `side !== null`,
-  `data-disabled`. Provides `TooltipPopupContext`.
+  inline positioning per section 7, `data-side` / `data-align` when `side !== null` (owned keys
+  only then; with `side={null}` they are neither emitted nor owned, so a `render` element or
+  stylesheet-driven `data-side` passes through), `data-disabled`. Provides `TooltipPopupContext`.
 - `Arrow`: `aria-hidden="true"`, `data-side` / `data-align` from `TooltipPopupContext`.
 - All three resolve `className` / `style` / `children` / `render` through the shared
   `use-render.tsx` helper. Props spread order: library attributes, then consumer attributes, then
@@ -928,14 +946,15 @@ fire in between because `show` clears the timer first.
 
 ```ts
 if (process.env.NODE_ENV !== "production" && trigger && popup) {
+  // console.error, once per instance per kind, like the shared useDevWarning helper.
   if (provides === "name" && trigger.hasAttribute("aria-label"))
-    console.warn(
+    console.error(
       '[Tooltip] provides="name" with aria-label on the trigger announces the name twice. Remove aria-label.',
     );
   if (trigger.tabIndex < 0)
-    console.warn("[Tooltip] the trigger is not focusable; keyboard users cannot open the tooltip.");
+    console.error("[Tooltip] the trigger is not focusable; keyboard users cannot open the tooltip.");
   if (popup.querySelector("a[href],button,input,select,textarea,[tabindex]"))
-    console.warn("[Tooltip] tooltips must not contain interactive content.");
+    console.error("[Tooltip] tooltips must not contain interactive content.");
 }
 ```
 

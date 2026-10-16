@@ -928,8 +928,12 @@ notes"):
 | Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
 
 Rules of thumb: platform attribute names in source are the HTML spelling; the augmentation file
-is the only place any `declare module` appears (`"react"` for attributes, `"csstype"` for
-properties such as `interest-delay-start` / `interest-delay-end`); and every workaround for a react-dom
+is the only place any `declare module` appears, and that module is always `"react"`: HTML
+attributes go on `React.HTMLAttributes` and friends, and CSS properties the installed `csstype`
+lacks (`interest-delay`, `interest-delay-start`, `interest-delay-end`) go on
+`React.CSSProperties`, which has the same effect for `style` props. Never `declare module
+"csstype"`: `csstype` is not a dependency of this package, so under pnpm's strict layout the
+augmentation fails with TS2664 and would not reach consumers even if it compiled here; and every workaround for a react-dom
 limitation links the upstream issue (filed by us if none exists, as the survey recommends for
 `hidden="until-found"`).
 
@@ -1138,9 +1142,10 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     until a component shows it cannot be done in CSS on the popup itself.
 11. **`provides="description" | "name"`** is the convention for any part whose content labels or
     describes another element (Tooltip's `Popup`, future `Label`/`Description` parts):
-    `"description"` wires `aria-describedby`, `"name"` wires `aria-labelledby`. The component picks
-    the default (Tooltip: `"description"`, switching to `"name"` when the trigger has no accessible
-    name of its own), and the prop name is shared across components.
+    `"description"` wires `aria-describedby`, `"name"` wires `aria-labelledby`. It is an
+    **explicit prop with a fixed default** (`"description"`); there is no automatic switch to
+    `"name"` based on whether the trigger already has an accessible name (clarified 2026-10-16
+    after the Tooltip implementation; the design wins). The prop name is shared across components.
 12. **All Accordion parts are client modules** (section 7.3). Server Components render them and
     the native toggle works before hydration; directive-free variants are a later concern (#19).
 
