@@ -31,3 +31,4 @@
 - Accordion (#12) merged c66167e (161 tests total); review-accordion running (opus). tabs-impl running (opus, worktree). Next: Tooltip (#13) after Tabs; docs site (#14).
 - Tabs (#11) merged (284 tests total). Accordion review fixes landed (owned keys in mergeProps; latestInFlight() on hook). Next: review Tabs (opus) → fixes; then Tooltip (#13); docs site (#14).
 - Decision: reason vocabulary unified — "activate" (user) / "platform" (browser-initiated: find-in-page, pre-hydration). Tabs' "find" → "platform".
+- Tabs review: acceptable w/ minor fixes. Decisions: until-found stays revealed while pending; List becomes tab stop when controlled value matches no tab (+dev warning); focus-driven dispatch only when relatedTarget is inside the List; type="button" only on real buttons (Toggle too). tabs-fixes (opus) running on master; tooltip-impl (opus) in worktree; architect patching docs.
