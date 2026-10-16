@@ -172,6 +172,21 @@ const [enabled, setEnabled] = useState(feature.enabled);
 The parent writes only on success, so a rejected save leaves `enabled` unchanged and the
 optimistic flip reverts. Controlled twin of 2.1; section 11 tests the parity.
 
+Caveat (conventions 2.5): the latest-intent guard protects uncontrolled state only. Two rapid
+clicks whose saves complete in the opposite order leave this parent with the *older* intent,
+because each `setEnabled(next)` is a whole-value write landing in completion order. A parent
+that must survive overlap writes functionally against what the action changed, or keeps a
+sequence number and ignores stale completions:
+
+```tsx
+const seq = useRef(0);
+checkedChangeAction={async (next) => {
+  const id = ++seq.current;
+  await api.setFeature(feature.id, next);
+  if (id === seq.current) startTransition(() => setEnabled(next));
+}}
+```
+
 ### 2.6 Function props and `render`
 
 ```tsx
@@ -321,9 +336,11 @@ Omissions from the native prop set:
 Everything else on `<input>` passes through: `id`, `name`, `value`, `required`, `form`,
 `autoFocus`, `aria-label`, `aria-labelledby`, `aria-describedby`, `onClick`, `onBlur`,
 `onInput`, `onInvalid`, `title`, and so on. `onClick` passes through because the library does not
-use it; a consumer `onClick` that calls `preventDefault()` triggers the same desync and the same
-dev warning as doing it in the action (section 6.7). `readOnly` passes through but has no effect
-on checkable inputs (platform).
+use it; a consumer `onClick` that calls `preventDefault()` runs before the library's `onChange`,
+so the click is an **already-cancelled click**: no dispatch, no warning, and the browser reverts
+the DOM after dispatch (conventions 2.3 item 3). Only a `preventDefault()` *inside the action*
+desyncs and warns (section 6.7). `readOnly` passes through but has no effect on checkable inputs
+(platform).
 
 `checked` and `defaultChecked` both set, or `checked` flipping between `undefined` and a boolean
 after mount, log a dev warning (shared hook, conventions 3.1). `defaultChecked` is read once for
@@ -534,7 +551,9 @@ React itself intends for controlled inputs), is listed as question 1 for the pro
 ### 6.7 Sequence: `preventDefault()` (unsupported)
 
 With `checked={optimistic}`, calling `details.event.preventDefault()` in the action's sync prefix
-(or in a pass-through `onClick`, which runs before the library's `onChange`, verified) yields:
+yields the sequence below. (A pass-through `onClick` that cancels the click is a different case:
+it runs *before* the library's `onChange`, so the guard sees an already-cancelled click and does
+not dispatch at all, conventions 2.3 item 3.)
 
 ```
 click → DOM true → onChange → dispatch → sync-lane commit + restore: el.checked = true
@@ -643,7 +662,7 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
  * cancelled; otherwise dispatch, then warn once per instance in development if the action's sync
  * prefix (or a pass-through `onClick`) called `preventDefault()`.
  */
-export function guardCheckableChange(event: Event, dispatch: () => void): void;
+export function guardCheckableChange(event: Event, dispatch: () => void, componentName?: string): void;
 ```
 
 Behaviour, in order of declaration (effects run in declaration order):
@@ -656,11 +675,12 @@ Behaviour, in order of declaration (effects run in declaration order):
    latestInFlight()?.next ?? checked`; if `el.checked !== base`, call
    `onPlatformChange(el.checked, undefined)`. Runs before the re-apply effect so the
    pre-hydration value is read before it is overwritten.
-3. **Re-apply after every commit** (`useLayoutEffect`, no deps; all parts):
-   `want = latestInFlight()?.next ?? checked; if (el.checked !== want) el.checked = want;`
-   then `if (indeterminate !== undefined) el.indeterminate = indeterminate;` then
-   `if (defaultChecked !== undefined) el.defaultChecked = defaultChecked;`. Programmatic property
-   writes fire no events.
+3. **Re-apply after every commit** (`useLayoutEffect`, no deps; all parts), in this order:
+   `if (defaultChecked !== undefined) el.defaultChecked = defaultChecked;` first, because writing
+   the default can move `checked` on an input still at its default; then
+   `want = latestInFlight()?.next ?? checked; if (el.checked !== want) el.checked = want;` then
+   `if (indeterminate !== undefined) el.indeterminate = indeterminate;`. Skipped for `checked` in
+   the mount commit (conventions 3.8 rule 3). Programmatic property writes fire no events.
 4. **Form reset** (single controls; `useFormReset(ref, onReset)`): in the microtask,
    `next = el.defaultChecked; base = latestInFlight()?.next ?? checked;` if `next !== base` call
    `onPlatformChange(next, event)`, else `if (el.checked !== base) el.checked = base`.
@@ -771,7 +791,7 @@ verified (probe 04), so most rows stay there.
 | 16 | `render` function | jsdom | Function form receives `(props, state)`; rendering `<><input {...props}/><span/></>` works and the sibling can read `state.pending`. Rendering a `<button>` logs the dev warning. |
 | 17 | Post-await rule | jsdom | Controlled parent that `await`s then `startTransition(() => setChecked(next))`: `checked` and `data-pending` converge in one state. |
 | 18 | `transition` prop | jsdom | Renders identically with `transition` unset, `"fsui-fade"`, and a type map (wiring only). |
-| 19 | Dev warnings | jsdom | `checked` with `defaultChecked` warns once; mode switch warns once; `preventDefault()` in the action's sync prefix warns once and leaves `el.checked === false` while pending (documents the desync), in sync after settle; `preventDefault()` in a pass-through `onClick` warns too. |
+| 19 | Dev warnings | jsdom | `checked` with `defaultChecked` warns once; mode switch warns once; `preventDefault()` in the action's sync prefix warns once and leaves `el.checked === false` while pending (documents the desync), in sync after settle; a pass-through `onClick` that cancels the click neither dispatches nor warns (row 26). |
 | 20 | Platform: form reset (both) | jsdom | Inside `<form>` with `<button type="reset">`: after a click (committed `true`), reset → action called with `(false, { reason: "platform" })`, `details.event.type === "reset"`; uncontrolled: `el.checked` false after settle; controlled parent that refuses: `el.checked` true again after settle; parent that accepts: false. A listener that cancels `reset` → no dispatch, DOM unchanged. |
 | 21 | Platform: React automatic reset | jsdom | `<form action={async () => {}}>` containing an uncontrolled Switch with no action: click (true), submit; after the action resolves the DOM and `data-checked` are back to `defaultChecked` (false) with no desync. Variant: the parent re-renders with `defaultChecked={true}` inside the action's transition → the Switch ends `checked` true (reset target follows the latest prop). |
 | 21b | Platform: React automatic reset | browser | Row 21's first variant in all three engines (`requestFormReset` goes through the engine's `form.reset()`). |
@@ -866,7 +886,7 @@ export function Switch({
         if (disabled) return;
         guardCheckableChange(event.nativeEvent, () =>
           dispatch(!optimistic, createActionDetails(event.nativeEvent, { reason: "activate" })),
-        ); // already-cancelled click: no dispatch; preventDefault() in the action: dev warning (6.7)
+        "Switch"); // already-cancelled click: no dispatch, no warning; preventDefault() in the action: dev warning (6.7)
       },
     },
   });

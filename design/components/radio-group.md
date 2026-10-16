@@ -345,7 +345,10 @@ Firefox restored the dynamic checked state on reload, leaves DOM ≠ React state
 layout effect at mount reads the group, and if the checked value differs from the initial value,
 dispatches it once with `reason: "platform"` and `event: undefined`. One dispatch per group, never
 one per radio. The StrictMode re-run of the effect sees the dispatch already in flight and does
-nothing. No `suppressHydrationWarning` is needed: the HTML `checked` attribute still matches the
+nothing. An Item that mounts **after** the Root reconciled (inside a Suspense boundary that
+hydrates later) calls `onItemMounted()` from the adapter, handed down through context; the Root
+then reconciles once more in a microtask, deduped across items mounting in the same commit and
+subject to the same base comparison (conventions 3.8 rule 3; product-owner decision). No `suppressHydrationWarning` is needed: the HTML `checked` attribute still matches the
 server render and react-dom does not diff the `checked` property during hydration.
 
 ### 5.2 Form reset
@@ -795,7 +798,7 @@ controlled wrapper.
 | Overlap | Arrow to b then c, resolve b last: DOM and `data-checked` on c throughout, final committed c; walkthrough 9.6 (click back to committed while pending): final committed is the committed value, both actions called. |
 | Superseded rejection (both) | b rejects after c resolved, and while c is pending: error reaches the boundary; c's outcome unaffected. |
 | Suspending content (both) | Dependent `<Suspender />` keyed on the consumer's state updated in the action: old content stays, no fallback from the boundary above, Root `data-pending`; after resolve, new content. |
-| Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; rejection rolls the DOM back to "a". StrictMode: still one dispatch. |
+| Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; rejection rolls the DOM back to "a". StrictMode: still one dispatch. Late-mounting Item: an Item under a Suspense boundary that resolves after hydration, with its DOM `checked` set before reveal, produces one additional dispatch via `onItemMounted()`; two such Items in one commit produce one. |
 | Platform: form reset | Inside a `<form>`: check "b", call `form.reset()` → one dispatch `(a-or-null, { reason: "platform", event: Event("reset") })`, uncontrolled commits it; controlled parent that ignores → DOM re-checks the parent's radio after settle; `<form action>` that succeeds auto-resets and dispatches the same way; a cancelled `reset` event dispatches nothing; `Root disabled` still dispatches on reset; reset whose target equals the optimistic value dispatches nothing. |
 | `preventDefault` warning | `details.event.preventDefault()` inside the action logs the dev warning once; the action still ran. |
 | Platform: reset target by mode | Uncontrolled: after the Root re-renders with a new `defaultValue` (inside a transition), `form.reset()` returns the group to the new default and dispatches it; controlled: reset returns to the mount-time `value` and the parent is notified. |
@@ -847,6 +850,8 @@ interface RadioGroupContextValue {
   readonly disabled: boolean;
   /** No-op if `value === optimistic`, or if `event.defaultPrevented` (section 4.3). Never checks `disabled`; a disabled radio never fires. */
   readonly select: (value: string, event: Event) => void;
+  /** From `useNativeGroupReconciliation`; an Item calls it from its mount effect so a late-mounting Item is reconciled (5.1). */
+  readonly onItemMounted: () => void;
 }
 ```
 
@@ -891,9 +896,11 @@ is not in the context: no part renders it.
   `disabled = ctx.disabled || disabledProp`.
 - `useNativeChecked({ type: "radio", component: "RadioGroup.Item", checked, group: true,
   defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value })`
-  (conventions 3.8): tag check, re-apply of `checked` and `defaultChecked` after every commit; no
-  residual-path reporting (the Root does it once per group). `onChange` goes through
-  `guardCheckableChange` before calling `ctx.select`.
+  (conventions 3.8): tag check, re-apply of `defaultChecked` then `checked` after every commit
+  except the mount commit; no residual-path reporting (the Root does it once per group), but the
+  mount effect calls `ctx.onItemMounted()` so a late-mounting Item is reconciled (5.1).
+  `onChange` goes through `guardCheckableChange(event, dispatch, "RadioGroup.Item")` before
+  calling `ctx.select`.
 - Renders through `use-render` with `defaultElement: "input"`; pass-through `props` are `rest`
   plus `disabled: disabledProp` (native, own prop only); `libraryProps`:
   `type: "radio"`, `name: ctx.name`, `value`, `checked`, `form: ctx.form`, `required: ctx.required`,

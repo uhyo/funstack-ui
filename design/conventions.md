@@ -129,6 +129,9 @@ Rules for the element passed to `render` (same as Base UI):
   part computes always wins *even when its computed value is `undefined`*, in which case the
   attribute is removed rather than falling back to the element's value. A `render` element can
   therefore never re-introduce `name`, `data-open`, `aria-disabled`, `aria-pressed` and the like.
+  **`disabled` is owned by every part that takes a `disabled` prop**: a `render` element cannot
+  re-enable a part the consumer disabled (nor disable one the library computed as enabled), so
+  the prop, the native attribute, `data-disabled` and the no-dispatch rule always agree.
   Rationale: a second writer for a state attribute would leave stale ARIA that keyboard and AT
   navigation read (an `aria-disabled="true"` from the element outliving the library's
   `undefined`), and `name` on `<details>` would silently change exclusive-group membership.
@@ -403,7 +406,11 @@ is not the latest for, stores the first such error in state, and **throws it fro
 next commit, so a superseded action's failure reaches the same nearest boundary as a latest one.
 Contract:
 
-- The latest dispatch's rejection propagates through React's own path (nothing is caught).
+- The latest dispatch's rejection propagates through React's own path (nothing is caught). It
+  reaches the boundary only **after every older overlapping dispatch has settled**: React holds
+  the boundary's commit while the entangled action lane is still pending (section 2.3 item 5).
+  React behaviour, documented so a test that rejects the newest of two dispatches does not expect
+  the fallback before the older one resolves.
 - A superseded dispatch's rejection is caught by the hook, stored, and rethrown from render inside
   a transition-free update so the boundary sees it on the next render of the owner.
 - Only the first superseded error is kept; later ones are reported through `reportError` to avoid
@@ -444,6 +451,13 @@ React neither cancels nor orders overlapping actions. The library's stance:
   recently dispatched action, ignoring earlier ones that resolve later. (Verified: without this
   guard the slowest promise wins.) An earlier action's *rejection* is not ignored: the hook
   surfaces it to the boundary itself, because React would drop it (section 2.4).
+- **Controlled parents are not guarded.** The latest-intent guard protects uncontrolled state
+  only. A controlled "update on success" parent that writes the *whole value*
+  (`startTransition(() => setChecked(next))` after its `await`) lands writes in completion order,
+  so under overlap with differing completion order the slower, older intent wins; this is the
+  same class of problem as Accordion's multiple mode (`design/components/accordion.md` 2.2).
+  Recommended: functional updates keyed by what changed, or a sequence check in the parent, or
+  uncontrolled mode. Component docs show the pattern next to every "update on success" example.
 - **No queueing in the library.** Components that need ordered, result-threaded actions (forms,
   counters) use `useActionState` internally and document that. None of the initial four do.
 - Consumers who need abort semantics implement them in the action (`AbortController` captured in
@@ -732,8 +746,8 @@ This is the one contract both designs implement (reconciled 2026-10-16 from
 | Hook | Called by | Does |
 | --- | --- | --- |
 | `useFormReset(ref, onReset)` (`internal/use-form-reset.ts`) | the other two | **Stable** `reset` subscription on the form owner (`ref.current.form`; the element may be an `<input>` or a `<fieldset>`, both form-associated and honouring `form=`). Re-reads the owner after every commit but re-subscribes only when it changed; the handler body is a `useEffectEvent`. On `reset` it queues a microtask and, unless `event.defaultPrevented`, calls `onReset(event)`. |
-| `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies `checked` (optimistic), `indeterminate` (if given) and `defaultChecked` (if given); and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
-| `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. |
+| `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies, in this order, `defaultChecked` (if given), then `checked` (optimistic), then `indeterminate` (if given); the order is load-bearing because writing `defaultChecked` can move `checked` on an input whose value is still the default; and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
+| `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns `{ onItemMounted }`, which the Root passes down through context; a `group: true` item calls it from its mount effect so an item that mounts **after** the Root's own reconciliation (under a Suspense boundary that hydrates later) triggers one more reconciliation, deduped and run in a microtask. |
 
 Rules the three hooks implement, which component docs may cite instead of restating:
 
@@ -753,7 +767,13 @@ Rules the three hooks implement, which component docs may cite instead of restat
    StrictMode's re-run of the mount effects (detected with a per-render token rather than a
    `useRef` flag, which StrictMode would reuse); from the second commit on it re-applies after
    every commit. A single control is unaffected (its own mount reconciliation reads the DOM
-   first), but the rule is uniform so the hook has one behaviour.
+   first), but the rule is uniform so the hook has one behaviour. **Late-mounting items**
+   (product-owner decision): an item that mounts after the Root reconciled, for example inside a
+   Suspense boundary that hydrates after the Root, is not covered by the Root's mount effect; its
+   `useNativeChecked({ group: true })` calls the adapter's `onItemMounted()` (from context) in its
+   mount effect, and the adapter reconciles again in a microtask, deduped across several items
+   mounting in one commit and subject to the same base comparison, so it dispatches only when the
+   late item's DOM value differs from what the user intends.
 4. **The reset subscription must be stable.** React's automatic reset after a successful
    `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
    the next subscription, so a listener attached in a deps-less effect never sees it (verified,
@@ -773,10 +793,12 @@ Rules the three hooks implement, which component docs may cite instead of restat
    rewrites it on every commit of the input) and load-bearing for `indeterminate` and
    `defaultChecked`, which React does not manage on a controlled input. It also ends the
    `preventDefault()` desync at the next commit.
-9. **Click guard**, shared by every part's `onChange` (`guardCheckableChange(event, dispatch)` in
-   `use-native-checked.ts`): if `event.defaultPrevented` is already true, return without
-   dispatching (section 2.3 item 3); otherwise dispatch, then in development warn once per instance
-   if the event is now `defaultPrevented`.
+9. **Click guard**, shared by every part's `onChange`
+   (`guardCheckableChange(event, dispatch, componentName?)` in `use-native-checked.ts`): if
+   `event.defaultPrevented` is already true, return without dispatching **and without warning**
+   (section 2.3 item 3: an already-cancelled click is not a change); otherwise dispatch, then in
+   development warn once per element, naming `componentName`, if the event is now
+   `defaultPrevented`.
 
 ---
 
@@ -795,7 +817,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
 | `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
-| `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` is an exact equivalent. |
+| `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
