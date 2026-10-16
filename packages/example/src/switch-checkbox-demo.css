@@ -1,0 +1,205 @@
+/* Switch and Checkbox demo: the input itself is the control (appearance: none + ::before), or a
+   visually hidden input with a sibling styled through :has(). Data attributes and pseudo-classes
+   agree because the DOM state is the optimistic state. */
+
+.stack {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.row.nested {
+  margin-inline-start: 1.5em;
+}
+
+/* label:has(:checked) styles the whole row from the native state. */
+.row:has(:checked) {
+  font-weight: 600;
+}
+
+.row:has([data-pending]) {
+  cursor: progress;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* --- Switch: the input is the track, ::before is the thumb. ------------------------------- */
+
+.sc-switch {
+  appearance: none;
+  margin: 0;
+  inline-size: 2.5em;
+  block-size: 1.5em;
+  border-radius: 1em;
+  background: #bbb;
+  cursor: inherit;
+  transition: background-color 120ms;
+}
+
+.sc-switch::before {
+  content: "";
+  display: block;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  margin: 0.125em;
+  border-radius: 50%;
+  background: white;
+  transition: translate 120ms;
+}
+
+.sc-switch:checked {
+  background: #15803d;
+}
+
+.sc-switch:checked::before {
+  translate: 1em 0;
+}
+
+.sc-switch[data-pending] {
+  opacity: 0.7;
+}
+
+.sc-switch:focus-visible,
+.sc-checkbox:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.sc-switch:disabled,
+.sc-checkbox:disabled {
+  opacity: 0.5;
+}
+
+/* --- Checkbox: check and dash drawn in CSS. -------------------------------------------------- */
+
+.sc-checkbox {
+  appearance: none;
+  margin: 0;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  border: 2px solid #666;
+  border-radius: 0.25em;
+  display: inline-grid;
+  place-content: center;
+  cursor: inherit;
+  transition:
+    background-color 120ms,
+    border-color 120ms;
+}
+
+.sc-checkbox::before {
+  content: "";
+  inline-size: 0.7em;
+  block-size: 0.7em;
+  background: currentColor;
+  scale: 0;
+  transition: scale 100ms;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.sc-checkbox[data-checked] {
+  background: #15803d;
+  border-color: #15803d;
+  color: white;
+}
+
+.sc-checkbox[data-checked]::before {
+  scale: 1;
+}
+
+/* data-indeterminate works before hydration; :indeterminate only after. Chromium does not match
+   :checked on a box that is both checked and indeterminate, so the data attributes are used here. */
+.sc-checkbox[data-indeterminate] {
+  background: #15803d;
+  border-color: #15803d;
+  color: white;
+}
+
+.sc-checkbox[data-indeterminate]::before {
+  scale: 1;
+  clip-path: none;
+  block-size: 0.18em;
+}
+
+.sc-checkbox[data-pending] {
+  opacity: 0.7;
+}
+
+.sc-checkbox:user-invalid {
+  border-color: #b91c1c;
+}
+
+/* --- Visually hidden input with a sibling track. -------------------------------------------- */
+
+.sr-only-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.thumb-row {
+  position: relative;
+}
+
+.track {
+  display: inline-block;
+  inline-size: 2.5em;
+  block-size: 1.5em;
+  border-radius: 1em;
+  background: #bbb;
+  transition: background-color 120ms;
+}
+
+.thumb {
+  display: block;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  margin: 0.125em;
+  border-radius: 50%;
+  background: white;
+  transition: translate 120ms;
+}
+
+.thumb-row:has(:checked) .track {
+  background: #2563eb;
+}
+
+.thumb-row:has(:checked) .thumb {
+  translate: 1em 0;
+}
+
+.thumb-row:has([data-pending]) .track {
+  opacity: 0.6;
+}
+
+.thumb-row:has(:focus-visible) .track {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-switch,
+  .sc-switch::before,
+  .sc-checkbox,
+  .sc-checkbox::before,
+  .track,
+  .thumb {
+    transition: none;
+  }
+}
