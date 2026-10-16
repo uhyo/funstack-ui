@@ -33,7 +33,7 @@ form reset). Read this document before the Checkbox one.
 | 10 | ARIA | `role="switch"` on the input; the native `checked` state is the ARIA state. `aria-checked` is **owned and always removed** (forbidden on native inputs by ARIA in HTML). No key handling: native Space. |
 | 11 | `render` | Must keep an `<input type="checkbox">`; `type`, `checked`, `role`, `onChange` and the state attributes are owned. Dev warning when the mounted node is anything else. |
 | 12 | `switch` attribute | Not used (WebKit-only). Reserved as `experimental_switch` for when Chromium ships it. |
-| 13 | Files | `src/switch/{index.ts,switch.tsx,switch.test.tsx,switch.browser.test.tsx}`, `src/internal/use-native-checked.ts`. `switch.tsx` and the hook are `"use client"`. Exports `Switch`, `SwitchProps`, `SwitchState`, `SwitchCheckedChangeDetails`. |
+| 13 | Files | `src/switch/{index.ts,switch.tsx,switch.test.tsx,switch.browser.test.tsx}`, `src/internal/use-native-checked.ts`, `src/internal/use-form-reset.ts` (conventions 3.8). `switch.tsx` and both hooks are `"use client"`. Exports `Switch`, `SwitchProps`, `SwitchState`, `SwitchCheckedChangeDetails`. |
 
 ---
 
@@ -246,7 +246,7 @@ conventions 5.4.
 ```ts
 // packages/ui/src/switch/switch.tsx
 import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
-import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type { ActionDetails, ChangeAction, ChangeReason, RenderProp, StateValue } from "../internal/types.js";
 
 export interface SwitchState {
   /** Optimistic checked state: what the user sees, including an in-flight change. */
@@ -265,7 +265,7 @@ export interface SwitchCheckedChangeDetails extends ActionDetails {
    * the `reset` event) or a click before hydration / Firefox form-state restoration found on
    * mount (`event` is `undefined`).
    */
-  readonly reason: "activate" | "platform";
+  readonly reason: ChangeReason;
 }
 
 export interface SwitchProps
@@ -589,12 +589,16 @@ hydration) never dispatches here: `initInput` writes `el.checked` from the prop.
 
 ---
 
-## 7. Shared internal: `useNativeChecked`
+## 7. Shared internal: `useNativeChecked` (conventions 3.8)
 
-Everything a native checkable input needs beyond `useControllableAction` lives in one hook so
-that Switch, Checkbox and RadioGroup items behave identically (conventions 3.4's reasoning). It
-owns the three DOM-side concerns: the dev tag check, the two residual browser paths, and keeping
-DOM properties React does not manage in sync.
+The native-input machinery is specified once in conventions 3.8 as three hooks: `useFormReset`
+(stable `reset` subscription on a form owner), `useNativeChecked` (per `<input>`), and
+`useNativeGroupReconciliation` (per fieldset Root). Switch, a single control, uses
+`useNativeChecked` alone; its residual paths are reported by the hook itself. RadioGroup items use
+the same hook with `group: true` and let their Root report once per group. This section records
+the per-element hook's options and the behaviour Switch relies on; the rules themselves
+(base comparison, stable subscription, `defaultChecked` read, reset target by mode, click guard)
+are conventions 3.8 rules 1 to 9 and are not restated.
 
 ```ts
 // packages/ui/src/internal/use-native-checked.ts
@@ -610,23 +614,36 @@ export interface UseNativeCheckedOptions {
   /**
    * The form-reset target. Uncontrolled parts pass the latest `defaultChecked` prop (`?? false`),
    * mirrored into `el.defaultChecked` after every commit. Controlled parts pass `undefined`:
-   * React's mount-time value stays.
+   * React's mount-time value stays. (Conventions 3.8 rule 6.)
    */
   readonly defaultChecked: boolean | undefined;
   /** Checkbox only: `el.indeterminate` after every commit (the part passes `indeterminate && !pending`). */
   readonly indeterminate?: boolean;
-  /** From `useControllableAction`: the value the DOM is compared against on the residual paths. */
-  readonly latestInFlight: () => { readonly next: boolean } | null;
   /**
-   * The browser changed the value on a residual path and it differs from library state. `event`
-   * is the `reset` event, or `undefined` for mount reconciliation. The part dispatches with
-   * `reason: "platform"`. RadioGroup's items report through this and the Root folds the reports.
+   * `true` inside a group (`RadioGroup.Item`): the hook does the tag check and the re-apply only;
+   * mount reconciliation and form reset are reported once per group by the Root through
+   * `useNativeGroupReconciliation`. Default `false`: the hook reports both paths itself.
    */
-  readonly onPlatformChange: (next: boolean, event: Event | undefined) => void;
+  readonly group?: boolean;
+  /** From `useControllableAction`: the value the DOM is compared against on the residual paths. */
+  readonly latestInFlight?: () => { readonly next: boolean } | null;
+  /**
+   * Single controls only. The browser changed the value on a residual path and it differs from
+   * what the user intends. `event` is the `reset` event, or `undefined` for mount reconciliation.
+   * The part dispatches with `reason: "platform"`.
+   */
+  readonly onPlatformChange?: (next: boolean, event: Event | undefined) => void;
 }
 
 /** Returns the ref to attach to the input (merged by `useRender`). */
 export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<HTMLInputElement>;
+
+/**
+ * Shared `onChange` guard (conventions 3.8 rule 9): no dispatch when the click is already
+ * cancelled; otherwise dispatch, then warn once per instance in development if the action's sync
+ * prefix (or a pass-through `onClick`) called `preventDefault()`.
+ */
+export function guardCheckableChange(event: Event, dispatch: () => void): void;
 ```
 
 Behaviour, in order of declaration (effects run in declaration order):
@@ -635,37 +652,21 @@ Behaviour, in order of declaration (effects run in declaration order):
    `HTMLInputElement` whose `type` equals `options.type` ("Switch: expected to render an
    `<input type="checkbox">` but got …; the platform semantics need a real input"). Returns a
    cleanup that clears the node.
-2. **Mount reconciliation** (`useLayoutEffect`, `[]`): `base = latestInFlight()?.next ?? checked`;
-   if `el.checked !== base`, call `onPlatformChange(el.checked, undefined)`. Runs before the
-   re-apply effect so the pre-hydration value is read before it is overwritten.
-3. **Re-apply after every commit** (`useLayoutEffect`, no deps):
+2. **Mount reconciliation** (single controls; `useLayoutEffect`, `[]`): `base =
+   latestInFlight()?.next ?? checked`; if `el.checked !== base`, call
+   `onPlatformChange(el.checked, undefined)`. Runs before the re-apply effect so the
+   pre-hydration value is read before it is overwritten.
+3. **Re-apply after every commit** (`useLayoutEffect`, no deps; all parts):
    `want = latestInFlight()?.next ?? checked; if (el.checked !== want) el.checked = want;`
    then `if (indeterminate !== undefined) el.indeterminate = indeterminate;` then
    `if (defaultChecked !== undefined) el.defaultChecked = defaultChecked;`. Programmatic property
-   writes fire no events. React itself rewrites `el.checked` in `updateInput` on every commit of
-   the input (verified), so this is belt-and-braces for `checked` and load-bearing for the other
-   two properties, which React does not manage on a controlled input. It also closes the
-   `preventDefault()` desync at the next commit and re-shows `indeterminate` after a rollback.
-4. **Form reset** (`useEffect`, no deps, but it only swaps the subscription when `el.form`
-   changed since the last run; the handler body is a `useEffectEvent` so it needs no
-   re-subscription): on `reset`, `queueMicrotask` → if `event.defaultPrevented` return;
-   `next = el.defaultChecked; base = latestInFlight()?.next ?? checked;` if `next !== base`
-   call `onPlatformChange(next, event)`, else `if (el.checked !== base) el.checked = base`.
-   **The subscription must be stable**: React's automatic reset runs in the commit's mutation
-   phase, between the previous effect cleanup and the next subscription, so a listener attached
-   in a deps-less effect never sees it (verified; probe in the notes). Why a microtask: the reset
-   event precedes the reset algorithm, and when the reset is React's it happens inside a commit,
-   where dispatching would be unsafe; a microtask runs after both. Why `el.defaultChecked` rather
-   than the DOM `checked`: for React's automatic reset the re-apply effect (3) has already put
-   the optimistic value back by the time the microtask runs; `defaultChecked` is the value the
-   browser reset to, in both modes (6.6).
+   writes fire no events.
+4. **Form reset** (single controls; `useFormReset(ref, onReset)`): in the microtask,
+   `next = el.defaultChecked; base = latestInFlight()?.next ?? checked;` if `next !== base` call
+   `onPlatformChange(next, event)`, else `if (el.checked !== base) el.checked = base`.
 
 The hook does not know about transitions, `reason` values or dispatch; the part wires
-`onPlatformChange` to `dispatch(next, createActionDetails(event, { reason: "platform" }))`. For
-RadioGroup, each item's hook reports `(checked, event)` and the Root folds the reports of one
-reset or one mount into a single `value` dispatch (Accordion's mount reconciliation precedent);
-that design decides whether the Root owns the `reset` subscription instead. `useFormReset` is
-not split out as a separate hook until RadioGroup shows it needs one.
+`onPlatformChange` to `dispatch(next, createActionDetails(event, { reason: "platform" }))`.
 
 ---
 
@@ -776,7 +777,8 @@ verified (probe 04), so most rows stay there.
 | 22 | Platform: pre-hydration click | jsdom | `renderToString` markup, flip `el.checked` before `hydrateRoot`: one dispatch `(true, { reason: "platform" })` with `details.event === undefined`, no hydration warning (console spy), uncontrolled commits `true`; controlled parent that refuses → `el.checked` false after settle. `createRoot` variant never dispatches on mount. |
 | 23 | `details.event` is virtual | jsdom | Toggle row 21 verbatim, plus `JSON.stringify(details) === '{"reason":"activate"}'`. |
 | 24 | Forms | jsdom | `new FormData(form)` has `name=on` when checked and nothing when unchecked; `value="weekly"` posts `weekly`; `required` unchecked → `form.checkValidity()` false and `:invalid` matches. |
-| 25 | Directive | build | `dist/switch/switch.mjs` and `dist/internal/use-native-checked.mjs` start with `"use client"`; `dist/switch/index.mjs` does not. |
+| 25 | Directive | build | `dist/switch/switch.mjs`, `dist/internal/use-native-checked.mjs` and `dist/internal/use-form-reset.mjs` start with `"use client"`; `dist/switch/index.mjs` does not. |
+| 26 | Sync action (both) | jsdom | A pass-through `onClick` that calls `preventDefault()`: no dispatch, `el.checked` back to the old value after the click, no warning about the action (conventions 2.3 item 3). |
 
 Not automated, covered by the research's probes and the example app: the accessibility-tree role
 (`switch`, probe 06), Firefox form-state restoration on reload, `appearance: none` rendering,
@@ -790,7 +792,8 @@ ViewTransition behaviour.
 
 ```
 packages/ui/src/internal/
-  use-native-checked.ts        # "use client" (section 7); shared with Checkbox and RadioGroup
+  use-form-reset.ts            # "use client" (conventions 3.8); stable reset subscription on a form owner
+  use-native-checked.ts        # "use client" (section 7); per input, shared with Checkbox and RadioGroup.Item
 packages/ui/src/switch/
   index.ts                     # no directive: export { Switch } and the three types
   switch.tsx                   # "use client"
@@ -812,7 +815,7 @@ import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useNativeChecked } from "../internal/use-native-checked.js";
+import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 
 export function Switch({
@@ -860,8 +863,9 @@ export function Switch({
       "data-disabled": dataAttr(disabled),
       onChange: (event: ChangeEvent<HTMLInputElement>) => {
         if (disabled) return;
-        dispatch(!optimistic, createActionDetails(event.nativeEvent, { reason: "activate" }));
-        warnIfDefaultPrevented(event.nativeEvent); // dev only, once per instance (6.7)
+        guardCheckableChange(event.nativeEvent, () =>
+          dispatch(!optimistic, createActionDetails(event.nativeEvent, { reason: "activate" })),
+        ); // already-cancelled click: no dispatch; preventDefault() in the action: dev warning (6.7)
       },
     },
   });
@@ -881,8 +885,9 @@ Switch.displayName = "Switch";
 - **`children: undefined`** is passed to `useRender`; `SwitchProps` has no `children`.
 - **No `useId`, no context, no key handling.** Label association is the consumer's `<label>`.
 - **Transition types** come from the shared `transitionTypes("switch", …)` helper.
-- **Dev warning for `preventDefault()`** is a tiny module-local helper with a `useRef` flag, not
-  `useDevWarning` (which is effect-based and would need state to carry the event-time fact).
+- **The click guard** (`guardCheckableChange`, conventions 3.8 rule 9) is shared with Checkbox
+  and RadioGroup: a click already cancelled by a pass-through `onClick` never dispatches; a
+  `preventDefault()` inside the action warns once per instance.
 - **`defaultChecked` for the hook** is `undefined` in controlled mode so React's mount-time value
   stays (6.6); in uncontrolled mode it is the latest prop so the reset target follows re-renders.
 - Nothing else: Switch is `useControllableAction` + `useNativeChecked` + `useRender`. Checkbox is
@@ -898,70 +903,34 @@ documents `defaultChecked` as the reset target and `preventDefault()` as unsuppo
 
 ---
 
-## Cross-component: what this design assumes RadioGroup and Checkbox do the same
+## Cross-component (resolved 2026-10-16)
 
-- **Vocabulary**: `checked` is the state word for every checkable input (`data-checked`,
-  `state.checked`), not `selected`; RadioGroup items reuse it and the Root's state is
-  `value` / `defaultValue` / `valueChangeAction` (`string | null`).
-- **`details.reason`**: `"activate"` | `"platform"`, with `"platform"` for mount reconciliation
-  (`event: undefined`) and form reset (`event` = the `reset` event). RadioGroup folds the
-  reports of its items into one dispatch per reset or mount.
-- **`checked={optimistic}`** on every native input, `checked={optimistic === item.value}` for
-  radios; `aria-checked` owned and removed everywhere.
-- **`useNativeChecked`** (section 7) per input with `type: "radio"`; `name` is owned by the
-  RadioGroup Root (`useId()` default), whereas Switch and Checkbox pass `name` through.
-- **Groups** are `<fieldset>` + `<legend>`: `RadioGroup.Root` = `<fieldset role="radiogroup">`
-  with a `Label` part rendering `<legend>`; a future `CheckboxGroup.Root` = `<fieldset>` (role
-  `group`) with the same `Label` part; a group of switches is consumer markup.
-- **Native `disabled`** on the input and on the fieldset; `data-disabled` reflects props only.
-- **No `useFormStatus`** anywhere; the form channel and the action channel stay independent.
+The assumptions this design made about RadioGroup and Checkbox are now conventions, recorded as
+resolved questions 16 to 21 and section 3.8 there: `checked` is the vocabulary word on every
+checkable input; `details.reason` is the shared `ChangeReason`; `checked={optimistic}` on every
+native input (`optimistic === item.value` for radios); `aria-checked` owned and removed; the
+three-hook machinery with one dispatch per state owner; `<fieldset>` + `<legend>` (`Label`)
+groups; native `disabled`; no `useFormStatus` coupling. The one difference that stays: `name` is
+pass-through on Switch and Checkbox and Root-owned on RadioGroup items.
 
-## Conventions feedback
+## Conventions feedback (applied 2026-10-16)
 
-1. **1.3 / 1.5, void elements.** "`className`, `style`, `children` accept a value or a function"
-   should say that a part rendering a void element (`<input>`) has no `children` prop at all (it
-   is omitted from the type), rather than a `children` that is ignored.
-2. **3.5, residual browser paths.** The research's item 2 (form reset) plus two specifics this
-   design found: the uncontrolled reset target is the **latest** `defaultX` prop, mirrored into
-   the DOM by the library (React's own rule for uncontrolled inputs); and the `reset` subscription
-   must be stable because React's automatic reset runs in the mutation phase (a deps-less effect
-   misses it). Worth one sentence each, since RadioGroup and any future native control hit both.
-3. **3.1, "`defaultX` is read once".** For native form controls it is read once for the initial
-   value and *also* defines the reset target, which does follow later values. Suggest: "read once
-   for the initial value; native form controls additionally use the latest value as the reset
-   target (component docs say so)".
-4. **2.3 item 3 and the `preventDefault()` warning.** The research's item 3 is being applied; this
-   design specifies the warning text and that it also covers a pass-through `onClick` (which runs
-   before the library's `onChange`, verified).
-5. **4.1 state table.** `checked` (Switch, Checkbox, RadioGroup items) and `indeterminate`
-   (Checkbox, see that design: it is suspended while pending). Add the pseudo-class column
-   entries `:checked`, `:indeterminate`, `:disabled` (fieldset inheritance), `:user-invalid`.
-6. **5.3 types table.** Add `Switch: fsui-switch, fsui-switch-on, fsui-switch-off` and
-   `Checkbox: fsui-checkbox, fsui-checkbox-check, fsui-checkbox-uncheck`.
-7. **9.1 layout.** Add `internal/use-native-checked.ts`.
-8. **2.2 shared reason type.** Three components now declare `"activate" | "platform"` locally
-   (`AccordionChangeReason`, and the two here). Suggest exporting one `ChangeReason` type from
-   `internal/types.ts` (public, re-exported from the root) and having each `…ChangeDetails` use it.
-9. **10.1 required rows.** Components with residual browser paths should have a required
-   "Platform path" row (Accordion added one ad hoc): mount reconciliation and, for form controls,
-   form reset including React's automatic reset.
-10. **8, experimental table.** Add `switch` attribute → `Switch experimental_switch` (missing in
-    Blink, Gecko) as a listed future customer.
+All ten items were applied to `design/conventions.md`: void-element parts have no `children`
+(1.3); form reset and the stable subscription (3.5, 3.8); `defaultX` as the reset target and `null`
+from platform paths (3.1); the `preventDefault()` rules including the pass-through `onClick` case
+(2.3); `checked` / `indeterminate` rows and pseudo-class equivalents (4.1, 4.2); the types table
+(5.3); the layout (9.1); the public `ChangeReason` type (2.2, 9.4); the "Platform path" test row
+(10.1); and `experimental_switch` as a future flag customer (8).
 
 ## Questions for the product owner
 
-1. **Form reset in controlled mode** (6.6): this design *notifies the parent* (`reason:
-   "platform"`, `event.type === "reset"`) and lets it accept or refuse, with the DOM's reset
-   target left at React's mount-time value. The alternative is "controlled state wins, resets are
-   ignored" (what React intends for controlled inputs; implementable by mirroring `committed` into
-   `el.defaultChecked`). Recommendation: notify, because it is the same rule as every other
-   residual browser path and gives the parent a way to implement reset at all.
-2. **No `Switch.Thumb` / `Switch.Label` parts in v0** (section 1); the `render` function form may
-   render siblings next to the input as the JS escape hatch. Confirm, since Base UI, Radix and
-   React Aria all ship a thumb/indicator part and consumers may expect one.
+1. **Form reset in controlled mode** (6.6): resolved, notify the parent (conventions resolved
+   question 17).
+2. **No `Switch.Thumb` / `Switch.Label` parts in v0** (section 1): resolved, plain-input anatomy
+   (conventions resolved question 16).
 3. **`transition` on a void input**: kept for consistency (same as Toggle, conventions resolved
    question 9), documented as doing little on a bare input. Confirm or drop for Switch/Checkbox.
 4. **`experimental_switch`**: agree to wait for Chromium rather than add the flag now (WebKit-only
    today)?
-5. **Conventions feedback 8** (shared `ChangeReason` type) is a small public-API addition; approve
-   for the conventions architect?
+5. **Shared `ChangeReason` type**: resolved, public type in `internal/types.ts` re-exported from
+   the root (conventions resolved question 19).

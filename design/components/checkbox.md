@@ -218,7 +218,7 @@ export interface CheckboxState {
 /** Details passed as the second argument of `checkedChangeAction`. */
 export interface CheckboxCheckedChangeDetails extends ActionDetails {
   /** `"activate"`: user click/Space/label; `"platform"`: form reset (`event` is the `reset` event) or a pre-hydration click found on mount (`event` undefined). */
-  readonly reason: "activate" | "platform";
+  readonly reason: ChangeReason;
 }
 
 export interface CheckboxProps
@@ -397,7 +397,9 @@ works as long as MyInput forwards `ref` to its `<input>`. A `render` element's o
 
 ## 7. `useNativeChecked`, Checkbox usage
 
-Identical to Switch 12.2 with `indeterminate: indeterminate && !pending` passed to the hook.
+Identical to Switch 12.2 (a single control: no `group` option, the hook reports both residual
+paths itself, conventions 3.8) with `indeterminate: indeterminate && !pending` passed to the
+hook and `guardCheckableChange` around the dispatch.
 Owned keys: `type`, `checked`, `defaultChecked`, `indeterminate` (stripped), `aria-checked`,
 `onChange`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`. `role`,
 `disabled`, `name`, `value` are pass-through.
@@ -501,35 +503,26 @@ rollback-to-mixed path of 6.2 can be seen in real engines; the CSS of 2.6 and 2.
 
 ---
 
-## Cross-component
+## Cross-component (resolved 2026-10-16)
 
-As Switch's section: `checked` vocabulary, `"activate" | "platform"`, `useNativeChecked` per
-input, `<fieldset>` + `<legend>` groups, pass-through `name` on single controls and Root-owned
-`name` in groups. RadioGroup is assumed to have **no** `indeterminate` (an empty radio group
-matches `:indeterminate` natively; that is the platform's business and not a library state).
+As Switch's section: everything assumed here is now in conventions 3.8 and resolved questions 16
+to 21. `CheckboxGroup` is deferred as issue #33 (section 10). RadioGroup has no `indeterminate`;
+an empty radio group matching `:indeterminate` is the platform's business.
 
-## Conventions feedback
+## Conventions feedback (applied 2026-10-16)
 
-In addition to Switch's list:
-
-1. **4.1, `indeterminate` row.** "Consumer-owned, mirrored" is a fourth kind of state next to
-   library-owned, browser-owned and prop: a controlled-only value the library writes to a DOM
-   property and suspends while pending. One sentence in 3.5's table or 4.1 would let RadioGroup
-   and future components (a Progress `value`, a Dialog `returnValue`) reuse the term.
-2. **1.2, element-type restriction for `render`.** The research's item 6: Switch, Checkbox and
-   RadioGroup items must stay an `<input>` of the same `type`; the dev warning lives in the
-   shared hook.
+Both items were applied: "consumer-owned, mirrored" is named as the fourth kind of state in
+conventions 3.5 and on the `indeterminate` row of 4.1; the `render` element-type restriction for
+native inputs and fieldset Roots is in 1.2, with the dev warning in the shared hook.
 
 ## Questions for the product owner
 
-1. **`state.indeterminate = indeterminate && !pending`** (section 4): confirm that suspending
-   mixed for the whole pending window (including platform dispatches) is preferred over keeping
-   the attribute from the prop and letting the DOM property disagree while pending.
-2. **No `Checkbox.Indicator` in v0** (section 1): same question as Switch's thumb, with the
-   stronger ecosystem expectation (Radix, Base UI, Ark all ship one). Recommendation: ship the
-   CSS recipes, add the part only on demand.
-3. **CheckboxGroup deferred** (section 10): confirm, and note the group-level `required`
-   question for that design.
+1. **`state.indeterminate = indeterminate && !pending`** (section 4): resolved, suspended while
+   pending (conventions resolved question 18).
+2. **No `Checkbox.Indicator` in v0** (section 1): resolved, plain-input anatomy (conventions
+   resolved question 16).
+3. **CheckboxGroup deferred** (section 10): resolved, issue #33 (conventions resolved question
+   20); the group-level `required` question goes to that design.
 4. **`indeterminate` with uncontrolled `checked`** is allowed (no warning). Alternative: warn
    that mixed only makes sense when the parent controls `checked`. Recommendation: allow; the
    dash simply persists until the parent changes the prop, and a warning would be wrong for the

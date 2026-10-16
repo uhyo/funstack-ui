@@ -22,13 +22,13 @@ stays native and the Async React model stays the conventions' model.
 
 | # | Topic | Decision |
 | --- | --- | --- |
-| 1 | Anatomy | `RadioGroup.Root` (`fieldset[role=radiogroup]`), `RadioGroup.Label` (`legend`, optional), `RadioGroup.Item` (`input[type=radio]`). **No `Indicator` part**: the input is the visible control and is styled with `appearance: none` plus pseudo-elements, or with `accent-color`. The alternative anatomy (visually hidden input in a `<label>` Item with an `Indicator` sibling) is specified in section 14 so the product owner can pick one shape for Checkbox, Switch and RadioGroup together. |
+| 1 | Anatomy | `RadioGroup.Root` (`fieldset[role=radiogroup]`), `RadioGroup.Label` (`legend`, optional), `RadioGroup.Item` (`input[type=radio]`). **No `Indicator` part**: the input is the visible control and is styled with `appearance: none` plus pseudo-elements, or with `accent-color`. Confirmed by the product owner for Switch, Checkbox and RadioGroup together (conventions resolved question 16); the alternative anatomy in section 14 is kept for the record only. |
 | 2 | State | One library-owned state, `value: string \| null`, as `value` / `defaultValue` / `valueChangeAction(next, details)`. `null` means no radio checked. `defaultValue` defaults to `null` and **no dev warning fires** when neither prop is given: an unchecked group is the HTML default and the normal form case. |
 | 3 | Rendered DOM state | Every Item renders `checked={optimistic === value}`. This is a correctness requirement, not a style: react-dom restores a controlled input's DOM `checked` to its props after every event, and only sync-lane (optimistic) state survives that restore (`form-controls.md` section 2). |
 | 4 | `next` type | `valueChangeAction` receives `string` for every user interaction. It receives `null` only on the platform paths that can empty the group (form reset to a mount-time "none checked"), with `details.reason: "platform"`. |
 | 5 | Keyboard | Entirely native: single tab stop, Space checks, all four arrows select and wrap, RTL mirrored, disabled radios skipped. No `Home`/`End` (not in the APG Radio Group pattern; adding them would be the component's first keyboard JS). No `orientation` prop: native arrows ignore it and a prop that changed nothing would mislead. No `focusgroup` flag. |
 | 6 | Pending and checked exposure | `data-pending` on Root and on the Item whose value is the optimistic one; `data-checked` (optimistic) on Items; `data-disabled` on Root and Items. The vocabulary word is **`checked`** (the platform's), not `selected`. |
-| 7 | Residual browser paths (`reason: "platform"`) | Mount reconciliation (pre-hydration clicks, Firefox form-state restoration): one dispatch per group with `event: undefined`. Form reset (`<button type=reset>`, `form.reset()`, React's automatic reset after a successful `<form action>`): one dispatch per group with `event` set to the `reset` event. Both read the DOM, compare against what the user already intends, and dispatch the difference. |
+| 7 | Residual browser paths (`reason: "platform"`) | Mount reconciliation (pre-hydration clicks, Firefox form-state restoration): one dispatch per group with `event: undefined`. Form reset (`<button type=reset>`, `form.reset()`, React's automatic reset after a successful `<form action>`): one dispatch per group with `event` set to the `reset` event. Both go through the Root's `useNativeGroupReconciliation` on the fieldset (conventions 3.8); Items call `useNativeChecked` with `group: true` and report nothing themselves. |
 | 8 | `preventDefault` | Not a veto. A click cancelled **before** the library's handler runs (a pass-through `onClick`) is treated as "no change" and never dispatches, because the browser reverts the DOM. `details.event.preventDefault()` inside the action desyncs the DOM while pending and triggers a dev warning. A veto is controlled mode. |
 | 9 | Disabled | Native: `disabled` on an Item, `<fieldset disabled>` for the group. Disabled radios are skipped by native arrow navigation and never dispatch. A form reset still resets a disabled group and the group follows it (section 5.3). |
 | 10 | Transition types | `fsui-radio-group` only. Consumers' dependent content elsewhere in the tree can key a `<ViewTransition>` type map on it. |
@@ -132,7 +132,7 @@ export interface RadioGroupValueChangeDetails extends ActionDetails {
    * `reset` event), or interaction before hydration / Firefox form-state restoration reconciled
    * at mount (`details.event` is `undefined`).
    */
-  readonly reason: "activate" | "platform";
+  readonly reason: ChangeReason;
 }
 
 export interface RadioGroupRootState {
@@ -327,10 +327,15 @@ is then re-synced by React's normal `checked` prop writes once the action settle
 
 Both paths read the DOM the same way: the Root queries `input[type="radio"]` inside the fieldset,
 keeps those whose `name` property equals the group name (nested groups have different names), and
-takes the `value` of the checked one, else `null`. The result is compared against **what the user
-already intends**: the latest in-flight dispatch's `next` if any, else the optimistic value
-(`latestInFlight()` from the shared hook, exactly as Accordion's `dispatchFromDom` does). Reading
-the DOM alone would lose a pending optimistic check.
+takes the `value` of the checked one, else `null`; for a reset it reads `defaultChecked` instead
+of `checked` (conventions 3.8 rule 5: by the time the microtask runs after React's own reset, the
+Items' re-apply effect has already put the optimistic value back into `checked`). The result is
+compared against **what the user already intends**: the latest in-flight dispatch's `next` if
+any, else the optimistic value (`latestInFlight()` from `useControllableAction`, exactly as
+Accordion's `dispatchFromDom` does). Reading the DOM alone would lose a pending optimistic check.
+Both paths are the Root's single call to `useNativeGroupReconciliation` (conventions 3.8) with
+`element` = the fieldset ref, `readCurrent` / `readDefault` as above, `base`, and
+`onPlatformChange` = `dispatchFromDom`.
 
 ### 5.1 Mount reconciliation (pre-hydration clicks, Firefox form-state restoration)
 
@@ -346,20 +351,27 @@ server render and react-dom does not diff the `checked` property during hydratio
 ### 5.2 Form reset
 
 `form.reset()` restores every radio to its `defaultChecked`. react-dom sets `defaultChecked` once
-at mount to the initial `checked` prop and never updates it for a controlled input, so the reset
-target is the **mount-time value**: `defaultValue` in uncontrolled mode, the initial `value` in
-controlled mode. A consumer who wants a different reset target remounts the group with `key`.
+at mount to the initial `checked` prop and never updates it for a controlled input. The reset
+target therefore follows conventions 3.8 rule 6: in **uncontrolled** mode it is the **latest
+`defaultValue`** (the Root passes `defaultValue` through context and each Item's `useNativeChecked`
+mirrors `defaultChecked: defaultValue === value` into the DOM after every commit, as Switch does
+with `defaultChecked`); in **controlled** mode it is the mount-time `value`, and the reset is
+offered to the parent (product-owner decision, conventions resolved question 17).
 
 Reset arrives three ways and the library handles all of them the same: a `<button type="reset">`,
 a programmatic `form.reset()`, and React's own `requestFormReset` after a successful
 `<form action>` (which calls `form.reset()` during commit; this is the case that desyncs every
 controlled input in an app that does not listen, `form-controls.md` section 2).
 
-The Root attaches a `reset` listener to the fieldset's form owner (`fieldset.form`, which honours
-the `form` attribute the Root also puts on the radios). `reset` fires before the values change and
-the reset runs synchronously after the event, so the handler re-reads the group in a microtask and
-dispatches the new value with `reason: "platform"` and `event` set to the `reset` event. A reset
-that a consumer's own listener cancelled changes nothing and dispatches nothing.
+The Root's `useNativeGroupReconciliation` subscribes to `reset` on the fieldset's form owner
+(`fieldset.form`, which honours the `form` attribute the Root also puts on the radios) through
+`useFormReset`. The subscription is **stable** (re-subscribed only when the form owner changes,
+`useEffectEvent` body): React's automatic reset runs in the commit's mutation phase, between an
+effect's cleanup and its re-run, so a deps-less effect would miss it (conventions 3.8 rule 4).
+`reset` fires before the values change and the reset runs synchronously after the event, so the
+handler re-reads the group (`readDefault()`) in a microtask and dispatches the new value with
+`reason: "platform"` and `event` set to the `reset` event. A reset that a consumer's own listener
+cancelled changes nothing and dispatches nothing.
 
 What the user sees: the radios already show the reset value (the browser did it). Uncontrolled
 mode commits it. A controlled parent either follows (adopts `next`) or ignores it, in which case
@@ -786,6 +798,8 @@ controlled wrapper.
 | Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; rejection rolls the DOM back to "a". StrictMode: still one dispatch. |
 | Platform: form reset | Inside a `<form>`: check "b", call `form.reset()` → one dispatch `(a-or-null, { reason: "platform", event: Event("reset") })`, uncontrolled commits it; controlled parent that ignores → DOM re-checks the parent's radio after settle; `<form action>` that succeeds auto-resets and dispatches the same way; a cancelled `reset` event dispatches nothing; `Root disabled` still dispatches on reset; reset whose target equals the optimistic value dispatches nothing. |
 | `preventDefault` warning | `details.event.preventDefault()` inside the action logs the dev warning once; the action still ran. |
+| Platform: reset target by mode | Uncontrolled: after the Root re-renders with a new `defaultValue` (inside a transition), `form.reset()` returns the group to the new default and dispatches it; controlled: reset returns to the mount-time `value` and the parent is notified. |
+| `details.event` is virtual | Toggle row 21 verbatim on an Item click, plus `JSON.stringify(details) === '{"reason":"activate"}'`; a fake Server Function (plain async spy) receives `(next, details)` with the same shape. |
 | Function props | `className` / `style` on Root, Label, Item receive the documented state (`checked` optimistic, `pending` per Item); `children` on Root and Label receive Root state; Item has no `children`. |
 | `render` element | `render={<input id="x" className="y" />}` on Item keeps `type="radio"`, `name`, `checked` and the library's handler, concatenates `className`, forwards `ref`; `render={<fieldset />}` on Root; dev warning when the mounted tag is not `INPUT` / `FIELDSET`. |
 | Post-await rule | Controlled wrapper that awaits then `startTransition(setValue)` works end to end. |
@@ -815,7 +829,9 @@ packages/ui/src/radio-group/
   radio-group.test.tsx
   radio-group.browser.test.tsx
 packages/ui/src/internal/
-  use-native-input-reconciliation.ts   # "use client"; shared with Switch/Checkbox, see Cross-component
+  use-form-reset.ts                    # "use client"; stable reset subscription (conventions 3.8)
+  use-native-checked.ts                # "use client"; per input, `group: true` here (conventions 3.8)
+  use-native-group-reconciliation.ts   # "use client"; the Root's one-dispatch-per-group adapter
 ```
 
 ### 13.2 Context
@@ -851,13 +867,14 @@ is not in the context: no part renders it.
   return if `next === base`; else `dispatch(next, createActionDetails(event, { reason: "platform" }))`.
 - `readGroup()`: `fieldset.querySelectorAll('input[type="radio"]')`, filter by `.name === name`,
   return the checked one's `.value` or `null`.
-- Mount reconciliation: `useLayoutEffect(() => { reconcile(undefined) }, [])` through a
-  `useEffectEvent` that calls `dispatchFromDom(readGroup(), undefined)`.
-- Reset: an effect without deps (re-subscribed after every commit, like `use-until-found.ts`, so a
-  changed `form` prop or a moved fieldset is covered) that reads `fieldsetRef.current.form`,
-  attaches `reset`, and in the handler schedules `queueMicrotask(() => dispatchFromDom(readGroup(), event))`.
-  Both of these belong to the shared hook (Cross-component, item 2); the Root just supplies
-  `readGroup`, the form owner, and `dispatchFromDom`.
+- Residual paths: one call,
+  `useNativeGroupReconciliation({ element: fieldsetRef, readCurrent: readGroup, readDefault: readGroupDefault, base: () => latestInFlight()?.next ?? optimistic, onPlatformChange: dispatchFromDom })`
+  (conventions 3.8). It runs the mount reconciliation once in a layout effect and owns the
+  stable `reset` subscription on `fieldsetRef.current.form` via `useFormReset`; a changed `form`
+  prop or a moved fieldset re-subscribes because the owner is re-read after every commit.
+  `readGroupDefault()` is `readGroup()` over `defaultChecked` instead of `checked`.
+- Context additionally carries `defaultValue` (uncontrolled mode only) so each Item can mirror
+  its reset target (13.5).
 - Renders `<fieldset role="radiogroup" disabled={disabled} form={form} data-pending data-disabled>`
   through `use-render` with `RadioGroupRootState`; dev warning when the mounted `tagName` is not
   `FIELDSET`.
@@ -872,6 +889,11 @@ is not in the context: no part renders it.
 
 - Reads context; `checked = ctx.optimistic === value`; `pending = ctx.pending && checked`;
   `disabled = ctx.disabled || disabledProp`.
+- `useNativeChecked({ type: "radio", component: "RadioGroup.Item", checked, group: true,
+  defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value })`
+  (conventions 3.8): tag check, re-apply of `checked` and `defaultChecked` after every commit; no
+  residual-path reporting (the Root does it once per group). `onChange` goes through
+  `guardCheckableChange` before calling `ctx.select`.
 - Renders through `use-render` with `defaultElement: "input"`; pass-through `props` are `rest`
   plus `disabled: disabledProp` (native, own prop only); `libraryProps`:
   `type: "radio"`, `name: ctx.name`, `value`, `checked`, `form: ctx.form`, `required: ctx.required`,
@@ -880,8 +902,9 @@ is not in the context: no part renders it.
 - Output: `<ViewTransition default={transition ?? "none"}>{element}</ViewTransition>`.
 - Owned keys: `type`, `name`, `value`, `checked`, `form`, `required`, `data-checked`,
   `data-pending`, `data-disabled`, `onChange`.
-- No `defaultChecked` is ever rendered: react-dom derives the reset target from the initial
-  `checked` prop (section 5.2).
+- No `defaultChecked` is ever rendered as a prop (react-dom derives the mount-time value from the
+  initial `checked` prop); in uncontrolled mode the hook keeps `el.defaultChecked` equal to
+  `defaultValue === value` so the reset target follows the latest `defaultValue` (section 5.2).
 
 ### 13.6 Dev warnings
 
@@ -890,10 +913,10 @@ Wrong `tagName` behind `render` (Root, Item); `preventDefault()` inside the acti
 Deliberately absent: neither `value` nor `defaultValue` given; a controlled `value` that matches no
 Item (nothing checked is a valid, native state and the tab stop still works).
 
-## 14. Alternative anatomy: hidden input with a label Item and an Indicator
+## 14. Alternative anatomy (not chosen): hidden input with a label Item and an Indicator
 
-Specified so that the product owner can choose one shape for Checkbox, Switch and RadioGroup
-together (research section 7, shape 2). Not the recommendation; see Cross-component, item 1.
+Kept for the record. The product owner confirmed shape 1 for Checkbox, Switch and RadioGroup
+together (conventions resolved question 16); this shape would be a new design, not a switch.
 
 ```tsx
 <RadioGroup.Root defaultValue="pro">
@@ -928,81 +951,27 @@ second half of that exchange cheap, which is why shape 1 is the primary design.
 
 ---
 
-## Cross-component
+## Cross-component (resolved 2026-10-16)
 
-Assumptions about the concurrent Switch/Checkbox design, stated so the product owner can
-reconcile:
+The six assumptions this design stated about Switch and Checkbox are settled in
+`design/conventions.md` (section 3.8 and resolved questions 16 to 21): shape 1 anatomy on all
+three; the shared machinery is `useFormReset` + `useNativeChecked` (with `group: true` in Items)
++ `useNativeGroupReconciliation` on the fieldset Root, giving one dispatch per group; the
+`defaultPrevented` rules are the shared `guardCheckableChange`; `checked` is the vocabulary word
+and `data-indeterminate` exists on Checkbox only; `details.reason` is the public `ChangeReason`;
+form props are pass-through on single controls and Root-owned here.
 
-1. **Anatomy.** I assume `Checkbox` and `Switch` are plain single-element components rendering the
-   native input (conventions decision 1: "single-element components are plain"; research shape 1),
-   with no `Indicator`. RadioGroup follows with `Item` = input and no `Indicator`. If Checkbox and
-   Switch become compound parts around a visually hidden input with an `Indicator`, RadioGroup
-   should switch to section 14 so the three components share one shape.
-2. **Shared hook for native inputs.** I assume an internal `"use client"` hook along the lines of
-   ```ts
-   useNativeInputReconciliation<T>(options: {
-     /** The form-associated element whose `.form` is the form owner (the input, or RadioGroup's fieldset). */
-     element: RefObject<HTMLElement | null>;
-     /** Reads the current DOM value (a checkbox's `checked`, the checked radio's value or null). */
-     readDom: () => T;
-     /** What the user already intends: `latestInFlight()?.next ?? optimistic`. */
-     base: () => T;
-     /** Dispatches with `reason: "platform"`; `event` is the `reset` event or `undefined` at mount. */
-     onPlatformChange: (next: T, event: Event | undefined) => void;
-   }): void;
-   ```
-   that (a) runs the mount reconciliation in a layout effect once (StrictMode-safe through the
-   `base` comparison), and (b) subscribes to `reset` on the form owner and re-reads the DOM in a
-   microtask. RadioGroup calls it **once from Root** with the fieldset as `element`, so one group
-   gets one dispatch; Checkbox and Switch call it per input. If the other design puts the reset
-   listener on the input rather than the form-associated element, RadioGroup needs the
-   fieldset variant anyway (the group has no single input).
-3. **`defaultPrevented` handling.** The "cancelled before our handler: no dispatch; cancelled inside
-   the action: dev warning" rule (section 4.3) should be identical for checkbox, switch and radio,
-   and can live in a small shared helper used by each part's `onChange`.
-4. **Vocabulary.** `checked` is the state word on all three (`data-checked`, `state.checked`);
-   `data-indeterminate` exists on Checkbox only; radios emit nothing for `:indeterminate`.
-5. **`details.reason`.** Both use `"activate"` | `"platform"`, with `event` = the `reset` event for
-   resets and `undefined` for mount reconciliation.
-6. **Form props.** Checkbox/Switch pass `name`, `value`, `required`, `form` through per input;
-   RadioGroup takes `name`, `required`, `form` on Root and `value` per Item. Same native
-   semantics, different owner, documented on both.
+## Conventions feedback (applied 2026-10-16)
 
-## Conventions feedback
-
-1. **4.1 state table.** Add RadioGroup `Item` to the `checked` row ("Switch, Checkbox, RadioGroup
-   Item; optimistic; equivalent to `:checked`"). Radios use the platform word `checked`, not
-   `selected`, as the research recommended.
-2. **3.5 residual browser paths.** This design relies on the form-reset path the research asked
-   to add (research item 2); I assume the conventions architect is adding it. Wording this design
-   needs: "form reset (`<button type=reset>`, `form.reset()`, React's automatic reset after a
-   successful `<form action>`) dispatches the new DOM value with `reason: "platform"` and `event`
-   set to the `reset` event, once per state owner".
-3. **2.3 item 3 and 4.3 here.** Besides "preventDefault() is not a veto on checkable inputs"
-   (research item 3), state the complementary rule: a click that is already `defaultPrevented`
-   when the library's handler runs is not a change and does not dispatch, because the browser
-   reverts it. Library-wide for native checkable inputs.
-4. **2.3 item 6 / 3.6 `disabled`.** "Disabled parts never dispatch" should say "never dispatch for
-   user interaction"; platform dispatches that the form owner causes (reset) are not blocked by
-   `disabled` (section 5.3). Accordion's find-in-page rule stays as is (per-item, user-targeted).
-5. **3.1 `null`.** "None selected is `null`" plus "the UI cannot deselect" (Tabs) does not hold
-   for form controls: a reset can empty the group, so `valueChangeAction` may receive `null` with
-   `reason: "platform"`. Worth a sentence in 3.1 so the next form control does not re-derive it.
-6. **5.3 transition types.** Add `RadioGroup | fsui-radio-group` (no direction variants).
-7. **1.2 `render`.** Add the element-type restriction the research asked for (item 6): for
-   native-input parts the rendered element must stay an `<input>` of the library's `type`, and
-   for `RadioGroup.Root` a `<fieldset>`; the library warns in development.
-8. **1.1 part vocabulary.** `Label` as `<legend>` for fieldset-based groups (RadioGroup, future
-   CheckboxGroup); note it in the vocabulary table.
-9. **7.3 / #19.** An action-less RadioGroup is JS-free in behaviour (native radios work before
-   hydration, form submission needs nothing); every part is still a client module because of
-   context. Record it as a directive-free candidate alongside Accordion.
+All nine items were applied to `design/conventions.md`: `RadioGroup.Item` on the `checked` row
+(4.1); the form-reset path (3.5, 3.8); the already-cancelled click rule (2.3 item 3); "disabled
+never dispatches" scoped to user interaction (2.3 item 6, 3.6); `null` from platform paths (3.1);
+`fsui-radio-group` (5.3); the `render` restriction for inputs and fieldset Roots (1.2); `Label`
+as `<legend>` in the part vocabulary (1.1); and the #19 note (7.3).
 
 ## Questions for the product owner
 
-1. **Anatomy.** Confirm shape 1 (Item = the visible native input, no Indicator) once the
-   Checkbox/Switch design lands, or move both to shape 2 (section 14). This is the one decision
-   that changes call sites.
+1. **Anatomy.** Resolved: shape 1 (conventions resolved question 16).
 2. **`next: string | null`.** Accept that `valueChangeAction` is typed `string | null` because a
    form reset can empty the group? The alternative (type `string`, never dispatch `null`) would
    leave `data-checked` stale after a reset to "nothing checked", which is the common
@@ -1018,8 +987,8 @@ reconcile:
    "re-apply committed state, no dispatch" for disabled groups.
 7. **Root must be a `<fieldset>`.** No `div[role=radiogroup]` variant in v0 (it would lose legend
    naming, disabled inheritance and `.form`). Confirm.
-8. **Part name `Label` vs `Legend`.** `Label` matches the vocabulary; `Legend` is HTML-literal and
-   signals the first-child rule. This design uses `Label`.
+8. **Part name `Label` vs `Legend`.** Resolved: `Label`, now in the conventions' part vocabulary
+   (1.1) as the `<legend>` of fieldset-based groups.
 9. **`transition` on `Item`.** Kept for parity with Toggle and Tabs; on a void element it animates
    only `data-pending` leaving and the rollback write. Keep, or drop as the first documented
    exception?

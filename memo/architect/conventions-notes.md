@@ -59,3 +59,17 @@ added to the repo. Re-run them in a browser before relying on them for a release
   conventions.md section 3.3 can now cite the research doc instead of "supersedes" wording.
 - `vitest` browser mode will be needed once components rely on Popover/anchor APIs that jsdom
   lacks; jsdom tests cover the React semantics only.
+
+## 2026-10-16: native-input hook reconciliation (wave 2)
+
+switch.md specified a per-input `useNativeChecked` that reported both residual paths itself;
+radio-group.md assumed a group-level `useNativeInputReconciliation` called once from Root. Settled
+in conventions 3.8 as three hooks: `useFormReset` (stable subscription on a form owner, the
+primitive both need), `useNativeChecked` (per input; `group: true` disables its own reporting),
+and `useNativeGroupReconciliation` (fieldset Root, one dispatch per group). Two facts drove the
+shape: React's automatic reset runs in the mutation phase, so the subscription must be stable
+(switch probe 3); and after that reset the per-input re-apply effect has already restored the
+optimistic `checked`, so a reset must read `defaultChecked`, which for a group means "the radio
+whose `defaultChecked` is true". RadioGroup's uncontrolled reset target now follows the latest
+`defaultValue` (Items mirror `defaultValue === value`), matching Switch's rule rather than the
+mount-time value it originally specified.

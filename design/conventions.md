@@ -68,7 +68,8 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` |
 | `Indicator` | Purely visual element that tracks state (active tab marker). | `span` |
-| `Header`, `Group`, `Label`, `Separator`, `Arrow` | Structural or decorative. | as named |
+| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, future CheckboxGroup) it renders `<legend>` and must be the Root's first child. | `label` / `legend` |
+| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
 top layer and CSS Anchor Positioning places it, so the platform does both jobs (see
@@ -100,8 +101,11 @@ Rules for the element passed to `render` (same as Base UI):
 - A custom component must accept `ref` as a prop (React 19; no `forwardRef`) and spread the
   received props onto its DOM node.
 - A part whose default element is a **native input** (`Checkbox`, `Switch`, `RadioGroup.Item`)
-  must stay an `<input>` of the same `type`: `render` may substitute a styled input or a wrapper
-  component that renders one, never a `<button>` or `<div>`. The input is a void element, so it
+  must stay an `<input>` of the same `type`, and a group Root that is a `<fieldset>`
+  (`RadioGroup.Root`) must stay a `<fieldset>` (legend naming, `disabled` inheritance and
+  `.form` depend on it): `render` may substitute a styled element or a wrapper component that
+  renders one, never a `<button>` or `<div>`. The shared hook warns in development when the
+  mounted node has the wrong tag or `type`. The input is a void element, so it
   has no children; visual indicators are **sibling parts** (`Indicator`) that receive the same
   state attributes. Replacing the element would lose form participation, validation, reset, label
   activation, native radio keyboard handling and RTL mirroring (`docs/research/form-controls.md`).
@@ -139,7 +143,8 @@ Rejected alternatives:
 ### 1.3 `className`, `style`, `children` as functions of state
 
 Each part has a `State` object (section 4). `className`, `style` and `children` accept either a
-plain value or a function of that state.
+plain value or a function of that state. A part that renders a **void element** (`<input>`) has
+no `children` prop at all: it is omitted from the props type rather than accepted and ignored.
 
 ```tsx
 <Toggle
@@ -227,7 +232,14 @@ export interface ActionDetails {
 }
 
 export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Action<[next: T, details: Details]>;
+
+/** Why a change action was dispatched; the full vocabulary (section 2.2, "reason" table). */
+export type ChangeReason = "activate" | "platform";
 ```
+
+`ChangeReason` is **one public type**, exported from the root entry; every
+`<Component><State>ChangeDetails` that exposes `reason` declares it as `readonly reason:
+ChangeReason` rather than a local union, so the vocabulary cannot drift per component.
 
 `details` is the native DOM event (not React's synthetic one) plus component-specific fields,
 typed per component as `<Component><State>ChangeDetails` (for example `TabsValueChangeDetails`
@@ -330,8 +342,12 @@ What a consumer can rely on:
    DOM `checked` *after* React has restored it to the optimistic value, and suppresses `input` and
    `change`, so the DOM shows the old value while `optimistic` and `data-checked` say the new one
    for as long as the action is pending (`docs/research/form-controls.md` §2). The library logs a
-   dev warning when `details.event.defaultPrevented` is true after the sync prefix. Vetoing is
-   done with controlled mode: the parent simply does not adopt the change (section 2.4).
+   dev warning when `details.event.defaultPrevented` is true after the sync prefix; the same check
+   catches a `preventDefault()` in a pass-through `onClick`, which runs before the library's
+   `onChange` for the same click. The complementary rule: a click that is **already cancelled**
+   when the library's handler runs is not a change and does not dispatch, because the browser
+   reverts the DOM after dispatch and React restores unchanged props. Vetoing is done with
+   controlled mode: the parent simply does not adopt the change (section 2.4).
 4. **`setState` after the consumer's own `await` is not a Transition** (React limitation). Wrap it:
    ```tsx
    valueChangeAction={async (next) => {
@@ -351,7 +367,12 @@ What a consumer can rely on:
    // Panel switches when the save succeeds; the tab shows pending meanwhile.
    valueChangeAction={async (next) => { await saveSelection(next); }}
    ```
-6. **Disabled parts never dispatch.** A disabled Tab does not call `valueChangeAction`.
+6. **Disabled parts never dispatch for user interaction.** A disabled Tab does not call
+   `valueChangeAction`. Platform dispatches that the *form owner* causes are not blocked by
+   `disabled`: `form.reset()` resets a `<fieldset disabled>` group too, and the group follows it
+   with `reason: "platform"` (section 3.8), because the form's author acted on the whole form,
+   not the user on one disabled control. Accordion's find-in-page rule (a disabled item re-closes
+   without dispatching) stays: there the browser acted on one user-targeted item.
 7. **No-op interactions do not dispatch** unless the component says otherwise. "No-op" is judged
    against the **optimistic** value, not the committed one: clicking the Tab that is already
    optimistically selected calls nothing, but clicking back to the committed tab while another is
@@ -470,6 +491,16 @@ Every controllable state `x` of type `T` comes as a triple:
 
 "None selected" is `null`, never `undefined`, so that `undefined` always means uncontrolled.
 Switching between modes after mount is unsupported (dev warning).
+
+`defaultX` is read once for the initial value. **Native form controls additionally use the latest
+`defaultX` as the form-reset target** in uncontrolled mode (the library mirrors it into
+`el.defaultChecked` after every commit, which is React's own rule for a plain uncontrolled
+input); in controlled mode the reset target is React's mount-time value (section 3.8).
+
+A component whose UI cannot deselect may still receive `null` from a **platform path**: a form
+reset can empty a radio group, so `RadioGroup`'s `valueChangeAction` is typed `string | null`
+and receives `null` only with `reason: "platform"`. Tabs keeps `string` because it has no
+platform path that empties it.
 
 ```tsx
 // Uncontrolled
@@ -632,13 +663,18 @@ Rules:
 - Per-component designs list every state and label it library-owned or browser-owned.
 - Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
   dispatches use `"activate"`.
+- A fourth kind of state, **consumer-owned, mirrored**: a controlled-only prop that the library
+  writes to a DOM property it does not own (`Checkbox`'s `indeterminate`, a future Progress
+  `value` or Dialog `returnValue`). It has no `defaultX` and no action; the library re-applies it
+  after every commit and may suspend it while an action is pending (section 4.1).
 
 ### 3.6 `disabled`
 
 `disabled` is a boolean prop on the owner and on individual triggers. Native `disabled` is used
 where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs), the
 part sets `aria-disabled` instead. In both cases the part emits `data-disabled` and never
-dispatches.
+dispatches for user interaction (platform dispatches from the form owner are the exception,
+section 2.3 item 6).
 
 **A part is never disabled while pending** (product-owner decision, library-wide). The library
 does not set `disabled`, `aria-disabled` or `inert` on a trigger because its action is in flight:
@@ -667,6 +703,55 @@ Tabs defines the semantics. Accordion has no `keepMounted`: its Panel is always 
 (`design/components/accordion.md` 4.4). Future content regions that hide content via library
 state reuse the prop unchanged.
 
+### 3.8 Native checkable inputs: the shared machinery
+
+Switch, Checkbox and RadioGroup render controlled native inputs. Beyond `useControllableAction`
+they share three internal hooks, so that one dispatch model covers single controls and groups.
+This is the one contract both designs implement (reconciled 2026-10-16 from
+`design/components/switch.md` §7 and `design/components/radio-group.md` Cross-component item 2).
+
+| Hook | Called by | Does |
+| --- | --- | --- |
+| `useFormReset(ref, onReset)` (`internal/use-form-reset.ts`) | the other two | **Stable** `reset` subscription on the form owner (`ref.current.form`; the element may be an `<input>` or a `<fieldset>`, both form-associated and honouring `form=`). Re-reads the owner after every commit but re-subscribes only when it changed; the handler body is a `useEffectEvent`. On `reset` it queues a microtask and, unless `event.defaultPrevented`, calls `onReset(event)`. |
+| `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies `checked` (optimistic), `indeterminate` (if given) and `defaultChecked` (if given); and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
+| `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. |
+
+Rules the three hooks implement, which component docs may cite instead of restating:
+
+1. **Base comparison.** A residual path dispatches only when the DOM value differs from what the
+   user already intends: `base = latestInFlight()?.next ?? optimistic` (`latestInFlight` comes from
+   `useControllableAction`). Reading the DOM alone would lose a pending optimistic change. This
+   also makes the StrictMode double layout effect dispatch once.
+2. **One dispatch per state owner.** A single control dispatches for itself; a group's Root
+   dispatches once for the whole group, never once per radio.
+3. **Mount reconciliation** runs in a layout effect at mount, before the re-apply effect, and
+   dispatches with `reason: "platform"` and `event: undefined`. It covers clicks before hydration
+   and Firefox's form-state restoration (react-dom keeps the DOM `checked` when hydrating, fires no
+   `onChange` and logs no mismatch, so no `suppressHydrationWarning` is needed).
+4. **The reset subscription must be stable.** React's automatic reset after a successful
+   `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
+   the next subscription, so a listener attached in a deps-less effect never sees it (verified,
+   `memo/architect/switch-checkbox-notes.md`).
+5. **Reset reads `defaultChecked`, not `checked`.** The `reset` event precedes the reset
+   algorithm, so the hook waits a microtask; by then, for React's own reset, the re-apply effect
+   has already put the optimistic value back into `checked`. `el.defaultChecked` is the value the
+   browser reset to in every case. A group's `readDefault()` therefore returns the value of the
+   radio whose `defaultChecked` is true, or `null`.
+6. **Reset target by mode.** Uncontrolled: the latest `defaultX` prop, mirrored into
+   `el.defaultChecked` by the re-apply effect (a group Root passes `defaultValue` down so each
+   item mirrors `defaultValue === value`). Controlled: React's mount-time value; the reset is
+   **offered to the parent** as a `"platform"` dispatch with `event.type === "reset"`
+   (product-owner decision), and after settle the DOM follows the parent's decision.
+7. **A cancelled `reset`** (`event.defaultPrevented` in the microtask) dispatches nothing.
+8. **Re-apply after every commit** is belt-and-braces for `checked` (react-dom's `updateInput`
+   rewrites it on every commit of the input) and load-bearing for `indeterminate` and
+   `defaultChecked`, which React does not manage on a controlled input. It also ends the
+   `preventDefault()` desync at the next commit.
+9. **Click guard**, shared by every part's `onChange` (`guardCheckableChange(event, dispatch)` in
+   `use-native-checked.ts`): if `event.defaultPrevented` is already true, return without
+   dispatching (section 2.3 item 3); otherwise dispatch, then in development warn once per instance
+   if the event is now `defaultPrevented`.
+
 ---
 
 ## 4. Pending and state exposure
@@ -685,7 +770,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
 | `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` is an exact equivalent. |
-| `indeterminate` | boolean | Checkbox (controlled-only prop; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after the action settles, since the browser clears it on every click. |
+| `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
@@ -824,6 +909,9 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Toggle | `fsui-toggle`, `fsui-toggle-press`, `fsui-toggle-release` |
 | Tabs | `fsui-tabs`, `fsui-tabs-next`, `fsui-tabs-prev` (by DOM order of the target tab relative to the committed tab) |
 | Accordion | `fsui-accordion`, `fsui-accordion-expand`, `fsui-accordion-collapse` |
+| Switch | `fsui-switch`, `fsui-switch-on`, `fsui-switch-off` |
+| Checkbox | `fsui-checkbox`, `fsui-checkbox-check`, `fsui-checkbox-uncheck` |
+| RadioGroup | `fsui-radio-group` (no direction variants) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1028,6 +1116,7 @@ a flag (`docs/vision.md`). Mechanism:
    | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
    | `<dialog closedby>` | WebKit (TP) | `Dialog.Root experimental_closedby` | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | `Select.Root experimental_baseAppearance` | `appearance: base-select` markup; degrades to the native picker elsewhere. |
+   | `<input type="checkbox" switch>` | Blink (proposed), Gecko | `Switch experimental_switch` (future; not added while WebKit-only) | Native switch rendering and semantics; `role="switch"` already gives the semantics everywhere. |
 
    Two flags with the same graduation path go on the same part as separate props, not one
    object, so each can be removed independently.
@@ -1058,10 +1147,17 @@ consumer has accepted Chromium-only behaviour.
 packages/ui/src/
   index.ts                  # root entry: re-exports every component namespace and shared types
   internal/                 # not exported
-    types.ts                # Action, ActionDetails, ChangeAction, RenderProp, StateValue
+    types.ts                # Action, ActionDetails, ChangeAction, ChangeReason, RenderProp, StateValue
+    action-details.ts       # createActionDetails (section 2.2); directive-free
+    data-attr.ts            # dataAttr(flag) -> "" | undefined (section 4.1)
+    transition-types.ts     # transitionTypes(component, change?) -> string[] (section 5.3)
+    platform-attributes.ts  # the one `declare module "react"` (section 7.4)
     use-controllable-action.ts
     use-render.tsx          # resolves render / className / style / children against state
     merge-props.ts
+    use-form-reset.ts       # section 3.8
+    use-native-checked.ts   # section 3.8; also exports guardCheckableChange
+    use-native-group-reconciliation.ts  # section 3.8
   __tests__/
     vitest.setup.ts
     helpers.tsx             # section 10
@@ -1119,9 +1215,11 @@ The part components keep their long names (`TabsRoot`) as `displayName` and in s
 
 - `<Component><Part>Props`, `<Component><Part>State`; single-part components drop the part:
   `ToggleProps`, `ToggleState`.
-- `<Component><State>ChangeDetails` extends `ActionDetails`.
-- Shared: `Action`, `ActionDetails`, `ChangeAction`, `RenderProp<Props, State>`,
-  `StateValue<T, State> = T | ((state: State) => T)`.
+- `<Component><State>ChangeDetails` extends `ActionDetails`; when it exposes `reason`, the
+  member is `readonly reason: ChangeReason` (never a local union).
+- Shared: `Action`, `ActionDetails`, `ChangeAction`, `ChangeReason`, `RenderProp<Props, State>`,
+  `StateValue<T, State> = T | ((state: State) => T)`, `ViewTransitionClass` (the `transition`
+  prop's type, section 5.2).
 - Props interfaces are `interface`s extending the element props (section 1.5); state objects are
   `interface`s with readonly members.
 - Everything public is exported with `export type`; nothing from `internal/` is public.
@@ -1152,6 +1250,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` works end to end (guards the documented pattern). |
 | Directive | Each built part file starts with `"use client"` or not, exactly as the component's design doc records (script over `dist`, run in `test:run` after `build`). |
+| Platform path (both) | Required for every component with a residual browser path (section 3.5): mount reconciliation (`renderToString`, change the DOM before `hydrateRoot`, exactly one dispatch with `reason: "platform"` and `event === undefined`, StrictMode still one) and, for native form controls, form reset through `<button type="reset">`, `form.reset()` and React's automatic reset after a successful `<form action>` (one dispatch per state owner with the `reset` event; a cancelled `reset` dispatches nothing; a controlled parent that refuses gets the DOM re-synced after settle). |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). Tests only assert that components render with and without `transition`
@@ -1216,6 +1315,23 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 14. **`details.reason` vocabulary unified** to `"activate"` | `"platform"` (section 2.2); Tabs'
     `"find"` and Accordion's `"trigger"` are renamed.
 15. **Tabs warns in development** when neither `value` nor `defaultValue` is given.
+16. **Plain-input anatomy for native form controls** (wave 2, 2026-10-16): `Switch` and
+    `Checkbox` are single components rendering the input, with no `Indicator`, `Thumb` or
+    `Label` parts; `RadioGroup` is `Root` (`<fieldset role="radiogroup">`) / `Label` (`<legend>`)
+    / `Item` (`<input type="radio">`), the research's shape 1. Sibling indicators are consumer
+    markup styled with `:has()`, or rendered through `render`'s function form.
+17. **Form reset in controlled mode notifies the parent** with `reason: "platform"` and the
+    `reset` event (section 3.8 rule 6); resets are never silently ignored.
+18. **`indeterminate` is suspended while pending** (`state.indeterminate = indeterminate &&
+    !pending`, section 4.1).
+19. **One public `ChangeReason` type** (`"activate" | "platform"`, section 2.2) replaces the
+    per-component unions.
+20. **`CheckboxGroup` is deferred** to its own design (issue #33); Checkbox leaves room for it
+    (`design/components/checkbox.md` §10).
+21. **Shared native-input machinery** is the three-hook contract of section 3.8: per-element
+    `useNativeChecked` (with `group: true` inside a group), the group adapter
+    `useNativeGroupReconciliation` on a fieldset Root, both on `useFormReset`; one dispatch per
+    state owner.
 
 ## Open questions
 
