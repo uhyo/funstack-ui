@@ -994,7 +994,7 @@ mechanism is pending the reviewer's confirmation).
    `Indicator` and documents `Tab`'s as settle/snap-back only. If the corrected section 5 removes
    `transition` from trigger parts altogether, `Tab` should follow; if it keeps it for Toggle,
    `Tab` stays as designed.
-6. **No-op rule precision.** Section 2.3 item 7 says "clicking the already-selected Tab calls
+6. **No-op rule precision.** Section 2.3 item 8 says "clicking the already-selected Tab calls
    nothing". This design reads "selected" as the optimistic value, which makes clicking back to the
    committed tab a cancelling dispatch (section 9.4). Worth stating in the conventions so every
    single-shot component does the same.

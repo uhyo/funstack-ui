@@ -1,8 +1,8 @@
 # RadioGroup
 
-Status: **proposed** (2026-10-16, GitHub issue #28). Follows `design/conventions.md` (accepted);
-where this document and the conventions disagree, the conventions win. Deviations and additions
-are listed under "Conventions feedback" at the end.
+Status: **accepted** (2026-10-16, GitHub issue #28; review corrections from
+`memo/reviewer/radio-group.md` folded in the same day). Follows `design/conventions.md`
+(accepted); where this document and the conventions disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/form-controls.md` (binding
 findings on native inputs), `docs/research/react-async-apis.md`, `design/components/tabs.md`
@@ -291,7 +291,7 @@ action means the whole pending time (verified in jsdom, Chromium 156 and Firefox
 
 ### 4.2 No-op rule
 
-A dispatch is skipped when the target equals the **optimistic** value (conventions 2.3 item 7).
+A dispatch is skipped when the target equals the **optimistic** value (conventions 2.3 item 8).
 Native radios make this almost moot (the browser fires no `onChange` for an already-checked radio),
 but it matters for the platform paths: a reset whose target is what the user already intends does
 nothing. Clicking back to the committed radio while another is pending is a real dispatch that
@@ -351,12 +351,20 @@ then reconciles once more in a microtask, deduped across items mounting in the s
 subject to the same base comparison (conventions 3.8 rule 3; product-owner decision). Calls from
 Items rendered in the Root's own commit are ignored by the adapter (they are covered by its mount
 reconciliation; StrictMode's re-run behaves the same because the flag is reset in the effect
-cleanup). **Accepted limitation:** a *programmatic* `value` change (controlled parent, not a
-click) made while both the old and the new radio are inside a still-dehydrated boundary is
-misread: the DOM still shows the server's checked radio, and the late reconciliation dispatches
-that old value as a user change. Distinguishing the two needs history (a native `change`
-listener on the fieldset catching clicks on not-yet-registered members); not done in v0. No `suppressHydrationWarning` is needed: the HTML `checked` attribute still matches the
-server render and react-dom does not diff the `checked` property during hydration.
+cleanup). A programmatic `value` change while members are still dehydrated is **not** a problem
+(reviewer probes B2/B3): a transition update is held until the boundary hydrates and an urgent
+update client-renders the boundary; neither dispatches.
+
+**Unsupported: partial hydration of a group.** If a Suspense boundary sits between the Root and
+some Items, and the user clicks a *hydrated* radio while same-`name` siblings are inside a
+still-dehydrated boundary, react-dom's `restoreStateOfTarget` throws "ReactDOMInput: Mixing
+React and non-React radio inputs with the same `name` is not supported" (the dehydrated siblings
+have no fiber yet). This is React's limitation, not the library's, and cannot be worked around
+from inside the group (reviewer probe B). The library emits a dev warning on the late-mount path
+when it detects members hydrating after the Root; the docs say to keep every Item of a group in
+the same Suspense boundary as its Root. Recorded in issue #34 for a human to report upstream.
+No `suppressHydrationWarning` is needed for the normal case: the HTML `checked` attribute still
+matches the server render and react-dom does not diff the `checked` property during hydration.
 
 ### 5.2 Form reset
 
@@ -367,6 +375,14 @@ target therefore follows conventions 3.8 rule 6: in **uncontrolled** mode it is 
 mirrors `defaultChecked: defaultValue === value` into the DOM after every commit, as Switch does
 with `defaultChecked`); in **controlled** mode it is the mount-time `value`, and the reset is
 offered to the parent (product-owner decision, conventions resolved question 17).
+
+Controlled-mode caveat (reviewer probe F): "mount-time" is per *Item*, not per group. An Item
+added on the client while the controlled `value` equals its value mounts with `checked={true}`,
+and react-dom sets that input's `defaultChecked` from its initial `checked`, so two radios can
+carry `defaultChecked` (the one checked at the group's mount and the later one). A reset then
+checks whichever the browser resolves first in tree order, and `readDefault()` reports that one.
+The parent is notified as usual and decides; a parent that wants a stable reset target remounts
+the group with `key` or stays uncontrolled, where the hook mirrors `defaultValue` into every Item.
 
 Reset arrives three ways and the library handles all of them the same: a `<button type="reset">`,
 a programmatic `form.reset()`, and React's own `requestFormReset` after a successful
@@ -395,7 +411,7 @@ the browser writes first.
 `<fieldset disabled>` stops the user, not `form.reset()`: the browser resets disabled radios too.
 The library dispatches the reset for a disabled group as well, so that state follows the DOM and
 the group shows the right radio when it is re-enabled. "Disabled parts never dispatch"
-(conventions 2.3 item 6) is a statement about user interaction; the form's author reset the form.
+(conventions 2.3 item 7) is a statement about user interaction; the form's author reset the form.
 This differs from Accordion, which re-closes a disabled item that find-in-page opened: there the
 browser acted on one user-targeted item, here it acted on the whole form. Flagged in the questions.
 
@@ -406,7 +422,7 @@ that native radios may focus the last radio on Shift+Tab when none is checked; b
 
 | Part | Attributes |
 | --- | --- |
-| `Root` | `role="radiogroup"`, `disabled` (native, when `disabled`), `form` (pass-through of the prop), `data-pending`, `data-disabled`. `aria-label` / `aria-labelledby` pass through for groups without a `Label`. |
+| `Root` | `role="radiogroup"`, `aria-required="true"` when `required` (owned; absent otherwise), `disabled` (native, when `disabled`), `form` (pass-through of the prop), `data-pending`, `data-disabled`. `aria-label` / `aria-labelledby` pass through for groups without a `Label`. |
 | `Label` | none added; `<legend>` names the fieldset natively. |
 | `Item` | `type="radio"`, `name` (group), `value`, `checked` (optimistic), `form` (group), `required` (group), `disabled` (own prop), `data-checked`, `data-pending`, `data-disabled`. No `aria-checked` (forbidden on native inputs by ARIA in HTML and ignored by Chromium), no `tabindex` (native roving), no `id` wiring. |
 
@@ -418,7 +434,10 @@ that native radios may focus the last radio on Shift+Tab when none is checked; b
   group is required in every engine; one checked radio satisfies it. After a submit attempt every
   radio matches `:user-invalid` while nothing is checked. Chromium exposes unchecked required radios
   as `invalid` in the accessibility tree before any interaction (platform behaviour, noted for AT
-  testing).
+  testing). The **group** itself is not exposed as required by `required` on the radios: Chromium's
+  AX tree reports `required: false` on the `radiogroup` (reviewer probe H), so the Root also emits
+  `aria-required="true"` when `required`, as the APG radiogroup pattern specifies (product-owner
+  decision); the key is owned so a `render` element cannot contradict the prop.
 - **Empty group.** When nothing is checked every radio matches `:indeterminate` (both probed
   engines). The library emits no `data-indeterminate`: it is a group fact, not an item state, and
   `:not(:checked)` plus `.group:not(:has(:checked))` already express it.
@@ -799,7 +818,7 @@ controlled wrapper.
 
 | Area | Tests |
 | --- | --- |
-| Roles and ARIA | `fieldset[role=radiogroup]` with accessible name from `Label` (`toHaveAccessibleName`); `aria-label` fallback without `Label`; every Item is `input[type=radio]` with the same `name`; `useId` name when `name` omitted, prop when given; `value` attribute per Item; `required` on every Item when set on Root; `disabled` on the fieldset for `Root disabled`, on the input for `Item disabled`; `data-disabled` on Items in both cases; `form` attribute on fieldset and inputs. |
+| Roles and ARIA | `fieldset[role=radiogroup]` with accessible name from `Label` (`toHaveAccessibleName`); `aria-required="true"` on the fieldset when `required`, absent otherwise, and not overridable through a `render` element; `aria-label` fallback without `Label`; every Item is `input[type=radio]` with the same `name`; `useId` name when `name` omitted, prop when given; `value` attribute per Item; `required` on every Item when set on Root; `disabled` on the fieldset for `Root disabled`, on the input for `Item disabled`; `data-disabled` on Items in both cases; `form` attribute on fieldset and inputs. |
 | Keyboard | Click, Space and arrow keys (user-event emulates native radio walking: next/previous, wrap, disabled skipped) each dispatch once with a native `click` event; Tab enters on the checked radio; `Home`/`End` do nothing. **Browser mode:** RTL mirroring, native wrap, Shift+Tab return, Safari note. |
 | Sync action (both) | `(next, details)` shape; `details.reason === "activate"`; `details.event.type === "click"`; clicking the checked radio, a disabled radio, or any radio under `Root disabled` never dispatches; a click whose `defaultPrevented` is already true (pass-through `onClick`) never dispatches and leaves the DOM on the old radio. |
 | Async action (both) | While unresolved: `data-pending` on Root and the clicked Item only; the clicked input is `checked` in the DOM; `data-checked` moved; other Items unchanged. After resolve: pending gone, value committed (uncontrolled) / parent updated (controlled). |
@@ -810,6 +829,7 @@ controlled wrapper.
 | Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; a controlled parent that refuses the hydration dispatch (or catches a rejection inside the action without updating) → the DOM is back on "a" after settle, group still mounted. StrictMode: still one dispatch. Late-mounting Item: an Item under a Suspense boundary that resolves after hydration, with its DOM `checked` set before reveal, produces one additional dispatch via `onItemMounted()`; two such Items in one commit produce one. |
 | Platform: form reset | Inside a `<form>`: check "b", call `form.reset()` → one dispatch `(a-or-null, { reason: "platform", event: Event("reset") })`, uncontrolled commits it; controlled parent that ignores → DOM re-checks the parent's radio after settle; `<form action>` that succeeds auto-resets and dispatches the same way; a cancelled `reset` event dispatches nothing; `Root disabled` still dispatches on reset; reset whose target equals the optimistic value dispatches nothing. |
 | `preventDefault` warning | `details.event.preventDefault()` inside the action logs the dev warning once; the action still ran. |
+| Platform: base comparison (rule 1) | Two synchronous `form.reset()` calls while a reset to `null` is still pending dispatch **once** (the second reads the in-flight `null` as the base); a copy using `?.next ?? optimistic` would dispatch twice, so this row is the guard for conventions 3.8 rule 1. |
 | Platform: reset target by mode | Uncontrolled: after the Root re-renders with a new `defaultValue` (inside a transition), `form.reset()` returns the group to the new default and dispatches it; controlled: reset returns to the mount-time `value` and the parent is notified. |
 | `details.event` is virtual | Toggle row 21 verbatim on an Item click, plus `JSON.stringify(details) === '{"reason":"activate"}'`; a fake Server Function (plain async spy) receives `(next, details)` with the same shape. |
 | Function props | `className` / `style` on Root, Label, Item receive the documented state (`checked` optimistic, `pending` per Item); `children` on Root and Label receive Root state; Item has no `children`. |
@@ -891,10 +911,10 @@ is not in the context: no part renders it.
   `readGroupDefault()` is `readGroup()` over `defaultChecked` instead of `checked`.
 - Context additionally carries `defaultValue` (uncontrolled mode only) so each Item can mirror
   its reset target (13.5).
-- Renders `<fieldset role="radiogroup" disabled={disabled} form={form} data-pending data-disabled>`
-  through `use-render` with `RadioGroupRootState`; dev warning when the mounted `tagName` is not
-  `FIELDSET`.
-- Owned keys: `role`, `disabled`, `form`, `data-pending`, `data-disabled`.
+- Renders `<fieldset role="radiogroup" aria-required={required ? "true" : undefined}
+  disabled={disabled} form={form} data-pending data-disabled>` through `use-render` with
+  `RadioGroupRootState`; dev warning when the mounted `tagName` is not `FIELDSET`.
+- Owned keys: `role`, `aria-required`, `disabled`, `form`, `data-pending`, `data-disabled`.
 
 ### 13.4 Label
 
@@ -928,7 +948,9 @@ is not in the context: no part renders it.
 ### 13.6 Dev warnings
 
 Wrong `tagName` behind `render` (Root, Item); `preventDefault()` inside the action; `Item` or
-`Label` outside a Root (throw, as Tabs does); the shared hook's controlled/uncontrolled warnings.
+`Label` outside a Root (throw, as Tabs does); the shared hook's controlled/uncontrolled warnings;
+Items hydrating after the Root (the late-mount path), because partial hydration of a group is
+unsupported (5.1).
 Deliberately absent: neither `value` nor `defaultValue` given; a controlled `value` that matches no
 Item (nothing checked is a valid, native state and the tab stop still works).
 
@@ -984,11 +1006,14 @@ form props are pass-through on single controls and Root-owned here.
 
 All nine items were applied to `design/conventions.md`: `RadioGroup.Item` on the `checked` row
 (4.1); the form-reset path (3.5, 3.8); the already-cancelled click rule (2.3 item 3); "disabled
-never dispatches" scoped to user interaction (2.3 item 6, 3.6); `null` from platform paths (3.1);
+never dispatches" scoped to user interaction (2.3 item 7, 3.6); `null` from platform paths (3.1);
 `fsui-radio-group` (5.3); the `render` restriction for inputs and fieldset Roots (1.2); `Label`
 as `<legend>` in the part vocabulary (1.1); and the #19 note (7.3).
 
 ## Questions for the product owner
+
+The design was accepted on 2026-10-16; items not marked resolved stand as designed unless the
+product owner reopens them.
 
 1. **Anatomy.** Resolved: shape 1 (conventions resolved question 16).
 2. **`next: string | null`.** Accept that `valueChangeAction` is typed `string | null` because a

@@ -379,17 +379,26 @@ What a consumer can rely on:
    // Panel switches when the save succeeds; the tab shows pending meanwhile.
    valueChangeAction={async (next) => { await saveSelection(next); }}
    ```
-6. **Disabled parts never dispatch for user interaction.** A disabled Tab does not call
+6. **An action must never await user input.** Every transition started while an async action is
+   pending is entangled with it (item 5), including the one that would show the user the thing
+   they must respond to. An action that opens a confirmation dialog in a transition and awaits
+   the user's answer therefore deadlocks: the confirmation never commits, so the answer never
+   comes, so the action never resolves. Rule: user input arrives through its own dispatch, not
+   through a promise an action awaits. The confirm-before-close shape is "the Close part's
+   action opens the confirmation (sync prefix, or urgently outside the action scope) and
+   returns; the confirmation's own Close action does the work" (`design/components/dialog.md`
+   12.5). The same applies to any "ask then continue" flow: split it into two actions.
+7. **Disabled parts never dispatch for user interaction.** A disabled Tab does not call
    `valueChangeAction`. Platform dispatches that the *form owner* causes are not blocked by
    `disabled`: `form.reset()` resets a `<fieldset disabled>` group too, and the group follows it
    with `reason: "platform"` (section 3.8), because the form's author acted on the whole form,
    not the user on one disabled control. Accordion's find-in-page rule (a disabled item re-closes
    without dispatching) stays: there the browser acted on one user-targeted item.
-7. **No-op interactions do not dispatch** unless the component says otherwise. "No-op" is judged
+8. **No-op interactions do not dispatch** unless the component says otherwise. "No-op" is judged
    against the **optimistic** value, not the committed one: clicking the Tab that is already
    optimistically selected calls nothing, but clicking back to the committed tab while another is
    pending is a real dispatch that replaces the in-flight intent (section 2.5).
-8. **Parts are never disabled while pending.** See section 3.6.
+9. **Parts are never disabled while pending.** See section 3.6.
 
 ### 2.4 Errors
 
@@ -462,6 +471,9 @@ React neither cancels nor orders overlapping actions. The library's stance:
   counters) use `useActionState` internally and document that. None of the initial four do.
 - Consumers who need abort semantics implement them in the action (`AbortController` captured in
   a ref); the library passes no signal in v0.
+- **Overlap never includes user input.** An action that awaits a promise another user action is
+  supposed to resolve cannot overlap with it: the second action's transition is held by the
+  first (section 2.3 item 6). Design flows as independent dispatches.
 
 ### 2.6 The "no handlers" rule and urgent updates
 
@@ -706,7 +718,7 @@ Rules:
 where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs), the
 part sets `aria-disabled` instead. In both cases the part emits `data-disabled` and never
 dispatches for user interaction (platform dispatches from the form owner are the exception,
-section 2.3 item 6).
+section 2.3 item 7).
 
 **A part is never disabled while pending** (product-owner decision, library-wide). The library
 does not set `disabled`, `aria-disabled` or `inert` on a trigger because its action is in flight:
@@ -780,12 +792,14 @@ Rules the three hooks implement, which component docs may cite instead of restat
    reconciliation are ignored (those items are in the Root's commit and covered); later calls
    queue one microtask per commit that compares `readCurrent()` with `base()` and dispatches
    `"platform"` with `event: undefined` only when the late item's DOM value differs from what the
-   user intends. **Accepted limitation:** if the value changes *programmatically* (a controlled
-   `value` update, not a click) while both the old and the new radio are inside a boundary that is
-   still dehydrated, the DOM still holds the server's checked radio and the late reconciliation
-   reads it as a user change, dispatching the old value. Telling the two apart needs history (a
-   native `change` listener on the fieldset for clicks on not-yet-registered members); not done
-   in v0, an edge on an edge, documented in the RadioGroup design.
+   user intends. A programmatic value change while members are still dehydrated is not a problem
+   (a transition update is held until hydration, an urgent one client-renders the boundary; no
+   dispatch either way, reviewer-verified). **Unsupported: partial hydration of a native radio
+   group.** Clicking a hydrated radio while same-`name` siblings are inside a still-dehydrated
+   Suspense boundary makes react-dom throw "Mixing React and non-React radio inputs with the same
+   `name` is not supported" from its radio restore. This is a React limitation; the library emits
+   a dev warning on the late-mount path, documents "keep all Items in the Root's Suspense
+   boundary", and issue #34 tracks a human upstream report.
 4. **The reset subscription must be stable.** React's automatic reset after a successful
    `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
    the next subscription, so a listener attached in a deps-less effect never sees it (verified,
@@ -954,7 +968,7 @@ What this means per kind of part:
 | Part renders | Animate with | Why |
 | --- | --- | --- |
 | Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
-| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop (`<ViewTransition>`, rendered only because the prop is set) | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`, Dialog's Popup children) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. |
+| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop (`<ViewTransition>`, rendered only because the prop is set) | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. A boundary that mounts *under a new DOM element* is shielded: Dialog's children mount under the `<dialog>` element on a plain open, so a plain open starts no view transition even with `transition` set; only a nested Popup mounting together with outer content, or a Root inserted by a transition, pays. |
 | `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
 | Any part with `transition` absent | nothing (no boundary rendered) | Baseline timing; a switch or open calls no `startViewTransition`. |
 
@@ -1351,11 +1365,14 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). jsdom tests assert that components render with and without `transition`
-set; animation behaviour is checked in the example app. **Every mount-prone part** (a part that
-mounts or is revealed in a transition commit: `Tabs.Panel`, `Accordion.Panel`, Dialog's Popup
-children, and any single-element part the test conditionally renders) also gets a **browser-mode
-row**: with `transition` absent, a switch or open calls `document.startViewTransition` zero times
-(spy on it before the interaction); with `transition="none"` it is called (the boundary exists). When a component depends on platform APIs
+set; animation behaviour is checked in the example app. **Every mount-prone part** (a part whose
+boundary mounts or is revealed as the top of an inserted subtree in a transition commit:
+`Tabs.Panel`, `Accordion.Panel`, a Dialog Root inserted by a transition, and any single-element
+part the test conditionally renders) also gets a **browser-mode row**: with `transition` absent,
+a switch or open calls `document.startViewTransition` zero times (spy on it before the
+interaction); with `transition="none"` it is called where the boundary is the top of the inserted
+subtree. Where a new DOM element shields the boundary (Dialog's plain open: children mount under
+the `<dialog>`), the row asserts zero calls in both cases. When a component depends on platform APIs
 jsdom lacks (Popover, anchor positioning), the rows that need them go in a sibling
 `foo.browser.test.tsx`, which vitest runs in headless Chromium (browser mode, see `CLAUDE.md`);
 the jsdom file notes which rows moved there. Browser tests are slower, so they cover only what
