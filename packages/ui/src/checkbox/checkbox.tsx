@@ -99,9 +99,12 @@ export interface CheckboxProps extends Omit<
  * `<input type="checkbox">` whose DOM `checked` is the optimistic state; the input carries
  * `data-pending` while `checkedChangeAction` is in flight and takes part in forms natively.
  *
- * Owned keys (a `render` element cannot set them): `type`, `checked`, `defaultChecked`,
- * `indeterminate` (stripped), `aria-checked` (always removed), `onChange`, `data-checked`,
- * `data-indeterminate`, `data-pending`, `data-disabled`. `role` passes through.
+ * Owned keys (a `render` element's value is overridden): `type`, `checked`, `defaultChecked`,
+ * `indeterminate` (stripped), `aria-checked` (always removed), `disabled`, `data-checked`,
+ * `data-indeterminate`, `data-pending`, `data-disabled`. `role` passes through. Event handlers
+ * are merged rather than owned: a `render` element's own `onChange` (or `onClick`) runs first,
+ * then the library's; an `onClick` that calls `preventDefault()` cancels the change (nothing is
+ * dispatched).
  */
 export function Checkbox({
   checked,
@@ -159,7 +162,7 @@ export function Checkbox({
     children: undefined,
     ref: inputRef,
     // Pass-through layer: a `render` element's own props win over these (`role` included).
-    props: { ...rest, disabled },
+    props: rest,
     // Library-controlled layer (owned keys, conventions 1.2).
     libraryProps: {
       type: "checkbox",
@@ -170,6 +173,9 @@ export function Checkbox({
       // `indeterminate` prop (which react-dom would warn about) is stripped.
       ...({ indeterminate: undefined } as object),
       "aria-checked": undefined,
+      // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
+      // `render` element cannot re-enable (`disabled={false}`) or disable the input on its own.
+      disabled,
       "data-checked": dataAttr(optimistic),
       "data-indeterminate": dataAttr(shownIndeterminate),
       "data-pending": dataAttr(pending),

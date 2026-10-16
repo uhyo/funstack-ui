@@ -674,6 +674,31 @@ describe("Toggle", () => {
       expect(button()).toHaveAttribute("id", "mine");
     });
 
+    it("element form cannot override disabled: native disabled and data-disabled agree", async () => {
+      const action = vi.fn();
+      const { rerender } = render(
+        <Toggle disabled pressedChangeAction={action} render={<button disabled={false} />}>
+          Favorite
+        </Toggle>,
+      );
+      expect(button()).toBeDisabled();
+      expect(button()).toHaveAttribute("data-disabled", "");
+      await act(async () => {
+        button().click();
+      });
+      expect(action).not.toHaveBeenCalled();
+
+      rerender(
+        <Toggle pressedChangeAction={action} render={<button disabled />}>
+          Favorite
+        </Toggle>,
+      );
+      expect(button()).toBeEnabled();
+      expect(button()).not.toHaveAttribute("data-disabled");
+      await setupUser().click(button());
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
     it("element form cannot re-introduce an owned attribute the library left off", async () => {
       const d = deferred();
       render(

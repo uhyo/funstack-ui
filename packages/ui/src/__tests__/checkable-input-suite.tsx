@@ -5,7 +5,7 @@
 // half of 26) live in the components' *.browser.test.tsx; row 25 (directive) is in
 // directives.test.ts.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, useLayoutEffect, useState } from "react";
+import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ComponentType, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -686,6 +686,34 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         expect(consoleError).not.toHaveBeenCalled();
       });
 
+      it("element form cannot override disabled: native disabled and data-disabled agree", async () => {
+        const action = vi.fn<ActionFn>();
+        const { rerender } = render(
+          <Control
+            aria-label="Wi-Fi"
+            disabled
+            checkedChangeAction={action}
+            render={<input disabled={false} />}
+          />,
+        );
+        expect(input()).toBeDisabled();
+        expect(input()).toHaveAttribute("data-disabled", "");
+        await act(async () => {
+          input().click();
+        });
+        expect(action).not.toHaveBeenCalled();
+        expect(input().checked).toBe(false);
+
+        rerender(
+          <Control aria-label="Wi-Fi" checkedChangeAction={action} render={<input disabled />} />,
+        );
+        expect(input()).toBeEnabled();
+        expect(input()).not.toHaveAttribute("data-disabled");
+        await setupUser().click(input());
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(input().checked).toBe(true);
+      });
+
       it("function form receives (props, state) and may render siblings (row 16)", async () => {
         const d = deferred();
         const renderFn = vi.fn((props: ComponentPropsWithRef<"input">, state: ControlState) => (
@@ -1169,6 +1197,66 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         expect(action).toHaveBeenCalledTimes(1);
         expect(input().checked).toBe(false);
         expect(input()).not.toHaveAttribute("data-checked");
+      });
+
+      describe("inside a Suspense boundary that hydrates after its parent", () => {
+        function Gate({ promise, children }: { promise: Promise<void>; children: ReactNode }) {
+          use(promise);
+          return children;
+        }
+        function Page({ gate, action }: { gate: Promise<void>; action: ActionFn }) {
+          return (
+            <main>
+              <Suspense fallback={null}>
+                <Gate promise={gate}>
+                  <Control aria-label="Late" checkedChangeAction={action} />
+                </Gate>
+              </Suspense>
+            </main>
+          );
+        }
+
+        for (const strict of [false, true]) {
+          it(`a click before the boundary hydrates dispatches once${strict ? " (StrictMode)" : ""}`, async () => {
+            // A single control reconciles at its own mount, which is the boundary's hydration;
+            // nothing depends on when its parents mounted (contrast the group adapter).
+            const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+            const action = vi.fn<ActionFn>();
+            const wrap = (ui: ReactNode) => (strict ? <StrictMode>{ui}</StrictMode> : ui);
+            const container = document.createElement("div");
+            document.body.append(container);
+            const ready = Object.assign(Promise.resolve(), {
+              status: "fulfilled",
+              value: undefined,
+            });
+            container.innerHTML = renderToString(wrap(<Page gate={ready} action={action} />));
+            const gate = deferred();
+            render(wrap(<Page gate={gate.promise} action={action} />), {
+              container,
+              hydrate: true,
+            });
+            await flush();
+            const server = container.querySelector("input")!;
+            await act(async () => {
+              server.click();
+            });
+            expect(server.checked).toBe(true);
+            expect(action).not.toHaveBeenCalled();
+
+            await act(async () => {
+              gate.resolve();
+            });
+            await flush();
+            expect(action).toHaveBeenCalledTimes(1);
+            expect(action.mock.calls[0]?.[0]).toBe(true);
+            expect(action.mock.calls[0]?.[1].reason).toBe("platform");
+            expect(input()).toBe(server);
+            expect(input().checked).toBe(true);
+            expect(input()).toHaveAttribute("data-checked", "");
+            const errors = consoleError.mock.calls.map(([m]) => String(m));
+            expect(errors.filter((m) => /hydrat|match/i.test(m))).toEqual([]);
+          });
+        }
       });
 
       it("createRoot never dispatches on mount", async () => {

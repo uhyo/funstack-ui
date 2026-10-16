@@ -1,5 +1,5 @@
 "use client";
-import { useEffectEvent, useLayoutEffect } from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { useFormReset } from "./use-form-reset.js";
 
@@ -14,19 +14,41 @@ export interface UseNativeGroupReconciliationOptions<T> {
   readonly base: () => T;
   /**
    * The browser changed the group's value on a residual path and it differs from `base()`.
-   * `event` is the `reset` event, or `undefined` for mount reconciliation. The Root dispatches
-   * once for the whole group with `reason: "platform"`.
+   * `event` is the `reset` event, or `undefined` for mount reconciliation (the Root's mount, or a
+   * member mounting later). The Root dispatches once for the whole group with
+   * `reason: "platform"`.
    */
   readonly onPlatformChange: (next: T, event: Event | undefined) => void;
 }
 
+export interface UseNativeGroupReconciliationResult {
+  /**
+   * Stable. Pass it to every member, which hands it to
+   * `useNativeChecked({ group: true, onItemMounted })`; the hook calls it from the member's mount
+   * layout effect. A member that mounts after the Root's own mount reconciliation (inside a
+   * Suspense boundary that hydrates later, selective hydration, or a member added on the client)
+   * makes the adapter reconcile the group again: `readCurrent()` vs `base()`, in a microtask, once
+   * for all members mounted in the same commit. Members mounting in the Root's own commit are
+   * covered by the Root's mount reconciliation (their effects run before the Root's) and are
+   * ignored.
+   *
+   * RadioGroup wiring: `const { onItemMounted } = useNativeGroupReconciliation(...)` in the Root,
+   * put `onItemMounted` in the group context, and in each Item
+   * `useNativeChecked({ type: "radio", group: true, onItemMounted: ctx.onItemMounted, ... })`.
+   */
+  readonly onItemMounted: () => void;
+}
+
 /**
  * Group adapter of the native-input machinery (conventions 3.8): one dispatch per group for the
- * two residual browser paths, from the Root rather than once per member.
+ * residual browser paths, from the Root rather than once per member.
  *
  * - Mount reconciliation, once, in a layout effect: `readCurrent()` vs `base()`. The members'
- *   `useNativeChecked({ group: true })` leaves `checked` alone in the mount commit, so this effect,
- *   which runs after the members' (children first), still reads the hydrated DOM.
+ *   `useNativeChecked({ group: true })` leaves `checked` alone in their mount commit, so this
+ *   effect, which runs after the members' (children first), still reads the hydrated DOM.
+ * - Late members: a member mounting in a later commit (a Suspense boundary that hydrates after the
+ *   Root, where a click before hydration changed the DOM) reports through `onItemMounted`, and the
+ *   group is reconciled again the same way (see `UseNativeGroupReconciliationResult`).
  * - Form reset through `useFormReset` on the container: in a microtask after the reset,
  *   `readDefault()` vs `base()`.
  *
@@ -34,23 +56,53 @@ export interface UseNativeGroupReconciliationOptions<T> {
  */
 export function useNativeGroupReconciliation<T>(
   options: UseNativeGroupReconciliationOptions<T>,
-): void {
+): UseNativeGroupReconciliationResult {
   const { element } = options;
 
-  function reconcile(next: T, event: Event | undefined): void {
-    if (!Object.is(next, options.base())) options.onPlatformChange(next, event);
-  }
+  // The latest committed options, for the late reconciliation, which runs in a microtask outside
+  // any effect (so it cannot go through an Effect Event).
+  const latest = useRef(options);
+  useLayoutEffect(() => {
+    latest.current = options;
+  });
+
+  /** The Root's own mount reconciliation has run (reset by its cleanup, StrictMode included). */
+  const rootReconciled = useRef(false);
+  /** A late reconciliation is queued; members mounting in the same commit share it. */
+  const lateQueued = useRef(false);
 
   const reconcileMount = useEffectEvent(() => {
     if (element.current === null) return;
-    reconcile(options.readCurrent(), undefined);
+    reconcile(options, options.readCurrent());
   });
   useLayoutEffect(() => {
     reconcileMount();
+    rootReconciled.current = true;
+    return () => {
+      rootReconciled.current = false;
+    };
+  }, []);
+
+  const onItemMounted = useCallback(() => {
+    if (!rootReconciled.current || lateQueued.current) return;
+    lateQueued.current = true;
+    queueMicrotask(() => {
+      lateQueued.current = false;
+      if (!rootReconciled.current) return;
+      const current = latest.current;
+      if (current.element.current === null) return;
+      reconcile(current, current.readCurrent());
+    });
   }, []);
 
   useFormReset(element, (event) => {
     if (element.current === null) return;
-    reconcile(options.readDefault(), event);
+    reconcile(options, options.readDefault(), event);
   });
+
+  return { onItemMounted };
+}
+
+function reconcile<T>(options: UseNativeGroupReconciliationOptions<T>, next: T, event?: Event) {
+  if (!Object.is(next, options.base())) options.onPlatformChange(next, event);
 }
