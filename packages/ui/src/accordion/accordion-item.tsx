@@ -175,8 +175,10 @@ export function AccordionItem({
     style,
     children,
     ref: libraryRef,
-    props: {
-      ...rest,
+    props: rest,
+    // Library-controlled layer: `open`, `name` and `onToggle` are owned by the library in at
+    // least one mode, so a `render` element cannot override them either (conventions 1.2).
+    libraryProps: {
       open: isLibrary ? committedOpen : staticOpen,
       name: !isLibrary ? root?.name : undefined,
       onToggle,

@@ -119,8 +119,9 @@ export function AccordionTrigger({
     style,
     children,
     ref: libraryRef,
-    props: {
-      ...rest,
+    props: rest,
+    // Library-controlled layer: wins over a `render` element's props (conventions 1.2).
+    libraryProps: {
       "aria-disabled": item.disabled ? true : undefined,
       "data-open": dataAttr(item.optimisticOpen === true),
       "data-pending": dataAttr(item.pending),

@@ -914,6 +914,33 @@ describe("Accordion", () => {
       expect(trigger("a")).toHaveAttribute("data-open", "");
     });
 
+    it("element form: library-controlled attributes win, pass-through props lose to the element", async () => {
+      render(
+        <Accordion.Root defaultValue={["a"]}>
+          <Accordion.Item
+            value="a"
+            aria-label="part"
+            data-testid="item-a"
+            render={<details data-open="nope" aria-label="element" />}
+          >
+            <Accordion.Trigger data-testid="trigger-a" render={<summary data-open="nope" />}>
+              A
+            </Accordion.Trigger>
+          </Accordion.Item>
+        </Accordion.Root>,
+      );
+      const user = setupUser();
+      expect(item("a")).toHaveAttribute("data-open", "");
+      expect(item("a")).toHaveAttribute("aria-label", "element");
+      expect(trigger("a")).toHaveAttribute("data-open", "");
+      // The element cannot take `open` away from the library either.
+      await user.click(trigger("a"));
+      expect(item("a").open).toBe(false);
+      // Once closed the library's `data-open` is undefined ("not defined" in the merge), so the
+      // element's own value shows through; `:not([data-open])` styling must not rely on it.
+      expect(trigger("a")).toHaveAttribute("data-open", "nope");
+    });
+
     it("function form receives (props, state)", async () => {
       const d = deferred();
       const renderTrigger = vi.fn(

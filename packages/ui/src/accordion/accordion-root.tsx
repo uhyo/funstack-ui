@@ -319,8 +319,9 @@ export function AccordionRoot(props: AccordionRootProps) {
     className,
     style: finalStyle,
     children,
-    props: {
-      ...rest,
+    props: rest,
+    // Library-controlled layer: wins over a `render` element's props (conventions 1.2).
+    libraryProps: {
       "data-pending": dataAttr(state.pending),
       "data-disabled": dataAttr(disabled),
       onKeyDown,

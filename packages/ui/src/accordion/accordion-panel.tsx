@@ -72,8 +72,8 @@ export function AccordionPanel({
     className,
     style,
     children,
-    props: {
-      ...rest,
+    props: rest,
+    libraryProps: {
       "data-disabled": dataAttr(item.disabled),
     },
   });
