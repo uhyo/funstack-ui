@@ -10,7 +10,7 @@
 // - Find-in-page cannot be simulated. The platform path is driven by `setAttribute("open", "")`,
 //   which makes jsdom fire `toggle` on a macrotask exactly like a browser does.
 // - ViewTransition: jsdom has no `startViewTransition`, so `transition` is smoke-tested only.
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, configure, fireEvent, getConfig, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
@@ -22,7 +22,7 @@ import {
   expectNotPending,
   expectPending,
   renderBoth,
-  setupUser,
+  setupUser as setupUserEvent,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Accordion } from "./index.js";
@@ -171,6 +171,33 @@ const flushToggle = () =>
   act(async () => {
     await new Promise((resolve) => setImmediate(resolve));
   });
+
+/**
+ * user-event, with every interaction inside one async `act`. Bare user-event runs through RTL's
+ * `asyncWrapper`, which turns the act environment off: React then renders the click's transition
+ * on the real Scheduler (time-sliced) while the wrapper waits only one `setTimeout(0)`, so under
+ * load the action's commit landed after the call returned and the next assertion saw the
+ * optimistic state (a flake in the first tests of the file, while everything is cold). Inside
+ * `act`, React queues that work and drains it before resolving; the wrapper is bypassed for the
+ * duration because its act-environment-off window would make React warn about the outer `act`.
+ * A pending deferred still stays pending, so mid-flight assertions keep working.
+ */
+function setupUser() {
+  const user = setupUserEvent();
+  const inAct = async (interaction: () => Promise<void>) => {
+    const { asyncWrapper } = getConfig();
+    configure({ asyncWrapper: (cb) => cb() });
+    try {
+      await act(interaction);
+    } finally {
+      configure({ asyncWrapper });
+    }
+  };
+  return {
+    click: (element: Element) => inAct(() => user.click(element)),
+    keyboard: (keys: string) => inAct(() => user.keyboard(keys)),
+  };
+}
 
 function expectOpenAttr(el: Element, open: boolean) {
   if (open) expect(el).toHaveAttribute("open");
@@ -463,7 +490,7 @@ describe("Accordion", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("click dispatches (next, { event, reason: 'trigger', item, open }) and opens", async () => {
+    it("click dispatches (next, { event, reason: 'activate', item, open }) and opens", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);
       const user = setupUser();
