@@ -49,3 +49,4 @@
   - No agents running (all finished). Remaining wave 2: review Switch/Checkbox → fixes; implement RadioGroup (#31, hooks ready); implement Dialog (#29); docs pages (#32).
   - Doc follow-ups for architect: conventions 2.2 add reason "dismiss" + details.returnValue (Dialog); 4.2 caveat (Chromium doesn't match :checked when indeterminate); 3.8 rule 3 group clarification (no re-apply in mount commit); switch.md §10 (augmentation lacks `switch`).
   - Human tasks: jsdom checkbox canceled-activation bug (report upstream); find-in-page manual check; release/deploy secrets.
+- 2026-10-16 resumed. Running: review-switch-checkbox (opus), radio-group-impl (#31, opus, worktree), dialog-impl (#29, opus, worktree), architect doc follow-ups (dismiss reason etc.). User away; proceed autonomously.
