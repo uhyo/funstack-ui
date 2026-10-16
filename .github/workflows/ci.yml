@@ -37,11 +37,39 @@ jobs:
       - name: Run tests (jsdom)
         run: pnpm run test:jsdom
 
-      - name: Install Playwright browsers
-        run: pnpm --filter @funstack/ui exec playwright install --with-deps chromium
+      - name: Build
+        run: pnpm run build
+
+  # The vitest browser project, one job per engine (docs/vision.md: latest stable Blink, Gecko
+  # and WebKit), so the jsdom job above stays fast and a failure names its engine.
+  browser:
+    name: browser (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm --filter @funstack/ui exec playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run tests (browser)
         run: pnpm run test:browser
-
-      - name: Build
-        run: pnpm run build
+        env:
+          FUNSTACK_BROWSERS: ${{ matrix.browser }}
