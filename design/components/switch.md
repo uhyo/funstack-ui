@@ -644,6 +644,12 @@ export interface UseNativeCheckedOptions {
    * `useNativeGroupReconciliation`. Default `false`: the hook reports both paths itself.
    */
   readonly group?: boolean;
+  /**
+   * Group items only: the adapter's stable callback (from the Root's context), called from this
+   * hook's mount layout effect so an item mounting after the Root's reconciliation is reconciled
+   * (conventions 3.8 rule 3). Ignored by the adapter for items in the Root's own commit.
+   */
+  readonly onItemMounted?: () => void;
   /** From `useControllableAction`: the value the DOM is compared against on the residual paths. */
   readonly latestInFlight?: () => { readonly next: boolean } | null;
   /**
@@ -676,11 +682,18 @@ Behaviour, in order of declaration (effects run in declaration order):
    `onPlatformChange(el.checked, undefined)`. Runs before the re-apply effect so the
    pre-hydration value is read before it is overwritten.
 3. **Re-apply after every commit** (`useLayoutEffect`, no deps; all parts), in this order:
-   `if (defaultChecked !== undefined) el.defaultChecked = defaultChecked;` first, because writing
-   the default can move `checked` on an input still at its default; then
+   `if (defaultChecked !== undefined) el.defaultChecked = defaultChecked;` first, then
    `want = latestInFlight()?.next ?? checked; if (el.checked !== want) el.checked = want;` then
-   `if (indeterminate !== undefined) el.indeterminate = indeterminate;`. Skipped for `checked` in
-   the mount commit (conventions 3.8 rule 3). Programmatic property writes fire no events.
+   `if (indeterminate !== undefined) el.indeterminate = indeterminate;`. Why the order: react-dom's
+   `updateInput` writes `el.checked` on every update of the input (setting the dirty-checkedness
+   flag), and React's automatic form reset runs in the form's mutation effects, after the inputs'
+   updates and before layout effects. After that reset the dirty flag is clear, so writing
+   `defaultChecked` (the `checked` content attribute) moves `checked` as well; writing `checked`
+   afterwards settles it. A plain `form.reset()` followed by a re-render cannot tell the orders
+   apart; only the automatic reset can (test "re-apply order" in `use-native-checked.test.tsx`,
+   verified failing with the order swapped). `indeterminate` is independent of both. `checked` is
+   skipped in the mount commit (conventions 3.8 rule 3); `defaultChecked` and `indeterminate` are
+   applied at mount as usual. Programmatic property writes fire no events.
 4. **Form reset** (single controls; `useFormReset(ref, onReset)`): in the microtask,
    `next = el.defaultChecked; base = latestInFlight()?.next ?? checked;` if `next !== base` call
    `onPlatformChange(next, event)`, else `if (el.checked !== base) el.checked = base`.
@@ -897,9 +910,11 @@ Switch.displayName = "Switch";
 ```
 
 - **Owned keys** (documented per conventions 1.2): `type`, `role`, `checked`, `defaultChecked`,
-  `aria-checked`, `onChange`, `data-checked`, `data-pending`, `data-disabled`. `disabled` and
-  `name` are pass-through (a `render` element may set them), unlike Accordion's `name`, because
-  here they are the consumer's form wiring, not library state.
+  `aria-checked`, `onChange`, `disabled`, `data-checked`, `data-pending`, `data-disabled`.
+  `disabled` is owned because every part that takes a `disabled` prop owns it (conventions 1.2; the
+  same holds for Toggle): a `render` element can neither re-enable nor disable the Switch. `name`
+  stays pass-through (a `render` element may set it), unlike Accordion's `name`, because here it
+  is the consumer's form wiring, not library state.
 - **`onChange`, not `onClick`.** React warns when `checked` is given without `onChange`, and
   `onChange` on a checkable input is React's `click`-driven change event, so `details.event` is
   the click. The consumer's `onClick` passes through and runs first.

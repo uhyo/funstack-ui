@@ -383,6 +383,13 @@ user asked for (verified: two clicks on an unpressed toggle dispatch `true` then
 There is no "no-op interaction" for Toggle: every click changes the value, so every click
 dispatches. The one exception is `disabled`.
 
+Owned keys (conventions 1.2): `type` (only when the rendered element is a `<button>`),
+`aria-pressed`, `disabled`, `data-pressed`, `data-pending`, `data-disabled`, `onClick`. `disabled`
+is owned like on every part that takes the prop: a `render` element can neither re-enable a
+disabled Toggle nor disable an enabled one, so the prop, the native attribute, `data-disabled`
+and the no-dispatch rule always agree. (The 12.2 sketch predates the `libraryProps` split in
+`useRender`; these keys go in `libraryProps`, the rest of `rest` in `props`.)
+
 ### 6.2 Sequence: sync action
 
 ```

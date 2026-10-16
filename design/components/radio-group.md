@@ -348,7 +348,14 @@ one per radio. The StrictMode re-run of the effect sees the dispatch already in 
 nothing. An Item that mounts **after** the Root reconciled (inside a Suspense boundary that
 hydrates later) calls `onItemMounted()` from the adapter, handed down through context; the Root
 then reconciles once more in a microtask, deduped across items mounting in the same commit and
-subject to the same base comparison (conventions 3.8 rule 3; product-owner decision). No `suppressHydrationWarning` is needed: the HTML `checked` attribute still matches the
+subject to the same base comparison (conventions 3.8 rule 3; product-owner decision). Calls from
+Items rendered in the Root's own commit are ignored by the adapter (they are covered by its mount
+reconciliation; StrictMode's re-run behaves the same because the flag is reset in the effect
+cleanup). **Accepted limitation:** a *programmatic* `value` change (controlled parent, not a
+click) made while both the old and the new radio are inside a still-dehydrated boundary is
+misread: the DOM still shows the server's checked radio, and the late reconciliation dispatches
+that old value as a user change. Distinguishing the two needs history (a native `change`
+listener on the fieldset catching clicks on not-yet-registered members); not done in v0. No `suppressHydrationWarning` is needed: the HTML `checked` attribute still matches the
 server render and react-dom does not diff the `checked` property during hydration.
 
 ### 5.2 Form reset
@@ -898,6 +905,7 @@ is not in the context: no part renders it.
 - Reads context; `checked = ctx.optimistic === value`; `pending = ctx.pending && checked`;
   `disabled = ctx.disabled || disabledProp`.
 - `useNativeChecked({ type: "radio", component: "RadioGroup.Item", checked, group: true,
+  onItemMounted: ctx.onItemMounted,
   defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value })`
   (conventions 3.8): tag check, re-apply of `defaultChecked` then `checked` after every commit
   except the mount commit; no residual-path reporting (the Root does it once per group), but the
