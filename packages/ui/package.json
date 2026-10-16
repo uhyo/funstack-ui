@@ -31,6 +31,7 @@
     ".": "./dist/index.mjs",
     "./accordion": "./dist/accordion/index.mjs",
     "./checkbox": "./dist/checkbox/index.mjs",
+    "./dialog": "./dist/dialog/index.mjs",
     "./switch": "./dist/switch/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",
     "./toggle": "./dist/toggle/index.mjs",

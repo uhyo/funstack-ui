@@ -24,10 +24,13 @@ export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Act
  *
  * - `"activate"`: the user acted on a trigger part (click, Enter/Space, label click, focus in an
  *   automatic-activation mode). `details.event` is the native event.
+ * - `"dismiss"`: the user closed the component without acting on one of its parts: Escape,
+ *   Android back, an assistive-technology dismiss gesture, or a click outside (light dismiss).
+ *   `details.event` is the platform's `close` event. Dialog is the first component to use it.
  * - `"platform"`: the browser changed the state itself: find-in-page, a form reset (`event` is
  *   the `reset` event), or interaction before hydration found at mount (`event` is `undefined`).
  */
-export type ChangeReason = "activate" | "platform";
+export type ChangeReason = "activate" | "dismiss" | "platform";
 
 /** A prop value that is either a plain value or a function of the part's state. */
 export type StateValue<T, State> = T | ((state: State) => T);
