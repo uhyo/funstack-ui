@@ -16,7 +16,8 @@
     },
     "test:run": {
       "dependsOn": ["^build", "build"],
-      "outputs": []
+      "outputs": [],
+      "env": ["FUNSTACK_BROWSERS", "CI"]
     },
     "test:jsdom": {
       "dependsOn": ["^build", "build"],
@@ -24,7 +25,8 @@
     },
     "test:browser": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      "env": ["FUNSTACK_BROWSERS", "CI"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
