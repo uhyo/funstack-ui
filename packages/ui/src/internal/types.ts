@@ -1,7 +1,12 @@
 import type { ReactElement, ReactNode } from "react";
 
-/** A callback the library runs inside a Transition. May be sync or async. */
-export type Action<Args extends readonly unknown[] = []> = (...args: Args) => void | Promise<void>;
+/**
+ * A callback the library runs inside a Transition. May be sync or async: the library awaits
+ * whatever it returns (a thenable is awaited, anything else is ignored). The return type is
+ * `unknown` rather than `void | Promise<void>` so that `(next) => save(next)` compiles when `save`
+ * returns data, as Server Functions usually do (conventions 2.2).
+ */
+export type Action<Args extends readonly unknown[] = []> = (...args: Args) => unknown;
 
 export interface ActionDetails {
   /** The DOM event that caused the action, or `undefined` for programmatic changes. */

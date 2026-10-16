@@ -45,15 +45,34 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/** Reports an error that cannot reach a boundary (conventions 2.4: never swallow). */
+function report(error: unknown): void {
+  if (typeof reportError === "function") reportError(error);
+  else console.error(error);
+}
+
 /**
  * The one place the state model of conventions section 3 is implemented: committed state,
  * optimistic state (`useOptimistic`, reducer form), the component's own transition, the
- * post-`await` write of uncontrolled state, and the latest-dispatch guard.
+ * post-`await` write of uncontrolled state, the latest-dispatch guard, and the surfacing of
+ * superseded rejections (conventions 2.4).
  */
 export function useControllableAction<T, Details extends ActionDetails = ActionDetails>(
   options: UseControllableActionOptions<T, Details>,
 ): ControllableAction<T, Details> {
   const { controlled, defaultValue, initialValue, action, transitionTypes, warn } = options;
+
+  // React keeps only the newest thenable per `useTransition`, so a rejection from a dispatch that
+  // was superseded by a later one would be dropped entirely (no boundary, no `reportError`). The
+  // hook catches those itself, keeps the first, and throws it from render so it reaches the same
+  // nearest Error Boundary as the latest dispatch's rejection does through React.
+  //
+  // The throw sits before `useTransition` on purpose: React retries an errored render with every
+  // pending lane, and in that retry `useTransition` unwraps the still-pending action thenable and
+  // suspends, which would hold the boundary commit until the newer action settles.
+  const [supersededError, setSupersededError] = useState<{ readonly error: unknown } | null>(null);
+  const hasSupersededError = useRef(false);
+  if (supersededError !== null) throw supersededError.error;
 
   const [internal, setInternal] = useState<T>(
     defaultValue === undefined ? initialValue : defaultValue,
@@ -63,8 +82,16 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const [optimistic, setOptimistic] = useOptimistic(committed, (_prev: T, next: T) => next);
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
+  const mounted = useRef(false);
 
   useDevWarnings(isControlled, defaultValue !== undefined, warn);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   function dispatch(next: T, details: Details): void {
     const prev = committed;
@@ -72,7 +99,24 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
     startOwnTransition(async () => {
       for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
       setOptimistic(next);
-      await action?.(next, details);
+      try {
+        await action?.(next, details);
+      } catch (error) {
+        // The latest dispatch's rejection takes React's own route to the boundary.
+        if (id === latest.current) throw error;
+        // Nothing to throw to once unmounted (React drops its own thenables the same way).
+        if (!mounted.current) return;
+        if (hasSupersededError.current) {
+          // One boundary reset per burst is enough; later errors are still reported.
+          report(error);
+          return;
+        }
+        hasSupersededError.current = true;
+        // Outside the transition by now (after an await), so this is an urgent update: the owner
+        // re-renders promptly and throws.
+        setSupersededError({ error });
+        return;
+      }
       if (!isControlled && id === latest.current) {
         startTransition(() => setInternal(next));
       }

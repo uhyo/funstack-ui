@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Suspense, startTransition, useState } from "react";
+import { Suspense, startTransition, useLayoutEffect, useRef, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -15,7 +15,7 @@ import type { ControlMode } from "../__tests__/helpers.js";
 import { Toggle } from "./toggle.js";
 import type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./toggle.js";
 
-type ActionFn = (next: boolean, details: TogglePressedChangeDetails) => void | Promise<void>;
+type ActionFn = (next: boolean, details: TogglePressedChangeDetails) => unknown;
 
 interface HarnessProps extends Omit<
   ToggleProps,
@@ -104,22 +104,28 @@ describe("Toggle", () => {
     });
 
     it("defaultPressed gives aria-pressed=true; never mixed or absent (row 1)", () => {
-      const { rerender } = render(<Toggle defaultPressed>Favorite</Toggle>);
+      // Fresh renders rather than rerenders: switching modes after mount is a dev warning.
+      const uncontrolled = render(<Toggle defaultPressed>Favorite</Toggle>);
       expect(button()).toHaveAttribute("aria-pressed", "true");
-      rerender(<Toggle pressed={false}>Favorite</Toggle>);
+      uncontrolled.unmount();
+
+      const off = render(<Toggle pressed={false}>Favorite</Toggle>);
       expect(button()).toHaveAttribute("aria-pressed", "false");
-      rerender(<Toggle pressed>Favorite</Toggle>);
+      off.unmount();
+
+      render(<Toggle pressed>Favorite</Toggle>);
       expect(button()).toHaveAttribute("aria-pressed", "true");
     });
 
     it("emits boolean data attributes by presence (row 2)", () => {
-      const { rerender } = render(<Toggle>Favorite</Toggle>);
+      const plain = render(<Toggle>Favorite</Toggle>);
       expect(button()).not.toHaveAttribute("data-pressed");
       expect(button()).not.toHaveAttribute("data-pending");
       expect(button()).not.toHaveAttribute("data-disabled");
       expect(button()).not.toBeDisabled();
+      plain.unmount();
 
-      rerender(
+      render(
         <Toggle pressed disabled>
           Favorite
         </Toggle>,
@@ -254,7 +260,33 @@ describe("Toggle", () => {
       expect(committed()).toHaveTextContent("true");
     });
 
-    it("keeps working after unmounting while pending (edge case)", async () => {
+    it("awaits an action that resolves with data (non-void return, row 8)", async () => {
+      const d = deferred<{ ok: boolean }>();
+      const save = (_next: boolean): Promise<{ ok: boolean }> => d.promise;
+      // Type-level: `(next) => save(next)` returns `Promise<{ ok }>`, which `Action` must accept.
+      render(<Harness mode={mode} action={(next) => save(next)} />);
+      const user = setupUser();
+
+      await user.click(button());
+      expectPending(button());
+      await act(async () => {
+        d.resolve({ ok: true });
+      });
+      expectNotPending(button());
+      expect(button()).toHaveAttribute("aria-pressed", "true");
+      expect(committed()).toHaveTextContent("true");
+    });
+
+    it("ignores a non-thenable return value (sync data, row 8)", async () => {
+      render(<Harness mode={mode} action={() => 42} />);
+      const user = setupUser();
+      await user.click(button());
+      expectNotPending(button());
+      expect(button()).toHaveAttribute("aria-pressed", "true");
+      expect(committed()).toHaveTextContent("true");
+    });
+
+    it("settles quietly when unmounted while pending (smoke test)", async () => {
       const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       const d = deferred();
       const { unmount } = render(<Harness mode={mode} action={() => d.promise} />);
@@ -379,6 +411,127 @@ describe("Toggle", () => {
         deferreds[0]!.resolve();
       });
       expectNotPending(button());
+    });
+  });
+
+  renderBoth("superseded rejection", (mode) => {
+    function renderTwoClicks(onError: (error: unknown) => void, count = 2) {
+      const deferreds = Array.from({ length: count }, () => deferred());
+      let calls = 0;
+      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      render(<Harness mode={mode} action={action} boundary={onError} />);
+      return { deferreds, action };
+    }
+
+    it("reaches the boundary when the older action rejects after the newer resolved (row 12a)", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const onError = vi.fn();
+      const { deferreds, action } = renderTwoClicks(onError);
+      const user = setupUser();
+
+      await user.click(button());
+      await user.click(button());
+      expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
+
+      await act(async () => {
+        deferreds[1]!.resolve();
+      });
+      expect(onError).not.toHaveBeenCalled();
+      expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "false");
+
+      const err = new Error("older save failed");
+      await act(async () => {
+        deferreds[0]!.reject(err);
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(err);
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
+      expect(committed()).toHaveTextContent("false");
+    });
+
+    it("reaches the boundary when the older action rejects while the newer is pending (row 12b)", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const onError = vi.fn();
+      const { deferreds } = renderTwoClicks(onError);
+      const user = setupUser();
+
+      await user.click(button());
+      await user.click(button());
+      expectPending(button());
+
+      const err = new Error("older save failed");
+      await act(async () => {
+        deferreds[0]!.reject(err);
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(err);
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
+
+      // The newer action's outcome is unaffected and nothing is thrown a second time.
+      await act(async () => {
+        deferreds[1]!.resolve();
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
+      expect(committed()).toHaveTextContent("false");
+    });
+
+    it("keeps the first superseded error and reports later ones through reportError", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const onError = vi.fn();
+      const { deferreds } = renderTwoClicks(onError, 3);
+      const user = setupUser();
+
+      await user.click(button());
+      await user.click(button());
+      await user.click(button());
+
+      const first = new Error("first");
+      const second = new Error("second");
+      await act(async () => {
+        deferreds[0]!.reject(first);
+        deferreds[1]!.reject(second);
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(first);
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(second);
+
+      await act(async () => {
+        deferreds[2]!.resolve();
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledTimes(1);
+      vi.unstubAllGlobals();
+    });
+
+    it("ignores a superseded rejection after unmount (smoke test)", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const onError = vi.fn();
+      const deferreds = [deferred(), deferred()];
+      let calls = 0;
+      const { unmount } = render(
+        <Harness mode={mode} action={() => deferreds[calls++]!.promise} boundary={onError} />,
+      );
+      const user = setupUser();
+
+      await user.click(button());
+      await user.click(button());
+      unmount();
+      await act(async () => {
+        deferreds[0]!.reject(new Error("too late"));
+        deferreds[1]!.resolve();
+      });
+      expect(onError).not.toHaveBeenCalled();
+      expect(reportError).not.toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
     });
   });
 
@@ -521,6 +674,33 @@ describe("Toggle", () => {
       expect(button()).toHaveAttribute("id", "mine");
     });
 
+    it("element form lets the element win over pass-through props and merges id lists", () => {
+      render(
+        <Toggle
+          aria-label="From Toggle"
+          aria-describedby="toggle-desc"
+          data-kind="toggle"
+          title="toggle"
+          render={
+            <button
+              type="submit"
+              aria-label="From element"
+              aria-describedby="el-desc toggle-desc"
+              data-kind="element"
+            />
+          }
+        >
+          Favorite
+        </Toggle>,
+      );
+      const el = screen.getByRole("button", { name: "From element" });
+      expect(el).toHaveAttribute("aria-describedby", "el-desc toggle-desc");
+      expect(el).toHaveAttribute("data-kind", "element");
+      expect(el).toHaveAttribute("title", "toggle");
+      // The element's own `type` wins (design section 3); the default is still "button".
+      expect(el).toHaveAttribute("type", "submit");
+    });
+
     it("function form receives (props, state) (row 16)", async () => {
       const d = deferred();
       const renderFn = vi.fn((props: ComponentPropsWithRef<"button">, state: ToggleState) => (
@@ -553,7 +733,11 @@ describe("Toggle", () => {
   });
 
   describe("post-await rule (row 17)", () => {
-    function Parent({ promise, wrap }: { promise: Promise<void>; wrap: boolean }) {
+    function Parent({
+      promise,
+      wrap,
+      children = "Favorite",
+    }: { promise: Promise<void>; wrap: boolean } & Pick<ToggleProps, "children">) {
       const [pressed, setPressed] = useState(false);
       return (
         <Toggle
@@ -564,36 +748,48 @@ describe("Toggle", () => {
             else setPressed(next);
           }}
         >
-          Favorite
+          {children}
         </Toggle>
       );
     }
 
     it("aria-pressed and data-pending converge in one commit with startTransition", async () => {
       const d = deferred();
-      render(<Parent promise={d.promise} wrap />);
-      const user = setupUser();
-      const el = button();
+      // A layout effect inside `children` runs after every commit of the Toggle, so it sees each
+      // intermediate commit (a MutationObserver would coalesce commits made in the same task).
       const snapshots: { pressed: string | null; pending: boolean }[] = [];
-      const observer = new MutationObserver(() => {
-        snapshots.push({
-          pressed: el.getAttribute("aria-pressed"),
-          pending: el.hasAttribute("data-pending"),
+      function Recorder() {
+        const ref = useRef<HTMLSpanElement>(null);
+        useLayoutEffect(() => {
+          // Own ref rather than the Toggle's: a child's layout effect runs before the parent's
+          // ref is attached within the same commit.
+          const el = ref.current!.closest("button")!;
+          snapshots.push({
+            pressed: el.getAttribute("aria-pressed"),
+            pending: el.hasAttribute("data-pending"),
+          });
         });
-      });
-      observer.observe(el, { attributes: true });
+        return <span ref={ref}>Favorite</span>;
+      }
+      render(
+        <Parent promise={d.promise} wrap>
+          {() => <Recorder />}
+        </Parent>,
+      );
+      const user = setupUser();
+      expect(snapshots).toEqual([{ pressed: "false", pending: false }]);
 
-      await user.click(el);
+      await user.click(button());
+      expect(snapshots.at(-1)).toEqual({ pressed: "true", pending: true });
+      const afterClick = snapshots.length;
       await act(async () => {
         d.resolve();
       });
-      observer.disconnect();
 
-      expect(snapshots.length).toBeGreaterThanOrEqual(2);
-      expect(snapshots[0]).toEqual({ pressed: "true", pending: true });
+      expect(snapshots.length).toBeGreaterThan(afterClick);
       expect(snapshots.at(-1)).toEqual({ pressed: "true", pending: false });
-      // No commit ever showed the old value again.
-      expect(snapshots.every((s) => s.pressed === "true")).toBe(true);
+      // No commit after the click ever showed the old value again.
+      expect(snapshots.slice(1).every((s) => s.pressed === "true")).toBe(true);
     });
 
     it("still ends in the right state without startTransition (documented limitation)", async () => {
