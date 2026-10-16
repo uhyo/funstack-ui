@@ -22,6 +22,23 @@ export type {
   AccordionPanelState,
 } from "./accordion/index.js";
 
+export { Tabs } from "./tabs/index.js";
+export type {
+  TabsRootProps,
+  TabsRootState,
+  TabsValueChangeDetails,
+  TabsOrientation,
+  TabsActivationMode,
+  TabsListProps,
+  TabsListState,
+  TabsTabProps,
+  TabsTabState,
+  TabsPanelProps,
+  TabsPanelState,
+  TabsIndicatorProps,
+  TabsIndicatorState,
+} from "./tabs/index.js";
+
 export type {
   Action,
   ActionDetails,

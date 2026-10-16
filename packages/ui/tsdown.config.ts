@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/toggle/index.ts", "src/accordion/index.ts"],
+  entry: ["src/index.ts", "src/toggle/index.ts", "src/accordion/index.ts", "src/tabs/index.ts"],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives
   // (conventions 7.2). Bundling would strip the directive from non-entry files.

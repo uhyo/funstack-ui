@@ -19,6 +19,14 @@ const clientFiles = [
   "accordion/accordion-item.mjs",
   "accordion/accordion-trigger.mjs",
   "accordion/accordion-panel.mjs",
+  // Every Tabs part and its context are client modules (design/components/tabs.md, 13.1).
+  "tabs/tabs-context.mjs",
+  "tabs/tabs-root.mjs",
+  "tabs/tabs-list.mjs",
+  "tabs/tabs-tab.mjs",
+  "tabs/tabs-panel.mjs",
+  "tabs/tabs-indicator.mjs",
+  "internal/use-until-found.mjs",
   "internal/use-controllable-action.mjs",
   "internal/use-dev-warning.mjs",
   "internal/use-render.mjs",
@@ -29,6 +37,8 @@ const directiveFreeFiles = [
   "toggle/index.mjs",
   "accordion/index.mjs",
   "internal/action-details.mjs",
+  "tabs/index.mjs",
+  "tabs/tabs-ids.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {
