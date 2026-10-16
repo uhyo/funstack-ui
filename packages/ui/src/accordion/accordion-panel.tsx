@@ -1,6 +1,7 @@
 "use client";
-import { use, ViewTransition } from "react";
+import { use } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, ViewTransitionClass } from "react";
+import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -21,6 +22,11 @@ export interface AccordionPanelProps extends Omit<
   /**
    * Library mode only. Forwarded as `default` to the `<ViewTransition>` around the panel's
    * `div`; animates content that mounts or changes in the commit that ends an action.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionPanelState>;
@@ -78,9 +84,7 @@ export function AccordionPanel({
     },
   });
 
-  return (
-    <ViewTransition default={isLibrary ? (transition ?? "none") : "none"}>{element}</ViewTransition>
-  );
+  return useTransitionBoundary("Accordion.Panel", isLibrary ? transition : undefined, element);
 }
 
 AccordionPanel.displayName = "AccordionPanel";

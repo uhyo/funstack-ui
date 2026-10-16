@@ -1,6 +1,7 @@
 "use client";
-import { Activity, ViewTransition } from "react";
+import { Activity } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, ViewTransitionClass } from "react";
+import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -32,7 +33,14 @@ export interface TabsPanelProps extends Omit<
    *   tab (`details.reason === "platform"`).
    */
   keepMounted?: boolean | "until-found";
-  /** Forwarded to the Panel's `<ViewTransition default>`. Default `"none"`. */
+  /**
+   * Forwarded to the Panel's `<ViewTransition default>`. Default: no boundary.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, TabsPanelState>;
   style?: StateValue<CSSProperties | undefined, TabsPanelState>;
@@ -119,5 +127,5 @@ function PanelElement({
     ref: untilFound ? untilFoundRef : undefined,
   });
 
-  return <ViewTransition default={transition ?? "none"}>{element}</ViewTransition>;
+  return useTransitionBoundary("Tabs.Panel", transition, element);
 }

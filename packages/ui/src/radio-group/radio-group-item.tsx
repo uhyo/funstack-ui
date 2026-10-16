@@ -1,6 +1,6 @@
 "use client";
-import { ViewTransition } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
@@ -37,9 +37,14 @@ export interface RadioGroupItemProps extends Omit<
   /** Native `disabled`: unfocusable, skipped by arrow keys, never dispatches. */
   disabled?: boolean;
   /**
-   * Forwarded to the Item's `<ViewTransition default>`. Default `"none"`. Fires only on the commit
+   * Forwarded to the Item's `<ViewTransition default>`. Default: no boundary. Fires only on the commit
    * that settles the action (or rolls it back), never on the optimistic check; animate the check
    * itself with CSS on `:checked`.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, RadioGroupItemState>;
@@ -120,7 +125,7 @@ export function RadioGroupItem({
     },
   });
 
-  return <ViewTransition default={transition ?? "none"}>{element}</ViewTransition>;
+  return useTransitionBoundary("RadioGroup.Item", transition, element);
 }
 
 RadioGroupItem.displayName = "RadioGroupItem";
