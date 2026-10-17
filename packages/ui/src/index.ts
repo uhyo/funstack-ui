@@ -86,6 +86,18 @@ export type {
   DialogDescriptionState,
 } from "./dialog/index.js";
 export { RadioGroup } from "./radio-group/index.js";
+
+export { CheckboxGroup } from "./checkbox-group/index.js";
+export type {
+  CheckboxGroupRootProps,
+  CheckboxGroupRootState,
+  CheckboxGroupValueChangeDetails,
+  CheckboxGroupLabelProps,
+  CheckboxGroupItemProps,
+  CheckboxGroupItemState,
+  CheckboxGroupParentProps,
+  CheckboxGroupParentState,
+} from "./checkbox-group/index.js";
 export type {
   RadioGroupRootProps,
   RadioGroupRootState,

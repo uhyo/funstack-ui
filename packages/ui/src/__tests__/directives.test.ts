@@ -58,6 +58,13 @@ const clientFiles = [
   "radio-group/radio-group-root.mjs",
   "radio-group/radio-group-label.mjs",
   "radio-group/radio-group-item.mjs",
+  // Every CheckboxGroup part and its context are client modules
+  // (design/components/checkbox-group.md, decision 13 and 14.1).
+  "checkbox-group/checkbox-group-context.mjs",
+  "checkbox-group/checkbox-group-root.mjs",
+  "checkbox-group/checkbox-group-label.mjs",
+  "checkbox-group/checkbox-group-item.mjs",
+  "checkbox-group/checkbox-group-parent.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -72,6 +79,8 @@ const directiveFreeFiles = [
   "checkbox/index.mjs",
   "dialog/index.mjs",
   "radio-group/index.mjs",
+  "checkbox-group/index.mjs",
+  "checkbox-group/sync-presence.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

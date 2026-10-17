@@ -11,6 +11,7 @@ export default defineConfig({
     "src/checkbox/index.ts",
     "src/dialog/index.ts",
     "src/radio-group/index.ts",
+    "src/checkbox-group/index.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives

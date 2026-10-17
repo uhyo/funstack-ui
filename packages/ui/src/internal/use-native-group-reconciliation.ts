@@ -24,6 +24,12 @@ export interface UseNativeGroupReconciliationOptions<T> {
    * `reason: "platform"`.
    */
   readonly onPlatformChange: (next: T, event: Event | undefined) => void;
+  /**
+   * Equality between a read value and `base()`. Default `Object.is`, right for a primitive value
+   * (RadioGroup's `string | null`); a group with a collection value (CheckboxGroup's
+   * `ReadonlySet<string>`) passes structural equality, since every read builds a new object.
+   */
+  readonly equals?: ((a: T, b: T) => boolean) | undefined;
 }
 
 export interface UseNativeGroupReconciliationResult {
@@ -58,7 +64,7 @@ export interface UseNativeGroupReconciliationResult {
  * - Form reset through `useFormReset` on the container: in a microtask after the reset,
  *   `readDefault()` vs `base()`.
  *
- * Values are compared with `Object.is`.
+ * Values are compared with `equals` (default `Object.is`).
  */
 export function useNativeGroupReconciliation<T>(
   options: UseNativeGroupReconciliationOptions<T>,
@@ -110,5 +116,6 @@ export function useNativeGroupReconciliation<T>(
 }
 
 function reconcile<T>(options: UseNativeGroupReconciliationOptions<T>, next: T, event?: Event) {
-  if (!Object.is(next, options.base())) options.onPlatformChange(next, event);
+  const equals = options.equals ?? Object.is;
+  if (!equals(next, options.base())) options.onPlatformChange(next, event);
 }
