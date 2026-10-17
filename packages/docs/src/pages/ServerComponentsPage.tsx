@@ -104,6 +104,10 @@ import { saveOpenSections } from "./actions"; // "use server"
             "Select",
             'A native select: picking, the keyboard, typeahead, `required` and form submission all work, and with `appearance: base-select` the browser copies the selected option into `Select.Value` before hydration. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).',
           ],
+          [
+            "Combobox",
+            'A plain text field: typing works and the form posts the default selection (and the raw text, if the Input has a `name`). The listbox never opens before hydration. Text typed then is kept and reported once through `inputValueChangeAction` (`reason: "platform"`).',
+          ],
         ]}
       />
       <p>

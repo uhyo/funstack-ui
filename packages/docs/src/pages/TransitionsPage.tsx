@@ -94,6 +94,10 @@ export function TransitionsPage() {
             "CheckboxGroup",
             "`fsui-checkbox-group`, `fsui-checkbox-group-check`, `fsui-checkbox-group-uncheck` (a reset can carry both)",
           ],
+          [
+            "Combobox",
+            '`fsui-combobox`, `fsui-combobox-select`, `fsui-combobox-open`, `fsui-combobox-close` (a deferred results render carries none: use `default: "none"`)',
+          ],
         ]}
       />
       <p>

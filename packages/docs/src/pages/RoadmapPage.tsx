@@ -78,11 +78,19 @@ export function RoadmapPage() {
           selection, options that load late, and a button that stays in sync with the selected
           option (<a href={issue(50)}>#50</a>).
         </li>
+        <li>
+          <a href="/components/combobox">Combobox</a>: an editable combobox whose typing is the
+          library's first urgent state (<code>inputValueChangeAction</code>, typed{" "}
+          <code>UrgentChangeAction</code>), with results from a deferred query inside Suspense,{" "}
+          <code>aria-activedescendant</code>, an option that stays pending until its save settles,
+          free text, forms, and a default result-count announcement through <code>ariaNotify</code>{" "}
+          (<a href={issue(50)}>#50</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
       <ul>
-        <li>More components toward a full set: Combobox, ToggleGroup, and more.</li>
+        <li>More components toward a full set: ToggleGroup, and more.</li>
       </ul>
 
       <h3>Deferred</h3>

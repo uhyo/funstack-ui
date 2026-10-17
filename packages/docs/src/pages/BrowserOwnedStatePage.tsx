@@ -22,8 +22,8 @@ export function BrowserOwnedStatePage() {
         rows={[
           [
             "Examples",
-            "Toggle `pressed`, Tabs `value`, Accordion `value` in library mode, Switch and Checkbox `checked`, RadioGroup and Select `value`, opening a Dialog in library mode",
-            "Tooltip open state (top layer), a Select's picker (`:open`), `<details open>` in Accordion's JS-free mode, a Dialog in JS-free mode, closing any Dialog",
+            "Toggle `pressed`, Tabs `value`, Accordion `value` in library mode, Switch and Checkbox `checked`, RadioGroup, Select and Combobox `value`, opening a Dialog in library mode, a Combobox's opens and the close after a choice",
+            "Tooltip open state (top layer), a Select's picker (`:open`), `<details open>` in Accordion's JS-free mode, a Dialog in JS-free mode, closing any Dialog, a Combobox listbox dismissed with Escape or a click outside",
           ],
           [
             "Who changes it",

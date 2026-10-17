@@ -1,0 +1,126 @@
+/* Combobox: the Input is a text field with role="combobox"; the Popup is a <div popover="auto">
+   placed below it by the library's inline anchor positioning; the List inside is the listbox.
+   The active option (virtual focus) carries `data-active`, the selected one `data-selected`, the
+   one being saved `data-pending`; stale results carry `data-stale` on the Popup and the List. */
+
+.demo-combobox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline-end: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+}
+.demo-combobox-field:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.demo-combobox-input {
+  min-inline-size: 14rem;
+  padding: 0.4em 0.6em;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+}
+.demo-combobox-input[data-pending] {
+  cursor: progress;
+}
+.demo-combobox-icon {
+  padding: 0.2em 0.45em;
+  border: 0;
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+/* Nothing to clear: hide Clear (the input shows its placeholder when empty). */
+.demo-combobox-field:has(.demo-combobox-input:placeholder-shown) .demo-combobox-clear {
+  visibility: hidden;
+}
+
+.demo-combobox-popup {
+  /* The popover UA stylesheet sets `inset: 0; margin: auto`: reset both for anchored placement. */
+  margin: 0;
+  margin-block-start: 4px;
+  inset: auto;
+  max-block-size: 16rem;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+  /* CSS enter / exit, used by dismissals (Escape, a click outside). */
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+.demo-combobox-popup:popover-open {
+  opacity: 1;
+}
+@starting-style {
+  .demo-combobox-popup:popover-open {
+    opacity: 0;
+  }
+}
+
+/* Old results while the next ones load. */
+.demo-combobox-popup [role="listbox"][data-stale] {
+  opacity: 0.55;
+  transition: opacity 150ms 100ms;
+}
+.demo-combobox-popup [role="option"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: default;
+}
+/* Virtual focus; hovering makes an option active too, so this is the hover style as well. */
+.demo-combobox-popup [role="option"][data-active] {
+  background: var(--color-bg-secondary);
+}
+.demo-combobox-popup [role="option"][data-selected]::after {
+  content: "✓";
+  color: var(--color-primary);
+}
+.demo-combobox-popup [role="option"][data-pending] {
+  cursor: progress;
+}
+.demo-combobox-status {
+  padding: 6px 10px;
+  color: var(--color-text-secondary);
+}
+
+/* The library's view transition types: animate the library-driven open and close, nothing else
+   (a results change would cross-fade otherwise). */
+::view-transition-old(.demo-combobox-pop) {
+  animation: 120ms ease-in both demo-combobox-out;
+}
+::view-transition-new(.demo-combobox-pop) {
+  animation: 120ms ease-out both demo-combobox-in;
+}
+@keyframes demo-combobox-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes demo-combobox-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-combobox-popup {
+    transition: none;
+  }
+}

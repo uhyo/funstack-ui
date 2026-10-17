@@ -441,7 +441,8 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         option selected. The library re-applies the value when they arrive, without a dispatch.
         Until then nothing (or the fallback) is selected and the button is empty. Use a disabled
         fallback option, or put the whole Select inside the boundary for a skeleton. There is no
-        "load on open": a native select has no open event (Combobox will cover that).
+        "load on open": a native select has no open event (use a{" "}
+        <a href="/components/combobox">Combobox</a> for that).
       </p>
 
       <h3>Forms</h3>
@@ -499,8 +500,8 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         No experimental flag: the markup works everywhere and the opt-in is your CSS. Whether Safari
         on iOS draws the styled picker in the page or the system wheel is not verified yet; the
         value contract is the same either way (wrap the opt-in in{" "}
-        <code>@media (pointer: fine)</code> if you need the wheel). Search, free text, async loading
-        on open and multi-select are Combobox's job.
+        <code>@media (pointer: fine)</code> if you need the wheel). Search, free text and async
+        loading on open are <a href="/components/combobox">Combobox</a>'s job.
       </p>
 
       <h3>Server Functions and forms</h3>

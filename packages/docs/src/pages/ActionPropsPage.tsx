@@ -48,6 +48,11 @@ export function ActionPropsPage() {
             "`value` / `defaultValue` (a set as `string[]`)",
             "`valueChangeAction`",
           ],
+          [
+            "Combobox",
+            "`value` / `defaultValue` (`string | null`); `inputValue` / `defaultInputValue` (urgent); `open` / `defaultOpen`",
+            "`valueChangeAction`; `inputValueChangeAction` (an `UrgentChangeAction`); `openChangeAction`",
+          ],
         ]}
       />
       <p>
@@ -270,6 +275,25 @@ import { setFavorite } from "./actions"; // "use server"
           reverse: React commits them together.
         </li>
       </ul>
+
+      <h3>The urgent lane</h3>
+      <p>
+        One kind of state cannot be a transition: the text of a controlled text input, which React
+        must update in the same event as the keystroke. Such a state keeps the triple (
+        <code>inputValue</code> / <code>defaultInputValue</code> /{" "}
+        <code>inputValueChangeAction</code> on <a href="/components/combobox">Combobox</a>), and its
+        action has a different type:
+      </p>
+      <CodeBlock language="typescript">{`/** Called synchronously, outside any Transition, and not awaited. */
+type UrgentChangeAction<T, Details extends ActionDetails = ActionDetails> =
+  (next: T, details: Details) => void;`}</CodeBlock>
+      <p>
+        Nothing is pending or optimistic for it: the DOM already holds the value when it runs, so{" "}
+        <code>{"(next) => setText(next)"}</code> is the whole controlled pattern. Everything the
+        urgent value drives leaves the urgent lane at once (a deferred query, an open, a selection).
+        A returned promise is ignored and warned about in development. It is still not an{" "}
+        <code>on*</code> handler: there are none.
+      </p>
 
       <h3>What about native handlers?</h3>
       <p>

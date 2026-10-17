@@ -53,6 +53,16 @@ export function SuspensePage() {
         <AccordionThreads />
       </Example>
 
+      <h3>Combobox: results from a deferred query</h3>
+      <p>
+        A <a href="/components/combobox">Combobox</a> renders its results from{" "}
+        <code>useDeferredValue</code> of the typed text, so an async search is just{" "}
+        <code>use(search(query))</code> inside a boundary in the List. The first load shows your
+        fallback (a new boundary); after that, every keystroke keeps the previous results on screen,
+        marked <code>data-stale</code> and <code>aria-busy</code>, until the new ones are ready.
+        Only the latest query is ever rendered, so responses cannot arrive out of order.
+      </p>
+
       <h3>Opting into a fallback</h3>
       <p>
         A boundary that mounts with the new content shows its fallback immediately (a React rule).
