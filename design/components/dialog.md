@@ -633,8 +633,11 @@ closed dialog. A superseded click's rejection is surfaced by the hook (conventio
 **A stale close is dropped** (the Popover 3.4 rule). If the user dismissed the dialog (Escape)
 and opened it again while the action ran, the continuation would `close()` the new open. The
 Root keeps an **open generation**, a counter bumped by every open it sees (its own open dispatch
-and the Popup's native `toggle` to open, so foreign, pre-hydration and JS-free opens count too,
-as Popover 14.1), and the Close passes it as `useActionTrigger(openGeneration)`, which skips the
+and the Popup's native `beforetoggle` to open, which fires synchronously inside `showModal()` /
+`show()`, so foreign, pre-hydration and JS-free opens count too, as Popover 14.1; **not**
+`toggle`, which is queued and could arrive after a pending Close settled, so the stale close ran
+on the new open, a flaky test fixed in 03ab818), and the Close passes it as
+`useActionTrigger(openGeneration)`, which skips the
 close when the counter changed after the click. The action's result stands; only the close is
 dropped. `Dialog.Form` guards the same case with `closedSinceSubmit` (8.1). Added at the Menu
 review (M2): until then `Dialog.Close` was the one part without the guard. In library mode the
@@ -1654,7 +1657,7 @@ hook); folded into the sections named.
 
 | Item | Correction | Section |
 | --- | --- | --- |
-| M2 | `Dialog.Close` drops a stale close: the Root carries an open-generation counter (bumped on the open dispatch and on the Popup's native `toggle` to open) and the Close passes it to `useActionTrigger`, as `Popover.Close` does (02f2f42). Load-bearing for JS-free / native re-opens; in library mode React's entanglement already holds the re-open. | 3.4, 13.2, 14 |
+| M2 | `Dialog.Close` drops a stale close: the Root carries an open-generation counter (bumped on the open dispatch and on the Popup's native `beforetoggle` to open, synchronous inside `showModal()` / `show()`; `toggle` is queued and arrived too late, 03ab818) and the Close passes it to `useActionTrigger`, as `Popover.Close` does (02f2f42). Load-bearing for JS-free / native re-opens; in library mode React's entanglement already holds the re-open. | 3.4, 13.2, 14 |
 | L2 | The Close part runs through the shared `useActionTrigger` (ac7064e); the superseded-rejection gap recorded for v0 is closed. | 3.4, 14 |
 
 ---
