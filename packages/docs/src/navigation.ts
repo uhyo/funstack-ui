@@ -31,6 +31,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/tooltip", label: "Tooltip" },
   { path: "/components/dialog", label: "Dialog" },
   { path: "/components/popover", label: "Popover" },
+  { path: "/components/menu", label: "Menu" },
   { path: "/components/switch", label: "Switch" },
   { path: "/components/checkbox", label: "Checkbox" },
   { path: "/components/radio-group", label: "RadioGroup" },

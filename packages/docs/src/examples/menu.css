@@ -1,0 +1,126 @@
+/* Menu: the Popup is a <div popover="auto" role="menu">. Open state is `:popover-open` on it;
+   items carry `data-pending`, `data-checked` and `aria-disabled`; the Trigger and SubmenuTrigger
+   carry `data-open` / `data-pending`. Hovering an item focuses it, so `:focus` is the hover
+   style too. */
+
+.demo-menu {
+  /* The popover UA stylesheet sets `inset: 0; margin: auto`: reset both for anchored placement. */
+  margin: 0;
+  inset: auto;
+  min-inline-size: 12rem;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+  /* CSS enter / exit, used by dismissals (Escape, a click outside, Tab). */
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+.demo-menu:popover-open {
+  opacity: 1;
+}
+@starting-style {
+  .demo-menu:popover-open {
+    opacity: 0;
+  }
+}
+.demo-menu[data-side="bottom"] {
+  margin-block-start: 4px;
+}
+/* The submenu gap. */
+.demo-menu[data-side="right"] {
+  margin-inline-start: 2px;
+}
+
+.demo-menu [role^="menuitem"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  inline-size: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.demo-menu [role^="menuitem"]:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+.demo-menu [aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+.demo-menu [data-pending] {
+  cursor: progress;
+}
+/* A check column for checkbox and radio items. */
+.demo-menu [role="menuitemcheckbox"]::before,
+.demo-menu [role="menuitemradio"]::before {
+  content: "";
+  inline-size: 1em;
+}
+.demo-menu [role="menuitemcheckbox"][data-checked]::before,
+.demo-menu [role="menuitemradio"][data-checked]::before {
+  content: "✓";
+}
+.demo-menu [role="menuitemcheckbox"][data-pending]::after,
+.demo-menu [role="menuitemradio"][data-pending]::after {
+  content: "…";
+  margin-inline-start: auto;
+}
+/* A submenu arrow; flipped by the writing direction. */
+.demo-menu [aria-haspopup="menu"]::after {
+  content: "›";
+  margin-inline-start: auto;
+}
+.demo-menu hr {
+  margin: 4px 0;
+  border: 0;
+  border-block-start: 1px solid var(--color-border);
+}
+.demo-menu-label {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, inherit);
+}
+.demo-menu-danger {
+  color: #dc2626;
+}
+
+/* Library-driven opens and closes (an item's activation): `transition` on the Popup. */
+::view-transition-new(.menu-in) {
+  animation: 120ms ease-out both menu-in;
+}
+::view-transition-old(.menu-out) {
+  animation: 120ms ease-in both menu-out;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-menu {
+    transition: none;
+  }
+  ::view-transition-new(.menu-in),
+  ::view-transition-old(.menu-out) {
+    animation: none;
+  }
+}

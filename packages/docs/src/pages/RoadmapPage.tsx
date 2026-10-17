@@ -65,14 +65,18 @@ export function RoadmapPage() {
           with a view transition in every engine (<a href={issue(38)}>#38</a>,{" "}
           <a href={issue(40)}>#40</a>).
         </li>
+        <li>
+          <a href="/components/menu">Menu</a>: a menu button whose items run their actions with
+          pending state and close the menu when they settle, optimistic checkbox and radio items,
+          typeahead and submenus (<a href={issue(39)}>#39</a>, <a href={issue(41)}>#41</a>). Close
+          parts and menu items now share one action hook that never drops a rejection (
+          <a href={issue(47)}>#47</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
       <ul>
-        <li>
-          Menu: a menu button (<a href={issue(39)}>#39</a>, <a href={issue(41)}>#41</a>).
-        </li>
-        <li>More components after that, toward a full set: Select, ToggleGroup, and more.</li>
+        <li>More components toward a full set: Select, ToggleGroup, and more.</li>
       </ul>
 
       <h3>Deferred</h3>

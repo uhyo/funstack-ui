@@ -41,6 +41,7 @@ const AccordionPage = lazyPage(() => import("./pages/AccordionPage.js"), "Accord
 const TooltipPage = lazyPage(() => import("./pages/TooltipPage.js"), "TooltipPage");
 const DialogPage = lazyPage(() => import("./pages/DialogPage.js"), "DialogPage");
 const PopoverPage = lazyPage(() => import("./pages/PopoverPage.js"), "PopoverPage");
+const MenuPage = lazyPage(() => import("./pages/MenuPage.js"), "MenuPage");
 const SwitchPage = lazyPage(() => import("./pages/SwitchPage.js"), "SwitchPage");
 const CheckboxPage = lazyPage(() => import("./pages/CheckboxPage.js"), "CheckboxPage");
 const RadioGroupPage = lazyPage(() => import("./pages/RadioGroupPage.js"), "RadioGroupPage");
@@ -127,6 +128,7 @@ export const routes = [
                   page("/tooltip", "/components/tooltip", TooltipPage, "TooltipPage"),
                   page("/dialog", "/components/dialog", DialogPage, "DialogPage"),
                   page("/popover", "/components/popover", PopoverPage, "PopoverPage"),
+                  page("/menu", "/components/menu", MenuPage, "MenuPage"),
                   page("/switch", "/components/switch", SwitchPage, "SwitchPage"),
                   page("/checkbox", "/components/checkbox", CheckboxPage, "CheckboxPage"),
                   page("/radio-group", "/components/radio-group", RadioGroupPage, "RadioGroupPage"),
