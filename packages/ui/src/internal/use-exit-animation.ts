@@ -1,5 +1,5 @@
 "use client";
-import { startTransition, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 /** An animation that ends: infinite ones (a spinner) would hold the content forever. */
 function ends(animation: Animation): boolean {
@@ -23,7 +23,7 @@ export interface ExitAnimation {
   readonly held: boolean;
   /** Set `held` now (urgent, library-internal) and clear it when `animations` settle. */
   readonly holdUntil: (animations: readonly Animation[]) => void;
-  /** Clear `held` now, in a transition, cancelling any wait in progress. */
+  /** Clear `held` now (a normal update, never a transition), cancelling any wait in progress. */
   readonly release: () => void;
   /** Set `held` during render (the "previous value in state" pattern). */
   readonly holdDuringRender: () => void;
@@ -32,9 +32,10 @@ export interface ExitAnimation {
 }
 
 /**
- * The deferred unmount of a top-layer popup's content while its hide animates. The commit that
- * clears `held` carries no `fsui-*` transition types: the popup is already hidden, nothing
- * visible changes.
+ * The deferred unmount of a top-layer popup's content while its hide animates. `held` is cleared
+ * with a normal (urgent) update, never in a transition: the popup is already hidden, nothing
+ * visible changes, and only transition commits start a document view transition, so a dismissal
+ * runs one (its notification commit) instead of two (design 4.4).
  */
 export function useExitAnimation(): ExitAnimation {
   const [held, setHeld] = useState(false);
@@ -49,14 +50,14 @@ export function useExitAnimation(): ExitAnimation {
     void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
       if (generation.current !== current) return;
       wait.current = null;
-      startTransition(() => setHeld(false));
+      setHeld(false);
     });
   };
 
   const release = (): void => {
     generation.current++;
     wait.current = null;
-    startTransition(() => setHeld(false));
+    setHeld(false);
   };
 
   return {

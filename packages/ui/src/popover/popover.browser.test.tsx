@@ -12,9 +12,6 @@
 //   found anything when the popup was hidden.
 // - WebKit 302008: `position-try-fallbacks` on a nested popover hangs / spins, so the nested rows
 //   render the inner Popup with `side={null}` on WebKit and the nested flip runs elsewhere only.
-// - `<dialog popover>` focusing steps are unverified in WebKit: the raw-platform row records what
-//   the engine does; the library rows assert the library's result, which the design 6.1 fallback
-//   makes the same in every engine.
 // - `popover="hint"` is missing in Safari 27.0 (`supportsPopoverHint`); the Tooltip row expects
 //   the same either way.
 import { act, render, screen } from "@testing-library/react";
@@ -278,14 +275,10 @@ describe("focus (browser)", () => {
     act(() => raw.showPopover({ source: opener }));
     const inside = raw.contains(document.activeElement);
     console.info(`[${browserName}] <dialog popover> focusing steps move focus inside: ${inside}`);
-    if (browserName === "webkit") {
-      // Unverified (design 6.1): record it; the library's fallback covers either outcome.
-      expect([true, false]).toContain(inside);
-    } else {
-      // Chromium 156, Firefox 157 (research): the dialog focusing steps run.
-      expect(inside).toBe(true);
-      expect(screen.getByTestId("inside")).toHaveFocus();
-    }
+    // Chromium 156, Firefox 157 (research) and WebKit (CI): the dialog focusing steps run, so the
+    // library needs no focus fallback of its own (design 6.1).
+    expect(inside).toBe(true);
+    expect(screen.getByTestId("inside")).toHaveFocus();
   });
 
   it("<dialog> default: focus moves to the first focusable descendant after a library open", async () => {
@@ -576,7 +569,15 @@ describe("ViewTransition (browser)", () => {
   });
 
   /** No wrapper element: inserted by a transition, the Popup's boundary is the subtree's top. */
-  function Plain({ transition }: { transition?: ViewTransitionClass }) {
+  function Plain({
+    transition,
+    className,
+    keepMounted,
+  }: {
+    transition?: ViewTransitionClass;
+    className?: string;
+    keepMounted?: boolean;
+  }) {
     return (
       <Popover.Root defaultOpen={false}>
         <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
@@ -584,9 +585,12 @@ describe("ViewTransition (browser)", () => {
           data-testid="popup"
           aria-label="Filters"
           transition={transition}
+          className={className}
+          keepMounted={keepMounted}
           style={box(200, 100)}
         >
           <span data-testid="content">content</span>
+          <Popover.Close data-testid="close">Rename</Popover.Close>
         </Popover.Popup>
       </Popover.Root>
     );
@@ -632,6 +636,55 @@ describe("ViewTransition (browser)", () => {
     expect(calls[1]!.openAtStart).toBe(false);
     await transitions[1]!.finished;
     await expect.poll(() => screen.queryByTestId("content")).toBeNull();
+  });
+
+  it('transition="pop" plus a CSS exit: a dismissal runs one view transition, not two', async () => {
+    cleanups.push(
+      addStyle(`
+        .fade {
+          opacity: 0;
+          transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
+        }
+        .fade:popover-open { opacity: 1; }
+        @starting-style { .fade:popover-open { opacity: 0; } }
+      `),
+    );
+    render(<Plain transition="pop" className="fade" />);
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(true);
+    await expect.poll(() => calls.length).toBe(1);
+    await transitions[0]!.finished;
+    await sleep(250); // the enter fade
+    popup().hidePopover();
+    // The notification commit (design 4.4); the content may be held for the CSS fade.
+    await expect.poll(() => calls.length).toBe(2);
+    await transitions[1]!.finished;
+    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
+    // Releasing the hold is a normal update: no second document view transition.
+    await sleep(100);
+    expect(calls).toHaveLength(2);
+  });
+
+  // H1: with `transition` the close commit unmounts the focused Close before `hidePopover()`
+  // runs, so the platform (which restores focus only from inside the popover) restores nothing.
+  describe.each([
+    ["pop", false],
+    ["none", false],
+    ["pop", true],
+  ] as const)("transition=%s keepMounted=%s", (transition, keepMounted) => {
+    it("a Close activated from the keyboard returns focus to the Trigger", async () => {
+      render(<Plain transition={transition} keepMounted={keepMounted} />);
+      trigger().click();
+      await expect.poll(() => isOpen()).toBe(true);
+      await Promise.allSettled(transitions.map((t) => t.finished));
+      const close = screen.getByTestId("close");
+      close.focus();
+      expect(close).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      await expect.poll(() => isOpen()).toBe(false);
+      await Promise.allSettled(transitions.map((t) => t.finished));
+      await expect.poll(() => document.activeElement).toBe(trigger());
+    });
   });
 
   it("without transition: no view transition for an open or a close", async () => {

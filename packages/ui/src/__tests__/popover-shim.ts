@@ -21,14 +21,21 @@
 //   `hide-popover` or `toggle-popover` dispatches a cancelable `command` event at the popover and
 //   runs the command, with the button as `source`, unless it was cancelled. `show-popover` on an
 //   open popover and `hide-popover` on a closed one are invalid (no event).
-// - No focus handling (no focusing steps, no focus return), no light dismiss, no close watcher
-//   and no "hide all popovers until": tests drive dismissals with `hidePopover()`.
+// - `showPopover()` runs the popover focusing steps (HTML): a `<dialog>` runs the dialog focusing
+//   steps (an `autofocus` descendant, else the first sequentially focusable descendant, else the
+//   dialog itself), any other popover focuses only itself with `autofocus` or an `autofocus`
+//   descendant. Chromium, Firefox and WebKit all do this for `<dialog popover>`
+//   (popover.browser.test.tsx, platform probe).
+// - No focus return on hide, no light dismiss, no close watcher and no "hide all popovers
+//   until": tests drive dismissals with `hidePopover()`, and the focus left inside a hidden
+//   popover stands in for the platform's nested-popover case.
 import { installInvokerShim, registerCommandHandler } from "./invoker-shim.js";
 
 /**
- * Marks a shown popover for the shim's stylesheet only. jsdom's UA sheet hides a `<dialog>`
- * without `open` (`showPopover()` never sets it) and jsdom refuses focus under `display: none`,
- * so an open `<dialog popover>` is made `display: block` as in the platform's top layer.
+ * Marks a shown popover for the shim's stylesheet only. jsdom's UA sheet hides every
+ * `[popover]` (its `:popover-open` never matches) and a `<dialog>` without `open`
+ * (`showPopover()` never sets it), and jsdom refuses focus under `display: none`, so a shown
+ * popover is made `display: block` as in the platform's top layer.
  */
 const SHOWN_ATTRIBUTE = "data-popover-shim-open";
 
@@ -59,6 +66,43 @@ export function isPopoverOpen(element: Element): boolean {
  */
 export function popoverSource(element: Element): HTMLElement | null {
   return sources.get(element as HTMLElement) ?? null;
+}
+
+const SEQUENTIALLY_FOCUSABLE =
+  "button, input, select, textarea, a[href], area[href], summary, iframe, audio[controls], " +
+  "video[controls], [contenteditable], [tabindex]";
+
+/** The first sequentially focusable descendant: enabled, not `tabindex="-1"`, rendered. */
+function firstSequentiallyFocusable(root: HTMLElement): HTMLElement | null {
+  for (const element of root.querySelectorAll<HTMLElement>(SEQUENTIALLY_FOCUSABLE)) {
+    if (element.tabIndex < 0 || element.matches(":disabled")) continue;
+    if (element.matches("input[type=hidden]")) continue;
+    if (element.contentEditable === "false" && !element.hasAttribute("tabindex")) continue;
+    if (typeof element.checkVisibility === "function" && !element.checkVisibility()) continue;
+    return element;
+  }
+  return null;
+}
+
+/** HTML's popover focusing steps, run by `showPopover()` once the popover is shown. */
+function popoverFocusingSteps(popover: HTMLElement): void {
+  const autofocus = popover.querySelector<HTMLElement>("[autofocus]");
+  if (popover.localName === "dialog") {
+    const control = autofocus ?? firstSequentiallyFocusable(popover);
+    if (control !== null) {
+      control.focus();
+      return;
+    }
+    // The dialog itself; jsdom only focuses elements it considers focusable, so lend it a
+    // `tabindex` for the call (the platform needs none).
+    const hadTabIndex = popover.hasAttribute("tabindex");
+    if (!hadTabIndex) popover.setAttribute("tabindex", "-1");
+    popover.focus();
+    if (!hadTabIndex) popover.removeAttribute("tabindex");
+    return;
+  }
+  const control = popover.hasAttribute("autofocus") ? popover : autofocus;
+  control?.focus();
 }
 
 function toggleEvent(type: string, oldState: string, newState: string): Event {
@@ -94,6 +138,7 @@ function setOpen(element: HTMLElement, open: boolean, source: HTMLElement | null
     openPopovers.add(element);
     sources.set(element, source);
     element.setAttribute(SHOWN_ATTRIBUTE, "");
+    popoverFocusingSteps(element);
   } else {
     openPopovers.delete(element);
     element.removeAttribute(SHOWN_ATTRIBUTE);
@@ -119,8 +164,9 @@ if (typeof HTMLElement !== "undefined" && !("showPopover" in HTMLElement.prototy
   });
 
   const style = document.createElement("style");
-  // jsdom's `dialog:not([open]) { display: none }` wins over normal author rules.
-  style.textContent = `dialog[${SHOWN_ATTRIBUTE}] { display: block !important; }`;
+  // jsdom's `[popover]:not(:popover-open)` and `dialog:not([open])` `display: none` win over
+  // normal author rules.
+  style.textContent = `[${SHOWN_ATTRIBUTE}] { display: block !important; }`;
   document.head.append(style);
 
   registerCommandHandler({

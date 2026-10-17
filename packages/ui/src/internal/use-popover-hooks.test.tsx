@@ -1,9 +1,9 @@
 // The extension points of the shared popover hooks that Menu (#39, design/components/menu.md 14)
-// uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, and a
-// `<div popover>` popup (no dialog focusing steps, no focus fallback). Popover's own behaviour is
-// covered by src/popover/popover.test.tsx.
+// uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, a
+// `<div popover>` popup (no dialog focusing steps), and `wrapContent` with a Menu-style
+// `requestClose`. Popover's own behaviour is covered by src/popover/popover.test.tsx.
 import { act, render, screen } from "@testing-library/react";
-import type { Ref } from "react";
+import type { Ref, ViewTransitionClass } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setupUser } from "../__tests__/helpers.js";
 import type { ChangeReason } from "./types.js";
@@ -15,9 +15,11 @@ import { usePopoverTrigger } from "./use-popover-trigger.js";
 function Mini({
   onDispatch,
   resolve,
+  transition,
 }: {
   onDispatch?: (next: boolean, details: PopoverLikeDetails) => void;
   resolve?: (popup: HTMLElement) => HTMLElement | null;
+  transition?: ViewTransitionClass;
 }) {
   const ctx = usePopoverRoot<PopoverLikeDetails>({
     component: "menu",
@@ -28,25 +30,23 @@ function Mini({
     openChangeAction: undefined,
     onDispatch,
   });
-  const trigger = usePopoverTrigger(ctx, {
+  // Destructured: React Compiler's ref inference taints an object once one of its members is
+  // passed as `ref`, and would then flag reading `visible` from it during render.
+  const { libraryProps: triggerProps, ref: triggerRef } = usePopoverTrigger(ctx, {
     part: "Mini.Trigger",
     disabled: false,
     render: undefined,
   });
-  const popup = usePopoverPopup(ctx, {
+  const { setElement, visible, wrapContent } = usePopoverPopup(ctx, {
     part: "Mini.Popup",
     initialFocus: undefined,
     resolveInitialFocus: resolve,
     keepMounted: undefined,
-    transition: undefined,
+    transition,
   });
   return (
     <>
-      <button
-        {...trigger.libraryProps}
-        ref={trigger.ref as Ref<HTMLButtonElement>}
-        data-testid="trigger"
-      >
+      <button {...triggerProps} ref={triggerRef as Ref<HTMLButtonElement>} data-testid="trigger">
         Menu
       </button>
       <div
@@ -54,19 +54,25 @@ function Mini({
         popover="auto"
         role="menu"
         aria-label="Mini"
-        ref={popup.setElement as Ref<HTMLDivElement>}
+        ref={setElement as Ref<HTMLDivElement>}
         data-testid="popup"
       >
-        {popup.visible && (
-          <>
-            <button type="button" data-testid="one">
-              One
-            </button>
-            <button type="button" data-testid="two">
-              Two
-            </button>
-          </>
-        )}
+        {visible &&
+          wrapContent(
+            <>
+              <button
+                type="button"
+                data-testid="one"
+                // Menu's item activation: a library-owned close.
+                onClick={(event) => ctx.requestClose(event.nativeEvent, "activate")}
+              >
+                One
+              </button>
+              <button type="button" data-testid="two">
+                Two
+              </button>
+            </>,
+          )}
       </div>
     </>
   );
@@ -120,11 +126,27 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(screen.getByTestId("two")).not.toHaveAttribute("autofocus");
   });
 
-  it("a <div popover> gets no focus fallback (the Trigger keeps focus without autofocus)", async () => {
+  it("a <div popover> keeps focus on the Trigger without autofocus", async () => {
     const user = setupUser();
     render(<Mini />);
     await user.click(screen.getByTestId("trigger"));
     await flush();
     expect(screen.getByTestId("trigger")).toHaveFocus();
   });
+
+  it.each([["pop"], [undefined]] as const)(
+    "requestClose from an item (transition %s): focus returns to the Trigger",
+    async (transition) => {
+      const user = setupUser();
+      render(<Mini transition={transition} resolve={(popup) => popup.querySelector("button")} />);
+      await user.click(screen.getByTestId("trigger"));
+      await flush();
+      expect(screen.getByTestId("one")).toHaveFocus();
+      await user.keyboard("{Enter}");
+      await flush();
+      expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
+      expect(screen.queryByTestId("one")).toBeNull();
+      expect(screen.getByTestId("trigger")).toHaveFocus();
+    },
+  );
 });

@@ -22,7 +22,8 @@ export interface PopoverCloseProps extends Omit<
    * Runs inside this part's own transition (`data-pending` on the button), then closes the
    * popover: in library mode through the Root (`openChangeAction(false)` awaited, view
    * transition if set), in JS-free mode with `hidePopover()`. A rejection reaches the nearest
-   * Error Boundary above the Close part and leaves the popover open. Without `action` in JS-free
+   * Error Boundary above the Close part and leaves the popover open. If the popover was
+   * dismissed and opened again while the action ran, the close is dropped. Without `action` in JS-free
    * mode the button is a native `command="hide-popover"` invoker.
    */
   action?: Action<[details: ActionDetails]>;
@@ -65,7 +66,7 @@ export function PopoverClose({
 }: PopoverCloseProps) {
   const ctx = usePopoverContext("Popover.Close");
   const [pending, startOwnTransition] = useTransition();
-  const { ids, popupRef, recordCloseIntent } = ctx;
+  const { ids, popupRef, recordCloseIntent, openGeneration } = ctx;
   const isLibrary = ctx.mode === "library";
   const hasAction = action !== undefined;
   const installClick = isLibrary || hasAction;
@@ -110,8 +111,12 @@ export function PopoverClose({
       return;
     }
     const details = createActionDetails(native, {});
+    // The open this click belongs to: if the user dismisses and re-opens the popover while the
+    // action runs, its continuation must not close the new open.
+    const generation = openGeneration();
     startOwnTransition(async () => {
       await action(details);
+      if (openGeneration() !== generation) return;
       // Repeated clicks re-run the action; the first close wins (design 3.4).
       close(native);
     });

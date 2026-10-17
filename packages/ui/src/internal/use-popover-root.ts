@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useId, useInsertionEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createActionDetails } from "./action-details.js";
 import { transitionTypes } from "./transition-types.js";
@@ -44,9 +44,18 @@ export interface PopoverRootValue {
   readonly pending: boolean;
   /**
    * What the user already intends: the latest in-flight dispatch's `next`, else the optimistic
-   * value of the last commit. Safe to call from handlers and effects, also after an `await`.
+   * value of the last commit. Safe to call from handlers and effects (layout effects included,
+   * also in the commit that changed it), and after an `await`. Not during render.
    */
   readonly intended: () => boolean;
+  /**
+   * A counter that grows with every open (a requested open, or the popup being shown). A part
+   * whose close runs after an `await` records it first and drops the close when it changed: the
+   * user dismissed and re-opened meanwhile (Popover.Close, design 3.4). Handlers only.
+   */
+  readonly openGeneration: () => number;
+  /** Advance `openGeneration` (the Popup's `beforetoggle` for an open). */
+  readonly nextOpenGeneration: () => void;
   /**
    * Open through the Root's transition (library mode): a Trigger click, a foreign open caught at
    * `beforetoggle`, or mount reconciliation. A no-op when `true` is already intended.
@@ -170,10 +179,17 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
 
   // The optimistic value of the last commit, for callers that run after an `await` (a Close
   // action's continuation) and would otherwise read the value of the render they were created in.
+  // An insertion effect runs in the mutation phase, before any layout effect of the same commit
+  // (a child's included), so `intended()` is current there too.
   const committedOptimistic = useRef(optimistic);
-  useLayoutEffect(() => {
+  useInsertionEffect(() => {
     committedOptimistic.current = optimistic;
   });
+  const generation = useRef(0);
+  const openGeneration = useCallback(() => generation.current, []);
+  const nextOpenGeneration = useCallback(() => {
+    generation.current++;
+  }, []);
 
   const recordCloseIntent = useCallback((intent: PopoverCloseIntent | undefined) => {
     closeIntent.current = intent;
@@ -197,6 +213,7 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
 
   const send = (next: boolean, event: Event | undefined, reason: ChangeReason): void => {
     const built = buildDetails(event, reason);
+    if (next) nextOpenGeneration();
     onDispatch?.(next, built);
     dispatch(next, built);
   };
@@ -226,6 +243,8 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
     optimistic: isLibrary && optimistic,
     pending: isLibrary && pending,
     intended,
+    openGeneration,
+    nextOpenGeneration,
     requestOpen,
     requestClose,
     notifyClosed,

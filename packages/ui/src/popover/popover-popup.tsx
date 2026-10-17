@@ -130,7 +130,7 @@ export function PopoverPopup({
       "always mounted so that the server HTML is complete.",
   );
 
-  const { setElement, visible } = usePopoverPopup(ctx, {
+  const { setElement, visible, wrapContent } = usePopoverPopup(ctx, {
     part: "Popover.Popup",
     initialFocus,
     keepMounted,
@@ -147,10 +147,12 @@ export function PopoverPopup({
       // The mode changes with committed state, inside the Root's transition (conventions 5.5);
       // it stays visible while an exit animation runs.
       node = (
-        <Activity mode={visible ? "visible" : "hidden"}>{resolveStateValue(children, s)}</Activity>
+        <Activity mode={visible ? "visible" : "hidden"}>
+          {wrapContent(resolveStateValue(children, s))}
+        </Activity>
       );
     } else {
-      node = visible ? resolveStateValue(children, s) : null;
+      node = visible ? wrapContent(resolveStateValue(children, s)) : null;
     }
     return <PopoverPopupContext value={s}>{node}</PopoverPopupContext>;
   };

@@ -1305,6 +1305,27 @@ describe("Popover", () => {
         expect(isOpen()).toBe(false);
       });
 
+      it("dismissed and re-opened while the action runs: the stale close is dropped", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        render(<Harness mode={mode} action={action} close={{ action: () => work.promise }} />);
+        await openThroughTrigger(user);
+        await user.click(screen.getByTestId("close"));
+        expectPending(screen.getByTestId("close"));
+        // A dismissal, then the user opens the popover again.
+        await act(async () => popup().hidePopover());
+        await flush();
+        expect(isOpen()).toBe(false);
+        // The re-open is entangled with the Close's pending async transition (React batches
+        // them), so it commits together with the action's end.
+        await user.click(trigger());
+        await act(async () => work.resolve());
+        await flush();
+        expect(isOpen()).toBe(true);
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+      });
+
       it("a rejection reaches the boundary inside the popup; the popup stays open", async () => {
         const user = setupUser();
         silenceErrors();
@@ -1456,7 +1477,7 @@ describe("Popover", () => {
       expect(screen.getByRole("textbox", { hidden: true })).toHaveAttribute("autofocus");
     });
 
-    describe("focus on open (design 6.1 fallback; the shim runs no focusing steps)", () => {
+    describe("focus on open (the platform's focusing steps, emulated by the shim)", () => {
       it("a <dialog> popup: the first sequentially focusable descendant", async () => {
         const user = setupUser();
         render(
@@ -1502,7 +1523,8 @@ describe("Popover", () => {
         render(<Harness mode="uncontrolled" content={<p>Read only</p>} />);
         await openThroughTrigger(user);
         expect(popup()).toHaveFocus();
-        expect(popup()).toHaveAttribute("tabindex", "-1");
+        // Nothing written by the library (the old 6.1 fallback left `tabindex="-1"` behind).
+        expect(popup()).not.toHaveAttribute("tabindex");
       });
 
       it("a <div> popup leaves focus on the Trigger", async () => {
@@ -1546,6 +1568,81 @@ describe("Popover", () => {
       });
     });
 
+    describe("a library-driven close from inside the popup with transition (H1)", () => {
+      // With `transition` the close commit unmounts the content (no hold), which drops focus on
+      // <body> before `hidePopover()` runs; the platform then restores nothing.
+      renderBoth("Close part", (mode) => {
+        it.each([["pop"], ["none"]] as const)(
+          'transition="%s": focus returns to the Trigger',
+          async (transition) => {
+            const user = setupUser();
+            render(<Harness mode={mode} popup={{ transition }} />);
+            await openThroughTrigger(user);
+            screen.getByTestId("close").focus();
+            await user.keyboard("{Enter}");
+            await flush();
+            expect(isOpen()).toBe(false);
+            expect(content()).toBeNull();
+            expect(trigger()).toHaveFocus();
+          },
+        );
+      });
+
+      it("a controlled open={false} from a submit inside the popup", async () => {
+        const user = setupUser();
+        let setOpen!: (open: boolean) => void;
+        render(
+          <Harness
+            mode="controlled"
+            popup={{ transition: "pop" }}
+            content={<input data-testid="field" />}
+            outside={(set) => {
+              setOpen = set;
+              return null;
+            }}
+          />,
+        );
+        await openThroughTrigger(user);
+        screen.getByTestId("field").focus();
+        await act(async () => setOpen(false));
+        await flush();
+        expect(isOpen()).toBe(false);
+        expect(trigger()).toHaveFocus();
+      });
+
+      it("focus outside the popup at close time is left alone", async () => {
+        const user = setupUser();
+        let setOpen!: (open: boolean) => void;
+        render(
+          <Harness
+            mode="controlled"
+            popup={{ transition: "pop" }}
+            outside={(set) => {
+              setOpen = set;
+              return null;
+            }}
+          />,
+        );
+        await openThroughTrigger(user);
+        screen.getByTestId("elsewhere").focus();
+        await act(async () => setOpen(false));
+        await flush();
+        expect(isOpen()).toBe(false);
+        expect(screen.getByTestId("elsewhere")).toHaveFocus();
+      });
+
+      it("keepMounted: focus returns to the Trigger as well", async () => {
+        const user = setupUser();
+        render(<Harness mode="uncontrolled" popup={{ transition: "pop", keepMounted: true }} />);
+        await openThroughTrigger(user);
+        screen.getByTestId("close").focus();
+        await user.keyboard("{Enter}");
+        await flush();
+        expect(isOpen()).toBe(false);
+        expect(trigger()).toHaveFocus();
+      });
+    });
+
     it("JS-free mode: the same fallback applies", async () => {
       const user = setupUser();
       render(<Harness mode="static" />);
@@ -1586,14 +1683,19 @@ describe("Popover", () => {
       const outer = screen.getByTestId("outer");
       act(() => outer.showPopover());
       await user.click(trigger());
-      screen.getByTestId("close").focus();
+      const close = screen.getByTestId("close");
+      close.focus();
+      expect(close).toHaveFocus();
+      const blur = vi.spyOn(HTMLElement.prototype, "blur");
       await act(async () => {
         outer.hidePopover();
         popup().hidePopover();
       });
       await flush();
       expect(trigger()).not.toHaveFocus();
-      expect(document.activeElement).toBe(document.body);
+      // The library blurs the focused element instead (jsdom ignores `blur()` on an element
+      // under `display: none`, so the result is not observable here; browsers move it to body).
+      expect(blur.mock.contexts).toContain(close);
     });
   });
 
