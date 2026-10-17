@@ -135,7 +135,7 @@ export function DialogRoot({
     closeIntent.current = undefined;
     return intent;
   }, []);
-  // Advanced on every open (the open dispatch and the Popup's native `toggle` to open), so a Close action that
+  // Advanced on every open (the open dispatch and the Popup's native `beforetoggle` to open), so a Close action that
   // settles after the user dismissed and re-opened the dialog does not close the new open (the
   // PO's open-generation rule, design/components/popover.md 3.4; review M2).
   const generation = useRef(0);

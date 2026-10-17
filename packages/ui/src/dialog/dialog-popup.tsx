@@ -361,18 +361,16 @@ export function DialogPopup({
     ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
   });
 
-  // Every native open counts as a new opening (design 3.4, as Popover 14.1): foreign,
-  // pre-hydration and JS-free opens too. A Close action from an earlier opening then skips its
-  // close.
-  const onToggle = useEffectEvent((event: Event) => {
-    if (event.target !== dialogRef.current) return;
-    if ((event as ToggleEvent).newState === "open") ctx.nextOpenGeneration();
-  });
-
   const onBeforeToggle = useEffectEvent((event: Event) => {
     if (event.target !== dialogRef.current) return;
     const newState = (event as ToggleEvent).newState;
     awaitingClose.current = newState === "closed";
+    // Every native open counts as a new opening (design 3.4, as Popover 14.1): foreign,
+    // pre-hydration and JS-free opens too, so a Close action from an earlier opening skips its
+    // close. Counted here, synchronously inside `showModal()` / `show()`, not at the queued
+    // `toggle`: an action settling between the open and that task would otherwise still see the
+    // old generation and close the new open.
+    if (newState === "open") ctx.nextOpenGeneration();
   });
 
   useEffect(() => {
@@ -386,7 +384,6 @@ export function DialogPopup({
       [dialog, "submit", onSubmit, false],
       [dialog, "close", onClose, false],
       [dialog, "beforetoggle", onBeforeToggle, false],
-      [dialog, "toggle", onToggle, false],
     ];
 
     if (!modal && !nativeClosedBy) {

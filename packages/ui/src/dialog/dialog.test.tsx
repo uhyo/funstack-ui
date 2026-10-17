@@ -1279,10 +1279,19 @@ describe("Dialog", () => {
       await act(async () => popup().requestClose());
       await flush();
       expect(popup().open).toBe(false);
-      await act(async () => popup().showModal());
       close.mockClear();
-      await act(async () => work.resolve());
-      await flush();
+      // The action may settle after the native re-open but before its queued `toggle` task (the
+      // order varied in CI when the guard counted opens at `toggle`). Hold that task's event
+      // back for good, so only the synchronous `beforetoggle` can count the re-open.
+      const holdToggle = (event: Event) => event.stopImmediatePropagation();
+      window.addEventListener("toggle", holdToggle, true);
+      try {
+        await act(async () => popup().showModal());
+        await act(async () => work.resolve());
+        await flush();
+      } finally {
+        window.removeEventListener("toggle", holdToggle, true);
+      }
       expect(popup().open).toBe(true);
       expect(close).not.toHaveBeenCalled();
     });

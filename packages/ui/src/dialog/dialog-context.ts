@@ -55,7 +55,7 @@ export interface DialogContextValue {
    * if a newer open started meanwhile (the dialog was dismissed and opened again).
    */
   readonly openGeneration: () => number;
-  /** Advance `openGeneration` (an open dispatch, the `<dialog>`'s native `toggle` to open). */
+  /** Advance `openGeneration` (an open dispatch, the `<dialog>`'s native `beforetoggle` to open). */
   readonly nextOpenGeneration: () => void;
 }
 
