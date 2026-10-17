@@ -64,3 +64,4 @@
 - Version bumped to 0.1.0-alpha.0 (6cbe7c1), LICENSE shipped in package (8cf21ac). USER publishes first version by hand (npm trusted publisher can only be set after package exists). After that: optional GitHub release (publish.yml will fail harmlessly as version exists).
 - WAVE 2 COMPLETE. Next: propose wave 3 to user. Open: #33 CheckboxGroup, #19/#20/#21 Tooltip deferred, #16/#34 human upstream.
 - WAVE 3 approved by user: Popover + Menu (+ CheckboxGroup #33 side item). Issues: #37 research, #38 design Popover, #39 design Menu, #40 impl Popover, #41 impl Menu, #42 roadmap page. Running: research #37 (opus), architect CheckboxGroup design #33, developer roadmap #42. Next: Popover design after research.
+- 2026-10-17: USER PUBLISHED @funstack/ui 0.1.0-alpha.0 by hand (dist-tags: latest+alpha → 0.1.0-alpha.0; also an old 0.0.0-stage exists). No GitHub release yet (offered). Trusted publisher setup is the user's next one-time step.
