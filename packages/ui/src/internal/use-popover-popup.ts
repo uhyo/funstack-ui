@@ -1,6 +1,5 @@
 "use client";
 import {
-  createElement,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -10,6 +9,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
+import { useContentFocusProbe } from "./content-focus-probe.js";
 import { exitAnimations, useExitAnimation } from "./use-exit-animation.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
@@ -115,22 +115,6 @@ function insideHiddenPopover(element: Element): boolean {
 }
 
 /**
- * Records, from its layout-effect cleanup, whether focus is inside the popup when the content
- * goes away: React runs a deleted component's layout cleanups before it detaches the host nodes,
- * so `document.activeElement` still names the focused element there.
- */
-function ContentFocusProbe({
-  onDetach,
-  children,
-}: {
-  onDetach: () => void;
-  children?: ReactNode;
-}): ReactNode {
-  useLayoutEffect(() => onDetach, [onDetach]);
-  return children;
-}
-
-/**
  * Everything in a popover-like Popup except rendering (design/components/popover.md 14.2): mount
  * reconciliation, the apply effect, the native `beforetoggle` / `toggle` / `command` listeners,
  * close intents, the focus-return fallback, the JS-free `aria-expanded` sync, the deferred
@@ -153,8 +137,6 @@ export function usePopoverPopup(
   const awaitingClose = useRef(false);
   // Whether focus was inside the popup when its last close began (design 6.2 rule 1).
   const focusWasInside = useRef(false);
-  // Whether the content unmounted while holding focus since the popup was last shown (H1).
-  const contentHadFocus = useRef(false);
   const warnedFocus = useRef(false);
 
   // --- `held`: children stay mounted while the hide animates (design 4.4) -------------------
@@ -171,20 +153,8 @@ export function usePopoverPopup(
     if (isLibrary && prevCommitted && transition === undefined) exit.holdDuringRender();
   }
 
-  const recordContentFocus = useCallback(() => {
-    const element = popupRef.current;
-    if (element === null) return;
-    const active = element.ownerDocument.activeElement;
-    if (active !== null && active !== element && element.contains(active)) {
-      contentHadFocus.current = true;
-    }
-  }, [popupRef]);
-
-  const wrapContent = useCallback(
-    (children: ReactNode): ReactNode =>
-      createElement(ContentFocusProbe, { onDetach: recordContentFocus }, children),
-    [recordContentFocus],
-  );
+  // Whether the content unmounted while holding focus since the popup was last shown (H1).
+  const { wrapContent, hadFocus: contentHadFocus } = useContentFocusProbe(popupRef);
 
   const syncExpanded = (element: HTMLElement): void => {
     // JS-free mode only (design 9): read the DOM, not `newState`, so a stale task cannot lie.
@@ -274,8 +244,12 @@ export function usePopoverPopup(
     reconcileOnMount();
   }, []);
 
-  // The apply effect (design 2.5): after every commit, once nothing is in flight, the DOM
-  // follows committed state. One effect covers the normal open, `defaultOpen`, a controlled open
+  // The apply effect (design 2.5): after every commit that re-renders the Popup, once nothing is
+  // in flight, the DOM follows committed state. Since the Root's value is memoised (#48) an
+  // unrelated Root render does not re-render the Popup, so this does not run for it; every path
+  // that makes the DOM diverge from state goes through a dispatch, whose `pending` flips re-render
+  // the Popup (review of #48, finding 4). Do not rely on an unrelated render to re-apply state.
+  // One effect covers the normal open, `defaultOpen`, a controlled open
   // or close, a library-driven close after `openChangeAction(false)` settled, the re-open of a
   // refused dismissal, and the close after a refused or failed pre-hydration open.
   useLayoutEffect(() => {
