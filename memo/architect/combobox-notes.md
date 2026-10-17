@@ -94,3 +94,28 @@ strings: English defaults, accessibility-only, always a function prop, no locale
 Conventions feedback 1 to 12 applied (2.6 urgent lane, 3.2 virtual focus row, 3.5 residual
 paths, 1.1 vocabulary, 4.1 rows, 5.1 deferred note, 5.3 types, 7.3, 8, 9.4, 10.1 row,
 resolved question 27, decisions row 11).
+
+## After review (2026-10-17)
+
+Folded `memo/reviewer/combobox.md` (H1, M1-M3, L1-L6) and the developer's deviations into the
+design ("Review revisions" table at the end) and into conventions 1.1, 2.6, 3.5, 3.8, 4.1, 10.1
+and resolved question 27. Choices I made where the product owner left room:
+
+- **Status inside the List renders `role="none"`** (the reviewer's suggestion). A role-less
+  `div` would also do, but `none` states the intent and keeps axe's required-children check
+  quiet; the busy listbox (`aria-busy`, which axe exempts from the check) carries the meaning.
+- **`loading` is not exposed** as `state.loading` or `data-loading` in v1; `[aria-busy="true"]`
+  on the List covers styling. Listed in section 13 as a possible follow-up.
+- **L1 (dangling `aria-labelledby`)**: the design now says the Label registers and the List
+  emits `aria-labelledby` only while a Label is mounted, otherwise the consumer's `aria-label`
+  (dev warning with neither). Recorded in 9 and the test plan; it is a Low finding, so the
+  developer may land it with or after the fix wave.
+- **RTL override spelling** for a consumer with an RTL island: `style={{ positionArea:
+  "block-end span-left" }}`. Not verified in an engine; it is the physical equivalent of the
+  logical keyword for an RTL anchor, and consumer `style` wins per property.
+- The two mouse-related additions (`onMouseDown` prevented alongside `onPointerDown`, Trigger
+  `onPointerCancel`) are now owned keys in the `Omit` lists.
+
+Verified items from "Things to verify" above: the deferred-lane claim (yes, not entangled; React
+19.3.1 `requestDeferredLane`), the implicit-submission flush (no: Firefox submits before React's
+scheduled flush, hence `flushSync` for the closed-Enter commit), the hydration path (fine).
