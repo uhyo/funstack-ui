@@ -5,7 +5,7 @@
 // Chromium through vitest browser mode.
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { userEvent } from "vitest/browser";
+import { user } from "../__tests__/browser-user.js";
 import { describe, expect, it, vi } from "vitest";
 import { deferred } from "../__tests__/helpers.js";
 import { Accordion } from "./index.js";
@@ -45,7 +45,7 @@ describe("Accordion (browser)", () => {
 
     trigger("a").focus();
     expect(trigger("a")).toHaveFocus();
-    await userEvent.keyboard("{Enter}");
+    await user.keyboard("{Enter}");
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]?.[0]).toEqual(["a"]);
     expect(action.mock.calls[0]?.[1].event?.type).toBe("click");
@@ -60,7 +60,7 @@ describe("Accordion (browser)", () => {
     expect(item("a").open).toBe(true);
     expect(trigger("a")).not.toHaveAttribute("data-pending");
 
-    await userEvent.keyboard(" ");
+    await user.keyboard(" ");
     expect(action).toHaveBeenCalledTimes(2);
     expect(action.mock.calls[1]?.[0]).toEqual([]);
     expect(action.mock.calls[1]?.[1].event?.type).toBe("click");
@@ -84,16 +84,16 @@ describe("Accordion (browser)", () => {
     expect(item("a").open).toBe(true);
     expect(item("a").getAttribute("name")).toBe(item("b").getAttribute("name"));
 
-    await userEvent.click(trigger("b"));
+    await user.click(trigger("b"));
     expect(item("b").open).toBe(true);
     expect(item("a").open).toBe(false); // the platform's exclusive group
     expect(item("b")).not.toHaveAttribute("data-open");
 
     trigger("a").focus();
-    await userEvent.keyboard("{Enter}");
+    await user.keyboard("{Enter}");
     expect(item("a").open).toBe(true);
     expect(item("b").open).toBe(false);
-    await userEvent.keyboard(" ");
+    await user.keyboard(" ");
     expect(item("a").open).toBe(false);
   });
 
@@ -154,7 +154,7 @@ describe("Accordion (browser)", () => {
     );
 
     for (const id of ["select", "textarea", "editable", "text", "checkbox"]) {
-      await userEvent.click(screen.getByTestId(id));
+      await user.click(screen.getByTestId(id));
       await flushToggle();
       expect(item("a").open, id).toBe(false);
       expect(action, id).not.toHaveBeenCalled();

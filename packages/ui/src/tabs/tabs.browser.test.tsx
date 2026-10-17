@@ -4,7 +4,7 @@
 // click (mousedown focus, then click) dispatches once.
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { user } from "../__tests__/browser-user.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Tabs } from "./index.js";
 import type { TabsValueChangeDetails } from "./index.js";
@@ -94,14 +94,14 @@ describe("Tabs view transitions", () => {
       </Tabs.Root>,
     );
 
-    await userEvent.click(screen.getByRole("tab", { name: "C" }));
+    await user.click(screen.getByRole("tab", { name: "C" }));
     await expect.poll(() => screen.queryByText("Gamma")).not.toBeNull();
     await expect.poll(() => types.length).toBeGreaterThan(0);
     expect(types.at(-1)).toEqual(expect.arrayContaining(["fsui-tabs", "fsui-tabs-next"]));
     expect(types.at(-1)).not.toContain("fsui-tabs-prev");
 
     types.length = 0;
-    await userEvent.click(screen.getByRole("tab", { name: "A" }));
+    await user.click(screen.getByRole("tab", { name: "A" }));
     await expect.poll(() => screen.queryByText("Alpha")).not.toBeNull();
     await expect.poll(() => types.length).toBeGreaterThan(0);
     expect(types.at(-1)).toEqual(expect.arrayContaining(["fsui-tabs", "fsui-tabs-prev"]));
@@ -126,7 +126,7 @@ describe("Tabs pointer activation", () => {
       const tab = (name: string) => screen.getByRole("tab", { name });
 
       // Focus comes from outside the list (the body): only the click handler dispatches.
-      await userEvent.click(tab("B"));
+      await user.click(tab("B"));
       await expect.poll(() => tab("B").getAttribute("aria-selected")).toBe("true");
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe("b");
@@ -139,7 +139,7 @@ describe("Tabs pointer activation", () => {
       let clicked = false;
       tab("C").addEventListener("focus", () => (focusedBeforeClick ||= !clicked));
       tab("C").addEventListener("click", () => (clicked = true), { capture: true });
-      await userEvent.click(tab("C"));
+      await user.click(tab("C"));
       await expect.poll(() => tab("C").getAttribute("aria-selected")).toBe("true");
       expect(action).toHaveBeenCalledTimes(2);
       expect(action.mock.calls[1]?.[0]).toBe("c");

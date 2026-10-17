@@ -2,7 +2,7 @@ import { Component, use } from "react";
 import type { ReactNode } from "react";
 import { expect, describe } from "vitest";
 import { userEvent } from "@testing-library/user-event";
-import { act } from "@testing-library/react";
+import { act, configure, getConfig } from "@testing-library/react";
 
 /** A promise whose settlement the test controls. */
 export interface Deferred<T> {
@@ -155,7 +155,43 @@ export function expectNotPending(el: Element): void {
   expect(el).not.toHaveAttribute("data-pending");
 }
 
-/** A `user-event` instance. Call it in each test, after `render`. */
-export function setupUser() {
-  return userEvent.setup();
+type UserEvent = ReturnType<typeof userEvent.setup>;
+
+/**
+ * Runs one user-event interaction inside a single async `act()`.
+ *
+ * Testing Library's `asyncWrapper` runs user-event with the act environment switched off, so
+ * React renders the transition a click or key press starts on the real (time-sliced) Scheduler
+ * while the wrapper only waits one `setTimeout(0)`. On a cold start the commit can land after the
+ * interaction has returned, and the next assertion sees the optimistic state (the Accordion and
+ * Tabs flakes of issue #36). Inside `act` React queues that work and drains it before returning.
+ * The asyncWrapper is bypassed meanwhile: its act-environment-off window would make React warn
+ * about the outer `act`. A pending deferred stays pending, so mid-flight assertions still work.
+ */
+async function inAct<T>(interaction: () => Promise<T>): Promise<T> {
+  const { asyncWrapper } = getConfig();
+  configure({ asyncWrapper: (cb) => cb() });
+  try {
+    return await act(interaction);
+  } finally {
+    configure({ asyncWrapper });
+  }
+}
+
+/**
+ * A `user-event` instance whose every interaction (`click`, `keyboard`, `tab`, `hover`, `type`,
+ * …) runs inside `act()`, so the transitions it starts have committed when the call resolves.
+ * Call it in each test, after `render`.
+ */
+export function setupUser(options?: Parameters<typeof userEvent.setup>[0]): UserEvent {
+  const user = userEvent.setup(options);
+  return new Proxy(user, {
+    get(target, key, receiver) {
+      const value: unknown = Reflect.get(target, key, receiver);
+      // `setup` derives another instance synchronously; leave it (and non-functions) alone.
+      if (typeof value !== "function" || key === "setup") return value;
+      return (...args: unknown[]) =>
+        inAct(() => Promise.resolve((value as (...a: unknown[]) => unknown).apply(target, args)));
+    },
+  });
 }

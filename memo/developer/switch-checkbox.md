@@ -126,3 +126,16 @@ native-input machinery of conventions 3.8.
   dispatches ... and opens" fails ~1 in 6 full cold runs (`open` attribute missing right after
   the click). Happens with the original `vitest.setup.ts` too (baseline run), so it is a
   pre-existing load-dependent flake (jsdom `toggle` via `setImmediate`), not caused by these fixes.
+
+## Issue #36 follow-up (2026-10-17)
+
+- `setupUser()` in `src/__tests__/helpers.tsx` is now the act-wrapped one from 5fbaa51: a Proxy
+  over `userEvent.setup()` that runs every method (except `setup`) inside one async `act`, with
+  RTL's `asyncWrapper` bypassed meanwhile. All jsdom suites using the helper adopt it; the
+  file-local copy in accordion.test.tsx is gone. jsdom: 854 pass, 0 act warnings, 8 repeat runs
+  green. tooltip.test.tsx still uses user-event directly (fake timers + advanceTimers); untouched.
+- Tabs "a value matching no tab" flake: same race (ArrowRight's transition committing after
+  `user.keyboard` returned, so `committed()` / the List tabindex lagged). Could not reproduce
+  locally before or after (15 serial + 18 parallel runs of the old code), fix is by construction.
+- Tabs/Accordion browser suites now use `browser-user.ts`: 62 act warnings to 0 (Chromium +
+  Firefox, `--silent=false`), ViewTransition and native toggle rows unaffected.
