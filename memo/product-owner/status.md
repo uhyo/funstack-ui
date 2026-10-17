@@ -110,3 +110,13 @@
 - Research #55 is closed. #58 holds the upstream reports, a human task.
 - Toast design 3cf4192, accepted in ff840c3 with all 9 recommendations. Amendment: a server-side toast() is a no-op and never buffered. The architect is applying the conventions amendments next.
 - The Slider design is in progress with a second architect, who must not edit conventions.md.
+
+## 2026-10-18 — usage limit reached mid-wave
+- Done: #46 implemented (97effd1), review fixes 56e1ea8..bcdb7e1 (CI green). Toast merged (03404ef). The Slider design was accepted (d009da0, 40f3511); I made decisions 1, 2 and 8 autonomously and still need to report them to the user.
+- In flight when the limit hit:
+  - the Slider developer (worktree);
+  - the Field/Form architect;
+  - the #46 design-fold architect;
+  - the Toast reviewer.
+  Check their outputs and branches on resume.
+- Toast browser row "animates the enter; holds ... data-ending" flaked once under load. The reviewer was asked to assess it.
