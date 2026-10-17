@@ -103,3 +103,10 @@
 - 0.1.0-alpha.2 released (69aeb80); the publish workflow succeeded.
 - Wave 5 (#54): Toast, Slider, Field/Form. Research #55 is in progress with the platform-researcher.
 - In flight: #48 and #49 (developers in worktrees), #46 Dialog VT exit design (architect).
+
+## 2026-10-18 — wave 5 progress
+- #48 merged and reviewed (a53bf23); follow-ups merged in 22607ac (the Accordion ItemContext deviation was accepted and folded in 705c40e). #49 and #56 closed. #57 is the Tooltip roving-tabindex false-positive warning.
+- #46: the Dialog design amendment (1251efa) was accepted in 1b98656 with all 3 recommendations. A developer is implementing it, together with #48 review items 4 and 5.
+- Research #55 is closed. #58 holds the upstream reports, a human task.
+- Toast design 3cf4192, accepted in ff840c3 with all 9 recommendations. Amendment: a server-side toast() is a no-op and never buffered. The architect is applying the conventions amendments next.
+- The Slider design is in progress with a second architect, who must not edit conventions.md.
