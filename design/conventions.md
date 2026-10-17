@@ -9,7 +9,11 @@ and the `focusGroup` detection in 8, issue #43; Popover and Menu accepted the sa
 resolved questions 24 and 25; amended 2026-10-17 with the Select design, #50, see resolved
 question 26; amended 2026-10-17 with the Combobox design, #50: the urgent lane in 2.6 and 3.2,
 the built-in strings rule in section 11, see resolved question 27; amended 2026-10-17 with the
-Dialog close amendment, #46: the "cancelable step" rule for part-initiated closes in 3.5). Binding for every component design in
+Dialog close amendment, #46: the "cancelable step" rule for part-initiated closes in 3.5; amended 2026-10-18 with the Toast
+design, #54, see resolved question 28: `"timeout"` in 2.2, the urgent queue in 2.6, the registry
+and the library-driven region in 3.5, the `ending` / `paused` / `type` rows in 4.1, the third
+no-`transition` category in 5.1, the Suspense guard in 6, the function export in 1.1 and 9.3,
+the strings in 11, the Lanes row in 10.1). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -23,7 +27,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
-| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. No `on*` handlers in the library API. |
+| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. No `on*` handlers in the library API. A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), never a handler. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
@@ -32,7 +36,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
-| 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
+| 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6). Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 
 ---
 
@@ -55,6 +59,11 @@ import { Tabs } from "@funstack/ui/tabs";
   <Tabs.Panel value="billing"><BillingSettings /></Tabs.Panel>
 </Tabs.Root>
 ```
+
+A component whose **input is a command rather than an interaction** exports a plain function
+next to its namespace, from the same subpath: `toast()` and `createToastManager()` beside
+`Toast.Viewport` / `Toast.Root` / … (Toast, #54). The namespace object stays parts-only, and the
+function is never a handler: it enqueues, and the parts render what was enqueued.
 
 Single-element components are plain components, no `.Root`:
 
@@ -256,7 +265,7 @@ export interface ActionDetails {
 export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Action<[next: T, details: Details]>;
 
 /** Why a change action was dispatched; the full vocabulary (section 2.2, "reason" table). */
-export type ChangeReason = "activate" | "platform" | "dismiss";
+export type ChangeReason = "activate" | "platform" | "dismiss" | "timeout";
 ```
 
 `ChangeReason` is **one public type**, exported from the root entry; every
@@ -274,7 +283,8 @@ exposes `reason` uses exactly these values and no synonyms:
 | --- | --- | --- |
 | `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). For native checkbox and radio inputs it is always the `click` `PointerEvent`, including Space and radio arrow keys, because React's `onChange` for them is click-driven. |
 | `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), form reset, or interaction before hydration reconciled at mount. Never a user gesture. | The platform event, or `undefined` for mount reconciliation. |
-| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover, focus leaving the component (Tab out of a menu), the pointer leaving a hover-opened submenu, or a parent overlay closing (a submenu when its menu closes). A close through a part (`Dialog.Close`, a Form submit) is `"activate"`. | The platform's `close` or `toggle` event. |
+| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover, focus leaving the component (Tab out of a menu), the pointer leaving a hover-opened submenu, or a parent overlay closing (a submenu when its menu closes). A close through a part **that carries a decision** (`Dialog.Close`, a Form submit) is `"activate"`; `Toast.Close`, which only ever means "go away" (the same as Escape), is `"dismiss"`, so a toast's `closeAction` can tell "acted on the content" (its Action part, `"activate"`) from everything else. | The platform's `close` or `toggle` event; the click or keydown for Toast. |
+| `"timeout"` | The library's own timer closed the component: no user gesture and no platform event. Toast's auto-dismiss is the only user; the Undo-window pattern (`design/components/toast.md` 9.3) relies on it being distinct from `"dismiss"`. | `undefined` |
 
 Components whose close carries a platform result add it as a serialisable field next to
 `reason`: Dialog's `details.returnValue` is `dialog.returnValue` (the `value` of the Close button
@@ -287,7 +297,7 @@ apply it as a functional update instead of writing the whole set (section 2.5). 
 earlier `item` / `open` pair stays as is; a new set-valued component uses the diff form.
 
 Adding a value is a change to this document, not to one component (`"dismiss"` was added
-2026-10-16 for Dialog; Popover and Menu reuse it). The first argument is always the next value, so the
+2026-10-16 for Dialog; Popover and Menu reuse it; `"timeout"` was added 2026-10-18 for Toast). The first argument is always the next value, so the
 common case stays short:
 
 ```tsx
@@ -537,6 +547,16 @@ the rethrow (Combobox review, M2). The library uses the lane only where React re
 state. Consumers who need an urgent update from an interaction that has no urgent action still
 use pass-through or `ref`, unsupported as before.
 
+**A state that is urgent by design: the Toast queue** (third urgent state, Toast #54). A toast
+reports on an action that is pending elsewhere; a transition push would be held by that very
+action (2.3 item 5), so every queue mutation (add, update, dismiss, drop after exit) is a normal
+update. Its input is not a prop at all: the imperative `toast()` builds a command and dispatches
+it from a `queueMicrotask` callback, so a call made inside a `startTransition` scope (an action's
+sync prefix) escapes the scope while order is preserved; the Viewport applies the command with
+`useState`. Everything the toast *drives* (its Action part's action, its `closeAction`) is a
+transition as usual. Such a state has no `UrgentChangeAction` prop and no `x` / `defaultX`
+triple, and its commits never run a view transition (5.1).
+
 ### 2.7 Form-level actions are a separate channel
 
 `<form action>`, `useFormStatus` and React's automatic form reset are React's form channel. A
@@ -767,7 +787,7 @@ can delay or roll it back. The boundary:
 
 | | Library-owned | Browser-owned |
 | --- | --- | --- |
-| Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in Accordion's static (JS-free) mode, `<dialog open>` |
+| Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in Accordion's static (JS-free) mode, `<dialog open>`; the Toast region (`popover="manual"`), which the library shows and hides in both directions, driven by the urgent queue, and never notifies: it has no `openChangeAction` because nothing a consumer could do with "the region opened" exists |
 | Who changes it | The library, inside its transition | The browser (top layer, light dismiss, `interestfor`, find-in-page) |
 | Optimistic source | `useOptimistic` | The DOM itself |
 | `xChangeAction` | Can be awaited; the UI waits for it | Notification: dispatched from the platform event (`toggle`) inside a transition, after the fact |
@@ -797,6 +817,13 @@ Rules:
 - Per-component designs list every state and label it library-owned or browser-owned.
 - Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
   dispatches use `"activate"`.
+- A **module-level registry** is an allowed shape for a cross-component fact the DOM does not
+  expose: `src/internal/modal-registry.ts` (directive-free) holds the stack of open modal
+  `<dialog>` elements; `Dialog.Popup` pushes after `showModal()` and removes on `close` and
+  unmount, and a reader (Toast's Viewport, which portals its region into the topmost modal so
+  it is not inert) subscribes through `useSyncExternalStore` with a server snapshot of `null`.
+  Writes happen in layout effects or platform event listeners, never during render; the
+  registry is never the source of truth for a component's own state (Toast #54).
 - A fourth kind of state, **consumer-owned, mirrored**: a controlled-only prop that the library
   writes to a DOM property it does not own (`Checkbox`'s `indeterminate`, a future Progress
   `value` or Dialog `returnValue`). It has no `defaultX` and no action; the library re-applies it
@@ -970,7 +997,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 
 | Name | Kind | Where | Meaning |
 | --- | --- | --- | --- |
-| `pending` | boolean | owner + initiating trigger | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). |
+| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action` | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`), `Combobox.Option` (optimistic `aria-selected`; distinct from `active`), `Combobox.Input` (a non-null optimistic value) | Optimistic selection on triggers; committed on panels. |
@@ -981,6 +1008,9 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
+| `ending` | boolean | Toast `Root` | Closed, kept mounted (and `inert`) until its exit animations finish (`useExitAnimation`); CSS animates on it. |
+| `paused` | boolean | Toast `Viewport` | A viewport-wide timer pause holds (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
+| `type` | string | Toast `Root` | The toast's consumer-defined `type` (`"error"`, `"success"`, …), an enum whose vocabulary is the consumer's. |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
 their value. Negative pairs (`data-closed`, `data-unchecked`) are not emitted; use `:not([data-open])`.
@@ -1090,7 +1120,12 @@ change is an optimistic flip that never animates (Menu's items, whose `aria-chec
 sync render and whose settle shows nothing; every Select part, since the picker is a UA
 pseudo-element, `<selectedcontent>` is written by the browser and every library attribute is
 optimistic) has no `transition` prop; Toggle keeps its own
-because its element's content can change with the settled action.
+because its element's content can change with the settled action. A third category without the
+prop: parts whose **every commit is on the urgent lane by design** (Toast, section 2.6): react-dom
+never starts a view transition for an urgent commit, so a boundary could animate nothing and
+would still pay the page cross-fade whenever the part happened to mount inside another
+component's transition commit; such parts animate enter and exit in CSS (`@starting-style`,
+`data-ending`).
 
 **Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
 (decision for Popover, #38, from the `vt-popover` probe in `docs/research/popover-menu.md`). A
@@ -1181,6 +1216,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
 | Select | `fsui-select` (no direction variants) |
 | Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch) |
+| Toast | none (no `transition` prop; every commit is urgent, section 5.1) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1236,6 +1272,13 @@ Every `transition` example in the docs carries this block. No JS-level `matchMed
 - **The library's own `use()` calls** (`use(browser())` for client-only sub-parts) require a
   Suspense boundary above the component during SSR; a component that does this says so in its
   design doc.
+- **The one library-owned boundary: Toast's guard** (#54). `Toast.Root` wraps its children in a
+  `<Suspense>` whose fallback renders nothing visible. The reason is specific and not to be
+  generalised: a toast is mounted in an **urgent** commit from outside the consumer's tree, so a
+  suspending toast would reveal the fallback of the nearest boundary *above the Viewport* (the
+  app shell in the common layout) instead of keeping old content as a transition would. The
+  guard only gates the toast's timer and announcement; a visible skeleton is still the
+  consumer's own `<Suspense>` inside the Root, which catches first.
 
 ---
 
@@ -1505,6 +1548,9 @@ export type { TabsTabProps, TabsTabState } from "./tabs-tab.js";
 ```
 
 The part components keep their long names (`TabsRoot`) as `displayName` and in stack traces.
+A command-input component also exports its function(s) by name from the same `index.ts`
+(`export { toast, createToastManager } from "./toast.js"`; section 1.1), and the root entry
+re-exports them.
 
 ### 9.4 Public types
 
@@ -1546,6 +1592,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` works end to end (guards the documented pattern). |
 | Directive | Each built part file starts with `"use client"` or not, exactly as the component's design doc records (script over `dist`, run in `test:run` after `build`). |
 | Platform path (both) | Required for every component with a residual browser path (section 3.5): mount reconciliation (`renderToString`, change the DOM before `hydrateRoot`, exactly one dispatch with `reason: "platform"` and `event === undefined`, StrictMode still one) and, for native form controls, form reset through `<button type="reset">`, `form.reset()` and React's automatic reset after a successful `<form action>` (one dispatch per state owner with the `reset` event; a cancelled `reset` dispatches nothing; a controlled parent that refuses gets the DOM re-synced after settle). |
+| Lanes | Required for a state that is urgent by design (section 2.6, Toast): with an unrelated `useTransition` action pending (a deferred), the command called inside that action's sync prefix, inside a consumer `startTransition`, and plainly, all commit before the action settles; several commands in one tick keep their order. The component also lists the rows it declares N/A for lacking an `x` / `defaultX` triple (controlled parity, post-await, optimistic, platform path, urgent action) in its top-of-file comment. |
 | Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
@@ -1595,6 +1642,12 @@ question 27):
   pluralisation and state; returning `null` announces nothing.
 - The library ships **no locale mechanism** (no provider, no `lang` detection): localisation is
   the consumer passing the function, and the docs show the one-liner next to every example.
+- Toast (#54) adds two: the announcement default (the `textContent` of `Toast.Title` and
+  `Toast.Description`, a function of the toast, overridable through `announce(toast)` per toast
+  or per Viewport, `null` for silence) and the region's accessible name `"Notifications (F8)"`
+  (following `hotkey`). The name is **static**, so its override is the ordinary `aria-label`
+  pass-through rather than a function prop: the function form exists for strings that depend on
+  state, and a label with no state would only add a prop.
 
 ---
 
@@ -1728,6 +1781,19 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     4.1); the hidden-input pattern in 3.5 and 3.8 rule 6 has no `defaultValue` mirror (the
     reset target is computed in JS; a text input's mirror is written in the `reset` event
     through `useFormReset`'s `onResetEvent`).
+
+28. **Toast (#54)** accepted 2026-10-18 (`design/components/toast.md`), all nine product-owner
+    questions as recommended (module-level `toast` singleton with `createToastManager` for
+    isolation; `"timeout"` in `ChangeReason` and `Toast.Close` as `"dismiss"`; action toasts
+    persistent by default; swipe deferred; focusable `dialog` / `alertdialog` Roots; F8; foreign
+    modal dialogs undetected in v1; the library-owned Suspense guard; `limit` 3 with queueing),
+    with one amendment: a `toast()` call on the server is a no-op with a dev warning and is
+    never buffered (the module-level manager would share a queue between requests). The
+    conventions changes it asked for (the function export in 1.1 and 9.3, `"timeout"` and the
+    "part that carries a decision" wording in 2.2, the urgent-by-design queue in 2.6, the Toast
+    region row and the module-level registry in 3.5, the `pending` / `ending` / `paused` /
+    `type` rows in 4.1, the third no-`transition` category in 5.1 and the Toast row in 5.3, the
+    Suspense guard in 6, the Lanes row in 10.1, the two strings in 11) are applied.
 
 ## Open questions
 

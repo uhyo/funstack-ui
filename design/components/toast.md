@@ -46,7 +46,7 @@ hiding the stack.
 | 11 | Stacking | `limit` (default 3) visible toasts; further toasts queue in order and show as earlier ones leave (never dropped). The DOM order is chronological; visual order is CSS. |
 | 12 | Animation | Enter with `@starting-style` (CSS), exit with `data-ending` on the Root held until its `getAnimations()` finish (`useExitAnimation`), no `<ViewTransition>` and **no `transition` prop on any part**: every Toast commit is on the urgent lane, where react-dom never starts a view transition (conventions 5.1, third no-`transition` category). |
 | 13 | Suspense guard | `Toast.Root` wraps its children in a `<Suspense>` whose fallback renders nothing visible: a toast whose content suspends shows an empty toast (consumers add their own skeleton boundary) instead of pulling the whole Viewport, which lives in an urgent commit, into the nearest consumer boundary. The toast's timer and announcement wait for the reveal, which commits while unrelated actions are pending (retry lane; probe). The one deliberate exception to "the library never wraps children in `<Suspense>`" (conventions 6, feedback 6). |
-| 14 | SSR and directives | Client-only behaviour: the Viewport server-renders the empty region (`popover` serialises; no hydration issue), `toast()` calls before the Viewport mounts are buffered. No JS-free mode (a toast cannot exist without JS). Every part file is `"use client"`; `toast.ts` (the manager) has no directive and no React import. |
+| 14 | SSR and directives | Client-only behaviour: the Viewport server-renders the empty region (`popover` serialises; no hydration issue), on the client, `toast()` calls before the Viewport mounts are buffered; on the server (`typeof document === "undefined"`) a call is a **no-op with a dev warning, never buffered** (the module-level manager would otherwise hold a queue shared between requests). No JS-free mode (a toast cannot exist without JS). Every part file is `"use client"`; `toast.ts` (the manager) has no directive and no React import. |
 
 ---
 
@@ -771,8 +771,9 @@ It is not set while content is merely suspended (that is the guard's job, and no
   state, so a consumer map renders nothing). The `popover` attribute serialises; the region is
   `display: none` until `showPopover()`. No `use(browser())`, no Suspense requirement.
 - **Hydration**: the Viewport subscribes to the manager in an effect and drains the buffer of
-  `toast()` calls made before it mounted (a Server Function result handled during hydration, a
-  store firing early). Order preserved.
+  `toast()` calls made **on the client** before it mounted (a Server Function result handled
+  during hydration, a store firing early). Order preserved. The buffer is client-only (next
+  bullet).
 - **Server Components**: `<Toast.Viewport>` needs a function child, so it is rendered from a
   Client Component file (`notifications.tsx`) that a Server Component layout renders. `toast()`
   is client code; a Server Function returns data and the client calls `toast()` with it (section
@@ -780,8 +781,11 @@ It is not set while content is merely suspended (that is the guard's job, and no
 - **Directives**: every part file is `"use client"` (hooks, DOM). `toast.ts` (the manager and
   `createToastManager`) and `internal/modal-registry.ts` carry none: no React, no DOM API beyond
   `queueMicrotask`, so a Server Component may import `toast` for its type without a client
-  reference, though calling it there is meaningless (the server has no viewport; a dev warning
-  when `typeof document === "undefined"`).
+  reference. **A `toast()` call on the server is a no-op with a dev warning and is never
+  buffered** (product-owner amendment): the default manager is module-level, so a server-side
+  buffer would be a queue shared between requests, leaking memory and one user's data to
+  another. Every manager method checks `typeof document === "undefined"` first; the pre-mount
+  buffer exists on the client only.
 - **JS-free**: none. A notification that must exist before hydration is `<p role="status">` in the
   consumer's markup.
 
@@ -1013,7 +1017,7 @@ rule (no controlled state; the queue is not an `x` / `defaultX` triple), optimis
 | Announcements | `document.ariaNotify` stubbed: called after the add commit (not synchronously in the click), with Title + Description text and `{ priority }`; `announce` option and prop override, `null` silences; two adds in one tick → one call with both texts and the higher priority; `update` with unchanged text → no call; dismissal → no call; absent `ariaNotify` → no throw. |
 | Exit | On close the Root stays with `data-ending` and `inert`; dropped in the same effect in jsdom (no animations); the region's `hidePopover` shim is called when the last item is dropped; `ending` items keep their position. |
 | Function props and `render` | `className` / `style` / `children` / `render` on Viewport, Root, Action, Close receive the documented state; `render={<article />}` keeps the handlers and forwards `ref`. |
-| Manager | `createToastManager()` isolation (two Viewports, two managers, no cross-talk); a second Viewport on the default manager warns and renders nothing; `toast()` before any Viewport is buffered and rendered on mount, once under StrictMode. |
+| Manager | `createToastManager()` isolation (two Viewports, two managers, no cross-talk); a second Viewport on the default manager warns and renders nothing; `toast()` before any Viewport is buffered and rendered on mount, once under StrictMode; with `document` undefined (a `// @vitest-environment node` row or a deleted global) every method is a no-op that warns once and leaves the buffer empty. |
 | Modal registry | With the Dialog shim: a modal `Dialog` open → the region is a descendant of the `<dialog>` and `showPopover` was called again; on close → back inline and shown again; a Viewport rendered inside a Dialog warns. |
 | Directive | Every part file starts with `"use client"`; `toast.ts` and `internal/modal-registry.ts` do not. |
 
@@ -1063,9 +1067,10 @@ packages/ui/src/internal/
 
 - **Manager.** `createToastManager()` returns a callable (`Object.assign(add, { add, promise,
   update, dismiss })`) over `{ listener: Dispatcher | null, buffer: Command[], nextId }`. Every
-  method builds a command (`{ kind: "add" | "update" | "dismiss", … }`) and calls
-  `queueMicrotask(() => flush())`; `flush` hands the batch to the listener or appends to the
-  buffer. `subscribe(dispatcher)` from the Viewport's effect sets the listener, drains the
+  method first returns (no-op, dev warning) when `typeof document === "undefined"`, so a server
+  never buffers; otherwise it builds a command (`{ kind: "add" | "update" | "dismiss", … }`) and
+  calls `queueMicrotask(() => flush())`; `flush` hands the batch to the listener or appends to
+  the client-only buffer. `subscribe(dispatcher)` from the Viewport's effect sets the listener, drains the
   buffer, and returns an unsubscribe; a second subscriber is the dev-warning case. Ids are
   `"fsui-toast-" + n` per manager. `promise` wraps: `const id = add(pending)`, then
   `promise.then(v => update(id, resolve(success, v)) or dismiss(id), e => update(id,
