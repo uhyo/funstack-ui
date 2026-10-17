@@ -11,10 +11,10 @@ metadata:
 
 # Release FUNSTACK Skill
 
-Creating a GitHub release is the whole release: the `release: created` event triggers two workflows.
+Creating a GitHub release is the whole release: the `release: created` event triggers the npm publish workflow.
 
 - `.github/workflows/publish.yml` builds `@funstack/ui` and publishes it to npm (trusted publishing). A prerelease version such as `0.1.0-alpha.0` is published under the matching dist-tag (`alpha`); other versions go to `latest`.
-- `.github/workflows/deploy-docs.yml` builds `packages/docs` and deploys it to Cloudflare Workers at https://ui.funstack.work.
+- The docs site (https://ui.funstack.work) is deployed by Cloudflare's Git integration, not by a GitHub workflow.
 
 Do not run `npm publish` or `wrangler deploy` locally.
 
