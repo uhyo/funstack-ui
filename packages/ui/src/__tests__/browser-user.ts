@@ -18,6 +18,11 @@ export const user = {
     act(async () => {
       await userEvent.keyboard(text);
     }),
+  /** Selects the field's text and deletes it (`userEvent.clear`). */
+  clear: (element: Element) =>
+    act(async () => {
+      await userEvent.clear(element);
+    }),
   /** Tab (or Shift+Tab with `{ shift: true }`) through the real focus order. */
   tab: (options?: { shift?: boolean }) =>
     act(async () => {
