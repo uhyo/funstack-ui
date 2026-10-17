@@ -28,3 +28,15 @@ Slider findings:
   instead (ax_object.cc kAriaValueText).
 - WebKit standards-positions summary.json shows #464 interestfor position None (oppose withdrawn);
   chromestatus still says "Negative" - stale.
+
+Field/Form findings:
+- React auto-resets after a "successful" useActionState even with returned errors; :user-invalid
+  cleared by reset. onSubmit+preventDefault+startTransition(dispatch) avoids reset and still
+  sets useFormStatus (react-dom submit plugin path with action null).
+- Chromium AX: valueMissing never `invalid`; customError/typeMismatch `invalid` immediately;
+  aria-invalid overrides both ways.
+- vitest browser runs in Firefox: some real-click submits silently did nothing depending on test
+  order (F2, F7 in react-form run). Re-verify surprising Firefox results in isolation or plain
+  Playwright before writing them up.
+- React 19.3.0 CHANGELOG form items: onReset on auto reset (#35176), submitter (#35590, #29028).
+- Re-check: aria-errormessage in VoiceOver macOS; React #29034 / PR #36334 (autoReset).

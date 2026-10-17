@@ -1,0 +1,8 @@
+[chromium] fill-both events ["click","submit"] calls ["uncontrolled"] u 
+[chromium] fill-uncontrolled-only events ["click","submit"] calls ["uncontrolled"] u 
+[chromium] no-fill events ["click","submit"] calls [""] u 
+[chromium] fill-controlled-only events ["click","submit"] calls [""] u 
+[firefox] fill-both events ["click","submit"] calls ["uncontrolled"] u 
+[firefox] fill-uncontrolled-only events ["click","submit"] calls ["uncontrolled"] u 
+[firefox] no-fill events ["click","submit"] calls [""] u 
+[firefox] fill-controlled-only events ["click","submit"] calls [""] u 

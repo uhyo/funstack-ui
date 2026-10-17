@@ -1,0 +1,12 @@
+chromium 156.0.8078.4
+Required untouched                                   {"invalid":"false","required":true}
+Required typed+cleared                               {"invalid":"false","required":true}
+Custom validity                                      {"invalid":"true","required":false}
+aria-invalid only                                    {"invalid":"true","required":false}
+valid but aria-invalid=false on required empty       {"invalid":"false","required":true}
+describedby                                          {"invalid":"true","required":false,"description":"Use 8+ chars. Too short."}
+errormessage                                         {"invalid":"true","required":false,"errormessage":"gerr"}
+email typeMismatch                                   {"invalid":"true","required":false}
+typeMismatch + aria-invalid=false                    {"invalid":"false","required":false}
+required empty + aria-invalid=true                   {"invalid":"true","required":true}
+pseudo-classes a:-/I b:UI/I c:-/I d:-/- e:-/I f:-/- g:-/- h:-/I i:-/I j:-/I

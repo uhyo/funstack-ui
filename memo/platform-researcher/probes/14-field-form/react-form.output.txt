@@ -1,0 +1,42 @@
+[chromium] F1 :user-invalid before submit false validationMessage Please fill out this field.
+[chromium] F1 after click submit: action calls [] invalid events ["invalid"] focus q1 :user-invalid true
+[chromium] F1 form action attribute javascript:throw new Error('A React form was unexpectedly su
+[chromium] F2 canceled invalid: action calls 0 focus b2 :user-invalid true
+[chromium] F3 noValidate click: calls ["novalidate:"] :user-invalid false
+[chromium] F3 requestSubmit() on invalid form: calls [] invalid events ["invalid"] focus q3b
+[chromium] F3 requestSubmit() on valid form: calls ["rs:ok"]
+[chromium] F3 checkValidity fires invalid? [false,1]
+[chromium] F4 pending: useFormStatus pending:taken | in portal pending:taken | isPending true | input value during pending taken
+[chromium] F4 after error result: input value "" | valid false customError true | :user-invalid false | error shown Name is taken
+[chromium] F4 after typing again: valid true :user-invalid false
+[chromium] F4 after success: input value "" :user-invalid false error null
+[chromium] F5 after typing (custom validity not cleared): valid false msg Server says no
+[chromium] F5 submit blocked? calls 0 :user-invalid true
+[chromium] F6 after typing+clearing+blur: :user-invalid true
+[chromium] F6 after reset: :user-invalid false
+[chromium] F7 action calls ["uncontrolled"]
+[chromium] F7 after successful action: controlled "controlled" uncontrolled ""
+[chromium] F8a defaultValue={state.q} after action: "kept"
+[chromium] F8b onSubmit+dispatch while pending: isPending true useFormStatus pending:kept
+[chromium] F8b onSubmit+dispatch after action: "kept"
+[firefox] F1 :user-invalid before submit false validationMessage Please fill out this field.
+[firefox] F1 after click submit: action calls [] invalid events ["invalid"] focus q1 :user-invalid true
+[firefox] F1 form action attribute javascript:throw new Error('A React form was unexpectedly su
+[firefox] F2 canceled invalid: action calls 0 focus other :user-invalid false
+[firefox] F3 noValidate click: calls ["novalidate:"] :user-invalid false
+[firefox] F3 requestSubmit() on invalid form: calls [] invalid events ["invalid"] focus q3b
+[firefox] F3 requestSubmit() on valid form: calls ["rs:ok"]
+[firefox] F3 checkValidity fires invalid? [false,1]
+[firefox] F4 pending: useFormStatus pending:taken | in portal pending:taken | isPending true | input value during pending taken
+[firefox] F4 after error result: input value "" | valid false customError true | :user-invalid false | error shown Name is taken
+[firefox] F4 after typing again: valid true :user-invalid false
+[firefox] F4 after success: input value "" :user-invalid false error null
+[firefox] F5 after typing (custom validity not cleared): valid false msg Server says no
+[firefox] F5 submit blocked? calls 0 :user-invalid true
+[firefox] F6 after typing+clearing+blur: :user-invalid true
+[firefox] F6 after reset: :user-invalid false
+[firefox] F7 action calls []
+[firefox] F7 after successful action: controlled "controlled" uncontrolled "uncontrolled"
+[firefox] F8a defaultValue={state.q} after action: "kept"
+[firefox] F8b onSubmit+dispatch while pending: isPending true useFormStatus pending:kept
+[firefox] F8b onSubmit+dispatch after action: "kept"

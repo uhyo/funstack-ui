@@ -1,0 +1,2 @@
+chromium 156.0.8078.4 {"q_canceled":true,"r_notCanceled":true,"focus":"r"} {"onlyCanceledField_userInvalid":true,"focus":"b"}
+firefox 157.0 {"q_canceled":true,"r_notCanceled":true,"focus":"r"} {"onlyCanceledField_userInvalid":true,"focus":"b"}

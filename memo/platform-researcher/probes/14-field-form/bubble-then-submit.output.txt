@@ -1,0 +1,2 @@
+chromium 156.0.8078.4 {"submitsAfterFirstClickRightAfterBubble":1,"afterSecondClick":2,"afterWaiting6s":3}
+firefox 157.0 {"submitsAfterFirstClickRightAfterBubble":1,"afterSecondClick":2,"afterWaiting6s":3}
