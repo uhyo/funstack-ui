@@ -1,0 +1,163 @@
+.cb-demo {
+  --cb-accent: #2563eb;
+  --cb-accent-weak: #dbeafe;
+}
+
+.cb-label {
+  display: block;
+  margin-block-end: 0.25em;
+  font-weight: 600;
+}
+
+.cb-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid GrayText;
+  border-radius: 6px;
+  padding-inline-end: 2px;
+}
+.cb-field:focus-within {
+  outline: 2px solid var(--cb-accent);
+  outline-offset: 1px;
+}
+
+.cb-input {
+  border: 0;
+  outline: none;
+  padding: 0.4em 0.6em;
+  font: inherit;
+  min-inline-size: 14em;
+  background: transparent;
+}
+.cb-input[data-pending] {
+  cursor: progress;
+}
+
+.cb-icon-button {
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.2em 0.4em;
+}
+/* Nothing to clear: hide the Clear button. */
+.cb-field:has(.cb-input:placeholder-shown) .cb-icon-button[aria-label="Clear"] {
+  visibility: hidden;
+}
+
+.cb-popup {
+  margin: 0;
+  inset: auto;
+  max-block-size: 16rem;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: Canvas;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.2);
+  opacity: 0;
+  translate: 0 -4px;
+  transition:
+    opacity 120ms,
+    translate 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+.cb-popup:popover-open {
+  opacity: 1;
+  translate: 0 0;
+}
+@starting-style {
+  .cb-popup:popover-open {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+.cb-list[data-stale] {
+  opacity: 0.55;
+  transition: opacity 150ms 100ms;
+}
+
+.cb-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: default;
+}
+.cb-option[data-active] {
+  background: var(--cb-accent-weak);
+}
+.cb-option[data-selected]::after {
+  content: "✓";
+  color: var(--cb-accent);
+}
+.cb-option[data-pending] {
+  cursor: progress;
+}
+
+.cb-status {
+  padding: 6px 10px;
+  color: GrayText;
+}
+
+.cb-spinner {
+  inline-size: 0.8em;
+  block-size: 0.8em;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: cb-spin 700ms linear infinite;
+}
+@keyframes cb-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.cb-note {
+  color: GrayText;
+}
+.cb-toggle {
+  display: block;
+  margin-block-end: 0.5em;
+}
+.cb-error-box {
+  border: 1px solid crimson;
+  padding: 0.5em;
+}
+.cb-dialog {
+  padding: 1em 1.5em;
+}
+
+::view-transition-old(.cb-pop) {
+  animation: 120ms ease-in both cb-pop-out;
+}
+::view-transition-new(.cb-pop) {
+  animation: 120ms ease-out both cb-pop-in;
+}
+@keyframes cb-pop-out {
+  to {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@keyframes cb-pop-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-popup {
+    transition: none;
+  }
+  .cb-spinner {
+    animation: none;
+  }
+}

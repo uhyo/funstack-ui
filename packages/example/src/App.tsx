@@ -9,6 +9,7 @@ import { MenuDemo } from "./menu-demo";
 import { RadioGroupDemo } from "./radio-group-demo";
 import { CheckboxGroupDemo } from "./checkbox-group-demo";
 import { SelectDemo } from "./select-demo";
+import { ComboboxDemo } from "./combobox-demo";
 
 export function App() {
   return (
@@ -29,6 +30,7 @@ export function App() {
       <RadioGroupDemo />
       <CheckboxGroupDemo />
       <SelectDemo />
+      <ComboboxDemo />
     </main>
   );
 }
