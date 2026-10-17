@@ -66,3 +66,15 @@ not the selected tab (APG says the selected one). Probe results: `tablist inline
 "Tabs.List experimental_focusgroup" asserts the native path by `defaultPrevented === false` at a
 document keydown listener (JS path prevents). design/components/tabs.md and conventions.md section
 8 still describe roving tabindex unchanged on the native path; reported, not edited.
+
+## Combobox (2026-10-17, #50)
+
+- Implicit form submission on Enter: Firefox 157 submits before React's scheduled flush of a
+  `useOptimistic` update made in the keydown (Chromium 156 after). Anything the key's default
+  action must see has to be flushed with `flushSync` in the handler.
+- Logical `position-area` keywords on a top-layer popover resolve against the root's direction:
+  `dir="rtl"` on a container does not flip them in Chromium; Firefox misplaces. Page-level RTL is
+  fine in both. Details in combobox.md.
+- Escape hides an auto popover synchronously but its `toggle` is a task: key handlers that run
+  in between must read `:popover-open`, not the library's intended state.
+- Firefox keeps keyboard focus in a removed iframe; restore `window.focus()` after iframe rows.
