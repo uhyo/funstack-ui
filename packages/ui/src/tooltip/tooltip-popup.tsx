@@ -1,5 +1,6 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -44,22 +45,6 @@ export interface TooltipPopupProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, TooltipPopupState>;
 }
 
-const FALLBACKS = "flip-block, flip-inline, flip-block flip-inline";
-
-/** Design section 7.1: the `position-area` for each side and alignment. */
-function positionArea(side: TooltipSide, align: TooltipAlign): string {
-  if (align === "center") return side;
-  const vertical = side === "top" || side === "bottom";
-  const span = vertical
-    ? align === "start"
-      ? "span-right"
-      : "span-left"
-    : align === "start"
-      ? "span-bottom"
-      : "span-top";
-  return `${side} ${span}`;
-}
-
 /**
  * The tooltip content: a `div` with `popover` and `role="tooltip"`, shown in the top layer and
  * anchored to the trigger implicitly (`interestfor` or `showPopover({ source })`). Open state is
@@ -101,7 +86,7 @@ export function TooltipPopup({
         ? style
         : (s) => ({
             positionArea: positionArea(side, align),
-            positionTryFallbacks: FALLBACKS,
+            positionTryFallbacks: POSITION_TRY_FALLBACKS,
             ...resolveStateValue(style, s),
           }),
     children,
