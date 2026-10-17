@@ -1,0 +1,30 @@
+chromium supports base-select true
+chromium 1 opened {"value":"b","idx":2,"open":true,"active":"option[b]","sc":"<i>Bee</i>","log":""}
+chromium 1 after value=same while open {"value":"b","idx":2,"open":true,"active":"option[b]","sc":"<i>Bee</i>","log":""}
+chromium 1 after Escape {"value":"b","idx":2,"open":false,"active":"#s","sc":"<i>Bee</i>","log":"focus"}
+chromium 2 mutated while open {"value":"b","idx":2,"open":true,"active":"option[b]","sc":"<i>Bee</i>","log":""}
+chromium 2 refreshed while open {"value":"b","idx":2,"open":true,"active":"option[b]","sc":"<i>Bumblebee</i>","log":""}
+chromium 2 ArrowDown {"value":"b","idx":2,"open":true,"active":"option[c]","sc":"<i>Bumblebee</i>","log":""}
+chromium 2 Escape {"value":"b","idx":2,"open":false,"active":"#s","sc":"<i>Bumblebee</i>","log":"focus"}
+chromium 3 ArrowDown while open {"value":"b","idx":2,"open":true,"active":"option[c]","sc":"<i>Bee</i>","log":""}
+chromium 3 after value=same {"value":"b","idx":2,"open":true,"active":"option[c]","sc":"<i>Bee</i>","log":""}
+chromium 3 Enter {"value":"c","idx":3,"open":false,"active":"#s","sc":"C","log":"input,change,focus"}
+chromium 4 appended while open {"value":"b","idx":2,"open":true,"active":"option[b]","sc":"<i>Bee</i>","log":""}
+chromium 4 selected=true on new option while open {"value":"z","idx":4,"open":true,"active":"option[b]","sc":"Zed","log":""}
+chromium 4 Escape {"value":"z","idx":4,"open":false,"active":"#s","sc":"Zed","log":"focus"}
+chromium 5 selected=true on c (closed) {"value":"c","idx":3,"open":false,"active":"body[]","sc":"C","log":""}
+chromium 6 initial {"value":"b","idx":2,"open":false,"active":"body[]","sc":"<i>Bee</i>","log":""}
+chromium 6 a.defaultSelected=true (a non-dirty, b parser-selected) {"value":"a","idx":1,"open":false,"active":"body[]","sc":"A","log":""}
+chromium 6 b.selected=true (b now dirty) {"value":"b","idx":2,"open":false,"active":"body[]","sc":"<i>Bee</i>","log":""}
+chromium 6 c.defaultSelected=true, a.defaultSelected=false (b dirty) {"value":"c","idx":3,"open":false,"active":"body[]","sc":"C","log":""}
+chromium 6 b.defaultSelected=false (b dirty, selected) {"value":"c","idx":3,"open":false,"active":"body[]","sc":"C","log":""}
+chromium 6 form.reset() -> expect c {"value":"c","idx":3,"open":false,"active":"body[]","sc":"C","log":""}
+chromium 6 a.selected=true then a.defaultSelected=true {"value":"a","idx":1,"open":false,"active":"body[]","sc":"A","log":""}
+chromium 6 a.defaultSelected=false while a dirty+selected (should stay a) {"value":"a","idx":1,"open":false,"active":"body[]","sc":"A","log":""}
+chromium 7 value=nope {"value":"","idx":-1,"open":false,"active":"body[]","sc":"","log":""}
+chromium 7 value=same ('') {"value":"","idx":0,"open":false,"active":"body[]","sc":"Choose","log":""}
+chromium 8 observer {"afterTextMutation":["childList@I<OPTION"],"afterRefresh":["childList@SELECTEDCONTENT<BUTTON"],"afterOptionAttr":["attributes@OPTION<SELECT"],"sc":"<i>Buzz</i>"}
+chromium 9 ArrowDown on focused closed select {"value":"b","idx":2,"open":true,"active":"option[b]","sc":"<i>Bee</i>","log":"focus,blur"}
+chromium 10 replaced selected option while open {"value":"","idx":0,"open":true,"active":"body[]","sc":"Choose","log":""}
+chromium 10 re-applied selected=true {"value":"b","idx":2,"open":true,"active":"body[]","sc":"<i>Bee 2</i>","log":""}
+webkit cannot launch: browserType.launch: 
