@@ -6,7 +6,8 @@ the ViewTransition correction in 5.1, the pending-is-never-disabled rule in 3.6,
 Function note in 2.4; amended 2026-10-17 after the CheckboxGroup design, #33, see resolved
 question 20; amended 2026-10-17 with the Popover design, #38: the top-layer rule in 3.5 and 5.1,
 and the `focusGroup` detection in 8, issue #43; Popover and Menu accepted the same day, see
-resolved questions 24 and 25). Binding for every component design in
+resolved questions 24 and 25; amended 2026-10-17 with the Select design, #50, see resolved
+question 26). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -73,6 +74,8 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Indicator` | Purely visual element that tracks state (active tab marker). | `span` |
 | `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child. | `label` / `legend` |
 | `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its checked/mixed state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
+| `Option` | One choice in a native `<select>` (Select). Renders optimistic `data-selected`, equal to the platform's `:checked`. | `option` |
+| `Value` | The element the browser fills with the selected option's content (Select). It has **no `children` prop**: the parser and the browser write its content, so the part renders it with the hydration pattern of section 7.4. | `selectedcontent` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
 | `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role). | as named |
@@ -109,7 +112,10 @@ Rules for the element passed to `render` (same as Base UI):
 - A part whose default element is a **native input** (`Checkbox`, `Switch`, `RadioGroup.Item`)
   must stay an `<input>` of the same `type`, and a group Root that is a `<fieldset>`
   (`RadioGroup.Root`) must stay a `<fieldset>` (legend naming, `disabled` inheritance and
-  `.form` depend on it): `render` may substitute a styled element or a wrapper component that
+  `.form` depend on it), and Select's parts must keep their native elements (`Root` a
+  `<select>`, `Trigger` a `<button>`, `Value` a `<selectedcontent>`, `Option` an `<option>`,
+  `Group` an `<optgroup>`; the parser, the picker and `<selectedcontent>` cloning key on the
+  element): `render` may substitute a styled element or a wrapper component that
   renders one, never a `<button>` or `<div>`. The shared hook warns in development when the
   mounted node has the wrong tag or `type`. The input is a void element, so it
   has no children; visual indicators are **sibling parts** (`Indicator`) that receive the same
@@ -542,6 +548,13 @@ Every controllable state `x` of type `T` comes as a triple:
 "None selected" is `null`, never `undefined`, so that `undefined` always means uncontrolled.
 Switching between modes after mount is unsupported (dev warning).
 
+One accepted exception (Select, #50): `Select.Root`'s `value` is `string`, with `""` for the
+placeholder option. A single `<select>` has no empty state other than an option (`select.value`
+is always a string) and `""` is what `required` validates against, so `null` would be a second
+spelling of the same DOM state. With neither `value` nor `defaultValue` the Select adopts the
+browser's own default (the first enabled option) at mount without a dispatch and without a
+warning (`design/components/select.md` 5).
+
 `defaultX` is read once for the initial value. **Native form controls additionally use the latest
 `defaultX` as the form-reset target** in uncontrolled mode (the library mirrors it into
 `el.defaultChecked` after every commit, which is React's own rule for a plain uncontrolled
@@ -725,7 +738,7 @@ can delay or roll it back. The boundary:
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
 | Server Components | Only through Server Functions as actions | Uncontrolled form needs no behaviour JS; the part may still be a client module (section 7.3) |
-| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event | n/a |
+| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event; **late-mounting options** in a `<select>` (Select) are never selected by React (`updateOptions` runs only in the select's own commit), so the Root re-applies the intended option when an Option reports its mount: an option that **hydrated** is reconciled first (a user may have picked it before hydration) and one React **created** is only re-applied (the browser's automatic first-option selection on insertion is not an intent), told apart by `useSyncExternalStore`'s server snapshot; and a platform dispatch on a `<select>` requires the **intended option to exist in the DOM**, so a value whose option is still loading is never "reconciled" to the fallback | n/a |
 
 Rules:
 
@@ -817,9 +830,10 @@ This is the one contract both designs implement (reconciled 2026-10-16 from
 
 | Hook | Called by | Does |
 | --- | --- | --- |
-| `useFormReset(ref, onReset)` (`internal/use-form-reset.ts`) | the other two | **Stable** `reset` subscription on the form owner (`ref.current.form`; the element may be an `<input>` or a `<fieldset>`, both form-associated and honouring `form=`). Re-reads the owner after every commit but re-subscribes only when it changed; the handler body is a `useEffectEvent`. On `reset` it queues a microtask and, unless `event.defaultPrevented`, calls `onReset(event)`. |
+| `useFormReset(ref, onReset)` (`internal/use-form-reset.ts`) | the other two | **Stable** `reset` subscription on the form owner (`ref.current.form`; the element may be an `<input>`, a `<select>` or a `<fieldset>`, both form-associated and honouring `form=`). Re-reads the owner after every commit but re-subscribes only when it changed; the handler body is a `useEffectEvent`. On `reset` it queues a microtask and, unless `event.defaultPrevented`, calls `onReset(event)`. |
 | `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies, in this order, `defaultChecked` (if given), then `checked` (optimistic), then `indeterminate` (if given). The order matters in exactly one case: react-dom's `updateInput` writes `el.checked` on every update of the input (setting the dirty-checkedness flag), and React's automatic form reset runs in the form's mutation effects, after the inputs' updates and before layout effects; after that reset the dirty flag is clear, so writing `defaultChecked` (the `checked` content attribute) would move `checked` too, and writing `checked` afterwards settles it. `indeterminate` is independent of both; and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
 | `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns a stable `{ onItemMounted }`, which the Root passes down through context and `group: true` items call from their mount layout effect (`useNativeChecked` takes `onItemMounted` and `component` options). The adapter **ignores calls made before its own mount reconciliation has run** (members rendered in the Root's commit run their effects first, so they are covered by that reconciliation; the flag is reset in the effect cleanup so StrictMode's re-run behaves the same); any later call queues **one microtask per commit** that compares `readCurrent()` with `base()` and dispatches `"platform"` with `event: undefined`. Comparison is `equals` (option, default `Object.is`); a group with a set value (`CheckboxGroup.Root`) passes set equality, because two sets are never `Object.is`-equal. |
+| `useNativeSelectValue(options)` (`internal/use-native-select-value.ts`) | `Select.Root` with its `<select>` ref | The select analogue of `useNativeChecked`, built on `useNativeGroupReconciliation`. After every commit, and for each late Option's mount report, it mirrors the reset target into `option.defaultSelected` (uncontrolled: the latest `defaultValue`, nothing when absent; controlled: the Root's mount-time value; react-dom writes `defaultSelected` only for an uncontrolled `defaultValue`) **and then** re-applies the intended option's `selected`, in that order in one synchronous step, because `defaultSelected = true` on an option the user or script never selected moves the selection. Mount reconciliation reads `select.value`; the reset path reads the spec's reset result (the last `defaultSelected` option, else the first enabled option, else `""`); both dispatch once per Select and only when the intended option exists. With neither `value` nor `defaultValue` the uncontrolled value is **adopted** from the browser's choice without a dispatch (`adopt(next)` on `useControllableAction`, uncontrolled only). |
 
 Rules the three hooks implement, which component docs may cite instead of restating:
 
@@ -910,8 +924,8 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `pending` | boolean | owner + initiating trigger | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). |
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
-| `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
+| `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`) | Optimistic selection on triggers; committed on panels. |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
@@ -1021,7 +1035,9 @@ happens outside any React transition and animates with `@starting-style` and
 `transition-behavior: allow-discrete` in CSS. "Every animatable part has `transition`" means every
 part whose mount, unmount or **committed** library state. A part whose only library-driven
 change is an optimistic flip that never animates (Menu's items, whose `aria-checked` lands in a
-sync render and whose settle shows nothing) has no `transition` prop; Toggle keeps its own
+sync render and whose settle shows nothing; every Select part, since the picker is a UA
+pseudo-element, `<selectedcontent>` is written by the browser and every library attribute is
+optimistic) has no `transition` prop; Toggle keeps its own
 because its element's content can change with the settled action.
 
 **Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
@@ -1105,6 +1121,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | CheckboxGroup | `fsui-checkbox-group`, `fsui-checkbox-group-check` (when `details.added` is non-empty), `fsui-checkbox-group-uncheck` (when `details.removed` is non-empty; a reset may carry both) |
 | Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
 | Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
+| Select | `fsui-select` (no direction variants) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1273,10 +1290,11 @@ notes"):
 | Gap | Convention |
 | --- | --- |
 | Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). |
-| Attribute untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. Mechanism verified by the reviewer: tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
+| Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. Mechanism verified by the reviewer: tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
+| Element whose children the **parser writes before hydration** (`<selectedcontent>`: Chromium and Safari clone the selected option's children into it at parse time, so a plain element fails hydration and client-renders the whole root) | Render it with `suppressHydrationWarning` and `dangerouslySetInnerHTML={{ __html: "" }}`, so React treats the children as opaque and the attribute mismatch is silenced (verified in `docs/research/select-combobox.md` §4: hydrates with no recoverable error, later browser writes keep working); the part has no `children` prop. One such element per component at most, named in its design doc (`Select.Value`). |
 | Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
 | ARIA state the platform changes for browser-owned state and assistive technology needs explicitly (`aria-expanded` on a Popover Trigger in JS-free mode, where no React state exists) | Render the initial value and keep it current with a DOM write from the platform event through the ref (`toggle`, reading `:popover-open`), never React state. The attribute is owned, so React's value for it never changes in that mode and the DOM write is never overwritten. One attribute per component at most, named in its design doc. |
 
@@ -1320,7 +1338,7 @@ a flag (`docs/vision.md`). Mechanism:
    | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup`, `Menu.Popup experimental_focusgroup` (renders `focusgroup="menu wrap\|nowrap"`; items render no `tabindex` on the native path; typeahead, activation, submenu keys and Tab stay JS) | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex` (#43). |
    | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
    | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute; camelCase like `experimental_interestFor`) | Native light dismiss instead of JS. |
-   | Customizable `<select>` | Gecko (pref) | `Select.Root experimental_baseAppearance` | `appearance: base-select` markup; degrades to the native picker elsewhere. |
+   | Customizable `<select>` | Gecko (pref) | **none** (withdrawn 2026-10-17, Select design #50) | The markup (`<button>` + `<selectedcontent>`, rich options, `<legend>` in `<optgroup>`) is parsed everywhere and degrades to the native select; the opt-in is the consumer's CSS (`appearance: base-select`), so no library flag exists. |
    | `<input type="checkbox" switch>` | Blink (proposed), Gecko | `Switch experimental_switch` (future; not added while WebKit-only) | Native switch rendering and semantics; `role="switch"` already gives the semantics everywhere. |
 
    Two flags with the same graduation path go on the same part as separate props, not one
@@ -1587,6 +1605,20 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     (`GroupLabel` / `Separator` / `Item` in 1.1, `useActionTrigger` in 3.4, the always-library
     configuration in 7.3, the committed-state wording in 5.1, the types in 5.3, the flag row in
     8, the `checked` and `open` rows in 4.1, the `"dismiss"` examples in 2.2) are applied.
+26. **Select (#50)** accepted 2026-10-17 (`design/components/select.md`), questions 1 to 3 and
+    5 to 8 as recommended and question 4 decided the other way: a real `<select>` rendering
+    `value={optimistic}` with no open state; `value: string` with `""` for the placeholder;
+    `Select.Value` as `<selectedcontent>` with the hydration workaround and an automatic
+    `MutationObserver` refresh (WebKit contingency recorded); late options re-applied with the
+    `useSyncExternalStore` hydration tell; the reset target mirrored into `defaultSelected`;
+    **no dev warning** with neither `value` nor `defaultValue`, the Select adopting the
+    browser's first-option default (native-first, RadioGroup precedent); no `transition` on any
+    part; `Group label` required with optional `GroupLabel`; the WebKit 302008 test row with a
+    consumer CSS mitigation; the `experimental_baseAppearance` flag row withdrawn. The
+    conventions changes it asked for (`Option` / `Value` in 1.1, the element rule in 1.2, the
+    `string` exception in 3.1, the late-option path in 3.5, `useNativeSelectValue` and
+    `HTMLSelectElement` in 3.8, the `selected` / `open` rows in 4.1, the no-transition note in
+    5.1, `fsui-select` in 5.3, the `selectedcontent` rows in 7.4, the flag row in 8) are applied.
 
 ## Open questions
 

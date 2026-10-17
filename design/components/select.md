@@ -1,6 +1,8 @@
 # Select
 
-Status: **proposed** (2026-10-17, wave 4, GitHub issue #50). Follows `design/conventions.md`
+Status: **accepted** (2026-10-17, GitHub issue #50; the product owner accepted questions 1 to 3
+and 5 to 8 as recommended and decided question 4 against the warning, see "Decisions recorded"
+at the end). Follows `design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
 `design/components/radio-group.md` first**: it defines the model for a library-owned value held
 in a controlled native form control (`value` / `defaultValue` / `valueChangeAction`, optimistic
@@ -35,7 +37,7 @@ with a `<select>` (hydrating `<selectedcontent>`, options that mount late, a sta
 | --- | --- | --- |
 | 1 | Element | `Select.Root` renders `<select>` (product-owner decision 1). There is **no open state**: no `open`, `defaultOpen`, `openChangeAction`, `data-open`, `Popup` part or `transition` for open/close. The picker is the UA's `::picker(select)` pseudo-element, opened and closed by the browser with no events (`select-combobox.md` §5); `:open` and `::picker(select)` are the styling hooks and are documented (section 7). A best-effort `data-open` from focus heuristics is rejected: it would be wrong in Chromium (focus moves to the option while open) and could not be promised anywhere. |
 | 2 | Anatomy | `Select.Root` (`select`), `Select.Trigger` (`button`, first child), `Select.Value` (`selectedcontent`), `Select.Option` (`option`), `Select.Group` (`optgroup`), `Select.GroupLabel` (`legend`), `Select.Separator` (`hr`). `Trigger` and `Value` are optional: without them an engine with customizable select renders its UA button with the selected option's text. `::picker-icon` and `::checkmark` are pseudo-elements, not parts. |
-| 3 | State | One library-owned state, `value: string`, as `value` / `defaultValue` / `valueChangeAction(next, details)`. The value is **always a string** and never `null`: a single `<select>` always has a value (`select.value` is a string), and "nothing chosen" is the HTML idiom of a first `<Select.Option value="">` placeholder, which is also what `required` rejects (section 5). `defaultValue` defaults to `""`; development warns when neither `value` nor `defaultValue` is given (Tabs precedent, conventions resolved question 15), because the browser then selects the first option while the library's state says `""`. |
+| 3 | State | One library-owned state, `value: string`, as `value` / `defaultValue` / `valueChangeAction(next, details)`. The value is **always a string** and never `null`: a single `<select>` always has a value (`select.value` is a string), and "nothing chosen" is the HTML idiom of a first `<Select.Option value="">` placeholder, which is also what `required` rejects (section 5). With neither `value` nor `defaultValue` the Select **follows the browser** (product-owner decision 4, native-first as RadioGroup): the initial value is the option the browser selects, the first enabled option (a first `value=""` placeholder counts), adopted silently at mount; **no dev warning** (section 5). |
 | 4 | Rendered DOM state | `Root` renders `value={optimistic}` (React problem 3). react-dom restores a controlled select's options to its props after every event (`restoreControlledSelectState` → `updateOptions`), and only the sync-lane optimistic update is flushed before that restore; a transition-only value snaps back, and `<selectedcontent>` with it, for the whole pending time (`select-combobox.md` §4, probe B). |
 | 5 | `Select.Value` | Renders `<selectedcontent suppressHydrationWarning dangerouslySetInnerHTML={{ __html: "" }} />` (product-owner decision 2, the verified workaround for React problem 1). The browser fills it; it has **no `children` prop**. It works before hydration and in a Server Component tree. |
 | 6 | Stale `<selectedcontent>` | **The library refreshes it automatically** (product-owner decision 3, my call): `Select.Value` observes the `<select>` subtree with a `MutationObserver` and, when a mutation lands inside the currently selected option, re-assigns `select.value = select.value`, which re-clones the option in Chromium and is spec-conformant for Safari. Verified cheap (one small clone per batch of mutations) and safe (no events, selection unchanged, the open picker and its focused option are untouched). Section 6.3 has the justification and the filter. |
@@ -185,7 +187,7 @@ export interface SelectRootProps
   > {
   /** Controlled value. `undefined` means uncontrolled. Use `""` for the placeholder option. */
   value?: string;
-  /** Initial value in uncontrolled mode. Defaults to `""` (the placeholder option, if any). */
+  /** Initial value in uncontrolled mode. When omitted, the browser's choice (the first enabled option) is adopted at mount. */
   defaultValue?: string;
   /**
    * Runs inside the Root's transition whenever the selected option changes. May be sync or
@@ -399,10 +401,19 @@ controlled mode (RadioGroup 9.5).
   post the browser's choice. This is a consumer error outside Suspense (section 6.2 covers the
   transient case); the library does not warn, because it cannot tell the two apart at commit
   time.
-- **Neither `value` nor `defaultValue`.** `defaultValue` defaults to `""`; development warns
-  once. Without a placeholder the browser selects the first option while the state is `""`,
-  and mount reconciliation would then dispatch that option with `reason: "platform"`; the
-  warning says to pass `defaultValue`.
+- **Neither `value` nor `defaultValue`: the browser's default.** Valid HTML selects its first
+  enabled option, so the Select does the same (product-owner decision 4; no warning, the
+  RadioGroup precedent). Until mount the state is `""`, so the server HTML carries no
+  `selected` attribute and the parser selects the first enabled option, exactly what React's
+  `updateOptions("")` does on a client mount. In the Root's mount layout effect the
+  uncontrolled value **adopts** the DOM's selection without a dispatch, and the mount
+  reconciliation compares the DOM against that implicit default (the first enabled option)
+  rather than against the not-yet-adopted `""`, so a pre-hydration pick of another option is
+  still dispatched with `reason: "platform"`. The same adoption runs when options mount later
+  while the state's option does not exist (the fallback-only case). No reset target is
+  mirrored, so `form.reset()` returns to the browser's own result, the first enabled option.
+  Adoption is a layout-effect state write flushed before paint (`adopt(next)` on
+  `useControllableAction`, uncontrolled mode only; it never calls the action).
 
 ## 6. The three React fixes
 
@@ -445,8 +456,9 @@ Facts the order relies on (Chromium probe, `memo/architect/select-notes.md`):
   improvement over RadioGroup's controlled-mode caveat: the mount-time value is the **Root's**,
   so an Option added later never becomes a second reset target.
 
-`resetTarget` is `defaultValue ?? ""` in uncontrolled mode (re-read every commit) and the value
-captured at the Root's mount in controlled mode.
+`resetTarget` is the latest `defaultValue` in uncontrolled mode (re-read every commit;
+`undefined` when the prop is absent, so nothing is mirrored and the browser's own reset result,
+the first enabled option, stands) and the value captured at the Root's mount in controlled mode.
 
 ### 6.2 Late-mounting options (React problem 2)
 
@@ -856,7 +868,7 @@ the browser row).
 | Platform: mount reconciliation | `renderToString` with `"a"` selected, set `select.value = "c"` before `hydrateRoot`: exactly one dispatch `("c", { reason: "platform", event: undefined })`; StrictMode still one; a controlled parent that refuses → DOM back on `"a"` after settle; **no dispatch** when the value matches no option (fallback-only DOM) at mount; a late hydrated option (Suspense boundary hydrating after the Root, DOM pick set before reveal) → one dispatch; a late created option → none. |
 | Platform: form reset | `form.reset()` → one dispatch `(resetTarget, { reason: "platform", event: Event("reset") })`; `<form action>` success auto-resets the same way; cancelled `reset` dispatches nothing; `Root disabled` still dispatches; reset whose target equals the optimistic value dispatches nothing; two synchronous resets while one is pending dispatch once (base rule). |
 | Reset target (6.1) | Uncontrolled: after `defaultValue` changes (in a transition), `form.reset()` returns the select to the new default and `defaultSelected` is on exactly that option; controlled client render: `defaultSelected` is on the mount-time option (react-dom alone would leave none), a reset returns to it and notifies the parent; an Option added later never gains `defaultSelected`. The mirror does not move the current selection (an option with a new default selected is re-applied in the same effect: assert `select.value` unchanged after the commit). |
-| Placeholder and `required` | `defaultValue=""` with a disabled placeholder selects it; `required` + `""` is `validity.valueMissing`; picking clears it; dev warning once when neither `value` nor `defaultValue` is given. |
+| Placeholder and `required` | `defaultValue=""` with a disabled placeholder selects it; `required` + `""` is `validity.valueMissing`; picking clears it. With neither `value` nor `defaultValue`: `state.value` and `data-selected` adopt the first enabled option after mount with **no dispatch** (and no warning); a pre-hydration pick of another option dispatches once with `"platform"`; options arriving later while the state's option is absent are adopted with no dispatch; `form.reset()` returns to the first enabled option. |
 | `details.event` is virtual | Toggle row 21 on a pick, `JSON.stringify(details) === '{"reason":"activate"}'`; a fake Server Function receives the same shape. |
 | Function props | `className` / `style` / `children` on Root, Trigger, Option receive the documented state (`selected` optimistic, per-Option `pending`); `Value` has no `children`; Group / GroupLabel / Separator render their elements. |
 | `render` element | `render={<select id />}` on Root, `<button>` on Trigger, `<option>` on Option keep the owned attributes and handlers, concatenate `className`, forward `ref`; dev warning for a wrong tag (`SELECT`, `BUTTON`, `SELECTEDCONTENT`, `OPTION`, `OPTGROUP`); dev warning when the Trigger is not the first child. |
@@ -917,8 +929,11 @@ packages/ui/src/internal/
 
 - `useControllableAction<string, SelectValueChangeDetails>({ controlled: value, defaultValue,
   initialValue: "", action: valueChangeAction, transitionTypes: () => transitionTypes("select"),
-  warn: { component: "Select.Root", prop: "value" } })`; `useDevWarning` once when both props
-  are `undefined` (decision 3).
+  warn: { component: "Select.Root", prop: "value" } })`. With neither prop given, the Root
+  calls `adopt(dom)` (a new uncontrolled-only method of the shared hook: writes the internal
+  value, no action, no optimistic step) from the mount layout effect, using the first enabled
+  option as the base of the mount reconciliation, and again on a late-option report whose
+  target option is absent (decision 3, section 5). No warning.
 - `onChange(e)`: `next = e.currentTarget.value`; return if `next === optimistic`; else
   `dispatch(next, createActionDetails(e.nativeEvent, { reason: "activate" }))`.
 - `useNativeSelectValue({ ref, target: () => { const f = latestInFlight(); return f === null ? optimistic : f.next; }, resetTarget, onPlatformChange: dispatchFromDom })` which wires
@@ -947,8 +962,9 @@ packages/ui/src/internal/
 ### 15.5 Dev warnings
 
 Wrong tag behind `render` (every part); Trigger not the first child; GroupLabel not the first
-child of its Group; a part outside a Root (throw, as Tabs); neither `value` nor `defaultValue`;
-the shared hook's controlled/uncontrolled warnings. Deliberately absent: a value matching no
+child of its Group; a part outside a Root (throw, as Tabs); the shared hook's
+controlled/uncontrolled warnings. Deliberately absent: neither `value` nor `defaultValue` (the
+browser's first-option default is valid HTML; product-owner decision 4); a value matching no
 option (transient under Suspense); `label` on an Option (documented, not policed).
 
 ### 15.6 Example app and docs site
@@ -958,7 +974,7 @@ Function-like action, an "options load late" variant and a "label changes while 
 with the opt-in CSS and a Firefox note. Docs page: the props tables from the declarations, the
 CSS recipes of section 7, the per-engine keyboard table, the Firefox column of section 11.
 
-## Conventions feedback (to apply on acceptance)
+## Conventions feedback (applied 2026-10-17)
 
 1. **1.1 part vocabulary**: add `Value` ("the element the browser fills with the selected
    option's content; `<selectedcontent>`; no `children`") and `Option` (`<option>` in Select).
@@ -971,7 +987,8 @@ CSS recipes of section 7, the per-engine keyboard table, the Firefox column of s
    tell)", and "a platform dispatch requires the intended option to exist".
 5. **3.8**: widen `FormAssociatedElement` with `HTMLSelectElement`; add `useNativeSelectValue`
    as the select analogue of `useNativeChecked` (mirror `defaultSelected` then re-apply, in that
-   order, because `defaultSelected` moves a non-dirty option's selection).
+   order, because `defaultSelected` moves a non-dirty option's selection); `adopt(next)` on
+   `useControllableAction` for the no-default case.
 6. **4.1**: `selected` row gains `Select.Option` (optimistic, equal to `:checked`); `open` row
    notes Select emits none (`:open` only).
 7. **5.1**: Select's parts have no `transition` (the Menu-items reasoning).
@@ -982,7 +999,7 @@ CSS recipes of section 7, the per-engine keyboard table, the Firefox column of s
 10. **8**: withdraw the `Select.Root experimental_baseAppearance` row: the markup is
     unconditional and the opt-in is consumer CSS (progressive enhancement, no flag).
 
-## Questions for the product owner
+## Questions for the product owner (resolved 2026-10-17, see below)
 
 1. **`value: string`, never `null`** (decision 3). Accept the deviation from conventions 3.1
    ("none selected is `null`"), on the grounds that a `<select>` has no empty state other than
@@ -1011,3 +1028,18 @@ CSS recipes of section 7, the per-engine keyboard table, the Firefox column of s
 7. **WebKit 302008 handling**: a dedicated WebKit row under a timeout, and a documented consumer
    CSS mitigation rather than any library CSS. Confirm (the Menu precedent).
 8. **Conventions change 10**: withdraw the `experimental_baseAppearance` flag row. Confirm.
+
+## Decisions recorded (product owner, 2026-10-17)
+
+1. `value: string`, never `null`: accepted (conventions 3.1 carries the exception).
+2. The `MutationObserver` refresh in `Select.Value`: accepted, with the WebKit contingency (defer
+   the refresh while `:open` if the first CI runs show the picker closing or losing focus).
+3. The per-Option `useSyncExternalStore` hydration tell: accepted. Correctness of a
+   pre-hydration pick wins over the simpler limitation.
+4. **No dev warning** when neither `value` nor `defaultValue` is given: a native select picks its
+   first option, which is valid HTML (native-first; follows RadioGroup). Applied: decision 3,
+   section 5, 6.1, 14.1, 15.2 and 15.5 now describe the adopted browser default.
+5. No `transition` prop on any part: accepted.
+6. `Group label` required, `GroupLabel` optional: accepted.
+7. WebKit 302008: the dedicated test row and the consumer CSS mitigation: accepted.
+8. The `experimental_baseAppearance` flag row withdrawn from conventions section 8: accepted.

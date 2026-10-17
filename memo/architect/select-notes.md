@@ -51,3 +51,16 @@ What it settled:
 
 Design written and committed as proposed; eight questions for the product owner at the end of
 the document; conventions changes listed under "Conventions feedback" to apply on acceptance.
+
+## Status, 2026-10-17 (later)
+
+Product owner accepted all questions as recommended except 4: **no dev warning** when neither
+`value` nor `defaultValue` is given (native-first; RadioGroup precedent). Applied as "the Select
+adopts the browser's first-option default": state is `""` until the Root's mount layout effect
+adopts the DOM selection through a new uncontrolled-only `adopt(next)` on
+`useControllableAction` (no action call), the mount reconciliation compares against that implicit
+default so a pre-hydration pick of another option still dispatches `"platform"`, the same adoption
+runs for late options when the state's option is absent, and no reset target is mirrored (reset
+returns to the browser's first enabled option). select.md marked accepted; the ten conventions
+changes applied (resolved question 26). The developer implements in parallel; the `adopt` method
+is the one shared-hook addition they need beyond the design's 15.x notes.
