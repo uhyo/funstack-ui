@@ -1195,3 +1195,5 @@ proceeds as recommended unless overridden.
    visible UI is shipped.
 9. **`limit` default 3 with queueing** (Base UI, React Aria) versus dropping the oldest (Sonner's
    `visibleToasts` hides, Radix shows all). Queueing never loses an Undo. Recommended.
+
+**Accepted by the product owner (2026-10-18):** all nine recommendations as written. One amendment: a `toast()` call on the server (`typeof document === "undefined"`) must be a no-op with a dev warning. It must **not** be buffered: the default manager is module-level, so on a server it would build up a queue shared between requests (leaking memory and data between users). The pre-mount buffer is for the client only.
