@@ -96,7 +96,7 @@ value is what the APG example implementations do and costs nothing.
 ## 3. Props and types
 
 Shared types come from `packages/ui/src/internal/types.ts` (conventions section 2.2 and 9.4).
-`TransitionProp` below is `ViewTransitionProps["default"]` from React (`ViewTransitionClass`).
+The `transition` prop is typed with React's own `ViewTransitionClass` (the type of `<ViewTransition default>`, imported from `react`), as on every animatable part.
 
 ### 3.1 `Tabs.Root`
 
@@ -200,7 +200,7 @@ export interface TabsTabProps
    * Forwarded to the Tab's `<ViewTransition default>`. Default "none". Fires only on the commit
    * that settles the action (or rolls it back), never on the optimistic click (section 10.1).
    */
-  transition?: TransitionProp;
+  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, TabsTabState>;
   style?: StateValue<CSSProperties | undefined, TabsTabState>;
   children?: StateValue<ReactNode, TabsTabState>;
@@ -236,7 +236,7 @@ export interface TabsPanelProps
    */
   keepMounted?: boolean | "until-found";
   /** Forwarded to the Panel's `<ViewTransition default>`. Default "none". */
-  transition?: TransitionProp;
+  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, TabsPanelState>;
   style?: StateValue<CSSProperties | undefined, TabsPanelState>;
   children?: StateValue<ReactNode, TabsPanelState>;

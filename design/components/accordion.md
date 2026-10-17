@@ -351,7 +351,7 @@ export interface AccordionItemProps
   defaultOpen?: boolean;
   disabled?: boolean;
   /** Library mode only. Forwarded to `<ViewTransition default>` around the details. */
-  transition?: ViewTransitionProps["default"];
+  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionItemState>;
   style?: StateValue<CSSProperties | undefined, AccordionItemState>;
   children?: StateValue<ReactNode, AccordionItemState>;
@@ -376,7 +376,7 @@ because `open` would read as controlled to a React developer.
 ```ts
 export interface AccordionTriggerProps
   extends Omit<ComponentPropsWithRef<"summary">, "onClick" | "className" | "style" | "children"> {
-  transition?: ViewTransitionProps["default"];
+  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionTriggerState>;
   style?: StateValue<CSSProperties | undefined, AccordionTriggerState>;
   children?: StateValue<ReactNode, AccordionTriggerState>;
@@ -394,7 +394,7 @@ Content rendered from `children(state)` must not suspend (conventions 3.2).
 ```ts
 export interface AccordionPanelProps
   extends Omit<ComponentPropsWithRef<"div">, "className" | "style" | "children"> {
-  transition?: ViewTransitionProps["default"];
+  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionPanelState>;
   style?: StateValue<CSSProperties | undefined, AccordionPanelState>;
   children?: StateValue<ReactNode, AccordionPanelState>;
