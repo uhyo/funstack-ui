@@ -144,4 +144,5 @@ commit that re-renders the Popup") and 5 (Dialog `intended` through `useLatest`)
   capture after `showModal()`, Escape = one VT, CSS exit + Escape = one VT, focus return with
   Enter on Close for non-modal/keepMounted/modal), the controlled-close CSS fade row (content
   held, mounted once), `close()` inside the update callback restoring focus to the Trigger,
-  and `event.source` on a foreign `request-close` (jsdom only covers it through the shim).
+  and `event.source` on a foreign `request-close` (browser row added; passes on Chromium 156 and
+  Firefox 157, `returnValue` is the invoker's `value`).

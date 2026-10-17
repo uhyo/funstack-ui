@@ -206,6 +206,30 @@ describe("library mode (browser)", () => {
     await settle(() => expect(popup().open).toBe(true));
   });
 
+  it("a foreign request-close invoker is intercepted; its value arrives through event.source (#46)", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library action={action}>
+        <button type="button" data-testid="foreign" value="foreign">
+          Foreign close
+        </button>
+      </Library>,
+    );
+    await openWithTrigger();
+    const foreign = screen.getByTestId("foreign");
+    foreign.setAttribute("commandfor", popup().id);
+    foreign.setAttribute("command", "request-close");
+    await user.click(foreign);
+    expect(action).toHaveBeenCalledTimes(2);
+    const details = action.mock.calls[1]![1];
+    expect(details.event).toBeInstanceOf(CommandEvent);
+    expect(details.event!.defaultPrevented).toBe(true);
+    expect(details.reason).toBe("activate");
+    expect(details.returnValue).toBe("foreign");
+    await settle(() => expect(popup().open).toBe(false));
+    expect(popup().returnValue).toBe("foreign");
+  });
+
   it("content that suspends holds the open; the dialog opens complete", async () => {
     const suspender = createSuspender();
     render(
