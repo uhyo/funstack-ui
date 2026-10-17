@@ -18,9 +18,13 @@ export interface DialogFormProps extends Omit<
   /**
    * React form action (`(formData) => unknown`, may be a Server Function). Passed to the form
    * unwrapped so React's progressive enhancement is kept; the dialog closes with the submitter's
-   * `value` as `returnValue` once the action's transition settles (see `closeOnSettle`). A
-   * rejection leaves the dialog open. Without `action` the form renders `method="dialog"`:
-   * submitting closes the dialog natively. A string `action` (a URL) is a plain navigating form.
+   * `value` as `returnValue` once the action's transition settles (see `closeOnSettle`): in
+   * library mode through the Root (`openChangeAction(false)` awaited, view transition if set),
+   * in JS-free mode with `close(value)`. A rejection leaves the dialog open. Without `action`
+   * the form renders `method="dialog"`: submitting closes the dialog, natively in JS-free mode
+   * and through the Root in library mode (a `preventDefault()` in your own `onSubmit` blocks
+   * both; `stopPropagation()` there leaves the close to the browser, notified as a dismissal).
+   * A string `action` (a URL) is a plain navigating form.
    */
   action?: string | ((formData: FormData) => unknown);
   /**
@@ -73,7 +77,8 @@ function FormStatusWatcher({ onPendingChange, onSettled }: FormStatusWatcherProp
 
 /**
  * A form that completes the dialog. Without `action`: `<form method="dialog">`, so a submit
- * closes the dialog natively (JS-free) with the submitter's `value` as `returnValue`. With a
+ * closes the dialog with the submitter's `value` as `returnValue` (natively in JS-free mode;
+ * in library mode the Popup cancels the submission and closes through the Root). With a
  * function `action`: `<form action={action}>` (React overrides the method) and a status watcher
  * that closes the dialog once the action has settled, with the submitter's `value`, unless
  * `closeOnSettle` is `false` or the dialog was closed while the action ran.
@@ -95,7 +100,8 @@ export function DialogForm({
   ...rest
 }: DialogFormProps) {
   const ctx = useDialogContext("Dialog.Form");
-  const { dialogRef, recordCloseIntent } = ctx;
+  const { dialogRef, recordCloseIntent, requestClose } = ctx;
+  const isLibrary = ctx.mode === "library";
   const [pending, setPending] = useState(false);
   const submission = useRef<{ event: Event; returnValue: string } | null>(null);
   // The dialog closed after the last submit (Escape, a Close part): the settle must not close it
@@ -133,9 +139,16 @@ export function DialogForm({
     submission.current = null;
     if (!closeOnSettle || closedSinceSubmit.current) return;
     if (dialog === null || !dialog.open) return;
+    const returnValue = submitted?.returnValue ?? "";
+    if (isLibrary) {
+      // A library-owned close (design 2.3): `openChangeAction(false)` awaited, then
+      // `close(returnValue)` in the commit, inside the view transition if set.
+      requestClose(submitted?.event, "activate", returnValue);
+      return;
+    }
     recordCloseIntent({ reason: "activate", event: submitted?.event });
-    dialog.close(submitted?.returnValue ?? "");
-  }, [closeOnSettle, dialogRef, recordCloseIntent]);
+    dialog.close(returnValue);
+  }, [closeOnSettle, dialogRef, isLibrary, recordCloseIntent, requestClose]);
 
   const state: DialogFormState = { pending };
 

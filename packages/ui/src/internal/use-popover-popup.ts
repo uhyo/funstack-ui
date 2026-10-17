@@ -154,7 +154,8 @@ export function usePopoverPopup(
   }
 
   // Whether the content unmounted while holding focus since the popup was last shown (H1).
-  const { wrapContent, hadFocus: contentHadFocus } = useContentFocusProbe(popupRef);
+  const contentProbe = useContentFocusProbe(popupRef);
+  const { wrapContent } = contentProbe;
 
   const syncExpanded = (element: HTMLElement): void => {
     // JS-free mode only (design 9): read the DOM, not `newState`, so a stale task cannot lie.
@@ -270,7 +271,7 @@ export function usePopoverPopup(
       }
     }
     // Content that unmounted while the popup stays open (not a close): forget it.
-    if (ctx.committed && isPopoverOpen(element)) contentHadFocus.current = false;
+    if (ctx.committed && isPopoverOpen(element)) contentProbe.forget();
     // A hold the close commit set (or a dismissal's notification commit) that no hide animation
     // is going to release: the popup is already hidden and its `toggle` has been handled.
     if (
@@ -301,13 +302,13 @@ export function usePopoverPopup(
         // A Close action that resolves after this open must not close it (design 3.4).
         ctx.nextOpenGeneration();
       }
-      contentHadFocus.current = false;
+      contentProbe.forget();
     } else {
       awaitingClose.current = true;
       const active = element.ownerDocument.activeElement;
       focusWasInside.current =
-        (active !== null && element.contains(active)) || contentHadFocus.current;
-      contentHadFocus.current = false;
+        (active !== null && element.contains(active)) || contentProbe.hadFocus();
+      contentProbe.forget();
     }
     onBeforeToggleOption?.(toggle);
   };

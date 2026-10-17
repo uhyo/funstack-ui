@@ -1,7 +1,6 @@
 "use client";
 import {
   Activity,
-  startTransition,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -16,10 +15,12 @@ import type {
   RefObject,
   ViewTransitionClass,
 } from "react";
+import { useContentFocusProbe } from "../internal/content-focus-probe.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { exitAnimations, useExitAnimation } from "../internal/use-exit-animation.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
@@ -71,8 +72,10 @@ export interface DialogPopupProps extends Omit<
   experimental_closedBy?: boolean;
   /**
    * Library mode only. Forwarded to the `<ViewTransition default>` around the dialog. Animates
-   * the opening commit and content changes while open; the close is the browser's and animates
-   * with CSS. Ignored (dev warning) in JS-free mode.
+   * the opening commit, content changes while open, and every library-driven close (a Close
+   * part, a Form submit or settled action, a foreign close command, a controlled
+   * `open={false}`), in all engines; dismissals (Escape, a click outside) are the browser's and
+   * animate with CSS only. Ignored (dev warning) in JS-free mode.
    *
    * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
    * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
@@ -155,10 +158,12 @@ function onBackdrop(dialog: HTMLDialogElement, event: Event): boolean {
   );
 }
 
-/** An animation that ends: infinite ones (a spinner) would hold the content forever. */
-function ends(animation: Animation): boolean {
-  const end = animation.effect?.getComputedTiming().endTime;
-  return typeof end === "number" && Number.isFinite(end);
+/** The submitter's or invoker's `value` (`""` without one, or where the engine gives no source). */
+function valueOf(element: unknown): string {
+  if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
+    return element.value;
+  }
+  return "";
 }
 
 /**
@@ -169,8 +174,12 @@ function ends(animation: Animation): boolean {
  *
  * In library mode the children render from committed state, so content that suspends keeps the
  * dialog closed (and the Trigger pending) until it is ready; `showModal()` runs in the layout
- * effect of the commit that mounted them. Closing is the browser's: the native `close` event
- * becomes `openChangeAction(false, { reason, returnValue })`.
+ * effect of the commit that mounted them. A close a part asks for (Close, a `method="dialog"`
+ * submit, a Form's settle close, a foreign close command) is cancelled and goes through the
+ * Root: `openChangeAction(false)` is awaited and `close(returnValue)` runs in the layout effect
+ * of the commit that ends it, inside the view transition if `transition` is set. A dismissal
+ * (Escape, a click outside) is the browser's: the native `close` event becomes
+ * `openChangeAction(false, { reason: "dismiss", returnValue })`.
  *
  * Owned keys (conventions 1.2): `id`, `open`, `closedby`, `aria-labelledby` and
  * `aria-describedby` (token-merged), `data-modal`, `suppressHydrationWarning`.
@@ -191,14 +200,31 @@ export function DialogPopup({
   const isLibrary = ctx.mode === "library";
   const { modal, ids, dialogRef, triggerRef } = ctx;
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
-  // Children stay mounted while the dialog's exit animation runs (design 4.4).
-  const [exiting, setExiting] = useState(false);
-  const exitGeneration = useRef(0);
   // Set by the synchronous `beforetoggle` of a close, cleared by the `close` event a task later:
   // the dialog is closed but its notification is not dispatched yet, so the apply effect must
   // not re-open it from a commit that lands in between.
   const awaitingClose = useRef(false);
   const warnedFocus = useRef(false);
+
+  // --- `held`: children stay mounted while the close animates (design 4.4) -----------------
+
+  const exit = useExitAnimation();
+
+  // A library-driven close commits `false` first and closes in the layout effect, so without
+  // `transition` the children are held through the close commit ("previous value in state").
+  // With `transition` the close commit unmounts them inside the view transition, whose old
+  // snapshot carries the content out. (A dismissal's notification commit sets it too; the apply
+  // effect's release rule clears that one.)
+  const [prevCommitted, setPrevCommitted] = useState(ctx.committed);
+  if (prevCommitted !== ctx.committed) {
+    setPrevCommitted(ctx.committed);
+    if (isLibrary && prevCommitted && transition === undefined) exit.holdDuringRender();
+  }
+
+  // Whether the content unmounted while holding focus since the dialog was last shown: a close
+  // with `transition` removes the focused Close part before `close()` runs (design 6.2 rule 2).
+  const contentProbe = useContentFocusProbe(dialogRef);
+  const { wrapContent } = contentProbe;
 
   useDevWarning(
     !isLibrary && transition !== undefined,
@@ -270,23 +296,58 @@ export function DialogPopup({
     if (isLibrary) reconcileOnMount();
   }, [isLibrary]);
 
-  // The apply effect (design 2.5): after every commit, once nothing is in flight, the DOM
-  // follows committed state. Opens on the user's dispatch, `defaultOpen`, a controlled parent,
-  // the re-open of a refused or failed close; closes after a controlled close or a refused
-  // pre-hydration open.
+  /**
+   * Design 6.2 rule 2, after a close whose commit unmounted the focused content: when focus is
+   * now on `<body>` or still inside the closed dialog, focus the Trigger (if connected), else
+   * blur what holds focus. A modal dialog never needs it (the platform restores focus on
+   * `close()` unconditionally); a non-modal one restores only when focus is inside.
+   */
+  const returnFocus = (element: HTMLDialogElement): void => {
+    const doc = element.ownerDocument;
+    const active = doc.activeElement;
+    if (active !== null && active !== doc.body && !element.contains(active)) return;
+    const trigger = triggerRef.current;
+    if (trigger !== null && trigger.isConnected) trigger.focus();
+    else if (active instanceof HTMLElement && active !== doc.body) active.blur();
+  };
+
+  // The apply effect (design 2.5): after every commit that re-renders the Popup, once nothing
+  // is in flight, the DOM follows committed state. The Root's context is memoised (#48), so an
+  // unrelated Root render does not re-render the Popup and does not run this; every path that
+  // makes the DOM diverge from state goes through a dispatch, whose `pending` flips re-render the
+  // Popup (review of #48, finding 4). Do not rely on an unrelated render to re-apply state.
+  // Opens on the user's dispatch, `defaultOpen`, a controlled parent, the re-open of a refused
+  // dismissal; closes after a part-initiated close settled, a controlled close, or a refused
+  // pre-hydration open. Also returns focus after a close whose commit unmounted the focused
+  // content, and releases a `held` no exit animation is going to release (4.4).
   useLayoutEffect(() => {
     if (!isLibrary) return;
     const element = dialogRef.current;
     if (element === null || !element.isConnected) return;
-    if (ctx.pending || ctx.latestInFlight() !== null) return;
-    if (ctx.committed && !element.open) {
-      if (awaitingClose.current) return;
-      openDialog(element);
-    } else if (!ctx.committed && element.open) {
-      // An echo: the `close` listener finds nothing intended and skips the dispatch. `close()`,
-      // not `requestClose()`: a parent's close is not vetoable.
-      ctx.recordCloseIntent(undefined);
-      element.close();
+    if (!ctx.pending && ctx.latestInFlight() === null) {
+      if (ctx.committed && !element.open) {
+        // Closed, but its `close` event has not arrived yet: wait for it.
+        if (!awaitingClose.current) openDialog(element);
+      } else if (!ctx.committed && element.open) {
+        // An echo: the `close` listener finds `false` intended and skips the dispatch. `close()`,
+        // not `requestClose()`: the veto point was `openChangeAction`, not `cancel`. The part's
+        // `returnValue` (design 2.3), `""` for a controlled close.
+        ctx.recordCloseIntent(undefined);
+        element.close(ctx.takeCloseReturnValue());
+        // The close commit may have unmounted the focused content before `close()`: a
+        // non-modal dialog restores focus only from inside, so do it now.
+        if (contentProbe.hadFocus()) {
+          contentProbe.forget();
+          returnFocus(element);
+        }
+      }
+    }
+    // Content that unmounted while the dialog stays open (not a close): forget it.
+    if (ctx.committed && element.open) contentProbe.forget();
+    // A hold the close commit set (or a dismissal's notification commit) that no exit animation
+    // is going to release: the dialog is closed and its `close` event has been handled.
+    if (exit.held && !ctx.committed && !exit.waiting() && !awaitingClose.current && !element.open) {
+      exit.release();
     }
   });
 
@@ -311,10 +372,21 @@ export function DialogPopup({
       event.preventDefault();
       ctx.requestOpen(event, "activate");
     } else if (command === "request-close" || command === "close") {
-      ctx.recordCloseIntent({ reason: "activate", event });
+      if (isLibrary) {
+        // A foreign close invoker (design 2.3) goes through the library like a foreign
+        // `show-modal`: same markup as Dialog.Close, same behaviour. `source` is the invoker
+        // (`""` where an engine gives none).
+        event.preventDefault();
+        const source = (event as Event & { source?: unknown }).source;
+        ctx.requestClose(event, "activate", valueOf(source));
+      } else {
+        ctx.recordCloseIntent({ reason: "activate", event });
+      }
     }
   });
 
+  // On the document, bubble phase: after React's root listener, so a consumer's `onSubmit` that
+  // calls `preventDefault()` has run (design 8.1).
   const onSubmit = useEffectEvent((event: Event) => {
     const element = dialogRef.current;
     const form = event.target;
@@ -324,7 +396,15 @@ export function DialogPopup({
     const formMethod = submitter?.getAttribute("formmethod");
     const method = formMethod != null ? formMethod.toLowerCase() : form.method;
     if (method !== "dialog") return;
-    ctx.recordCloseIntent({ reason: "activate", event });
+    if (!isLibrary) {
+      ctx.recordCloseIntent({ reason: "activate", event });
+      return;
+    }
+    // The consumer blocked the submission: the form did not submit, the dialog stays open.
+    if (event.defaultPrevented) return;
+    // Cancel the native close; the library closes once `openChangeAction(false)` settled.
+    event.preventDefault();
+    ctx.requestClose(event, "activate", valueOf(submitter));
   });
 
   const onClose = useEffectEvent((event: Event) => {
@@ -345,16 +425,19 @@ export function DialogPopup({
     const intent = ctx.takeCloseIntent();
     if (!isLibrary) return;
 
-    // Keep the children while the exit animation runs (design 4.4). Firefox has none.
-    if (element.isConnected && typeof element.getAnimations === "function") {
-      void getComputedStyle(element).opacity; // flush style so the exit transitions exist
-      const animations = element.getAnimations({ subtree: true }).filter(ends);
+    // `false` already intended: the library's own `close()` (or a dismissal during a pending
+    // part-initiated close). With `transition` such a close needs no hold: the close commit's
+    // view transition carried the content out (4.4).
+    const echo = !ctx.intended();
+    if (!echo || transition === undefined) {
+      const animations = exitAnimations(element);
       if (animations.length > 0) {
-        const generation = ++exitGeneration.current;
-        setExiting(true);
-        void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
-          if (exitGeneration.current === generation) startTransition(() => setExiting(false));
-        });
+        // Before the notification, so its commit keeps the children (urgent, internal).
+        exit.holdUntil(animations);
+      } else {
+        // Nothing animates (Firefox, or no CSS exit): release a hold now; the commit is
+        // invisible, the dialog is already `display: none`.
+        exit.release();
       }
     }
 
@@ -370,7 +453,10 @@ export function DialogPopup({
     // close. Counted here, synchronously inside `showModal()` / `show()`, not at the queued
     // `toggle`: an action settling between the open and that task would otherwise still see the
     // old generation and close the new open.
-    if (newState === "open") ctx.nextOpenGeneration();
+    if (newState === "open") {
+      ctx.nextOpenGeneration();
+      contentProbe.forget();
+    }
   });
 
   useEffect(() => {
@@ -381,7 +467,8 @@ export function DialogPopup({
 
     const listeners: [EventTarget, string, EventListener, boolean][] = [
       [dialog, "command", onCommand, false],
-      [dialog, "submit", onSubmit, false],
+      // Bubble phase on the document: after React's root listener (the consumer's `onSubmit`).
+      [doc, "submit", onSubmit, false],
       [dialog, "close", onClose, false],
       [dialog, "beforetoggle", onBeforeToggle, false],
     ];
@@ -502,18 +589,20 @@ export function DialogPopup({
   }, [dialog, shown]);
 
   const state: DialogPopupState = { open: ctx.committed, modal };
-  const visible = ctx.committed || exiting;
+  const visible = ctx.committed || exit.held;
 
   const content = (s: DialogPopupState): ReactNode => {
     if (!isLibrary) return resolveStateValue(children, s);
     if (keepMounted === true) {
       // The mode changes with committed state, inside the Root's transition (conventions 5.5);
-      // it stays visible while an exit animation runs.
+      // it stays visible while the close animates (a hidden Activity is `display: none`).
       return (
-        <Activity mode={visible ? "visible" : "hidden"}>{resolveStateValue(children, s)}</Activity>
+        <Activity mode={visible ? "visible" : "hidden"}>
+          {wrapContent(resolveStateValue(children, s))}
+        </Activity>
       );
     }
-    return visible ? resolveStateValue(children, s) : null;
+    return visible ? wrapContent(resolveStateValue(children, s)) : null;
   };
 
   const libraryProps: ComponentPropsWithRef<"dialog"> & DataAttributes = {

@@ -25,12 +25,17 @@ export interface ContentFocusProbeHook {
    */
   readonly wrapContent: (children: ReactNode) => ReactNode;
   /**
-   * Set when the wrapped content unmounted (or was hidden by `<Activity>`) while it held focus.
-   * The owner reads it after its close (design/components/popover.md 6.2 rule 2,
-   * design/components/dialog.md 6.2 rule 2) and clears it whenever the content went away while
-   * the popup stays open (not a close).
+   * Whether the wrapped content unmounted (or was hidden by `<Activity>`) while it held focus
+   * since the last `forget()`. The owner reads it after its close
+   * (design/components/popover.md 6.2 rule 2, design/components/dialog.md 6.2 rule 2).
+   * Handlers and effects only.
    */
-  readonly hadFocus: RefObject<boolean>;
+  readonly hadFocus: () => boolean;
+  /**
+   * Clear the record: on every open, after the owner used it, and whenever the content went
+   * away while the popup stays open (not a close).
+   */
+  readonly forget: () => void;
 }
 
 /**
@@ -42,14 +47,14 @@ export interface ContentFocusProbeHook {
 export function useContentFocusProbe(
   popupRef: RefObject<HTMLElement | null>,
 ): ContentFocusProbeHook {
-  const hadFocus = useRef(false);
+  const lostFocus = useRef(false);
 
   const record = useCallback(() => {
     const element = popupRef.current;
     if (element === null) return;
     const active = element.ownerDocument.activeElement;
     if (active !== null && active !== element && element.contains(active)) {
-      hadFocus.current = true;
+      lostFocus.current = true;
     }
   }, [popupRef]);
 
@@ -59,6 +64,10 @@ export function useContentFocusProbe(
     ),
     [record],
   );
+  const hadFocus = useCallback(() => lostFocus.current, []);
+  const forget = useCallback(() => {
+    lostFocus.current = false;
+  }, []);
 
-  return { wrapContent, hadFocus };
+  return { wrapContent, hadFocus, forget };
 }

@@ -5,8 +5,8 @@ import type { ChangeReason } from "../internal/types.js";
 
 /**
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
- * open is library-owned (a transition keyed on committed state), close is browser-owned and
- * notified (design section 2).
+ * opening and the closes a part asks for are library-owned (transitions keyed on committed
+ * state); dismissals are browser-owned and notified (design section 2).
  */
 export type DialogMode = "static" | "library";
 
@@ -40,6 +40,28 @@ export interface DialogContextValue {
    * library's own echo) already intends `false`.
    */
   readonly notifyClosed: (event: Event, reason: ChangeReason, returnValue: string) => void;
+  /**
+   * What the user already intends: the latest in-flight dispatch's `next`, else the optimistic
+   * value of the last commit. Safe to call from handlers and effects (layout effects included,
+   * also in the commit that changed it), and after an `await`. Not during render.
+   */
+  readonly intended: () => boolean;
+  /**
+   * A library-owned close (library mode, design 2.3): a Close part, a `method="dialog"` submit,
+   * a Form's settle close, a foreign close command. Records `returnValue` for the apply effect's
+   * `close()` and dispatches `false` (`openChangeAction(false)` awaited). A no-op when `false` is
+   * already intended.
+   */
+  readonly requestClose: (
+    event: Event | undefined,
+    reason: ChangeReason,
+    returnValue: string,
+  ) => void;
+  /**
+   * Read and clear the `returnValue` of the pending part-initiated close, for the apply effect's
+   * `close()`; `""` when there is none (a controlled close).
+   */
+  readonly takeCloseReturnValue: () => string;
   /** From `useControllableAction`: the latest in-flight intent, or `null`. */
   readonly latestInFlight: () => { readonly next: boolean } | null;
   /** The registered Trigger element, for the focus-return fallback (design 6.2). */
