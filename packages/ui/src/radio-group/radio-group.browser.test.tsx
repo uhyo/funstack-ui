@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
+import { browserName } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { RadioGroup } from "./index.js";
 import type { RadioGroupValueChangeDetails } from "./index.js";
@@ -25,6 +26,10 @@ const checkedValues = () =>
   (screen.getAllByRole("radio") as HTMLInputElement[])
     .filter((r) => r.matches(":checked"))
     .map((r) => r.value);
+/** Native radio arrows wrap from last to first and back; WebKit stops at the ends. */
+const arrowsWrap = browserName !== "webkit";
+/** Native ArrowLeft / ArrowRight swap under RTL; WebKit always maps Right to next. */
+const arrowsMirrorRtl = browserName !== "webkit";
 
 function Fruits({
   action,
@@ -54,7 +59,11 @@ function Fruits({
 
 describe("RadioGroup (browser)", () => {
   describe("native keyboard", () => {
-    it("arrows check the next / previous radio, wrap, and dispatch once per press", async () => {
+    // WebKit's native radio arrows neither wrap at the ends of the group nor mirror under RTL
+    // (RadioInputType::handleKeydownEvent walks the DOM forward for Down/Right and backward for
+    // Up/Left, and stops at the end; WebKit bug 145687). The library installs no key handler, so
+    // the degraded behaviour is asserted there (memo/developer/cross-engine.md).
+    it("arrows check the next / previous radio, wrap (not in WebKit), and dispatch once per press", async () => {
       const action = vi.fn<ActionFn>();
       render(<Fruits action={action} />);
       radio("a").focus();
@@ -68,39 +77,45 @@ describe("RadioGroup (browser)", () => {
       await user.keyboard("{ArrowDown}");
       await user.keyboard("{ArrowDown}");
       await flush();
-      // Wrapped from d to a.
-      expect(radio("a")).toHaveFocus();
+      // Wrapped from d to a; WebKit stays on d without dispatching.
+      expect(radio(arrowsWrap ? "a" : "d")).toHaveFocus();
       await user.keyboard("{ArrowUp}");
       await flush();
-      expect(radio("d")).toHaveFocus();
+      expect(radio(arrowsWrap ? "d" : "c")).toHaveFocus();
       await user.keyboard("{ArrowLeft}");
       await flush();
-      expect(radio("c")).toHaveFocus();
+      expect(radio(arrowsWrap ? "c" : "b")).toHaveFocus();
 
-      expect(action.mock.calls.map(([n]) => n)).toEqual(["b", "c", "d", "a", "d", "c"]);
+      expect(action.mock.calls.map(([n]) => n)).toEqual(
+        arrowsWrap ? ["b", "c", "d", "a", "d", "c"] : ["b", "c", "d", "c", "b"],
+      );
       expect(action.mock.calls.every(([, d]) => d.event?.type === "click")).toBe(true);
       expect(action.mock.calls.every(([, d]) => d.reason === "activate")).toBe(true);
-      expect(checkedValues()).toEqual(["c"]);
-      expect(radio("c")).toHaveAttribute("data-checked", "");
+      const last = arrowsWrap ? "c" : "b";
+      expect(checkedValues()).toEqual([last]);
+      expect(radio(last)).toHaveAttribute("data-checked", "");
     });
 
-    it("mirrors ArrowLeft / ArrowRight under dir=rtl", async () => {
+    it("mirrors ArrowLeft / ArrowRight under dir=rtl (not in WebKit)", async () => {
       const action = vi.fn<ActionFn>();
       render(<Fruits action={action} dir="rtl" defaultValue="b" />);
       radio("b").focus();
       await user.keyboard("{ArrowRight}");
       await flush();
-      expect(radio("a")).toHaveFocus();
+      expect(radio(arrowsMirrorRtl ? "a" : "c")).toHaveFocus();
       await user.keyboard("{ArrowLeft}");
       await user.keyboard("{ArrowLeft}");
       await flush();
-      expect(radio("c")).toHaveFocus();
+      expect(radio(arrowsMirrorRtl ? "c" : "a")).toHaveFocus();
       // Up / Down are not mirrored.
       await user.keyboard("{ArrowDown}");
       await flush();
-      expect(radio("d")).toHaveFocus();
-      expect(action.mock.calls.map(([n]) => n)).toEqual(["a", "b", "c", "d"]);
-      expect(checkedValues()).toEqual(["d"]);
+      const last = arrowsMirrorRtl ? "d" : "b";
+      expect(radio(last)).toHaveFocus();
+      expect(action.mock.calls.map(([n]) => n)).toEqual(
+        arrowsMirrorRtl ? ["a", "b", "c", "d"] : ["c", "b", "a", "b"],
+      );
+      expect(checkedValues()).toEqual([last]);
     });
 
     it("skips disabled radios, and a disabled group takes no focus", async () => {

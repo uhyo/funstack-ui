@@ -9,8 +9,9 @@ const alignments = [
 ];
 
 // Inside dir="rtl" the browser mirrors the arrow keys: ArrowLeft moves to the next radio, which
-// is visually to the left. The library has no keyboard code to mirror. Controlled with local
-// state: the setState runs in the action's synchronous part, so it is a transition update.
+// is visually to the left (Safari does not mirror). The library has no keyboard code of its own.
+// Controlled with local state: the setState runs in the action's synchronous part, so it is a
+// transition update.
 export function RadioGroupRtl() {
   const [value, setValue] = useState<string | null>("right");
   return (

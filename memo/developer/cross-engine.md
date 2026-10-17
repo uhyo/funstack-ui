@@ -27,3 +27,21 @@ Things to watch on the first WebKit CI run:
   blocks, that is a Playwright limitation (skip with a comment), not a library bug.
 - `userEvent.tab()` onto a button (Tooltip keyboard test) depends on WebKit's tab-focus setting.
 - `details` `toggle` being a `ToggleEvent` (Accordion platform-path test).
+
+## WebKit native radio arrows (2026-10-17, RadioGroup)
+
+The `browser (webkit)` job failed since RadioGroup landed: two keyboard rows. Genuine WebKit
+behaviour, not ours (RadioGroup installs no key handler, vision: native platform first):
+`RadioInputType::handleKeydownEvent` (WebKit main) maps Down/Right to "next" and Up/Left to
+"previous", walks `NodeTraversal::next/previous` for a same-name focusable radio, focuses and
+clicks it, and simply stops at the end. Comment in the source: "even for RTL, left still means
+previous radio button" (matching old WinIE). So in WebKit:
+- no wrap at either end (pressing past the end does nothing and dispatches nothing);
+- no RTL mirroring of Left/Right.
+Upstream: WebKit bug 145687 (2015 patch to cycle in the group, never landed). Not reported by us.
+
+Tests branch on `browserName !== "webkit"` (`arrowsWrap`, `arrowsMirrorRtl` in
+radio-group.browser.test.tsx) and assert the degraded sequence, including that the end press
+does not dispatch ("once per press" still holds for every press that moves). Docs page notes it.
+design/components/radio-group.md sections 5 and the keyboard table claim wrap + RTL in all
+engines; reported to the architect rather than edited.

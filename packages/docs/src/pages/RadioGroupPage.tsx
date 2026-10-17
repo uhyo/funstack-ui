@@ -22,9 +22,9 @@ export function RadioGroupPage() {
       <p className="page-intro">
         A radio group (WAI-ARIA Radio Group pattern, native radio variant): a{" "}
         <code>&lt;fieldset&gt;</code> of real <code>&lt;input type="radio"&gt;</code> elements. The
-        platform supplies the single tab stop, arrow keys with wrapping and RTL mirroring, forms and
-        validation. The library adds one thing: the checked value is changed through{" "}
-        <code>valueChangeAction</code> in a transition, with optimistic feedback and{" "}
+        platform supplies the single tab stop, arrow keys (wrapping and RTL-mirrored outside
+        Safari), forms and validation. The library adds one thing: the checked value is changed
+        through <code>valueChangeAction</code> in a transition, with optimistic feedback and{" "}
         <code>data-pending</code>.
       </p>
 
@@ -259,12 +259,12 @@ export function RadioGroupPage() {
           ["Space", "Checks the focused radio.", "yes"],
           [
             "ArrowDown / ArrowRight",
-            'Focuses and checks the next enabled radio, wrapping. Mirrored under `dir="rtl"`.',
+            'Focuses and checks the next enabled radio, wrapping (not in Safari). Mirrored under `dir="rtl"` (not in Safari).',
             "yes, once per press",
           ],
           [
             "ArrowUp / ArrowLeft",
-            "Previous enabled radio, wrapping. Mirrored under RTL.",
+            "Previous enabled radio, wrapping (not in Safari). Mirrored under RTL (not in Safari).",
             "yes, once per press",
           ],
           ["Enter", "Submits the form (implicit submission).", "no"],
@@ -274,6 +274,12 @@ export function RadioGroupPage() {
         <li>
           No Home/End (not in the APG Radio Group pattern) and no <code>orientation</code> prop:
           native radios honour all four arrows whatever the layout.
+        </li>
+        <li>
+          Safari (WebKit) neither wraps at the ends of the group nor mirrors ArrowLeft / ArrowRight
+          under RTL: Right and Down always go to the next radio in document order, Left and Up to
+          the previous one, and a press past the end does nothing (and dispatches nothing). This is
+          the platform's behaviour; the library deliberately adds no key handler to change it.
         </li>
         <li>
           The checked state assistive technology reads is the optimistic one, so a new choice is
