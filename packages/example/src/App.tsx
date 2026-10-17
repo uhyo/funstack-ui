@@ -8,6 +8,7 @@ import { PopoverDemo } from "./popover-demo";
 import { MenuDemo } from "./menu-demo";
 import { RadioGroupDemo } from "./radio-group-demo";
 import { CheckboxGroupDemo } from "./checkbox-group-demo";
+import { SelectDemo } from "./select-demo";
 
 export function App() {
   return (
@@ -27,6 +28,7 @@ export function App() {
       <MenuDemo />
       <RadioGroupDemo />
       <CheckboxGroupDemo />
+      <SelectDemo />
     </main>
   );
 }
