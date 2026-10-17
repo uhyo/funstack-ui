@@ -1097,3 +1097,5 @@ Genuine product decisions, with recommendations; none blocks implementation.
 11. **No `transition` prop on any part** (section 11), the Select precedent. **Recommendation:
     as designed.**
 12. **Conventions feedback 1 to 13** to apply on acceptance by whoever holds `conventions.md`.
+
+**Accepted by the product owner (2026-10-18):** all twelve recommendations as written. The user asked the team to proceed autonomously on wave 5, so decisions 1, 2 and 8 were made here; they will be reported to the user, who may revisit them before the first release that includes Slider. Apply the conventions feedback (item 12) to `design/conventions.md` and set the status above to accepted.
