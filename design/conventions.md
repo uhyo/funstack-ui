@@ -832,7 +832,13 @@ Rules the three hooks implement, which component docs may cite instead of restat
    reconciliation are ignored (those items are in the Root's commit and covered); later calls
    queue one microtask per commit that compares `readCurrent()` with `base()` and dispatches
    `"platform"` with `event: undefined` only when the late item's DOM value differs from what the
-   user intends. A programmatic value change while members are still dehydrated is not a problem
+   user intends. **The members' DOM value must be recorded in the layout phase** of the commit
+   the late members mount in, and the microtask read must use that snapshot (CheckboxGroup 8.1):
+   any re-render between a late member's mount and the adapter's microtask (a registration state
+   write, a parent re-render) makes `useNativeChecked` re-apply the optimistic value and overwrite
+   DOM state that has not been read yet, erasing a click made before the member hydrated. The
+   group adapter's `onItemMounted` wrapper takes the snapshot once per commit and clears it in a
+   microtask. A programmatic value change while members are still dehydrated is not a problem
    (a transition update is held until hydration, an urgent one client-renders the boundary; no
    dispatch either way, reviewer-verified). **Unsupported: partial hydration of a native radio
    group** (radios only). Clicking a hydrated radio while same-`name` siblings are inside a
