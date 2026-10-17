@@ -70,3 +70,4 @@
 - CheckboxGroup design accepted (03b595f, 2c2cd02; PO accepted all 8 recommendations). Impl running in worktree. Popover design (#38) running (architect); PO answers: Q6 context menu out; Q4 VT wraps top-layer element (Dialog close-animation = follow-up); Q1/2/3/5 architect decides.
 - #43 fixed 253650f (native focusgroup path needed nomemory/focusgroupstart/no tabindex). CheckboxGroup merged (db8299d..f08773f), 1197 tests, CI green incl. webkit; review running.
 - Popover design 9f4d928: PO accepted all 8 recommendations; #46 filed (Dialog VT exit for library-driven close). Popover impl (#40) running in worktree; architect accepting popover.md then designing Menu (#39).
+- CheckboxGroup review (bb71ce8): H1 Firefox form-restore of Parent → autocomplete=off; M1 uncontrolled reset; M2 PO DECISION: Parent ignores disabled Items (toggle + derived state over enabled Items). Fixes running on master (developer). Design corrections to architect after Menu design.
