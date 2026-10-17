@@ -2,14 +2,17 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { useFormReset } from "./use-form-reset.js";
+import type { FormAssociatedElement } from "./use-form-reset.js";
 import { useLatest } from "./use-latest.js";
 
 export interface UseNativeGroupReconciliationOptions<T> {
   /**
    * The group's form-associated element: `RadioGroup.Root`'s / `CheckboxGroup.Root`'s
-   * `<fieldset>`, or `Select.Root`'s `<select>` (whose options are the members).
+   * `<fieldset>`, `Select.Root`'s `<select>` (whose options are the members), or any member
+   * input when the Root renders no form-associated element (`Slider.Root` subscribes through its
+   * first Thumb's `<input type="range">`).
    */
-  readonly element: RefObject<HTMLFieldSetElement | HTMLSelectElement | null>;
+  readonly element: RefObject<FormAssociatedElement | null>;
   /** The group's value as the DOM shows it now (`checked` of the members). */
   readonly readCurrent: () => T;
   /** The value the browser resets the group to (`defaultChecked` of the members, rule 5). */
@@ -34,6 +37,13 @@ export interface UseNativeGroupReconciliationOptions<T> {
    * `ReadonlySet<string>`) passes structural equality, since every read builds a new object.
    */
   readonly equals?: ((a: T, b: T) => boolean) | undefined;
+  /**
+   * Passed through to `useFormReset`: called synchronously from the `reset` event, before the
+   * reset algorithm runs. A group of controlled **value** inputs (Slider) writes each input's
+   * `defaultValue` to the reset target here, because react-dom keeps that attribute equal to the
+   * current value after every update (conventions 3.8 rule 6).
+   */
+  readonly onResetEvent?: ((event: Event) => void) | undefined;
 }
 
 export interface UseNativeGroupReconciliationResult {
@@ -108,10 +118,17 @@ export function useNativeGroupReconciliation<T>(
     });
   }, [latest]);
 
-  useFormReset(element, (event) => {
-    if (element.current === null) return;
-    reconcile(options, options.readDefault(), event);
-  });
+  useFormReset(
+    element,
+    (event) => {
+      if (element.current === null) return;
+      reconcile(options, options.readDefault(), event);
+    },
+    (event) => {
+      if (element.current === null) return;
+      options.onResetEvent?.(event);
+    },
+  );
 
   return { onItemMounted };
 }

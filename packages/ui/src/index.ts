@@ -202,6 +202,25 @@ export type {
   ComboboxStatusState,
 } from "./combobox/index.js";
 
+export { Slider } from "./slider/index.js";
+export type {
+  SliderValue,
+  SliderOrientation,
+  SliderRootProps,
+  SliderRootState,
+  SliderValueChangeDetails,
+  SliderValueCommitDetails,
+  SliderLabelProps,
+  SliderTrackProps,
+  SliderTrackState,
+  SliderIndicatorProps,
+  SliderIndicatorState,
+  SliderThumbProps,
+  SliderThumbState,
+  SliderValueProps,
+  SliderValueState,
+} from "./slider/index.js";
+
 export type {
   Action,
   ActionDetails,
