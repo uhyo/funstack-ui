@@ -77,3 +77,8 @@
 - Popover CI green incl. WebKit (dialog popover focus works there). Review af064d8: H1 focus→body on lib close w/ transition (shared hook), M1 double VT on dismissal, M2 superseded rejection (→ #47 Menu dev), L1 dead focus fallback, L3 PO DECISION: stale Close action must not close a re-opened popover (open generation). Fixes running on master; Menu dev briefed. Design corrections → architect after fixes.
 - Popover fixes landed 35e57e1..1cb5854 (CI green). Hook API: wrapContent, openGeneration. #38/#39/#40 closed. Menu dev briefed; architect folding popover review into design.
 - 14:58 USAGE LIMIT. Menu (#41) + useActionTrigger (#47) MERGED & pushed (1599 tests chromium/firefox; first WebKit CI run pending — watch submenu/H1/div-popover autofocus rows). Next: check CI, review Menu, fixes, architect fold (menu deviations 1-6; dialog.md ~1594 superseded-rejection gap now closed), close #41/#47, then wave 3 done → propose next (e.g. #46 Dialog VT close, 0.1.0-alpha.1 release via skill — first OIDC publish test).
+
+## 2026-10-17 (resumed after usage refill)
+- Menu merge CI green on all 3 engines (incl. first WebKit run).
+- Reviewer launched on Menu + useActionTrigger (#41/#47), writing memo/reviewer/menu.md, with verdicts on developer deviations 1-6.
+- Next: fixes → architect fold → close #41/#47 → wave 3 done → propose next (#46, alpha.1 = first OIDC publish).
