@@ -108,3 +108,39 @@ is a transition and does wait, as designed.)
 - Screen-reader pass (design 9) not done (no AT here).
 - Tooling note: `pnpm lint` prints nothing at all when clean in a non-TTY shell (no "Found 0"
   summary); it does lint worktrees under `.claude/`.
+
+## Review fixes (memo/reviewer/combobox.md), 2026-10-17
+
+Commits 5d92f41 (ui), ce0cf0f (docs), c7dfcd7 (List name warning). Design fold: 937a796.
+
+- H1: `statusCountRef` mirrors the Status count; the announcement effect reads it (the open
+  commit's passive effects run before the Status registration re-render). jsdom row: fallback
+  in the List, zero `ariaNotify` calls until resolve, then "3 results".
+- M1/L5: `typed()` and Home/End/Left/Right (not prevented) clear the active option.
+  `autoHighlight` is an armed flag (`autoArmed`): armed while closed and by `typed()`, consumed
+  by an auto-highlight or by any active option; only on non-stale results. The caret keys do not
+  re-arm, so the clear sticks. Side effect: an active option that unmounts for a reason other
+  than an edit is not auto-replaced (the results for an unchanged query do not change in
+  practice).
+- M2: `await undefined` at the top of the catch. Row probes React's
+  `__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.T` in the text action.
+- M3: List `aria-busy` while stale or loading (no public `loading` state, no data attribute;
+  style with `[aria-busy="true"]`). Status inside the List: `role="none"` (axe
+  aria-required-children treats a role-less / none element without global ARIA as transparent;
+  its text node is allowed; aria-busy passes the missing-children check). Outside: `status`.
+- L1: Label registers (layout effect); List emits `aria-labelledby` only then. Dev warning (a
+  microtask after the List element attaches; the Label's sync re-render has committed by then)
+  when the List has neither `aria-labelledby` nor `aria-label`.
+- L2: Trigger `onPointerCancel` (new owned key) clears the snapshot; a click with
+  `detail === 0` ignores it. Not `lostpointercapture` (fires before click for touch).
+- L3: `leave()` returns early when disabled. L4: iframe fallback WebKit-only.
+- Browser IME row: the composed text now clears the active option; re-ArrowDown before Enter.
+- jsdom 121 tests; browser 42 passed / 2 skipped (Chromium + Firefox).
+
+WebKit CI (first Combobox runs, 39030861052 and 39031405946): all rows pass, the 302008 row
+included; the real keyboard reaches the hydration iframe (no fallback warning). Every engine logs
+~26 "not wrapped in act" warnings from the focus-loss / Tab rows (the deferred `focusout` timer);
+noise, not failures.
+
+Design note: design 14's `ComboboxListProps` Omit lists `aria-labelledby`, but 9 / the table say
+it is token-merged with the consumer's; the code keeps it passable (token-merged).
