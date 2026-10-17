@@ -4,7 +4,8 @@ Status: **accepted** (2026-10-15, GitHub issue #5; open questions resolved by th
 with the user, see the end of this document; amended 2026-10-15 after the Toggle design, #6, with
 the ViewTransition correction in 5.1, the pending-is-never-disabled rule in 3.6, and the Server
 Function note in 2.4; amended 2026-10-17 after the CheckboxGroup design, #33, see resolved
-question 20). Binding for every component design in
+question 20; amended 2026-10-17 with the Popover design, #38: the top-layer rule in 3.5 and 5.1,
+and the `focusGroup` detection in 8, issue #43). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -21,7 +22,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. No `on*` handlers in the library API. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
-| 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
+| 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
 | 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc, and none of the initial four has one (directive-free variants tracked in #19). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
@@ -706,7 +707,14 @@ Rules:
   the DOM (`matches(":popover-open")`, `details.open`) when it needs the value for attributes.
 - `<ViewTransition>` does not apply to browser-owned open/close (the browser performs it outside
   a React transition). Those parts animate with `@starting-style` and
-  `transition-behavior: allow-discrete` in CSS, and the component docs show the CSS.
+  `transition-behavior: allow-discrete` in CSS, and the component docs show the CSS. It **does**
+  apply to a **library-driven** open or close of a top-layer element: when the part calls
+  `showPopover()` / `hidePopover()` (or `showModal()` / `close()`) in a layout effect of a
+  transition commit and the boundary wraps the top-layer element itself (section 5.1), both the
+  enter and the exit are captured, in Firefox too, where CSS cannot animate a popover's exit
+  (`docs/research/popover-menu.md`, "ViewTransition"). Popover is the first component to use
+  this for its part-initiated closes (`design/components/popover.md` 2.3, 10.2); Dialog's
+  library-driven close is a follow-up.
 - Per-component designs list every state and label it library-owned or browser-owned.
 - Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
   dispatches use `"activate"`.
@@ -971,6 +979,16 @@ Accordion's `<details>` in static mode) render no `<ViewTransition>` in any case
 happens outside any React transition and animates with `@starting-style` and
 `transition-behavior: allow-discrete` in CSS. "Every animatable part has `transition`" means every
 part whose mount, unmount or content is driven by library state.
+
+**Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
+(decision for Popover, #38, from the `vt-popover` probe in `docs/research/popover-menu.md`). A
+boundary placed inside a `[popover]` or `<dialog>` around content mounted on open has no box
+while the element is `display: none`, so it gets no enter; wrapping the element captures the
+popup's own box on a library-driven open (`::view-transition-new`) and on a library-driven close
+(`::view-transition-old`), in all three engines. `Dialog.Popup` already wraps the `<dialog>`;
+`Popover.Popup` and `Menu.Popup` wrap the `[popover]` element. The rule only matters for opens
+and closes the library performs in a layout effect of a transition commit; browser-initiated
+ones (Escape, light dismiss) happen outside React and animate with CSS, as above.
 
 ```tsx
 // inside Tabs.Panel (mount strategy per `keepMounted`, section 3.7: not rendered, <Activity>,
@@ -1244,7 +1262,7 @@ a flag (`docs/vision.md`). Mechanism:
    | --- | --- | --- | --- |
    | `popover="hint"` | Safari 27.0 (TP only) | `Tooltip.Popup experimental_hint` | Popup renders `popover="hint"` instead of the baseline type plus JS Escape/outside-click handling. |
    | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor` | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
-   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup` | Native roving focus; JS arrow-key handling skipped where supported. |
+   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup` | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex` (#43). |
    | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
    | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute; camelCase like `experimental_interestFor`) | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | `Select.Root experimental_baseAppearance` | `appearance: base-select` markup; degrades to the native picker elsewhere. |
@@ -1263,9 +1281,14 @@ a flag (`docs/vision.md`). Mechanism:
 When the flagged path is a strict superset of the baseline (Chromium's `interestfor` tooltip
 versus the JS fallback), the component may feature-detect at runtime *only when the flag is on*;
 with the flag off it runs the baseline everywhere. Feature detection reads a prototype property
-(`"interestForElement" in HTMLButtonElement.prototype`, `"focusgroup" in HTMLElement.prototype`)
-inside an effect or `use(browser())`, never during render, so flags never change markup between
-server and client renders. A flagged feature that silently does nothing in unsupported engines
+(`"interestForElement" in HTMLButtonElement.prototype`, `"focusGroup" in HTMLElement.prototype`;
+IDL attributes are camel-cased, and `"focusgroup" in HTMLElement.prototype` is always false,
+issue #43) inside an effect, through `useSyncExternalStore` with a server snapshot of `false`, or
+`use(browser())`, never during a server render or hydration, so flags never change markup between
+server and client renders. When the detected answer has to change markup (Tabs renders no
+`tabindex` on unselected tabs on the native `focusgroup` path, because Chromium leaves
+`tabindex="-1"` elements out of the group), `useSyncExternalStore` is the form to use: hydration
+renders the server answer and React re-renders with the client answer afterwards. A flagged feature that silently does nothing in unsupported engines
 (`interestfor`) must keep the baseline JS path active underneath unless the flag's docs say the
 consumer has accepted Chromium-only behaviour.
 

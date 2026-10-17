@@ -409,8 +409,8 @@ Per APG Tabs pattern.
 | Part | Attributes |
 | --- | --- |
 | `Root` | `data-pending`, `data-orientation`, `data-disabled` |
-| `List` | `role="tablist"`, `aria-orientation` (always set), `data-orientation`, `data-disabled`, `tabindex="0"` only while the List is the tab stop: `value` is `null`, or a controlled `value` matches no `Tabs.Tab` (section 8); with `experimental_focusgroup`: `focusgroup="tablist inline wrap"` (`block` for vertical, `nowrap` when `loop={false}`) |
-| `Tab` | `type="button"` (only when the rendered element is a `<button>`; `render={<a />}` gets no `type`, conventions 1.2), `role="tab"`, `id`, `aria-selected` (optimistic), `aria-controls` (always set, see below), `aria-disabled="true"` when disabled, `tabindex` (`0` on the optimistic tab, else `-1`), `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, `style="anchor-name: …"` |
+| `List` | `role="tablist"`, `aria-orientation` (always set), `data-orientation`, `data-disabled`, `tabindex="0"` only while the List is the tab stop: `value` is `null`, or a controlled `value` matches no `Tabs.Tab` (section 8); with `experimental_focusgroup`: `focusgroup="tablist inline wrap nomemory"` (`block` for vertical, `nowrap` when `loop={false}`; `nomemory` so that Tab re-enters on the selected tab, not the last focused one) |
+| `Tab` | `type="button"` (only when the rendered element is a `<button>`; `render={<a />}` gets no `type`, conventions 1.2), `role="tab"`, `id`, `aria-selected` (optimistic), `aria-controls` (always set, see below), `aria-disabled="true"` when disabled, `tabindex` (`0` on the optimistic tab, else `-1`; on the native `focusgroup` path unselected tabs render **no** `tabindex`, because Chromium leaves `tabindex="-1"` elements out of the group), `focusgroupstart` on the selected tab with `experimental_focusgroup` (rendered with the flag in every engine, inert where unsupported), `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, `style="anchor-name: …"` |
 | `Panel` | `role="tabpanel"`, `id`, `aria-labelledby`, `tabindex="0"` (overridable), `data-selected` (committed); `hidden` in `"until-found"` mode |
 | `Indicator` | `aria-hidden="true"`, `hidden` when no optimistic selection, `data-selected` when there is one, `data-pending`, `style="position-anchor: …"` |
 
@@ -499,11 +499,19 @@ Roving tabindex details:
 - Key events with `altKey`, `ctrlKey` or `metaKey` set are ignored by the arrow / Home / End
   navigation and by Enter / Space activation, so browser and OS shortcuts keep working.
 
-`experimental_focusgroup`: when on, `List` renders the `focusgroup` attribute and, inside an
-effect, checks `"focusgroup" in HTMLElement.prototype`. Where true, the arrow/Home/End branch of
-the JS handler is skipped and the browser moves focus; the Tab's `focus` handler still provides
-automatic activation. Where false, nothing changes. Markup is identical on server and client
-(conventions section 8).
+`experimental_focusgroup`: when on, `List` renders
+`focusgroup="tablist inline|block wrap|nowrap nomemory"` and the selected Tab renders
+`focusgroupstart`, in every engine. The List detects the native path with
+`"focusGroup" in HTMLElement.prototype` (the IDL attribute is camel-cased; `"focusgroup"` is
+always false, issue #43) through `useSyncExternalStore` with a server snapshot of `false`, so the
+answer is `false` on the server and during hydration and the client re-renders with the real one
+afterwards. Where true, the arrow/Home/End branch of the JS handler is skipped and the browser
+moves focus, and unselected Tabs render **no** `tabindex` (Chromium leaves `tabindex="-1"`
+elements out of the focusgroup; with roving tabindex the browser moved nothing); `nomemory` plus
+`focusgroupstart` make Tab enter on the selected tab, as the APG requires, rather than on the
+last focused one, which differs under manual activation. The Tab's `focus` handler still
+provides automatic activation. Where false, nothing changes: roving tabindex and the JS handler
+(conventions section 8; findings in `memo/developer/cross-engine.md`).
 
 ## 9. Async walkthroughs
 
@@ -919,8 +927,12 @@ One context; every part re-renders on a dispatch anyway (attributes change).
   resolve the key against `orientation` and computed `direction`; collect tabs by DOM query;
   compute the index with `loop`; `preventDefault()`; `focus({ focusVisible: true })`.
 - `experimental_focusgroup`: render the attribute (lowercase, typed by the shared augmentation
-  file); in an effect set a ref `nativeFocusgroup = "focusgroup" in HTMLElement.prototype`; the
-  keydown handler returns early for navigation keys when the ref is true.
+  file) with the `nomemory` token; detect the native path with
+  `useSyncExternalStore(subscribeNever, () => experimental_focusgroup && "focusGroup" in
+  HTMLElement.prototype, () => false)` (camel-cased IDL attribute, #43; the server snapshot keeps
+  hydration markup identical) and provide it through a `TabsListContext` so each Tab can drop
+  `tabindex="-1"` and render `focusgroupstart` when selected; the keydown handler returns early
+  for navigation keys when the detected value is true.
 
 ### 13.5 Tab
 
