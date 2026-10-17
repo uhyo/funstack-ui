@@ -1,6 +1,8 @@
 # Combobox
 
-Status: **proposed** (2026-10-17, wave 4, GitHub issue #50). Follows `design/conventions.md`
+Status: **accepted** (2026-10-17, wave 4, GitHub issue #50; the product owner accepted questions
+1 to 5 and 7 to 11 as recommended and the user overrode question 6: a default English
+announcement ships, see "Decisions recorded" at the end). Follows `design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` and `design/components/menu.md` first**: Combobox is built on
 the same internal hooks (`usePopoverRoot`, `usePopoverPopup`, `useActionTrigger`), the same
@@ -48,7 +50,7 @@ and a hidden input that follows the optimistic value.
 | 8 | Free text | `allowCustomValue`: Enter with no active option, or focus leaving, commits the text as the value (`details.custom: true`). Without it the text reverts on focus loss to the committed value's label (React Aria's rule). |
 | 9 | Form | `name` / `form` on Root render `<input type="hidden" name value={optimistic ?? ""}>`; `required` goes on `Combobox.Input` and is native (empty text is `valueMissing`). No `setCustomValidity` (conventions 3.6). Form reset dispatches `"platform"` for both states; a pre-hydration typed text is reconciled at mount for `inputValue`. |
 | 10 | Positioning | Inline `position-area: block-end span-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)` on Popup (logical keywords: RTL-correct for free). No `side` / `align`: a listbox goes below or above its input. `style` overrides. |
-| 11 | Announcements | `ariaNotify()` on the List with the consumer's `announce(count)` string when results settle (not while stale); no live region; no default string (the library ships no text, as it ships no CSS; question 6). |
+| 11 | Announcements | `ariaNotify()` on the List when results settle (not while stale); no live region. **A default English message ships** (`"No results"`, `"1 result"`, `"N results"`; user decision on question 6), overridable through `announce(count, state)` for localisation. The library's first built-in UI string; the convention it sets (built-in strings are English defaults, always overridable) is in conventions 11. |
 | 12 | Pending and state exposure | `data-pending` on Input (value or open in flight), Trigger (open in flight), the optimistic target Option; `data-open` on Input and Trigger; `data-selected`, `data-active`, `data-disabled` on Option; `data-stale` on Popup and List; `data-empty` on List. |
 | 13 | ViewTransition | `transition` on `Combobox.Popup`, wrapping the `<div popover>` itself (conventions 5.1): library-driven opens and closes animate in every engine. A deferred results render also activates the boundary (React rule), so the docs recommend a type map with `default: "none"`. Types `fsui-combobox`, `fsui-combobox-open` / `-close`, `fsui-combobox-select`. |
 | 14 | Not in v1 | `multiple` (chips), inline autocompletion (`aria-autocomplete="both"`), virtualization, a built-in filter, `Separator`, `Combobox.Input` inside the popup (searchable select), context-menu-style anchors. Section 13. |
@@ -330,11 +332,12 @@ export interface ComboboxRootProps {
   /** Wrap from the last option to the first and back with the arrow keys. Default `false` (APG default; Menu wraps). */
   loop?: boolean;
   /**
-   * The message `ariaNotify()` announces on the List when the results settle: the number of
-   * mounted options. No announcement when absent (the library ships no strings). Ignored where
-   * `ariaNotify` is missing.
+   * The message `ariaNotify()` announces on the List when the results settle, from the number
+   * of mounted options. Default (English): `"No results"`, `"1 result"`, `"N results"`.
+   * Override for localisation or a richer message; return `null` to announce nothing.
+   * Ignored where `ariaNotify` is missing.
    */
-  announce?: (count: number, state: ComboboxRootState) => string;
+  announce?: (count: number, state: ComboboxRootState) => string | null;
 
   /** Form participation through a hidden input with this name (value `""` for `null`). */
   name?: string;
@@ -723,9 +726,11 @@ Debounced by construction: a deferred render settles once per query. Nothing is 
 stale or for an unchanged count. The active option itself is announced by the screen reader
 through `aria-activedescendant`.
 
-`announce` has no default string. The library ships no text, for the same reason it ships no
-CSS (it would be English, and every real app localises). The docs show the one-liner and say
-that without it the combobox announces option navigation but not result counts. Question 6.
+`announce` has a **default English message** (`"No results"`, `"1 result"`, `"N results"`;
+user decision on question 6, overriding the recommendation of no default): accessibility works
+out of the box, and a localised app passes its own function (`null` to announce nothing). This
+is the library's first built-in UI string; conventions 11 records the rule it sets: built-in
+strings are English defaults and are always overridable through a prop.
 
 ### 6.5 Active-option revalidation
 
@@ -1046,7 +1051,7 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Focus loss | `focusout` with `relatedTarget` outside → `hidePopover` at once, notification `"dismiss"`; `relatedTarget: null` → nothing; `pointerdown` on an Option / the Popup is `defaultPrevented` and the input keeps focus. |
 | Active-option revalidation | The active option unmounts (results change) → `aria-activedescendant` removed; with `autoHighlight` → the first enabled option once not stale; never a dangling id. |
 | Empty and Status | `Empty` renders only with zero mounted options and not stale: hidden during the Suspense fallback and while stale old results show; `data-empty` on the List likewise. |
-| Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with `announce(count)`; not while stale; not for an unchanged count; never without `announce`. |
+| Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with the default message (`"No results"` / `"1 result"` / `"3 results"`) or the consumer's `announce(count)`; not while stale; not for an unchanged count; never when `announce` returns `null`. |
 | Clear | Writes `""`, dispatches `null` (`"activate"`, the `click`), no dispatch when already `null`, input keeps focus. |
 | Platform path (both) | Mount reconciliation: `renderToString`, set `input.value = "jap"` before `hydrateRoot` → one `inputValueChangeAction("jap", { reason: "platform", event: undefined })`, no open, StrictMode still one; no `valueChangeAction`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → one `valueChangeAction(resetTarget, "platform")` with the `reset` event and one text write; the hidden and visible inputs carry the mirrored `defaultValue`s (uncontrolled: latest props; controlled: mount-time). |
 | Suspending content (both) | Dependent content keyed on `value` suspends on accept: old content stays, Input `data-pending`, no fallback above; then new content. Results boundary outside the List: the open waits with `data-pending` on Input and Trigger, `showPopover` not called until resolve. |
@@ -1070,7 +1075,7 @@ Element.prototype` (all three stable engines; asserted true, branch kept for Pla
 | Typing while a save is pending | Deferred results re-render during a pending `valueChangeAction` (walkthrough 6): new options appear before the save resolves. **Verifies the lane claim of section 4**; if it fails, the design's statement is corrected to "results wait for a pending save". | none |
 | Enter submits with the new value | `allowCustomValue` inside a `<form>` with a submit spy: Enter while closed posts the typed text in `FormData` (hidden input updated before the implicit submission). | all three; document any engine where the sync flush lands after submission |
 | Nested in Popover / Dialog | Opening the listbox keeps the outer open; light dismiss closes the stack; **WebKit 302008 row**: `browserName === "webkit"`, open the listbox inside an open `Popover.Popup` twice with the default `flip-block` under a 15 s timeout so a hang fails instead of stalling. | WebKit row runs regardless |
-| Announcements | `ariaNotify` spied on the List: one call per settled result set with the `announce` string; none while stale. | `supportsAriaNotify`; otherwise assert no throw |
+| Announcements | `ariaNotify` spied on the List: one call per settled result set with the default or the `announce` string; none while stale. | `supportsAriaNotify`; otherwise assert no throw |
 | Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration, one `"platform"` text dispatch, no `valueChangeAction`, nothing opened. | none |
 | ViewTransition | With `transition={{ …, default: "none" }}`: open calls `startViewTransition` once, accept-close once with a `::view-transition-old` of the popup present, a deferred results change zero times; with `transition="pop"` a results change calls it once (documents the cost); without `transition` zero calls. | none |
 | IME | Composition (`compositionstart` … `compositionend` through Playwright's `insertText` / keyboard IME where available): the text updates per composition update, the listbox opens, Enter during composition does not accept. | Chromium (Playwright IME support); others assert the non-composition path |
@@ -1165,7 +1170,7 @@ packages/ui/src/internal/
 
 ---
 
-## Conventions feedback (proposed; not applied, another session owns `conventions.md` today)
+## Conventions feedback (applied to `design/conventions.md` at acceptance, 2026-10-17)
 
 1. **2.6 Urgent updates.** Replace "not provided in v0" with the urgent lane as designed in
    section 4: an urgent state keeps the `x` / `defaultX` / `xChangeAction` triple; its action
@@ -1207,6 +1212,10 @@ packages/ui/src/internal/
 11. **10.1 test rows.** Add "Urgent action (both)" as a required row for any component with an
     urgent state: called synchronously per DOM event, outside a transition, DOM in sync for a
     controlled parent.
+12. **New section 11, built-in strings** (from the user's decision on question 6): a built-in
+    UI string is an English default, exists only where accessibility needs text the consumer
+    might forget, and is always overridable through a prop that takes a function (so the
+    message can depend on state); the library never ships a locale mechanism.
 
 ---
 
@@ -1255,3 +1264,20 @@ packages/ui/src/internal/
 10. **The WebKit 302008 row and the `style={{ positionTryFallbacks: "none" }}` escape hatch**
     (7.3), keeping `flip-block` by default (Menu / Select precedent). Confirm.
 11. **Conventions feedback 1 to 11** to apply on acceptance by whoever holds `conventions.md`.
+
+---
+
+## Decisions recorded (product owner, 2026-10-17)
+
+Questions 1 to 5 and 7 to 11 accepted as recommended: one component with `allowCustomValue`;
+`inputValueChangeAction: UrgentChangeAction` as the library-wide urgent convention; two explicit
+states and no `itemToString`; stay open with `data-pending` on the option and close on settle
+(consistent with Menu); Tab does not accept; `multiple` deferred; no `commandfor` on the Trigger
+and no JS-free mode; Escape not intercepted; the WebKit 302008 row with the
+`positionTryFallbacks` escape hatch; the conventions changes applied (feedback 1 to 12).
+
+**Question 6, overridden by the user:** `announce` ships a default English message
+(`"No results"`, `"1 result"`, `"N results"`), overridable for i18n, so the result count is
+announced out of the box. Recorded as a convention (conventions 11): built-in strings are
+English defaults and always overridable. Sections 6.4, 3.1 and the decisions table are updated;
+the test rows assert the default.

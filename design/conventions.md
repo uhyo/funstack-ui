@@ -7,7 +7,8 @@ Function note in 2.4; amended 2026-10-17 after the CheckboxGroup design, #33, se
 question 20; amended 2026-10-17 with the Popover design, #38: the top-layer rule in 3.5 and 5.1,
 and the `focusGroup` detection in 8, issue #43; Popover and Menu accepted the same day, see
 resolved questions 24 and 25; amended 2026-10-17 with the Select design, #50, see resolved
-question 26). Binding for every component design in
+question 26; amended 2026-10-17 with the Combobox design, #50: the urgent lane in 2.6 and 3.2,
+the built-in strings rule in section 11, see resolved question 27). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -30,6 +31,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
+| 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 
 ---
 
@@ -65,16 +67,20 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 
 | Part | Meaning | Default element |
 | --- | --- | --- |
-| `Root` | Owns state, context and the transition. May render no DOM (overlays) or a wrapper. | `div` or none |
-| `List` | Groups triggers; owns keyboard navigation between them. | `div` |
+| `Root` | Owns state, context and the transition. May render no DOM (overlays) or a wrapper; a Root that owns a form value but no visible element may render exactly one `<input type="hidden">` when `name` is given (Combobox). | `div` or none |
+| `List` | Groups triggers; owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (the Popup is the container, because a listbox may contain only options and groups). | `div` |
 | `Item` | One entry in a multi-item component (Accordion, Menu). Menu's is a `button[role=menuitem]` with an `action`. | `div` / `details` / `button` |
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
 | `Indicator` | Purely visual element that tracks state (active tab marker). | `span` |
-| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child. | `label` / `legend` |
+| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child; for a component whose owner surface is an `Input` part (Combobox) it renders `<label for>`. | `label` / `legend` |
+| `Input` | The text field of a combobox-like component: `input[role=combobox]`, the owner's surface for `data-pending`, with the urgent `inputValue` state (section 2.6). | `input` |
 | `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its checked/mixed state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
-| `Option` | One choice in a native `<select>` (Select). Renders optimistic `data-selected`, equal to the platform's `:checked`. | `option` |
+| `Option` | One choice in a native `<select>` (Select; renders optimistic `data-selected`, equal to the platform's `:checked`) or in a listbox (Combobox: `div[role=option]`, never focused, `data-active` for virtual focus). | `option` / `div` |
+| `Clear` | A `tabindex="-1"` button that empties a text field and dispatches the empty selection (Combobox). | `button` |
+| `Empty` | Content the **library** shows only when a list has no mounted options and its results are not stale (Combobox). | `div` |
+| `Status` | A `role="status"` container for a loading fallback or hint inside a popup (Combobox). | `div` |
 | `Value` | The element the browser fills with the selected option's content (Select). It has **no `children` prop**: the parser and the browser write its content, so the part renders it with the hydration pattern of section 7.4. | `selectedcontent` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
@@ -503,10 +509,28 @@ What is still reachable, and why it is not a contradiction:
 - `ref` gives the element for `addEventListener` when a component needs an event React does not
   synthesize (`command`, `beforematch`).
 
-**Urgent (non-transition) updates: not provided in v0.** The vision defers this until a component
-genuinely needs it (text input in Combobox). Until then the stance is: a consumer who needs an
-urgent update from a FUNSTACK interaction attaches a native handler through pass-through or `ref`,
-and that path is unsupported and undocumented. Flagged for the product owner (open question 2).
+**Urgent (non-transition) updates: the urgent lane** (designed with Combobox, #50, resolved
+question 27; the vision's documented opt-out). A state that React requires to be urgent, which
+today means the text of a controlled text input ("Transition updates can't be used to control
+text inputs"), keeps the ordinary triple, `inputValue` / `defaultInputValue` /
+`inputValueChangeAction`, so the three props read as a set and the no-`on*` rule keeps having no
+exceptions. What makes it urgent is the action's **type**:
+
+```ts
+/** Called synchronously, outside any Transition, and not awaited: the urgent lane. */
+export type UrgentChangeAction<T, Details extends ActionDetails = ActionDetails> = (next: T, details: Details) => void;
+```
+
+Rules: the library sets its own `useState` for the value and calls the action synchronously
+from the DOM event (and from its own documented writes), never inside `startTransition`, so a
+controlled parent's `setState` in the body is an urgent update; nothing is awaited, pending or
+optimistic for it (the DOM already holds the value; a returned thenable is a dev warning);
+a controlled urgent prop follows the DOM and does not gate it; everything the urgent value
+drives (a deferred query through `useDeferredValue`, an open, a selection) leaves the urgent
+lane at once and is a transition or a deferred render. The library uses the lane only where
+React requires it; "transition by default" is unchanged for every other state. Component docs
+name each urgent state. Consumers who need an urgent update from an interaction that has no
+urgent action still use pass-through or `ref`, unsupported as before.
 
 ### 2.7 Form-level actions are a separate channel
 
@@ -585,6 +609,13 @@ The state owner (`Root` or the single component) holds:
 | `committed` | `x ?? internal` | transition | content regions (`Panel`, `Popup`), everything that may suspend |
 | `optimistic` | `useOptimistic(committed, reducer)` | sync | trigger parts (`Tab`, `Trigger`, `Toggle`): `aria-pressed`, `aria-selected`, `data-selected`, state passed to their function props |
 | `pending` | `useTransition()` | sync | `data-pending` on the owner and on the trigger that initiated the change |
+| urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
+
+**Virtual focus is urgent library state.** Where a pattern keeps DOM focus on one element and
+moves focus virtually with `aria-activedescendant` (Combobox), the active item is a plain
+`useState`, never a transition and never a dispatch: it is focus, which is immediate and
+browser-owned everywhere else in the library, and a transition would freeze it while any async
+action is pending (entanglement, section 2.3 item 5).
 
 **Trigger parts render optimistic state; content regions render committed state.** This is the
 load-bearing rule of the whole design and it follows from React, not taste: optimistic updates
@@ -738,7 +769,7 @@ can delay or roll it back. The boundary:
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
 | Server Components | Only through Server Functions as actions | Uncontrolled form needs no behaviour JS; the part may still be a client module (section 7.3) |
-| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event; **late-mounting options** in a `<select>` (Select) are never selected by React (`updateOptions` runs only in the select's own commit), so the Root re-applies the intended option when an Option reports its mount: an option that **hydrated** is reconciled first (a user may have picked it before hydration) and one React **created** is only re-applied (the browser's automatic first-option selection on insertion is not an intent), told apart by `useSyncExternalStore`'s server snapshot; and a platform dispatch on a `<select>` requires the **intended option to exist in the DOM**, so a value whose option is still loading is never "reconciled" to the fallback | n/a |
+| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event; **late-mounting options** in a `<select>` (Select) are never selected by React (`updateOptions` runs only in the select's own commit), so the Root re-applies the intended option when an Option reports its mount: an option that **hydrated** is reconciled first (a user may have picked it before hydration) and one React **created** is only re-applied (the browser's automatic first-option selection on insertion is not an intent), told apart by `useSyncExternalStore`'s server snapshot; and a platform dispatch on a `<select>` requires the **intended option to exist in the DOM**, so a value whose option is still loading is never "reconciled" to the fallback; **text typed into a controlled text input before hydration** (Combobox) is adopted at mount through the urgent action with `reason: "platform"` (react-dom keeps a hydrated text input's DOM value and fires no `onChange`); and a component that owns a form value with no visible form element of its own **mirrors the optimistic value into a hidden input** whose `defaultValue` is the reset target, and listens to `reset` on it | n/a |
 
 Rules:
 
@@ -924,8 +955,11 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `pending` | boolean | owner + initiating trigger | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). |
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
-| `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`) | Optimistic selection on triggers; committed on panels. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
+| `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`), `Combobox.Option` (optimistic `aria-selected`; distinct from `active`), `Combobox.Input` (a non-null optimistic value) | Optimistic selection on triggers; committed on panels. |
+| `active` | boolean | `Combobox.Option` | Virtual focus: `aria-activedescendant` points here. Urgent (section 3.2), never a transition. |
+| `stale` | boolean | `Combobox.Popup`, `Combobox.List` (with `aria-busy="true"` on the listbox) | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile. |
+| `empty` | boolean | `Combobox.List` | No mounted options and not stale; the same condition under which `Empty` renders. |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`); Combobox `Input` and `Trigger` likewise, its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
@@ -1070,6 +1104,12 @@ What this means per kind of part:
 | `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
 | Any part with `transition` absent | nothing (no boundary rendered) | Baseline timing; a switch or open calls no `startViewTransition`. |
 
+**Deferred renders animate too.** An update from `useDeferredValue` activates a boundary like a
+transition does (React rule). A part whose content re-renders from a deferred value inside an
+open boundary (Combobox's results inside `Combobox.Popup`) would run a document view transition
+per result change, so its docs recommend the type-map form with `default: "none"` and name the
+cost of a class on `default`.
+
 `Tabs.Indicator` therefore follows optimistic selection, renders no `<ViewTransition>` and has no
 `transition` prop: it is positioned by CSS Anchor Positioning on the optimistic tab and slides via
 a plain CSS `transition` on the anchored insets (moves on click, snaps back on rejection). Any
@@ -1122,6 +1162,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
 | Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
 | Select | `fsui-select` (no direction variants) |
+| Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1278,6 +1319,9 @@ still renders the declarative Invoker Command on its Trigger for the implicit an
 platform's `aria-expanded` mapping and a pre-hydration open that mount reconciliation fills.
 That open shows an empty popup until hydration, as Dialog's and Popover's library mode do; it
 is progressive enhancement, not a supported JS-free mode, and the component doc says so.
+Combobox is the second such component: its Trigger renders no command at all (the popup must be
+anchored to the input, not the button), and its progressive enhancement is that the text input
+works before hydration and the typed text is adopted at mount (section 3.5).
 
 ---
 
@@ -1343,6 +1387,11 @@ a flag (`docs/vision.md`). Mechanism:
 
    Two flags with the same graduation path go on the same part as separate props, not one
    object, so each can be removed independently.
+
+   Adopted without a flag because every stable engine has it: `Element.ariaNotify()` (Chrome
+   141, Firefox 150, Safari 27; Combobox announcements). Recorded as a future `experimental_`
+   rendering candidate: the Open UI customizable combobox (`<input list>` + `<datalist>` with
+   `appearance: base`), Chromium `experimental` only.
 
 2. **Whole component that cannot exist without a flagged feature: the `@funstack/ui/experimental`
    subpath**, same namespace shape, documented as unstable. Nothing in the initial four needs this
@@ -1445,9 +1494,9 @@ The part components keep their long names (`TabsRoot`) as `displayName` and in s
   `ToggleProps`, `ToggleState`.
 - `<Component><State>ChangeDetails` extends `ActionDetails`; when it exposes `reason`, the
   member is `readonly reason: ChangeReason` (never a local union).
-- Shared: `Action`, `ActionDetails`, `ChangeAction`, `ChangeReason`, `RenderProp<Props, State>`,
-  `StateValue<T, State> = T | ((state: State) => T)`, `ViewTransitionClass` (the `transition`
-  prop's type, section 5.2).
+- Shared: `Action`, `ActionDetails`, `ChangeAction`, `UrgentChangeAction` (section 2.6),
+  `ChangeReason`, `RenderProp<Props, State>`, `StateValue<T, State> = T | ((state: State) => T)`,
+  `ViewTransitionClass` (the `transition` prop's type, section 5.2).
 - Props interfaces are `interface`s extending the element props (section 1.5); state objects are
   `interface`s with readonly members.
 - Everything public is exported with `export type`; nothing from `internal/` is public.
@@ -1479,6 +1528,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` works end to end (guards the documented pattern). |
 | Directive | Each built part file starts with `"use client"` or not, exactly as the component's design doc records (script over `dist`, run in `test:run` after `build`). |
 | Platform path (both) | Required for every component with a residual browser path (section 3.5): mount reconciliation (`renderToString`, change the DOM before `hydrateRoot`, exactly one dispatch with `reason: "platform"` and `event === undefined`, StrictMode still one) and, for native form controls, form reset through `<button type="reset">`, `form.reset()` and React's automatic reset after a successful `<form action>` (one dispatch per state owner with the `reset` event; a cancelled `reset` dispatches nothing; a controlled parent that refuses gets the DOM re-synced after settle). |
+| Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once. |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). jsdom tests assert that components render with and without `transition`
@@ -1511,6 +1561,25 @@ never on internal hook state.
 
 ---
 
+## 11. Built-in strings
+
+The library ships no CSS and, until Combobox, shipped no text. It now ships **one kind of
+text**: strings assistive technology needs that a consumer could forget to supply (Combobox's
+result-count announcement through `ariaNotify`). Rules (user decision, Combobox #50, resolved
+question 27):
+
+- A built-in string exists only where its absence is an accessibility gap, never for visible
+  UI (no "Loading…" labels, no placeholder text, no button captions).
+- The default is **English**, written in the component's design doc and its props table, so a
+  consumer can see what will be announced.
+- It is **always overridable** through a prop that takes a **function** of the relevant state
+  (`announce(count, state)`), never a plain string, so a localised message can depend on
+  pluralisation and state; returning `null` announces nothing.
+- The library ships **no locale mechanism** (no provider, no `lang` detection): localisation is
+  the consumer passing the function, and the docs show the one-liner next to every example.
+
+---
+
 ## Resolved questions (2026-10-15)
 
 Decided by the product owner, items 1, 2 and 5 confirmed with the user:
@@ -1519,7 +1588,8 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
    `valueChangeAction`, `openChangeAction`). No bare `changeAction`.
 2. **Urgent opt-out placeholder**: v0 provides no mechanism. Native `on*` props the library does not
    use pass through to the element as an unsupported escape hatch; library-used handlers are removed
-   from part prop types.
+   from part prop types. **Superseded 2026-10-17** by the urgent lane of section 2.6 (resolved
+   question 27); the pass-through escape hatch remains for interactions with no urgent action.
 3. **Swallowed errors count as success** in uncontrolled mode. No veto mechanism until a real case
    appears.
 4. **Root entry plus per-component subpaths.**
@@ -1619,6 +1689,22 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `string` exception in 3.1, the late-option path in 3.5, `useNativeSelectValue` and
     `HTMLSelectElement` in 3.8, the `selected` / `open` rows in 4.1, the no-transition note in
     5.1, `fsui-select` in 5.3, the `selectedcontent` rows in 7.4, the flag row in 8) are applied.
+27. **Combobox (#50)** accepted 2026-10-17 (`design/components/combobox.md`), questions 1 to 5
+    and 7 to 11 as recommended and question 6 **overridden by the user**: one `Combobox` with
+    `allowCustomValue` (no separate Autocomplete); the urgent lane as `inputValueChangeAction:
+    UrgentChangeAction` (section 2.6); two explicit states (`value`, `inputValue`) with no
+    `itemToString`; accepting an option keeps the listbox open with `data-pending` on the
+    option and closes on settle (Menu's rule); Tab does not accept; `multiple` deferred; no
+    `commandfor` on the Trigger and no JS-free mode; Escape left to the platform; the WebKit
+    302008 row with a `positionTryFallbacks` escape hatch; and, by the user's decision, a
+    **default English announcement** (`"No results"`, `"1 result"`, `"N results"`) through
+    `ariaNotify`, overridable through `announce(count, state)`, which sets the built-in-strings
+    rule of section 11. The conventions changes it asked for (2.6 and 3.2 urgent lane and
+    virtual focus, `UrgentChangeAction` in 9.4, the residual paths in 3.5, `Input` / `Clear` /
+    `Empty` / `Status` and the `Root` / `List` / `Label` / `Option` notes in 1.1, the `active` /
+    `stale` / `empty` / `selected` / `open` rows in 4.1, the deferred-render note in 5.1, the
+    types in 5.3, the always-library note in 7.3, the `ariaNotify` note in 8, the urgent test
+    row in 10.1, section 11) are applied.
 
 ## Open questions
 

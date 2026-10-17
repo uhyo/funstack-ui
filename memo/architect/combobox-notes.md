@@ -85,3 +85,12 @@ Positioner/Arrow, Chips (v1), `displayValue` (two explicit states instead).
 
 Design written and committed as proposed; eleven questions for the product owner; conventions
 changes listed in the doc (not applied: another session owns conventions.md today).
+
+## After acceptance (2026-10-17)
+
+Accepted with one user override: `announce` ships a default English message ("No results" /
+"1 result" / "N results"), overridable, `null` to silence. New conventions section 11 (built-in
+strings: English defaults, accessibility-only, always a function prop, no locale mechanism).
+Conventions feedback 1 to 12 applied (2.6 urgent lane, 3.2 virtual focus row, 3.5 residual
+paths, 1.1 vocabulary, 4.1 rows, 5.1 deferred note, 5.3 types, 7.3, 8, 9.4, 10.1 row,
+resolved question 27, decisions row 11).
