@@ -45,3 +45,18 @@ export const supportsDialogClosedBy =
  */
 export const supportsFocusgroup =
   typeof HTMLElement !== "undefined" && "focusGroup" in HTMLElement.prototype;
+
+/**
+ * `focus({ focusVisible })` is read (Chromium 145+, Firefox 104+, Safari 18.4+): the bindings
+ * read the dictionary member before the method runs, so a detached element is enough.
+ */
+export const supportsFocusVisibleOption = (() => {
+  let read = false;
+  document.createElement("div").focus({
+    get focusVisible() {
+      read = true;
+      return false;
+    },
+  } as FocusOptions);
+  return read;
+})();

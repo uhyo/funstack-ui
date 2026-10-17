@@ -1225,6 +1225,68 @@ describe("Dialog", () => {
       await act(async () => runs[1]!.resolve());
     });
 
+    renderBoth("open-generation guard (review M2)", (mode) => {
+      it("action pending, closed by Escape and re-opened: the settle does not close the new open", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        const close = spyClose();
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={
+              <Dialog.Close data-testid="delete" action={() => work.promise}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        await user.click(screen.getByTestId("delete"));
+        // Escape while the action runs: the dialog closes natively.
+        await act(async () => popup().requestClose());
+        await flush();
+        expect(popup().open).toBe(false);
+        // The re-open is entangled with the Close's pending async transition (React batches
+        // them), so it commits together with the action's end.
+        await user.click(trigger());
+        close.mockClear();
+        await act(async () => work.resolve());
+        await flush();
+        expect(popup().open).toBe(true);
+        expect(close).not.toHaveBeenCalled();
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+      });
+    });
+
+    it("JS-free: action pending, closed by Escape and re-opened natively: the dialog stays open", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const close = spyClose();
+      render(
+        <Harness
+          mode="static"
+          content={
+            <Dialog.Close data-testid="delete" action={() => work.promise}>
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      await act(async () => popup().showModal());
+      await user.click(screen.getByTestId("delete"));
+      await act(async () => popup().requestClose());
+      await flush();
+      expect(popup().open).toBe(false);
+      await act(async () => popup().showModal());
+      close.mockClear();
+      await act(async () => work.resolve());
+      await flush();
+      expect(popup().open).toBe(true);
+      expect(close).not.toHaveBeenCalled();
+    });
+
     it("a disabled Close never runs its action", async () => {
       const user = setupUser();
       const closeAction = vi.fn();

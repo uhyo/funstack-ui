@@ -445,6 +445,74 @@ describe("Menu", () => {
       expect(item("archive")).toHaveFocus();
     });
 
+    it("a press on non-item space keeps focus on the current item (M1)", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          content={
+            <>
+              <Menu.Group data-testid="group">
+                <Menu.GroupLabel data-testid="label">File</Menu.GroupLabel>
+                <Menu.Item data-testid="rename">Rename</Menu.Item>
+              </Menu.Group>
+              <Menu.Separator data-testid="sep" />
+              <Menu.Item data-testid="delete">Delete</Menu.Item>
+            </>
+          }
+        />,
+      );
+      await openMenu(user);
+      expect(item("rename")).toHaveFocus();
+      for (const id of ["sep", "label", "popup"]) {
+        expect(fireEvent.mouseDown(item(id))).toBe(false);
+      }
+      await user.click(item("sep"));
+      await user.click(item("label"));
+      await user.pointer({ keys: "[MouseLeft]", target: popup() });
+      expect(item("rename")).toHaveFocus();
+      await user.keyboard("{ArrowDown}");
+      expect(item("delete")).toHaveFocus();
+      // A press on an item is not prevented (the item takes focus as usual).
+      expect(fireEvent.mouseDown(item("rename"))).toBe(true);
+    });
+
+    it("a consumer's control in the popup still takes focus", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          content={
+            <>
+              <input data-testid="field" aria-label="Filter" />
+              <Menu.Item data-testid="rename">Rename</Menu.Item>
+            </>
+          }
+        />,
+      );
+      await openMenu(user);
+      expect(fireEvent.mouseDown(item("field"))).toBe(true);
+      await user.click(item("field"));
+      expect(item("field")).toHaveFocus();
+    });
+
+    it("with focus on the popup itself, ArrowDown / Home go to the first item, ArrowUp / End to the last (M1)", async () => {
+      const user = setupUser();
+      render(<Harness root={{ loop: false }} />);
+      await openMenu(user);
+      for (const [key, id] of [
+        ["{ArrowDown}", "rename"],
+        ["{Home}", "rename"],
+        ["{ArrowUp}", "delete"],
+        ["{End}", "delete"],
+      ] as const) {
+        popup().focus();
+        expect(popup()).toHaveFocus();
+        await user.keyboard(key);
+        expect(item(id)).toHaveFocus();
+      }
+      popup().focus();
+      expect(fireEvent.keyDown(popup(), { key: "ArrowDown" })).toBe(false);
+    });
+
     it("ArrowRight / ArrowLeft on plain items of the top-level menu do nothing", async () => {
       const user = setupUser();
       render(<Harness />);
@@ -972,6 +1040,26 @@ describe("Menu.CheckboxItem", () => {
       expect(isOpen()).toBe(false);
     });
 
+    it("closeOnActivate: dismissed and re-opened while the change runs, the menu stays open (L1)", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const action = vi.fn((_next: boolean) => work.promise);
+      render(<Box action={action} closeOnActivate />);
+      await openMenu(user);
+      await user.click(item("box"));
+      expect(action).toHaveBeenCalledTimes(1);
+      // Escape (the platform's hide), then a new open while the change still runs. React holds
+      // the re-open's commit until the change settles (entangled transitions); the stack close,
+      // which belongs to the first opening, is then dropped.
+      await act(async () => popup().hidePopover());
+      await flush();
+      expect(isOpen()).toBe(false);
+      await user.click(trigger());
+      await act(async () => work.resolve());
+      await flush();
+      expect(isOpen()).toBe(true);
+    });
+
     it("a rejection reaches the boundary", async () => {
       const user = setupUser();
       silenceErrors();
@@ -1191,6 +1279,24 @@ describe("Menu.RadioGroup", () => {
       await user.click(item("date"));
       await flush();
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "sort failed" }));
+    });
+
+    it("closeOnActivate: dismissed and re-opened while the change runs, the menu stays open (L1)", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const action = vi.fn((_next: string) => work.promise);
+      render(<Radios action={action} closeOnActivate />);
+      await openMenu(user);
+      await user.click(item("date"));
+      expect(action).toHaveBeenCalledTimes(1);
+      await act(async () => popup().hidePopover());
+      await flush();
+      expect(isOpen()).toBe(false);
+      await user.click(trigger());
+      await act(async () => work.resolve());
+      await flush();
+      expect(isOpen()).toBe(true);
+      expect(item("date")).toHaveAttribute("aria-checked", "true");
     });
 
     it("closeOnActivate closes after the change; re-activating the selected item closes too", async () => {

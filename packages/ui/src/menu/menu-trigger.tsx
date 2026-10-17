@@ -48,8 +48,13 @@ export function openMenuWithFocus(
     }
     return;
   }
-  menu.setOpenCause(which);
+  menu.setOpenCause(which, isPointerClick(event));
   popover.requestOpen(event, "activate");
+}
+
+/** A click from a pointing device (`detail` counts clicks; keyboard and `click()` give 0). */
+export function isPointerClick(event: Event): boolean {
+  return event.type === "click" && (event as MouseEvent).detail > 0;
 }
 
 /**
@@ -94,7 +99,7 @@ export function MenuTrigger({
       if (menu.popover.intended()) {
         menu.popover.requestClose(native, "activate");
       } else {
-        menu.setOpenCause("first");
+        menu.setOpenCause("first", isPointerClick(native));
         menu.popover.requestOpen(native, "activate");
       }
     },

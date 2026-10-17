@@ -63,7 +63,8 @@ export function DialogClose({
   ...rest
 }: DialogCloseProps) {
   const ctx = useDialogContext("Dialog.Close");
-  const { pending, run } = useActionTrigger();
+  // The open-generation guard: a close from a previous opening must not close a new one.
+  const { pending, run } = useActionTrigger(ctx.openGeneration);
   const { ids, dialogRef, recordCloseIntent } = ctx;
   const hasAction = action !== undefined;
 

@@ -135,6 +135,14 @@ export function DialogRoot({
     closeIntent.current = undefined;
     return intent;
   }, []);
+  // Advanced on every open (the open dispatch and the Popup's native `toggle` to open), so a Close action that
+  // settles after the user dismissed and re-opened the dialog does not close the new open (the
+  // PO's open-generation rule, design/components/popover.md 3.4; review M2).
+  const generation = useRef(0);
+  const openGeneration = useCallback(() => generation.current, []);
+  const nextOpenGeneration = useCallback(() => {
+    generation.current++;
+  }, []);
 
   // What the user already intends: the latest in-flight dispatch, else the optimistic value
   // (conventions 3.8 rule 1). Judging no-ops against it also deduplicates the StrictMode re-run
@@ -143,6 +151,7 @@ export function DialogRoot({
 
   const requestOpen = (event: Event | undefined, reason: ChangeReason): void => {
     if (!isLibrary || intended()) return;
+    nextOpenGeneration();
     dispatch(true, createActionDetails(event, { reason, returnValue: undefined }));
   };
 
@@ -170,6 +179,8 @@ export function DialogRoot({
     dialogRef,
     recordCloseIntent,
     takeCloseIntent,
+    openGeneration,
+    nextOpenGeneration,
   };
 
   const state: DialogRootState = {

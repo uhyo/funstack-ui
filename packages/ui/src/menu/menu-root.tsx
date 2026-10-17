@@ -1,5 +1,5 @@
 "use client";
-import { use, useRef } from "react";
+import { use, useCallback, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
 import { useDelayedPair } from "../internal/use-delayed-pair.js";
@@ -7,7 +7,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { usePopoverRoot } from "../internal/use-popover-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { MenuContext, MenuListContext } from "./menu-context.js";
-import type { MenuContextValue, MenuOpenCause } from "./menu-context.js";
+import type { MenuContextValue, MenuOpenFocus } from "./menu-context.js";
 
 /** Details passed as the second argument of `Menu.Root`'s `openChangeAction`. */
 export interface MenuOpenChangeDetails extends ActionDetails {
@@ -67,6 +67,8 @@ export interface MenuRootProps {
  * `showPopover()` / `hidePopover()` once the change has committed); dismissals are the
  * browser's and `openChangeAction(false)` is a notification.
  */
+const DEFAULT_FOCUS: MenuOpenFocus = { cause: "first", pointer: false };
+
 export function MenuRoot({
   open,
   defaultOpen,
@@ -96,8 +98,8 @@ export function MenuRoot({
   const timers = useDelayedPair();
   // The cause recorded by the part about to dispatch an open, and the cause of the open being
   // shown (design 14, "Open cause").
-  const nextCause = useRef<MenuOpenCause | null>(null);
-  const openCause = useRef<MenuOpenCause | null>(null);
+  const nextCause = useRef<MenuOpenFocus | null>(null);
+  const openCause = useRef<MenuOpenFocus | null>(null);
 
   const popover = usePopoverRoot<MenuOpenChangeDetails>({
     component: "menu",
@@ -109,31 +111,55 @@ export function MenuRoot({
     onDispatch: (next) => {
       // Any dispatch cancels hover intent (walkthrough 9).
       timers.cancel();
-      if (next) openCause.current = nextCause.current ?? "first";
+      if (next) openCause.current = nextCause.current ?? DEFAULT_FOCUS;
       nextCause.current = null;
     },
   });
 
-  const value: { -readonly [K in keyof MenuContextValue]: MenuContextValue[K] } = {
+  const setOpenCause = useCallback((cause: MenuOpenFocus["cause"], pointer = false) => {
+    nextCause.current = { cause, pointer };
+  }, []);
+  const takeOpenCause = useCallback(() => {
+    const cause = openCause.current ?? DEFAULT_FOCUS;
+    openCause.current = null;
+    return cause;
+  }, []);
+
+  const resolvedDelay = delay ?? 100;
+  const resolvedCloseDelay = closeDelay ?? 150;
+  // Note: `popover` is a new object on every render (the shared `usePopoverRoot` is not memoised:
+  // its `dispatch` closes over the render's state), so today this recomputes on every render of
+  // the Root and the parts re-render with it, as Popover's do. The other members are stable; the
+  // memo starts to hit without further change once that hook returns a stable value.
+  const value = useMemo<MenuContextValue>(() => {
+    const self: MenuContextValue = {
+      popover,
+      submenu,
+      // The top-level menu: this one, or the parent's root (design 2.2).
+      get root() {
+        return parentMenu?.root ?? self;
+      },
+      parent: parentMenu,
+      loop,
+      delay: resolvedDelay,
+      closeDelay: resolvedCloseDelay,
+      triggerId: `${popover.ids.popup}-trigger`,
+      setOpenCause,
+      takeOpenCause,
+      timers,
+    };
+    return self;
+  }, [
     popover,
     submenu,
-    root: null as unknown as MenuContextValue,
-    parent: parentMenu,
+    parentMenu,
     loop,
-    delay: delay ?? 100,
-    closeDelay: closeDelay ?? 150,
-    triggerId: `${popover.ids.popup}-trigger`,
-    setOpenCause: (cause) => {
-      nextCause.current = cause;
-    },
-    takeOpenCause: () => {
-      const cause = openCause.current ?? "first";
-      openCause.current = null;
-      return cause;
-    },
+    resolvedDelay,
+    resolvedCloseDelay,
+    setOpenCause,
+    takeOpenCause,
     timers,
-  };
-  value.root = parentMenu?.root ?? value;
+  ]);
 
   const state: MenuRootState = {
     open: popover.optimistic,

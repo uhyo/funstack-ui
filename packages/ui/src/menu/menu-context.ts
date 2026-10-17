@@ -10,6 +10,16 @@ import type { PopoverRootValue } from "../internal/use-popover-root.js";
  */
 export type MenuOpenCause = "first" | "last" | "none";
 
+/** How the open being shown should place focus (design 6.1; review H1). */
+export interface MenuOpenFocus {
+  readonly cause: MenuOpenCause;
+  /**
+   * The open came from a pointer click (`detail > 0`): the item is focused without the focus
+   * ring where the engine supports `focus({ focusVisible: false })`.
+   */
+  readonly pointer: boolean;
+}
+
 /** One menu level: what its Root provides to its Trigger, Popup and items. */
 export interface MenuContextValue {
   /** The shared popover machinery (`usePopoverRoot`). */
@@ -25,10 +35,10 @@ export interface MenuContextValue {
   readonly closeDelay: number;
   /** The Trigger's id (`aria-labelledby` of the Popup). */
   readonly triggerId: string;
-  /** Record the focus target of the next open; read when it is dispatched. */
-  readonly setOpenCause: (cause: MenuOpenCause) => void;
-  /** Read and clear the focus target of the open being shown (default `"first"`). */
-  readonly takeOpenCause: () => MenuOpenCause;
+  /** Record the focus target of the next open (and whether a pointer asked for it). */
+  readonly setOpenCause: (cause: MenuOpenCause, pointer?: boolean) => void;
+  /** Read and clear the focus target of the open being shown (default `"first"`, keyboard). */
+  readonly takeOpenCause: () => MenuOpenFocus;
   /** Submenu hover-intent timers, shared by the SubmenuTrigger and the Popup. */
   readonly timers: DelayedPair;
 }

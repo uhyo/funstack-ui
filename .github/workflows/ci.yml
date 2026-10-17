@@ -69,7 +69,10 @@ jobs:
       - name: Install Playwright browser
         run: pnpm --filter @funstack/ui exec playwright install --with-deps ${{ matrix.browser }}
 
+      # Bounded: a hang of the engine (WebKit 302008, the submenu placement row) must fail the
+      # job rather than stall it. A normal run takes about a minute.
       - name: Run tests (browser)
+        timeout-minutes: 10
         run: pnpm run test:browser
         env:
           FUNSTACK_BROWSERS: ${{ matrix.browser }}

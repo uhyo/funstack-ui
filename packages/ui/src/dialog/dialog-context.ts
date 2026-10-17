@@ -50,6 +50,13 @@ export interface DialogContextValue {
   readonly recordCloseIntent: (intent: DialogCloseIntent | undefined) => void;
   /** Read and clear the recorded intent (the Popup's `close` listener). */
   readonly takeCloseIntent: () => DialogCloseIntent | undefined;
+  /**
+   * Counts the opens of this dialog. A Close action reads it when it starts and skips its close
+   * if a newer open started meanwhile (the dialog was dismissed and opened again).
+   */
+  readonly openGeneration: () => number;
+  /** Advance `openGeneration` (an open dispatch, the `<dialog>`'s native `toggle` to open). */
+  readonly nextOpenGeneration: () => void;
 }
 
 export const DialogContext = createContext<DialogContextValue | null>(null);

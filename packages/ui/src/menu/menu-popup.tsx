@@ -5,6 +5,7 @@ import type {
   CSSProperties,
   FocusEvent,
   KeyboardEvent,
+  MouseEvent,
   PointerEvent,
   ReactNode,
   ViewTransitionClass,
@@ -51,6 +52,9 @@ export interface MenuPopupProps extends Omit<
   | "onKeyDown"
   | "onFocus"
   | "onBlur"
+  | "onMouseDown"
+  | "onPointerEnter"
+  | "onPointerLeave"
   | "onToggle"
   | "onBeforeToggle"
   | "className"
@@ -101,6 +105,10 @@ const TYPEAHEAD_RESET_MS = 500;
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/** What a press may focus inside a popup: items, the popup itself, the consumer's controls. */
+const FOCUSABLE_SELECTOR =
+  'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"])';
+
 /**
  * The menu itself: `<div popover="auto" role="menu" aria-labelledby={trigger} tabindex="-1">`,
  * placed against its Trigger with CSS Anchor Positioning. Owns the keyboard model (design 5):
@@ -110,8 +118,9 @@ const isDev = process.env.NODE_ENV !== "production";
  * Style it with `:popover-open`; it emits `data-side` / `data-align` but no `data-open`.
  *
  * Owned keys (conventions 1.2): `id`, `popover`, `role`, `aria-labelledby` (token-merged),
- * `tabIndex`, `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onPointerEnter` /
- * `onPointerLeave` (submenus), and `data-side` / `data-align` unless `side` is `null`.
+ * `tabIndex`, `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
+ * non-item space keeps focus on the current item), `onPointerEnter` / `onPointerLeave`, and
+ * `data-side` / `data-align` unless `side` is `null`.
  */
 export function MenuPopup({
   side: sideProp,
@@ -147,10 +156,12 @@ export function MenuPopup({
     initialFocus: undefined,
     // Design 6.1: the first (or last) enabled item by open cause, nothing for a hover open, the
     // popup itself when there are no items.
+    // A pointer open focuses without the focus ring where the engine can be told so (H1).
     resolveInitialFocus: (popup) => {
-      const cause = menu.takeOpenCause();
+      const { cause, pointer } = menu.takeOpenCause();
       if (cause === "none") return null;
-      return edgeItem(popup, cause) ?? popup;
+      const element = edgeItem(popup, cause) ?? popup;
+      return pointer ? { element, focusVisible: false } : element;
     },
     keepMounted,
     transition,
@@ -216,8 +227,17 @@ export function MenuPopup({
     }
 
     if (key === "ArrowDown" || key === "ArrowUp" || key === "Home" || key === "End") {
+      if (!onItem) {
+        // The popup itself has focus (no items at open, or focus landed on it some other way):
+        // into the list from its edge (review M1).
+        event.preventDefault();
+        const items = menuItems(popup);
+        const item = key === "ArrowDown" || key === "Home" ? items[0] : items.at(-1);
+        if (item !== undefined) focusItem(item);
+        return;
+      }
       // The browser moves focus itself where `focusgroup` is implemented.
-      if (nativeFocusgroup || !onItem) return;
+      if (nativeFocusgroup) return;
       event.preventDefault();
       const items = menuItems(popup);
       const index = items.indexOf(target);
@@ -248,6 +268,17 @@ export function MenuPopup({
     if (popup.matches(":popover-open")) popup.hidePopover();
   };
 
+  // A press on non-item space (padding, a Separator, a GroupLabel) would focus the popup itself
+  // (`tabindex="-1"`) and take focus off the current item; keep it where it is (review M1, the
+  // pointer-focus model of design 6.2). Focusable content of the consumer's (a text field) still
+  // takes focus.
+  const onMouseDown = (event: MouseEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as Element;
+    const focusable = target.closest(FOCUSABLE_SELECTOR);
+    if (focusable === null || focusable.getAttribute("role") === "menu") event.preventDefault();
+  };
+
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
     id: popover.ids.popup,
     popover: "auto",
@@ -258,6 +289,7 @@ export function MenuPopup({
     ...(experimental_focusgroup && { focusgroup: `menu ${loop ? "wrap" : "nowrap"}` }),
     onKeyDown,
     onBlur,
+    onMouseDown,
     ...(submenu && {
       onPointerEnter: (event: PointerEvent<HTMLElement>) => {
         if (event.pointerType !== "touch") menu.timers.cancelClose();
