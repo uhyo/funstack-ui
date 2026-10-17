@@ -65,6 +65,19 @@ const clientFiles = [
   "checkbox-group/checkbox-group-label.mjs",
   "checkbox-group/checkbox-group-item.mjs",
   "checkbox-group/checkbox-group-parent.mjs",
+  // Every Popover part, its context and the hooks Menu shares are client modules
+  // (design/components/popover.md, decision 12 and 14).
+  "popover/popover-context.mjs",
+  "popover/popover-root.mjs",
+  "popover/popover-trigger.mjs",
+  "popover/popover-popup.mjs",
+  "popover/popover-close.mjs",
+  "popover/popover-title.mjs",
+  "popover/popover-description.mjs",
+  "internal/use-popover-root.mjs",
+  "internal/use-popover-popup.mjs",
+  "internal/use-popover-trigger.mjs",
+  "internal/use-exit-animation.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -81,6 +94,8 @@ const directiveFreeFiles = [
   "radio-group/index.mjs",
   "checkbox-group/index.mjs",
   "checkbox-group/sync-presence.mjs",
+  "popover/index.mjs",
+  "internal/anchor-position.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

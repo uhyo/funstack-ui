@@ -33,6 +33,7 @@
     "./checkbox": "./dist/checkbox/index.mjs",
     "./checkbox-group": "./dist/checkbox-group/index.mjs",
     "./dialog": "./dist/dialog/index.mjs",
+    "./popover": "./dist/popover/index.mjs",
     "./radio-group": "./dist/radio-group/index.mjs",
     "./switch": "./dist/switch/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",

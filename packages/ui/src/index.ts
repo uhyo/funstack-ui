@@ -85,6 +85,26 @@ export type {
   DialogDescriptionProps,
   DialogDescriptionState,
 } from "./dialog/index.js";
+
+export { Popover } from "./popover/index.js";
+export type {
+  PopoverRootProps,
+  PopoverRootState,
+  PopoverOpenChangeDetails,
+  PopoverTriggerProps,
+  PopoverTriggerState,
+  PopoverPopupProps,
+  PopoverPopupState,
+  PopoverSide,
+  PopoverAlign,
+  PopoverCloseProps,
+  PopoverCloseState,
+  PopoverTitleProps,
+  PopoverTitleState,
+  PopoverDescriptionProps,
+  PopoverDescriptionState,
+} from "./popover/index.js";
+
 export { RadioGroup } from "./radio-group/index.js";
 
 export { CheckboxGroup } from "./checkbox-group/index.js";

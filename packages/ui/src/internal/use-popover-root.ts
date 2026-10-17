@@ -1,0 +1,219 @@
+"use client";
+import { useCallback, useId, useLayoutEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
+import { createActionDetails } from "./action-details.js";
+import { transitionTypes } from "./transition-types.js";
+import type { ActionDetails, ChangeAction, ChangeReason } from "./types.js";
+import { useControllableAction } from "./use-controllable-action.js";
+import { useDevWarning } from "./use-dev-warning.js";
+
+/**
+ * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
+ * opening and part-initiated closing are library-owned (transitions keyed on committed state);
+ * dismissals are the browser's and notified (design/components/popover.md section 2).
+ */
+export type PopoverMode = "static" | "library";
+
+/**
+ * What caused the next close, recorded just before it happens (design 2.3). The `toggle` event
+ * carries no source; without an intent a close is a `"dismiss"`.
+ */
+export interface PopoverCloseIntent {
+  readonly reason: ChangeReason;
+  readonly event: Event | undefined;
+}
+
+/** The `details` every popover-like `openChangeAction` receives. */
+export interface PopoverLikeDetails extends ActionDetails {
+  readonly reason: ChangeReason;
+}
+
+/**
+ * The Root's state and machinery, shared by Popover and Menu (design 14). The component puts it
+ * in its own context; `usePopoverTrigger` and `usePopoverPopup` take it as their first argument.
+ */
+export interface PopoverRootValue {
+  readonly mode: PopoverMode;
+  /** `useId`-based ids: the popup, its Title and its Description. */
+  readonly ids: { readonly popup: string; readonly title: string; readonly description: string };
+  /** Committed open state (library mode); `false` in JS-free mode. */
+  readonly committed: boolean;
+  /** Optimistic open state (library mode); `false` in JS-free mode. */
+  readonly optimistic: boolean;
+  /** The Root's transition is pending (library mode). */
+  readonly pending: boolean;
+  /**
+   * What the user already intends: the latest in-flight dispatch's `next`, else the optimistic
+   * value of the last commit. Safe to call from handlers and effects, also after an `await`.
+   */
+  readonly intended: () => boolean;
+  /**
+   * Open through the Root's transition (library mode): a Trigger click, a foreign open caught at
+   * `beforetoggle`, or mount reconciliation. A no-op when `true` is already intended.
+   */
+  readonly requestOpen: (event: Event | undefined, reason: ChangeReason) => void;
+  /**
+   * A library-owned close (library mode): a Trigger click while open, a Close part, Menu's item
+   * activation. `openChangeAction(false)` is awaited and the popup hides in the commit. A no-op
+   * when `false` is already intended.
+   */
+  readonly requestClose: (event: Event | undefined, reason: ChangeReason) => void;
+  /**
+   * The browser hid the popup (a dismissal or a foreign invoker): dispatch the `false`
+   * notification unless `false` is already intended (the library's own echo, or a dismissal
+   * during a pending part-initiated close).
+   */
+  readonly notifyClosed: (event: Event | undefined, reason: ChangeReason) => void;
+  /** From `useControllableAction`: the latest in-flight intent, or `null`. */
+  readonly latestInFlight: () => { readonly next: boolean } | null;
+  /** The registered Trigger: `showPopover({ source })` and the focus-return fallback. */
+  readonly triggerRef: RefObject<HTMLElement | null>;
+  /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()`. */
+  readonly popupRef: RefObject<HTMLElement | null>;
+  /** Record what causes the next close. Cleared after a task if the popover did not close. */
+  readonly recordCloseIntent: (intent: PopoverCloseIntent | undefined) => void;
+  /** Read and clear the recorded intent (the Popup's `toggle` listener). */
+  readonly takeCloseIntent: () => PopoverCloseIntent | undefined;
+}
+
+export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
+  /** Transition types and messages: `"popover"` gives `fsui-popover`, `fsui-popover-open`, … */
+  readonly component: string;
+  /** Public name of the Root part for development warnings (`"Popover.Root"`). */
+  readonly part: string;
+  readonly open: boolean | undefined;
+  readonly defaultOpen: boolean | undefined;
+  readonly openChangeAction: ChangeAction<boolean, Details> | undefined;
+  /**
+   * Builds the `details` of a dispatch. Default: `createActionDetails(event, { reason })`. A
+   * component with more fields (Menu) passes its own.
+   */
+  readonly details?: (event: Event | undefined, reason: ChangeReason) => Details;
+}
+
+function isPopoverOpen(element: Element | null): boolean {
+  if (element === null) return false;
+  try {
+    return element.matches(":popover-open");
+  } catch {
+    return false;
+  }
+}
+
+/** How long a recorded close intent survives when the popover did not close (design 2.3). */
+function clearLater(
+  intentRef: { current: PopoverCloseIntent | undefined },
+  intent: PopoverCloseIntent,
+  popupRef: { current: HTMLElement | null },
+): void {
+  setTimeout(() => {
+    // Closed: its `toggle` event (queued as a task) consumes the intent. Still open: the close
+    // was cancelled or invalid, so the intent is stale.
+    if (intentRef.current === intent && isPopoverOpen(popupRef.current)) {
+      intentRef.current = undefined;
+    }
+  }, 0);
+}
+
+/**
+ * The Root of a popover-like component without its public props (design 14.1): mode detection
+ * (once, from the first render), `useControllableAction<boolean>`, ids, refs, close intents and
+ * the intent-aware `requestOpen` / `requestClose` / `notifyClosed`.
+ */
+export function usePopoverRoot<Details extends PopoverLikeDetails>(
+  options: UsePopoverRootOptions<Details>,
+): PopoverRootValue {
+  const { component, part, open, defaultOpen, openChangeAction, details } = options;
+
+  // Mode is decided once, from the first render's props (design 2).
+  const isLibraryNow =
+    open !== undefined || defaultOpen !== undefined || openChangeAction !== undefined;
+  const [mode] = useState<PopoverMode>(isLibraryNow ? "library" : "static");
+  const isLibrary = mode === "library";
+  useDevWarning(
+    isLibrary !== isLibraryNow,
+    `${part}: the mode changed after mount (\`open\`, \`defaultOpen\` and \`openChangeAction\` ` +
+      "were all absent on one render and present on another). Switching between JS-free and " +
+      "library mode is not supported.",
+  );
+
+  // Hooks cannot be conditional: JS-free mode calls the hook too and never dispatches.
+  const { committed, optimistic, pending, dispatch, latestInFlight } = useControllableAction<
+    boolean,
+    Details
+  >({
+    controlled: isLibrary ? open : undefined,
+    defaultValue: isLibrary ? defaultOpen : undefined,
+    initialValue: false,
+    action: isLibrary ? openChangeAction : undefined,
+    transitionTypes: (next) => transitionTypes(component, next ? "open" : "close"),
+    warn: { component: part, prop: "open" },
+  });
+
+  const id = useId();
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const popupRef = useRef<HTMLElement | null>(null);
+  const closeIntent = useRef<PopoverCloseIntent | undefined>(undefined);
+
+  // The optimistic value of the last commit, for callers that run after an `await` (a Close
+  // action's continuation) and would otherwise read the value of the render they were created in.
+  const committedOptimistic = useRef(optimistic);
+  useLayoutEffect(() => {
+    committedOptimistic.current = optimistic;
+  });
+
+  const recordCloseIntent = useCallback((intent: PopoverCloseIntent | undefined) => {
+    closeIntent.current = intent;
+    if (intent !== undefined) clearLater(closeIntent, intent, popupRef);
+  }, []);
+  const takeCloseIntent = useCallback(() => {
+    const intent = closeIntent.current;
+    closeIntent.current = undefined;
+    return intent;
+  }, []);
+
+  // Conventions 3.8 rule 1: judge no-ops against what the user already intends. That also
+  // deduplicates the StrictMode re-run of the mount reconciliation and recognises the library's
+  // own `hidePopover()` echoing back through `toggle`.
+  const intended = (): boolean => latestInFlight()?.next ?? committedOptimistic.current;
+
+  const buildDetails = (event: Event | undefined, reason: ChangeReason): Details =>
+    details !== undefined
+      ? details(event, reason)
+      : (createActionDetails(event, { reason }) as unknown as Details);
+
+  const requestOpen = (event: Event | undefined, reason: ChangeReason): void => {
+    if (!isLibrary || intended()) return;
+    dispatch(true, buildDetails(event, reason));
+  };
+
+  const requestClose = (event: Event | undefined, reason: ChangeReason): void => {
+    if (!isLibrary || !intended()) return;
+    dispatch(false, buildDetails(event, reason));
+  };
+
+  // Same guard as `requestClose`; a separate name because the callers mean different things.
+  const notifyClosed = (event: Event | undefined, reason: ChangeReason): void => {
+    if (!isLibrary || !intended()) return;
+    dispatch(false, buildDetails(event, reason));
+  };
+
+  // Not memoised: `dispatch` is a new function on every render (as Dialog), so parts re-render
+  // with the Root, which they do anyway when its state changes.
+  return {
+    mode,
+    ids: { popup: id, title: `${id}-title`, description: `${id}-description` },
+    committed: isLibrary && committed,
+    optimistic: isLibrary && optimistic,
+    pending: isLibrary && pending,
+    intended,
+    requestOpen,
+    requestClose,
+    notifyClosed,
+    latestInFlight,
+    triggerRef,
+    popupRef,
+    recordCloseIntent,
+    takeCloseIntent,
+  };
+}

@@ -1,0 +1,749 @@
+// Popover rows that need a real engine (design/components/popover.md 13.3): real Invoker Commands
+// and `:popover-open`, the implicit anchor placing the popup, Escape and light dismiss, the
+// platform's focusing steps and focus return, nested auto popovers (and the library's focus return
+// the platform leaves out), `position-try-fallbacks`, exit animations and the deferred unmount,
+// ViewTransition around the top-layer element, and stacking with Tooltip, Dialog and unrelated
+// popovers. Real keyboard and pointer input comes from Playwright through `user` (`userEvent`
+// from `vitest/browser` inside `act`); the ViewTransition rows click in-page outside `act`, as
+// `transition-boundary.browser.test.tsx` does, because `act` would flush React's queue itself.
+//
+// Engine branches (src/__tests__/engine.ts, memo/developer/cross-engine.md):
+// - Firefox animates no CSS exit of a popover: the exit rows branch on whether `getAnimations()`
+//   found anything when the popup was hidden.
+// - WebKit 302008: `position-try-fallbacks` on a nested popover hangs / spins, so the nested rows
+//   render the inner Popup with `side={null}` on WebKit and the nested flip runs elsewhere only.
+// - `<dialog popover>` focusing steps are unverified in WebKit: the raw-platform row records what
+//   the engine does; the library rows assert the library's result, which the design 6.1 fallback
+//   makes the same in every engine.
+// - `popover="hint"` is missing in Safari 27.0 (`supportsPopoverHint`); the Tooltip row expects
+//   the same either way.
+import { act, render, screen } from "@testing-library/react";
+import { startTransition, useState } from "react";
+import type { ReactNode, ViewTransitionClass } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { userEvent } from "vitest/browser";
+import { user } from "../__tests__/browser-user.js";
+import { browserName, supportsPopoverHint } from "../__tests__/engine.js";
+import { Dialog } from "../dialog/index.js";
+import { Tooltip } from "../tooltip/index.js";
+import { Popover } from "./index.js";
+import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
+
+type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
+
+const trigger = () => screen.getByTestId("trigger");
+const popup = () => screen.getByTestId("popup");
+const isOpen = (element: Element = popup()) => element.matches(":popover-open");
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Lets queued `toggle` tasks and React's follow-up work run. */
+const flush = () =>
+  act(async () => {
+    await sleep(20);
+  });
+
+function addStyle(css: string): () => void {
+  const style = document.createElement("style");
+  style.textContent = css;
+  document.head.append(style);
+  return () => style.remove();
+}
+
+const cleanups: (() => void)[] = [];
+
+afterEach(async () => {
+  // Close anything left open so the next test starts with an interactive page.
+  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
+  for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
+    if (element.matches(":popover-open")) element.hidePopover();
+  }
+  for (const cleanup of cleanups.splice(0)) cleanup();
+  vi.restoreAllMocks();
+});
+
+/** Box styles that make positions predictable (the popover and dialog UA styles reset). */
+const box = (width: number, height: number) => ({
+  margin: 0,
+  inset: "auto",
+  padding: 0,
+  border: 0,
+  width,
+  height,
+});
+
+function Library({
+  action,
+  popup: popupProps,
+  children,
+  before,
+}: {
+  action?: ActionFn;
+  popup?: Partial<PopoverPopupProps>;
+  children?: ReactNode;
+  /** Rendered before the Root (an outside button). */
+  before?: ReactNode;
+}) {
+  return (
+    <div style={{ padding: "40px 160px" }}>
+      {/* Above the Trigger, so the popup (placed below it) never covers it. */}
+      <button type="button" data-testid="outside" style={{ display: "block" }}>
+        Outside
+      </button>
+      {before}
+      <Popover.Root defaultOpen={false} openChangeAction={action}>
+        <Popover.Trigger data-testid="trigger" style={{ width: 100, height: 30 }}>
+          Filters
+        </Popover.Trigger>
+        <Popover.Popup data-testid="popup" style={box(200, 120)} {...popupProps}>
+          <Popover.Title>Filters</Popover.Title>
+          {children ?? (
+            <>
+              <input name="query" />
+              <Popover.Close data-testid="close">Done</Popover.Close>
+            </>
+          )}
+        </Popover.Popup>
+      </Popover.Root>
+    </div>
+  );
+}
+
+describe("JS-free mode (browser)", () => {
+  it("a real toggle-popover click opens and closes; aria-expanded follows; Close hides", async () => {
+    render(
+      <Popover.Root>
+        <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+        <Popover.Popup data-testid="popup" style={box(200, 100)}>
+          <Popover.Title>Filters</Popover.Title>
+          <Popover.Close data-testid="close">Done</Popover.Close>
+        </Popover.Popup>
+      </Popover.Root>,
+    );
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    await user.click(trigger());
+    expect(isOpen()).toBe(true);
+    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("true");
+    await user.click(trigger());
+    expect(isOpen()).toBe(false);
+    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
+    await user.click(trigger());
+    expect(isOpen()).toBe(true);
+    await user.click(screen.getByTestId("close"));
+    expect(isOpen()).toBe(false);
+    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
+    // The platform returned focus to the invoker (first popover in a stack).
+    expect(trigger()).toHaveFocus();
+  });
+});
+
+describe("library mode (browser)", () => {
+  it("the Trigger's click goes through the library; the popup is anchored below it", async () => {
+    let release!: () => void;
+    const action = vi.fn<ActionFn>(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    render(<Library action={action} />);
+    await user.click(trigger());
+    expect(action).toHaveBeenCalledTimes(1);
+    const details = action.mock.calls[0]![1];
+    expect(details.event).toBeInstanceOf(MouseEvent);
+    expect(details.reason).toBe("activate");
+    // The command was cancelled: the popup is still hidden while the action runs.
+    expect(isOpen()).toBe(false);
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    await act(async () => release());
+    expect(isOpen()).toBe(true);
+    expect(trigger()).not.toHaveAttribute("data-pending");
+    // `showPopover({ source: trigger })`: the implicit anchor; `position-area: bottom`.
+    const t = trigger().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    expect(p.top).toBeCloseTo(t.bottom, 0);
+    expect(p.left + p.width / 2).toBeCloseTo(t.left + t.width / 2, 0);
+  });
+
+  it("a foreign show-popover invoker is cancelled at beforetoggle; the ToggleEvent names it", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library
+        action={action}
+        before={
+          <button type="button" data-testid="foreign">
+            Foreign
+          </button>
+        }
+      />,
+    );
+    const foreign = screen.getByTestId("foreign");
+    foreign.setAttribute("commandfor", popup().id);
+    foreign.setAttribute("command", "show-popover");
+    await user.click(foreign);
+    expect(action).toHaveBeenCalledTimes(1);
+    const event = action.mock.calls[0]![1].event!;
+    expect(event).toBeInstanceOf(ToggleEvent);
+    expect(event.type).toBe("beforetoggle");
+    expect((event as ToggleEvent & { source?: Element | null }).source).toBe(foreign);
+    await flush();
+    expect(isOpen()).toBe(true);
+  });
+
+  it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
+    const action = vi.fn<ActionFn>();
+    render(<Library action={action} />);
+    await user.click(trigger());
+    await flush();
+    expect(isOpen()).toBe(true);
+    await user.keyboard("{Escape}");
+    expect(isOpen()).toBe(false);
+    expect(trigger()).toHaveFocus();
+    await flush();
+    expect(action).toHaveBeenCalledTimes(2);
+    const [next, details] = action.mock.calls[1]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("dismiss");
+    expect(details.event?.type).toBe("toggle");
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("a click outside light-dismisses ('dismiss'); focus stays on the clicked element", async () => {
+    const action = vi.fn<ActionFn>();
+    render(<Library action={action} />);
+    await user.click(trigger());
+    await flush();
+    expect(isOpen()).toBe(true);
+    await user.click(screen.getByTestId("outside"));
+    expect(isOpen()).toBe(false);
+    await flush();
+    expect(screen.getByTestId("outside")).toHaveFocus();
+    expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+  });
+
+  it("a Trigger click while open closes through the library and does not reopen", async () => {
+    const action = vi.fn<ActionFn>();
+    render(<Library action={action} />);
+    await user.click(trigger());
+    await flush();
+    await user.click(trigger());
+    await flush();
+    expect(isOpen()).toBe(false);
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(action.mock.calls[1]![0]).toBe(false);
+    expect(action.mock.calls[1]![1].reason).toBe("activate");
+    expect(action.mock.calls[1]![1].event).toBeInstanceOf(MouseEvent);
+  });
+
+  it("a Close part closes through the library ('activate')", async () => {
+    const action = vi.fn<ActionFn>();
+    render(<Library action={action} />);
+    await user.click(trigger());
+    await flush();
+    await user.click(screen.getByTestId("close"));
+    await flush();
+    expect(isOpen()).toBe(false);
+    expect(action.mock.calls[1]![1].reason).toBe("activate");
+    expect(trigger()).toHaveFocus();
+  });
+
+  it("aria-modal='false' and role='dialog' are on the <dialog>", () => {
+    render(<Library />);
+    expect(popup().tagName).toBe("DIALOG");
+    expect(popup()).toHaveAttribute("aria-modal", "false");
+    expect(popup()).toHaveAttribute("role", "dialog");
+    expect(popup()).toHaveAttribute("popover", "auto");
+    expect((popup() as HTMLElement).popover).toBe("auto");
+  });
+});
+
+describe("focus (browser)", () => {
+  it("platform probe: what showPopover() on a <dialog> does with focus", async () => {
+    // Raw platform, no library: records the engine's popover focusing steps for a <dialog>.
+    render(
+      <>
+        <button type="button" data-testid="opener">
+          Opener
+        </button>
+        <dialog popover="auto" data-testid="raw" aria-label="raw">
+          <button type="button" data-testid="inside">
+            Inside
+          </button>
+        </dialog>
+      </>,
+    );
+    const opener = screen.getByTestId("opener");
+    opener.focus();
+    const raw = screen.getByTestId("raw");
+    act(() => raw.showPopover({ source: opener }));
+    const inside = raw.contains(document.activeElement);
+    console.info(`[${browserName}] <dialog popover> focusing steps move focus inside: ${inside}`);
+    if (browserName === "webkit") {
+      // Unverified (design 6.1): record it; the library's fallback covers either outcome.
+      expect([true, false]).toContain(inside);
+    } else {
+      // Chromium 156, Firefox 157 (research): the dialog focusing steps run.
+      expect(inside).toBe(true);
+      expect(screen.getByTestId("inside")).toHaveFocus();
+    }
+  });
+
+  it("<dialog> default: focus moves to the first focusable descendant after a library open", async () => {
+    render(<Library />);
+    await user.click(trigger());
+    await flush();
+    expect(document.activeElement).toHaveAttribute("name", "query");
+    await user.keyboard("{Escape}");
+    expect(trigger()).toHaveFocus();
+  });
+
+  it("initialFocus: the target gets focus through the deferred showPopover()", async () => {
+    render(
+      <Library popup={{ initialFocus: "[data-initial]" }}>
+        <button type="button">First</button>
+        <h3 tabIndex={-1} data-initial="">
+          Heading
+        </h3>
+      </Library>,
+    );
+    await user.click(trigger());
+    await flush();
+    expect(document.activeElement).toHaveAttribute("data-initial");
+    expect(document.activeElement).not.toHaveAttribute("autofocus");
+  });
+
+  it("nothing focusable: the popup itself gets focus", async () => {
+    render(
+      <Library>
+        <p>Read only</p>
+      </Library>,
+    );
+    await user.click(trigger());
+    await flush();
+    expect(popup().contains(document.activeElement)).toBe(true);
+  });
+
+  it("render={<div />}: focus stays on the Trigger and Tab enters the adjacent popup", async () => {
+    render(
+      <Library popup={{ render: <div />, role: "region", "aria-label": "Help" }}>
+        <a href="#more" data-testid="link">
+          Learn more
+        </a>
+      </Library>,
+    );
+    await user.click(trigger());
+    await flush();
+    expect(isOpen()).toBe(true);
+    expect(trigger()).toHaveFocus();
+    // The Popup is rendered right after the Trigger: Tab enters it in every engine.
+    await user.tab();
+    expect(screen.getByTestId("link")).toHaveFocus();
+    expect(isOpen()).toBe(true);
+  });
+});
+
+describe("nested popovers (browser)", () => {
+  /** WebKit 302008: `position-try-fallbacks` on a nested popover hangs; no inline placement there. */
+  const innerSide = browserName === "webkit" ? null : "right";
+
+  function Nested({ action, innerAction }: { action?: ActionFn; innerAction?: ActionFn }) {
+    return (
+      <Library action={action}>
+        <Popover.Root defaultOpen={false} openChangeAction={innerAction}>
+          <Popover.Trigger data-testid="inner-trigger">Permissions</Popover.Trigger>
+          <Popover.Popup
+            data-testid="inner"
+            aria-label="Permissions"
+            side={innerSide}
+            align="start"
+            style={box(120, 60)}
+          >
+            <button type="button" data-testid="inner-button">
+              Can edit
+            </button>
+          </Popover.Popup>
+        </Popover.Root>
+      </Library>
+    );
+  }
+
+  const inner = () => screen.getByTestId("inner");
+
+  async function openBoth() {
+    await user.click(trigger());
+    await flush();
+    await user.click(screen.getByTestId("inner-trigger"));
+    await flush();
+    await expect.poll(() => isOpen(inner())).toBe(true);
+    expect(isOpen()).toBe(true);
+  }
+
+  it("Escape closes the inner only and the library focuses the inner Trigger; a second Escape closes the outer", async () => {
+    const innerAction = vi.fn<ActionFn>();
+    render(<Nested innerAction={innerAction} />);
+    await openBoth();
+    expect(inner().contains(document.activeElement)).toBe(true);
+    await user.keyboard("{Escape}");
+    expect(isOpen(inner())).toBe(false);
+    expect(isOpen()).toBe(true);
+    // The platform restores nothing for a nested popover; the library does, from `toggle`.
+    await expect.poll(() => document.activeElement).toBe(screen.getByTestId("inner-trigger"));
+    await flush();
+    expect(innerAction.mock.calls.at(-1)).toEqual([false, expect.anything()]);
+    expect(innerAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await user.keyboard("{Escape}");
+    expect(isOpen()).toBe(false);
+    expect(trigger()).toHaveFocus();
+  });
+
+  it("a click outside closes both and leaves focus alone", async () => {
+    const action = vi.fn<ActionFn>();
+    const innerAction = vi.fn<ActionFn>();
+    render(<Nested action={action} innerAction={innerAction} />);
+    await openBoth();
+    const innerElement = inner();
+    await user.click(screen.getByTestId("outside"));
+    expect(isOpen(innerElement)).toBe(false);
+    expect(isOpen()).toBe(false);
+    await flush();
+    expect(screen.getByTestId("outside")).toHaveFocus();
+    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    expect(innerAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+  });
+
+  it("a click in the outer popup closes the inner only", async () => {
+    render(<Nested />);
+    await openBoth();
+    await user.click(screen.getByRole("heading", { name: "Filters" }));
+    expect(isOpen(inner())).toBe(false);
+    expect(isOpen()).toBe(true);
+  });
+
+  it.runIf(browserName !== "webkit")(
+    "the inner popup flips to the other side near the viewport edge (not on WebKit: 302008)",
+    async () => {
+      render(
+        <Popover.Root defaultOpen={false}>
+          <Popover.Trigger data-testid="trigger">Share</Popover.Trigger>
+          <Popover.Popup
+            data-testid="popup"
+            aria-label="Share"
+            side={null}
+            style={{ ...box(160, 80), position: "fixed", inset: "100px 0 auto auto" }}
+          >
+            <Popover.Root defaultOpen={false}>
+              <Popover.Trigger data-testid="inner-trigger" style={{ marginLeft: 100 }}>
+                More
+              </Popover.Trigger>
+              <Popover.Popup
+                data-testid="inner"
+                aria-label="More"
+                side="right"
+                style={box(300, 40)}
+              >
+                content
+              </Popover.Popup>
+            </Popover.Root>
+          </Popover.Popup>
+        </Popover.Root>,
+      );
+      await user.click(trigger());
+      await flush();
+      await user.click(screen.getByTestId("inner-trigger"));
+      await expect.poll(() => isOpen(inner())).toBe(true);
+      const t = screen.getByTestId("inner-trigger").getBoundingClientRect();
+      const p = inner().getBoundingClientRect();
+      // No room on the right: `flip-inline` places it on the left of its Trigger.
+      expect(p.right).toBeCloseTo(t.left, 0);
+    },
+  );
+});
+
+describe("exit animation and the deferred unmount (browser)", () => {
+  function fadeStyle() {
+    cleanups.push(
+      addStyle(`
+        .fade {
+          opacity: 0;
+          transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
+        }
+        .fade:popover-open { opacity: 1; }
+        @starting-style { .fade:popover-open { opacity: 0; } }
+      `),
+    );
+  }
+
+  /** Records the exit animations the engine runs when the popup is hidden. */
+  function watchExit() {
+    const seen = { count: -1, finished: Promise.resolve() as Promise<unknown> };
+    popup().addEventListener("toggle", (event) => {
+      if ((event as ToggleEvent).newState !== "closed") return;
+      void getComputedStyle(popup()).opacity;
+      const animations = popup().getAnimations({ subtree: true });
+      seen.count = animations.length;
+      seen.finished = Promise.allSettled(animations.map((animation) => animation.finished));
+    });
+    return seen;
+  }
+
+  async function expectHeldThenReleased(seen: { count: number; finished: Promise<unknown> }) {
+    expect(seen.count).toBeGreaterThanOrEqual(0);
+    if (seen.count > 0) {
+      // Chromium / WebKit: the popup is still fading out; the content stays.
+      expect(screen.queryByTestId("content")).not.toBeNull();
+      // The unmount is a transition the Popup starts when the animations finish: inside `act`.
+      await act(async () => {
+        await seen.finished;
+        await sleep(20);
+      });
+      expect(screen.queryByTestId("content")).toBeNull();
+    } else {
+      // Firefox: no CSS exit for a popover; nothing to wait for.
+      expect(screen.queryByTestId("content")).toBeNull();
+    }
+  }
+
+  it("a part-initiated close keeps the content while the CSS exit runs; none in Firefox", async () => {
+    fadeStyle();
+    render(
+      <Library popup={{ className: "fade" }}>
+        <span data-testid="content">content</span>
+      </Library>,
+    );
+    await user.click(trigger());
+    await flush();
+    await sleep(350); // let the enter transition finish
+    const seen = watchExit();
+    await user.click(trigger());
+    await flush();
+    expect(isOpen()).toBe(false);
+    await expectHeldThenReleased(seen);
+  });
+
+  it("a dismissal keeps the content while the CSS exit runs; none in Firefox", async () => {
+    fadeStyle();
+    render(
+      <Library popup={{ className: "fade" }}>
+        <span data-testid="content">content</span>
+        <button type="button">Inside</button>
+      </Library>,
+    );
+    await user.click(trigger());
+    await flush();
+    await sleep(350);
+    const seen = watchExit();
+    await user.keyboard("{Escape}");
+    await flush();
+    expect(isOpen()).toBe(false);
+    await expectHeldThenReleased(seen);
+  });
+});
+
+describe("ViewTransition (browser)", () => {
+  type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  let actEnvironment: boolean | undefined;
+  let calls: { openAtStart: boolean }[] = [];
+  let transitions: ViewTransition[] = [];
+
+  beforeEach(() => {
+    calls = [];
+    transitions = [];
+    const original = document.startViewTransition.bind(document);
+    vi.spyOn(document, "startViewTransition").mockImplementation(((
+      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
+    ) => {
+      const element = document.querySelector("[data-testid=popup]");
+      calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
+      const transition = original(arg);
+      transitions.push(transition);
+      return transition;
+    }) as typeof document.startViewTransition);
+    actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
+    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
+    cleanups.push(
+      addStyle(`
+        ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
+        ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
+        @keyframes vt-pop-out { to { opacity: 0; } }
+        @keyframes vt-pop-in { from { opacity: 0; } }
+      `),
+    );
+  });
+
+  afterEach(async () => {
+    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    await Promise.allSettled(transitions.map((transition) => transition.finished));
+  });
+
+  /** No wrapper element: inserted by a transition, the Popup's boundary is the subtree's top. */
+  function Plain({ transition }: { transition?: ViewTransitionClass }) {
+    return (
+      <Popover.Root defaultOpen={false}>
+        <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+        <Popover.Popup
+          data-testid="popup"
+          aria-label="Filters"
+          transition={transition}
+          style={box(200, 100)}
+        >
+          <span data-testid="content">content</span>
+        </Popover.Popup>
+      </Popover.Root>
+    );
+  }
+
+  it('transition="pop": the open and the part-initiated close each run one view transition', async () => {
+    render(<Plain transition="pop" />);
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(true);
+    await expect.poll(() => calls.length).toBe(1);
+    // Started before the popup was shown; shown inside the update callback.
+    expect(calls[0]!.openAtStart).toBe(false);
+    await transitions[0]!.updateCallbackDone;
+    expect(isOpen()).toBe(true);
+    await transitions[0]!.finished;
+
+    trigger().click();
+    await expect.poll(() => calls.length).toBe(2);
+    expect(calls[1]!.openAtStart).toBe(true);
+    await transitions[1]!.ready;
+    // The old snapshot carries the popup (with its content) out, in every engine.
+    const oldImages = document
+      .getAnimations()
+      .filter((animation) =>
+        ((animation.effect as KeyframeEffect | null)?.pseudoElement ?? "").startsWith(
+          "::view-transition-old",
+        ),
+      );
+    expect(oldImages.length).toBeGreaterThan(0);
+    await transitions[1]!.finished;
+    expect(isOpen()).toBe(false);
+    expect(screen.queryByTestId("content")).toBeNull();
+  });
+
+  it('transition="pop": a dismissal runs one only for the notification commit, popup already hidden', async () => {
+    render(<Plain transition="pop" />);
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(true);
+    await expect.poll(() => calls.length).toBe(1);
+    await transitions[0]!.finished;
+    popup().hidePopover();
+    await expect.poll(() => calls.length).toBe(2);
+    expect(calls[1]!.openAtStart).toBe(false);
+    await transitions[1]!.finished;
+    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
+  });
+
+  it("without transition: no view transition for an open or a close", async () => {
+    render(<Plain />);
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(true);
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(false);
+    await sleep(50);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('transition="none": a plain open runs none (shielded); a Root inserted by a transition runs one', async () => {
+    function Inserted() {
+      const [shown, setShown] = useState(false);
+      return (
+        <>
+          <button
+            type="button"
+            data-testid="insert"
+            onClick={() => startTransition(() => setShown(true))}
+          >
+            Insert
+          </button>
+          {shown && <Plain transition="none" />}
+        </>
+      );
+    }
+    render(<Inserted />);
+    screen.getByTestId("insert").click();
+    await expect.poll(() => screen.queryByTestId("trigger")).not.toBeNull();
+    await expect.poll(() => calls.length).toBe(1);
+    await transitions[0]!.finished;
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(true);
+    await sleep(50);
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("stack interactions (browser)", () => {
+  it.each([false, true])(
+    "a Tooltip (hint=%s) opened inside the popup does not close it",
+    async (hint) => {
+      render(
+        <Library>
+          <Tooltip.Root delay={0}>
+            <Tooltip.Trigger data-testid="tip-trigger">Help</Tooltip.Trigger>
+            <Tooltip.Popup data-testid="tip" experimental_hint={hint}>
+              Explains
+            </Tooltip.Popup>
+          </Tooltip.Root>
+        </Library>,
+      );
+      await user.click(trigger());
+      await flush();
+      const tip = screen.getByTestId("tip");
+      expect(tip.popover).toBe(hint && supportsPopoverHint ? "hint" : "manual");
+      await user.hover(screen.getByTestId("tip-trigger"));
+      await expect.poll(() => isOpen(tip)).toBe(true);
+      expect(isOpen()).toBe(true);
+      await userEvent.unhover(document.body);
+    },
+  );
+
+  it("a modal Dialog opened from inside keeps the popup open; Escape closes the Dialog first", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library action={action}>
+        <Dialog.Root>
+          <Dialog.Trigger data-testid="dialog-trigger">Advanced…</Dialog.Trigger>
+          <Dialog.Popup data-testid="dialog" aria-label="Advanced">
+            <button type="button">OK</button>
+          </Dialog.Popup>
+        </Dialog.Root>
+      </Library>,
+    );
+    await user.click(trigger());
+    await flush();
+    await user.click(screen.getByTestId("dialog-trigger"));
+    const dialog = screen.getByTestId("dialog") as HTMLDialogElement;
+    expect(dialog.open).toBe(true);
+    expect(dialog.matches(":modal")).toBe(true);
+    expect(isOpen()).toBe(true);
+    await user.keyboard("{Escape}");
+    expect(dialog.open).toBe(false);
+    expect(isOpen()).toBe(true);
+    await flush();
+    await user.keyboard("{Escape}");
+    expect(isOpen()).toBe(false);
+    await flush();
+    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+  });
+
+  it("an unrelated auto popover opening closes the popup with 'dismiss'", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <>
+        <Library action={action} />
+        <div popover="auto" data-testid="other">
+          Other
+        </div>
+      </>,
+    );
+    await user.click(trigger());
+    await flush();
+    expect(isOpen()).toBe(true);
+    act(() => screen.getByTestId("other").showPopover());
+    expect(isOpen()).toBe(false);
+    await flush();
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(action.mock.calls[1]![0]).toBe(false);
+    expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+  });
+});
