@@ -1,0 +1,58 @@
+[chromium] C2 c/disabled-option before: "" -1
+[chromium] C2 c/disabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[chromium] C2 c/enabled-option before: "" 0
+[chromium] C2 c/enabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[chromium] C2 c/null before: "" -1
+[chromium] C2 c/null after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[chromium] C2 native/disabled-option before: "" -1
+[chromium] C2 native/disabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[chromium] C2 native/enabled-option before: "" 0
+[chromium] C2 native/enabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[chromium] C2 native/null before: "" -1
+[chromium] C2 native/null after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[chromium] C3 after parent re-render: c
+[chromium] D2 text mutation: <i>Bee</i>
+[chromium] D2 selected=true again: <i>Bee</i>
+[chromium] D2 value=same: <i>Bumblebee</i>
+[chromium] D2 deselect+reselect: <i>Bumblebee</i>
+[chromium] D2 append child: <i>Bumblebee</i>
+[chromium] D2 reinsert selectedcontent: <i>Bumblebee</i> (more)
+[chromium] E2 selectedcontent: kept select=false errors=[] recoverable=["Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on "]
+[chromium] E2 selectedcontent: after change value=a button="<selectedcontent><span aria-hidden=\"true\">*</span> Apple</selectedcontent>"
+[chromium] E2 selectedcontent-dsih: kept select=true errors=["A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:\n\n- A server/client bran"] recoverable=[]
+[chromium] E2 selectedcontent-dsih: after change value=a button="<selectedcontent><span aria-hidden=\"true\">*</span> Apple</selectedcontent>"
+[chromium] E2 selectedcontent-dsih-shw: kept select=true errors=[] recoverable=[]
+[chromium] E2 selectedcontent-dsih-shw: after change value=a button="<selectedcontent><span aria-hidden=\"true\">*</span> Apple</selectedcontent>"
+[chromium] E2 button-text: kept select=true errors=[] recoverable=[]
+[chromium] E2 button-text: after change value=a button="A"
+[chromium] E2 no-button: kept select=true errors=[] recoverable=[]
+[chromium] E2 no-button: after change value=a button=null
+[firefox] C2 c/disabled-option before: "" -1
+[firefox] C2 c/disabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[firefox] C2 c/enabled-option before: "" 0
+[firefox] C2 c/enabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[firefox] C2 c/null before: "" -1
+[firefox] C2 c/null after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[firefox] C2 native/disabled-option before: "" -1
+[firefox] C2 native/disabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[firefox] C2 native/enabled-option before: "" 0
+[firefox] C2 native/enabled-option after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[firefox] C2 native/null before: "" -1
+[firefox] C2 native/null after: "a" 0 <option value="a">A</option><option value="b">B</option><option value="c">C</option>
+[firefox] C3 after parent re-render: c
+[firefox] D2 text mutation: 
+[firefox] D2 selected=true again: 
+[firefox] D2 value=same: 
+[firefox] D2 deselect+reselect: 
+[firefox] D2 append child: 
+[firefox] D2 reinsert selectedcontent: 
+[firefox] E2 selectedcontent: kept select=true errors=[] recoverable=[]
+[firefox] E2 selectedcontent: after change value=a button="<selectedcontent></selectedcontent>"
+[firefox] E2 selectedcontent-dsih: kept select=true errors=[] recoverable=[]
+[firefox] E2 selectedcontent-dsih: after change value=a button="<selectedcontent></selectedcontent>"
+[firefox] E2 selectedcontent-dsih-shw: kept select=true errors=[] recoverable=[]
+[firefox] E2 selectedcontent-dsih-shw: after change value=a button="<selectedcontent></selectedcontent>"
+[firefox] E2 button-text: kept select=true errors=[] recoverable=[]
+[firefox] E2 button-text: after change value=a button="A"
+[firefox] E2 no-button: kept select=true errors=[] recoverable=[]
+[firefox] E2 no-button: after change value=a button=null

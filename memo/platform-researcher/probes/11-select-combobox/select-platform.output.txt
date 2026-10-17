@@ -1,0 +1,308 @@
+
+######## chromium 156.0.8078.4
+
+== features
+  {
+   "supportsBaseSelect": true,
+   "selectedContentIface": true,
+   "selectedContentCtor": "HTMLSelectedContentElement",
+   "firstChildOfSelect": "BUTTON",
+   "buttonStillInSelect": true,
+   "spanInOption": true,
+   "legendInOptgroup": true,
+   "hrInSelect": true,
+   "computedAppearance": "base-select",
+   "selectedContentInitial": "Choose a fruit",
+   "optionsLength": 8,
+   "optionLabel": "OOrange tangy",
+   "optionText": "OOrange tangy",
+   "openPseudo": false,
+   "showPicker": "function",
+   "validity": {
+    "valid": false,
+    "valueMissing": true,
+    "msg": "Please select an item in the list."
+   },
+   "formData": [
+    [
+     "fruit",
+     ""
+    ]
+   ],
+   "buttonType": "submit"
+  }
+
+== programmatic
+  {
+   "afterSetValue": "<span class=\"icon\" aria-hidden=\"true\">O</span><span>Orange</span> <small>tangy</small>",
+   "valid": true,
+   "fd": "orange",
+   "events": "(none)",
+   "afterReset": {
+    "value": "",
+    "sc": "Choose a fruit"
+   },
+   "afterOptionSelected": "Blueberry"
+  }
+
+== keyboardClosed
+  ["focus",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[]","sc":"Choose a fruit","log":"blur"}]
+  ["Escape",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["b",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":"input,change"}]
+  ["Escape",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":""}]
+
+== keyboardOpenPick
+  ["Enter",{"value":"","open":true,"active":"option[]","sc":"Choose a fruit","log":"focus,blur"}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[orange]","sc":"Choose a fruit","log":""}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[lemon]","sc":"Choose a fruit","log":""}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[banana]","sc":"Choose a fruit","log":""}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[blueberry]","sc":"Choose a fruit","log":""}]
+  ["End",{"value":"","open":true,"active":"option[date]","sc":"Choose a fruit","log":""}]
+  ["Home",{"value":"","open":true,"active":"option[]","sc":"Choose a fruit","log":""}]
+  ["b",{"value":"","open":true,"active":"option[banana]","sc":"Choose a fruit","log":""}]
+  ["l",{"value":"","open":true,"active":"option[blueberry]","sc":"Choose a fruit","log":""}]
+  ["Enter",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":"input,change,focus"}]
+
+== spaceAndTab
+  ["Space",{"value":"","open":true,"active":"option[]","sc":"Choose a fruit","log":"focus,blur"}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[orange]","sc":"Choose a fruit","log":""}]
+  ["Space",{"value":"orange","open":false,"active":"#s","sc":"OOrange tangy","log":"input,change,focus"}]
+  ["Space",{"value":"orange","open":true,"active":"option[orange]","sc":"OOrange tangy","log":"blur"}]
+  ["ArrowDown",{"value":"orange","open":true,"active":"option[lemon]","sc":"OOrange tangy","log":""}]
+  ["Tab",{"value":"orange","open":false,"active":"#s","sc":"OOrange tangy","log":"focus"}]
+
+== mouse
+  ["click select",{"value":"","open":true,"active":"option[]","sc":"Choose a fruit","log":""}]
+  ["geometry",{"select":[78.25,48],"banana":[79.25,181,151.4375,24]}]
+  ["click Banana",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":"input,change,focus"}]
+
+== inPopover
+  ["open popover","p"]
+  ["click select","p",{"value":"","open":true,"active":"option[]","sc":"Choose a fruit","log":""}]
+  ["Escape","p",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["Escape 2","(none)",{"value":"","open":false,"active":"#t","sc":"Choose a fruit","log":"blur"}]
+  ["open unrelated select while popover open","(none)",true]
+
+== inModalDialog
+  ["Enter",true,{"value":"","open":true,"active":"option[]","sc":"Choose a fruit","log":"focus,blur"}]
+  ["Escape",true,{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["Escape 2",false,{"value":"","open":false,"active":"body[]","sc":"Choose a fruit","log":"blur"}]
+
+== hiddenOptionsFiltering
+  ["Enter",{"value":"","open":true,"active":"option[banana]","sc":"Choose a fruit","log":"focus,blur"}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[blueberry]","sc":"Choose a fruit","log":""}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[blueberry]","sc":"Choose a fruit","log":""}]
+  ["ArrowDown",{"value":"","open":true,"active":"option[blueberry]","sc":"Choose a fruit","log":""}]
+  ["Enter",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":"input,change,focus"}]
+
+== buttonInPicker
+  ["input kept in select",false]
+  ["open",{"value":"","open":true,"active":"body[]","sc":"","log":""}]
+  ["input rect",[177,21]]
+  ["typed into input",{"value":"","open":false,"active":"#q","sc":"","log":""},"tw"]
+
+######## firefox 157.0
+
+== features
+  {
+   "supportsBaseSelect": false,
+   "selectedContentIface": false,
+   "selectedContentCtor": "HTMLElement",
+   "firstChildOfSelect": "BUTTON",
+   "buttonStillInSelect": true,
+   "spanInOption": true,
+   "legendInOptgroup": true,
+   "hrInSelect": true,
+   "computedAppearance": "auto",
+   "selectedContentInitial": "",
+   "optionsLength": 8,
+   "optionLabel": "OOrange tangy",
+   "optionText": "OOrange tangy",
+   "openPseudo": false,
+   "showPicker": "function",
+   "validity": {
+    "valid": false,
+    "valueMissing": true,
+    "msg": "Please select an item in the list."
+   },
+   "formData": [
+    [
+     "fruit",
+     ""
+    ]
+   ],
+   "buttonType": "button"
+  }
+
+== programmatic
+  {
+   "afterSetValue": "",
+   "valid": true,
+   "fd": "orange",
+   "events": "(none)",
+   "afterReset": {
+    "value": "",
+    "sc": ""
+   },
+   "afterOptionSelected": ""
+  }
+
+== keyboardClosed
+  ["focus",{"value":"","open":false,"active":"#s","sc":"","log":"focus"}]
+  ["ArrowDown",{"value":"orange","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["Escape",{"value":"orange","open":false,"active":"#s","sc":"","log":""}]
+  ["b",{"value":"banana","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["Escape",{"value":"banana","open":false,"active":"#s","sc":"","log":""}]
+
+== keyboardOpenPick
+  ["Enter",{"value":"","open":false,"active":"#s","sc":"","log":"focus"}]
+  ["ArrowDown",{"value":"orange","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["ArrowDown",{"value":"lemon","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["ArrowDown",{"value":"banana","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["ArrowDown",{"value":"blueberry","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["End",{"value":"date","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["Home",{"value":"","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["b",{"value":"banana","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["l",{"value":"blueberry","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["Enter",{"value":"blueberry","open":false,"active":"#s","sc":"","log":""}]
+
+== spaceAndTab
+  ["Space",{"value":"","open":true,"active":"#s","sc":"","log":"focus"}]
+  ["ArrowDown",{"value":"","open":true,"active":"#s","sc":"","log":""}]
+  ["Space",{"value":"","open":true,"active":"#s","sc":"","log":""}]
+  ["Space",{"value":"","open":true,"active":"#s","sc":"","log":""}]
+  ["ArrowDown",{"value":"","open":true,"active":"#s","sc":"","log":""}]
+  ["Tab",{"value":"","open":false,"active":"#after","sc":"","log":"blur"}]
+
+== mouse
+  ["click select",{"value":"","open":false,"active":"#s","sc":"","log":"focus"}]
+  ["geometry",{"select":[79.98333740234375,43],"banana":[0,0,0,0]}]
+
+== inPopover
+  ["open popover","p"]
+  ["click select","p",{"value":"","open":false,"active":"#s","sc":"","log":"focus"}]
+  ["Escape","(none)",{"value":"","open":false,"active":"#t","sc":"","log":"blur"}]
+  ["Escape 2","(none)",{"value":"","open":false,"active":"#t","sc":"","log":""}]
+  ["open unrelated select while popover open","(none)",false]
+
+== inModalDialog
+  ["Enter",true,{"value":"","open":false,"active":"#s","sc":"","log":"focus"}]
+  ["Escape",false,{"value":"","open":false,"active":"body[]","sc":"","log":"blur"}]
+  ["Escape 2",false,{"value":"","open":false,"active":"body[]","sc":"","log":""}]
+
+== hiddenOptionsFiltering
+  ["Enter",{"value":"","open":false,"active":"#s","sc":"","log":"focus"}]
+  ["ArrowDown",{"value":"banana","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["ArrowDown",{"value":"blueberry","open":false,"active":"#s","sc":"","log":"input,change"}]
+  ["ArrowDown",{"value":"blueberry","open":false,"active":"#s","sc":"","log":""}]
+  ["Enter",{"value":"blueberry","open":false,"active":"#s","sc":"","log":""}]
+
+== buttonInPicker
+  ["input kept in select",false]
+  ["open",{"value":"","open":false,"active":"#s","sc":"","log":"focus"}]
+  ["input rect",[190.6666717529297,23]]
+  ["typed into input",{"value":"","open":false,"active":"#q","sc":"","log":"blur"},"tw"]
+
+######## firefox+prefs 157.0
+
+== features
+  {
+   "supportsBaseSelect": true,
+   "selectedContentIface": true,
+   "selectedContentCtor": "HTMLSelectedContentElement",
+   "firstChildOfSelect": "BUTTON",
+   "buttonStillInSelect": true,
+   "spanInOption": true,
+   "legendInOptgroup": true,
+   "hrInSelect": true,
+   "computedAppearance": "base-select",
+   "selectedContentInitial": "Choose a fruit",
+   "optionsLength": 8,
+   "optionLabel": "OOrange tangy",
+   "optionText": "OOrange tangy",
+   "openPseudo": false,
+   "showPicker": "function",
+   "validity": {
+    "valid": false,
+    "valueMissing": true,
+    "msg": "Please select an item in the list."
+   },
+   "formData": [
+    [
+     "fruit",
+     ""
+    ]
+   ],
+   "buttonType": "button"
+  }
+
+== programmatic
+  {
+   "afterSetValue": "<span class=\"icon\" aria-hidden=\"true\">O</span><span>Orange</span> <small>tangy</small>",
+   "valid": true,
+   "fd": "orange",
+   "events": "(none)",
+   "afterReset": {
+    "value": "",
+    "sc": "Choose a fruit"
+   },
+   "afterOptionSelected": "Blueberry"
+  }
+
+== keyboardClosed
+  ["focus",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["ArrowDown",{"value":"orange","open":false,"active":"#s","sc":"OOrange tangy","log":"input,change"}]
+  ["Escape",{"value":"orange","open":false,"active":"#s","sc":"OOrange tangy","log":""}]
+  ["b",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":"input,change"}]
+  ["Escape",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":""}]
+
+== keyboardOpenPick
+  ["Enter",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["ArrowDown",{"value":"orange","open":false,"active":"#s","sc":"OOrange tangy","log":"input,change"}]
+  ["ArrowDown",{"value":"lemon","open":false,"active":"#s","sc":"Lemon","log":"input,change"}]
+  ["ArrowDown",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":"input,change"}]
+  ["ArrowDown",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":"input,change"}]
+  ["End",{"value":"date","open":false,"active":"#s","sc":"Date","log":"input,change"}]
+  ["Home",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"input,change"}]
+  ["b",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":"input,change"}]
+  ["l",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":"input,change"}]
+  ["Enter",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":""}]
+
+== spaceAndTab
+  ["Space",{"value":"","open":true,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["ArrowDown",{"value":"orange","open":true,"active":"#s","sc":"OOrange tangy","log":"input,change"}]
+  ["Space",{"value":"orange","open":false,"active":"#s","sc":"OOrange tangy","log":""}]
+  ["Space",{"value":"orange","open":true,"active":"#s","sc":"OOrange tangy","log":""}]
+  ["ArrowDown",{"value":"lemon","open":true,"active":"#s","sc":"Lemon","log":"input,change"}]
+  ["Tab",{"value":"lemon","open":true,"active":"#after","sc":"Lemon","log":"blur"}]
+
+== mouse
+  ["click select",{"value":"","open":true,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["geometry",{"select":[79.98333740234375,49],"banana":[80.98333740234375,202,163.31666564941406,24]}]
+  ["click Banana",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":"input,change"}]
+
+== inPopover
+  ["open popover","p"]
+  ["click select","p",{"value":"","open":true,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["Escape","p",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":""}]
+  ["Escape 2","(none)",{"value":"","open":false,"active":"#t","sc":"Choose a fruit","log":"blur"}]
+  ["open unrelated select while popover open","(none)",true]
+
+== inModalDialog
+  ["Enter",true,{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["Escape",false,{"value":"","open":false,"active":"body[]","sc":"Choose a fruit","log":"blur"}]
+  ["Escape 2",false,{"value":"","open":false,"active":"body[]","sc":"Choose a fruit","log":""}]
+
+== hiddenOptionsFiltering
+  ["Enter",{"value":"","open":false,"active":"#s","sc":"Choose a fruit","log":"focus"}]
+  ["ArrowDown",{"value":"banana","open":false,"active":"#s","sc":"Banana","log":"input,change"}]
+  ["ArrowDown",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":"input,change"}]
+  ["ArrowDown",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":""}]
+  ["Enter",{"value":"blueberry","open":false,"active":"#s","sc":"Blueberry","log":""}]
+
+== buttonInPicker
+  ["input kept in select",false]
+  ["open",{"value":"","open":true,"active":"#s","sc":"","log":"focus"}]
+  ["input rect",[190.66665649414062,23]]
+  ["typed into input",{"value":"","open":false,"active":"#q","sc":"","log":"blur"},"tw"]

@@ -1,0 +1,2 @@
+chromium {"click":{"open":true,"ev":[]},"escape":{"open":false,"ev":[]},"showPickerFromButton":{"r":"ok","open":true,"ev":[]},"d":{"afterBlur":true,"hasHidePicker":false}}
+firefox {"click":{"open":true,"ev":[]},"escape":{"open":false,"ev":[]},"showPickerFromButton":{"r":"ok","open":true,"ev":[]},"d":{"afterBlur":true,"hasHidePicker":false}}

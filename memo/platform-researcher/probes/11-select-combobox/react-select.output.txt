@@ -1,0 +1,38 @@
+[chromium] A sync after change: a A
+[chromium] A after microtask: a A
+[chromium] A pending: a A
+[chromium] A committed: b B rich
+[chromium] B sync after change: b B rich
+[chromium] B after microtask: b B rich
+[chromium] B pending: b B rich
+[chromium] B committed: b B rich
+[chromium] C before load: "" 
+[chromium] C after load: "" selectedIndex -1 
+[chromium] D initial: <i>Bee</i>
+[chromium] D after content change: <i>Bee</i>
+[chromium] E ssr html: <form><select class="c" name="fruit"><button type="button"><selectedcontent></selectedcontent></button><option value="a"><span aria-hidden="true">🍎</span> Apple</option><optgroup label="More"><option value="b" selected=""><span aria-hidden="true">🍌</span> <b>Banana</b></option></optgroup><hr/><option value="c">Cherry</option></select></form>
+[chromium] E parsed (pre-hydration): <form><select class="c" name="fruit"><button type="button"><selectedcontent><span aria-hidden="true">🍌</span> <b>Banana</b></selectedcontent></button><option value="a"><span aria-hidden="true">🍎</span> Apple</option><optgroup label="More"><option value="b" selected=""><span aria-hidden="true">🍌</span> <b>Banana</b></option></optgroup><hr><option value="c">Cherry</option></select></form>
+[chromium] E same select node after hydration: false
+[chromium] E console.error: []
+[chromium] E recoverable: ["Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math.random"]
+[chromium] E post-hydration selectedcontent: <span aria-hidden="true">🍌</span> <b>Banana</b>
+[chromium] E after change: c Cherry
+[firefox] A sync after change: a 
+[firefox] A after microtask: a 
+[firefox] A pending: a 
+[firefox] A committed: b 
+[firefox] B sync after change: b 
+[firefox] B after microtask: b 
+[firefox] B pending: b 
+[firefox] B committed: b 
+[firefox] C before load: "" 
+[firefox] C after load: "" selectedIndex -1 
+[firefox] D initial: 
+[firefox] D after content change: 
+[firefox] E ssr html: <form><select class="c" name="fruit"><button type="button"><selectedcontent></selectedcontent></button><option value="a"><span aria-hidden="true">🍎</span> Apple</option><optgroup label="More"><option value="b" selected=""><span aria-hidden="true">🍌</span> <b>Banana</b></option></optgroup><hr/><option value="c">Cherry</option></select></form>
+[firefox] E parsed (pre-hydration): <form><select class="c" name="fruit"><button type="button"><selectedcontent></selectedcontent></button><option value="a"><span aria-hidden="true">🍎</span> Apple</option><optgroup label="More"><option value="b" selected=""><span aria-hidden="true">🍌</span> <b>Banana</b></option></optgroup><hr><option value="c">Cherry</option></select></form>
+[firefox] E same select node after hydration: true
+[firefox] E console.error: []
+[firefox] E recoverable: []
+[firefox] E post-hydration selectedcontent: 
+[firefox] E after change: c 

@@ -1,0 +1,74 @@
+
+######## chromium 156.0.8078.4
+
+== typingAndGeometry
+  ["click input (opens)",{"open":true,"active":"cb","value":"","log":"input-click"}]
+  ["type",{"open":true,"active":"cb","value":"ba","log":"toggle:open"}]
+  ["geometry",{"inputBottom":41,"lbTop":41,"inputLeft":114.703125,"lbLeft":114.703125,"inputW":300,"lbW":302}]
+
+== clickInputWhileOpen
+  ["opened",{"open":true,"active":"cb","value":"","log":"input-click"}]
+  ["click input again",{"open":true,"active":"cb","value":"","log":"toggle:open,input-click"}]
+
+== clickOption
+  ["click option (no preventDefault)",{"open":false,"active":"BODY","value":"Banana","log":"input-click,toggle:open,input-blur,pick:Banana"}]
+  ["click option, pointerdown preventDefault",{"open":false,"active":"cb","value":"Cherry","log":"toggle:closed,input-click,toggle:open,pick:Cherry"}]
+
+== escape
+  ["Escape",{"open":false,"active":"cb","value":"","log":"input-click"}]
+  ["Escape with keydown preventDefault",{"open":true,"active":"cb","value":"","log":"toggle:closed,input-click"}]
+
+== tab
+  ["Tab from input while open",{"open":true,"active":"after","value":"","log":"input-click,input-blur"}]
+  ["Tab again",{"open":true,"active":"BODY","value":"","log":""}]
+
+== manualMode
+  ["manual: click elsewhere",{"open":true,"active":"before","value":"","log":"input-click,toggle:open,input-blur"}]
+
+== insideModalDialogAndPopover
+  ["in modal dialog: pick",{"open":false,"active":"d","value":"Apple","log":"input-click,toggle:open,input-blur,pick:Apple"},true]
+  ["in modal dialog: Escape",{"open":false,"active":"cb","value":"Apple","log":"toggle:closed,input-click"},true]
+  ["in auto popover: open combobox",{"open":true,"active":"cb","value":"","log":"input-click"},true]
+  ["in auto popover: Escape",{"open":false,"active":"cb","value":"","log":""},true]
+
+== AX (open, activedescendant=o2)
+  button "before" 
+  combobox "Fruit" focused=true autocomplete="list" hasPopup="listbox" expanded=true activedescendant=["o2"] controls="lb"
+  listbox "Fruits" 
+  button "after" 
+  option "Apple" 
+  option "Banana" selected=true
+  option "Cherry" 
+  button "Create “…”" 
+
+######## firefox 157.0
+
+== typingAndGeometry
+  ["click input (opens)",{"open":true,"active":"cb","value":"","log":"input-click,toggle:open"}]
+  ["type",{"open":true,"active":"cb","value":"ba","log":""}]
+  ["geometry",{"inputBottom":43,"lbTop":43,"inputLeft":120.53334045410156,"lbLeft":120.53334045410156,"inputW":300,"lbW":302}]
+
+== clickInputWhileOpen
+  ["opened",{"open":true,"active":"cb","value":"","log":"input-click,toggle:open"}]
+  ["click input again",{"open":true,"active":"cb","value":"","log":"input-click,toggle:open"}]
+
+== clickOption
+  ["click option (no preventDefault)",{"open":false,"active":"BODY","value":"Banana","log":"input-click,toggle:open,input-blur,pick:Banana,toggle:closed"}]
+  ["click option, pointerdown preventDefault",{"open":false,"active":"cb","value":"Cherry","log":"input-click,toggle:open,pick:Cherry,toggle:closed"}]
+
+== escape
+  ["Escape",{"open":false,"active":"cb","value":"","log":"input-click,toggle:open,toggle:closed"}]
+  ["Escape with keydown preventDefault",{"open":true,"active":"cb","value":"","log":"input-click,toggle:open"}]
+
+== tab
+  ["Tab from input while open",{"open":true,"active":"after","value":"","log":"input-click,toggle:open,input-blur"}]
+  ["Tab again",{"open":true,"active":"after","value":"","log":""}]
+
+== manualMode
+  ["manual: click elsewhere",{"open":true,"active":"before","value":"","log":"input-click,toggle:open,input-blur"}]
+
+== insideModalDialogAndPopover
+  ["in modal dialog: pick",{"open":false,"active":"d","value":"Apple","log":"input-click,toggle:open,input-blur,pick:Apple,toggle:closed"},true]
+  ["in modal dialog: Escape",{"open":false,"active":"cb","value":"Apple","log":"input-click,toggle:open,toggle:closed"},true]
+  ["in auto popover: open combobox",{"open":true,"active":"cb","value":"","log":"input-click,toggle:open"},true]
+  ["in auto popover: Escape",{"open":false,"active":"cb","value":"","log":"toggle:closed"},true]

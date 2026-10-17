@@ -1,0 +1,156 @@
+chromium 156.0.8078.4
+
+== closed
+RootWebArea "" focusable=true focused=true
+  LabelText "" 
+    StaticText "Fruit" 
+  combobox "Fruit" value="Choose a fruit" invalid="true" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "Choose a fruit" focusable=true selected=true
+      group "" 
+        option "Orange tangy" focusable=true selected=false
+          StaticText "Orange" 
+          StaticText "tangy" 
+        option "Lemon content" focusable=true selected=false
+          StaticText "Lemon " 
+          StaticText "content" 
+      separator "" 
+      option "Apple" disabled=true
+      option "Banana" focusable=true selected=false
+  LabelText "" 
+    StaticText "Native" 
+  combobox "Native" value="One" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "One" focusable=true selected=true
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "No-button base-select" 
+  combobox "No-button base-select" value="One x" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "One x" focusable=true selected=true
+        StaticText "One " 
+        StaticText "x" 
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "Listbox" 
+  listbox "Listbox" invalid="false" multiselectable=true required=false activedescendant=[77]
+    option "A" focusable=true selected=false
+    option "B" focusable=true selected=true
+    option "C" focusable=true selected=false
+
+== #s open (Enter)
+RootWebArea "" focusable=true focused=true
+  LabelText "" 
+    StaticText "Fruit" 
+  combobox "Fruit" value="Choose a fruit" invalid="true" focusable=true hasPopup="menu" expanded=true
+    MenuListPopup "" activedescendant=[17]
+      option "Choose a fruit" focusable=true focused=true selected=true
+      group "Citrus" 
+        option "Orange tangy" focusable=true selected=false
+          StaticText "Orange" 
+          StaticText "tangy" 
+        option "Lemon content" focusable=true selected=false
+          StaticText "Lemon " 
+          StaticText "content" 
+      separator "" 
+      option "Apple" disabled=true
+      option "Banana" focusable=true selected=false
+  LabelText "" 
+    StaticText "Native" 
+  combobox "Native" value="One" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "One" focusable=true selected=true
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "No-button base-select" 
+  combobox "No-button base-select" value="One x" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "One x" focusable=true selected=true
+        StaticText "One " 
+        StaticText "x" 
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "Listbox" 
+  listbox "Listbox" invalid="false" multiselectable=true required=false activedescendant=[77]
+    option "A" focusable=true selected=false
+    option "B" focusable=true selected=true
+    option "C" focusable=true selected=false
+
+== #s open, ArrowDown
+RootWebArea "" focusable=true focused=true
+  LabelText "" 
+    StaticText "Fruit" 
+  combobox "Fruit" value="Choose a fruit" invalid="true" focusable=true hasPopup="menu" expanded=true
+    MenuListPopup "" activedescendant=[17]
+      option "Choose a fruit" focusable=true selected=true
+      group "Citrus" 
+        option "Orange tangy" focusable=true focused=true selected=false
+          StaticText "Orange" 
+          StaticText "tangy" 
+        option "Lemon content" focusable=true selected=false
+          StaticText "Lemon " 
+          StaticText "content" 
+      separator "" 
+      option "Apple" disabled=true
+      option "Banana" focusable=true selected=false
+  LabelText "" 
+    StaticText "Native" 
+  combobox "Native" value="One" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "One" focusable=true selected=true
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "No-button base-select" 
+  combobox "No-button base-select" value="One x" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "One x" focusable=true selected=true
+        StaticText "One " 
+        StaticText "x" 
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "Listbox" 
+  listbox "Listbox" invalid="false" multiselectable=true required=false activedescendant=[77]
+    option "A" focusable=true selected=false
+    option "B" focusable=true selected=true
+    option "C" focusable=true selected=false
+
+typeahead 'lem' (closed) value: lemon
+typeahead 'or' (closed) value: lemon
+
+== #ns (no <button>) open
+RootWebArea "" focusable=true focused=true
+  LabelText "" 
+    StaticText "Fruit" 
+  combobox "Fruit" value="Lemon content" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "Choose a fruit" focusable=true selected=false
+      group "" 
+        option "Orange tangy" focusable=true selected=false
+          StaticText "Orange" 
+          StaticText "tangy" 
+        option "Lemon content" focusable=true selected=true
+          StaticText "Lemon " 
+          StaticText "content" 
+      separator "" 
+      option "Apple" disabled=true
+      option "Banana" focusable=true selected=false
+  LabelText "" 
+    StaticText "Native" 
+  combobox "Native" value="One" invalid="false" focusable=true hasPopup="menu" expanded=false
+    MenuListPopup "" 
+      option "One" focusable=true selected=true
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "No-button base-select" 
+  combobox "No-button base-select" value="One x" invalid="false" focusable=true hasPopup="menu" expanded=true
+    MenuListPopup "" activedescendant=[62]
+      option "One x" focusable=true focused=true selected=true
+        StaticText "One" 
+        StaticText "x" 
+      option "Two" focusable=true selected=false
+  LabelText "" 
+    StaticText "Listbox" 
+  listbox "Listbox" invalid="false" multiselectable=true required=false activedescendant=[77]
+    option "A" focusable=true selected=false
+    option "B" focusable=true selected=true
+    option "C" focusable=true selected=false
