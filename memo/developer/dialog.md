@@ -146,3 +146,43 @@ commit that re-renders the Popup") and 5 (Dialog `intended` through `useLatest`)
   held, mounted once), `close()` inside the update callback restoring focus to the Trigger,
   and `event.source` on a foreign `request-close` (browser row added; passes on Chromium 156 and
   Firefox 157, `returnValue` is the invoker's `value`).
+
+## #46 review fixes (memo/reviewer/dialog-46.md), 2026-10-18
+
+Commits 56e1ea8 (code + jsdom rows) and 5dcce5f (recipe, docs, browser rows).
+
+- **M1 (PO: option a).** Popup ref `dismissedWhilePending = { event, returnValue, generation }`,
+  set in the `close` listener when the close is not the library's own and `false` is already
+  intended (an in-flight part close). The apply effect, finding committed `true` and the dialog
+  closed (nothing in flight, no `awaitingClose`), calls `ctx.notifyClosed(event, "dismiss",
+  returnValue)` instead of `openDialog()` when the record's generation is the current
+  `openGeneration()`. Cleared on `beforetoggle` open, when the close settles as `false`, and when
+  consumed. A Trigger re-open in between bumps the generation, so it supersedes the dismissal
+  (row). A parent that refuses the dismissal too gets the usual re-open.
+- **M3.** `if (event.cancelBubble) return;` after the `defaultPrevented` check. jsdom row: a
+  `document` submit listener that calls `stopPropagation()` registered before mount (stands in
+  for React's root on the document, FUNSTACK Static).
+- **L1.** Submit listener on `dialog.getRootNode()`. jsdom row renders into a shadow root (the
+  shim's window listener never sees that submit, so the old code left the dialog open: the row
+  failed before the fix).
+- **L2.** `closeOnSettle` doc (code and docs page): "a submit button in a separate
+  `method="dialog"` form"; a `formMethod="dialog"` submitter in a function-action Form re-runs
+  the action.
+- **L4.** `libraryClose` ref set right before the apply effect's `close()`, consumed by the
+  `close` listener: echo by source. A non-echo close also drops the Root's pending part
+  `returnValue` (`takeCloseReturnValue()`). `notifyClosed` is now only called for non-echo
+  closes; L3 is fixed along with it (the hold is skipped only for a real echo).
+- **L5 rows:** P2 (uncontrolled only: a controlled Harness that adopts in arrival order ends
+  with the superseded `false`, conventions 2.5), 11.16, Close action plus a controlled veto,
+  nested library / JS-free inner Root with the shared submit listener. All new M1/M3/L1/L4 rows
+  fail against 885d1ed's popup.
+- **M2.** Recipe: keep the CSS exit, add `html:active-view-transition .x { transition: none; }`
+  (dialog box only; the backdrop leaves the top layer with it). Applied to docs `dialog.css`,
+  `popover.css`, DialogPage / PopoverPage text and code blocks, playground `dialog-demo.css`,
+  `popover-demo.css`. Browser rows read pseudo-element names from `document.getAnimations()` at
+  `ready`; the dialog group is `_t_N_`. Chromium 156: without the recipe a Close has
+  `old(_t_N_)` + `new(_t_N_)` (dialog `display: block`); with it `old(_t_N_)` only, `display:
+  none`. Firefox: old only either way. **Popover's recipe had the same artifact** (Chromium probe,
+  same shape), now fixed the same way, with a row. Characterisation rows assert that every
+  non-Firefox engine animates the exit and so shows the double image without the recipe (WebKit
+  is checked by CI).
