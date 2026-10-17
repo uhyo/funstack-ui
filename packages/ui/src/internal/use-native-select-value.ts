@@ -200,7 +200,9 @@ export function useNativeSelectValue(
     // `established`: StrictMode's re-run after a mount reconciliation already dispatched.
     if (select === null || adoptDefault === undefined || adoptDefault.established()) return;
     const value = implicitDefault(select);
-    mountAdopted.current = value;
+    // `""` from a select with nothing selectable is no reset target (design 6.1): only a `""`
+    // option, the placeholder react-dom and Fizz select, is mirrored.
+    mountAdopted.current = value === "" && findOption(select, "") === null ? undefined : value;
     adoptNow(value, adoptDefault.adopt);
   });
   useLayoutEffect(() => {
