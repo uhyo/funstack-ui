@@ -116,8 +116,9 @@ export function ComboboxPage() {
           <strong>Popup and List are separate</strong> because a listbox may contain only options
           and groups: <code>Empty</code> and a hint <code>Status</code> go in the Popup, outside the
           List. A <code>Status</code> inside the List (the Suspense fallback above) marks the
-          results as loading: <code>Empty</code> stays hidden and nothing is announced while it is
-          mounted.
+          results as loading: it renders with <code>role="none"</code> (no live region inside the
+          listbox), the List gets <code>aria-busy="true"</code>, <code>Empty</code> stays hidden and
+          nothing is announced until the results arrive.
         </li>
         <li>
           <strong>No portal, no positioner.</strong> The Popup is shown with{" "}
@@ -237,7 +238,7 @@ export function ComboboxPage() {
             type: "boolean",
             default: "false",
             description:
-              "Make the first enabled option active whenever results settle and none is (APG automatic selection): typing then Enter picks the first match.",
+              "Make the first enabled option active when the results for an open or an edit settle (APG automatic selection): typing then Enter picks the first match. Stale results are never highlighted, so an Enter before they settle commits the typed text (`allowCustomValue`) or does nothing.",
           },
           {
             name: "openOnClick",
@@ -421,8 +422,10 @@ export function ComboboxPage() {
       <p>
         <code>ComboboxListState</code>: <code>{"{ query, stale, empty }"}</code>. Renders{" "}
         <code>&lt;div role="listbox"&gt;</code>, named by the Label (<code>aria-labelledby</code>,
-        token-merged with yours), with <code>aria-busy="true"</code> and <code>data-stale</code>{" "}
-        while stale and <code>data-empty</code> when settled with no options.
+        token-merged with yours, only when a <code>Combobox.Label</code> is rendered), with{" "}
+        <code>aria-busy="true"</code> while stale (with <code>data-stale</code>) or loading (a{" "}
+        <code>Status</code> fallback inside it), and <code>data-empty</code> when settled with no
+        options.
       </p>
 
       <h4>
@@ -483,9 +486,10 @@ export function ComboboxPage() {
       />
       <p>
         <code>Group</code> is <code>&lt;div role="group" aria-labelledby&gt;</code> named by the{" "}
-        <code>GroupLabel</code> inside it. <code>Status</code> is{" "}
-        <code>&lt;div role="status"&gt;</code>: inside the List (as a Suspense fallback) it marks
-        the results as loading, in the Popup it is a plain hint. <code>Empty</code> is a plain{" "}
+        <code>GroupLabel</code> inside it. <code>Status</code> inside the List (as a Suspense
+        fallback) is <code>&lt;div role="none"&gt;</code> and marks the results as loading (the List
+        is <code>aria-busy</code>); in the Popup it is a plain hint,{" "}
+        <code>&lt;div role="status"&gt;</code>. <code>Empty</code> is a plain{" "}
         <code>&lt;div&gt;</code> that renders nothing unless the results are settled and empty, so
         "No results" never flashes during a search.
       </p>
@@ -520,7 +524,11 @@ export function ComboboxPage() {
       <Table
         head={["Key", "Listbox", "Behaviour"]}
         rows={[
-          ["Typing, Backspace, paste", "any", "Changes the text (urgent) and opens the listbox."],
+          [
+            "Typing, Backspace, paste",
+            "any",
+            "Changes the text (urgent), clears the active option and opens the listbox.",
+          ],
           ["ArrowDown / ArrowUp", "closed", "Opens with the first / last enabled option active."],
           [
             "ArrowDown / ArrowUp",
@@ -549,7 +557,11 @@ export function ComboboxPage() {
             "any",
             "Focus moves on and the listbox closes; the text reverts or, with `allowCustomValue`, commits. Tab never accepts the active option.",
           ],
-          ["Home / End, Left / Right", "any", "The input's caret."],
+          [
+            "Home / End, Left / Right",
+            "any",
+            "The input's caret; the active option is cleared (focus is back on the text).",
+          ],
         ]}
       />
       <p>
@@ -562,14 +574,15 @@ export function ComboboxPage() {
         <li>
           The Input is <code>role="combobox"</code> with <code>aria-autocomplete="list"</code>,{" "}
           <code>aria-expanded</code>, <code>aria-controls</code> (the List) and{" "}
-          <code>aria-activedescendant</code> (the active option, never a stale id). Name it with{" "}
-          <code>Combobox.Label</code>, which names the listbox too.
+          <code>aria-activedescendant</code> (the active option, never a stale id; removed while you
+          edit the text). Name it with <code>Combobox.Label</code>, which names the listbox too.
         </li>
         <li>
           When results settle, the library announces their count with <code>ariaNotify()</code> on
           the List: by default the English <code>"No results"</code>, <code>"1 result"</code>,{" "}
-          <code>"N results"</code>. Nothing is announced while results are stale or loading, or for
-          an unchanged result set. Localise with one function:
+          <code>"N results"</code>. Nothing is announced while results are stale or loading (a{" "}
+          <code>Status</code> fallback showing in the List), or for an unchanged result set.
+          Localise with one function:
         </li>
       </ul>
       <CodeBlock>{`<Combobox.Root announce={(n) => (n === 0 ? "該当なし" : \`\${n}件\`)}>`}</CodeBlock>
