@@ -2,7 +2,7 @@
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
-import { useSelectContext } from "./select-context.js";
+import { SelectContext, useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
@@ -24,9 +24,13 @@ export interface SelectGroupProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"optgroup">, SelectRootState>;
 }
 
-/** An `<optgroup>` of options. Its state is the Root's state. Owned key: `label`. */
+/**
+ * An `<optgroup>` of options. Its state is the Root's state. Owned key: `label`. Its `disabled`
+ * reaches the Options' `state.disabled` / `data-disabled` through context, as `:disabled` does.
+ */
 export function SelectGroup({
   label,
+  disabled = false,
   className,
   style,
   children,
@@ -40,17 +44,19 @@ export function SelectGroup({
     disabled: ctx.disabled,
   };
   const { ref } = useSelectPartRef<HTMLOptGroupElement>("Select.Group", "optgroup");
-  return useRender<ComponentPropsWithRef<"optgroup">, SelectRootState>({
+  const element = useRender<ComponentPropsWithRef<"optgroup">, SelectRootState>({
     defaultElement: "optgroup",
     render,
     state,
     className,
     style,
     children,
-    props: rest,
+    props: { ...rest, disabled },
     libraryProps: { label },
     ref,
   });
+  // Nested groups are not valid HTML, so this only ever turns `false` into the group's value.
+  return <SelectContext value={{ ...ctx, groupDisabled: disabled }}>{element}</SelectContext>;
 }
 
 SelectGroup.displayName = "SelectGroup";

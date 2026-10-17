@@ -7,6 +7,8 @@ export interface SelectContextValue {
   readonly pending: boolean;
   /** `Root disabled` (natively disables the whole `<select>`). */
   readonly disabled: boolean;
+  /** Inside a `Select.Group disabled` (`false` outside groups): Options match `:disabled`. */
+  readonly groupDisabled: boolean;
   /**
    * Called by each Option from its mount layout effect with its element and whether that render
    * hydrated server HTML. Late options are re-applied, and hydrated late options reconciled

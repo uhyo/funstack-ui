@@ -115,9 +115,16 @@ function Fruits({
 
 describe("Select (browser)", () => {
   it("environment: the feature checks match the engine", () => {
-    // Chromium and WebKit (Safari 27) ship customizable select; Firefox keeps it behind prefs.
-    expect(supportsBaseSelect).toBe(browserName !== "firefox");
-    expect(supportsSelectedContent).toBe(browserName !== "firefox");
+    // Chromium ships customizable select; Firefox keeps it behind prefs. Safari 27 ships it too,
+    // but Playwright's WebKit is a trunk build whose features need not match a Safari release,
+    // so WebKit's values are logged, not pinned: the other rows branch on the feature checks.
+    if (browserName !== "webkit") {
+      expect(supportsBaseSelect).toBe(browserName === "chromium");
+      expect(supportsSelectedContent).toBe(browserName === "chromium");
+    }
+    console.info(
+      `[${browserName}] base-select: ${supportsBaseSelect}, selectedcontent: ${supportsSelectedContent}`,
+    );
   });
 
   it("degradation: styled button and cloned content with base-select, the native select without; the value contract is identical", async () => {

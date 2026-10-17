@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -56,7 +56,9 @@ export interface SelectRootProps extends Omit<
   /**
    * Initial value in uncontrolled mode, and the value a form reset returns to (the latest prop is
    * mirrored into the options' `defaultSelected`). When omitted, the browser's choice (an option
-   * whose value is `""`, else the first enabled option) is adopted at mount, without a dispatch.
+   * whose value is `""`, else the first enabled option) is adopted at mount, without a dispatch,
+   * and is what a form reset returns to. Until a pick (or a platform change) sets the value,
+   * options that mount later without the adopted one (a Suspense fallback) adopt again.
    */
   defaultValue?: string;
   /**
@@ -117,21 +119,38 @@ export function SelectRoot({
   // Deliberately no warning when neither `value` nor `defaultValue` is given: the browser's
   // first-option default is adopted (design decision 3, product-owner decision 4).
 
-  // Controlled: the mount-time value is the reset target (conventions 3.8 rule 6).
+  // Controlled: the mount-time value is the reset target (conventions 3.8 rule 6). Neither
+  // `value` nor `defaultValue`: the value adopted at mount, chosen inside the hook.
   const [mountValue] = useState(value);
   const resetTarget = value === undefined ? defaultValue : (mountValue ?? value);
+
+  // Any dispatch, a pick or a platform change, ends the adoption of the browser's default.
+  const established = useRef(false);
+  const dispatchChange = (next: string, details: SelectValueChangeDetails) => {
+    established.current = true;
+    dispatch(next, details);
+  };
 
   const { optionMounted } = useNativeSelectValue({
     ref: selectRef,
     optimistic,
     latestInFlight,
     resetTarget,
-    adoptDefault: value === undefined && defaultValue === undefined ? adopt : undefined,
+    adoptDefault:
+      value === undefined && defaultValue === undefined
+        ? { adopt, established: () => established.current }
+        : undefined,
     onPlatformChange: (next, event) =>
-      dispatch(next, createActionDetails(event, { reason: "platform" })),
+      dispatchChange(next, createActionDetails(event, { reason: "platform" })),
   });
 
-  const context: SelectContextValue = { optimistic, pending, disabled, optionMounted };
+  const context: SelectContextValue = {
+    optimistic,
+    pending,
+    disabled,
+    groupDisabled: false,
+    optionMounted,
+  };
   const state: SelectRootState = { value: optimistic, pending, disabled };
 
   const element = useRender<ComponentPropsWithRef<"select">, SelectRootState>({
@@ -153,7 +172,7 @@ export function SelectRoot({
         const next = event.currentTarget.value;
         // No-op rule against the optimistic value (conventions 2.3, design 4.2).
         if (next === optimistic) return;
-        dispatch(next, createActionDetails(event.nativeEvent, { reason: "activate" }));
+        dispatchChange(next, createActionDetails(event.nativeEvent, { reason: "activate" }));
       },
     },
     ref: libraryRef,
