@@ -1,6 +1,7 @@
 # CheckboxGroup
 
-Status: **proposed** (2026-10-17, GitHub issue #33). Follows `design/conventions.md` (accepted);
+Status: **accepted** (2026-10-17, GitHub issue #33; the product owner accepted all eight questions
+as recommended, see the end of this document). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/radio-group.md` first**: it specifies the `<fieldset>` Root + `Label`
 (`<legend>`) + native-input `Item` anatomy, the one-dispatch-per-group residual browser paths
@@ -1015,24 +1016,22 @@ To apply to `design/conventions.md` if this design is accepted:
 7. **2.2 `details` fields**: `added` / `removed` as the shape for set-valued states (Accordion's
    `item` / `open` stays; a future set-valued component should prefer the diff form).
 
-## Questions for the product owner
+## Decisions recorded (product owner, 2026-10-17)
 
-1. **`CheckboxGroup.Item` as its own part** rather than `Checkbox` reading a group context
-   (Checkbox §10 item 2 sketched the latter). Recommendation: the separate part (section 1); a
-   plain `Checkbox` inside a `Root` stays independent.
-2. **`Parent` as the part name and `values` on the Parent** (several Parents per group) rather
-   than Base UI's `allValues` on the Root with a `parent` flag. Alternatives: `CheckboxGroup.All`
-   / `SelectAll`. Recommendation: `Parent` with `values`.
-3. **APG restore cycle by default** (unchecked → last committed partial) versus two-state
-   (unchecked → all, Base UI / Gmail). Recommendation: APG by default; add `cycle={false}` only
-   if asked.
-4. **Group `required` as dynamic native `required` on the Items** (section 7), accepting the
-   browser's "check this box" wording and the pre-hydration over-blocking, and **no
-   `aria-required` on the fieldset** (not allowed on `group`). Alternative B
-   (`setCustomValidity` + a message prop). Recommendation: C.
-5. **`details.added` / `details.removed`** instead of `item` / `checked` (section 2.6 shows why).
-6. **`next` in document order of the Items**, with set equality everywhere and the "treat it as a
-   set" guidance. Alternative: insertion order (cheaper, no DOM read per dispatch).
-7. **No partial-hydration warning** for CheckboxGroup (8.3); recommend one boundary in the docs
-   only as simplicity.
-8. **`transition` on `Item` and `Parent`** kept for parity (RadioGroup question 9 applies).
+All eight questions raised by the proposal were accepted as recommended; the conventions
+feedback above was applied to `design/conventions.md` the same day.
+
+1. **`CheckboxGroup.Item` is its own part**; a plain `Checkbox` inside a `Root` is not a member
+   (section 1). The context sketch in Checkbox §10 item 2 is withdrawn.
+2. **`Parent` is the part name and `values` lives on the Parent** (several Parents per group);
+   no `allValues` on the Root.
+3. **APG restore cycle by default** (unchecked → last committed partial, section 6.2). No
+   `cycle` prop for now; it can be added without a breaking change.
+4. **Group `required` is dynamic native `required` on the Items** (section 7, option C), with the
+   browser's wording and the pre-hydration over-blocking accepted, and **no `aria-required` on the
+   fieldset** (not allowed on role `group`).
+5. **`details.added` / `details.removed`** are the details shape (sections 2.6, 3.1).
+6. **`next` is in document order of the Items**, set equality everywhere (section 5.1).
+7. **No partial-hydration warning** for CheckboxGroup (section 8.3); one Suspense boundary is a
+   docs recommendation for simplicity only.
+8. **`transition` stays on `Item` and `Parent`** for parity with the other native-input parts.
