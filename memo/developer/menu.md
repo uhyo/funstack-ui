@@ -103,3 +103,11 @@ Chromium, Firefox and WebKit.
   render because `usePopoverRoot` returns a fresh object (its `dispatch` is per render); a real
   hit needs that shared hook (and `useControllableAction.dispatch`) to become stable.
 - PO note: MenuPopupProps omits `onMouseDown`, `onPointerEnter`, `onPointerLeave` (owned).
+
+## Deflake, 2026-10-17 (03ab818)
+
+The JS-free Dialog.Close generation row flaked in CI (job 117364065051). Cause: the library.
+Native opens were counted at the queued `toggle` task, so an action settling between
+`showModal()` and that task closed the re-open. The count now happens in the synchronous
+`beforetoggle` (as Popover does). The row stops the `toggle` event so that order is
+deterministic; it fails with the old count. 0/40 failures under CPU load; CI 39023523252 green.
