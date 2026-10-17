@@ -165,7 +165,7 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
             type: "string",
             default: "the browser's choice",
             description:
-              'Initial value in uncontrolled mode, and what a form reset returns to (the latest value is mirrored into the options\' `defaultSelected`). Without it (and without `value`) the Select follows the browser: an option with `value=""`, else the first enabled option, is adopted at mount without calling the action, and a reset returns to the first enabled option.',
+              'Initial value in uncontrolled mode, and what a form reset returns to (the latest value is mirrored into the options\' `defaultSelected`). Without it (and without `value`) the Select follows the browser: an option with `value=""`, else the first enabled option, is adopted at mount without calling the action, and a reset returns to that adopted option (a disabled `""` placeholder included). Until a pick sets the value, options that load later behind a fallback are adopted again; after one, the pick is kept.',
           },
           {
             name: "valueChangeAction",
@@ -285,8 +285,9 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
       <p>
         <code>SelectOptionState</code>: <code>{"{ value, selected, pending, disabled }"}</code>.{" "}
         <code>selected</code> is optimistic, <code>pending</code> is true on the option the user is
-        waiting on, <code>disabled</code> includes <code>Root disabled</code>. The Option owns{" "}
-        <code>value</code>, <code>selected</code> (never rendered) and <code>disabled</code>.
+        waiting on, <code>disabled</code> includes a disabled <code>Select.Group</code> and{" "}
+        <code>Root disabled</code>. The Option owns <code>value</code>, <code>selected</code> (never
+        rendered) and <code>disabled</code>.
       </p>
 
       <h4>
@@ -332,7 +333,7 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
             "`data-disabled`",
             "Root, Trigger, Option",
             "`:disabled`",
-            "Disabled by prop; on an Option, by its own prop or `Root disabled`.",
+            "Disabled by prop; on an Option, by its own prop, a disabled Group or `Root disabled`.",
           ],
           [
             "–",
@@ -464,8 +465,9 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
           <strong>Form reset</strong> (the Reset button, <code>form.reset()</code>, or React's
           automatic reset after the action succeeds) is one dispatch with{" "}
           <code>reason: "platform"</code> and the <code>reset</code> event. Uncontrolled, the target
-          is the latest <code>defaultValue</code>; controlled, the Root's mount-time value, offered
-          to the parent. A disabled Select is reset too.
+          is the latest <code>defaultValue</code> (without one, the option adopted at mount);
+          controlled, the Root's mount-time value, offered to the parent. A disabled Select is reset
+          too.
         </li>
         <li>
           <strong>Picks before hydration</strong> (and Firefox restoring form state on reload) work
