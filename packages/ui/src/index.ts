@@ -171,6 +171,37 @@ export type {
   SelectSeparatorProps,
 } from "./select/index.js";
 
+export { Combobox } from "./combobox/index.js";
+export type {
+  ComboboxRootProps,
+  ComboboxRootState,
+  ComboboxValueChangeDetails,
+  ComboboxInputValueChangeDetails,
+  ComboboxOpenChangeDetails,
+  ComboboxLabelProps,
+  ComboboxLabelState,
+  ComboboxInputProps,
+  ComboboxInputState,
+  ComboboxTriggerProps,
+  ComboboxTriggerState,
+  ComboboxClearProps,
+  ComboboxClearState,
+  ComboboxPopupProps,
+  ComboboxPopupState,
+  ComboboxListProps,
+  ComboboxListState,
+  ComboboxOptionProps,
+  ComboboxOptionState,
+  ComboboxGroupProps,
+  ComboboxGroupState,
+  ComboboxGroupLabelProps,
+  ComboboxGroupLabelState,
+  ComboboxEmptyProps,
+  ComboboxEmptyState,
+  ComboboxStatusProps,
+  ComboboxStatusState,
+} from "./combobox/index.js";
+
 export type {
   Action,
   ActionDetails,
@@ -178,4 +209,5 @@ export type {
   ChangeReason,
   RenderProp,
   StateValue,
+  UrgentChangeAction,
 } from "./internal/types.js";

@@ -19,6 +19,18 @@ export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Act
 >;
 
 /**
+ * A change action the library calls **synchronously, outside any Transition, and does not
+ * await**: the urgent lane (conventions 2.6; first used by Combobox's `inputValueChangeAction`).
+ * The body runs during the DOM event, so `(next) => setText(next)` is an urgent update, which is
+ * what a controlled text input needs. Nothing is pending or optimistic for it; a returned promise
+ * is ignored (development warns once).
+ */
+export type UrgentChangeAction<T, Details extends ActionDetails = ActionDetails> = (
+  next: T,
+  details: Details,
+) => void;
+
+/**
  * Why a change action was dispatched (conventions 2.2). One library-wide vocabulary: every
  * `<Component><State>ChangeDetails` that exposes `reason` declares it with this type.
  *

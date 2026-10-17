@@ -32,6 +32,7 @@
     "./accordion": "./dist/accordion/index.mjs",
     "./checkbox": "./dist/checkbox/index.mjs",
     "./checkbox-group": "./dist/checkbox-group/index.mjs",
+    "./combobox": "./dist/combobox/index.mjs",
     "./dialog": "./dist/dialog/index.mjs",
     "./menu": "./dist/menu/index.mjs",
     "./popover": "./dist/popover/index.mjs",

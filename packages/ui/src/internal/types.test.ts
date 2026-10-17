@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { Action, ActionDetails, ChangeAction } from "./types.js";
+import type { Action, ActionDetails, ChangeAction, UrgentChangeAction } from "./types.js";
 
 /**
  * Type-level checks for the action signatures (conventions 2.2). `expectTypeOf` is a no-op at
@@ -31,6 +31,17 @@ describe("Action types", () => {
       [next: string, details: ActionDetails]
     >();
     expectTypeOf<ActionDetails["event"]>().toEqualTypeOf<Event | undefined>();
+  });
+
+  it("UrgentChangeAction is synchronous: (next, details) => void", () => {
+    expectTypeOf<UrgentChangeAction<string>>().parameters.toEqualTypeOf<
+      [next: string, details: ActionDetails]
+    >();
+    expectTypeOf<UrgentChangeAction<string>>().returns.toBeVoid();
+    // A plain state setter fits (the controlled text input case).
+    const setText = (_next: string): void => {};
+    const urgent: UrgentChangeAction<string> = (next) => setText(next);
+    void urgent;
   });
 
   it("rejects a callback whose parameters do not fit", () => {

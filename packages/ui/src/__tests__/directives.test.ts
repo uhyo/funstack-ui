@@ -108,6 +108,18 @@ const clientFiles = [
   "internal/use-native-select-value.mjs",
   "internal/use-hydrated-mount.mjs",
   "internal/use-delayed-pair.mjs",
+  // Every Combobox part and its context are client modules (design/components/combobox.md,
+  // decision 15 and 12.1 "Directive").
+  "combobox/combobox-context.mjs",
+  "combobox/combobox-root.mjs",
+  "combobox/combobox-label.mjs",
+  "combobox/combobox-input.mjs",
+  "combobox/combobox-trigger.mjs",
+  "combobox/combobox-clear.mjs",
+  "combobox/combobox-popup.mjs",
+  "combobox/combobox-list.mjs",
+  "combobox/combobox-option.mjs",
+  "combobox/combobox-group.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -127,6 +139,7 @@ const directiveFreeFiles = [
   "popover/index.mjs",
   "menu/index.mjs",
   "select/index.mjs",
+  "combobox/index.mjs",
   "internal/anchor-position.mjs",
 ];
 

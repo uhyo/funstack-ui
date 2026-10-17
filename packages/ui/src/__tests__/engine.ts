@@ -60,6 +60,14 @@ export const supportsBaseSelect =
 export const supportsSelectedContent = "HTMLSelectedContentElement" in globalThis;
 
 /**
+ * `Element.prototype.ariaNotify()` (Chromium 141, Firefox 150, Safari 27): Combobox announces
+ * the result count with it (design/components/combobox.md 6.4). All three stable engines have it;
+ * the check stays for Playwright builds that may lag.
+ */
+export const supportsAriaNotify =
+  typeof Element !== "undefined" && "ariaNotify" in Element.prototype;
+
+/**
  * `focus({ focusVisible })` is read (Chromium 145+, Firefox 104+, Safari 18.4+): the bindings
  * read the dictionary member before the method runs, so a detached element is enough.
  */

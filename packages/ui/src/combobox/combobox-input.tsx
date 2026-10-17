@@ -1,0 +1,155 @@
+"use client";
+import { isValidElement, useCallback } from "react";
+import type {
+  ChangeEvent,
+  ComponentPropsWithRef,
+  CSSProperties,
+  FocusEvent,
+  KeyboardEvent,
+  MouseEvent,
+} from "react";
+import { dataAttr } from "../internal/data-attr.js";
+import type { RenderProp, StateValue } from "../internal/types.js";
+import { useRender } from "../internal/use-render.js";
+import type { DataAttributes } from "../internal/use-render.js";
+import { optionId, useComboboxContext } from "./combobox-context.js";
+
+export interface ComboboxInputState {
+  /** Optimistic selection. */
+  readonly value: string | null;
+  /** The urgent text. */
+  readonly inputValue: string;
+  /** Optimistic open state. */
+  readonly open: boolean;
+  /** The Root is pending (a selection or an open in flight). */
+  readonly pending: boolean;
+  /** The results shown are for an older text. */
+  readonly stale: boolean;
+  readonly disabled: boolean;
+}
+
+export interface ComboboxInputProps extends Omit<
+  ComponentPropsWithRef<"input">,
+  | "value"
+  | "defaultValue"
+  | "onChange"
+  | "onInput"
+  | "onKeyDown"
+  | "onBlur"
+  | "onClick"
+  | "role"
+  | "aria-autocomplete"
+  | "aria-expanded"
+  | "aria-controls"
+  | "aria-activedescendant"
+  | "autoComplete"
+  | "disabled"
+  | "className"
+  | "style"
+  | "children"
+> {
+  /** Native `required`: empty text is `valueMissing`. */
+  required?: boolean;
+  className?: StateValue<string | undefined, ComboboxInputState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxInputState>;
+  /** Must render an `<input>` of type `text` or `search`. */
+  render?: RenderProp<ComponentPropsWithRef<"input">, ComboboxInputState>;
+}
+
+const isDev = process.env.NODE_ENV !== "production";
+
+/**
+ * The text field: `<input role="combobox" aria-autocomplete="list" aria-expanded aria-controls
+ * aria-activedescendant autocomplete="off">`. DOM focus stays here while the active option moves
+ * virtually (design 7.1). Its text is the Root's urgent `inputValue`; typing opens the listbox.
+ *
+ * Owned keys (conventions 1.2): `id`, `type`, `role`, `value`, `autoComplete`,
+ * `aria-autocomplete`, `aria-expanded`, `aria-controls` (token-merged), `aria-activedescendant`,
+ * `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `data-open`, `data-pending`,
+ * `data-selected`, `data-stale`, `data-disabled`.
+ */
+export function ComboboxInput({ className, style, render, ...rest }: ComboboxInputProps) {
+  const ctx = useComboboxContext("Combobox.Input");
+  const { popover, ids, inputRef } = ctx;
+  const { triggerRef } = popover;
+
+  const state: ComboboxInputState = {
+    value: ctx.value,
+    inputValue: ctx.inputValue,
+    open: popover.optimistic,
+    pending: ctx.pending,
+    stale: ctx.stale,
+    disabled: ctx.disabled,
+  };
+
+  const ref = useCallback(
+    (element: HTMLElement) => {
+      if (isDev) {
+        const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
+        if (type !== "text" && type !== "search") {
+          console.error(
+            `Combobox.Input: rendered <${element.tagName.toLowerCase()}` +
+              `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text" or ` +
+              '"search": `role="combobox"`, `aria-activedescendant` and the caret keys depend on it.',
+          );
+        }
+      }
+      inputRef.current = element as HTMLInputElement;
+      // The popover's "trigger" is the input: `showPopover({ source: input })` anchors the
+      // listbox to it and makes clicks on it not light-dismiss (design 5.1).
+      triggerRef.current = element;
+      return () => {
+        if (inputRef.current === element) inputRef.current = null;
+        if (triggerRef.current === element) triggerRef.current = null;
+      };
+    },
+    [inputRef, triggerRef],
+  );
+
+  const searchType = isValidElement<{ type?: unknown }>(render) && render.props.type === "search";
+
+  const libraryProps: ComponentPropsWithRef<"input"> & DataAttributes = {
+    id: ids.input,
+    type: searchType ? "search" : "text",
+    role: "combobox",
+    value: ctx.inputValue,
+    autoComplete: "off",
+    "aria-autocomplete": "list",
+    "aria-expanded": popover.optimistic,
+    "aria-controls": ids.list,
+    "aria-activedescendant":
+      ctx.activeValue === null ? undefined : optionId(ids.optionPrefix, ctx.activeValue),
+    disabled: ctx.disabled,
+    onChange: (event: ChangeEvent<HTMLInputElement>) => {
+      ctx.typed(event.currentTarget.value, event.nativeEvent);
+    },
+    onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+      ctx.keyDown(event.nativeEvent);
+    },
+    onBlur: (event: FocusEvent<HTMLInputElement>) => {
+      ctx.focusOut(event.nativeEvent);
+    },
+    onClick: (event: MouseEvent<HTMLInputElement>) => {
+      ctx.inputClick(event.nativeEvent);
+    },
+    "data-open": dataAttr(popover.optimistic),
+    "data-pending": dataAttr(state.pending),
+    "data-selected": dataAttr(ctx.value !== null),
+    "data-stale": dataAttr(ctx.stale),
+    "data-disabled": dataAttr(ctx.disabled),
+  };
+
+  return useRender<ComponentPropsWithRef<"input">, ComboboxInputState>({
+    defaultElement: "input",
+    render,
+    state,
+    className,
+    style,
+    children: undefined,
+    props: rest,
+    libraryProps,
+    ref,
+  });
+}
+
+ComboboxInput.displayName = "ComboboxInput";

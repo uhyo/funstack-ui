@@ -26,9 +26,18 @@ interface Subscription {
 export function useFormReset(
   ref: RefObject<FormAssociatedElement | null>,
   onReset: (event: Event) => void,
+  /**
+   * Called synchronously from the `reset` event, before the reset algorithm runs: the last
+   * moment to write a reset target the browser will restore (Combobox re-applies its mirrored
+   * `defaultValue`, which react-dom's attribute syncing overwrites after every keystroke).
+   */
+  onResetEvent?: (event: Event) => void,
 ): void {
   const handleReset = useEffectEvent((event: Event) => {
     onReset(event);
+  });
+  const handleResetEvent = useEffectEvent((event: Event) => {
+    onResetEvent?.(event);
   });
   const subscription = useRef<Subscription | null>(null);
 
@@ -42,6 +51,7 @@ export function useFormReset(
     subscription.current = null;
     if (form === null) return;
     const listener = (event: Event) => {
+      handleResetEvent(event);
       queueMicrotask(() => {
         if (event.defaultPrevented) return;
         handleReset(event);
