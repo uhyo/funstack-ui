@@ -180,7 +180,7 @@ html:has(dialog:modal) {
 /* `transition` on the Popup: a view transition animates library-driven opens and closes (a
    Close part, a Form, a controlled close), Firefox included; dismissals (Escape, a click
    outside) keep the CSS exit above. While a view transition runs the CSS transition is cut:
-   otherwise a closing dialog stays rendered through its fade and Chromium and Safari capture it
+   otherwise a closing dialog stays rendered through its fade and Chromium captures it
    in the close's new snapshot too (a double image). */
 html:active-view-transition .dlg-vt {
   transition: none;

@@ -183,6 +183,12 @@ Commits 56e1ea8 (code + jsdom rows) and 5dcce5f (recipe, docs, browser rows).
   `ready`; the dialog group is `_t_N_`. Chromium 156: without the recipe a Close has
   `old(_t_N_)` + `new(_t_N_)` (dialog `display: block`); with it `old(_t_N_)` only, `display:
   none`. Firefox: old only either way. **Popover's recipe had the same artifact** (Chromium probe,
-  same shape), now fixed the same way, with a row. Characterisation rows assert that every
-  non-Firefox engine animates the exit and so shows the double image without the recipe (WebKit
-  is checked by CI).
+  same shape), now fixed the same way, with a row.
+- **WebKit (CI only, run 5dc99d0).** At the close's `ready` the box is already `display: none`
+  with or without the recipe, so WebKit shows no double image (the docs now say "Chromium" only;
+  commit 5dcce5f's message still says "and WebKit", which was wrong). WebKit also lists the
+  dialog group's animation under `::view-transition-new(_t_N_)` and nothing under
+  `old(_t_N_)`, while the box cannot have a new image: pseudo-element names from
+  `getAnimations()` are not reliable there, so the WebKit rows assert `display` only. Worth a
+  look by someone with WebKit (is it a mislabel or a stale open animation?). The older row "the
+  open and %s each run one view transition" passes in WebKit only through `old(root)`.

@@ -419,10 +419,10 @@ html:active-view-transition .popover { transition: none; }
           Dismissals (Escape, a click outside) happen in the browser before React hears about them,
           so they animate with the CSS exit only: keep it. Cut it while a view transition runs (
           <code>html:active-view-transition .popover {"{ transition: none; }"}</code>): otherwise a
-          popover hidden by the library stays rendered through its fade, and Chromium and Safari
-          capture it in the close's new snapshot as well, a double image. The untyped selector is
-          deliberate: a controlled close carries no transition types. The cost: an unrelated view
-          transition of the page also cuts a fade in progress.
+          popover hidden by the library stays rendered through its fade, and Chromium captures it in
+          the close's new snapshot as well, a double image. The untyped selector is deliberate: a
+          controlled close carries no transition types. The cost: an unrelated view transition of
+          the page also cuts a fade in progress.
         </li>
         <li>
           With <code>transition="none"</code>, a plain open starts no document view transition: the

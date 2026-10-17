@@ -656,13 +656,15 @@ describe("ViewTransition (browser)", () => {
     expect(calls).toHaveLength(2);
   });
 
-  // The docs' CSS exit plus `transition` (review M2 of Dialog #46): Chromium (and WebKit) keep a
-  // hidden popover rendered through its fade, so a library-driven close's new snapshot captures
-  // it as a live `::view-transition-new` next to the old image (a double image). The recipe
+  // The docs' CSS exit plus `transition` (review M2 of Dialog #46): Chromium keeps a hidden
+  // popover rendered through its fade, so a library-driven close's new snapshot captures it as a
+  // live `::view-transition-new` next to the old image (a double image). The recipe
   // `html:active-view-transition .x { transition: none }` cuts the fade while a view transition
-  // runs. Firefox hides at once: old image only either way.
+  // runs. Firefox hides at once: old image only either way. WebKit (CI, 2026-10): the box is
+  // already `display: none` at `ready` either way, but WebKit lists the group's animation under
+  // `::view-transition-new(<name>)` and none under `old`, so its row asserts `display` only.
   it.each([
-    [false, "characterisation, without the recipe: a live new image where the exit animates"],
+    [false, "characterisation, without the recipe: a live new image in Chromium"],
     [true, "with the recipe: the old image only"],
   ])('transition="pop" plus a CSS exit, a part-initiated close (recipe=%s): %s', async (recipe) => {
     cleanups.push(
@@ -697,14 +699,11 @@ describe("ViewTransition (browser)", () => {
       );
     const fading = getComputedStyle(popup()).display !== "none";
     const seen = JSON.stringify({ names: [...names], fading });
-    expect(popupImages("old").length, seen).toBeGreaterThan(0);
-    if (recipe) {
-      expect(fading).toBe(false);
-      expect(popupImages("new")).toEqual([]);
-    } else {
-      // Firefox does not animate the exit (bug 1834877); Chromium and WebKit do.
-      expect(fading).toBe(browserName !== "firefox");
-      expect(popupImages("new").length > 0).toBe(fading);
+    const namesReliable = browserName !== "webkit";
+    expect(fading, seen).toBe(!recipe && browserName === "chromium");
+    if (namesReliable) {
+      expect(popupImages("old").length, seen).toBeGreaterThan(0);
+      expect(popupImages("new").length > 0, seen).toBe(fading);
     }
     await transitions[1]!.finished;
     expect(isOpen()).toBe(false);

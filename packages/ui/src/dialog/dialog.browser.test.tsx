@@ -863,6 +863,11 @@ describe("ViewTransition (browser, #46)", () => {
   // The CSS exit of design 10.1 on the box, plus the recipe that cuts it while a view transition
   // runs (review M2 of #46): without the last rule, Chromium keeps the closing dialog rendered
   // through its fade and captures it as a live `::view-transition-new` next to the old image.
+  // WebKit (CI, Playwright's WebKit build, 2026-10): the box is already `display: none` at
+  // `ready` with or without the recipe, so it cannot have a new image; yet WebKit lists the
+  // animation of the dialog's group under `::view-transition-new(<name>)` and none under `old`.
+  // The names are not reliable there, so the WebKit rows assert the box's `display` only.
+  const namesReliable = browserName !== "webkit";
   const cssExit = (recipe: boolean) => `
     .fade, .fade::backdrop {
       opacity: 0;
@@ -882,7 +887,7 @@ describe("ViewTransition (browser, #46)", () => {
     // The notification commit (design 4.4); the content may be held for the CSS fade.
     await expect.poll(() => calls.length).toBe(2);
     await transitions[1]!.ready;
-    expect(dialogNewImages()).toEqual([]);
+    if (namesReliable) expect(dialogNewImages(), JSON.stringify(pseudoNames())).toEqual([]);
     await transitions[1]!.finished;
     await expect.poll(() => screen.queryByTestId("content")).toBeNull();
     // Releasing the hold is a normal update: no second document view transition.
@@ -905,15 +910,18 @@ describe("ViewTransition (browser, #46)", () => {
       await transitions[1]!.ready;
       const names = pseudoNames();
       const seen = JSON.stringify({ names, display: getComputedStyle(popup()).display });
-      expect(
-        names.some(
-          (name) =>
-            name.startsWith("::view-transition-old(") && name !== "::view-transition-old(root)",
-        ),
-        seen,
-      ).toBe(true);
-      expect(dialogNewImages()).toEqual([]);
-      expect(getComputedStyle(popup()).display).toBe("none");
+      // Not rendered while the new snapshot is taken: no live image of the fading dialog.
+      expect(getComputedStyle(popup()).display, seen).toBe("none");
+      if (namesReliable) {
+        expect(
+          names.some(
+            (name) =>
+              name.startsWith("::view-transition-old(") && name !== "::view-transition-old(root)",
+          ),
+          seen,
+        ).toBe(true);
+        expect(dialogNewImages(), seen).toEqual([]);
+      }
       await transitions[1]!.finished;
       expect(isOpen()).toBe(false);
       await sleep(100);
@@ -921,7 +929,7 @@ describe("ViewTransition (browser, #46)", () => {
     },
   );
 
-  it('characterisation: transition="pop" plus a CSS exit without the recipe has a live new image where the exit animates', async () => {
+  it('characterisation: transition="pop" plus a CSS exit without the recipe has a live new image in Chromium', async () => {
     cleanups.push(addStyle(cssExit(false)));
     render(<Plain transition="pop" className="fade" />);
     await open();
@@ -929,14 +937,14 @@ describe("ViewTransition (browser, #46)", () => {
     screen.getByTestId("close").click();
     await expect.poll(() => calls.length).toBe(2);
     await transitions[1]!.ready;
-    // Chromium (and WebKit) keep the closed dialog rendered through its CSS fade, so the new
-    // snapshot captures it: a double image. Firefox closes at once (bug 1834877): old only. If
-    // this row starts failing, an engine changed and the docs' recipe may be unnecessary.
+    // Chromium keeps the closed dialog rendered through its CSS fade, so the new snapshot
+    // captures it: a double image. Firefox closes at once (bug 1834877) and WebKit has the box
+    // `display: none` by `ready`: no new image. If this row starts failing, an engine changed;
+    // re-check the docs' recipe.
     const fading = getComputedStyle(popup()).display !== "none";
-    // Firefox does not animate the exit (bug 1834877); Chromium and WebKit do.
     const seen = JSON.stringify({ names: pseudoNames(), fading });
-    expect(fading, seen).toBe(browserName !== "firefox");
-    expect(dialogNewImages().length > 0, seen).toBe(fading);
+    expect(fading, seen).toBe(browserName === "chromium");
+    if (namesReliable) expect(dialogNewImages().length > 0, seen).toBe(fading);
     await transitions[1]!.finished;
   });
 

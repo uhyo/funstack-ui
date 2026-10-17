@@ -69,7 +69,7 @@ html:has(.demo-dialog:modal) {
    part, a Form, a controlled close), Firefox included; dismissals (Escape, a click on the
    backdrop) are the browser's and keep the CSS exit above. While a view transition runs the CSS
    transition is cut: otherwise a closing dialog stays rendered through its fade, and Chromium
-   and Safari capture it in the close's new snapshot as well (a double image). */
+   captures it in the close's new snapshot as well (a double image). */
 html:active-view-transition .demo-dialog-vt {
   transition: none;
 }
