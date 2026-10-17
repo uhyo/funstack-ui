@@ -1,9 +1,10 @@
 # Slider
 
-Status: **proposed** (2026-10-18, wave 5, GitHub issue #54). Follows `design/conventions.md`
-(accepted); where this document and the conventions disagree, the conventions win. The
-conventions changes this design needs are listed under "Conventions feedback (proposed)" and
-are **not yet applied** (another design holds `conventions.md` concurrently).
+Status: **accepted** (2026-10-18, wave 5, GitHub issue #54; the product owner accepted all
+twelve items of "For the product owner" as recommended, see the end of this document; the
+conventions changes are applied, see "Conventions feedback (applied)" and conventions resolved
+question 29). Follows `design/conventions.md` (accepted); where this document and the
+conventions disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/slider.md` (binding: a visually
 hidden native `<input type="range">` per thumb, the optimistic value rendered during a drag, no
@@ -999,10 +1000,10 @@ packages/ui/src/internal/
 
 ---
 
-## Conventions feedback (proposed)
+## Conventions feedback (applied to `design/conventions.md` 2026-10-18)
 
-To be applied to `design/conventions.md` at acceptance by whoever holds it (another design holds
-it now):
+All thirteen items below are applied (conventions resolved question 29); the list is kept as the
+record of what changed and why.
 
 1. **2.1 action kinds.** Add a row: **commit notification** for a continuous state,
    `<state>CommitAction`, receiving `(next, details)`, called once per gesture, awaited in the
@@ -1096,6 +1097,7 @@ Genuine product decisions, with recommendations; none blocks implementation.
     Base UI). **Recommendation: explicit**, default `0`.
 11. **No `transition` prop on any part** (section 11), the Select precedent. **Recommendation:
     as designed.**
-12. **Conventions feedback 1 to 13** to apply on acceptance by whoever holds `conventions.md`.
+12. **Conventions feedback 1 to 13** to apply on acceptance by whoever holds `conventions.md`
+    (applied 2026-10-18).
 
 **Accepted by the product owner (2026-10-18):** all twelve recommendations as written. The user asked the team to proceed autonomously on wave 5, so decisions 1, 2 and 8 were made here; they will be reported to the user, who may revisit them before the first release that includes Slider. Apply the conventions feedback (item 12) to `design/conventions.md` and set the status above to accepted.
