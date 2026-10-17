@@ -3,7 +3,8 @@
 Status: **accepted** (2026-10-15, GitHub issue #5; open questions resolved by the product owner
 with the user, see the end of this document; amended 2026-10-15 after the Toggle design, #6, with
 the ViewTransition correction in 5.1, the pending-is-never-disabled rule in 3.6, and the Server
-Function note in 2.4). Binding for every component design in
+Function note in 2.4; amended 2026-10-17 after the CheckboxGroup design, #33, see resolved
+question 20). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -68,7 +69,8 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` |
 | `Indicator` | Purely visual element that tracks state (active tab marker). | `span` |
-| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, future CheckboxGroup) it renders `<legend>` and must be the Root's first child. | `label` / `legend` |
+| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child. | `label` / `legend` |
+| `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its checked/mixed state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
 | `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. | as named |
 
@@ -261,6 +263,12 @@ exposes `reason` uses exactly these values and no synonyms:
 Components whose close carries a platform result add it as a serialisable field next to
 `reason`: Dialog's `details.returnValue` is `dialog.returnValue` (the `value` of the Close button
 or form submitter, or the string passed to `requestClose()`), `undefined` on open.
+
+Components with a **set-valued state** describe what changed as a diff, `added: readonly
+string[]` and `removed: readonly string[]` (CheckboxGroup), so that one shape covers a single
+item, a multi-item trigger and a platform path, and a controlled "update on success" parent can
+apply it as a functional update instead of writing the whole set (section 2.5). Accordion's
+earlier `item` / `open` pair stays as is; a new set-valued component uses the diff form.
 
 Adding a value is a change to this document, not to one component (`"dismiss"` was added
 2026-10-16 for Dialog; Popover and Menu reuse it). The first argument is always the next value, so the
@@ -727,6 +735,15 @@ repeated activation safe. Consumers who want to block re-activation do it with C
 (`[data-pending] { pointer-events: none }`) or announce it with `aria-busy` through pass-through;
 the library emits `data-pending` and nothing else.
 
+**Computed native validity attributes.** A part may render a native constraint attribute from
+library state when the platform has no constraint for the component's semantic: CheckboxGroup
+renders `required` on every Item only while the group's **optimistic** set is empty ("at least
+one"), so validation, `:user-invalid` and the localised browser message stay native. Such an
+attribute is owned by the part, follows optimistic state (it appears during a pending uncheck of
+the last box and leaves on rollback), and is static before hydration (the server-rendered value),
+which the component doc records as its pre-hydration behaviour. It is never written through the
+DOM (`setCustomValidity`) in v0.
+
 ### 3.7 `keepMounted` on content regions
 
 Content regions whose visibility is driven by library state (`Tabs.Panel` today) share one prop
@@ -759,7 +776,7 @@ This is the one contract both designs implement (reconciled 2026-10-16 from
 | --- | --- | --- |
 | `useFormReset(ref, onReset)` (`internal/use-form-reset.ts`) | the other two | **Stable** `reset` subscription on the form owner (`ref.current.form`; the element may be an `<input>` or a `<fieldset>`, both form-associated and honouring `form=`). Re-reads the owner after every commit but re-subscribes only when it changed; the handler body is a `useEffectEvent`. On `reset` it queues a microtask and, unless `event.defaultPrevented`, calls `onReset(event)`. |
 | `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies, in this order, `defaultChecked` (if given), then `checked` (optimistic), then `indeterminate` (if given). The order matters in exactly one case: react-dom's `updateInput` writes `el.checked` on every update of the input (setting the dirty-checkedness flag), and React's automatic form reset runs in the form's mutation effects, after the inputs' updates and before layout effects; after that reset the dirty flag is clear, so writing `defaultChecked` (the `checked` content attribute) would move `checked` too, and writing `checked` afterwards settles it. `indeterminate` is independent of both; and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
-| `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns a stable `{ onItemMounted }`, which the Root passes down through context and `group: true` items call from their mount layout effect (`useNativeChecked` takes `onItemMounted` and `component` options). The adapter **ignores calls made before its own mount reconciliation has run** (members rendered in the Root's commit run their effects first, so they are covered by that reconciliation; the flag is reset in the effect cleanup so StrictMode's re-run behaves the same); any later call queues **one microtask per commit** that compares `readCurrent()` with `base()` and dispatches `"platform"` with `event: undefined`. Comparison is `Object.is`; a future group with an array value (`CheckboxGroup`, #33) needs an `equals` option, recorded as an input to that design. |
+| `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns a stable `{ onItemMounted }`, which the Root passes down through context and `group: true` items call from their mount layout effect (`useNativeChecked` takes `onItemMounted` and `component` options). The adapter **ignores calls made before its own mount reconciliation has run** (members rendered in the Root's commit run their effects first, so they are covered by that reconciliation; the flag is reset in the effect cleanup so StrictMode's re-run behaves the same); any later call queues **one microtask per commit** that compares `readCurrent()` with `base()` and dispatches `"platform"` with `event: undefined`. Comparison is `equals` (option, default `Object.is`); a group with a set value (`CheckboxGroup.Root`) passes set equality, because two sets are never `Object.is`-equal. |
 
 Rules the three hooks implement, which component docs may cite instead of restating:
 
@@ -795,11 +812,14 @@ Rules the three hooks implement, which component docs may cite instead of restat
    user intends. A programmatic value change while members are still dehydrated is not a problem
    (a transition update is held until hydration, an urgent one client-renders the boundary; no
    dispatch either way, reviewer-verified). **Unsupported: partial hydration of a native radio
-   group.** Clicking a hydrated radio while same-`name` siblings are inside a still-dehydrated
-   Suspense boundary makes react-dom throw "Mixing React and non-React radio inputs with the same
-   `name` is not supported" from its radio restore. This is a React limitation; the library emits
-   a dev warning on the late-mount path, documents "keep all Items in the Root's Suspense
-   boundary", and issue #34 tracks a human upstream report.
+   group** (radios only). Clicking a hydrated radio while same-`name` siblings are inside a
+   still-dehydrated Suspense boundary makes react-dom throw "Mixing React and non-React radio
+   inputs with the same `name` is not supported" from its radio restore. This is a React
+   limitation; RadioGroup emits a dev warning on the late-mount path, documents "keep all Items
+   in the Root's Suspense boundary", and issue #34 tracks a human upstream report. The same-`name`
+   walk in `restoreControlledInputState` is guarded by `type === "radio"`, so a **checkbox
+   group** is not affected: CheckboxGroup supports late-mounting Items and Parents through the
+   same `onItemMounted` path and emits no warning.
 4. **The reset subscription must be stable.** React's automatic reset after a successful
    `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
    the next subscription, so a listener attached in a deps-less effect never sees it (verified,
@@ -844,7 +864,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
 | `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
-| `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. |
+| `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
@@ -1020,6 +1040,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Switch | `fsui-switch`, `fsui-switch-on`, `fsui-switch-off` |
 | Checkbox | `fsui-checkbox`, `fsui-checkbox-check`, `fsui-checkbox-uncheck` |
 | RadioGroup | `fsui-radio-group` (no direction variants) |
+| CheckboxGroup | `fsui-checkbox-group`, `fsui-checkbox-group-check` (when `details.added` is non-empty), `fsui-checkbox-group-uncheck` (when `details.removed` is non-empty; a reset may carry both) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1454,8 +1475,14 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     both `Dialog.Close action` and `Dialog.Form` stay; a pre-hydration click opens an empty
     dialog that fills in after hydration; a refused close re-opens the dialog; the jsdom dialog
     shim is accepted.
-20. **`CheckboxGroup` is deferred** to its own design (issue #33); Checkbox leaves room for it
-    (`design/components/checkbox.md` §10).
+20. **`CheckboxGroup`** was deferred to its own design (issue #33) and accepted 2026-10-17
+    (`design/components/checkbox-group.md`): own `Item` part, `Parent` with `values`, APG restore
+    cycle, dynamic native `required` on Items with no `aria-required` on the fieldset,
+    `details.added` / `removed`, `next` in document order, no partial-hydration warning,
+    `transition` on `Item` and `Parent`. The conventions changes it asked for (the `equals`
+    option, rule 3.8.3 scoped to radios, `Parent` in 1.1, the derived `indeterminate` note in
+    4.1, computed native validity attributes in 3.6, the diff shape in 2.2, the types in 5.3)
+    are applied.
 21. **Shared native-input machinery** is the three-hook contract of section 3.8: per-element
     `useNativeChecked` (with `group: true` inside a group), the group adapter
     `useNativeGroupReconciliation` on a fieldset Root, both on `useFormReset`; one dispatch per

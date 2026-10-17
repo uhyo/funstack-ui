@@ -66,3 +66,11 @@ Working notes behind `design/components/checkbox-group.md`. Not a spec.
   renders an `<input name=…>` inside the fieldset, so the query finds it.
 - Whether `toHaveAccessibleName` resolves a `<legend>` for a plain `fieldset` in jsdom (RadioGroup
   used `role="radiogroup"`; here the implicit `group` role).
+
+## Status, 2026-10-17 (later)
+
+Product owner accepted all eight questions as recommended. checkbox-group.md set to accepted
+with the questions turned into recorded decisions; the seven conventions items applied to
+`design/conventions.md` (1.1 `Parent`, 2.2 diff shape, 3.6 computed validity attributes, 3.8
+`equals` and the radio-only scope of rule 3, 4.1 derived `indeterminate`, 5.3 types, resolved
+question 20); checkbox.md §10 now points at the group design and withdraws its item 2.

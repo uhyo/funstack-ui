@@ -1,0 +1,8 @@
+VTPOP {"ua":"chromium","variant":"content-in-vt","recs":[{"pseudo":["::view-transition-group(root)","::view-transition-new(root)","::view-transition-new(root)","::view-transition-old(root)","::view-transition-old(root)","::view-transition-old(_t_0_)"],"openAtUpdate":false}]}
+VTPOP {"ua":"chromium","variant":"vt-wraps-popover","recs":[{"pseudo":["::view-transition-old(root)","::view-transition-new(_t_1_)","::view-transition-group(root)","::view-transition"],"openAtUpdate":true},{"pseudo":["::view-transition-old(root)","::view-transition-old(_t_1_)","::view-transition-group(root)","::view-transition"],"openAtUpdate":false}]}
+VTPOP {"ua":"firefox","variant":"content-in-vt","recs":[{"pseudo":["::view-transition-group(root)","::view-transition-old(_t_0_)","::view-transition-old(root)","::view-transition-old(root)","::view-transition-new(root)","::view-transition-new(root)"],"openAtUpdate":false}]}
+VTPOP {"ua":"chromium","variant":"no-vt","recs":[]}
+VTPOP {"ua":"firefox","variant":"vt-wraps-popover","recs":[{"pseudo":["::view-transition-old(root)","::view-transition-new(_t_1_)","::view-transition-group(root)","::view-transition"],"openAtUpdate":true},{"pseudo":["::view-transition-old(_t_1_)","::view-transition-old(root)","::view-transition-group(root)","::view-transition"],"openAtUpdate":false}]}
+VTPOP {"ua":"firefox","variant":"no-vt","recs":[]}
+ Test Files  2 passed (2)
+      Tests  2 passed (2)

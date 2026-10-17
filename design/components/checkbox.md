@@ -432,11 +432,19 @@ mixed box still posts its value; research section 4).
 
 ---
 
-## 10. CheckboxGroup: deferred, and what Checkbox leaves room for
+## 10. CheckboxGroup: designed separately
 
-**Decision: not in v0.** A `CheckboxGroup` design (`design/components/checkbox-group.md`) is
-worth doing after RadioGroup settles the `<fieldset>` Root + `Label` (`<legend>`) shape, because
-it needs decisions that do not belong in Checkbox:
+**Designed and accepted 2026-10-17** as `design/components/checkbox-group.md` (issue #33). What
+it settled, against the room this document had left: the group has its own `CheckboxGroup.Item`
+part (a plain `Checkbox` inside a `CheckboxGroup.Root` is **not** a member, so item 2 below is
+withdrawn and `Checkbox` reads no group context); the "select all" box is a library part,
+`CheckboxGroup.Parent values={…}`, whose `indeterminate` is derived from the group's optimistic
+set and is **not** suspended while pending (the `&& !pending` rule of section 4 is specific to
+the consumer-owned prop here); group-level `required` is native `required` rendered on every
+Item only while nothing is checked; the details shape is `{ reason, added, removed }`. The
+consumer pattern in 2.4 remains valid for a select-all list built from plain Checkboxes.
+
+The list below is kept as the record of the questions this design handed over:
 
 - `CheckboxGroup.Root` = `<fieldset>` (role `group`) owning `value: string[]` /
   `defaultValue` / `valueChangeAction`, with a per-item optimistic reducer keyed by `value`
@@ -463,7 +471,7 @@ it needs decisions that do not belong in Checkbox:
 4. `name` stays pass-through on Checkbox; a group Root would own it on its items (as RadioGroup
    does), which is a per-mode ownership exactly like Accordion's `name`.
 
-Until then the consumer pattern in 2.4 is the documented way to build a select-all list.
+Items 1, 3 and 4 held; item 2 was replaced by the separate `Item` part (see above).
 
 ---
 
@@ -532,7 +540,8 @@ native inputs and fieldset Roots is in 1.2, with the dev warning in the shared h
 2. **No `Checkbox.Indicator` in v0** (section 1): resolved, plain-input anatomy (conventions
    resolved question 16).
 3. **CheckboxGroup deferred** (section 10): resolved, issue #33 (conventions resolved question
-   20); the group-level `required` question goes to that design.
+   20); designed and accepted 2026-10-17 in `design/components/checkbox-group.md`, which also
+   answered the group-level `required` question (dynamic native `required` on the Items).
 4. **`indeterminate` with uncontrolled `checked`** is allowed (no warning). Alternative: warn
    that mixed only makes sense when the parent controls `checked`. Recommendation: allow; the
    dash simply persists until the parent changes the prop, and a warning would be wrong for the

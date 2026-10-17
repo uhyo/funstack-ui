@@ -1539,10 +1539,10 @@ describe("Tabs", () => {
 
   describe("experimental_focusgroup", () => {
     it.each([
-      ["horizontal", true, "tablist inline wrap"],
-      ["horizontal", false, "tablist inline nowrap"],
-      ["vertical", true, "tablist block wrap"],
-      ["vertical", false, "tablist block nowrap"],
+      ["horizontal", true, "tablist inline wrap nomemory"],
+      ["horizontal", false, "tablist inline nowrap nomemory"],
+      ["vertical", true, "tablist block wrap nomemory"],
+      ["vertical", false, "tablist block nowrap nomemory"],
     ] as const)("%s loop=%s renders focusgroup=%s", (orientation, loop, expected) => {
       render(
         <Tabs.Root defaultValue="a" orientation={orientation} loop={loop}>
@@ -1557,6 +1557,7 @@ describe("Tabs", () => {
     it("is absent by default; JS arrows still work where focusgroup is unsupported", async () => {
       const first = render(<Harness mode="uncontrolled" />);
       expect(list()).not.toHaveAttribute("focusgroup");
+      expect(tab("A")).not.toHaveAttribute("focusgroupstart");
       first.unmount();
 
       render(
@@ -1567,7 +1568,11 @@ describe("Tabs", () => {
           </Tabs.List>
         </Tabs.Root>,
       );
-      expect("focusgroup" in HTMLElement.prototype).toBe(false);
+      expect("focusGroup" in HTMLElement.prototype).toBe(false);
+      // focusgroupstart on the selected tab only; roving tabindex stays (no native path).
+      expect(tab("A")).toHaveAttribute("focusgroupstart", "");
+      expect(tab("B")).not.toHaveAttribute("focusgroupstart");
+      expect(tab("B")).toHaveAttribute("tabindex", "-1");
       const user = setupUser();
       await user.tab();
       await user.keyboard("{ArrowRight}");

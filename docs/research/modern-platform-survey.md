@@ -158,7 +158,8 @@ Version numbers are the first supporting stable release. `TP` = Safari Technolog
   `element.focus({ focusVisible })` for programmatic focus; scroll snap for an overflowing tab strip
   with `scrollend`; `<ViewTransition>` for panel switches.
 - **Flag:** `focusgroup="tablist"` as the opt-in replacement for roving-tabindex JS (Chromium only).
-  Keep the JS path as default; feature-detect with `'focusgroup' in HTMLElement.prototype`.
+  Keep the JS path as default; feature-detect with `'focusGroup' in HTMLElement.prototype` (the IDL attribute is camel-cased;
+  `'focusgroup' in ...` is always false, issue #43).
 - **Tempting but blocked:** `hidden="until-found"` on inactive panels. The platform supports it in
   all three engines, but react-dom 19.3 serializes `hidden` as a boolean attribute, so
   `hidden="until-found"` becomes `hidden=""` on both client and server. See the React section for
