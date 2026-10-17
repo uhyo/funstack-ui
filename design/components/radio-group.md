@@ -12,8 +12,9 @@ precedent), the WAI-ARIA APG Radio Group pattern, the researcher's probes under
 `memo/architect/radio-group-notes.md`.
 
 RadioGroup is the first component built on a **native checkable input**. The platform gives it
-form participation, validation, labels, a single tab stop, arrow-key selection with wrapping and
-RTL mirroring, and pre-hydration interactivity. The library adds exactly one thing on top: the
+form participation, validation, labels, a single tab stop, arrow-key selection (wrapping and
+RTL-mirrored in Chromium and Firefox, neither in WebKit; section 8), and pre-hydration
+interactivity. The library adds exactly one thing on top: the
 selection is a library-owned state driven through `valueChangeAction` inside a transition, with
 optimistic feedback and `data-pending`. Everything below is arranged so that the native behaviour
 stays native and the Async React model stays the conventions' model.
@@ -26,7 +27,7 @@ stays native and the Async React model stays the conventions' model.
 | 2 | State | One library-owned state, `value: string \| null`, as `value` / `defaultValue` / `valueChangeAction(next, details)`. `null` means no radio checked. `defaultValue` defaults to `null` and **no dev warning fires** when neither prop is given: an unchecked group is the HTML default and the normal form case. |
 | 3 | Rendered DOM state | Every Item renders `checked={optimistic === value}`. This is a correctness requirement, not a style: react-dom restores a controlled input's DOM `checked` to its props after every event, and only sync-lane (optimistic) state survives that restore (`form-controls.md` section 2). |
 | 4 | `next` type | `valueChangeAction` receives `string` for every user interaction. It receives `null` only on the platform paths that can empty the group (form reset to a mount-time "none checked"), with `details.reason: "platform"`. |
-| 5 | Keyboard | Entirely native: single tab stop, Space checks, all four arrows select and wrap, RTL mirrored, disabled radios skipped. No `Home`/`End` (not in the APG Radio Group pattern; adding them would be the component's first keyboard JS). No `orientation` prop: native arrows ignore it and a prop that changed nothing would mislead. No `focusgroup` flag. |
+| 5 | Keyboard | Entirely native: single tab stop, Space checks, all four arrows select, disabled radios skipped; Chromium and Firefox wrap at the ends and mirror Left/Right under RTL, WebKit does neither (engine difference, kept as is: no key handler). No `Home`/`End` (not in the APG Radio Group pattern; adding them would be the component's first keyboard JS). No `orientation` prop: native arrows ignore it and a prop that changed nothing would mislead. No `focusgroup` flag. |
 | 6 | Pending and checked exposure | `data-pending` on Root and on the Item whose value is the optimistic one; `data-checked` (optimistic) on Items; `data-disabled` on Root and Items. The vocabulary word is **`checked`** (the platform's), not `selected`. |
 | 7 | Residual browser paths (`reason: "platform"`) | Mount reconciliation (pre-hydration clicks, Firefox form-state restoration): one dispatch per group with `event: undefined`. Form reset (`<button type=reset>`, `form.reset()`, React's automatic reset after a successful `<form action>`): one dispatch per group with `event` set to the `reset` event. Both go through the Root's `useNativeGroupReconciliation` on the fieldset (conventions 3.8); Items call `useNativeChecked` with `group: true` and report nothing themselves. |
 | 8 | `preventDefault` | Not a veto. A click cancelled **before** the library's handler runs (a pass-through `onClick`) is treated as "no change" and never dispatches, because the browser reverts the DOM. `details.event.preventDefault()` inside the action desyncs the DOM while pending and triggers a dev warning. A veto is controlled mode. |
@@ -516,21 +517,31 @@ Tailwind: `checked:border-accent data-pending:animate-pulse` on the Item,
 
 ## 8. Keyboard interaction
 
-Everything in this table is the browser's (probed in Chromium 156 and Firefox 157; WebKit per
-documentation, with the macOS caveat that Safari needs Option+Tab or the "press Tab to highlight
+Everything in this table is the browser's (probed in Chromium 156, Firefox 157 and WebKit in the
+browser suite, with the macOS caveat that Safari needs Option+Tab or the "press Tab to highlight
 each item" setting to tab into form controls at all):
 
 | Key | Effect | Dispatches? |
 | --- | --- | --- |
 | `Tab` / `Shift+Tab` | Enter the group on the checked radio; leave it with the next press. With nothing checked, enter on the first radio (Shift+Tab may land on the last). | No |
 | `Space` | Check the focused radio if it is unchecked. | Yes |
-| `ArrowDown` / `ArrowRight` | Focus **and check** the next enabled radio, wrapping from last to first. Under `direction: rtl`, `ArrowRight` goes to the previous radio. | Yes, once per press |
-| `ArrowUp` / `ArrowLeft` | Previous enabled radio, wrapping. Mirrored in RTL. | Yes, once per press |
+| `ArrowDown` / `ArrowRight` | Focus **and check** the next enabled radio. Chromium, Firefox: wraps from last to first, and under `direction: rtl` `ArrowRight` goes to the previous radio. WebKit: stops at the last radio and never mirrors. | Yes, once per press that moves |
+| `ArrowUp` / `ArrowLeft` | Previous enabled radio. Chromium, Firefox: wrapping, mirrored in RTL. WebKit: stops at the first radio, `ArrowLeft` is always previous. | Yes, once per press that moves |
 | `Enter` | Inside a `<form>`, implicit submission (native). | No |
 | `Home` / `End` | Nothing. | – |
 
 Decisions:
 
+- **WebKit's arrows neither wrap nor mirror, and the library leaves it so.** WebKit's
+  `RadioInputType::handleKeydownEvent` maps Down/Right to the next and Up/Left to the previous
+  same-name focusable radio in document order, focuses and clicks it, and simply stops at either
+  end; its source comments that "even for RTL, left still means previous radio button". A
+  press past the end moves nothing and dispatches nothing. WebKit bug 145687 (a 2015 patch to
+  cycle within the group) never landed. The APG allows either behaviour for the native variant,
+  the component installs no key handler (vision: the platform first), and papering over it would
+  mean re-implementing the whole arrow walk, including "check on focus", in JS. Documented as an
+  engine difference (docs page, `memo/developer/cross-engine.md`); the browser suite asserts the
+  degraded sequence on WebKit (commit 4451fe0). Not reported upstream by us.
 - **No `Home`/`End`.** The APG Radio Group pattern lists Tab, Space and the four arrows only.
   Native radios match it exactly, and adding two keys would mean the component's first keyboard
   JS, which would also have to replicate "check on focus" to stay consistent with the arrows.
@@ -831,7 +842,7 @@ controlled wrapper.
 | Area | Tests |
 | --- | --- |
 | Roles and ARIA | `fieldset[role=radiogroup]` with accessible name from `Label` (`toHaveAccessibleName`); `aria-required="true"` on the fieldset when `required`, absent otherwise, and not overridable through a `render` element; `aria-label` fallback without `Label`; every Item is `input[type=radio]` with the same `name`; `useId` name when `name` omitted, prop when given; `value` attribute per Item; `required` on every Item when set on Root; `disabled` on the fieldset for `Root disabled`, on the input for `Item disabled`; `data-disabled` on Items in both cases; `form` attribute on fieldset and inputs. |
-| Keyboard | Click, Space and arrow keys (user-event emulates native radio walking: next/previous, wrap, disabled skipped) each dispatch once with a native `click` event; Tab enters on the checked radio; `Home`/`End` do nothing. **Browser mode:** RTL mirroring, native wrap, Shift+Tab return, Safari note. |
+| Keyboard | Click, Space and arrow keys (user-event emulates native radio walking: next/previous, wrap, disabled skipped) each dispatch once with a native `click` event; Tab enters on the checked radio; `Home`/`End` do nothing. **Browser mode:** RTL mirroring and native wrap on Chromium and Firefox; on WebKit the non-wrapping, non-mirrored sequence, including that a press past the end dispatches nothing (`arrowsWrap` / `arrowsMirrorRtl` branch on the engine); Shift+Tab return; Safari note. |
 | Sync action (both) | `(next, details)` shape; `details.reason === "activate"`; `details.event.type === "click"`; clicking the checked radio, a disabled radio, or any radio under `Root disabled` never dispatches; a click whose `defaultPrevented` is already true (pass-through `onClick`) never dispatches and leaves the DOM on the old radio. |
 | Async action (both) | While unresolved: `data-pending` on Root and the clicked Item only; the clicked input is `checked` in the DOM; `data-checked` moved; other Items unchanged. After resolve: pending gone, value committed (uncontrolled) / parent updated (controlled). |
 | Rejection (both) | Uncaught: `ErrorCatcher` above the Root receives the error and the whole group is replaced by the boundary's fallback, so no DOM assertion on the radios; uncontrolled internal value unchanged (re-mount shows the old value). DOM rollback is asserted where the group stays mounted: a controlled parent that catches inside the action and does not update → the previously checked input is `checked` again in the DOM, `data-checked` reverted, no `data-pending`; a controlled veto (9.5) → same; uncontrolled caught-inside variant resolves and commits. |

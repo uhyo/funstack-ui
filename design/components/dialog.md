@@ -399,14 +399,20 @@ the dialog renders `closedby="closerequest"` or `"any"` and both listeners are s
 
 Nested dialogs need nothing from the library: an inner `Dialog.Root` inside an outer Popup gets
 its own ids and context; modal dialogs stack in the top layer; Escape closes the topmost one and
-returns focus to its opener inside the lower one (research, "Nesting").
+returns focus to its opener inside the lower one (research, "Nesting"). One cost to know: an
+inner Popup with `transition` set mounts its `<ViewTransition>` together with the outer content,
+and react-dom starts a document view transition for any boundary that mounts in a transition
+commit, whatever `"none"` says (#35): the page cross-fades and the inner open lands about 250 ms
+late. Leave `transition` off the inner Popup (no boundary is rendered then, 10.3) unless the
+animation is wanted.
 
 ---
 
 ## 3. Props and types
 
-Shared types come from `packages/ui/src/internal/types.ts`. `TransitionProp` is React's
-`ViewTransitionClass` (the type of `<ViewTransition default>`).
+Shared types come from `packages/ui/src/internal/types.ts`; the `transition` prop is typed with
+React's own `ViewTransitionClass` (the type of `<ViewTransition default>`, imported from
+`react`), as on every animatable part (conventions 5.1).
 
 ### 3.1 `Dialog.Root`
 
@@ -549,8 +555,14 @@ export interface DialogPopupProps
    * Library mode only. Forwarded to the `<ViewTransition default>` around the dialog. Animates
    * the opening commit and content changes while open; the close is the browser's and animates
    * with CSS. Ignored (dev warning) in JS-free mode.
+   *
+   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
+   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
+   * `<Activity>` reveal of this part inside a transition start a document view transition: the
+   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35,
+   * section 10.3).
    */
-  transition?: TransitionProp;
+  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, DialogPopupState>;
   style?: StateValue<CSSProperties | undefined, DialogPopupState>;
   children?: StateValue<ReactNode, DialogPopupState>;
@@ -1379,7 +1391,9 @@ outer dialog: a Close part always closes its own dialog (natively, through `requ
 after its `action`), and neither form can "close only if confirmed". The inner Root is JS-free
 (none of `open` / `defaultOpen` / `openChangeAction`), so its Trigger is a native
 `command="show-modal"` and the confirm opens synchronously inside the click, with no transition
-and nothing pending while the user decides. "Keep editing" and Escape close the confirm only
+and nothing pending while the user decides; its Popup has no `transition`, so no
+`<ViewTransition>` mounts with the editor's content and the #35 cross-fade is not paid (2.6).
+"Keep editing" and Escape close the confirm only
 (it is a DOM descendant of the editor, so it is not inert and stacks above; a second Escape
 closes the editor unconfirmed, which cannot be gated on this platform, section 7). The
 "Discard" Close's `action` discards the draft (`data-pending` on that button meanwhile; a

@@ -84,3 +84,9 @@ Status line was already "accepted". Folded: Root `form` is owned (fieldset and e
 context; `memo/developer/radio-group.md`), Item `disabled` owned in 13.5, and a "Hydration" bullet
 in section 6: any Suspense boundary between Root and Items makes those Items hydrate later, so the
 partial-hydration dev warning fires for them; the message has no link.
+
+## WebKit arrows, 2026-10-17
+
+Sections 8, the decisions table, the intro and the test plan now say: Chromium and Firefox wrap and
+mirror under RTL, WebKit does neither (`RadioInputType::handleKeydownEvent`, bug 145687 never
+landed; `memo/developer/cross-engine.md`, commit 4451fe0). Kept native, no key handler.

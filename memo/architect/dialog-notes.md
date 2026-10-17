@@ -107,3 +107,7 @@ Not changed, worth knowing: the Popup's `transition` prop is typed `ViewTransiti
 code (the design's prose says `TransitionProp`); same shape in practice. Issue #35 (a mounting
 `<ViewTransition>` starts a document view transition even with `"none"`) is referenced from the
 code's JSDoc, not from this design.
+
+Follow-up the same day: `transition` is typed `ViewTransitionClass` (the design had invented a
+`TransitionProp` alias that types.ts never had); the #35 mount cost is now in the 3.3 doc comment,
+in 2.6 (nested dialogs) and in 12.5 (the JS-free inner Root pays nothing), on top of 10.3.
