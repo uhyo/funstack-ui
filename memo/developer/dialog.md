@@ -101,3 +101,47 @@ time; the "dismiss" reason was added to `ChangeReason` as instructed).
   close / request-close on a closed one); custom `--x` commands fire and do nothing.
 - Docs page (packages/docs DialogPage) updated for the props and the Escape callout; the
   design text (11.10, 12.5, 4.2, 8.1, 9) still describes the old behaviour, for the architect.
+
+## #46: library-owned part-initiated closes (2026-10-17/18)
+
+Implemented the accepted amendment (design 2.3, 3.4, 4.4, 8.1, 10.3, 11.11-11.16, 13.2, 13.3,
+14, "Amendment" steps 1-7) plus #48 review findings 4 (apply-effect comments: "after every
+commit that re-renders the Popup") and 5 (Dialog `intended` through `useLatest`).
+
+- `internal/content-focus-probe.tsx`: `useContentFocusProbe(popupRef)` -> `{ wrapContent,
+  hadFocus(), forget() }`. Function API, not a ref: the compiler lint (`react(immutability)`)
+  flags writes to a ref returned by a custom hook.
+- Root: `requestClose(event, reason, returnValue)`, `takeCloseReturnValue()` (returns `""`
+  when none), the pending return value is cleared in an insertion effect whenever
+  `latestInFlight()?.next ?? optimistic` is true (veto snap-back or re-open).
+- Popup: `useExitAnimation` + render-time `holdDuringRender` (no `transition`), release rule
+  in the apply effect, echo check in `close`; `command` listener cancels `request-close` /
+  `close` in library mode (value from `event.source`, `""` without one); `submit` listener on
+  the **document** (bubble), cancels unless `defaultPrevented`.
+- Close: `onClick` installed in library mode or with `action`; Form: settle -> `requestClose`.
+
+### Things worth knowing
+
+- **jsdom shim**: its `method="dialog"` close was a document listener registered at setup, so
+  it ran before the Popup's document listener. Moved to a window bubble listener, plus a
+  microtask path armed by wrapping `stopPropagation` (a stopped submit still closes natively,
+  like a real default action). The stopped path cannot cancel the event, so jsdom logs "Not
+  implemented: requestSubmit()" in that one test.
+- Close with `action`: the Close's `isPending` does stay true until the Root's
+  `openChangeAction(false)` settles (React entangles the transitions); asserted in jsdom.
+- **CSS exit + `transition` (Chromium)**: probe (not committed) showed that with the 10.1 CSS
+  exit (`display` / `overlay` allow-discrete) on the dialog, a library-driven close's view
+  transition also captures the still-rendered, fading dialog as `::view-transition-new`
+  (dialog `display: block`, opacity ~0.89 at `ready`); without the CSS exit there is no new
+  image. Firefox: never a new image (no CSS exit). Design 10.3 recommends "at most a CSS exit
+  for dismissals" with `transition`; that CSS runs for library closes too. Docs example and
+  playground therefore drop the dialog box's CSS transition in the `transition` variant
+  (`.demo-dialog-vt`, `.dlg-vt`). Popover's docs recipe keeps the fade and likely has the same
+  artifact in Chromium (not probed). For the architect.
+- The opening-capture row (10.3's open question) passes on Chromium 156 and Firefox 157:
+  `::view-transition-new` exists at `ready` for a `showModal()` in the update callback.
+- Local engines: Chromium + Firefox only. WebKit rows for CI: the 13.3 VT rows (open + close
+  capture after `showModal()`, Escape = one VT, CSS exit + Escape = one VT, focus return with
+  Enter on Close for non-modal/keepMounted/modal), the controlled-close CSS fade row (content
+  held, mounted once), `close()` inside the update callback restoring focus to the Trigger,
+  and `event.source` on a foreign `request-close` (jsdom only covers it through the shim).
