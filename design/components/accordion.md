@@ -878,9 +878,19 @@ packages/ui/src/accordion/
   directive on all five modules. There is no `accordion-static.tsx`.
 - **Context.** `RootContext`: `{ mode: "static" | "library", exclusive, name (static+exclusive),
   disabled, pending, committed: ReadonlySet<string>, optimistic: ReadonlySet<string>, dispatch,
-  dispatchFromDom, registerTrigger }`. `ItemContext`: `{ value, disabled, committedOpen,
-  optimisticOpen, pending }` (all `undefined`-open in static mode). Root recomputes the context
-  value with `useMemo`; the sets are new objects only when they change.
+  dispatchFromDom, registerItem, registerTrigger }`. `ItemContext`: `{ value, disabled,
+  committedOpen, optimisticOpen, pending, library, dispatch, registerTrigger }` (the opens are
+  `undefined` in static mode; `dispatch` and `registerTrigger` are the Root's, `undefined`
+  outside a Root). **Trigger and Panel read only the `ItemContext`**, never the Root's: the
+  members they need are copied into it, and Item memoises its context value on its own fields,
+  so opening one item re-renders every Item (they read the Root's sets) but not the other
+  items' Triggers and Panels (review follow-ups 6 and 7 of #48, commit 0ba1612; internal only,
+  no public change). Root recomputes its context value with `useMemo`; the sets are new objects
+  only when they change, and the **controlled set is keyed on `JSON.stringify(value)`**, so an
+  inline `value={["a"]}` (a new array per render) neither re-bases `useOptimistic` nor changes
+  the context. `dispatch` and `dispatchFromDom` read `{ optimistic, exclusive }` through
+  `useLatest`, so their identity is stable across open-state changes (a handler only ever runs
+  against the committed UI, which is the set it would have closed over).
 - **Mode detection** once, from the first render's props (`value !== undefined ||
   defaultValue !== undefined || valueChangeAction !== undefined`), stored in a ref; warn if it
   changes.
@@ -897,7 +907,8 @@ packages/ui/src/accordion/
   browser now owns. The layout effect from 2.3 exists only in library mode.
 - **Trigger.** `onClick` per 2.2; `isNestedInteractive` = `event.target` has an ancestor matching
   `a[href], button, input, select, textarea, [contenteditable]` below the summary. Renders
-  `aria-disabled` and `data-*`. Registers with Root.
+  `aria-disabled` and `data-*`. Registers through the `ItemContext`'s `registerTrigger` and
+  dispatches through its `dispatch` (both the Root's functions, read from the item context).
 - **Panel.** Reads `ItemContext`, renders `<div data-disabled …>`, wrapped in a boundary only
   when `transition` is given in library mode.
 - **Ids.** `useId()` only in Root, only consumed for `name` in static exclusive mode.
