@@ -227,13 +227,15 @@ inside the tree).
 ### 2.3 Item activation and `closeOnActivate` (research question 1)
 
 ```tsx
-// inside MenuItem
+// inside MenuItem (the shape useActionTrigger wraps, section 14)
 const [pending, startOwnTransition] = useTransition();
 const activate = (event: Event) => {
   if (disabled) return;
   const details = createActionDetails(event, {});
+  const generation = rootMenu.openGeneration();   // the open this activation belongs to
   startOwnTransition(async () => {
     await action?.(details);
+    if (rootMenu.openGeneration() !== generation) return;  // dismissed and re-opened meanwhile: drop the close (Popover 3.4)
     if (closeOnActivate) rootMenu.requestClose(event, "activate");
   });
 };
@@ -603,8 +605,12 @@ for empty popup space or the page changes nothing.
 Top-level menu: the platform returns focus to the Trigger on Escape, item activation
 (`hidePopover()` from the apply effect runs the same hide steps) and ArrowLeft-free closes; a
 light dismiss leaves focus where the mousedown put it; Tab moves it on. Submenu: the platform
-restores nothing, so Popover 6.2's rule applies: `focusWasInside` at `beforetoggle(closed)`
-and focus on `<body>` or inside after → focus the SubmenuTrigger. Covers Escape and ArrowLeft in
+restores nothing, so Popover 6.2's rule applies: `focusWasInside` at `beforetoggle(closed)` (or
+the focused item unmounted in the close commit, recorded by `wrapContent`'s probe) and focus on
+`<body>` or inside after → focus the SubmenuTrigger. The same probe covers the top-level menu
+when item activation closes it with `transition` set: the focused item is unmounted before
+`hidePopover()` runs, the platform then restores nothing, and the apply effect focuses the
+Trigger (Popover 6.2, review H1); hence `Menu.Popup` renders its items through `wrapContent`. Covers Escape and ArrowLeft in
 a submenu and a submenu's `toggle` after a programmatic close. When the whole stack closes from
 inside a submenu (item activation, Tab), the root menu's own hide restores focus to the root
 Trigger (first in stack: platform) or lets Tab's target keep it; the submenu's rule sees
@@ -944,11 +950,31 @@ packages/ui/src/internal/
   use-popover-*.ts          # from #38; extension points below
 ```
 
-- **Extension points needed in the Popover hooks** (to add while implementing #40 or #41):
-  `usePopoverRoot({ component, mode: "library", onDispatch?(next, details) })` for the open-cause
-  record and timer cancellation; `usePopoverPopup({ resolveInitialFocus(popup, cause), onKeyDown,
-  onFocusOut, role })`; `usePopoverTrigger` reusable by `SubmenuTrigger` with extra handlers
-  merged in order (consumer's, then the item's, then the trigger's).
+- **Extension points in the Popover hooks.** Landed with #40 (`src/internal/use-popover-*.ts`,
+  tested in `use-popover-hooks.test.tsx`): `usePopoverRoot({ component: "menu", mode:
+  "library", details, onDispatch(next, details) })` for the open-cause record and timer
+  cancellation (`onDispatch` runs synchronously before every dispatch); `usePopoverPopup({
+  resolveInitialFocus(popup) })`, called right before each library `showPopover()`, **no `cause`
+  argument**: Menu reads the open cause from its own ref (written in `onDispatch` / before
+  `requestOpen`), the hook only honours the returned element (inside the popup, else the
+  platform's choice). Left to #41: `onKeyDown` / `onFocusOut` / `role` are not hook options;
+  Menu attaches its handlers and renders `role="menu"` on its own element; `usePopoverTrigger`
+  reused by `SubmenuTrigger` with extra handlers merged in order (consumer's, then the item's,
+  then the trigger's).
+- **`usePopoverPopup` result is `{ setElement, visible, wrapContent }`** (destructure it; a hook
+  result that carries a ref trips React Compiler's ref inference once a member is passed as
+  `ref`). `Menu.Popup` renders `visible ? wrapContent(items) : null` (or
+  `<Activity>{wrapContent(items)}</Activity>` with `keepMounted`): the probe inside `wrapContent`
+  is what returns focus to the Trigger when item activation closes the menu with `transition`
+  (Popover 6.2, H1); without it a keyboard activation ends with focus on `<body>`.
+- **`useActionTrigger` and the open-generation guard.** The item's activation records
+  `rootMenu.openGeneration()` before the `await` and skips the `requestClose` when it changed:
+  the user dismissed the menu and opened it again while the action ran, and the close belonged
+  to the earlier open (Popover 3.4, product-owner decision at the Popover review). The shared
+  hook carries this with the superseded-rejection surfacing; `Popover.Close` migrates onto it.
+- **Details factory.** Menu's `details` option for `usePopoverRoot` must build with
+  `createActionDetails(event, { reason })`, never an object literal: the Proxy keeps `event`
+  non-enumerable, which is what lets `openChangeAction` be a Server Function (Popover 14.1).
 - **Context.** Each Root provides `MenuContext` `{ ...popover context, submenu, rootMenu
   (the top-level context), loop, delay, closeDelay, openCause (ref), nativeFocusgroup (from the
   Popup, via MenuListContext) }`. Items read the nearest Root; `rootMenu.requestClose` closes the

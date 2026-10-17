@@ -444,7 +444,11 @@ export interface DialogRootState {
 export interface DialogRootProps {
   /** Controlled open state. `undefined` means uncontrolled (and, with the other two absent, JS-free mode). */
   open?: boolean;
-  /** Initial open state in uncontrolled library mode. A modal dialog opens after hydration, never in the server HTML. */
+  /**
+   * Initial open state in uncontrolled library mode. `true` renders the content and the Trigger's
+   * open state into the server HTML; a modal dialog is shown after hydration (`showModal()`
+   * cannot be server-rendered).
+   */
   defaultOpen?: boolean;
   /**
    * Awaited for `true` (the dialog opens when it resolves and the content has rendered); a
@@ -896,8 +900,12 @@ open so a later `initialFocus` change cannot leave two candidates. The library n
 `autofocus` on the resolved target in its mount effect and **keeps** it (a native `show-modal`
 command may open the dialog any number of times, and the attribute must be there each time).
 `autoFocus` on an element works too, in JS-free mode and for `keepMounted` content that was
-server-rendered, because the attribute is in the HTML (verified: `reactAutoFocusHydrated`). The
-docs recommend `initialFocus` in both modes, with `autoFocus` as the plain-HTML alternative.
+server-rendered, because the attribute is in the HTML (verified: `reactAutoFocusHydrated`), and
+**only then**: React writes `autofocus` into server-rendered HTML, not on client render, so after
+a client navigation to a Server Component page the attribute is missing and the dialog focusing
+steps pick the first focusable element instead. `initialFocus` is written after mount in JS-free
+mode and covers both. The docs recommend `initialFocus` in both modes, with `autoFocus` as the
+alternative for markup that is always server-rendered (Popover review L7).
 
 APG guidance, repeated in the docs: for long or destructive dialogs focus a static element
 (`<Dialog.Title tabIndex={-1}>` as the `initialFocus` target) so the user hears the title before
