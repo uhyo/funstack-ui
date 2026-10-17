@@ -91,3 +91,4 @@
 - Select: researched (e620cd2), designed + accepted (230086e, 50228e4; PO: no warning without value/defaultValue), implemented + merged (1114850..ba1f6e5), CI green all 3. Review 5a2acad: H1 adopt overwrites a pick, M1 reset target with "" placeholder; fix pass running on master; architect folding the review into select.md.
 - Combobox: designed + accepted (c000b43, 7349e2d). USER decided: English default announce string, overridable (first built-in string; conventions §11). Developer implementing in a worktree.
 - Issues: #51 (upstream React/Chromium + iOS check), #52 (Chromium selectedcontent reset bug, upstream).
+- Select COMPLETE: review fixes e4aab3b..2c8871c (CI green all 3), design fold 79b7393. Combobox implementation still running (worktree).
