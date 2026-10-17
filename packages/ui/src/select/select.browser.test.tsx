@@ -318,7 +318,10 @@ describe("Select (browser)", () => {
     it("re-clones when the selected option's content changes through React, without events", async () => {
       let setLabel!: (label: string) => void;
       const suspender = createSuspender();
-      render(<Refreshing onSetLabel={(s) => (setLabel = s)} suspender={suspender} />);
+      // Inside an async `act`: the option's Suspense boundary suspends on the first render.
+      await act(async () => {
+        render(<Refreshing onSetLabel={(s) => (setLabel = s)} suspender={suspender} />);
+      });
       await selectOption(sel(), "b");
       const changes = vi.fn();
       sel().addEventListener("change", changes);
@@ -352,7 +355,9 @@ describe("Select (browser)", () => {
       "with the picker open, the refresh lands and the picker stays open",
       async () => {
         let setLabel!: (label: string) => void;
-        render(<Refreshing onSetLabel={(s) => (setLabel = s)} suspender={createSuspender()} />);
+        await act(async () => {
+          render(<Refreshing onSetLabel={(s) => (setLabel = s)} suspender={createSuspender()} />);
+        });
         await selectOption(sel(), "b");
         await user.click(sel());
         await expect.poll(() => isOpen()).toBe(true);
