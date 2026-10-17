@@ -65,3 +65,4 @@
 - WAVE 2 COMPLETE. Next: propose wave 3 to user. Open: #33 CheckboxGroup, #19/#20/#21 Tooltip deferred, #16/#34 human upstream.
 - WAVE 3 approved by user: Popover + Menu (+ CheckboxGroup #33 side item). Issues: #37 research, #38 design Popover, #39 design Menu, #40 impl Popover, #41 impl Menu, #42 roadmap page. Running: research #37 (opus), architect CheckboxGroup design #33, developer roadmap #42. Next: Popover design after research.
 - 2026-10-17: USER PUBLISHED @funstack/ui 0.1.0-alpha.0 by hand (dist-tags: latest+alpha → 0.1.0-alpha.0; also an old 0.0.0-stage exists). No GitHub release yet (offered). Trusted publisher setup is the user's next one-time step.
+- GitHub release 0.1.0-alpha.0 created (prerelease, target 8cf21ac). Publish run skipped (version exists) → success; OIDC untested until next release. User set up trusted publisher.

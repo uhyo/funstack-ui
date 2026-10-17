@@ -40,7 +40,7 @@ To release a new version of the `@funstack/ui` package, follow these steps:
 - The tag name should be `x.y.z` where `x.y.z` is the new version (no `v` prefix).
 - Mark prerelease versions (those containing `-`) with `--prerelease`.
 
-5. Inform the user that the release has been created successfully, providing the URL to the release page on GitHub, and that the npm publish and docs deploy workflows are now running (`gh run list --limit 5` shows them).
+5. Inform the user that the release has been created successfully, providing the URL to the release page on GitHub, and that the npm publish workflow is now running (`gh run list --limit 5` shows it). The docs site is deployed by Cloudflare on its own.
 
 ## Writing Release Notes
 
