@@ -2068,6 +2068,8 @@ in every engine (Safari 26.5+ per the Popover notes; fall back to `""` when abse
    accept; the docs will phrase it as "adopt a dismissal's `false` unconditionally; a part's
    `false` is yours to refuse".
 
+**Accepted by the product owner (2026-10-17):** all three recommendations as written: intercept `method="dialog"` (opt out with `stopPropagation()`), intercept foreign `request-close` / `close` invokers, and the controlled snap-back veto for part closes. Popover symmetry for foreign `hide-popover` is a later follow-up.
+
 ## Review corrections (2026-10-17, from the Menu review)
 
 From `memo/reviewer/menu.md` (review of #41 / #47, which moved the Close part onto the shared
