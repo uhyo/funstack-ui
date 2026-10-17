@@ -110,16 +110,22 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
           ],
           [
             '`"dismiss"`',
-            "The user closed the component without one of its parts: Escape, Android back, an assistive-technology dismiss, a click outside.",
-            "The platform's `close` event.",
+            'The user closed the component without one of its parts: Escape, Android back, an assistive-technology dismiss, a click outside. Also a [Toast](/components/toast)\'s Close part, which only means "go away".',
+            "The platform's `close` event; for Toast the click or keydown.",
+          ],
+          [
+            '`"timeout"`',
+            "The library's own timer closed the component: a [Toast](/components/toast) whose `duration` elapsed. No user gesture, no platform event.",
+            "`undefined`",
           ],
         ]}
       />
       <p>
         Tabs, Accordion, Switch, Checkbox and RadioGroup dispatch <code>"activate"</code> and{" "}
-        <code>"platform"</code>; Dialog uses all three. A <code>"platform"</code> dispatch goes
-        through the same action as a user one, so a controlled parent hears about a form reset and
-        decides whether to adopt it. See{" "}
+        <code>"platform"</code>; Dialog uses the first three; a toast's <code>closeAction</code>{" "}
+        gets <code>"activate"</code>, <code>"dismiss"</code> or <code>"timeout"</code>. A{" "}
+        <code>"platform"</code> dispatch goes through the same action as a user one, so a controlled
+        parent hears about a form reset and decides whether to adopt it. See{" "}
         <a href="/concepts/browser-owned-state">Browser-owned state</a>.
       </p>
 

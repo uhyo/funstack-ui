@@ -98,6 +98,7 @@ export function TransitionsPage() {
             "Combobox",
             '`fsui-combobox`, `fsui-combobox-select`, `fsui-combobox-open`, `fsui-combobox-close` (a deferred results render carries none: use `default: "none"`)',
           ],
+          ["Toast", "none (no part takes `transition`: every Toast commit is urgent)"],
         ]}
       />
       <p>

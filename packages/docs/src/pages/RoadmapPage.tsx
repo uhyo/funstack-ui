@@ -86,6 +86,13 @@ export function RoadmapPage() {
           free text, forms, and a default result-count announcement through <code>ariaNotify</code>{" "}
           (<a href={issue(50)}>#50</a>).
         </li>
+        <li>
+          <a href="/components/toast">Toast</a>: a <code>toast()</code> function feeding an urgent
+          queue (a toast shows while the action it reports on is still pending), promise toasts, an
+          Undo action prop, <code>closeAction</code> for the Undo window, announcements through{" "}
+          <code>ariaNotify</code>, and a region that moves into an open modal Dialog so it stays
+          interactive (<a href={issue(54)}>#54</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>

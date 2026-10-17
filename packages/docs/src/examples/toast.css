@@ -1,0 +1,120 @@
+/* Toast: the Viewport is a <section popover="manual">, shown in the top layer while it has toasts
+   (`:popover-open`, `data-paused`). Roots carry `data-pending`, `data-ending` and `data-type`.
+   Enter with @starting-style, exit on [data-ending]: the library keeps the toast until its
+   transitions finish. */
+
+.demo-toasts {
+  position: fixed;
+  inset: auto 1rem 1rem auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  inline-size: min(22rem, calc(100vw - 2rem));
+  overflow: visible;
+  background: transparent;
+  color: var(--color-text);
+  /* The region's box never blocks the page; the toasts take pointer events. */
+  pointer-events: none;
+}
+.demo-toast-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms;
+}
+/* Collapse the gap a leaving toast leaves behind. */
+.demo-toast-slot:has([data-ending]) {
+  grid-template-rows: 0fr;
+}
+.demo-toast {
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+  min-block-size: 0;
+  overflow: hidden;
+  margin-block-start: 0.5rem;
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+  pointer-events: auto;
+  transition:
+    opacity 200ms,
+    translate 200ms;
+}
+@starting-style {
+  .demo-toast {
+    opacity: 0;
+    translate: 0 1rem;
+  }
+}
+.demo-toast[data-ending] {
+  opacity: 0;
+  translate: 0 1rem;
+}
+.demo-toast[data-pending] {
+  cursor: progress;
+}
+.demo-toast[data-pending] .demo-toast-title::after {
+  content: " ⏳";
+}
+.demo-toast[data-type="success"] {
+  border-inline-start: 4px solid #16a34a;
+}
+.demo-toast[data-type="error"] {
+  border-inline-start: 4px solid #dc2626;
+}
+.demo-toast:focus-visible {
+  outline: 2px solid var(--color-accent, #4f46e5);
+  outline-offset: 2px;
+}
+.demo-toast-text {
+  flex: 1;
+}
+.demo-toast-title {
+  font-weight: 600;
+}
+.demo-toast-description {
+  margin: 0.15rem 0 0;
+  font-size: 0.875em;
+  opacity: 0.8;
+}
+.demo-toast-action[data-pending] {
+  cursor: progress;
+  opacity: 0.7;
+}
+.demo-toast-close {
+  border: 0;
+  padding: 0 0.4em;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 1.2em;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.demo-toast-queued {
+  margin: 0.25rem 0 0;
+  text-align: end;
+  font-size: 0.8em;
+  opacity: 0.8;
+}
+.demo-toast-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.demo-toast-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-inline-size: 20rem;
+  padding: 0.25rem 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-toast,
+  .demo-toast-slot {
+    transition: none;
+  }
+}
