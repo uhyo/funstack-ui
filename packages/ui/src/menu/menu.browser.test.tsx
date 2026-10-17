@@ -129,19 +129,23 @@ function Basic({
 function Submenu({
   sub: subProps,
   onInbox,
-  side = subSide,
+  defaultPlacement = false,
 }: {
   sub?: Partial<MenuRootProps>;
   onInbox?: () => unknown;
-  /** The submenu Popup's `side`; default `subSide` (none on WebKit). */
-  side?: MenuPopupProps["side"];
+  /** Leave the submenu Popup's `side` unset (the shipped default), also on WebKit. */
+  defaultPlacement?: boolean;
 }) {
   return (
     <>
       <Menu.Item data-testid="rename">Rename</Menu.Item>
       <Menu.Root {...subProps}>
         <Menu.SubmenuTrigger data-testid="move">Move to</Menu.SubmenuTrigger>
-        <Menu.Popup data-testid="subpopup" side={side} style={popupStyle}>
+        <Menu.Popup
+          data-testid="subpopup"
+          {...(!defaultPlacement && { side: subSide })}
+          style={popupStyle}
+        >
           <Menu.Item data-testid="inbox" action={onInbox}>
             Inbox
           </Menu.Item>
@@ -249,14 +253,9 @@ describe("keyboard end to end (browser)", () => {
       expect(call[0]).toMatchObject({ focusVisible: false });
     }
     focus.mockRestore();
-    const visible = item("rename").matches(":focus-visible");
-    if (browserName === "webkit") {
-      // Review H1: WebKit matched `:focus-visible` on the `autofocus` target after a click.
-      // Recorded rather than asserted until CI shows what `focusVisible: false` does there.
-      console.info(`[webkit] :focus-visible after a pointer open: ${visible}`);
-    } else {
-      expect(visible).toBe(false);
-    }
+    // Review H1: WebKit matched `:focus-visible` on the `autofocus` target after a click; with
+    // `focus({ focusVisible: false })` it does not (CI, Playwright WebKit, 2026-10-17).
+    expect(item("rename").matches(":focus-visible")).toBe(false);
     await user.hover(item("duplicate"));
     expect(item("duplicate")).toHaveFocus();
     await user.keyboard("{ArrowDown}");
@@ -516,7 +515,7 @@ describe("submenus (browser)", () => {
     async () => {
       render(
         <Basic>
-          <Submenu side={undefined} />
+          <Submenu defaultPlacement />
         </Basic>,
       );
       await openSub();
