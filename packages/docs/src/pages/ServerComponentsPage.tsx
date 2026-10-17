@@ -90,7 +90,7 @@ import { saveOpenSections } from "./actions"; // "use server"
           ["Toggle", "Markup and ARIA. Pressing needs JavaScript."],
           [
             "Dialog, JS-free mode",
-            'Everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in the markup, CSS animation. A `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open.',
+            'Everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup (`initialFocus` after hydration), CSS animation. A `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open.',
           ],
           [
             "Dialog, library mode",

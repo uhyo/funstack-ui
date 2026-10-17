@@ -38,8 +38,8 @@ export function PopoverPage() {
       </Example>
       <p>
         This share popover is a Server Component in JS-free mode. The Trigger and Done are native
-        invokers, so it works before hydration and with JavaScript disabled; the{" "}
-        <code>autoFocus</code> input is focused by the platform.
+        invokers, so it works before hydration and with JavaScript disabled; the platform's dialog
+        focusing steps put focus on the input, the first focusable element.
       </p>
 
       <h3>Anatomy</h3>
@@ -156,7 +156,7 @@ export function PopoverPage() {
             name: "defaultOpen",
             type: "boolean",
             description:
-              "Initial open state in uncontrolled library mode. A popover that starts open opens after hydration (there is no attribute for an open popover in HTML). `defaultOpen={false}` is the usual way to select library mode without an action.",
+              'Initial open state in uncontrolled library mode. A popover that starts open is shown after hydration (there is no attribute for an open popover in HTML); its content and the Trigger\'s open state (`aria-expanded="true"`, `data-open`) are already in the server HTML. `defaultOpen={false}` is the usual way to select library mode without an action.',
           },
           {
             name: "openChangeAction",
@@ -261,8 +261,10 @@ export function PopoverPage() {
                 library writes <code>autofocus</code> on it right before <code>showPopover()</code>{" "}
                 and lets the platform focus it. Default: the platform's choice for a{" "}
                 <code>&lt;dialog&gt;</code> (the first focusable element, else the popup); with{" "}
-                <code>render={"{<div />}"}</code> focus stays on the Trigger. Works in JS-free mode
-                after hydration.
+                <code>render={"{<div />}"}</code> focus stays on the Trigger. In JS-free mode the
+                attribute is written after mount; prefer it to <code>autoFocus</code>, which React
+                writes only into server-rendered HTML (not when the Popup renders on the client, for
+                example after a client navigation to a Server Component page).
               </>
             ),
           },
@@ -322,7 +324,9 @@ export function PopoverPage() {
       <p>
         <code>PopoverCloseState</code>: <code>{"{ pending, disabled }"}</code>. In library mode the
         click is always intercepted, so every Close goes through the Root. Repeated clicks while
-        pending re-run the action; the first close wins. Popovers have no return value.
+        pending re-run the action; the first close wins. If the user dismisses the popover and opens
+        it again while the action runs, the action's close is dropped: it belonged to the earlier
+        open. Popovers have no return value.
       </p>
 
       <h4>
@@ -450,8 +454,7 @@ export function PopoverPage() {
         <li>
           <strong>Initial focus.</strong> With the default <code>&lt;dialog&gt;</code>, opening runs
           the dialog focusing steps: the <code>initialFocus</code> target, else the first focusable
-          element, else the popup itself (the APG non-modal dialog). Where an engine does not move
-          focus in, the library does the same after <code>showPopover()</code>. For a
+          element, else the popup itself (the APG non-modal dialog), in every engine. For a
           disclosure-style card that keeps focus on the Trigger, render a <code>&lt;div&gt;</code>:{" "}
           <code>render={"{<div />}"}</code> with <code>role="region"</code> and an{" "}
           <code>aria-label</code>.
@@ -528,12 +531,15 @@ export function PopoverPage() {
       <ul>
         <li>
           <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
-          <code>autoFocus</code> in the markup.
+          <code>autoFocus</code> in server-rendered markup. After hydration, and for content React
+          renders on the client, use <code>initialFocus</code>: React does not write{" "}
+          <code>autofocus</code> on client-rendered elements.
         </li>
         <li>
           <strong>Before hydration, library mode:</strong> the Trigger already carries the command,
-          so a click opens the popover natively, but the content is not in the HTML yet. On
-          hydration the Popup finds it open and dispatches{" "}
+          so a click opens the popover natively, but the content is not in the HTML yet (with{" "}
+          <code>defaultOpen</code> it is, and the Trigger already says it is expanded; only the
+          showing waits for hydration). On hydration the Popup finds it open and dispatches{" "}
           <code>openChangeAction(true, {'{ reason: "platform" }'})</code> with no event; the content
           mounts into the open popover. If the action rejects or a controlled parent refuses, the
           popover closes again.

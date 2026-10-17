@@ -137,7 +137,7 @@ export function DialogPage() {
             name: "defaultOpen",
             type: "boolean",
             description:
-              "Initial open state in uncontrolled library mode. A dialog that starts open opens after hydration, never in the server HTML. `defaultOpen={false}` is the usual way to select library mode without an action.",
+              "Initial open state in uncontrolled library mode. A dialog that starts open is shown after hydration, never by the server HTML; its content and the Trigger's open state are already in that HTML. `defaultOpen={false}` is the usual way to select library mode without an action.",
           },
           {
             name: "openChangeAction",
@@ -229,8 +229,10 @@ export function DialogPage() {
                 The element to focus on open: a ref, or a selector resolved inside the dialog. The
                 library writes <code>autofocus</code> on it right before <code>showModal()</code>{" "}
                 and lets the platform focus it; it never calls <code>.focus()</code>. Default: the
-                platform's choice (the first focusable element). Works in JS-free mode after
-                hydration.
+                platform's choice (the first focusable element). In JS-free mode the attribute is
+                written after mount; prefer it to <code>autoFocus</code>, which React writes only
+                into server-rendered HTML (not when the Popup renders on the client, for example
+                after a client navigation to a Server Component page).
               </>
             ),
           },
@@ -564,8 +566,10 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
       <ul>
         <li>
           <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
-          <code>autoFocus</code> in the markup and <code>Dialog.Form</code> with a Server Function
-          action (React's progressive enhancement).
+          <code>autoFocus</code> in server-rendered markup and <code>Dialog.Form</code> with a
+          Server Function action (React's progressive enhancement). After hydration, and for content
+          React renders on the client, use <code>initialFocus</code>: React does not write{" "}
+          <code>autofocus</code> on client-rendered elements.
         </li>
         <li>
           <strong>Before hydration, library mode:</strong> the Trigger already carries the command,
