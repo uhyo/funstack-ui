@@ -1220,6 +1220,23 @@ describe("Combobox", () => {
       await flush();
     });
 
+    it("Enter right after a dismissal, before its toggle task, is the closed Enter", async () => {
+      const action = vi.fn<ValueAction>();
+      const user = setupUser();
+      render(<Harness root={{ allowCustomValue: true, valueChangeAction: action, name: "tag" }} />);
+      await typeText(user, "Oz");
+      // The platform hides the popup at once and queues `toggle`; Enter arrives in between.
+      let notPrevented = false;
+      act(() => {
+        popup().hidePopover();
+        notPrevented = fireEvent.keyDown(input(), { key: "Enter" });
+      });
+      expect(notPrevented).toBe(true);
+      expect(action).toHaveBeenCalledWith("Oz", expect.anything());
+      expect(hidden()!.value).toBe("Oz");
+      await flush();
+    });
+
     it("focus leaving with changed text dispatches with the focusout event", async () => {
       const action = vi.fn<ValueAction>();
       const user = setupUser();

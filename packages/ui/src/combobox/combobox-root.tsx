@@ -689,7 +689,10 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     if (disabled || event.ctrlKey || event.metaKey) return false;
     // IME: the key belongs to the composition (Enter commits it, arrows pick a candidate).
     if (event.isComposing || event.keyCode === 229) return false;
-    const isOpen = popover.intended();
+    // What the user sees, not what is intended: right after Escape the platform has hidden the
+    // popup but its `toggle` (and the library's notification) is still queued, and an open that
+    // is still committing shows nothing yet. Enter must submit and arrows must open in both.
+    const isOpen = isPopoverOpen(popover.popupRef.current);
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
