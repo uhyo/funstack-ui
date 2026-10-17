@@ -100,6 +100,10 @@ import { saveOpenSections } from "./actions"; // "use server"
             "Switch, Checkbox, RadioGroup, CheckboxGroup",
             'They are native inputs: clicking, Space, arrow keys between radios, labels, `required` and form submission all work. On hydration a changed value is reconciled with one action call (`reason: "platform"`, one per group). `Checkbox indeterminate` and a mixed `CheckboxGroup.Parent` are drawn from `data-indeterminate` but announced as unchecked until hydration; a Parent clicked before hydration counts as "check all" of its values. A required CheckboxGroup keeps the server\'s `required` attributes until hydration.',
           ],
+          [
+            "Select",
+            'A native select: picking, the keyboard, typeahead, `required` and form submission all work, and with `appearance: base-select` the browser copies the selected option into `Select.Value` before hydration. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).',
+          ],
         ]}
       />
       <p>

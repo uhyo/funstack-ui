@@ -45,6 +45,7 @@ const MenuPage = lazyPage(() => import("./pages/MenuPage.js"), "MenuPage");
 const SwitchPage = lazyPage(() => import("./pages/SwitchPage.js"), "SwitchPage");
 const CheckboxPage = lazyPage(() => import("./pages/CheckboxPage.js"), "CheckboxPage");
 const RadioGroupPage = lazyPage(() => import("./pages/RadioGroupPage.js"), "RadioGroupPage");
+const SelectPage = lazyPage(() => import("./pages/SelectPage.js"), "SelectPage");
 const CheckboxGroupPage = lazyPage(
   () => import("./pages/CheckboxGroupPage.js"),
   "CheckboxGroupPage",
@@ -138,6 +139,7 @@ export const routes = [
                     CheckboxGroupPage,
                     "CheckboxGroupPage",
                   ),
+                  page("/select", "/components/select", SelectPage, "SelectPage"),
                 ],
               }),
               page("/roadmap", "/roadmap", RoadmapPage, "RoadmapPage"),

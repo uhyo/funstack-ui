@@ -72,11 +72,17 @@ export function RoadmapPage() {
           parts and menu items now share one action hook that never drops a rejection (
           <a href={issue(47)}>#47</a>).
         </li>
+        <li>
+          <a href="/components/select">Select</a>: a real <code>&lt;select&gt;</code> progressively
+          enhanced with customizable select (<code>appearance: base-select</code>), with optimistic
+          selection, options that load late, and a button that stays in sync with the selected
+          option (<a href={issue(50)}>#50</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
       <ul>
-        <li>More components toward a full set: Select, ToggleGroup, and more.</li>
+        <li>More components toward a full set: Combobox, ToggleGroup, and more.</li>
       </ul>
 
       <h3>Deferred</h3>

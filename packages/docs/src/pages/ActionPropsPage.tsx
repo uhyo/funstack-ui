@@ -39,6 +39,11 @@ export function ActionPropsPage() {
           ["Switch, Checkbox", "`checked` / `defaultChecked`", "`checkedChangeAction`"],
           ["RadioGroup", "`value` / `defaultValue`", "`valueChangeAction`"],
           [
+            "Select",
+            '`value` / `defaultValue` (a string; `""` is the placeholder)',
+            "`valueChangeAction`",
+          ],
+          [
             "CheckboxGroup",
             "`value` / `defaultValue` (a set as `string[]`)",
             "`valueChangeAction`",

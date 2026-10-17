@@ -129,8 +129,9 @@ export function HomePage() {
         The second wave brings overlays and native form controls:{" "}
         <a href="/components/dialog">Dialog</a>, <a href="/components/switch">Switch</a>,{" "}
         <a href="/components/checkbox">Checkbox</a>,{" "}
-        <a href="/components/radio-group">RadioGroup</a> and{" "}
-        <a href="/components/checkbox-group">CheckboxGroup</a>. A larger set follows; see the{" "}
+        <a href="/components/radio-group">RadioGroup</a>,{" "}
+        <a href="/components/checkbox-group">CheckboxGroup</a> and{" "}
+        <a href="/components/select">Select</a>. A larger set follows; see the{" "}
         <a href="/roadmap">roadmap</a>.
       </p>
       <CodeBlock language="bash">{`npm install @funstack/ui@alpha`}</CodeBlock>

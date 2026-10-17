@@ -1,0 +1,117 @@
+/* Select: the Root is a real <select>. The opt-in to the styled picker is `appearance:
+   base-select` on the select and on its ::picker(select); engines without customizable select
+   (Firefox today) keep the native select and ignore the rest. Two rules, because an engine that
+   does not know `::picker(select)` drops a whole rule that names it. */
+.demo-select {
+  appearance: base-select;
+  min-inline-size: 14rem;
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+.demo-select::picker(select) {
+  appearance: base-select;
+}
+
+.demo-select[data-pending] {
+  cursor: progress;
+}
+.demo-select[data-pending] selectedcontent {
+  opacity: 0.6;
+}
+.demo-select:user-invalid {
+  border-color: #dc2626;
+}
+.demo-select::picker-icon {
+  content: "▾";
+  transition: rotate 120ms;
+}
+.demo-select:open::picker-icon {
+  rotate: 180deg;
+}
+
+/* The select's own <button> (Select.Trigger): the UA makes it `display: contents`; lay out what
+   is inside it instead. */
+.demo-select-button selectedcontent,
+.demo-select selectedcontent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.demo-select-button .demo-spinner {
+  margin-inline-start: 0.5em;
+}
+
+/* The picker and its options. */
+.demo-select::picker(select) {
+  margin-block: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    overlay 120ms allow-discrete,
+    display 120ms allow-discrete;
+}
+.demo-select:open::picker(select) {
+  opacity: 1;
+  @starting-style {
+    opacity: 0;
+  }
+}
+.demo-select option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.4em 0.6em;
+  border-radius: 4px;
+}
+.demo-select option:hover,
+.demo-select option:focus-visible {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.demo-select option:checked {
+  font-weight: 600;
+}
+.demo-select option::checkmark {
+  content: "✓";
+  order: 1;
+  margin-inline-start: auto;
+}
+.demo-select option[data-pending]::after {
+  content: "…";
+}
+.demo-select option:disabled {
+  opacity: 0.45;
+}
+.demo-select optgroup legend {
+  padding: 0.3em 0.6em 0.1em;
+  font-size: 0.85em;
+  color: var(--color-text-secondary);
+}
+.demo-select hr {
+  margin: 4px 0;
+  border: 0;
+  border-block-start: 1px solid var(--color-border);
+}
+
+/* Icons: the clone in <selectedcontent> is a copy, so style it there too. */
+.demo-select-swatch {
+  flex: none;
+  inline-size: 0.8em;
+  block-size: 0.8em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-select::picker(select),
+  .demo-select::picker-icon {
+    transition: none;
+  }
+}
