@@ -120,6 +120,16 @@ const clientFiles = [
   "combobox/combobox-list.mjs",
   "combobox/combobox-option.mjs",
   "combobox/combobox-group.mjs",
+  // Every Toast part and its context are client modules; the manager is not
+  // (design/components/toast.md 13 and 17).
+  "toast/toast-context.mjs",
+  "toast/toast-viewport.mjs",
+  "toast/toast-root.mjs",
+  "toast/toast-title.mjs",
+  "toast/toast-description.mjs",
+  "toast/toast-action.mjs",
+  "toast/toast-close.mjs",
+  "internal/use-modal-registration.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -141,6 +151,9 @@ const directiveFreeFiles = [
   "select/index.mjs",
   "combobox/index.mjs",
   "internal/anchor-position.mjs",
+  "toast/index.mjs",
+  "toast/toast.mjs",
+  "internal/modal-registry.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

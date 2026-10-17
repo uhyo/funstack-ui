@@ -40,6 +40,7 @@
     "./select": "./dist/select/index.mjs",
     "./switch": "./dist/switch/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",
+    "./toast": "./dist/toast/index.mjs",
     "./toggle": "./dist/toggle/index.mjs",
     "./tooltip": "./dist/tooltip/index.mjs",
     "./package.json": "./package.json"

@@ -10,6 +10,7 @@ import { RadioGroupDemo } from "./radio-group-demo";
 import { CheckboxGroupDemo } from "./checkbox-group-demo";
 import { SelectDemo } from "./select-demo";
 import { ComboboxDemo } from "./combobox-demo";
+import { Notifications, ToastDemo } from "./toast-demo";
 
 export function App() {
   return (
@@ -31,6 +32,8 @@ export function App() {
       <CheckboxGroupDemo />
       <SelectDemo />
       <ComboboxDemo />
+      <ToastDemo />
+      <Notifications />
     </main>
   );
 }

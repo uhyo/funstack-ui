@@ -21,6 +21,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { exitAnimations, useExitAnimation } from "../internal/use-exit-animation.js";
+import { useModalRegistration } from "../internal/use-modal-registration.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
@@ -238,6 +239,9 @@ export function DialogPopup({
   // with `transition` removes the focused Close part before `close()` runs (design 6.2 rule 2).
   const contentProbe = useContentFocusProbe(dialogRef);
   const { wrapContent } = contentProbe;
+
+  // Toast's Viewport moves its region into the topmost open modal (design/components/toast.md 4.3).
+  useModalRegistration(dialog);
 
   useDevWarning(
     !isLibrary && transition !== undefined,
