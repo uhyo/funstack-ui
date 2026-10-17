@@ -17,3 +17,14 @@ Toast findings worth remembering:
 
 Re-check later:
 - WHATWG #9936; screen-reader behaviour of ariaNotify (NVDA/JAWS/Orca) - not measured.
+
+Slider findings:
+- React syncs the `value` attribute for controlled value inputs -> form.reset() is a no-op (unlike
+  checkboxes). Affects Slider and every controlled text field. Probe 13/react-range-reset.
+- Vertical range: Firefox ArrowRight decreases (vertical-lr + rtl), Chromium increases; in
+  vertical-lr ltr Chromium Up decreases (visual), Firefox Up increases (logical). Possible interop
+  issue to report (human task).
+- CDP getFullAXTree `valuetext` property does not reflect aria-valuetext; check Chromium source
+  instead (ax_object.cc kAriaValueText).
+- WebKit standards-positions summary.json shows #464 interestfor position None (oppose withdrawn);
+  chromestatus still says "Negative" - stale.

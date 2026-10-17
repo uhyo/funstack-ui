@@ -44,7 +44,7 @@ Three findings change the API design:
 | `scrollend` | 114 | 26.2 | 109 | possible (scroll-snap swipe) |
 | `scrollsnapchange` / `scrollsnapchanging` | 129 | ✗ | ✗ | **not yet** |
 | `Element.startViewTransition()` (scoped) | 147 | ✗ | ✗ | **not yet** |
-| `interestfor` / `interest` events | 142 | ✗ (position: negative) | ✗ (position: neutral) | **not yet** |
+| `interestfor` / `interest` events | 142 | ✗ (position #464: oppose withdrawn 2026-06-02, under re-evaluation) | ✗ (position: neutral) | **not yet** |
 | `popover="hint"` | 151 | Safari TP only | 153 | not useful for Toast |
 | `<toast>` element | No longer pursuing | – | – | n/a |
 
@@ -197,7 +197,7 @@ returning focus to the element focused before the hotkey. Pause all timers while
   `animation-play-state: paused` under `:hover`/`:focus-within` could drive dismissal via
   `animationend`, with no JS. It cannot see window blur or a hidden tab, and it hides the timer
   from React. Use it only as a visual progress indicator.
-- **`interestfor`** is Chromium-only (WebKit negative, Mozilla neutral) and does not help here:
+- **`interestfor`** is Chromium-only (WebKit re-evaluating, Mozilla neutral; popover-anchor-tooltip.md) and does not help here:
   `interest` events fire on an interest target shown from an invoker, not on hover over an
   arbitrary region.
 
