@@ -1,6 +1,8 @@
 # Switch
 
-Status: **proposed** (2026-10-16, GitHub issue #27). Follows `design/conventions.md` (accepted);
+Status: **accepted** (2026-10-16, GitHub issue #27, closed; the implementation-review corrections
+in `memo/developer/switch-checkbox.md`, among them owned `disabled`, are reflected in section
+12.2). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. The platform facts come
 from `docs/research/form-controls.md` (binding); this document adds the probes recorded in
 `memo/architect/switch-checkbox-notes.md` (react-dom 19.3.1 source reading and

@@ -1,6 +1,8 @@
 # Checkbox
 
-Status: **proposed** (2026-10-16, GitHub issue #27). Follows `design/conventions.md` (accepted);
+Status: **accepted** (2026-10-16, GitHub issue #27, closed; the implementation-review corrections
+in `memo/developer/switch-checkbox.md` folded in: `disabled` is owned, section 7). Follows
+`design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. The platform facts come
 from `docs/research/form-controls.md` (binding). **Read `design/components/switch.md` first**: it
 specifies the native-input model (optimistic `checked` on a controlled input), the shared hook
@@ -404,8 +406,12 @@ Identical to Switch 12.2 (a single control: no `group` option, the hook reports 
 paths itself, conventions 3.8) with `indeterminate: indeterminate && !pending` passed to the
 hook and `guardCheckableChange` around the dispatch.
 Owned keys: `type`, `checked`, `defaultChecked`, `indeterminate` (stripped), `aria-checked`,
-`onChange`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`. `role`,
-`disabled`, `name`, `value` are pass-through.
+`disabled`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`. `disabled` is
+owned as on Switch (12.2) and Toggle, per conventions 1.2 (every part that takes a `disabled`
+prop owns it): native disabledness, `data-disabled` and the click guard always agree, and a
+`render` element can neither re-enable nor disable the input. `onChange` (and `onClick`) are
+merged rather than owned: a `render` element's own handler runs first, then the library's.
+`role`, `name`, `value` are pass-through.
 
 ---
 

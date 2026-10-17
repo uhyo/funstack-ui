@@ -422,7 +422,7 @@ that native radios may focus the last radio on Shift+Tab when none is checked; b
 
 | Part | Attributes |
 | --- | --- |
-| `Root` | `role="radiogroup"`, `aria-required="true"` when `required` (owned; absent otherwise), `disabled` (native, when `disabled`), `form` (pass-through of the prop), `data-pending`, `data-disabled`. `aria-label` / `aria-labelledby` pass through for groups without a `Label`. |
+| `Root` | `role="radiogroup"`, `aria-required="true"` when `required` (owned; absent otherwise), `disabled` (native, when `disabled`), `form` (owned: the prop is applied to the fieldset and, through context, to every radio; a `render` element's `form` is overridden on both), `data-pending`, `data-disabled`. `aria-label` / `aria-labelledby` pass through for groups without a `Label`. |
 | `Label` | none added; `<legend>` names the fieldset natively. |
 | `Item` | `type="radio"`, `name` (group), `value`, `checked` (optimistic), `form` (group), `required` (group), `disabled` (own prop), `data-checked`, `data-pending`, `data-disabled`. No `aria-checked` (forbidden on native inputs by ARIA in HTML and ignored by Chromium), no `tabindex` (native roving), no `id` wiring. |
 
@@ -451,7 +451,19 @@ that native radios may focus the last radio on Shift+Tab when none is checked; b
   skips them. The APG allows native disabled radios, and the pattern has no "focusable but inert"
   requirement (unlike Tabs), so conventions 3.6's native-when-allowed rule applies. `data-disabled`
   is emitted on the Item in both cases so a wrapper can style it, since only the pseudo-class sees
-  fieldset inheritance.
+  fieldset inheritance. `disabled` is owned on both parts (Switch precedent, conventions 1.2).
+- **Hydration.** Keep every Item in the same Suspense boundary as its Root when server
+  rendering. **Any** Suspense boundary between the Root and some Items makes those Items hydrate
+  later than the Root (React hydrates a boundary in its own pass, even one whose content was in
+  the server HTML and never suspended), and the development warning for partial hydration fires
+  for them: "RadioGroup.Item: an Item hydrated after its RadioGroup.Root (a Suspense boundary
+  between them). Partial hydration of a radio group is not supported by React: … Keep every Item
+  in the same Suspense boundary as its Root." The message carries no link (there is no docs
+  anchor for it yet; the limitation is React's, recorded in issue #34). The detection is a
+  snapshot of the radios present in the fieldset when the Root mounts; an Item that mounts
+  later on one of those elements hydrated after the Root, whereas an Item created on the client
+  gets a new element and does not warn. See 5.1 for what goes wrong when the user clicks while
+  the boundary is still dehydrated.
 
 ## 7. State exposure and styling
 
@@ -939,7 +951,7 @@ is not in the context: no part renders it.
   `data-checked`, `data-pending`, `data-disabled`, `onChange: (e) => ctx.select(value, e.nativeEvent)`.
   Dev warning when the mounted `tagName` is not `INPUT`.
 - Output: `element`, wrapped in `<ViewTransition default={transition}>` only when `transition` is given.
-- Owned keys: `type`, `name`, `value`, `checked`, `form`, `required`, `data-checked`,
+- Owned keys: `type`, `name`, `value`, `checked`, `disabled`, `form`, `required`, `data-checked`,
   `data-pending`, `data-disabled`, `onChange`.
 - No `defaultChecked` is ever rendered as a prop (react-dom derives the mount-time value from the
   initial `checked` prop); in uncontrolled mode the hook keeps `el.defaultChecked` equal to
@@ -950,7 +962,8 @@ is not in the context: no part renders it.
 Wrong `tagName` behind `render` (Root, Item); `preventDefault()` inside the action; `Item` or
 `Label` outside a Root (throw, as Tabs does); the shared hook's controlled/uncontrolled warnings;
 Items hydrating after the Root (the late-mount path), because partial hydration of a group is
-unsupported (5.1).
+unsupported (5.1); it fires for every Item behind any Suspense boundary between Root and Items,
+and the message has no link (section 6, "Hydration").
 Deliberately absent: neither `value` nor `defaultValue` given; a controlled `value` that matches no
 Item (nothing checked is a valid, native state and the tab stop still works).
 

@@ -1,7 +1,10 @@
 # Dialog
 
 Status: **accepted** (2026-10-16, GitHub issue #26; all product-owner questions accepted as
-recommended, implementation deviations folded in from `memo/developer/dialog.md` the same day).
+recommended, implementation deviations folded in from `memo/developer/dialog.md` the same day,
+and the implementation-review fixes (light dismiss press-and-click, nested Escape, Form
+`closeOnSettle` / `method`, Trigger `pending`, owned `disabled`, the nested-confirm pattern)
+folded in on 2026-10-17).
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win.
 
@@ -32,7 +35,7 @@ when the content is ready.
 | 5 | Pending UI | Trigger: `data-open` (optimistic) and `data-pending` in library mode. The `<dialog>` emits no `data-open`: `:open` and `:modal` are exact. Root has no DOM, so `pending` lives on the Trigger and in Root's `children(state)`. |
 | 6 | Content mounting | Library mode: Popup children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">` (conventions 3.7, boolean only). Unmount is deferred until the dialog's exit animations finish so a fading dialog is never empty. JS-free mode: always mounted (the markup must be complete before hydration). |
 | 7 | Initial focus | `initialFocus` on Popup (a ref or a selector). The library writes `autofocus` on the resolved element through the DOM right before `showModal()` and lets the platform's dialog focusing steps run; it never calls `.focus()` on open. Return focus is the platform's; the library only handles "the opener is gone". |
-| 8 | Dismissal | Escape and Android back are the platform's and cannot be disabled in v0 (the anti-abuse rule allows one veto per activation, which is not an API). `lightDismiss` on Popup (default `false`) closes on backdrop click via a JS `click` listener. `experimental_closedBy` on Popup renders `closedby="any" \| "closerequest"` and skips the JS where `closedBy` is implemented. |
+| 8 | Dismissal | Escape and Android back are the platform's and cannot be disabled in v0 (the anti-abuse rule allows one veto per activation, which is not an API). `lightDismiss` on Popup (default `false`) closes on a backdrop click through JS `pointerdown` + `click` listeners: both the press and the click must land outside, as native `closedby="any"` requires. `experimental_closedBy` on Popup renders `closedby="any" \| "closerequest"` and skips the JS where `closedBy` is implemented. |
 | 9 | Forms | `Dialog.Form` renders `<form method="dialog">` (JS-free: submit closes with the submitter's `value` as `returnValue`) or, with `action`, `<form action={action}>` plus a status watcher that closes the dialog when the action's transition settles. The action is passed through unwrapped, so a Server Function keeps React's progressive enhancement. `Dialog.Close action` is the single-button form of the same thing. |
 | 10 | Animation | Enter and exit with CSS (`@starting-style`, `transition-behavior: allow-discrete`, `overlay`); exit is a progressive enhancement (instant in Firefox). Popup renders `<ViewTransition>` and takes `transition`: it animates the opening commit (content mount plus `showModal()`) and content changes while open, never the close. |
 | 11 | Scroll lock | CSS only, documented: `html:has(dialog:modal) { overflow: hidden }` with `scrollbar-gutter: stable`. No attribute on `<html>`, no JS. |
@@ -278,7 +281,7 @@ dialog.addEventListener("close", (event) => {
 `close()` for a controlled parent echoing back, section 2.5) and otherwise runs the normal
 dispatch with `next = false`: optimistic `false` at once (the Trigger loses `data-open`), the
 action awaited inside the transition, uncontrolled state committed after it. The Trigger shows
-`data-pending` while the notification action runs (its optimistic value differs from committed),
+`data-pending` while the notification action runs (the Root is pending, section 4.2),
 which is what a consumer who persists "dismissed" through a Server Function wants to style.
 
 Close intents. The `close` event carries no source, so the Popup records what caused the close
@@ -309,8 +312,9 @@ again: the dialog re-opens, with focus moved back into it. This is conventions 3
 the browser, it does not gate it"), the same behaviour as a refused find-in-page reveal in
 Accordion, and it is **not a veto mechanism**: the user sees the dialog close and come back. The
 docs say so and recommend adopting `false` unconditionally. "Unsaved changes" confirmation is
-built *inside* the dialog (a nested Dialog opened from the Close part's `action`, example 12.5),
-not by refusing the close.
+built *inside* the dialog (a nested JS-free confirm Dialog whose Trigger is the "Discard…"
+button and whose Close `action` closes the outer dialog, example 12.5), not by refusing the
+close.
 
 ### 2.4 Pre-hydration opens and mount reconciliation (library mode)
 
@@ -383,11 +387,13 @@ state; the Tooltip model), in library mode it dispatches. A non-modal dialog is 
 JS-free; the markup is still complete and the content is in the HTML.
 
 Baseline JS for non-modal dialogs (both modes): a `keydown` listener on the dialog closes it on
-Escape with `requestClose()` (skipping events targeted inside an open popover or nested dialog
-within it, so those close first), so the APG expectation holds; with `lightDismiss`, a document
-`click` listener (capture) closes it on clicks outside the dialog, **ignoring clicks on the
-Trigger** (otherwise the Trigger's own click would close and immediately re-open the dialog, or
-in JS-free mode close it on every second click). With `experimental_closedBy`
+Escape with `requestClose()`, leaving the event alone while it belongs to an inner layer (the
+target is inside an open nested `<dialog>` or an open `auto` / `hint` popover, or any open
+`auto` / `hint` popover inside the dialog would take the close request; section 9), so the APG
+expectation holds; with `lightDismiss`, document `pointerdown` and `click` listeners (capture)
+close it when both the press and the click land outside the dialog, **ignoring the Trigger**
+(otherwise the Trigger's own click would close and immediately re-open the dialog, or in
+JS-free mode close it on every second click). With `experimental_closedBy`
 the dialog renders `closedby="closerequest"` or `"any"` and both listeners are skipped where
 `closedBy` is implemented. Non-modal dialogs never lock scroll (the CSS recipe keys on `:modal`).
 
@@ -461,7 +467,10 @@ and a boolean is what every consumer will branch on; see open question 4).
 export interface DialogTriggerState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */
   readonly open: boolean;
-  /** The Root is pending and this dialog's optimistic open differs from the committed one. */
+  /**
+   * The Root's transition is pending: an open in flight, a close notification in flight, or a
+   * re-open requested while a close notification is still settling (section 4.2).
+   */
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -486,8 +495,10 @@ installs no handler, owns no `onClick`, and a `render` element's own `onClick` p
 modes (prop form, as Accordion's Trigger; the handler is not feature-detected away, so the
 Tooltip `addEventListener` route buys nothing here). Native `disabled` is used, not `aria-disabled`: the APG dialog pattern
 has no focusable-disabled requirement for the opener, and a natively disabled button is already
-not an invoker, so the JS-free mode gets `disabled` for free. Conventions 3.6 ("never disabled
-while pending") still holds: the library never sets `disabled` itself.
+not an invoker, so the JS-free mode gets `disabled` for free. `disabled` is owned (conventions
+1.2): a `render` element can neither re-enable a disabled Trigger (in JS-free mode the browser
+would run its command) nor disable an enabled one. Conventions 3.6 ("never disabled while
+pending") still holds: the library never sets `disabled` itself.
 
 ### 3.3 `Dialog.Popup`
 
@@ -522,7 +533,9 @@ export interface DialogPopupProps
   initialFocus?: RefObject<HTMLElement | null> | string;
   /**
    * Close on a click outside the dialog (on the backdrop for modal dialogs). Default `false`.
-   * Baseline: a JS `click` listener; with `experimental_closedBy`, native `closedby="any"`.
+   * Baseline: JS `pointerdown` + `click` listeners, which close only when both the press and the
+   * click land outside (a drag that starts inside, such as selecting text, never closes); with
+   * `experimental_closedBy`, native `closedby="any"`, which behaves the same.
    */
   lightDismiss?: boolean;
   /**
@@ -565,7 +578,10 @@ export interface DialogCloseState {
 }
 
 export interface DialogCloseProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "className" | "style" | "children"> {
+  extends Omit<
+    ComponentPropsWithRef<"button">,
+    "onClick" | "value" | "className" | "style" | "children"
+  > {
   /**
    * Runs inside this part's own transition, then closes the dialog with `close(value)`. A
    * rejection reaches the nearest Error Boundary above the Close part and leaves the dialog open.
@@ -574,6 +590,7 @@ export interface DialogCloseProps
   action?: Action<[details: DialogCloseDetails]>;
   /** Becomes `dialog.returnValue` (and `details.returnValue` of the close notification). */
   value?: string;
+  /** Native `disabled`; owned, so a `render` element cannot re-enable the button. */
   disabled?: boolean;
   className?: StateValue<string | undefined, DialogCloseState>;
   style?: StateValue<CSSProperties | undefined, DialogCloseState>;
@@ -582,6 +599,7 @@ export interface DialogCloseProps
 }
 
 export interface DialogCloseDetails extends ActionDetails {
+  /** The `value` the dialog closes with (`dialog.returnValue`); `""` without `value`. */
   readonly returnValue: string;
 }
 ```
@@ -603,18 +621,29 @@ export interface DialogFormProps
   /**
    * React form action (`(formData) => unknown`, may be a Server Function). Passed to the form
    * unwrapped so React's progressive enhancement is kept; the dialog closes with the submitter's
-   * `value` as `returnValue` once the action's transition settles. Without `action` the form
-   * renders `method="dialog"`: submitting closes the dialog natively.
+   * `value` as `returnValue` once the action's transition settles (see `closeOnSettle`). A
+   * rejection leaves the dialog open. Without `action` the form renders `method="dialog"`:
+   * submitting closes the dialog natively. A string `action` (a URL) is a plain navigating form.
    */
   action?: string | ((formData: FormData) => unknown);
   /**
-   * With a function `action`: close the dialog when the action's transition settles (default
-   * `true`). Set `false` when the action returns a result the form must show, e.g. validation
-   * errors through `useActionState`: a non-throwing result settles the transition like a success
-   * and would otherwise close the dialog. The consumer then closes explicitly (a `Dialog.Close`,
-   * or the controlled `open`) once the result is acceptable.
+   * With a function `action`: close the dialog once the action's transition settles without
+   * throwing. Default `true`.
+   *
+   * Any result that does not throw counts as success, including a `useActionState`-style result
+   * that reports validation errors: with the default the dialog closes and those errors are never
+   * seen. Throw to keep the dialog open, or set `closeOnSettle={false}` and close it yourself:
+   * a `Dialog.Close`, a submitter with `formMethod="dialog"`, or a controlled `open`.
+   *
+   * The dialog is not closed either when it was closed (Escape, a Close part) while the action
+   * ran, also if the user re-opened it meanwhile (section 8.1).
    */
   closeOnSettle?: boolean;
+  /**
+   * Only with a string `action` (a navigating form, for example `"post"`). Owned otherwise:
+   * `"dialog"` without `action`, React's own with a function `action`.
+   */
+  method?: ComponentPropsWithRef<"form">["method"];
   className?: StateValue<string | undefined, DialogFormState>;
   style?: StateValue<CSSProperties | undefined, DialogFormState>;
   children?: StateValue<ReactNode, DialogFormState>;
@@ -627,10 +656,12 @@ export interface DialogFormState {
 }
 ```
 
-Owned keys: `method` (owned as `"dialog"` only without `action`), `action`. A string `action` (a
-URL) renders a plain navigating form that does not close the dialog (the page navigates); in that
-case `method` is **not** owned and passes through (`method="post"` with a URL action is the
-consumer's form), so a `render` element or prop can set it. `DialogFormState.pending`
+Owned keys: `action`, and `method` except with a string `action`: `"dialog"` without `action`,
+React's own (nothing rendered) with a function `action`. A string `action` (a URL) renders a
+plain navigating form that does not close the dialog (the page navigates); only then does the
+`method` prop apply (`method="post"` with a URL action is the consumer's form). The base
+`method` is omitted and re-declared so that its doc comment states this rule; a `render`
+element's `method` is overridden in the owned cases. `DialogFormState.pending`
 is the one place the library reads `useFormStatus`: it is this form's own status, not folded into
 any control's `pending`, so conventions 2.7 is respected. `data-pending` is **not** emitted on
 the form element (the status is read by a child component, which cannot write the parent's
@@ -677,7 +708,7 @@ export const Dialog = {
 | State | Owner | Library-owned or browser-owned | Where it shows |
 | --- | --- | --- | --- |
 | `open` | Root (`useControllableAction<boolean>`) | **Library-owned for opening, browser-owned for closing** in library mode; fully browser-owned in JS-free mode | optimistic: Trigger `data-open`, `state.open` on Root/Trigger; committed: Popup children mounting, `state.open` on Popup; DOM: `:open`, `:modal` |
-| `pending` | Root `useTransition` | library | Trigger `data-pending` (when its optimistic open differs from committed), Root `state.pending` |
+| `pending` | Root `useTransition` | library | Trigger `data-pending` (whenever the Root is pending, 4.2), Root `state.pending` |
 | Close `pending` | Close part `useTransition` | library | `data-pending` on that Close button |
 | Form `pending` | React's form transition | React | `DialogFormState.pending`, `useFormStatus` in children |
 | `exiting` | Popup local state | library (derived from the DOM's running animations) | keeps children mounted during the exit animation; not exposed |
@@ -696,8 +727,8 @@ the `close` listener consult, exactly as Accordion's `dispatchFromDom` does.
 ### 4.2 Where `data-pending` lands
 
 Root has no element, so conventions 4.3's "owner" row has nowhere to land; the Trigger is the
-initiating trigger for opens, and for close notifications it is the only part whose optimistic
-state differs from committed. Rule: `trigger.pending = root.pending && root.optimistic !== root.committed`.
+initiating trigger for opens, and every Root dispatch is either an open or a close
+notification, both of which belong to the Trigger. Rule: **`trigger.pending = root.pending`**.
 Consequences: open pending → Trigger pending; close notification pending → Trigger pending;
 open then immediately re-click to close before it opened (impossible: the Trigger is a no-op
 while optimistically open) → n/a; refused close re-opening → Trigger pending until the re-open;
@@ -706,6 +737,12 @@ while optimistically open) → n/a; refused close re-opening → Trigger pending
 notification settles, because the re-open's transition is entangled with it (conventions 2.3
 item 5). The user sees "pending" rather than a dialog that opens late for no visible reason.
 The Popup never carries `data-pending` (it is a content region, conventions 4.3).
+
+The first version of this rule was `root.pending && root.optimistic !== root.committed`. The
+implementation review found that it hides exactly the re-open window: during it the close never
+committed, so committed and optimistic are both `true` while the Root is pending, and the
+Trigger would have shown nothing for a click the user made. The rule is now the Root's pending
+unconditionally (the Trigger's `state.pending` and Root's `children(state).pending` agree).
 
 ### 4.3 Error, rollback, veto
 
@@ -881,7 +918,7 @@ Menu opened from inside the dialog renders inside its subtree and the top layer 
 | Close request | Modal, baseline | Modal, `experimental_closedBy` | Non-modal, baseline | Non-modal, `experimental_closedBy` |
 | --- | --- | --- | --- | --- |
 | Escape, Android back, AT dismiss | platform | platform (`closedby="closerequest"`) | JS `keydown` on the dialog → `requestClose()` | platform where `closedBy` exists, else JS |
-| Backdrop / outside click | nothing; with `lightDismiss`: JS `click` on the dialog, target is the dialog and the point is outside its border box → `requestClose()` | with `lightDismiss`: platform (`closedby="any"`) | nothing; with `lightDismiss`: document `click` (capture) outside the dialog → `requestClose()` | with `lightDismiss`: platform where `closedBy` exists, else JS |
+| Backdrop / outside click | nothing; with `lightDismiss`: JS `pointerdown` + `click` on the dialog, target is the dialog and both points are outside its border box → `requestClose()` | with `lightDismiss`: platform (`closedby="any"`) | nothing; with `lightDismiss`: document `pointerdown` + `click` (capture), both outside the dialog and the Trigger → `requestClose()` | with `lightDismiss`: platform where `closedBy` exists, else JS |
 | Close part, Form submit | platform (`request-close` / `method="dialog"`) | same | same | same |
 
 - **Escape cannot be turned off** in v0. `cancel.preventDefault()` holds once per user
@@ -899,7 +936,10 @@ Menu opened from inside the dialog renders inside its subtree and the top layer 
   target (capture) and the `click` handler checks both. It ignores events whose target is a
   descendant of the dialog (an element backdrop the consumer rendered as the first child, a
   popover nested in the dialog), so only the real `::backdrop` dismisses, which is also the
-  native rule.
+  native rule. A consequence: a **keyboard-synthesised click never dismisses** a non-modal
+  dialog (Enter or Space on a button outside it, or `element.click()`), because no
+  `pointerdown` preceded it; native `closedby="any"` behaves the same, and a modal dialog's
+  `::backdrop` cannot be reached by keyboard at all. Keyboard users dismiss with Escape.
 - With the flag on, feature detection is `"closedBy" in HTMLDialogElement.prototype` inside the
   effect that would attach the listeners (never during render; conventions 8). Safari 27.0 fails
   the check and keeps the JS. Graduation: when WebKit ships `closedby`, the flag is removed and
@@ -941,16 +981,28 @@ enhancement: the server HTML would carry a throwing `javascript:` action instead
 endpoint and hidden fields) and a child `<FormStatusWatcher>` that reads `useFormStatus()`. A
 native `submit` listener on the form records the submitter's `value`. When `pending` goes from
 `true` to `false`, the watcher's effect records the `"activate"` intent and calls
-`dialog.close(returnValue)`. Because `useFormStatus().pending` covers the action's whole
-transition, a result that re-renders suspending content keeps the dialog open until that content
-has committed, which is the Suspense-native order.
+`dialog.close(returnValue)`, the **settle close**. Because `useFormStatus().pending` covers the
+action's whole transition, a result that re-renders suspending content keeps the dialog open
+until that content has committed, which is the Suspense-native order.
 
-`closeOnSettle={false}` turns the watcher's close off. It exists because "settled" is not
-"succeeded": an action wired through `useActionState` that *returns* validation errors instead of
-throwing settles its transition normally, and the dialog would close with the errors unseen. With
-`closeOnSettle={false}` the Form only records the intent; the consumer closes when the returned
-state says so (`<Dialog.Close>` next to the errors, or `setOpen(false)` from the controlled
-parent once `state.ok`).
+**`closeOnSettle`** (default `true`) is whether the settle close happens at all. It exists
+because "settled" is not "succeeded": an action wired through `useActionState` that *returns*
+validation errors instead of throwing settles its transition normally, and with the default the
+dialog closes with the errors unseen. Throwing keeps the dialog open (below); otherwise set
+`closeOnSettle={false}`, and the Form neither records an intent nor closes anything: the
+consumer closes when the returned state says so (a `<Dialog.Close>` next to the errors, a
+submitter with `formMethod="dialog"`, or `setOpen(false)` from the controlled parent once
+`state.ok`).
+
+**A close since the submit blocks the settle close.** The Form listens to the dialog's `close`
+event and remembers whether the dialog closed after the last `submit`; the settle close is
+skipped while that flag is set (and, trivially, while the dialog is not open). The case it
+guards is the review's variant of walkthrough 8: the user presses Escape during a slow save,
+then re-opens the dialog with the Trigger; the re-open is entangled with the form's action,
+so the dialog opens when the save settles, and the watcher's edge arrives at the same time with
+the dialog open again. Without the flag the Form would close the dialog the user just
+re-opened. The flag is reset by the next `submit`. In every case the action still ran to
+completion; `closeOnSettle` and the flag only decide whether the Form closes afterwards.
 
 An action that throws rejects the form's transition and reaches the nearest Error Boundary; the
 watcher never sees `false` with a submitted form, so the dialog stays open. A boundary inside
@@ -989,7 +1041,7 @@ library surfaces it as `details.returnValue` on the close notification and sets 
 | Tab / Shift+Tab inside a modal dialog | cycles through the dialog's focusable content and the browser UI; the page is inert | browser |
 | Escape (modal) | closes via a close request; focus returns to the opener; `openChangeAction(false, { reason: "dismiss" })` | browser |
 | Escape (non-modal) | closes via `requestClose()` | Popup listener (or `closedby` with the flag) |
-| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal: the JS `keydown` listener ignores Escape events whose target is inside an open `[popover]` or a nested open `<dialog>` within the Popup, so the popover or nested dialog handles it and the non-modal dialog stays open; the next Escape closes the dialog | browser |
+| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal: the dialog's JS `keydown` listener **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. A `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher and does not take Escape: Escape inside it closes the dialog | browser / Popup listener |
 | Enter in a form field | submits the Form: closes (`method="dialog"`) or runs the action then closes | browser / Form |
 
 | Part | ARIA |
@@ -1162,6 +1214,12 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
    (nothing in flight), sees `C=true` and `dialog.open=false` → `showModal()`. Net: the dialog
    re-opens when the user's second click settles, both actions were called, latest intent won.
    The superseded close's rejection, if any, is surfaced by the shared hook (conventions 2.4).
+   The Trigger shows `data-open` and `data-pending` from the second click until the re-open
+   commits (4.2). Variant: the close was an Escape during a `Dialog.Form` save. Both the
+   notification and the re-open are entangled with the form's action; when the save settles the
+   dialog opens (latest intent) and the Form's watcher does **not** close it again, because the
+   dialog was closed since the submit (8.1). `openChangeAction` ran three times: open, close
+   (`"dismiss"`), open.
 9. **Pre-hydration click, then hydration.** Server HTML: Trigger with `command="show-modal"`,
    empty `<dialog>`. Click → native open, focus on the dialog element, page inert. Hydration:
    React warns about the `open` attribute (suppressed) → the Popup's mount effect finds
@@ -1171,15 +1229,25 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
    the platform put it. If the parent refuses or the action rejects: after settle, `C=false`,
    `dialog.open=true` → `close()` (intent recorded as echo) → the dialog closes, focus returns to
    the Trigger, no notification dispatch.
-10. **Nested confirm, two actions.** "Discard" in the outer dialog opens the inner controlled
-    Dialog in a transition and returns (no action awaits anything). The inner modal stacks on top;
-    Escape closes the inner one only. The inner "Discard" Close's action sets the outer `open` to
-    `false` in its sync prefix: the inner dialog closes natively after the action resolves, the
-    outer apply effect sees committed `false` and calls `close()`, the outer
-    `openChangeAction(false)` fires with `reason: "activate"` (controlled echo skipped where the
-    parent already set it). What must **not** be written: an outer Close whose action awaits a
-    promise the inner dialog resolves; that deadlocks, because the inner open is a transition held
-    by the pending outer action (conventions 2.3 item 6). See example 12.5.
+10. **Nested confirm (example 12.5).** The outer dialog is controlled (`open` +
+    `openChangeAction={(next) => setOpen(next)}`). "Discard…" inside it is the `Dialog.Trigger`
+    of a nested **JS-free** `Dialog.Root`: a native `command="show-modal"`, so the confirm opens
+    synchronously in the click, with no transition and nothing pending; an unrelated transition
+    started while the user decides commits normally. The confirm stacks on top; Escape and the
+    "Keep editing" Close (`request-close`) close the confirm only. The "Discard" Close has
+    `action={async () => { await discardDraft(); startTransition(() => setOpen(false)); }}`: the
+    Close shows `data-pending` while the draft is discarded, then its own `close()` closes the
+    confirm, and the outer `open` becomes `false` in a transition. The outer dialog is closed by
+    **the parent's controlled close**: the outer apply effect sees committed `false` with an open
+    dialog, records the echo intent and calls `close()`; the outer `openChangeAction(false)` is
+    **not** called (2.3, "controlled parent set `open={false}`" row) and the outer
+    `returnValue` is `""`. A consumer who needs the outcome records it in the Close action (the
+    example's `setLast("discarded")`), not in the outer notification. What must **not** be
+    written: any action that awaits the user's answer (an outer Close whose action returns a
+    promise the confirm resolves, or that opens the confirm with `startTransition` and then
+    awaits). React puts every transition started while an async action is pending into that
+    action's lane, so the confirm never opens, or every transition in the app is held until the
+    user answers (conventions 2.3 item 6; a characterisation test keeps this on record).
 
 ---
 
@@ -1259,35 +1327,45 @@ the Trigger-less dialog shows nothing pending (there is no Trigger), which is fi
 already happened. Using a Server Function for the **open** side is possible but rarely useful;
 the idiomatic server interaction is `Dialog.Form action` (12.1).
 
-### 12.5 Confirm before closing (nested dialog, two independent actions)
+### 12.5 Confirm before closing (nested JS-free dialog, one action)
 
-An action must never await user input (conventions 2.3 item 6). The first draft of this example
-had the outer Close's action return a promise that the inner dialog's buttons resolved; that
-**deadlocks**: React holds every transition started while an async action is pending, so the
-inner dialog's open (a transition) never commits and the promise is never settled. The honest
-shape splits the flow into two dispatches:
+An action must never await user input (conventions 2.3 item 6). The first drafts of this example
+had an action wait for the confirm dialog's answer, either by returning a promise its buttons
+resolved or by opening it with `startTransition` and awaiting; both **deadlock or stall**: React
+puts every transition started while an async action is pending into that action's lane, so the
+confirm's open never commits, or every transition in the app is held until the user answers.
+The shape that was implemented and verified (example app, Chromium and Firefox: the confirm is
+`:modal` synchronously after the click) has no action waiting for anything:
 
 ```tsx
 "use client";
 function EditDialog() {
   const [open, setOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   return (
-    <Dialog.Root open={open} openChangeAction={(next) => { setOpen(next); }}>
+    <Dialog.Root open={open} openChangeAction={(next) => setOpen(next)}>
       <Dialog.Trigger>Edit</Dialog.Trigger>
       <Dialog.Popup>
         <Dialog.Title>Edit</Dialog.Title>
         <Dialog.Form action={save}>…<button type="submit">Save</button></Dialog.Form>
+        {/* Outer parts come before the inner Root: a part binds to the nearest Root. */}
+        <Dialog.Close value="close">Close</Dialog.Close>
 
-        {/* Does not close the outer dialog: no Close part. Opens the confirmation and returns. */}
-        <button type="button" onClick={() => startTransition(() => setConfirming(true))}>Discard</button>
-
-        <Dialog.Root open={confirming} openChangeAction={(next) => { setConfirming(next); }}>
-          <Dialog.Popup>
+        {/* JS-free: the Trigger is a native show-modal command, so the confirm opens at once. */}
+        <Dialog.Root>
+          <Dialog.Trigger>Discard…</Dialog.Trigger>
+          <Dialog.Popup role="alertdialog">
             <Dialog.Title>Discard changes?</Dialog.Title>
-            <Dialog.Close>Keep editing</Dialog.Close>
-            {/* The confirmation's own Close action does the work: close inner, then outer. */}
-            <Dialog.Close value="discard" action={() => { setOpen(false); }}>Discard</Dialog.Close>
+            <Dialog.Close value="keep">Keep editing</Dialog.Close>
+            {/* The confirm's own Close action does the work, then closes the controlled editor. */}
+            <Dialog.Close
+              value="discard"
+              action={async () => {
+                await discardDraft();
+                startTransition(() => setOpen(false));
+              }}
+            >
+              {({ pending }) => (pending ? <Spinner /> : "Discard")}
+            </Dialog.Close>
           </Dialog.Popup>
         </Dialog.Root>
       </Dialog.Popup>
@@ -1296,16 +1374,30 @@ function EditDialog() {
 }
 ```
 
-Why the "Discard" button inside the outer dialog is a plain button and not a `Dialog.Close`: a
-Close part always closes its dialog (natively, through `request-close`), and a Close with an
-`action` closes after the action resolves; neither can "close only if confirmed". The outer
-dialog is closed by the *inner* Close's action (`setOpen(false)` runs in that action's sync
-prefix, inside the inner Close's transition; the outer controlled `open` follows, 2.5). The
-inner dialog is a DOM descendant of the outer one, so it is not inert and stacks above; Escape
-closes the inner one first, and a second Escape closes the outer one unconfirmed, which cannot be
-gated on this platform (section 7). If the discard itself is a Server Function, it is the inner
-Close's `action` (`action={discardDraft}` with `setOpen(false)` in a wrapper's sync prefix);
-the inner Close shows `data-pending` while it runs.
+What each piece does. "Discard…" is the inner Root's `Dialog.Trigger`, not a Close of the
+outer dialog: a Close part always closes its own dialog (natively, through `request-close`, or
+after its `action`), and neither form can "close only if confirmed". The inner Root is JS-free
+(none of `open` / `defaultOpen` / `openChangeAction`), so its Trigger is a native
+`command="show-modal"` and the confirm opens synchronously inside the click, with no transition
+and nothing pending while the user decides. "Keep editing" and Escape close the confirm only
+(it is a DOM descendant of the editor, so it is not inert and stacks above; a second Escape
+closes the editor unconfirmed, which cannot be gated on this platform, section 7). The
+"Discard" Close's `action` discards the draft (`data-pending` on that button meanwhile; a
+Server Function can be awaited there), then closes the editor through its controlled `open` in
+a transition; the Close part closes the confirm itself after the action resolves. The outer
+dialog is closed by the parent's controlled close (2.5), so the outer `openChangeAction(false)`
+is **not** called for it and its `returnValue` is `""`: record the outcome in the Close action,
+as the example app's `setLast("discarded")` does.
+
+Placement rule: **the outer dialog's parts must sit outside the inner Root.** A part binds to
+the nearest `Dialog.Root` context, so an outer `Dialog.Close` written inside the inner Root
+would close the confirm instead. Keep the outer Form and Close before (or after) the inner
+`<Dialog.Root>` element, as above.
+
+The reviewer's alternative, deferring the confirm's open with `setTimeout(() =>
+setConfirming(true))` from inside an outer Close action that then awaits the answer, also
+opens the confirm, but it keeps an action awaiting user input and every transition in the app
+is held until the user answers; rejected for that reason.
 
 ### 12.6 Tailwind, non-modal, `render`
 
@@ -1378,7 +1470,7 @@ update-on-success). Library mode unless stated.
 | Directive | Every file under `src/dialog/` except `index.ts` begins with `"use client"`. |
 | Platform path | Mount with the dialog's `open` attribute already set (pre-hydration open): one dispatch with `reason: "platform"`, `event: undefined`; parent accepts → children mount and `showModal` not called again; parent refuses → `close` called. Controlled `open` flipping `true`/`false` programmatically calls `showModal` / `close` and the resulting `close` event does **not** dispatch (echo). |
 | Close part | Without `action`: `command="request-close"`, `value` rendered. With `action`: click is default-prevented, `data-pending` while the deferred action runs, `close(value)` called on resolve, not on reject (error in the catcher inside the dialog). |
-| Form part | `method="dialog"` without `action`; with `action`: `method` absent, the action receives `FormData`, `close(submitterValue)` called after it settles (fake the status through a resolved `deferred()`), not called when it throws. |
+| Form part | `method="dialog"` without `action`; with `action`: `method` absent, the action receives `FormData`, `close(submitterValue)` called after it settles (fake the status through a resolved `deferred()`), not called when it throws. `closeOnSettle`: a `useActionState` validation result closes by default; with `false` the dialog stays open showing the result and a `Dialog.Close` closes it. A close since the submit (Escape during the save, then a re-open through the Trigger) blocks the settle close: the dialog ends open, `close` not called again. `method="post"` is kept with a string `action` and replaced by `"dialog"` without one. |
 | Light dismiss (baseline) | With `lightDismiss`: a `pointerdown` + `click` on the dialog with coordinates outside `getBoundingClientRect()` (mocked) calls `requestClose`; inside, on a descendant, or a `pointerdown` inside followed by a `click` outside (drag out) does not; without the prop nothing. Non-modal: document pointerdown + click outside closes; a click on the Trigger does not. |
 | Focus | `initialFocus` ref/selector: the element has `autofocus=""` when `showModal` is called (spy inspects the DOM) and not afterwards; missing target warns. Opener removed: after `close`, if `activeElement` is inside the dialog the Trigger is focused when connected. |
 | Mode guard | Changing Root from JS-free to library mode after mount warns; `transition` / `keepMounted={false}` in JS-free mode warn. |
@@ -1438,8 +1530,9 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   the Trigger's callback ref (no state, read only in the `close` listener's focus fallback).
 - **Trigger.** `libraryProps`: `type` via `rendersButton(render)`, `commandfor: modal ? dialogId
   : undefined`, `command: modal ? "show-modal" : undefined`, `onClick` installed (and owned) only
-  when `mode === "library" || !modal`, `data-open`, `data-pending`, `data-disabled`. Static non-modal
-  click: `dialogRef.current?.show()`. The `disabled` prop maps to native `disabled`.
+  when `mode === "library" || !modal`, `disabled` (owned), `data-open`, `data-pending`,
+  `data-disabled`. `state.pending` is `root.pending` (4.2). Static non-modal click:
+  `dialogRef.current?.show()`. The `disabled` prop maps to native `disabled`.
 - **Popup, listeners.** All native, attached in one effect through the ref (conventions 7.4), each
   filtered on `event.target === dialog` (React still emulates bubbling for `toggle`, and `command`
   / `submit` bubble from descendants by design):
@@ -1453,13 +1546,18 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
     at `recordCloseIntent`, which clears only while the dialog is still open (2.3).
   - `close`: clear `closingRef`, focus fallback (6.2), exit detection (4.4), then in library mode
     `root.notifyClosed(details)`; in static mode nothing else.
-  - `keydown` Escape (non-modal only, no `closedBy` support or flag off) → `requestClose()`,
-    unless `event.target` is inside an open `[popover]` or a nested open `<dialog>` within this
-    Popup (`target.closest(":popover-open, dialog[open]")` is not this dialog), in which case the
-    inner thing handles it.
-  - `click` (`lightDismiss`, no native `closedby`): modal → target is the dialog and the point is
-    outside its rect → `requestClose()`; non-modal → a document-level capture listener while
-    open. That listener is installed and removed from a **native** `toggle` listener on the
+  - `keydown` Escape (non-modal only, no `closedBy` support or flag off) → `preventDefault()` +
+    `requestClose()`, unless the Escape belongs to an inner layer (section 9): walking from
+    `event.target` up to the dialog finds an open `<dialog>` or an open `auto` / `hint` popover,
+    or any `[popover]` inside the dialog is an open `auto` / `hint` one (`:popover-open`; the
+    state is read through the `popover` IDL attribute so an engine that maps `hint` to `manual`
+    is honoured, with the attribute as the fallback where the IDL is missing). Then the event is
+    left untouched for the inner layer's close watcher.
+  - `pointerdown` + `click` (`lightDismiss`, no native `closedby`): modal → both on the dialog
+    with the point outside its rect (`::backdrop`) → `requestClose()` on the click; the
+    `pointerdown` sets a `pressedOutside` flag the `click` consumes. Non-modal → document-level
+    capture listeners for both while open, outside meaning "not inside the dialog and not inside
+    the Trigger". They are installed and removed from a **native** `toggle` listener on the
     dialog (the React `onToggle` prop never fires after hydration, a native listener does),
     reading `dialog.open` rather than `newState` (coalescing rule) and guarding every decision
     on `dialog.open`, as the Tooltip effect does with `:popover-open`.
@@ -1474,18 +1572,23 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   default → `committed || exiting ? children : null`. `closedby` is typed in `@types/react` 19.3 (research)
   and needs no augmentation; `commandfor` / `command` on the buttons are already in
   `platform-attributes.ts`.
-- **Close.** `libraryProps`: `type`, `commandfor: dialogId`, `command: "request-close"`, `value`,
-  `onClick` only with `action`, `data-pending`, `data-disabled`. Own `useTransition`; on resolve:
+- **Close.** `libraryProps`: `type`, `disabled` (owned), `commandfor: dialogId`,
+  `command: "request-close"`, `value`, `onClick` only with `action`, `data-pending`,
+  `data-disabled`. Own `useTransition`; on resolve:
   `recordCloseIntent({ reason: "activate", event })` then `dialogRef.current?.close(value ?? "")`.
   Errors: not caught (React routes them to the boundary; overlapping clicks are not tracked, so a
   superseded rejection here is dropped by React. Accepted for v0 because the first resolution
   closes the dialog and unmounts the part; recorded as a known gap).
-- **Form.** `libraryProps`: `method: action === undefined ? "dialog" : undefined`, `action`.
-  Renders `<form …>{resolvedChildren}<FormStatusWatcher /></form>`; the watcher is a `null`-
-  rendering component that calls `useFormStatus()`, keeps the previous `pending` in a ref and, in
-  an effect on `true → false`, records the intent and calls `close(submitterValue)`. The
-  submitter's `value` comes from a native `submit` listener on the form (capture) set up in the
-  same part. `DialogFormState.pending` is read by the watcher and lifted through a tiny context
+- **Form.** `libraryProps`: `method: action === undefined ? "dialog" : typeof action ===
+  "string" ? method : undefined`, `action`. Renders `<form …>{resolvedChildren}<FormStatusWatcher
+  /></form>` (the watcher only with a function `action`); the watcher is a `null`-rendering
+  component that calls `useFormStatus()`, keeps the previous `pending` in a ref and, in an effect
+  on `true → false`, calls the Form's `onSettled`, which returns early when `closeOnSettle` is
+  `false`, when the dialog closed since the last `submit` (a `closedSinceSubmit` ref set by a
+  `close` listener on `form.closest("dialog")` and reset by the capture `submit` listener), or
+  when the dialog is not open, and otherwise records the intent and calls
+  `close(submitterValue)`. The submitter's `value` comes from that native `submit` listener on
+  the form (capture) set up in the same part. `DialogFormState.pending` is read by the watcher and lifted through a tiny context
   for the `className` / `children` functions of the Form itself (one extra render when pending
   changes; acceptable).
 - **Title / Description.** `libraryProps: { id }`; `h2` / `p` defaults.

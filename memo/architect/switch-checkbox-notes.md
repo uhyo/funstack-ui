@@ -45,3 +45,9 @@ Working notes behind `design/components/switch.md` and `design/components/checkb
   by the hook. Matches a plain React uncontrolled input after an RSC re-render.
 - **No `useFormStatus` coupling.**
 - **CheckboxGroup deferred** to its own design.
+
+## Status, 2026-10-17
+
+switch.md and checkbox.md set to accepted (#27 closed, see memo/product-owner/status.md).
+Checkbox 7 now lists `disabled` as owned (code: `packages/ui/src/checkbox/checkbox.tsx`, review
+item L2 in `memo/developer/switch-checkbox.md`); Switch 12.2 already said so.

@@ -77,3 +77,33 @@ Working notes behind `design/components/dialog.md`. Not a spec; the design doc i
   no-portal rule, and the Tooltip-style browser-owned open with notification.
 - Known gap: overlapping `Dialog.Close action` clicks do not surface a superseded rejection
   (no shared hook there). Fix if a case appears.
+
+## Review fold, 2026-10-17
+
+Folded the implementation-review fixes (commits 0ce1e8f, 0a563af, ad2853f, 63d35f1;
+`memo/developer/dialog.md` "Review fixes") into `design/components/dialog.md`, checking each
+claim against `packages/ui/src/dialog/*.tsx` and the tests:
+
+- 4.2: `trigger.pending = root.pending` (the old `&& optimistic !== committed` hid the re-open
+  window, where both are `true`). Kept the old rule as history in the section.
+- 3.5 / 8.1 / 14: `closeOnSettle` (default `true`; with `false` the Form records no intent at
+  all, it returns before `recordCloseIntent`) and the `closedSinceSubmit` flag: a dialog `close`
+  after the last `submit` blocks the settle close, also after a re-open. `method` is a declared
+  prop (base omitted, re-declared) applied only with a string `action`.
+- 7 / 9 / 2.6 / 14: press-and-click light dismiss (keyboard-synthesised clicks never dismiss;
+  `::backdrop` is unreachable by keyboard anyway). Non-modal Escape is left alone while an inner
+  layer owns it: target inside an open nested dialog or open auto/hint popover, **or any** open
+  auto/hint popover inside the dialog; `manual` (and `hint` mapped to manual, read through the
+  `popover` IDL) does not take Escape. Note: this only concerns the non-modal JS listener; for
+  modal dialogs the platform's close-watcher stack already does it.
+- 11.10 / 12.5: the nested confirm is a JS-free inner Root whose Trigger is "Discard…"; the
+  "Discard" Close action awaits the discard then `startTransition(() => setOpen(false))`; the
+  outer close is the parent's controlled close, so the outer `openChangeAction(false)` is not
+  called and `returnValue` is `""`. Outer parts must sit outside the inner Root (nearest-context
+  binding). The `setTimeout` alternative from the review is recorded as rejected.
+- Close props `Omit` now includes `value` (re-declared), matching the code.
+
+Not changed, worth knowing: the Popup's `transition` prop is typed `ViewTransitionClass` in the
+code (the design's prose says `TransitionProp`); same shape in practice. Issue #35 (a mounting
+`<ViewTransition>` starts a document view transition even with `"none"`) is referenced from the
+code's JSDoc, not from this design.
