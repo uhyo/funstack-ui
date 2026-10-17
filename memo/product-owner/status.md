@@ -85,3 +85,6 @@
 - Menu review: H1 (WebKit focus ring after pointer open, CI red) + M1-M3 + L1-L6 fixed (02f2f42, fa4908c, d4deae8). CI green all 3 engines at d4deae8. Architect fold 1783f7f, plus a small follow-up fold in progress (pointer-open quiet focus exception, Q6 settled: WebKit 302008 no hang).
 - Closed #41, #47. Filed #48 (stable root hook values), #49 (test leftovers). WAVE 3 DONE.
 - Next: ask the user, alpha.1 release (first OIDC publish) vs next wave.
+- Flaky Dialog JS-free re-open row was a real race (toggle queued) → count at beforetoggle (03ab818); design 774d1be.
+- RELEASED 0.1.0-alpha.1 (98bac72, prerelease). First OIDC publish WORKED (provenance signed). npm: alpha=0.1.0-alpha.1, latest still 0.1.0-alpha.0 (manual first publish set latest). Ask the user whether to move latest or deprecate 0.0.0-stage (human npm action).
+- Wave 4 started: #50 Select/Combobox; platform-researcher writing docs/research/select-combobox.md.
