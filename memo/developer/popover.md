@@ -23,6 +23,17 @@ questions as recommended). Branch `worktree-agent-a53037cd5ed289a71`.
   to Title / Description (outside a Popup they fall back to `{ open: committed, side: "bottom",
   align: "center" }`). The design listed `side` / `align` on the Root context instead.
 
+## Menu extension points (design/components/menu.md 14, accepted after the Popover design)
+
+Added after merging master: `usePopoverRoot({ mode: "library", onDispatch(next, details) })` and
+`usePopoverPopup({ resolveInitialFocus(popup) })` (the open cause is Menu's own ref; the hook
+just calls the resolver right before `showPopover()`). Tested in
+`src/internal/use-popover-hooks.test.tsx`. Not done, left to #41: `onKeyDown` / `onFocusOut` /
+`role` options on `usePopoverPopup` (Menu can attach them on its element), extra-handler merging
+in `usePopoverTrigger`, `use-action-trigger.ts` (Close's own transition with superseded-rejection
+surfacing, shared with Dialog.Close), `use-delayed-pair.ts`, and the shim's "hiding a popover
+hides its nested popovers".
+
 ## Things the design did not spell out (decided in code)
 
 1. **`intended()` reads a ref of the last committed optimistic value**, not the render closure.
@@ -68,10 +79,10 @@ questions as recommended). Branch `worktree-agent-a53037cd5ed289a71`.
 
 ## Results
 
-- jsdom: `popover.test.tsx` 120 tests, `anchor-position.test.ts` 13.
+- jsdom: `popover.test.tsx` 120 tests, `anchor-position.test.ts` 13, `use-popover-hooks.test.tsx` 3.
 - Browser (`popover.browser.test.tsx`): 27 rows per engine, Chromium 156 and Firefox 157 green
   (3 consecutive runs, no act warnings). WebKit: not runnable locally (missing libgtk-4 etc.).
-- Full gate: 1397 passed, 3 skipped (pre-existing).
+- Full gate after merging master: 1424 passed, 3 skipped (pre-existing).
 - Docs live examples smoke-tested with Playwright against `vite preview` in Chromium and Firefox:
   JS-free open focuses the autofocus input, library open after the fetch, Archive closes with one
   `startViewTransition` call, no console errors.
