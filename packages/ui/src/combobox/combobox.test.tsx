@@ -1845,8 +1845,11 @@ describe("Combobox", () => {
       const results = createSearch();
       const user = setupUser();
       function Slow() {
-        results.read("all");
-        return <Combobox.Option value="x">X</Combobox.Option>;
+        return (
+          <results.Gate gate="all">
+            <Combobox.Option value="x">X</Combobox.Option>
+          </results.Gate>
+        );
       }
       render(
         <Combobox.Root>
@@ -2108,10 +2111,14 @@ function createSearch() {
     use(entry(query).promise);
     return <Options query={query} />;
   }
+  /** Suspends until `resolve(gate)`; for content that is not a result list. */
+  function Gate({ gate, children }: { gate: string; children: ReactNode }) {
+    use(entry(gate).promise);
+    return children;
+  }
   return {
     Results,
-    /** Suspends until `resolve(key)`; for content that is not a result list. */
-    read: (key: string) => use(entry(key).promise),
+    Gate,
     resolve(query: string): void {
       const found = entry(query);
       (found.promise as TrackedPromise).status = "fulfilled";

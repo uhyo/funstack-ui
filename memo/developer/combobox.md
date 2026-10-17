@@ -106,5 +106,5 @@ is a transition and does wait, as designed.)
   a warning), Escape inside Dialog / Popover, ViewTransition counts, IME (asserts the composing
   keydown guard only).
 - Screen-reader pass (design 9) not done (no AT here).
-- Lint: `pnpm lint` ignores `**/.claude/**`, which is where agent worktrees live, so it checks
-  nothing in a worktree. Linted the changed files one by one with a copy of the config.
+- Tooling note: `pnpm lint` prints nothing at all when clean in a non-TTY shell (no "Found 0"
+  summary); it does lint worktrees under `.claude/`.
