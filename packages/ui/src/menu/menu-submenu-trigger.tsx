@@ -1,0 +1,144 @@
+"use client";
+import type {
+  ComponentPropsWithRef,
+  CSSProperties,
+  KeyboardEvent,
+  PointerEvent,
+  ReactNode,
+} from "react";
+import type { RenderProp, StateValue } from "../internal/types.js";
+import { useDevWarning } from "../internal/use-dev-warning.js";
+import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
+import { useRender } from "../internal/use-render.js";
+import { useMenuContext } from "./menu-context.js";
+import { hasModifier, isRtl } from "./menu-dom.js";
+import { scheduleHoverClose } from "./menu-hover.js";
+import type { MenuItemProps } from "./menu-item.js";
+import { openMenuWithFocus } from "./menu-trigger.js";
+import type { MenuTriggerState } from "./menu-trigger.js";
+import { useMenuItem } from "./use-menu-item.js";
+
+export type MenuSubmenuTriggerState = MenuTriggerState;
+
+export interface MenuSubmenuTriggerProps extends Omit<
+  MenuItemProps,
+  | "action"
+  | "closeOnActivate"
+  | "aria-expanded"
+  | "aria-haspopup"
+  | "onPointerEnter"
+  | "onPointerLeave"
+  | "className"
+  | "style"
+  | "children"
+  | "render"
+> {
+  className?: StateValue<string | undefined, MenuSubmenuTriggerState>;
+  style?: StateValue<CSSProperties | undefined, MenuSubmenuTriggerState>;
+  /** Rendered from optimistic state; must not suspend. */
+  children?: StateValue<ReactNode, MenuSubmenuTriggerState>;
+  render?: RenderProp<ComponentPropsWithRef<"button">, MenuSubmenuTriggerState>;
+}
+
+/**
+ * The item that opens a submenu: an item of the parent menu (`role="menuitem"`, roving
+ * `tabindex`, typeahead) and the Trigger of the submenu's Root (`commandfor`,
+ * `command="toggle-popover"`, `aria-haspopup="menu"`, `aria-expanded`). ArrowRight (ArrowLeft in
+ * RTL), Enter, Space or a click open the submenu with its first item focused; hovering it opens
+ * the submenu after the Root's `delay` and leaves focus where it is.
+ *
+ * Owned keys (conventions 1.2): the Trigger's (`type`, `id`, `commandfor`, `command`,
+ * `aria-haspopup`, `aria-expanded`, `data-open`, `data-pending`) and the item's (`role`,
+ * `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`,
+ * `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`).
+ */
+export function MenuSubmenuTrigger({
+  disabled = false,
+  label,
+  className,
+  style,
+  children,
+  render,
+  ...rest
+}: MenuSubmenuTriggerProps) {
+  const menu = useMenuContext("Menu.SubmenuTrigger");
+  useDevWarning(
+    !menu.submenu,
+    "Menu.SubmenuTrigger: rendered in a top-level Menu.Root. Use Menu.Trigger, or put this Root " +
+      "inside the parent's Menu.Popup.",
+  );
+
+  const open = (event: Event) => openMenuWithFocus(menu, event, "first");
+
+  // The item half: role, roving tabindex, aria-disabled, Enter / Space, pointer focus. Its
+  // activation is the click, which the trigger half handles (`activate` below).
+  const item = useMenuItem({
+    part: "Menu.SubmenuTrigger",
+    role: "menuitem",
+    disabled,
+    label,
+    activate: open,
+  });
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.defaultPrevented || hasModifier(event) || disabled) return;
+    const parentPopup = event.currentTarget.closest('[role="menu"]');
+    const forward = parentPopup !== null && isRtl(parentPopup) ? "ArrowLeft" : "ArrowRight";
+    if (event.key !== forward) return;
+    event.preventDefault();
+    open(event.nativeEvent);
+  };
+
+  const { state, libraryProps, ref } = usePopoverTrigger(menu.popover, {
+    part: "Menu.SubmenuTrigger",
+    disabled,
+    render,
+    disabledAs: "aria",
+    // Item first (Enter / Space activation, pointer focus), then the submenu keys.
+    handlers: {
+      onKeyDown: (event) => {
+        item.libraryProps.onKeyDown(event);
+        onKeyDown(event);
+      },
+      onPointerMove: item.libraryProps.onPointerMove,
+      onPointerEnter: (event: PointerEvent<HTMLButtonElement>) => {
+        if (disabled || event.pointerType === "touch") return;
+        const native = event.nativeEvent;
+        menu.timers.open(menu.delay, () => {
+          menu.setOpenCause("none");
+          menu.popover.requestOpen(native, "activate");
+        });
+      },
+      onPointerLeave: (event: PointerEvent<HTMLButtonElement>) => {
+        if (event.pointerType === "touch") return;
+        // Leaving before the open delay cancels it; leaving an open submenu's trigger starts the
+        // close delay (cancelled by entering the submenu).
+        if (menu.popover.intended()) scheduleHoverClose(menu, event.nativeEvent);
+        else menu.timers.cancel();
+      },
+    },
+    // A click opens (or moves focus into the open submenu); it never closes.
+    activate: (event) => open(event.nativeEvent),
+  });
+
+  return useRender<ComponentPropsWithRef<"button">, MenuSubmenuTriggerState>({
+    defaultElement: "button",
+    render,
+    state,
+    className,
+    style,
+    children,
+    props: rest,
+    libraryProps: {
+      ...libraryProps,
+      role: item.libraryProps.role,
+      tabIndex: item.libraryProps.tabIndex,
+      "data-typeahead": item.libraryProps["data-typeahead"],
+      id: menu.triggerId,
+      "aria-haspopup": "menu",
+    },
+    ref,
+  });
+}
+
+MenuSubmenuTrigger.displayName = "MenuSubmenuTrigger";

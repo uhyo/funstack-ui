@@ -78,6 +78,23 @@ const clientFiles = [
   "internal/use-popover-popup.mjs",
   "internal/use-popover-trigger.mjs",
   "internal/use-exit-animation.mjs",
+  // Every Menu part, its context and helpers, and the hooks it shares with Popover, Dialog and
+  // Tooltip (design/components/menu.md 13.1, "Directive").
+  "menu/menu-context.mjs",
+  "menu/menu-dom.mjs",
+  "menu/menu-hover.mjs",
+  "menu/menu-root.mjs",
+  "menu/menu-trigger.mjs",
+  "menu/menu-popup.mjs",
+  "menu/menu-item.mjs",
+  "menu/use-menu-item.mjs",
+  "menu/menu-checkbox-item.mjs",
+  "menu/menu-radio-group.mjs",
+  "menu/menu-radio-item.mjs",
+  "menu/menu-group.mjs",
+  "menu/menu-submenu-trigger.mjs",
+  "internal/use-action-trigger.mjs",
+  "internal/use-delayed-pair.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -95,6 +112,7 @@ const directiveFreeFiles = [
   "checkbox-group/index.mjs",
   "internal/sync-presence.mjs",
   "popover/index.mjs",
+  "menu/index.mjs",
   "internal/anchor-position.mjs",
 ];
 

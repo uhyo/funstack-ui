@@ -13,6 +13,7 @@ export default defineConfig({
     "src/radio-group/index.ts",
     "src/checkbox-group/index.ts",
     "src/popover/index.ts",
+    "src/menu/index.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives

@@ -105,6 +105,36 @@ export type {
   PopoverDescriptionState,
 } from "./popover/index.js";
 
+export { Menu } from "./menu/index.js";
+export type {
+  MenuRootProps,
+  MenuRootState,
+  MenuOpenChangeDetails,
+  MenuTriggerProps,
+  MenuTriggerState,
+  MenuPopupProps,
+  MenuPopupState,
+  MenuSide,
+  MenuAlign,
+  MenuItemProps,
+  MenuItemState,
+  MenuItemDetails,
+  MenuCheckboxItemProps,
+  MenuCheckboxItemState,
+  MenuRadioGroupProps,
+  MenuRadioGroupState,
+  MenuRadioItemProps,
+  MenuRadioItemState,
+  MenuGroupProps,
+  MenuGroupState,
+  MenuGroupLabelProps,
+  MenuGroupLabelState,
+  MenuSeparatorProps,
+  MenuSeparatorState,
+  MenuSubmenuTriggerProps,
+  MenuSubmenuTriggerState,
+} from "./menu/index.js";
+
 export { RadioGroup } from "./radio-group/index.js";
 
 export { CheckboxGroup } from "./checkbox-group/index.js";
