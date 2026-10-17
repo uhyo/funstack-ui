@@ -1,11 +1,12 @@
 "use client";
-import { useCallback, useId, useInsertionEffect, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createActionDetails } from "./action-details.js";
 import { transitionTypes } from "./transition-types.js";
 import type { ActionDetails, ChangeAction, ChangeReason } from "./types.js";
 import { useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
+import { useLatest } from "./use-latest.js";
 
 /**
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
@@ -181,10 +182,7 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   // action's continuation) and would otherwise read the value of the render they were created in.
   // An insertion effect runs in the mutation phase, before any layout effect of the same commit
   // (a child's included), so `intended()` is current there too.
-  const committedOptimistic = useRef(optimistic);
-  useInsertionEffect(() => {
-    committedOptimistic.current = optimistic;
-  });
+  const committedOptimistic = useLatest(optimistic);
   const generation = useRef(0);
   const openGeneration = useCallback(() => generation.current, []);
   const nextOpenGeneration = useCallback(() => {
@@ -204,54 +202,96 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   // Conventions 3.8 rule 1: judge no-ops against what the user already intends. That also
   // deduplicates the StrictMode re-run of the mount reconciliation and recognises the library's
   // own `hidePopover()` echoing back through `toggle`.
-  const intended = (): boolean => latestInFlight()?.next ?? committedOptimistic.current;
+  const intended = useCallback(
+    (): boolean => latestInFlight()?.next ?? committedOptimistic.current,
+    [latestInFlight, committedOptimistic],
+  );
 
-  const buildDetails = (event: Event | undefined, reason: ChangeReason): Details =>
-    details !== undefined
-      ? details(event, reason)
-      : (createActionDetails(event, { reason }) as unknown as Details);
+  // `details` and `onDispatch` are usually inline functions: read the committed render's through a
+  // ref so that the functions below, and with them the returned value, stay stable (#48).
+  const callbacks = useLatest({ details, onDispatch });
 
-  const send = (next: boolean, event: Event | undefined, reason: ChangeReason): void => {
-    const built = buildDetails(event, reason);
-    if (next) nextOpenGeneration();
-    onDispatch?.(next, built);
-    dispatch(next, built);
-  };
+  const send = useCallback(
+    (next: boolean, event: Event | undefined, reason: ChangeReason): void => {
+      const { details, onDispatch } = callbacks.current;
+      const built =
+        details !== undefined
+          ? details(event, reason)
+          : (createActionDetails(event, { reason }) as unknown as Details);
+      if (next) nextOpenGeneration();
+      onDispatch?.(next, built);
+      dispatch(next, built);
+    },
+    [callbacks, nextOpenGeneration, dispatch],
+  );
 
-  const requestOpen = (event: Event | undefined, reason: ChangeReason): void => {
-    if (!isLibrary || intended()) return;
-    send(true, event, reason);
-  };
+  const requestOpen = useCallback(
+    (event: Event | undefined, reason: ChangeReason): void => {
+      if (!isLibrary || intended()) return;
+      send(true, event, reason);
+    },
+    [isLibrary, intended, send],
+  );
 
-  const requestClose = (event: Event | undefined, reason: ChangeReason): void => {
-    if (!isLibrary || !intended()) return;
-    send(false, event, reason);
-  };
+  const requestClose = useCallback(
+    (event: Event | undefined, reason: ChangeReason): void => {
+      if (!isLibrary || !intended()) return;
+      send(false, event, reason);
+    },
+    [isLibrary, intended, send],
+  );
 
   // Same guard as `requestClose`; a separate name because the callers mean different things.
-  const notifyClosed = (event: Event | undefined, reason: ChangeReason): void => {
-    if (!isLibrary || !intended()) return;
-    send(false, event, reason);
-  };
+  const notifyClosed = useCallback(
+    (event: Event | undefined, reason: ChangeReason): void => {
+      if (!isLibrary || !intended()) return;
+      send(false, event, reason);
+    },
+    [isLibrary, intended, send],
+  );
 
-  // Not memoised: `dispatch` is a new function on every render (as Dialog), so parts re-render
-  // with the Root, which they do anyway when its state changes.
-  return {
-    mode,
-    ids: { popup: id, title: `${id}-title`, description: `${id}-description` },
-    committed: isLibrary && committed,
-    optimistic: isLibrary && optimistic,
-    pending: isLibrary && pending,
-    intended,
-    openGeneration,
-    nextOpenGeneration,
-    requestOpen,
-    requestClose,
-    notifyClosed,
-    latestInFlight,
-    triggerRef,
-    popupRef,
-    recordCloseIntent,
-    takeCloseIntent,
-  };
+  const ids = useMemo(
+    () => ({ popup: id, title: `${id}-title`, description: `${id}-description` }),
+    [id],
+  );
+
+  // Memoised: every function above is stable, so the value changes only with the open state and
+  // pending, and the components' context values built on it are reused otherwise (#48).
+  return useMemo(
+    () => ({
+      mode,
+      ids,
+      committed: isLibrary && committed,
+      optimistic: isLibrary && optimistic,
+      pending: isLibrary && pending,
+      intended,
+      openGeneration,
+      nextOpenGeneration,
+      requestOpen,
+      requestClose,
+      notifyClosed,
+      latestInFlight,
+      triggerRef,
+      popupRef,
+      recordCloseIntent,
+      takeCloseIntent,
+    }),
+    [
+      mode,
+      ids,
+      isLibrary,
+      committed,
+      optimistic,
+      pending,
+      intended,
+      openGeneration,
+      nextOpenGeneration,
+      requestOpen,
+      requestClose,
+      notifyClosed,
+      latestInFlight,
+      recordCloseIntent,
+      takeCloseIntent,
+    ],
+  );
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useId, useLayoutEffect, useRef } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -235,21 +235,37 @@ export function RadioGroupRoot({
     };
   }, []);
 
-  const context: RadioGroupContextValue = {
-    name,
-    form,
-    required,
-    optimistic,
-    pending,
-    disabled,
-    defaultValue: value === undefined ? (defaultValue ?? null) : undefined,
-    onItemMounted: onItemMountedWithCheck,
-    select: (next, event) => {
-      // No-op rule against the optimistic value (conventions 2.3 item 7, design 4.2).
-      if (next === optimistic) return;
-      dispatch(next, createActionDetails(event, { reason: "activate" }));
-    },
-  };
+  // Memoised (#48): `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with
+  // the state and the props below.
+  const contextDefault = value === undefined ? (defaultValue ?? null) : undefined;
+  const context = useMemo<RadioGroupContextValue>(
+    () => ({
+      name,
+      form,
+      required,
+      optimistic,
+      pending,
+      disabled,
+      defaultValue: contextDefault,
+      onItemMounted: onItemMountedWithCheck,
+      select: (next, event) => {
+        // No-op rule against the optimistic value (conventions 2.3 item 7, design 4.2).
+        if (next === optimistic) return;
+        dispatch(next, createActionDetails(event, { reason: "activate" }));
+      },
+    }),
+    [
+      name,
+      form,
+      required,
+      optimistic,
+      pending,
+      disabled,
+      contextDefault,
+      onItemMountedWithCheck,
+      dispatch,
+    ],
+  );
 
   const state: RadioGroupRootState = { value: optimistic, pending, disabled };
 

@@ -1,5 +1,5 @@
 "use client";
-import { useId, useRef } from "react";
+import { useId, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -70,15 +70,20 @@ export function MenuRadioGroup({
     warn: { component: "Menu.RadioGroup", prop: "value" },
   });
 
-  const context: MenuRadioGroupContextValue = {
-    value: optimistic,
-    pending,
-    select: (next, event, then) => {
-      const details = createActionDetails(event, {}) as ActionDetails;
-      if (then !== undefined) after.current.set(details, then);
-      dispatch(next, details);
-    },
-  };
+  // Memoised (#48): `dispatch` is stable.
+  const context = useMemo<MenuRadioGroupContextValue>(
+    () => ({
+      value: optimistic,
+      pending,
+      select: (next, event, then) => {
+        const details = createActionDetails(event, {}) as ActionDetails;
+        if (then !== undefined) after.current.set(details, then);
+        dispatch(next, details);
+      },
+    }),
+    [optimistic, pending, dispatch],
+  );
+  const groupContext = useMemo(() => ({ labelId }), [labelId]);
 
   const state: MenuRadioGroupState = { value: optimistic, pending };
 
@@ -98,7 +103,7 @@ export function MenuRadioGroup({
   });
 
   return (
-    <MenuGroupContext value={{ labelId }}>
+    <MenuGroupContext value={groupContext}>
       <MenuRadioGroupContext value={context}>{element}</MenuRadioGroupContext>
     </MenuGroupContext>
   );

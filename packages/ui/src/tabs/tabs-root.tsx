@@ -1,5 +1,5 @@
 "use client";
-import { useId, useRef } from "react";
+import { useId, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -135,21 +135,25 @@ export function TabsRoot({
       "panel is shown. Pass `defaultValue`, or `defaultValue={null}` to start with no selection.",
   );
 
-  const context: TabsContextValue = {
-    rootId,
-    committed,
-    optimistic,
-    pending,
-    orientation,
-    activationMode,
-    loop,
-    disabled,
-    select: (next, event, reason) => {
-      // No-op rule against the optimistic value (conventions 2.3 item 7, design section 9.4).
-      if (next === optimistic) return;
-      dispatch(next, createActionDetails(event, { reason }));
-    },
-  };
+  // Memoised (#48): `dispatch` is stable, so this changes only with the state and the props below.
+  const context = useMemo<TabsContextValue>(
+    () => ({
+      rootId,
+      committed,
+      optimistic,
+      pending,
+      orientation,
+      activationMode,
+      loop,
+      disabled,
+      select: (next, event, reason) => {
+        // No-op rule against the optimistic value (conventions 2.3 item 7, design section 9.4).
+        if (next === optimistic) return;
+        dispatch(next, createActionDetails(event, { reason }));
+      },
+    }),
+    [rootId, committed, optimistic, pending, orientation, activationMode, loop, disabled, dispatch],
+  );
 
   const state: TabsRootState = { value: optimistic, pending, orientation, disabled };
 

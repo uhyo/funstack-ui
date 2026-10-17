@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -147,41 +147,68 @@ export function DialogRoot({
   // What the user already intends: the latest in-flight dispatch, else the optimistic value
   // (conventions 3.8 rule 1). Judging no-ops against it also deduplicates the StrictMode re-run
   // of the mount reconciliation and recognises the library's own `close()` echoing back.
-  const intended = (): boolean => latestInFlight()?.next ?? optimistic;
+  const intended = useCallback(
+    (): boolean => latestInFlight()?.next ?? optimistic,
+    [latestInFlight, optimistic],
+  );
 
-  const requestOpen = (event: Event | undefined, reason: ChangeReason): void => {
-    if (!isLibrary || intended()) return;
-    nextOpenGeneration();
-    dispatch(true, createActionDetails(event, { reason, returnValue: undefined }));
-  };
+  const requestOpen = useCallback(
+    (event: Event | undefined, reason: ChangeReason): void => {
+      if (!isLibrary || intended()) return;
+      nextOpenGeneration();
+      dispatch(true, createActionDetails(event, { reason, returnValue: undefined }));
+    },
+    [isLibrary, intended, nextOpenGeneration, dispatch],
+  );
 
-  const notifyClosed = (event: Event, reason: ChangeReason, returnValue: string): void => {
-    if (!isLibrary || !intended()) return;
-    dispatch(false, createActionDetails(event, { reason, returnValue }));
-  };
+  const notifyClosed = useCallback(
+    (event: Event, reason: ChangeReason, returnValue: string): void => {
+      if (!isLibrary || !intended()) return;
+      dispatch(false, createActionDetails(event, { reason, returnValue }));
+    },
+    [isLibrary, intended, dispatch],
+  );
 
   const openState = isLibrary && optimistic;
   const pendingState = isLibrary && pending;
+  const committedState = isLibrary && committed;
 
-  // Not memoised: `dispatch` is a new function on every render of the Root (Accordion does the
-  // same), so parts re-render with the Root, which they do anyway when its state changes.
-  const context: DialogContextValue = {
-    mode,
-    ids: { dialog: id, title: `${id}-title`, description: `${id}-description` },
-    modal,
-    committed: isLibrary && committed,
-    optimistic: openState,
-    pending: pendingState,
-    requestOpen,
-    notifyClosed,
-    latestInFlight,
-    triggerRef,
-    dialogRef,
-    recordCloseIntent,
-    takeCloseIntent,
-    openGeneration,
-    nextOpenGeneration,
-  };
+  // Memoised (#48): `dispatch` is stable, so the value changes only with the open state, pending
+  // and `modal`, and the parts do not re-render for an unrelated render of the Root.
+  const context = useMemo<DialogContextValue>(
+    () => ({
+      mode,
+      ids: { dialog: id, title: `${id}-title`, description: `${id}-description` },
+      modal,
+      committed: committedState,
+      optimistic: openState,
+      pending: pendingState,
+      requestOpen,
+      notifyClosed,
+      latestInFlight,
+      triggerRef,
+      dialogRef,
+      recordCloseIntent,
+      takeCloseIntent,
+      openGeneration,
+      nextOpenGeneration,
+    }),
+    [
+      mode,
+      id,
+      modal,
+      committedState,
+      openState,
+      pendingState,
+      requestOpen,
+      notifyClosed,
+      latestInFlight,
+      recordCloseIntent,
+      takeCloseIntent,
+      openGeneration,
+      nextOpenGeneration,
+    ],
+  );
 
   const state: DialogRootState = {
     open: openState,

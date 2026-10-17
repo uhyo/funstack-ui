@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -56,7 +57,8 @@ export function SelectGroup({
     ref,
   });
   // Nested groups are not valid HTML, so this only ever turns `false` into the group's value.
-  return <SelectContext value={{ ...ctx, groupDisabled: disabled }}>{element}</SelectContext>;
+  const context = useMemo(() => ({ ...ctx, groupDisabled: disabled }), [ctx, disabled]);
+  return <SelectContext value={context}>{element}</SelectContext>;
 }
 
 SelectGroup.displayName = "SelectGroup";

@@ -9,7 +9,7 @@ import { setupUser } from "../__tests__/helpers.js";
 import type { ChangeReason } from "./types.js";
 import { usePopoverPopup } from "./use-popover-popup.js";
 import { usePopoverRoot } from "./use-popover-root.js";
-import type { PopoverLikeDetails } from "./use-popover-root.js";
+import type { PopoverLikeDetails, PopoverRootValue } from "./use-popover-root.js";
 import { usePopoverTrigger } from "./use-popover-trigger.js";
 
 function Mini({
@@ -132,6 +132,48 @@ describe("shared popover hooks: Menu's extension points", () => {
     await user.click(screen.getByTestId("trigger"));
     await flush();
     expect(screen.getByTestId("trigger")).toHaveFocus();
+  });
+
+  it("usePopoverRoot returns the same value across re-renders with unchanged state (#48)", async () => {
+    const user = setupUser();
+    const values: PopoverRootValue[] = [];
+    const first = vi.fn();
+    const second = vi.fn();
+    function Root({ onDispatch }: { onDispatch: () => void }) {
+      const ctx = usePopoverRoot<PopoverLikeDetails>({
+        component: "menu",
+        part: "Stable.Root",
+        mode: "library",
+        open: undefined,
+        defaultOpen: undefined,
+        openChangeAction: () => {},
+        // Inline, new on every render.
+        details: (event, reason) => ({ event, reason }),
+        onDispatch: () => onDispatch(),
+      });
+      values.push(ctx);
+      return (
+        <button type="button" onClick={(e) => ctx.requestOpen(e.nativeEvent, "activate")}>
+          {String(ctx.optimistic)}
+        </button>
+      );
+    }
+    const view = render(<Root onDispatch={first} />);
+    view.rerender(<Root onDispatch={first} />);
+    view.rerender(<Root onDispatch={second} />);
+    for (const v of values) expect(v).toBe(values[0]);
+
+    // The stable `requestOpen` reaches the `onDispatch` of the last committed render.
+    await user.click(screen.getByRole("button"));
+    await flush();
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+    const last = values.at(-1)!;
+    expect(last).not.toBe(values[0]);
+    expect(last.optimistic).toBe(true);
+    for (const key of ["requestOpen", "requestClose", "notifyClosed", "intended", "ids"] as const) {
+      expect(last[key]).toBe(values[0]![key]);
+    }
   });
 
   it.each([["pop"], [undefined]] as const)(

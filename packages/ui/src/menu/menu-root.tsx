@@ -127,10 +127,8 @@ export function MenuRoot({
 
   const resolvedDelay = delay ?? 100;
   const resolvedCloseDelay = closeDelay ?? 150;
-  // Note: `popover` is a new object on every render (the shared `usePopoverRoot` is not memoised:
-  // its `dispatch` closes over the render's state), so today this recomputes on every render of
-  // the Root and the parts re-render with it, as Popover's do. The other members are stable; the
-  // memo starts to hit without further change once that hook returns a stable value.
+  // `popover` is memoised by `usePopoverRoot` (#48) and the other members are stable, so this
+  // changes only with the open state, pending and the props listed below.
   const value = useMemo<MenuContextValue>(() => {
     const self: MenuContextValue = {
       popover,

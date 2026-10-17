@@ -2,13 +2,16 @@
 import {
   addTransitionType,
   startTransition,
+  useCallback,
   useEffect,
+  useMemo,
   useOptimistic,
   useRef,
   useState,
   useTransition,
 } from "react";
 import type { ActionDetails, ChangeAction } from "./types.js";
+import { useLatest } from "./use-latest.js";
 
 export interface UseControllableActionOptions<T, Details extends ActionDetails> {
   /** The controlled prop (`x`). `undefined` means uncontrolled. */
@@ -119,55 +122,72 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
     };
   }, []);
 
-  function dispatch(next: T, details: Details): void {
-    const prev = committed;
-    const id = ++latest.current;
-    inFlight.current.count += 1;
-    inFlight.current.next = next;
-    startOwnTransition(async () => {
-      for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
-      setOptimistic({ next, details });
-      try {
-        await action?.(next, details);
-      } catch (error) {
-        settle();
-        // The latest dispatch's rejection takes React's own route to the boundary.
-        if (id === latest.current) throw error;
-        // Nothing to throw to once unmounted (React drops its own thenables the same way).
-        if (!mounted.current) return;
-        if (hasSupersededError.current) {
-          // One boundary reset per burst is enough; later errors are still reported.
-          report(error);
-          return;
-        }
-        hasSupersededError.current = true;
-        // Outside the transition by now (after an await), so this is an urgent update: the owner
-        // re-renders promptly and throws.
-        setSupersededError({ error });
-        return;
-      }
-      settle();
-      if (!isControlled && id === latest.current) {
-        startTransition(() => setInternal(next));
-      }
-    });
-  }
+  // The functions below keep one identity for the hook's lifetime, so the returned object changes
+  // only with `committed`, `optimistic` and `pending`, and the components' memoised context values
+  // are reused across renders that change none of them (#48). They read the props of the last
+  // committed render through `props`; they run from handlers, actions and effects, never render.
+  const props = useLatest({ committed, isControlled, action, transitionTypes });
 
-  function settle(): void {
+  const settle = useCallback((): void => {
     inFlight.current.count -= 1;
     if (inFlight.current.count === 0) inFlight.current.next = undefined;
-  }
+  }, []);
 
-  function latestInFlight(): { readonly next: T } | null {
+  const dispatch = useCallback(
+    (next: T, details: Details): void => {
+      // Read once, at the call, as the per-render closure did: the action, the mode and the
+      // previous value belong to the UI the user acted on, even after the `await`.
+      const { committed: prev, isControlled, action, transitionTypes } = props.current;
+      const id = ++latest.current;
+      inFlight.current.count += 1;
+      inFlight.current.next = next;
+      startOwnTransition(async () => {
+        for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
+        setOptimistic({ next, details });
+        try {
+          await action?.(next, details);
+        } catch (error) {
+          settle();
+          // The latest dispatch's rejection takes React's own route to the boundary.
+          if (id === latest.current) throw error;
+          // Nothing to throw to once unmounted (React drops its own thenables the same way).
+          if (!mounted.current) return;
+          if (hasSupersededError.current) {
+            // One boundary reset per burst is enough; later errors are still reported.
+            report(error);
+            return;
+          }
+          hasSupersededError.current = true;
+          // Outside the transition by now (after an await), so this is an urgent update: the
+          // owner re-renders promptly and throws.
+          setSupersededError({ error });
+          return;
+        }
+        settle();
+        if (!isControlled && id === latest.current) {
+          startTransition(() => setInternal(next));
+        }
+      });
+    },
+    [props, settle, setOptimistic],
+  );
+
+  const latestInFlight = useCallback((): { readonly next: T } | null => {
     const { count, next } = inFlight.current;
     return count > 0 ? { next: next as T } : null;
-  }
+  }, []);
 
-  function adopt(next: T): void {
-    if (!isControlled) setInternal(next);
-  }
+  const adopt = useCallback(
+    (next: T): void => {
+      if (!props.current.isControlled) setInternal(next);
+    },
+    [props],
+  );
 
-  return { committed, optimistic, pending, dispatch, latestInFlight, adopt };
+  return useMemo(
+    () => ({ committed, optimistic, pending, dispatch, latestInFlight, adopt }),
+    [committed, optimistic, pending, dispatch, latestInFlight, adopt],
+  );
 }
 
 function useDevWarnings(

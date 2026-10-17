@@ -1,5 +1,5 @@
 "use client";
-import { use, useId } from "react";
+import { use, useId, useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -39,7 +39,8 @@ export function MenuGroup({ className, style, children, render, ...rest }: MenuG
     props: rest,
     libraryProps: { role: "group", "aria-labelledby": labelId },
   });
-  return <MenuGroupContext value={{ labelId }}>{element}</MenuGroupContext>;
+  const context = useMemo(() => ({ labelId }), [labelId]);
+  return <MenuGroupContext value={context}>{element}</MenuGroupContext>;
 }
 
 MenuGroup.displayName = "MenuGroup";
