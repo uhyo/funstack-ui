@@ -681,12 +681,32 @@ Library state never lives in `useSyncExternalStore`: a store mutation during a t
 blocking re-render and defeats both fallback avoidance and ViewTransition. Reading
 `matchMedia` for display only is fine.
 
-**Pure-trigger parts share `useActionTrigger(action)`** (decided with Menu, #39; lands as a
-follow-up once Popover is merged): a part with a bare `action` and its own transition but no
-state (`Dialog.Close`, `Popover.Close`, `Menu.Item`) runs the action through this hook, which
-applies the same superseded-rejection surfacing as `useControllableAction` (section 2.4) and
-exposes `pending`. Until it lands, those parts use `useTransition` directly and a superseded
-rejection is dropped by React (a recorded gap).
+**Pure-trigger parts share `useActionTrigger`** (decided with Menu, #39; landed with #41 in
+`packages/ui/src/internal/use-action-trigger.ts`): a part with a bare `action` and its own
+transition but no state (`Dialog.Close`, `Popover.Close`, `Menu.Item`) runs the action through
+this hook instead of calling `useTransition` itself:
+
+```ts
+const { pending, run } = useActionTrigger(openGeneration); // openGeneration?: () => number
+run(() => action?.(details), () => close());               // `then` runs inside the same transition once `work` resolved
+```
+
+- `pending` is the part's own transition (`data-pending` on the button or item).
+- A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
+  the part; an older run's rejection (the part was clicked again before the first settled) is
+  caught, kept and thrown from the part's render before `useTransition` (the superseded-rejection
+  surfacing of section 2.4), later ones go to `reportError`, and a rejection after the part
+  unmounted is dropped.
+- `then` still runs when the part unmounted meanwhile (an overlay's close must happen even though
+  the part left with the content), so the only thing that cancels it is the **open-generation
+  guard**: with `openGeneration` given, the hook reads the counter when `run` is called and skips
+  `then` when it has changed by the time `work` resolved, which means the user dismissed and
+  re-opened the overlay while the action ran and the close belongs to the earlier open (Popover
+  3.4; product-owner decision). `Popover.Root`, `Dialog.Root` and `Menu.Root` all carry the
+  counter.
+- React entangles transitions with a pending async action: a re-open dispatched while a run is
+  still pending commits only when the run settles. Documented per component (Popover 3.4, Menu
+  12), not worked around.
 
 ### 3.5 Library-owned vs. browser-owned state
 
@@ -1563,7 +1583,7 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     closes the stack with an immediate `hidePopover()`; submenu `flip-inline` fallback kept
     despite WebKit 302008; a nested `Menu.Root` is the submenu with `SubmenuTrigger` the only
     new part; `GroupLabel` and `<hr>`; `experimental_focusgroup` on `Menu.Popup`; the shared
-    `useActionTrigger` as a follow-up after Popover merges. The conventions changes it asked for
+    `useActionTrigger` (landed with #41, before Menu merged). The conventions changes it asked for
     (`GroupLabel` / `Separator` / `Item` in 1.1, `useActionTrigger` in 3.4, the always-library
     configuration in 7.3, the committed-state wording in 5.1, the types in 5.3, the flag row in
     8, the `checked` and `open` rows in 4.1, the `"dismiss"` examples in 2.2) are applied.

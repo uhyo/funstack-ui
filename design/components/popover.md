@@ -602,6 +602,8 @@ so every Close goes through the Root's transition and the apply effect; in JS-fr
 `action` the browser runs the command, with `action` the part runs it then calls
 `popup.hidePopover()` directly (a browser-owned close; the `toggle` listener has no Root state to
 notify). Repeated clicks while pending re-run the action (latest intent); the first hide wins.
+The action runs through the shared `useActionTrigger(openGeneration)` (conventions 3.4; landed
+with #41), which also surfaces a superseded click's rejection.
 
 **A stale close is dropped.** The action's continuation runs after an `await`; if the user
 dismissed the popover and opened it again meanwhile, `intended()` is `true` again and a naive
@@ -609,8 +611,11 @@ dismissed the popover and opened it again meanwhile, `intended()` is `true` agai
 click (`openGeneration()`, a counter bumped by every `requestOpen` and by the Popup's
 `beforetoggle(open)`, so foreign and pre-hydration opens count too) and, after the `await`,
 returns without closing when it changed (product-owner decision at review, L3). The action's
-result stands; only the close is dropped. Menu's item activation uses the same guard through
-`useActionTrigger` (menu.md 14).
+result stands; only the close is dropped. Menu's item activation and `Dialog.Close` use the same
+guard through `useActionTrigger` (menu.md 14, dialog.md 3.4). One React behaviour to know: a
+re-open dispatched while the Close's action is still pending is entangled with that action and
+commits only when it settles, so the Trigger shows `aria-expanded="true"` / `data-pending` and
+no popover until then (Menu 12, walkthrough 11).
 
 ### 3.5 `Popover.Title`, `Popover.Description`
 
@@ -1539,7 +1544,7 @@ item is folded into the section named; this list is the audit trail.
 | Deviation 4 | The apply-effect release rule for `held`. | 4.4, 2.5 |
 | Deviation 7 | The no-name warning checks `dialog`, `alertdialog` and `menu` roles only. | 9 |
 | Deviation 8 | `resolveInitialFocus(popup)` takes no `cause`; Menu's `details` factory uses `createActionDetails`. | 14.1, 14.2, 15, menu.md 14 |
-| M2 | `Popover.Close` still drops a superseded rejection (`useTransition` keeps the newest thenable); closed by the shared `useActionTrigger` in #41 (menu.md 14), which also carries the open-generation guard. | 3.4 (open) |
+| M2 | `Popover.Close` dropped a superseded rejection (`useTransition` keeps the newest thenable). Closed by the shared `useActionTrigger` (ac7064e, #41; conventions 3.4), which also carries the open-generation guard; one jsdom row fails without it. | 3.4 (closed 2026-10-17) |
 
 ---
 

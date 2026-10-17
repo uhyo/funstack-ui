@@ -1,8 +1,10 @@
 # Menu (menu button)
 
 Status: **accepted** (2026-10-17, GitHub issue #39; the product owner accepted all eleven
-questions as recommended, see the end of this document; the shared `useActionTrigger` lands as
-a follow-up after Popover merges). Follows `design/conventions.md` (accepted);
+questions as recommended, see the end of this document). **Implemented** in #41 (a456681; the
+shared `useActionTrigger` in ac7064e) and reviewed the same day: the review corrections and the
+six accepted deviations are folded into the sections below and listed at the end of this
+document. Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` first** (accepted): Menu is built on its internal hooks
 (`usePopoverRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
@@ -40,7 +42,7 @@ with a view transition in every engine.
 | 3 | Item activation and close (research Q1) | `Menu.Item action` runs in the item's own transition with `data-pending` on the item; **the menu stays open until the action settles, then the whole stack closes through the root Root's library-owned close** (`requestClose`, `openChangeAction(false)` awaited, `hidePopover()` in the apply effect, view transition if set). A sync action closes in the same tick, so the browser-feel is unchanged for the common case; a slow Server Function shows progress on the item and never leaves the user with a vanished menu and no feedback. A rejection leaves the menu open and reaches the nearest Error Boundary. |
 | 4 | Checkbox / radio items | `CheckboxItem` (`checked` / `defaultChecked` / `checkedChangeAction`) and `RadioGroup` (`value` / `defaultValue` / `valueChangeAction`) are state owners with `useOptimistic`: `aria-checked` and `data-checked` flip at once, `data-pending` while the action runs, rollback on rejection. **They keep the menu open by default** (APG: Space toggles without closing; toggling several options is the use case); `closeOnActivate` on every item kind overrides the default either way (`Item` defaults to `true`). |
 | 5 | Keyboard | APG Menu Button + Menu: Enter / Space / ArrowDown open with the first item focused, ArrowUp with the last; Up / Down move (wrap by default, `loop={false}` stops), Home / End, typeahead, Enter / Space activate, Escape closes the innermost menu, Tab / Shift+Tab close the whole stack and move on, ArrowRight / ArrowLeft open / close submenus (mirrored under `direction: rtl`). Disabled items are focusable (`aria-disabled`) and never activate. |
-| 6 | Focus model | Real DOM focus on items (roving: `tabindex="-1"` on every item, focus moved by script), never `aria-activedescendant`. On every open the first item is focused (last for ArrowUp) through the Popover hook's `autofocus` write; a hover-opened submenu keeps focus on its trigger. Pointer movement over an item focuses it, so keyboard and pointer always agree on the current item. |
+| 6 | Focus model | Real DOM focus on items (roving: `tabindex="-1"` on every item, focus moved by script), never `aria-activedescendant`. On every open the first item is focused (last for ArrowUp) through the Popover hook's `autofocus` write; a hover-opened submenu keeps focus on its trigger. Pointer movement over an item focuses it, so keyboard and pointer always agree on the current item; pressing non-item space (padding, a separator) never moves focus off it. Whether the item shows a ring after a pointer open is the engine's `:focus-visible` heuristic (WebKit may show one; 6.1). |
 | 7 | Submenus | A nested `Menu.Root` whose `Menu.SubmenuTrigger` is an item of the parent menu. Opened with `showPopover({ source: submenuTrigger })` (nested auto popover: the parent stays open, siblings close each other), placed `side="right" align="start"` with `position-try-fallbacks: flip-inline`. Opened by ArrowRight / Enter / Space / click (first item focused) or by hover intent (`delay` 100 ms, no focus move); closed by ArrowLeft, Escape (innermost only), hover leaving to a sibling item (`closeDelay` 150 ms), or the stack closing. Focus returns to the SubmenuTrigger through Popover 6.2's rule (the platform restores nothing for nested popovers). |
 | 8 | Hover intent (research Q5) | Timers only: `delay` / `closeDelay` on the submenu's `Menu.Root`, defaults 100 / 150 ms, implemented with the same small internal timer helper Tooltip's interaction uses for its delays, **not** Tooltip's interaction hook (focus, blur, document listeners and `interestfor` do not apply). No "safe triangle" in v0; `closeDelay` covers a diagonal move into the submenu. `interestfor` is not used (research: opens on focus and collapses the stack on Escape). |
 | 9 | `experimental_focusgroup` | On `Menu.Popup`: renders `focusgroup="menu wrap|nowrap"` (`wrap` from `loop`), detected with `"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore` (#43); on the native path items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out of the group) and the JS Up / Down / Home / End branch steps aside. Typeahead, Enter / Space, submenu keys and Tab-closes-stack stay JS everywhere. |
@@ -136,7 +138,7 @@ Why these parts:
 - **Items are `<button type="button">`** with explicit roles (research): Enter and Space
   activate natively, `type="button"` keeps them out of forms, and `render` can substitute a link
   (`render={<Link href />}` for a navigation item) at the cost of native activation, which the
-  keydown handler supplies. `disabled` becomes `aria-disabled="true"`, never the native
+  keydown handler supplies through `element.click()` (5.3), so the link still navigates. `disabled` becomes `aria-disabled="true"`, never the native
   attribute: the APG wants disabled items focusable, and Chromium's `focusgroup` skips natively
   disabled buttons.
 - **A submenu is a nested `Menu.Root`**, not a `Submenu*` family. The Popover hooks already make
@@ -227,17 +229,14 @@ inside the tree).
 ### 2.3 Item activation and `closeOnActivate` (research question 1)
 
 ```tsx
-// inside MenuItem (the shape useActionTrigger wraps, section 14)
-const [pending, startOwnTransition] = useTransition();
-const activate = (event: Event) => {
+// inside MenuItem (section 14; useActionTrigger is conventions 3.4)
+const { pending, run } = useActionTrigger(rootMenu.openGeneration); // the open this activation belongs to
+const onClick = (event: MouseEvent) => {                             // Enter / Space arrive here too (5.3)
   if (disabled) return;
-  const details = createActionDetails(event, {});
-  const generation = rootMenu.openGeneration();   // the open this activation belongs to
-  startOwnTransition(async () => {
-    await action?.(details);
-    if (rootMenu.openGeneration() !== generation) return;  // dismissed and re-opened meanwhile: drop the close (Popover 3.4)
-    if (closeOnActivate) rootMenu.requestClose(event, "activate");
-  });
+  run(
+    () => action?.(createActionDetails(event.nativeEvent, {})),
+    () => { if (closeOnActivate) rootMenu.requestClose(event.nativeEvent, "activate"); },
+  ); // `then` is skipped when the menu was dismissed and re-opened meanwhile (Popover 3.4)
 };
 ```
 
@@ -327,7 +326,7 @@ export interface MenuPopupState {
 }
 
 export interface MenuPopupProps
-  extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "role" | "aria-labelledby" | "onKeyDown" | "onFocus" | "onBlur" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "role" | "aria-labelledby" | "onKeyDown" | "onFocus" | "onBlur" | "onMouseDown" | "onPointerEnter" | "onPointerLeave" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"> {
   /** Default `"bottom"` for a top-level menu, `"right"` for a submenu. `null`: stylesheet-owned placement. */
   side?: MenuSide | null;
   /** Default `"start"` (both levels). */
@@ -353,8 +352,13 @@ export interface MenuPopupProps
 Owned keys: `id`, `popover` (`"auto"`), `role` (`"menu"`; owned here, unlike Popover, because the
 keyboard model assumes it), `aria-labelledby` (the Trigger's id, token-merged with the
 consumer's), `focusgroup` (with the flag), `tabIndex` (`-1`, so the popup itself can take focus
-as a last resort when a menu has no items), `data-side` / `data-align`, the three handlers. No
-`aria-orientation` (vertical is the default for `menu`; horizontal menus are not designed).
+as a last resort when a menu has no items; when it has focus the arrow keys enter the items,
+section 5), `data-side` / `data-align`, and the handlers: `onKeyDown` (section 5), `onBlur`
+(React's `focusout`, 2.2), `onMouseDown` (keeps focus on the current item when non-item space
+is pressed, 6.2) and, on a submenu Popup, `onPointerEnter` / `onPointerLeave` (hover intent,
+section 7). `usePopoverPopup` has no handler or `role` options; Menu attaches these as owned
+props on its own element (deviation 1). No `aria-orientation` (vertical is the default for
+`menu`; horizontal menus are not designed).
 `initialFocus` is **not** a prop: the menu decides (section 6). The submenu's default
 `position-try-fallbacks` is `flip-inline` only (research), the top level keeps Popover's three.
 
@@ -430,7 +434,7 @@ export interface MenuRadioGroupState { readonly value: string | null; readonly p
 export interface MenuRadioGroupProps extends Omit<ComponentPropsWithRef<"div">, "role" | "className" | "style" | "children"> {
   value?: string | null;          // `null`: none selected; `undefined`: uncontrolled
   defaultValue?: string | null;
-  /** Receives the chosen item's `value`; a selected item re-activated is a no-op. */
+  /** Receives the chosen item's `value`; a selected item re-activated dispatches nothing (with `closeOnActivate` the menu still closes). */
   valueChangeAction?: ChangeAction<string>;
   className?: StateValue<string | undefined, MenuRadioGroupState>;
   style?: StateValue<CSSProperties | undefined, MenuRadioGroupState>;
@@ -450,7 +454,9 @@ export interface MenuRadioItemProps extends Omit<MenuCheckboxItemProps, "checked
 ```
 
 `RadioGroup` is the owner (`useControllableAction<string | null>`; `data-pending` on the group,
-`role="group"`, `aria-labelledby` → a `GroupLabel` child's id if present); `RadioItem` renders
+`role="group"`, `aria-labelledby` → its `GroupLabel`'s id, always emitted as on `Group`: without
+a label the IDREF dangles, which accname ignores, so a consumer's `aria-label` still names the
+group; deviation 5); `RadioItem` renders
 `role="menuitemradio"`, `aria-checked={optimistic === value}`, `data-checked`, and `data-pending`
 when it is the optimistic target while the group is pending. Transition types `fsui-menu`,
 `fsui-menu-select`. A `RadioItem` outside a `RadioGroup` throws (no context).
@@ -503,8 +509,10 @@ settles, through the root Root, as `Item` does. Enter on a checkbox item behaves
 (APG lists Enter as "activates the item", which for a checkable item is the toggle; the only
 difference the APG draws is that Enter may close, and `closeOnActivate` is where that lives).
 
-`RadioItem` activation on the already-selected item is a no-op against the optimistic value
-(conventions 2.3 item 8); on another item it dispatches the group's `valueChangeAction(value)`,
+`RadioItem` activation on the already-selected item dispatches nothing (a no-op against the
+optimistic value, conventions 2.3 item 8), but with `closeOnActivate` it still closes the menu:
+activating the current choice of a close-on-select menu closes it (deviation 3); on another
+item it dispatches the group's `valueChangeAction(value)`,
 with `data-pending` on the chosen item and the group, and the previous item's `aria-checked`
 flipping to `false` at once. Overlapping radio dispatches: latest intent wins for uncontrolled
 state (the shared hook); a controlled parent follows "update on success" with the usual caveat.
@@ -525,8 +533,9 @@ item's `onKeyDown` / `onClick`; the open keys in `Trigger` / `SubmenuTrigger`.
 | ArrowUp | Trigger | open; focus the last enabled item | Trigger |
 | ArrowDown / ArrowUp | item | focus next / previous item (disabled included); wrap when `loop` | Popup (JS) or the browser (`focusgroup`) |
 | Home / End | item | first / last item | same |
+| ArrowDown, Home / ArrowUp, End | the popup itself (a menu with no items, or focus put there by script) | first / last item | Popup |
 | Printable character | item | typeahead (section 5.1) | Popup |
-| Enter | item | activate (`Item`: action then close; checkable items: toggle, close only with `closeOnActivate`); `preventDefault()` so a native button does not also click | item |
+| Enter | item | activate (`Item`: action then close; checkable items: toggle, close only with `closeOnActivate`): the keydown is `preventDefault()`ed and the item's `element.click()` called, so activation is one `click` path for pointer and keyboard (5.3) | item |
 | Space | item | as Enter, unless a typeahead buffer is active (then it is a character) | item |
 | Escape | anywhere in a menu | the innermost open menu closes; focus returns to its trigger | browser (close watcher); submenu focus return by the library |
 | Tab / Shift+Tab | item | the whole stack closes; focus moves on (Shift+Tab lands on the Trigger) | Popup `focusout` |
@@ -570,6 +579,19 @@ Everything else stays JS: typeahead, Enter / Space, submenu keys, `focusout`. Ch
 required for the other engines. No `nomemory` / `focusgroupstart`: a menu always opens with
 focus placed by the library and closes on Tab, so re-entry memory never applies.
 
+### 5.3 One activation path: `element.click()`
+
+Enter and Space on an item do not activate from the keydown. The item's handler prevents the
+default (so a native `<button>` does not click a second time on its own) and calls
+`element.click()`; the item's `onClick` is the single activation path and `details.event` is a
+`click` `MouseEvent` for pointer and keyboard alike (deviation 2). Reasons: an item composed with
+another trigger (`<Dialog.Trigger render={<Menu.Item />} />`, the layering row in 13.2) must run
+its native `command`, and a `render`ed link (`<Menu.Item render={<Link href />} />`) must
+navigate; activating from the keydown skipped both. A consumer who needs to tell the two apart
+reads `details.event.detail`: `0` for a keyboard activation (a synthetic click), `> 0` for a
+pointer one. A Space held on an item closes the menu once; the keyup lands on the Trigger and
+does not re-open it (probed in Chromium and Firefox at review).
+
 ---
 
 ## 6. Focus
@@ -589,8 +611,15 @@ the Root records at dispatch time:
 | SubmenuTrigger hover (intent timer) | none: focus stays on the SubmenuTrigger (the user is mousing; moving focus would make the parent menu's keyboard state jump into the submenu) |
 
 Focus on every open, pointer included, follows the APG example ("Actions" menu button focuses
-the first item on click) and keeps Escape / Tab behaviour uniform; `:focus-visible` heuristics
-hide the ring after a pointer open in every engine.
+the first item on click) and keeps Escape / Tab behaviour uniform. Whether the focused item shows
+a ring is the engine's `:focus-visible` heuristic, native-first: the open cause records whether
+the open was pointer-driven (a Trigger click with `detail > 0`), and after a pointer open the
+library re-focuses the resolved item with `focus({ focusVisible: false })` right after
+`showPopover()`, which Chromium and Firefox honour. WebKit does not implement the `focusVisible`
+option and may still match `:focus-visible` on the `autofocus`ed item after a mouse open (review
+H1; the browser row asserts the engine's behaviour rather than skipping). The stylesheet in
+section 9 styles `:focus` and `:focus-visible` alike with no outline, because hover focuses
+items anyway, so with that CSS the difference is invisible. Not worked around further.
 
 ### 6.2 Current item follows the pointer
 
@@ -599,6 +628,14 @@ pointer) focuses the item without `focusVisible` when it is not already focused.
 pointer then always agree on the current item: ArrowDown after hovering "Archive" moves to the
 item below "Archive", and Enter activates the hovered item, as native menus do. Leaving the items
 for empty popup space or the page changes nothing.
+
+Pressing non-item space does not move focus either. The popup has `tabindex="-1"` (so it is
+click-focusable), and a `mousedown` on its padding, a `Separator` or a `GroupLabel` would move
+focus from the current item to the popup, after which Up / Down / Home / End had no item to move
+from (review M1: a keyboard-plus-mouse user was stuck). The popup's owned `onMouseDown` calls
+`preventDefault()` when the target is not inside an item, so the current item stays current.
+Should focus land on the popup itself anyway (a menu with no items, or script), ArrowDown / Home
+focus the first item and ArrowUp / End the last (section 5).
 
 ### 6.3 Focus return
 
@@ -639,9 +676,11 @@ No `returnFocus` prop.
   horizontal gap is the stylesheet's (`margin-inline-start`). **WebKit 302008**
   (`position-try-fallbacks` on a nested popover hangs or spins): the default keeps the fallback,
   because the bug is NEW against a platform feature the vision adopts and the reporter says the
-  hang itself was fixed in 26.4; the first WebKit CI run of the submenu rows decides (section
-  13.3). Consumers who hit it set `side={null}` and position the submenu in CSS without
-  fallbacks. If the CI run hangs, the submenu default drops to no fallbacks until the bug is
+  hang itself was fixed in 26.4; a dedicated WebKit browser row opens and closes a submenu with
+  the default placement under a timeout, so every CI run shows whether the contingency applies
+  (13.2, review M3), and its result decides question 6. Consumers who hit it set `side={null}`
+  and position the submenu in CSS without fallbacks. If that row hangs or times out, the submenu
+  default drops to no fallbacks until the bug is
   fixed (question 6).
 - **Open by keyboard or click**: ArrowRight (ArrowLeft in RTL), Enter, Space, click on the
   SubmenuTrigger → `requestOpen(event, "activate")` with open cause "first item".
@@ -793,6 +832,15 @@ Notation: `C` / `O` / `P` as in Popover. Uncontrolled root menu, `keepMounted={f
     `tabindex="-1"`, so Tab goes past them: the user presses ArrowDown on the Trigger, which, with
     the menu already open, focuses the first item). Documented as the progressive-enhancement
     limit.
+11. **Dismiss and re-open while an item action is pending.** Enter on "Archive" (slow Server
+    Function) → `data-pending`; Escape → the platform hides the menu, `"dismiss"` notification,
+    the items unmount; click the Trigger → open dispatch. React entangles a transition started
+    while an async action is pending with that action: the re-open does **not** commit until
+    `archive` settles, so the Trigger shows `aria-expanded="true"` and `data-pending` with no
+    menu visible until then (React behaviour, not a library choice; review L5, documented on the
+    Menu page). When it settles: the item's `then` finds the open generation changed and drops
+    its close (section 14); the re-open commits, `showPopover()`, first item focused. The same
+    holds for `Popover.Close` (Popover 3.4) and `Dialog.Close`.
 
 ---
 
@@ -873,13 +921,23 @@ server responds, then closes.
 ## 12. Suspense, overlap, errors
 
 Covered by Popover 4.3 / 5 for the open and the Root's closes. Item-level: an item's `action` is
-awaited inside the item's `useTransition`; a rejection goes to the boundary above the item; a
+awaited inside the item's own transition through the shared `useActionTrigger` (conventions 3.4,
+landed with #41); a rejection goes to the boundary above the item and leaves the menu open; a
 superseded rejection on the same item (two clicks, the first rejects after the second resolved)
-is **dropped by React** (Dialog.Close's known gap, repeated here). To close it, the implementation
-should give `Menu.Item`, `Popover.Close` and `Dialog.Close` one shared internal
-`useActionTrigger(action)` that applies the superseded-rejection logic of `useControllableAction`
-without the state; recorded as implementation note and conventions feedback 2. Submenu content
-that suspends holds the submenu's open with `data-pending` on the SubmenuTrigger.
+is caught by the hook and thrown from the item's render, so it reaches the same boundary
+(`Popover.Close` and `Dialog.Close` share the hook; the gap Dialog had recorded is closed). A
+close that belongs to an earlier open is dropped (open-generation guard, section 14); this
+applies to `Item` and to `closeOnActivate` on `CheckboxItem` / `RadioItem` alike (deviation 6).
+Submenu content that suspends holds the submenu's open with `data-pending` on the
+SubmenuTrigger.
+
+React entangles transitions with a pending async action: a re-open dispatched while an item's
+action is still running commits only when that action settles (walkthrough 11). Until then the
+Trigger shows `aria-expanded="true"` and `data-pending` and no menu. This is React's behaviour,
+not the library's; a slow Server Function behind an item will show it, and the docs say so in
+one sentence. Separately, the page receives no pointer events while a view transition runs, so
+with `transition` set a click within the exit animation after a dismissal is lost: keep the
+durations short (section 9).
 
 ---
 
@@ -898,19 +956,20 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | Roles and ARIA | The section 1 HTML: trigger (`aria-haspopup`, `aria-expanded`, `id`, `commandfor`), popup (`role=menu`, `aria-labelledby` = trigger id, `tabindex=-1`), items (`role`, `tabindex=-1`, `type=button`), checkbox / radio `aria-checked`, group / label wiring, `<hr>`, SubmenuTrigger (`role=menuitem` + `aria-haspopup` + `aria-expanded` + `commandfor`); `experimental_focusgroup` renders `focusgroup="menu wrap"` (`nowrap` with `loop={false}`) and items keep `tabindex=-1` (no `focusGroup` in jsdom); `disabled` renders `aria-disabled` and no `disabled`. |
 | Keyboard | Trigger: Enter / Space / ArrowDown open with the first enabled item `autofocus`ed at `showPopover`, ArrowUp the last; in the menu: ArrowDown / ArrowUp / Home / End move focus, wrap with `loop`, stop without; disabled items receive focus; Enter / Space activate; Space with a typeahead buffer does not; modifiers ignored; RTL (`getComputedStyle` stub) swaps ArrowRight / ArrowLeft for submenus. Escape not simulable. |
 | Typeahead | "a" moves to the next item starting with "a" from the focused one, wraps; "a", "a" cycles; "ar" within 500 ms matches a prefix; after 500 ms the buffer resets; `label` overrides text; submenu items not matched from the parent. |
-| Sync action (both for CheckboxItem / RadioGroup; Root as Popover) | `Menu.Item action` receives `(details)` with `details.event` the native event (`click` for pointer, `keydown` for Enter); disabled items never dispatch; a selected RadioItem re-activated never dispatches; `closeOnActivate={false}` keeps the menu (no `requestClose`). |
+| Sync action (both for CheckboxItem / RadioGroup; Root as Popover) | `Menu.Item action` receives `(details)` with `details.event` the native `click` for pointer and keyboard alike (the Enter / Space keydown is prevented and `element.click()` called; `detail === 0` marks keyboard, 5.3); disabled items never dispatch; a selected RadioItem re-activated never dispatches (and still closes with `closeOnActivate`); `closeOnActivate={false}` keeps the menu (no `requestClose`). |
 | Async action (both) | Item: `data-pending` on the item while deferred; menu still open; resolve → root `openChangeAction(false, "activate")`, `hidePopover` called once. CheckboxItem: `aria-checked` / `data-checked` optimistic, `data-pending`, committed after resolve; stays open; with `closeOnActivate` closes after resolve. RadioGroup: `data-pending` on group and chosen item; previous item `aria-checked=false` at once. |
 | Rejection (both) | Item rejects: `ErrorCatcher` inside the Popup receives it, menu open, `hidePopover` not called. CheckboxItem rejects: `aria-checked` rolls back, catcher receives. RadioGroup likewise. Caught-inside variants commit. |
 | Overlap | Two RadioItem dispatches out of order: optimistic latest, committed latest. Two Item clicks: action called twice, `requestClose` once effective. |
-| Superseded rejection (both) | CheckboxItem / RadioGroup: the older dispatch rejects after and while the newer is pending; the catcher gets it. Item: documented gap, asserted via the shared `useActionTrigger` once implemented. |
+| Open-generation guard | Dismiss (`hidePopover()`) and re-open while an Item's, a `closeOnActivate` CheckboxItem's and a `closeOnActivate` RadioItem's action is pending (`keepMounted` for the radio, since uncontrolled state unmounts with the items); on resolve the menu stays open, `requestClose` not called. The re-open commits only when the action settles (walkthrough 11). |
+| Superseded rejection (both) | CheckboxItem / RadioGroup: the older dispatch rejects after and while the newer is pending; the catcher gets it. Item: the older click's rejection reaches the catcher through `useActionTrigger` (one row each for `Popover.Close` and `Dialog.Close` as well; they fail without the hook). |
 | Suspending content (both) | Popup children suspend on open: `showPopover` not called, Trigger pending; resolve: called, first item focused. Submenu likewise with `data-pending` on the SubmenuTrigger. |
-| Function props / `render` | Every part's state; `render={<a href />}` on an Item activates through keydown Enter and click; `render={<div role="separator" />}` on Separator. |
+| Function props / `render` | Every part's state; `render={<a href />}` on an Item activates through Enter (via `click()`) and click; `render={<div role="separator" />}` on Separator. |
 | Post-await rule | Controlled Root and controlled CheckboxItem / RadioGroup updating after `await`. |
 | Directive | Every file under `src/menu/` except `index.ts` is `"use client"`. |
 | Platform path | Mount with the popup already open (shim) → one `"platform"` dispatch; a foreign `show-popover` command is cancelled and routed; a controlled `open` flip calls `showPopover` / `hidePopover` with no echo dispatch. |
 | Submenus | A nested Root detects `submenu`; its Popup defaults `side="right"`, `align="start"`, fallbacks `flip-inline`; `showPopover` called with `{ source: submenuTrigger }`; ArrowRight / Enter / Space / click open with the first item `autofocus`ed; hover: `pointerenter` + 100 ms → open with no `autofocus`; `pointerleave` + 150 ms → `requestClose` ("dismiss"); entering the submenu popup cancels; keyboard focus inside blocks the hover close; ArrowLeft → `requestClose` ("activate") and, after `hidePopover` + `toggle` with focus moved to body by the test, the SubmenuTrigger is focused; `Menu.Trigger` in a submenu warns; `delay` on a top-level Root warns. |
 | Stack close | Item activation in a submenu calls the root Root's close; root `openChangeAction(false, "activate")`, submenu `openChangeAction(false, "dismiss")` after the shim's nested hide (the shim must hide nested popovers when an ancestor hides: addition). `focusout` to an outside element → root `hidePopover` at once, `"dismiss"` everywhere; `relatedTarget: null` → nothing; `focusout` into a submenu item → nothing. |
-| Pointer focus | `pointermove` on an item focuses it (no `focusVisible`); on the already-focused item nothing. |
+| Pointer focus | `pointermove` on an item focuses it (no `focusVisible`); on the already-focused item nothing. `mousedown` on a Separator or the popup's padding is `defaultPrevented` and focus stays on the item; with focus on the popup itself, ArrowDown / Home focus the first item and ArrowUp / End the last (M1). |
 | `transition` smoke | As Popover 13.2; plus item activation with `transition` unmounts in the close commit. |
 
 ### 13.2 Browser mode (`menu.browser.test.tsx`, Chromium, Firefox, WebKit)
@@ -919,35 +978,38 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | --- | --- | --- |
 | Native `focusgroup` | With `experimental_focusgroup`: ArrowDown on the first item moves focus **without** the library's `preventDefault()` (a document keydown listener sees `defaultPrevented === false`, the Tabs technique) and items have no `tabindex`; Home / End / wrap work; typeahead and Enter still work. | `supportsFocusgroup` (Chromium): native path. Elsewhere: items keep `tabindex="-1"`, the JS path prevents the keydown, same focus outcome. Both branches asserted, none skipped. |
 | Keyboard end to end | Trigger ArrowDown opens with real focus on the first item; arrows, Home / End, typeahead, Enter activates and the menu closes with focus back on the Trigger; Escape closes with focus on the Trigger; Shift+Tab from the first item lands on the Trigger and closes the menu; Tab from the last item lands after the Trigger and closes. | none |
-| Submenu | ArrowRight opens the submenu anchored at the item's right edge (`getBoundingClientRect`) with focus on its first item; Escape closes only the submenu and **the library** focuses the SubmenuTrigger (every engine: the platform restores nothing); ArrowLeft likewise; hover intent with real timers (open after ~100 ms, close after leaving ~150 ms, cancelled by entering the submenu); item activation in the submenu closes both with focus on the root Trigger; outside click closes both. | WebKit 302008: on `browserName === "webkit"` the submenu Popup renders `side={null}` with a comment; the inline-flip assertion (a submenu near the right edge flips left) runs on Chromium and Firefox. Watch the first WebKit run for a timeout with the default fallbacks in one dedicated row (`test.fails` style record, not a skip). |
+| Submenu | ArrowRight opens the submenu anchored at the item's right edge (`getBoundingClientRect`) with focus on its first item; Escape closes only the submenu and **the library** focuses the SubmenuTrigger (every engine: the platform restores nothing); ArrowLeft likewise; hover intent with real timers (open after ~100 ms, close after leaving ~150 ms, cancelled by entering the submenu); item activation in the submenu closes both with focus on the root Trigger; outside click closes both. | WebKit 302008: on `browserName === "webkit"` the submenu Popup renders `side={null}` with a comment; the inline-flip assertion (a submenu near the right edge flips left) runs on Chromium and Firefox. One dedicated WebKit row opens and closes a submenu with the **default** placement (`flip-inline`), bounded by a timeout so a hang fails instead of stalling the job (review M3); its result decides question 6. |
 | Checkbox / radio | Space toggles `aria-checked` and keeps the menu open; `closeOnActivate` closes after the action; radio switch updates both items at once. | none |
 | Exit animation | After item activation without `transition`: `held` keeps items until `getAnimations()` settle; after Escape likewise. | Firefox: `getAnimations().length === 0` → unmount with the commit. |
 | ViewTransition | With `transition`: open calls `startViewTransition` once; item activation once with a `::view-transition-old` of the popup present during the transition; Escape only for the notification commit; without `transition` zero calls. | Assert on all three. |
 | Light dismiss and layering | Click outside closes with `"dismiss"`; a Tooltip (`manual` / `hint`) on an item does not close the menu; a modal Dialog opened from an item keeps the menu open while it is a DOM descendant (and closes it when opened outside). | `supportsPopoverHint` for the hint variant. |
-| Pointer focus | Moving the real pointer over items focuses them; `:focus-visible` is false after a pointer open. | none (assert `:focus-visible` only where `matches` supports it; all three do). |
+| Pointer focus | Moving the real pointer over items focuses them; `:focus-visible` is false after a pointer open; a click on a Separator leaves focus on the current item and ArrowDown still moves (M1). | WebKit: `:focus-visible` may be true after a pointer open (no `focusVisible` option; H1), asserted as the documented degraded behaviour on `browserName === "webkit"`, not skipped. |
 
 ---
 
 ## 14. Implementation notes
 
 ```
-packages/ui/src/menu/
+packages/ui/src/menu/                    (as implemented in #41)
   index.ts                  # no directive; namespace + types; imports platform-attributes
-  menu-context.ts           # "use client": MenuContext (root + per-level), MenuGroupContext, MenuRadioGroupContext, MenuListContext (focusgroup)
-  menu-root.tsx             # "use client": usePopoverRoot({ component: "menu", mode: "library" }), submenu detection, open-cause ref, hover timers' options
-  menu-trigger.tsx          # "use client": usePopoverTrigger + aria-haspopup + ArrowDown/ArrowUp
-  menu-popup.tsx            # "use client": usePopoverPopup with the resolver; keyboard, typeahead, focusout, focusgroup detection
-  menu-item.tsx             # "use client": useActionTrigger; role/tabindex/aria-disabled; pointermove focus
+  menu-context.ts           # "use client": MenuContext (root + per-level), MenuGroupContext, MenuRadioGroupContext, MenuListContext (focusgroup); closeStackLater
+  menu-root.tsx             # "use client": usePopoverRoot({ component: "menu", mode: "library" }), submenu detection, open cause (setOpenCause / takeOpenCause), hover timers (useDelayedPair)
+  menu-trigger.tsx          # "use client": usePopoverTrigger + aria-haspopup + ArrowDown/ArrowUp (openMenuWithFocus, shared with SubmenuTrigger)
+  menu-popup.tsx            # "use client": usePopoverPopup with the resolver; keyboard, typeahead, focusout, mousedown, focusgroup detection, submenu pointer enter/leave
+  use-menu-item.ts          # "use client": the item half of every item kind: role, roving tabindex, aria-disabled, Enter/Space -> click(), pointermove focus
+  menu-item.tsx             # "use client": useActionTrigger(rootMenu.openGeneration)
   menu-checkbox-item.tsx    # "use client": useControllableAction<boolean>
   menu-radio-group.tsx      # "use client": useControllableAction<string | null>
   menu-radio-item.tsx       # "use client"
-  menu-group.tsx, menu-group-label.tsx, menu-separator.tsx   # "use client" (context for ids)
+  menu-group.tsx            # "use client": Group, GroupLabel and Separator (three stateless parts sharing one context; one file, deviation 4)
   menu-submenu-trigger.tsx  # "use client": item + trigger; hover intent
+  menu-hover.ts             # "use client": scheduleHoverClose (the :hover / focus-inside checks before a hover close)
+  menu-dom.ts               # items from the DOM, typeahead text
   menu.test.tsx, menu.browser.test.tsx
 packages/ui/src/internal/
-  use-action-trigger.ts     # "use client": own transition + superseded-rejection surfacing (shared with Popover.Close, Dialog.Close)
-  use-delayed-pair.ts       # "use client": open/close timer pair (Tooltip's hook refactored onto it)
-  use-popover-*.ts          # from #38; extension points below
+  use-action-trigger.ts     # "use client": useActionTrigger(openGeneration?) => { pending, run(work, then?) } (shared with Popover.Close, Dialog.Close)
+  use-delayed-pair.ts       # "use client": createDelayedPair() / useDelayedPair(): one open-or-close timer slot with cancelClose (Tooltip uses the factory inside its effect)
+  use-popover-*.ts          # from #38 / #40; extension points below
 ```
 
 - **Extension points in the Popover hooks.** Landed with #40 (`src/internal/use-popover-*.ts`,
@@ -957,21 +1019,36 @@ packages/ui/src/internal/
   resolveInitialFocus(popup) })`, called right before each library `showPopover()`, **no `cause`
   argument**: Menu reads the open cause from its own ref (written in `onDispatch` / before
   `requestOpen`), the hook only honours the returned element (inside the popup, else the
-  platform's choice). Left to #41: `onKeyDown` / `onFocusOut` / `role` are not hook options;
-  Menu attaches its handlers and renders `role="menu"` on its own element; `usePopoverTrigger`
-  reused by `SubmenuTrigger` with extra handlers merged in order (consumer's, then the item's,
-  then the trigger's).
+  platform's choice). Settled in #41 (deviation 1): `onKeyDown` / `onFocusOut` / `role` are
+  **not** hook options; Menu attaches its handlers (`onKeyDown`, `onBlur`, `onMouseDown`, the
+  submenu pointer handlers) and renders `role="menu"` as owned props on its own element, a
+  pass-through option being indirection only. `usePopoverTrigger` gained `handlers` (merged in
+  front of the Trigger's own), `activate` (a click override: `SubmenuTrigger` opens or focuses
+  into, never closes) and `disabledAs: "aria"`, which is how `SubmenuTrigger` reuses it.
 - **`usePopoverPopup` result is `{ setElement, visible, wrapContent }`** (destructure it; a hook
   result that carries a ref trips React Compiler's ref inference once a member is passed as
   `ref`). `Menu.Popup` renders `visible ? wrapContent(items) : null` (or
   `<Activity>{wrapContent(items)}</Activity>` with `keepMounted`): the probe inside `wrapContent`
   is what returns focus to the Trigger when item activation closes the menu with `transition`
   (Popover 6.2, H1); without it a keyboard activation ends with focus on `<body>`.
-- **`useActionTrigger` and the open-generation guard.** The item's activation records
-  `rootMenu.openGeneration()` before the `await` and skips the `requestClose` when it changed:
-  the user dismissed the menu and opened it again while the action ran, and the close belonged
-  to the earlier open (Popover 3.4, product-owner decision at the Popover review). The shared
-  hook carries this with the superseded-rejection surfacing; `Popover.Close` migrates onto it.
+- **`useActionTrigger` and the open-generation guard.** `const { pending, run } =
+  useActionTrigger(rootMenu.openGeneration)` (conventions 3.4). The item's click runs
+  `run(() => action?.(details), () => { if (closeOnActivate) rootMenu.requestClose(event,
+  "activate"); })`: the hook reads the root Root's open generation when `run` is called and skips
+  `then` when it changed by the time the action resolved, meaning the user dismissed the menu and
+  opened it again while the action ran and the close belonged to the earlier open (Popover 3.4,
+  product-owner decision at the Popover review). The hook also surfaces a superseded click's
+  rejection (section 12). `CheckboxItem` and `RadioItem` with `closeOnActivate` apply the same
+  guard through `closeStackLater` in `menu-context.ts` (their state lives in
+  `useControllableAction`, so they do not use the hook; deviation 6). `Popover.Close` and
+  `Dialog.Close` use the same hook.
+- **Keyboard activation goes through `element.click()`** (5.3): `use-menu-item.ts` prevents the
+  Enter / Space keydown and calls `event.currentTarget.click()`; `onClick` is the single
+  activation path, and composed triggers and `render`ed links keep their native command or
+  navigation.
+- **Pointer open and `:focus-visible`** (6.1): the open cause carries whether the open came from
+  a pointer; after `showPopover()` the Popup re-focuses the resolved item with
+  `focus({ focusVisible: false })` for a pointer open (a no-op where the option is unsupported).
 - **Details factory.** Menu's `details` option for `usePopoverRoot` must build with
   `createActionDetails(event, { reason })`, never an object literal: the Proxy keeps `event`
   non-enumerable, which is what lets `openChangeAction` be a Server Function (Popover 14.1).
@@ -1068,5 +1145,43 @@ All eleven accepted as recommended:
     designed.
 11. **`useActionTrigger` shared hook** (section 12, feedback 2) to close the superseded-rejection
     gap for `Menu.Item`, `Popover.Close` and `Dialog.Close` at once, as part of #41.
-    Decision: accepted as a follow-up after Popover merges; until then the Item uses
-    `useTransition` and the superseded-rejection row records the gap (conventions 3.4).
+    Decision: accepted; landed with #41 (ac7064e) before Menu merged, so the Item never shipped
+    without it (conventions 3.4).
+
+---
+
+## Review corrections (2026-10-17)
+
+From `memo/reviewer/menu.md` (review of the implementation, #41 / #47) and the developer's
+notes in `memo/developer/menu.md`. Each item is folded into the section named; this list is the
+audit trail. Fix decisions were taken by the product owner.
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| H1 | WebKit matches `:focus-visible` on the first item after a pointer open. Native-first: the "every engine" claim is withdrawn; the library re-focuses the item with `focus({ focusVisible: false })` after a pointer open where the option is implemented (Chromium, Firefox), WebKit may still show the ring, and the browser row asserts each engine's behaviour instead of skipping. | 6.1, 13.2, 14 |
+| M1 | A `mousedown` on non-item popup space (padding, Separator, GroupLabel) no longer moves focus off the current item (owned `onMouseDown`, `preventDefault()` outside items); with focus on the popup itself, ArrowDown / Home and ArrowUp / End enter the items. | 3.3, 5, 6.2, 13.1, 13.2 |
+| M2 | `Dialog.Root` carries an open-generation counter and `Dialog.Close` passes it to `useActionTrigger`, as `Popover.Close` does. | dialog.md 3.4, 14 |
+| M3 | A dedicated WebKit browser row exercises the default submenu placement (`flip-inline`, WebKit 302008) under a timeout; its result decides question 6. | 7, 13.2 |
+| L1 | The open-generation guard on `closeOnActivate` checkable items gets its own rows. | 13.1 |
+| L2 | Stale `useActionTrigger` text corrected: here (12, 13.1, 14, decision 11), conventions 3.4, dialog.md 3.4 / 14 and popover.md's M2 row. | 12, 13.1, 14 |
+| L3 | The six deviations below written into the design. | 2.3, 3.3, 3.6, 4, 5.3, 14 |
+| L5 | React's entanglement of a re-open with a pending item action is documented as React behaviour. | 10 (walkthrough 11), 12 |
+| L4, L6 | Test `act()` noise and context memoisation: implementation-only, no design change. | |
+
+## Accepted deviations (product owner, 2026-10-17)
+
+All six accepted as implemented:
+
+1. **No `onKeyDown` / `onFocusOut` / `role` options on `usePopoverPopup`.** `Menu.Popup` attaches
+   its handlers as owned props on its own element; pass-through options would be indirection
+   only (3.3, 14).
+2. **Keyboard activation goes through `element.click()`.** `details.event` is a `click` for Enter
+   and Space too; `detail === 0` marks a keyboard activation. Required for composed triggers and
+   `render`ed links (5.3, 13.1).
+3. **Re-activating the selected `RadioItem` closes without dispatching** when `closeOnActivate`
+   is set: activating the current choice of a close-on-select menu closes it (section 4).
+4. **`Group`, `GroupLabel` and `Separator` live in `menu-group.tsx`** (section 14).
+5. **`Menu.RadioGroup` always emits `aria-labelledby`**, like `Menu.Group`; a dangling IDREF is
+   ignored by accname, so a consumer's `aria-label` still names the group (3.6).
+6. **The open-generation guard also applies to `closeOnActivate` checkable items**: a close from
+   a previous opening must not close a new one, the same rule applied the same way (12, 14).

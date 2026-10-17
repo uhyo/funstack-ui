@@ -81,3 +81,36 @@ Working notes behind `design/components/menu.md`. Not a spec; the design doc is.
 - A safe-polygon hover intent if diagonal moves prove unreliable.
 - `experimental_` rendering of the Open UI `<menulist>` / `<menuitem>` elements if they ship.
 - Item `transition` (none in v0; conventions feedback 4).
+
+## After the review (2026-10-17)
+
+Folded `memo/reviewer/menu.md` and the developer's six deviations into `design/components/menu.md`
+(sections 2.3, 3.3, 3.6, 4, 5.3, 6.1, 6.2, 7, 10, 12, 13, 14, plus "Review corrections" and
+"Accepted deviations" at the end), `design/conventions.md` 3.4, `design/components/dialog.md`
+3.4 / 13.2 / 14 and `design/components/popover.md` 3.4 and the M2 row.
+
+Things I settled while writing, worth remembering:
+
+- `useActionTrigger(openGeneration?) => { pending, run(work, then?) }` is the real shape. The
+  design's earlier `useActionTrigger(action)` sketch was wrong in two ways: the hook takes the
+  generation reader, not the action, and `then` is what carries the close. `then` deliberately
+  runs after unmount (the overlay's close is why the item unmounted); only the generation guard
+  cancels it. Dialog.Root now needs the counter too (M2); I specified Popover's sources (own
+  open dispatch + the Popup's native `toggle` to open) so JS-free and foreign opens count.
+- M1: owned `onMouseDown` on `Menu.Popup` (added to the Omit list), plus `onPointerEnter` /
+  `onPointerLeave`, which the code already spreads as library props on submenus but the type did
+  not omit. The type now says owned for all three; the developer should align `MenuPopupProps`.
+- H1: native-first. The library re-focuses with `focus({ focusVisible: false })` after a
+  pointer open (Chromium, Firefox honour it); WebKit has no `focusVisible` option, so Safari may
+  show a ring after a mouse open. The section 9 CSS makes it invisible anyway (`:focus` styled
+  as hover, no outline). The browser row branches on webkit and asserts, never skips.
+- 5.3: keyboard activation through `element.click()` is the better design, not just an accepted
+  deviation: one activation path, `detail === 0` for keyboard, and composed triggers / links
+  keep their native behaviour. Worth carrying into any future item-like part (Listbox, Combobox).
+- L5: React entangles a re-open dispatched while an item's async action is pending; the re-open
+  commits when the action settles. Recorded as React behaviour in Menu 12 / walkthrough 11 and
+  Popover 3.4 and conventions 3.4. If it bites a consumer with a slow Server Function, the only
+  library-side fix is to run item actions outside `startTransition`, which loses `data-pending`;
+  not worth it.
+- Question 6 (WebKit 302008, submenu `flip-inline` default) is still open: the dedicated WebKit
+  row (M3) decides it from CI; the design keeps the fallback until that result is in.

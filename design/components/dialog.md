@@ -623,11 +623,21 @@ export interface DialogCloseDetails extends ActionDetails {
 Owned keys: `type`, `commandfor`, `command`, `value`, `disabled`, `onClick` (only with `action`),
 `data-pending`, `data-disabled` (`disabled` is owned on every part that takes the prop,
 conventions 1.2). With `action`, the click is `preventDefault()`ed (which cancels
-the command) and the part runs `startTransition(async () => { await action(details);
-close(value) })` in its own `useTransition`; the Close button is the only element that shows
-`data-pending` (Root's `pending` is reserved for `openChangeAction`; dim the dialog with
-`dialog:has([data-pending])`). Repeated clicks while pending re-run the action (latest intent;
-conventions 3.6); the first `close()` wins and later ones are no-ops on a closed dialog.
+the command) and the part runs the action through the shared `useActionTrigger` (conventions
+3.4), its own transition: `run(() => action(details), () => close(value))`; the Close button is
+the only element that shows `data-pending` (Root's `pending` is reserved for `openChangeAction`;
+dim the dialog with `dialog:has([data-pending])`). Repeated clicks while pending re-run the
+action (latest intent; conventions 3.6); the first `close()` wins and later ones are no-ops on a
+closed dialog. A superseded click's rejection is surfaced by the hook (conventions 2.4).
+
+**A stale close is dropped** (the Popover 3.4 rule). If the user dismissed the dialog (Escape)
+and opened it again while the action ran, the continuation would `close()` the new open. The
+Root keeps an **open generation**, a counter bumped by every open it sees (its own open dispatch
+and the Popup's native `toggle` to open, so foreign, pre-hydration and JS-free opens count too,
+as Popover 14.1), and the Close passes it as `useActionTrigger(openGeneration)`, which skips the
+close when the counter changed after the click. The action's result stands; only the close is
+dropped. `Dialog.Form` guards the same case with `closedSinceSubmit` (8.1). Added at the Menu
+review (M2): until then `Dialog.Close` was the one part without the guard.
 
 ### 3.5 `Dialog.Form`
 
@@ -1492,6 +1502,7 @@ update-on-success). Library mode unless stated.
 | Directive | Every file under `src/dialog/` except `index.ts` begins with `"use client"`. |
 | Platform path | Mount with the dialog's `open` attribute already set (pre-hydration open): one dispatch with `reason: "platform"`, `event: undefined`; parent accepts → children mount and `showModal` not called again; parent refuses → `close` called. Controlled `open` flipping `true`/`false` programmatically calls `showModal` / `close` and the resulting `close` event does **not** dispatch (echo). |
 | Close part | Without `action`: `command="request-close"`, `value` rendered. With `action`: click is default-prevented, `data-pending` while the deferred action runs, `close(value)` called on resolve, not on reject (error in the catcher inside the dialog). |
+| Close part, stale close | A `Dialog.Close` action pending; Escape closes the dialog; the Trigger re-opens it; the action resolves: `close` is not called on the new open (open-generation guard), the action ran once. A superseded click's rejection reaches the catcher (one row; it fails without the shared hook). |
 | Form part | `method="dialog"` without `action`; with `action`: `method` absent, the action receives `FormData`, `close(submitterValue)` called after it settles (fake the status through a resolved `deferred()`), not called when it throws. `closeOnSettle`: a `useActionState` validation result closes by default; with `false` the dialog stays open showing the result and a `Dialog.Close` closes it. A close since the submit (Escape during the save, then a re-open through the Trigger) blocks the settle close: the dialog ends open, `close` not called again. `method="post"` is kept with a string `action` and replaced by `"dialog"` without one. |
 | Light dismiss (baseline) | With `lightDismiss`: a `pointerdown` + `click` on the dialog with coordinates outside `getBoundingClientRect()` (mocked) calls `requestClose`; inside, on a descendant, or a `pointerdown` inside followed by a `click` outside (drag out) does not; without the prop nothing. Non-modal: document pointerdown + click outside closes; a click on the Trigger does not. |
 | Focus | `initialFocus` ref/selector: the element has `autofocus=""` when `showModal` is called (spy inspects the DOM) and not afterwards; missing target warns. Opener removed: after `close`, if `activeElement` is inside the dialog the Trigger is focused when connected. |
@@ -1538,7 +1549,9 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   directive-free.
 - **Context.** `{ mode: "static" | "library", ids: { dialog, title, description }, modal,
   committed, optimistic, pending, dispatch(next, details), latestInFlight, setTriggerElement,
-  dialogRef (RefObject<HTMLDialogElement | null>), recordCloseIntent(intent | undefined) }`.
+  dialogRef (RefObject<HTMLDialogElement | null>), recordCloseIntent(intent | undefined),
+  openGeneration() }`. `openGeneration` reads a counter the Root bumps on every open (3.4);
+  `Dialog.Close` passes it to `useActionTrigger`.
   Root recomputes the object every render (as Accordion does; `dispatch` is new per render).
   `dialogRef` is how Close and Form reach the dialog element for `close(value)` without a second
   registry; it is set by the Popup's callback ref.
@@ -1596,11 +1609,14 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   `platform-attributes.ts`.
 - **Close.** `libraryProps`: `type`, `disabled` (owned), `commandfor: dialogId`,
   `command: "request-close"`, `value`, `onClick` only with `action`, `data-pending`,
-  `data-disabled`. Own `useTransition`; on resolve:
-  `recordCloseIntent({ reason: "activate", event })` then `dialogRef.current?.close(value ?? "")`.
-  Errors: not caught (React routes them to the boundary; overlapping clicks are not tracked, so a
-  superseded rejection here is dropped by React. Accepted for v0 because the first resolution
-  closes the dialog and unmounts the part; recorded as a known gap).
+  `data-disabled`. `const { pending, run } = useActionTrigger(root.openGeneration)` (conventions
+  3.4; `src/internal/use-action-trigger.ts`, shared with `Popover.Close` and `Menu.Item`); the
+  click runs `run(() => action(details), () => { recordCloseIntent({ reason: "activate", event });
+  dialogRef.current?.close(value ?? ""); })`. Errors: the latest click's rejection takes React's
+  route to the boundary; a superseded click's rejection is caught by the hook and thrown from
+  the part's render (the gap recorded for v0 was closed by ac7064e). `then` is skipped when the
+  open generation changed (the user dismissed and re-opened the dialog while the action ran;
+  Menu review M2) and still runs after the part unmounted (a no-op on a closed dialog).
 - **Form.** `libraryProps`: `method: action === undefined ? "dialog" : typeof action ===
   "string" ? method : undefined`, `action`. Renders `<form …>{resolvedChildren}<FormStatusWatcher
   /></form>` (the watcher only with a function `action`); the watcher is a `null`-rendering
@@ -1624,6 +1640,18 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   that `setAttribute("autofocus")` immediately before `showModal()` is honoured
   by WebKit (research verified Chromium and Firefox only); that a `close` event fired for a
   removed dialog (unmount while open) is handled without touching a disconnected element.
+
+---
+
+## Review corrections (2026-10-17, from the Menu review)
+
+From `memo/reviewer/menu.md` (review of #41 / #47, which moved the Close part onto the shared
+hook); folded into the sections named.
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| M2 | `Dialog.Close` drops a stale close: the Root carries an open-generation counter and the Close passes it to `useActionTrigger`, as `Popover.Close` does. | 3.4, 13.2, 14 |
+| L2 | The Close part runs through the shared `useActionTrigger` (ac7064e); the superseded-rejection gap recorded for v0 is closed. | 3.4, 14 |
 
 ---
 
