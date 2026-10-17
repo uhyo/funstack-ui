@@ -8,7 +8,8 @@ question 20; amended 2026-10-17 with the Popover design, #38: the top-layer rule
 and the `focusGroup` detection in 8, issue #43; Popover and Menu accepted the same day, see
 resolved questions 24 and 25; amended 2026-10-17 with the Select design, #50, see resolved
 question 26; amended 2026-10-17 with the Combobox design, #50: the urgent lane in 2.6 and 3.2,
-the built-in strings rule in section 11, see resolved question 27). Binding for every component design in
+the built-in strings rule in section 11, see resolved question 27; amended 2026-10-17 with the
+Dialog close amendment, #46: the "cancelable step" rule for part-initiated closes in 3.5). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -789,9 +790,10 @@ Rules:
   `showPopover()` / `hidePopover()` (or `showModal()` / `close()`) in a layout effect of a
   transition commit and the boundary wraps the top-layer element itself (section 5.1), both the
   enter and the exit are captured, in Firefox too, where CSS cannot animate a popover's exit
-  (`docs/research/popover-menu.md`, "ViewTransition"). Popover is the first component to use
-  this for its part-initiated closes (`design/components/popover.md` 2.3, 10.2); Dialog's
-  library-driven close is a follow-up.
+  (`docs/research/popover-menu.md`, "ViewTransition"). Popover was the first component to use
+  this for its part-initiated closes (`design/components/popover.md` 2.3, 10.2); Dialog follows
+  for its Close part, Form and controlled close (`design/components/dialog.md` 2.3, 10.3,
+  amended for issue #46).
 - Per-component designs list every state and label it library-owned or browser-owned.
 - Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
   dispatches use `"activate"`.
@@ -799,17 +801,25 @@ Rules:
   writes to a DOM property it does not own (`Checkbox`'s `indeterminate`, a future Progress
   `value` or Dialog `returnValue`). It has no `defaultX` and no action; the library re-applies it
   after every commit and may suspend it while an action is pending (section 4.1).
-- A state may be **library-owned in one direction and browser-owned in the other** (Dialog's
-  `open`: opening is a transition the library drives and awaits; closing is performed by the
-  browser and reaches the library as a notification with `reason: "dismiss"` or `"activate"`
-  and `details.returnValue`). The component doc says which, and the `xChangeAction` doc comment
-  says so per value.
-- Where the platform's close is cancelable without an anti-abuse rule (popovers: the invoker's
-  command and the Close part's command, unlike a dialog's close request or `close()` from a
-  form), a component may **own the closes its parts initiate and leave dismissals to the
-  browser** (Popover: Trigger toggle, `Close` and a controlled `open={false}` are awaited and
-  hidden in the apply effect; Escape and light dismiss are notified). The component doc lists
-  which close is which.
+- A state may be **library-owned in one direction and browser-owned in the other**, or
+  **library-owned for some causes of a change and browser-owned for others** (Dialog's `open`:
+  opening and the closes a part asks for are transitions the library drives and awaits; a
+  dismissal is performed by the browser and reaches the library as a notification with
+  `reason: "dismiss"` and `details.returnValue`). The component doc says which, and the
+  `xChangeAction` doc comment says so per value.
+- Where the platform step a part's close goes through is **cancelable without an anti-abuse
+  rule**, a component may **own the closes its parts initiate and leave dismissals to the
+  browser**. The cancelable steps are the invoker's `command` event (popovers and dialogs
+  alike), a form's `submit` event, and the part's own `click` (cancelling it cancels the
+  command); the steps that are not are a dialog's close request (`cancel` is honoured once per
+  user activation) and the `close()` a `method="dialog"` form performs once its `submit` was
+  allowed, which is why a dialog's **Escape** is never library-owned while its **Close part**
+  is. Popover: Trigger toggle, `Close` and a controlled `open={false}` are awaited and hidden
+  in the apply effect; Escape and light dismiss are notified. Dialog (#46): `Close`, `Form`
+  (a `method="dialog"` submit, or the settle after a function action), a foreign close command
+  and a controlled `open={false}` are awaited and closed in the apply effect; Escape, Android
+  back, AT dismiss and light dismiss are notified. The component doc lists which close is
+  which.
 
 ### 3.6 `disabled`
 

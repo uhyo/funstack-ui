@@ -111,3 +111,53 @@ code's JSDoc, not from this design.
 Follow-up the same day: `transition` is typed `ViewTransitionClass` (the design had invented a
 `TransitionProp` alias that types.ts never had); the #35 mount cost is now in the 3.3 doc comment,
 in 2.6 (nested dialogs) and in 12.5 (the JS-free inner Root pays nothing), on top of 10.3.
+
+## Amendment for #46: library-owned part-initiated closes, 2026-10-17
+
+Written against the code as of 842af81 (`packages/ui/src/dialog/*`, `src/internal/use-popover-*.ts`,
+`use-exit-animation.ts`, `use-action-trigger.ts`) and `popover.md` 2.3 / 4.4 / 10.2 / 14.
+
+What I checked in the code before deciding:
+
+- `DialogRoot.intended()` reads the render closure's `optimistic`, not a ref: a Close action's
+  continuation (after an `await`) would see its click's value. Popover fixed this with
+  `committedOptimistic` in `useInsertionEffect` (review L2); the amendment requires the same.
+- The apply effect's close branch calls `element.close()` with no value; a library-owned close
+  needs the part's `value` there, hence the Root's pending-return-value ref, cleared whenever
+  optimistic is `true` again (veto, re-open) so it cannot go stale.
+- `exiting` is set only in the `close` listener and released with `startTransition`: a
+  controlled close without `transition` unmounts the content in the commit, shows an empty CSS
+  fade, and then `exiting=true` re-mounts it (fresh state) into the fading box; with
+  `transition` set the release starts a second, invisible view transition (Popover review M1).
+  Both go away by adopting `useExitAnimation` (`held`) and the Popover 4.4 shape.
+- The `command` listener already intercepts a foreign `show-modal`; intercepting
+  `request-close` / `close` is the same branch, and `Dialog.Close` renders that markup.
+- The `submit` listener sits on the dialog, which runs *before* React's root `onSubmit`. To keep
+  a consumer's `preventDefault()` working (it blocks the native close today), the interception
+  must observe `defaultPrevented` after React ran: a document-level bubble listener.
+- Generation counting: `requestOpen` and the Popup's `beforetoggle(open)` both bump, so a
+  library open counts twice. Harmless (equality only). Kept at `beforetoggle` per 03ab818; the
+  design now explains why the guard matters in library mode too (the re-open is the latest
+  intent when the continuation runs, so `requestClose` would dispatch against it).
+- Modal `close()` restores focus unconditionally (HTML "close the dialog", `wasModal`); non-modal
+  only when focus is inside. So the Popover content probe matters for non-modal dialogs with
+  `transition` and the default mounting; for modal ones it is a no-op.
+
+Decisions I went back and forth on:
+
+- **`method="dialog"` interception.** Leaving it browser-owned was simpler and closer to "the
+  platform's form idiom", but an OK submit button and a Dialog.Close in the same form would then
+  differ in animation and vetoability. Chose to intercept, opt-out by `stopPropagation()` in
+  `onSubmit` (then native close + `"dismiss"`). Escalated as question 1.
+- **Foreign close invokers.** Popover leaves foreign `hide-popover` browser-owned; Dialog
+  intercepts because it already intercepts foreign `show-modal`. Escalated as question 2.
+- **Trigger as a toggle for non-modal dialogs.** Tempting for parity with Popover, but there is no
+  `toggle` command for dialogs and the modal Trigger is inert while open. Left open-only.
+- **`requestClose()` vs `close()` in the apply effect.** `requestClose()` would let a consumer's
+  `onCancel` veto, but the anti-abuse rule makes that veto hold once and the effect would re-run
+  it; the veto point is `openChangeAction` now. `close()`.
+- **Form: open-generation guard vs `closedSinceSubmit`.** Kept `closedSinceSubmit`; it already
+  reads the `close` event the Form listens to and covers the re-open.
+
+Not touched: the docs site and the example app (the running code is what they show); listed
+for the developer in the amendment section.
