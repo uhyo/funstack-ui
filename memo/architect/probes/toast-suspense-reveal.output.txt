@@ -1,0 +1,14 @@
+react 19.3.1
+slow async action pending                                    => slowPending=true 
+urgent push of a toast whose content suspends                => slowPending=true [a:fallback]
+content promise resolved                                     => slowPending=true [a:fallback]
+450 ms after resolve (action still pending if any)           => slowPending=true [a:content=ready]
+slow action released                                         => slowPending=false [a:content=ready]
+200 ms later                                                 => slowPending=false [a:content=ready]
+600 ms later                                                 => slowPending=false [a:content=ready]
+react 19.3.1
+urgent push of a toast whose content suspends                => slowPending=false [a:fallback]
+content promise resolved                                     => slowPending=false [a:fallback]
+450 ms after resolve (action still pending if any)           => slowPending=false [a:content=ready]
+200 ms later                                                 => slowPending=false [a:content=ready]
+600 ms later                                                 => slowPending=false [a:content=ready]
