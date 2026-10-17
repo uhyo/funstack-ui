@@ -6,7 +6,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
-import { AccordionItemContext, AccordionRootContext } from "./accordion-context.js";
+import { AccordionItemContext } from "./accordion-context.js";
 
 export interface AccordionPanelState {
   readonly value: string;
@@ -52,12 +52,12 @@ export function AccordionPanel({
   render,
   ...rest
 }: AccordionPanelProps) {
-  const root = use(AccordionRootContext);
+  // Only the Item's context (memoised per item, #48).
   const item = use(AccordionItemContext);
   if (item === null) {
     throw new Error("Accordion.Panel must be rendered inside an Accordion.Item.");
   }
-  const isLibrary = root?.mode === "library";
+  const isLibrary = item.library;
 
   useDevWarning(
     !isLibrary && transition !== undefined,

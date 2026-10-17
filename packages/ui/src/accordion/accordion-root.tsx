@@ -15,6 +15,7 @@ import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { AccordionRootContext } from "./accordion-context.js";
 import type {
@@ -222,9 +223,16 @@ export function AccordionRoot(props: AccordionRootProps) {
     | ChangeAction<AccordionValue, AccordionValueChangeDetails>
     | undefined;
 
-  // Keep the committed set's identity stable while the consumer's `value` is, so `useOptimistic`
-  // only re-bases when the controlled value really changed.
-  const controlledSet = useMemo(() => (value === undefined ? undefined : toSet(value)), [value]);
+  // Keep the committed set's identity stable while the consumer's `value` has the same contents,
+  // so `useOptimistic` only re-bases, and the context only changes, when the controlled value
+  // really changed. Keyed on the contents, not the array: an inline `value={["a"]}` is a new
+  // array on every render. (Order-sensitive; a reordered array only costs one new set.)
+  const controlledKey = value === undefined ? undefined : JSON.stringify(value);
+  const controlledSet = useMemo(
+    () =>
+      controlledKey === undefined ? undefined : toSet(JSON.parse(controlledKey) as AccordionValue),
+    [controlledKey],
+  );
 
   const items = useRef(new Map<HTMLDetailsElement, string>());
   const triggers = useRef(new Set<HTMLElement>());
@@ -277,16 +285,23 @@ export function AccordionRoot(props: AccordionRootProps) {
     [dispatch],
   );
 
+  // The two dispatchers below read the last committed optimistic set through `latest`, so they
+  // keep one identity and the Items' contexts are reused across open-state changes (#48): a
+  // handler only ever runs against the committed UI, so this is the set it closed over before.
+  const latest = useLatest({ optimistic, exclusive });
+
   const dispatchFromTrigger = useCallback<AccordionRootContextValue["dispatch"]>(
     (item, open, event) => {
+      const { optimistic, exclusive } = latest.current;
       // `next` comes from the optimistic set: what the user sees and intends (design 2.2).
       dispatchChange(reduce(optimistic, item, open, exclusive), item, open, "activate", event);
     },
-    [dispatchChange, optimistic, exclusive],
+    [dispatchChange, latest],
   );
 
   const dispatchFromDom = useCallback<AccordionRootContextValue["dispatchFromDom"]>(
     (item, open, event) => {
+      const { optimistic, exclusive } = latest.current;
       // The browser flipped one item (design 2.3). `next` builds on what the user already
       // intends (the latest in-flight dispatch, else the optimistic set), never on the DOM: a
       // pending optimistic open would otherwise be lost to latest-wins. Exclusive mode therefore
@@ -296,7 +311,7 @@ export function AccordionRoot(props: AccordionRootProps) {
       if (setsEqual(next, base)) return;
       dispatchChange(next, item, open, "platform", event);
     },
-    [dispatchChange, latestInFlight, optimistic, exclusive],
+    [dispatchChange, latestInFlight, latest],
   );
 
   const isLibrary = mode === "library";
@@ -357,8 +372,8 @@ export function AccordionRoot(props: AccordionRootProps) {
   const contextCommitted = isLibrary ? committed : EMPTY;
   const contextOptimistic = isLibrary ? optimistic : EMPTY;
 
-  // Memoised (design 12, #48): the hook's `dispatch` is stable, so this changes only with the
-  // open sets, pending and the props below.
+  // Memoised (design 12, #48): the dispatchers are stable, so this changes only with the open
+  // sets, pending and the props below.
   const context = useMemo<AccordionRootContextValue>(
     () => ({
       mode,

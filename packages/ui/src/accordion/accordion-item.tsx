@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useState } from "react";
+import { use, useCallback, useMemo, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -134,13 +134,22 @@ export function AccordionItem({
     : undefined;
 
   const state: AccordionItemState = { value, open: optimisticOpen, pending, disabled };
-  const itemContext: AccordionItemContextValue = {
-    value,
-    disabled,
-    committedOpen,
-    optimisticOpen,
-    pending,
-  };
+  const dispatch = root?.dispatch;
+  const registerTrigger = root?.registerTrigger;
+  // Memoised (#48): changes only with this item's own values, not with every Root change.
+  const itemContext = useMemo<AccordionItemContextValue>(
+    () => ({
+      value,
+      disabled,
+      committedOpen,
+      optimisticOpen,
+      pending,
+      library: isLibrary,
+      dispatch,
+      registerTrigger,
+    }),
+    [value, disabled, committedOpen, optimisticOpen, pending, isLibrary, dispatch, registerTrigger],
+  );
 
   const element = useRender<ComponentPropsWithRef<"details">, AccordionItemState>({
     defaultElement: "details",
