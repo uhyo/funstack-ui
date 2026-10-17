@@ -88,3 +88,6 @@
 - Flaky Dialog JS-free re-open row was a real race (toggle queued) → count at beforetoggle (03ab818); design 774d1be.
 - RELEASED 0.1.0-alpha.1 (98bac72, prerelease). First OIDC publish WORKED (provenance signed). npm: alpha=0.1.0-alpha.1, latest still 0.1.0-alpha.0 (manual first publish set latest). Ask the user whether to move latest or deprecate 0.0.0-stage (human npm action).
 - Wave 4 started: #50 Select/Combobox; platform-researcher writing docs/research/select-combobox.md.
+- Select: researched (e620cd2), designed + accepted (230086e, 50228e4; PO: no warning without value/defaultValue), implemented + merged (1114850..ba1f6e5), CI green all 3. Review 5a2acad: H1 adopt overwrites a pick, M1 reset target with "" placeholder; fix pass running on master; architect folding the review into select.md.
+- Combobox: designed + accepted (c000b43, 7349e2d). USER decided: English default announce string, overridable (first built-in string; conventions §11). Developer implementing in a worktree.
+- Issues: #51 (upstream React/Chromium + iOS check), #52 (Chromium selectedcontent reset bug, upstream).
