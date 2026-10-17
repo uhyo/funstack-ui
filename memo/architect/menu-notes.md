@@ -114,3 +114,14 @@ Things I settled while writing, worth remembering:
   not worth it.
 - Question 6 (WebKit 302008, submenu `flip-inline` default) is still open: the dedicated WebKit
   row (M3) decides it from CI; the design keeps the fallback until that result is in.
+
+## Fix follow-up (02f2f42, d4deae8)
+
+- H1 resolved better than "native-first, WebKit may show a ring": the hook now takes a
+  `QuietFocusTarget` from `resolveInitialFocus` and calls `focus({ focusVisible: false })` after
+  `showPopover()` for a pointer open. The one `.focus()` on open in the library; Popover 6.1
+  records the exception. Safari 18.4+ implements the option, so WebKit CI is clean.
+- Question 6 settled: the WebKit default-placement row passed (CI 39021387650). Keep
+  `flip-inline`. The other WebKit submenu rows still use `side={null}`; relax when convenient.
+- M2 nuance: in library mode the entangled re-open means `dialog.open` is false when `then`
+  runs, so the guard is only load-bearing for JS-free / native re-opens. Still right to have.

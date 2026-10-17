@@ -751,7 +751,14 @@ platform probe in `popover.browser.test.tsx` asserts it in all three engines): a
 descendant, else the first sequentially focusable descendant, else the popup itself. That is the APG's non-modal dialog
 behaviour (focus moves in; Escape returns it), and it means the `initialFocus` prop works exactly
 as Dialog's: the library writes `autofocus` on the resolved element right before `showPopover()`
-and removes it after; it never calls `.focus()` on open.
+and removes it after; it never calls `.focus()` on open, with **one exception**: a
+`resolveInitialFocus` resolver (Menu) may return a `QuietFocusTarget`
+(`{ element, focusVisible: false }`) for a pointer-initiated open, and where the engine reads
+the `focusVisible` option (a getter probe on a detached element; Chromium 145, Firefox 104,
+Safari 18.4) the hook skips the `autofocus` write and calls `element.focus({ focusVisible:
+false })` right after `showPopover()` instead, so a mouse open does not paint a focus ring on the
+item (Menu 6.1, review H1). Elsewhere the `autofocus` path runs as before. `initialFocus` itself
+never takes this path.
 
 ```tsx
 <Popover.Popup initialFocus="[name=query]">…<input name="query" />…</Popover.Popup>
@@ -1351,8 +1358,10 @@ change), `useControllableAction<boolean, Details>` with `transitionTypes(compone
 Everything in the Popup except rendering. `options`: `{ part, initialFocus, resolveInitialFocus?,
 keepMounted, transition, onBeforeToggle?, onToggle? }` (the optional hooks are for Menu:
 `resolveInitialFocus(popup)` replaces `initialFocus` with a function called right before each
-library open, no `cause` argument since the open cause is Menu's own ref; `onToggle` closes the
-stack on Tab-out). Returns `{ setElement (callback ref), visible, wrapContent }`; nothing with a
+library open, no `cause` argument since the open cause is Menu's own ref; it returns an element,
+`null`, or a `QuietFocusTarget` `{ element, focusVisible: false }` that is focused with
+`focus({ focusVisible: false })` after `showPopover()` where the option is implemented (6.1);
+`onToggle` closes the stack on Tab-out). Returns `{ setElement (callback ref), visible, wrapContent }`; nothing with a
 ref inside the returned object (React Compiler's ref inference would flag every member once one
 is passed as `ref`; consumers destructure). Effects and listeners:
 
@@ -1443,8 +1452,9 @@ Reused as is, through the internal hooks of section 14:
   `intended()`, `requestOpen` / `requestClose` / `notifyClosed`, close intents, and the
   `"activate"` / `"dismiss"` / `"platform"` reasons.
 - The Popup machinery (`usePopoverPopup`): apply effect with `showPopover({ source })` and the
-  `autofocus` write (Menu passes `resolveInitialFocus(popup)`, returning its first or last item
-  from the open cause in its own ref), `beforetoggle` open interception, `toggle` notification,
+  `autofocus` write, or the quiet `focus({ focusVisible: false })` for a `QuietFocusTarget`
+  (Menu passes `resolveInitialFocus(popup)`, returning its first or last item from the open
+  cause in its own ref, quiet for a pointer open), `beforetoggle` open interception, `toggle` notification,
   `awaitingClose`, the `held` deferred unmount, the JS-free `aria-expanded` sync, the
   **nested focus-return rule** (6.2), which is exactly "focus the parent item when a submenu
   closes", and `wrapContent`, which Menu.Popup must render its items through so that an item

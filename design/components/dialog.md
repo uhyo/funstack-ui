@@ -637,7 +637,11 @@ and the Popup's native `toggle` to open, so foreign, pre-hydration and JS-free o
 as Popover 14.1), and the Close passes it as `useActionTrigger(openGeneration)`, which skips the
 close when the counter changed after the click. The action's result stands; only the close is
 dropped. `Dialog.Form` guards the same case with `closedSinceSubmit` (8.1). Added at the Menu
-review (M2): until then `Dialog.Close` was the one part without the guard.
+review (M2): until then `Dialog.Close` was the one part without the guard. In library mode the
+guard rarely fires: React holds the re-open (entangled with the pending action) until the action
+settles, so `dialog.open` is still `false` when `then` runs and `close()` is a no-op anyway. It
+matters for the JS-free / native-open case, where the browser re-opens the dialog at once
+(the jsdom row that fails without it is the JS-free one).
 
 ### 3.5 `Dialog.Form`
 
@@ -1650,7 +1654,7 @@ hook); folded into the sections named.
 
 | Item | Correction | Section |
 | --- | --- | --- |
-| M2 | `Dialog.Close` drops a stale close: the Root carries an open-generation counter and the Close passes it to `useActionTrigger`, as `Popover.Close` does. | 3.4, 13.2, 14 |
+| M2 | `Dialog.Close` drops a stale close: the Root carries an open-generation counter (bumped on the open dispatch and on the Popup's native `toggle` to open) and the Close passes it to `useActionTrigger`, as `Popover.Close` does (02f2f42). Load-bearing for JS-free / native re-opens; in library mode React's entanglement already holds the re-open. | 3.4, 13.2, 14 |
 | L2 | The Close part runs through the shared `useActionTrigger` (ac7064e); the superseded-rejection gap recorded for v0 is closed. | 3.4, 14 |
 
 ---

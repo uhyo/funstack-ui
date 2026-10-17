@@ -612,14 +612,17 @@ the Root records at dispatch time:
 
 Focus on every open, pointer included, follows the APG example ("Actions" menu button focuses
 the first item on click) and keeps Escape / Tab behaviour uniform. Whether the focused item shows
-a ring is the engine's `:focus-visible` heuristic, native-first: the open cause records whether
-the open was pointer-driven (a Trigger click with `detail > 0`), and after a pointer open the
-library re-focuses the resolved item with `focus({ focusVisible: false })` right after
-`showPopover()`, which Chromium and Firefox honour. WebKit does not implement the `focusVisible`
-option and may still match `:focus-visible` on the `autofocus`ed item after a mouse open (review
-H1; the browser row asserts the engine's behaviour rather than skipping). The stylesheet in
-section 9 styles `:focus` and `:focus-visible` alike with no outline, because hover focuses
-items anyway, so with that CSS the difference is invisible. Not worked around further.
+a ring is the engine's `:focus-visible` heuristic, and after a **pointer-initiated open** (a
+Trigger or SubmenuTrigger `click` with `detail > 0`, recorded with the open cause) WebKit would
+match `:focus-visible` on an `autofocus`ed item (review H1; Chromium and Firefox do not). So for
+a pointer open the resolver returns a `QuietFocusTarget` and the Popover hook, where the engine
+reads the `focusVisible` option (Chromium 145, Firefox 104, Safari 18.4), skips the `autofocus`
+write and calls `item.focus({ focusVisible: false })` right after `showPopover()` (Popover 6.1,
+the one exception to "never `.focus()` on open"). Keyboard and other opens keep the `autofocus`
+path. With this, `:focus-visible` is false after a pointer open in all three engines (asserted
+in the browser row); an engine without the option gets the `autofocus` path and its own
+heuristic. The stylesheet in section 9 styles `:focus` and `:focus-visible` alike anyway,
+because hover focuses items.
 
 ### 6.2 Current item follows the pointer
 
@@ -678,10 +681,10 @@ No `returnFocus` prop.
   because the bug is NEW against a platform feature the vision adopts and the reporter says the
   hang itself was fixed in 26.4; a dedicated WebKit browser row opens and closes a submenu with
   the default placement under a timeout, so every CI run shows whether the contingency applies
-  (13.2, review M3), and its result decides question 6. Consumers who hit it set `side={null}`
-  and position the submenu in CSS without fallbacks. If that row hangs or times out, the submenu
-  default drops to no fallbacks until the bug is
-  fixed (question 6).
+  (13.2, review M3). **Result: the row passed on the first WebKit CI run (39021387650): no
+  hang**, so question 6 is settled and the `flip-inline` default stays. Consumers who still hit
+  the bug in a Safari version set `side={null}` and position the submenu in CSS without
+  fallbacks. The other WebKit submenu rows still force `side={null}` and can be relaxed later.
 - **Open by keyboard or click**: ArrowRight (ArrowLeft in RTL), Enter, Space, click on the
   SubmenuTrigger → `requestOpen(event, "activate")` with open cause "first item".
 - **Open by hover intent** (research question 5): `pointerenter` on the SubmenuTrigger (not
@@ -978,12 +981,12 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | --- | --- | --- |
 | Native `focusgroup` | With `experimental_focusgroup`: ArrowDown on the first item moves focus **without** the library's `preventDefault()` (a document keydown listener sees `defaultPrevented === false`, the Tabs technique) and items have no `tabindex`; Home / End / wrap work; typeahead and Enter still work. | `supportsFocusgroup` (Chromium): native path. Elsewhere: items keep `tabindex="-1"`, the JS path prevents the keydown, same focus outcome. Both branches asserted, none skipped. |
 | Keyboard end to end | Trigger ArrowDown opens with real focus on the first item; arrows, Home / End, typeahead, Enter activates and the menu closes with focus back on the Trigger; Escape closes with focus on the Trigger; Shift+Tab from the first item lands on the Trigger and closes the menu; Tab from the last item lands after the Trigger and closes. | none |
-| Submenu | ArrowRight opens the submenu anchored at the item's right edge (`getBoundingClientRect`) with focus on its first item; Escape closes only the submenu and **the library** focuses the SubmenuTrigger (every engine: the platform restores nothing); ArrowLeft likewise; hover intent with real timers (open after ~100 ms, close after leaving ~150 ms, cancelled by entering the submenu); item activation in the submenu closes both with focus on the root Trigger; outside click closes both. | WebKit 302008: on `browserName === "webkit"` the submenu Popup renders `side={null}` with a comment; the inline-flip assertion (a submenu near the right edge flips left) runs on Chromium and Firefox. One dedicated WebKit row opens and closes a submenu with the **default** placement (`flip-inline`), bounded by a timeout so a hang fails instead of stalling the job (review M3); its result decides question 6. |
+| Submenu | ArrowRight opens the submenu anchored at the item's right edge (`getBoundingClientRect`) with focus on its first item; Escape closes only the submenu and **the library** focuses the SubmenuTrigger (every engine: the platform restores nothing); ArrowLeft likewise; hover intent with real timers (open after ~100 ms, close after leaving ~150 ms, cancelled by entering the submenu); item activation in the submenu closes both with focus on the root Trigger; outside click closes both. | WebKit 302008: on `browserName === "webkit"` the submenu Popup renders `side={null}` with a comment; the inline-flip assertion (a submenu near the right edge flips left) runs on Chromium and Firefox. One dedicated WebKit row opens a submenu twice with the **default** placement (`position-try-fallbacks: flip-inline` computed) under a 15 s timeout so a hang fails instead of stalling the job (review M3); it passed on the first WebKit run, settling question 6. |
 | Checkbox / radio | Space toggles `aria-checked` and keeps the menu open; `closeOnActivate` closes after the action; radio switch updates both items at once. | none |
 | Exit animation | After item activation without `transition`: `held` keeps items until `getAnimations()` settle; after Escape likewise. | Firefox: `getAnimations().length === 0` → unmount with the commit. |
 | ViewTransition | With `transition`: open calls `startViewTransition` once; item activation once with a `::view-transition-old` of the popup present during the transition; Escape only for the notification commit; without `transition` zero calls. | Assert on all three. |
 | Light dismiss and layering | Click outside closes with `"dismiss"`; a Tooltip (`manual` / `hint`) on an item does not close the menu; a modal Dialog opened from an item keeps the menu open while it is a DOM descendant (and closes it when opened outside). | `supportsPopoverHint` for the hint variant. |
-| Pointer focus | Moving the real pointer over items focuses them; `:focus-visible` is false after a pointer open; a click on a Separator leaves focus on the current item and ArrowDown still moves (M1). | WebKit: `:focus-visible` may be true after a pointer open (no `focusVisible` option; H1), asserted as the documented degraded behaviour on `browserName === "webkit"`, not skipped. |
+| Pointer focus | Moving the real pointer over items focuses them; `:focus-visible` is false after a pointer open (the quiet focus path, 6.1); a click on a Separator leaves focus on the current item and ArrowDown still moves (M1). | none: all three engines implement `focus({ focusVisible })` (WebKit verified on CI run 39021387650, H1). |
 
 ---
 
@@ -1046,9 +1049,11 @@ packages/ui/src/internal/
   Enter / Space keydown and calls `event.currentTarget.click()`; `onClick` is the single
   activation path, and composed triggers and `render`ed links keep their native command or
   navigation.
-- **Pointer open and `:focus-visible`** (6.1): the open cause carries whether the open came from
-  a pointer; after `showPopover()` the Popup re-focuses the resolved item with
-  `focus({ focusVisible: false })` for a pointer open (a no-op where the option is unsupported).
+- **Pointer open and `:focus-visible`** (6.1): the open cause carries `pointer` (a `click` with
+  `detail > 0` on the Trigger or SubmenuTrigger); for such an open the resolver returns
+  `{ element, focusVisible: false }` (`QuietFocusTarget`) and `usePopoverPopup` focuses it with
+  `focus({ focusVisible: false })` after `showPopover()` instead of writing `autofocus`, where
+  the engine implements the option (Popover 6.1, 14.2).
 - **Details factory.** Menu's `details` option for `usePopoverRoot` must build with
   `createActionDetails(event, { reason })`, never an object literal: the Proxy keeps `event`
   non-enumerable, which is what lets `openChangeAction` be a Server Function (Popover 14.1).
@@ -1131,7 +1136,8 @@ All eleven accepted as recommended:
    only). Decision: accepted; a menu over a page whose focus has moved on must not linger.
 6. **Submenu `position-try-fallbacks: flip-inline` by default despite WebKit 302008**, with
    `side={null}` as the escape hatch and a contingency (drop the fallback for submenus) if the
-   first WebKit CI run hangs. Decision: as designed.
+   first WebKit CI run hangs. Decision: as designed. **Settled 2026-10-17**: the dedicated WebKit
+   row (review M3) passed on CI; no hang; the `flip-inline` default stays.
 7. **Item activation in a submenu closes the whole stack through the root Root**, so the root
    `openChangeAction(false)` carries `"activate"` and each submenu's carries `"dismiss"` (2.2).
    Alternative: close only the submenu's chain with per-level `"activate"` dispatches (more
@@ -1158,10 +1164,10 @@ audit trail. Fix decisions were taken by the product owner.
 
 | Item | Correction | Section |
 | --- | --- | --- |
-| H1 | WebKit matches `:focus-visible` on the first item after a pointer open. Native-first: the "every engine" claim is withdrawn; the library re-focuses the item with `focus({ focusVisible: false })` after a pointer open where the option is implemented (Chromium, Firefox), WebKit may still show the ring, and the browser row asserts each engine's behaviour instead of skipping. | 6.1, 13.2, 14 |
+| H1 | WebKit matched `:focus-visible` on the `autofocus`ed first item after a pointer open. Fix (02f2f42): a pointer-initiated open focuses the first item with `focus({ focusVisible: false })` right after `showPopover()` instead of the `autofocus` write (the resolver returns a `QuietFocusTarget`; the one exception to Popover 6.1's "never `.focus()` on open"), where the engine implements the option. WebKit on CI now reports no `:focus-visible`; the row asserts false in all three engines. | 6.1, 14; popover.md 6.1, 14.2 |
 | M1 | A `mousedown` on non-item popup space (padding, Separator, GroupLabel) no longer moves focus off the current item (owned `onMouseDown`, `preventDefault()` outside items); with focus on the popup itself, ArrowDown / Home and ArrowUp / End enter the items. | 3.3, 5, 6.2, 13.1, 13.2 |
 | M2 | `Dialog.Root` carries an open-generation counter and `Dialog.Close` passes it to `useActionTrigger`, as `Popover.Close` does. | dialog.md 3.4, 14 |
-| M3 | A dedicated WebKit browser row exercises the default submenu placement (`flip-inline`, WebKit 302008) under a timeout; its result decides question 6. | 7, 13.2 |
+| M3 | A dedicated WebKit browser row exercises the default submenu placement (`flip-inline`, WebKit 302008) under a timeout. It passed on the first WebKit run (d4deae8): no hang; question 6 settled, the fallback stays. | 7, 13.2, decision 6 |
 | L1 | The open-generation guard on `closeOnActivate` checkable items gets its own rows. | 13.1 |
 | L2 | Stale `useActionTrigger` text corrected: here (12, 13.1, 14, decision 11), conventions 3.4, dialog.md 3.4 / 14 and popover.md's M2 row. | 12, 13.1, 14 |
 | L3 | The six deviations below written into the design. | 2.3, 3.3, 3.6, 4, 5.3, 14 |
