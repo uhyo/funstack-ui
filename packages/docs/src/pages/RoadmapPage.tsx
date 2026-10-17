@@ -59,14 +59,16 @@ export function RoadmapPage() {
           with a shared <code>name</code> and a set value, a Parent box with mixed state, and a
           group-level <code>required</code> (<a href={issue(33)}>#33</a>).
         </li>
+        <li>
+          <a href="/components/popover">Popover</a>: a non-modal overlay on{" "}
+          <code>popover="auto"</code> and Invoker Commands, with library-owned closes that animate
+          with a view transition in every engine (<a href={issue(38)}>#38</a>,{" "}
+          <a href={issue(40)}>#40</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
       <ul>
-        <li>
-          Popover: a non-modal overlay on the Popover API (<a href={issue(38)}>#38</a>,{" "}
-          <a href={issue(40)}>#40</a>).
-        </li>
         <li>
           Menu: a menu button (<a href={issue(39)}>#39</a>, <a href={issue(41)}>#41</a>).
         </li>

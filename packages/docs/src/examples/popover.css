@@ -1,0 +1,152 @@
+/* Popover: the Popup is the <dialog popover> itself. Open state is `:popover-open` on it (exact
+   in both modes); the Trigger carries `aria-expanded` in both modes and `data-open` /
+   `data-pending` in library mode only. */
+
+.demo-popover {
+  /* The popover UA stylesheet sets `inset: 0; margin: auto`: reset both for anchored placement. */
+  margin: 0;
+  inset: auto;
+  min-inline-size: 14rem;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+}
+
+/* The gap on the requested side; `data-side` is absent with `side={null}`. */
+.demo-popover[data-side="bottom"] {
+  margin-block-start: 6px;
+}
+.demo-popover[data-side="top"] {
+  margin-block-end: 6px;
+}
+
+.demo-popover h2 {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+}
+
+/* Enter and exit with CSS, both modes. Enter works everywhere; the exit animates in Chromium
+   (with `overlay`) and Safari and is instant in Firefox. On iOS, `position-try-fallbacks`
+   together with `@starting-style` can hang (WebKit bug 317926). */
+.demo-popover {
+  opacity: 0;
+  translate: 0 -4px;
+  transition:
+    opacity 120ms,
+    translate 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+
+.demo-popover:popover-open {
+  opacity: 1;
+  translate: 0 0;
+}
+
+@starting-style {
+  .demo-popover:popover-open {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+/* With `transition`, the view transition animates library-driven opens and closes (Firefox
+   included); keep only a CSS fade for dismissals and drop the CSS enter. */
+.demo-popover-vt,
+.demo-popover-vt:popover-open {
+  translate: 0 0;
+}
+
+@starting-style {
+  .demo-popover-vt:popover-open {
+    opacity: 1;
+  }
+}
+
+::view-transition-new(.pop) {
+  animation: 160ms ease-out both demo-pop-in;
+}
+
+::view-transition-old(.pop) {
+  animation: 120ms ease-in both demo-pop-out;
+}
+
+@keyframes demo-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes demo-pop-out {
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-popover {
+    transition: none;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Dim the popup while a Close action runs (the Close button carries data-pending). */
+.demo-popover:popover-open:has([data-pending]) {
+  opacity: 0.8;
+}
+
+.demo-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.demo-popover-input {
+  box-sizing: border-box;
+  inline-size: 100%;
+  padding: 0.35em 0.6em;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+/* The Trigger: `aria-expanded` in both modes, pending in library mode. */
+.demo-button[aria-expanded="true"] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.demo-button[data-pending] {
+  cursor: progress;
+}
+
+ul.demo-list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+ul.demo-list .demo-row {
+  justify-content: space-between;
+  max-inline-size: 20rem;
+  padding-block: 4px;
+}
+
+ul.demo-list .demo-row[data-archived] > span {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
