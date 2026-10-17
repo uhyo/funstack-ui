@@ -5,6 +5,7 @@ import { TooltipDemo } from "./tooltip-demo";
 import { SwitchCheckboxDemo } from "./switch-checkbox-demo";
 import { DialogDemo } from "./dialog-demo";
 import { PopoverDemo } from "./popover-demo";
+import { MenuDemo } from "./menu-demo";
 import { RadioGroupDemo } from "./radio-group-demo";
 import { CheckboxGroupDemo } from "./checkbox-group-demo";
 
@@ -23,6 +24,7 @@ export function App() {
       <SwitchCheckboxDemo />
       <DialogDemo />
       <PopoverDemo />
+      <MenuDemo />
       <RadioGroupDemo />
       <CheckboxGroupDemo />
     </main>

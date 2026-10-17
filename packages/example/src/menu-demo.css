@@ -1,0 +1,130 @@
+/* Menu demo. The library ships no CSS; this is the starter stylesheet from the design
+   (design/components/menu.md, section 9). Open state is `:popover-open` on the popup; items carry
+   `data-pending`, `data-checked`, `aria-disabled`; triggers `data-open` / `data-pending`. */
+
+.menu {
+  /* The popover UA stylesheet sets `inset: 0; margin: auto`; reset both for anchored placement. */
+  margin: 0;
+  inset: auto;
+  min-inline-size: 12rem;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.2);
+  color: #111827;
+  background: #fff;
+}
+.menu[data-side="bottom"] {
+  margin-block-start: 4px;
+}
+/* Submenu gap. */
+.menu[data-side="right"] {
+  margin-inline-start: 2px;
+}
+.menu [role^="menuitem"] {
+  display: flex;
+  gap: 8px;
+  inline-size: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  text-align: start;
+}
+/* Hovering focuses an item, so `:focus` is also the hover style. */
+.menu [role^="menuitem"]:focus {
+  outline: none;
+  background: #e0e7ff;
+}
+.menu [aria-disabled="true"] {
+  opacity: 0.4;
+}
+.menu [data-pending] {
+  cursor: progress;
+}
+.menu [role^="menuitem"][data-pending]::after {
+  content: "";
+  margin-inline-start: auto;
+  inline-size: 0.8em;
+  block-size: 0.8em;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: menu-spin 0.8s linear infinite;
+}
+.menu [role="menuitemcheckbox"]::before,
+.menu [role="menuitemradio"]::before {
+  content: "";
+  inline-size: 1em;
+}
+.menu [role="menuitemcheckbox"][data-checked]::before,
+.menu [role="menuitemradio"][data-checked]::before {
+  content: "✓";
+}
+.menu .danger {
+  color: #b91c1c;
+}
+.menu hr {
+  margin: 4px 0;
+  border: 0;
+  border-block-start: 1px solid #e5e7eb;
+}
+.menu-label {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.menu-btn[data-open] {
+  background: #e0e7ff;
+}
+.menu-btn[data-pending] {
+  cursor: progress;
+}
+.menu-log {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+/* CSS enter / exit for dismissals (Escape, click outside, Tab). */
+.menu {
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+.menu:popover-open {
+  opacity: 1;
+}
+@starting-style {
+  .menu:popover-open {
+    opacity: 0;
+  }
+}
+
+/* View transitions for library-driven opens and closes (`transition` on the Popup). */
+::view-transition-new(.menu-in) {
+  animation: 120ms ease-out both menu-in;
+}
+::view-transition-old(.menu-out) {
+  animation: 120ms ease-in both menu-out;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@keyframes menu-spin {
+  to {
+    rotate: 1turn;
+  }
+}
