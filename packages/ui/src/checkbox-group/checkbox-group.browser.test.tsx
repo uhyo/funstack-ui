@@ -328,14 +328,22 @@ describe("CheckboxGroup (browser)", () => {
         );
       }
       const { unmount } = render(<Late />);
-      await act(async () => {
+      // A view transition commits the update in its callback, after any `act` scope has
+      // returned (WebKit logged "not wrapped in act(...)", issue #49): like the ViewTransition
+      // rows of popover / menu, the click and the commit run outside React's act environment.
+      type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
+      const actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
+      (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
+      try {
         screen.getByRole("button", { name: "show" }).click();
-      });
-      await expect.poll(() => screen.queryByRole("checkbox", { name: "b" })).not.toBeNull();
-      // Let a started view transition finish so it cannot hold the next test's commits.
-      await (
-        document as Document & { __reactViewTransition?: ViewTransition | null }
-      ).__reactViewTransition?.finished.catch(() => {});
+        await expect.poll(() => screen.queryByRole("checkbox", { name: "b" })).not.toBeNull();
+        // Let a started view transition finish so it cannot hold the next test's commits.
+        await (
+          document as Document & { __reactViewTransition?: ViewTransition | null }
+        ).__reactViewTransition?.finished.catch(() => {});
+      } finally {
+        (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+      }
       unmount();
       spy.mockRestore();
       return calls;
