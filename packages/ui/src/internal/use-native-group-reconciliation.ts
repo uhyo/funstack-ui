@@ -2,6 +2,7 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { useFormReset } from "./use-form-reset.js";
+import { useLatest } from "./use-latest.js";
 
 export interface UseNativeGroupReconciliationOptions<T> {
   /**
@@ -76,10 +77,7 @@ export function useNativeGroupReconciliation<T>(
 
   // The latest committed options, for the late reconciliation, which runs in a microtask outside
   // any effect (so it cannot go through an Effect Event).
-  const latest = useRef(options);
-  useLayoutEffect(() => {
-    latest.current = options;
-  });
+  const latest = useLatest(options);
 
   /** The Root's own mount reconciliation has run (reset by its cleanup, StrictMode included). */
   const rootReconciled = useRef(false);
@@ -108,7 +106,7 @@ export function useNativeGroupReconciliation<T>(
       if (current.element.current === null) return;
       reconcile(current, current.readCurrent());
     });
-  }, []);
+  }, [latest]);
 
   useFormReset(element, (event) => {
     if (element.current === null) return;

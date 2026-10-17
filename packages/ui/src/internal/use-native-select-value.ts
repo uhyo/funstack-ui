@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
+import { useLatest } from "./use-latest.js";
 import { useNativeGroupReconciliation } from "./use-native-group-reconciliation.js";
 
 export interface UseNativeSelectValueOptions {
@@ -159,10 +160,9 @@ export function useNativeSelectValue(
     [elementRef],
   );
 
-  const latest = useRef(options);
-  useLayoutEffect(() => {
-    latest.current = options;
-  });
+  // The latest committed options. Written in the mutation phase (`useLatest`), so an Option's
+  // mount layout effect, which runs before this Root's layout effects, already reads this commit's.
+  const latest = useLatest(options);
 
   /**
    * A default adopted in this layout phase. Until the adoption's render (a sync update, flushed
@@ -297,7 +297,7 @@ export function useNativeSelectValue(
       }
       if (hydrated) onItemMounted(el);
     },
-    [ref, onItemMounted],
+    [ref, latest, onItemMounted],
   );
 
   return { optionMounted };

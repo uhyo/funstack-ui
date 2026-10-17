@@ -12,7 +12,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
-import { AccordionItemContext, AccordionRootContext } from "./accordion-context.js";
+import { AccordionItemContext } from "./accordion-context.js";
 import type { AccordionItemState } from "./accordion-item.js";
 
 /** The trigger is the item's control; it renders the item's state object. */
@@ -77,12 +77,12 @@ export function AccordionTrigger({
   render,
   ...rest
 }: AccordionTriggerProps) {
-  const root = use(AccordionRootContext);
+  // Only the Item's context (memoised per item, #48), which carries what is needed of the Root's.
   const item = use(AccordionItemContext);
   if (item === null) {
     throw new Error("Accordion.Trigger must be rendered inside an Accordion.Item.");
   }
-  const isLibrary = root?.mode === "library";
+  const isLibrary = item.library;
 
   useDevWarning(
     !isLibrary && transition !== undefined,
@@ -90,7 +90,7 @@ export function AccordionTrigger({
       "outside any React transition.",
   );
 
-  const registerTrigger = root?.registerTrigger;
+  const registerTrigger = item.registerTrigger;
   const libraryRef = useCallback(
     (element: HTMLElement) => {
       if (isDev && element.tagName !== "SUMMARY") {
@@ -131,7 +131,7 @@ export function AccordionTrigger({
           // Cancelling the click is what keeps the browser from touching `open`.
           event.preventDefault();
           if (item.disabled || !isLibrary) return;
-          root.dispatch(item.value, !item.optimisticOpen, event.nativeEvent);
+          item.dispatch?.(item.value, !item.optimisticOpen, event.nativeEvent);
         }
       : undefined;
 

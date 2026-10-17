@@ -41,6 +41,16 @@ export interface AccordionItemContextValue {
   /** `undefined` in static mode. */
   readonly optimisticOpen: boolean | undefined;
   readonly pending: boolean;
+  /**
+   * The Root's mode is `"library"`. The Root members the Trigger and Panel need are copied here
+   * so they read only this context, which is memoised per item: opening another item re-renders
+   * every Item (they read the Root's sets) but not their Triggers and Panels (#48).
+   */
+  readonly library: boolean;
+  /** The Root's `dispatch` (stable); `undefined` outside a Root. */
+  readonly dispatch: AccordionRootContextValue["dispatch"] | undefined;
+  /** The Root's `registerTrigger` (stable); `undefined` outside a Root. */
+  readonly registerTrigger: AccordionRootContextValue["registerTrigger"] | undefined;
 }
 
 export const AccordionItemContext = createContext<AccordionItemContextValue | null>(null);
