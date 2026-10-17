@@ -77,7 +77,36 @@ plus this memo.
   `<selectedcontent>` refresh timing (WebKit 325898; contingency in design 6.3: defer while
   `:open`), the reset re-clone. Rows branch on feature checks, so a WebKit without the features
   takes the Firefox branch.
-- Chromium: whether `select.value = select.value` resets the user-interacted flag
-  (`:user-invalid`) was not probed separately; the validity browser row picks after the blocked
-  submit and only checks the end state.
-- No `useControllableAction` unit test for `adopt`; covered through Select rows.
+- Chromium: `select.value = select.value` keeps `:user-invalid` (reviewer probe P1); no browser
+  row for it (review L9, skipped by the product owner).
+- (resolved in the review fixes below) `adopt` unit test.
+
+## Review fixes (memo/reviewer/select.md, 2026-10-17)
+
+Commits e4aab3b (ui), 19b3155 (docs), then the `""`-mirror nuance + this memo. Design was
+updated by the architect in 79b7393 to match.
+
+- H1: `adoptDefault` is now `{ adopt, established }`; the Root sets an `established` ref in
+  every dispatch (pick and platform) and the hook stops adopting (mount re-run under StrictMode
+  and late options) once it is true. jsdom row: pick "b", keyed boundary remount, options back,
+  "b" kept, one dispatch. Mutation-checked.
+- M1: adopt mode's reset target is `mountAdopted` (set in the mount adoption; `undefined` when
+  the adopted `""` came from no `""` option). Rows: client-rendered disabled `""` placeholder +
+  `<form action>`: untouched submit stays on `""` with no dispatch, a pick then submit resets to
+  `""` with one platform dispatch; the existing adopt reset row now expects `defaultSelected`
+  on the adopted option. Mutation-checked. Pitfall: an `<output>` inside the form is reset by
+  the form reset (textContent -> default value) and React then throws NotFoundError when it
+  updates its text node; expose state through `className` instead in form-action rows.
+- L3: `Select.Value` uses `useFormReset` with a getter ref to `closest("select")`. Its listener
+  registers before the Root's (child layout effects first), so the refresh now runs before the
+  Root's reset dispatch; harmless (the refresh assigns the reset value to itself). Row:
+  `stopPropagation()` on the form, and `form` attribute switched between two forms.
+- L4: WebKit logs `base-select` / `selectedcontent`; Chromium true, Firefox false asserted.
+- L5: the late window stays a microtask window (an Option effect cannot know its commit); every
+  later report in the window re-applies when the option is the intended or reset-target one
+  (at most two O(N) passes per commit). Not unit-tested (no part triggers a second commit in
+  one task).
+- L6: `SelectContext.groupDisabled`; Group re-provides the context with its `disabled` (passed
+  through as a prop, not owned). Option `state.disabled` = Root || Group || own.
+- L7: `internal/use-controllable-action.test.tsx` (first unit file for the hook).
+- L8: design-only. L9 skipped.
