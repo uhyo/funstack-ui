@@ -33,6 +33,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/switch", label: "Switch" },
   { path: "/components/checkbox", label: "Checkbox" },
   { path: "/components/radio-group", label: "RadioGroup" },
+  { path: "/components/checkbox-group", label: "CheckboxGroup" },
 ];
 
 // Site-wide documentation navigation, rendered by the sidebar and the mobile menu.

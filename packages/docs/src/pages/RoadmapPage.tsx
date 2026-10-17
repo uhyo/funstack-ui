@@ -54,6 +54,11 @@ export function RoadmapPage() {
         <li>
           The first npm release, <code>0.1.0-alpha.0</code> (dist-tag <code>alpha</code>).
         </li>
+        <li>
+          <a href="/components/checkbox-group">CheckboxGroup</a>: a <code>&lt;fieldset&gt;</code>{" "}
+          with a shared <code>name</code> and a set value, a Parent box with mixed state, and a
+          group-level <code>required</code> (<a href={issue(33)}>#33</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
@@ -64,11 +69,6 @@ export function RoadmapPage() {
         </li>
         <li>
           Menu: a menu button (<a href={issue(39)}>#39</a>, <a href={issue(41)}>#41</a>).
-        </li>
-        <li>
-          CheckboxGroup: a <code>&lt;fieldset&gt;</code> with a shared <code>name</code>, a parent
-          box with mixed state, and a group-level <code>required</code> (<a href={issue(33)}>#33</a>
-          ).
         </li>
         <li>More components after that, toward a full set: Select, ToggleGroup, and more.</li>
       </ul>

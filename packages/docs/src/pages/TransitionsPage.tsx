@@ -89,6 +89,10 @@ export function TransitionsPage() {
           ["Switch", "`fsui-switch`, `fsui-switch-on`, `fsui-switch-off`"],
           ["Checkbox", "`fsui-checkbox`, `fsui-checkbox-check`, `fsui-checkbox-uncheck`"],
           ["RadioGroup", "`fsui-radio-group`"],
+          [
+            "CheckboxGroup",
+            "`fsui-checkbox-group`, `fsui-checkbox-group-check`, `fsui-checkbox-group-uncheck` (a reset can carry both)",
+          ],
         ]}
       />
       <p>

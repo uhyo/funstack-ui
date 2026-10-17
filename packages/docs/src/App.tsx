@@ -43,6 +43,10 @@ const DialogPage = lazyPage(() => import("./pages/DialogPage.js"), "DialogPage")
 const SwitchPage = lazyPage(() => import("./pages/SwitchPage.js"), "SwitchPage");
 const CheckboxPage = lazyPage(() => import("./pages/CheckboxPage.js"), "CheckboxPage");
 const RadioGroupPage = lazyPage(() => import("./pages/RadioGroupPage.js"), "RadioGroupPage");
+const CheckboxGroupPage = lazyPage(
+  () => import("./pages/CheckboxGroupPage.js"),
+  "CheckboxGroupPage",
+);
 const RoadmapPage = lazyPage(() => import("./pages/RoadmapPage.js"), "RoadmapPage");
 const NotFoundPage = lazyPage(() => import("./pages/NotFoundPage.js"), "NotFoundPage");
 
@@ -124,6 +128,12 @@ export const routes = [
                   page("/switch", "/components/switch", SwitchPage, "SwitchPage"),
                   page("/checkbox", "/components/checkbox", CheckboxPage, "CheckboxPage"),
                   page("/radio-group", "/components/radio-group", RadioGroupPage, "RadioGroupPage"),
+                  page(
+                    "/checkbox-group",
+                    "/components/checkbox-group",
+                    CheckboxGroupPage,
+                    "CheckboxGroupPage",
+                  ),
                 ],
               }),
               page("/roadmap", "/roadmap", RoadmapPage, "RoadmapPage"),

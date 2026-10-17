@@ -1,0 +1,47 @@
+/* CheckboxGroup: the Root is a <fieldset>, the Label its <legend>. Items and Parents are styled
+   with `.demo-checkbox` from the Checkbox page (checkbox.css): the input is the box, ::before
+   draws the check or the dash from [data-checked] / [data-indeterminate]. Both agree with the
+   DOM, which holds the optimistic state. */
+.demo-checkbox-group {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+  margin: 0;
+  padding: 0.5rem 1rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.demo-checkbox-group legend {
+  padding-inline: 0.3rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.demo-checkbox-group[data-pending] {
+  cursor: progress;
+}
+
+/* An empty required group after a submit attempt (every Item is `required` while empty). */
+.demo-checkbox-group:has(.demo-checkbox:user-invalid) legend {
+  color: #dc2626;
+}
+
+.demo-field:has(.demo-checkbox:disabled) {
+  cursor: not-allowed;
+}
+
+/* The row spinner shows only next to the boxes whose state is changing. */
+.demo-checkbox-group-spinner {
+  display: none;
+}
+
+.demo-field:has(.demo-checkbox[data-pending]) .demo-checkbox-group-spinner {
+  display: inline-block;
+}
+
+.demo-checkbox-group-saving {
+  font-weight: normal;
+  font-size: 0.85em;
+  color: var(--color-text-secondary);
+}

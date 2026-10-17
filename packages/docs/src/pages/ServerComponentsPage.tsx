@@ -97,8 +97,8 @@ import { saveOpenSections } from "./actions"; // "use server"
             'The Trigger opens the dialog natively, but its content is not in the HTML. On hydration the dialog is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.',
           ],
           [
-            "Switch, Checkbox, RadioGroup",
-            'They are native inputs: clicking, Space, arrow keys between radios, labels, `required` and form submission all work. On hydration a changed value is reconciled with one action call (`reason: "platform"`, one per group). `Checkbox indeterminate` is drawn from `data-indeterminate` but announced as unchecked until hydration.',
+            "Switch, Checkbox, RadioGroup, CheckboxGroup",
+            'They are native inputs: clicking, Space, arrow keys between radios, labels, `required` and form submission all work. On hydration a changed value is reconciled with one action call (`reason: "platform"`, one per group). `Checkbox indeterminate` and a mixed `CheckboxGroup.Parent` are drawn from `data-indeterminate` but announced as unchecked until hydration; a Parent clicked before hydration counts as "check all" of its values. A required CheckboxGroup keeps the server\'s `required` attributes until hydration.',
           ],
         ]}
       />
