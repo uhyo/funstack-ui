@@ -80,7 +80,7 @@ const directiveFreeFiles = [
   "dialog/index.mjs",
   "radio-group/index.mjs",
   "checkbox-group/index.mjs",
-  "checkbox-group/sync-presence.mjs",
+  "internal/sync-presence.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

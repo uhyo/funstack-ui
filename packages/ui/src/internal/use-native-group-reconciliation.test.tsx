@@ -508,3 +508,56 @@ describe("useNativeGroupReconciliation", () => {
     expect(radio("m").checked).toBe(false);
   });
 });
+
+describe("equals option", () => {
+  /** A group whose value is a set: every read builds a new Set with the same members as `base`. */
+  function SetGroup({
+    equals,
+    onPlatformChange,
+  }: {
+    equals?: (a: ReadonlySet<string>, b: ReadonlySet<string>) => boolean;
+    onPlatformChange: (next: ReadonlySet<string>, event: Event | undefined) => void;
+  }) {
+    const fieldset = useRef<HTMLFieldSetElement>(null);
+    const base: ReadonlySet<string> = new Set(["a", "b"]);
+    useNativeGroupReconciliation<ReadonlySet<string>>({
+      element: fieldset,
+      readCurrent: () => new Set(["b", "a"]),
+      readDefault: () => new Set(["a", "b"]),
+      base: () => base,
+      equals,
+      onPlatformChange,
+    });
+    return (
+      <form data-testid="set-form">
+        <fieldset ref={fieldset} />
+      </form>
+    );
+  }
+  const setsEqual = (a: ReadonlySet<string>, b: ReadonlySet<string>) =>
+    a.size === b.size && [...a].every((v) => b.has(v));
+
+  it("a structural equals: a new set with the same members reports nothing (mount and reset)", async () => {
+    const onPlatformChange = vi.fn();
+    render(<SetGroup equals={setsEqual} onPlatformChange={onPlatformChange} />);
+    await act(async () => {
+      (screen.getByTestId("set-form") as HTMLFormElement).reset();
+    });
+    await flush();
+    expect(onPlatformChange).not.toHaveBeenCalled();
+  });
+
+  it("the default Object.is reports a new set even with the same members", async () => {
+    const onPlatformChange = vi.fn();
+    render(<SetGroup onPlatformChange={onPlatformChange} />);
+    expect(onPlatformChange).toHaveBeenCalledTimes(1);
+    expect([...onPlatformChange.mock.calls[0]![0]]).toEqual(["b", "a"]);
+    expect(onPlatformChange.mock.calls[0]![1]).toBeUndefined();
+    await act(async () => {
+      (screen.getByTestId("set-form") as HTMLFormElement).reset();
+    });
+    await flush();
+    expect(onPlatformChange).toHaveBeenCalledTimes(2);
+    expect(onPlatformChange.mock.calls[1]![1]).toBeInstanceOf(Event);
+  });
+});

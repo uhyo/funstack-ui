@@ -2,6 +2,7 @@
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { syncPresence } from "../internal/sync-presence.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
@@ -145,10 +146,3 @@ export function RadioGroupItem({
 }
 
 RadioGroupItem.displayName = "RadioGroupItem";
-
-function syncPresence(el: Element, name: string, present: boolean): void {
-  if (el.hasAttribute(name) !== present) {
-    if (present) el.setAttribute(name, "");
-    else el.removeAttribute(name);
-  }
-}

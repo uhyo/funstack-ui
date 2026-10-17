@@ -22,7 +22,7 @@ import type {
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
-import { CheckboxGroupContext } from "./checkbox-group-context.js";
+import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
 import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -44,8 +44,11 @@ export interface CheckboxGroupValueChangeDetails extends ActionDetails {
 
 export interface CheckboxGroupRootState {
   /**
-   * Optimistic checked values, in document order of the Items (as of the last commit; values
-   * with no Item last). Content rendered from it must not suspend.
+   * Optimistic checked values, in document order of the Items as of the Root's last render
+   * (values with no Item last). Items reordered by a component that re-renders without the Root
+   * keep the previous order here until the Root renders again; `next` and `details` of
+   * `valueChangeAction` always read the current DOM order. The server render and the first client
+   * render use the value's own order. Content rendered from it must not suspend.
    */
   readonly value: readonly string[];
   /** An action dispatched through this group is in flight. */
@@ -102,8 +105,10 @@ export interface CheckboxGroupRootProps extends Omit<
   form?: string;
   /**
    * "At least one Item must be checked." Rendered as native `required` on every Item while no
-   * value is checked, and on none once one is. Not exposed on the fieldset (ARIA does not allow
-   * `aria-required` on role `group`): say it in the `Label` or through `aria-describedby`.
+   * enabled Item is checked, and on none once one is: values with no Item and checked disabled
+   * Items (neither is submitted) do not satisfy it. Until the Items have mounted (server HTML,
+   * before hydration) any checked value satisfies it. Not exposed on the fieldset (ARIA does not
+   * allow `aria-required` on role `group`): say it in the `Label` or through `aria-describedby`.
    */
   required?: boolean;
   /** Renders `<fieldset disabled>`: every Item and Parent is disabled and unfocusable. */
@@ -147,6 +152,30 @@ function sortByOrder(values: Iterable<string>, order: readonly string[]): string
   for (const v of order) if (wanted.delete(v)) sorted.push(v);
   for (const v of wanted) sorted.push(v);
   return sorted;
+}
+
+/** Value → "has an Item without its own `disabled`", over the registered Items. */
+type ItemRegistry = Map<object, { readonly value: string; readonly disabled: boolean }>;
+
+function summarize(registry: ItemRegistry): Map<string, boolean> {
+  const items = new Map<string, boolean>();
+  for (const { value, disabled } of registry.values()) {
+    items.set(value, (items.get(value) ?? false) || !disabled);
+  }
+  return items;
+}
+
+function disabledOf(items: ReadonlyMap<string, boolean> | null): ValueSet {
+  if (items === null) return EMPTY;
+  const disabled = new Set<string>();
+  for (const [value, enabled] of items) if (!enabled) disabled.add(value);
+  return disabled.size === 0 ? EMPTY : disabled;
+}
+
+function mapsEqual(a: ReadonlyMap<string, boolean>, b: ReadonlyMap<string, boolean>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) if (b.get(k) !== v) return false;
+  return true;
 }
 
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
@@ -193,6 +222,27 @@ export function CheckboxGroupRoot({
   const warnedDuplicate = useRef(false);
   /** Parent reports waiting for the next mount read (design 8.1). */
   const parentReports = useRef<{ values: readonly string[]; checked: boolean }[]>([]);
+
+  // Item registration (design 6.2, 7): each Item reports its value and own `disabled` from a
+  // layout effect. The ref is current for the residual-path reads; the state, set only when the
+  // summary changes, is what render uses. `null` until an Item registered, so the server render
+  // and the hydration render (which cannot know) agree.
+  const itemRegistry = useRef<ItemRegistry>(new Map());
+  const [items, setItems] = useState<ReadonlyMap<string, boolean> | null>(null);
+  const registerItem = useCallback((value: string, disabled: boolean) => {
+    const publish = () => {
+      const next = summarize(itemRegistry.current);
+      setItems((prev) => (prev !== null && mapsEqual(prev, next) ? prev : next));
+    };
+    const token = {};
+    itemRegistry.current.set(token, { value, disabled });
+    publish();
+    return () => {
+      itemRegistry.current.delete(token);
+      publish();
+    };
+  }, []);
+  const disabledItems = useMemo(() => disabledOf(items), [items]);
 
   const controlledSet = useMemo(() => (value === undefined ? undefined : toSet(value)), [value]);
   const defaultSet = useMemo(
@@ -252,24 +302,47 @@ export function CheckboxGroupRoot({
    * The group as the DOM shows it (`checked`) or as a form reset leaves it (`defaultChecked`),
    * laid over `base()` so that values with no Item are kept (they have no DOM to read).
    */
-  const readGroup = (prop: "checked" | "defaultChecked"): Set<string> => {
-    const next = new Set(base());
-    for (const item of readItems(fieldsetRef.current, name)) {
-      if (item[prop]) next.add(item.value);
-      else next.delete(item.value);
+  const readDom = (prop: "checked" | "defaultChecked"): Map<string, boolean> =>
+    new Map(readItems(fieldsetRef.current, name).map((item) => [item.value, item[prop]]));
+  const readGroup = (
+    prop: "checked" | "defaultChecked",
+    from: ValueSet,
+    dom: ReadonlyMap<string, boolean> = readDom(prop),
+  ): Set<string> => {
+    const next = new Set(from);
+    for (const [v, isChecked] of dom) {
+      if (isChecked) next.add(v);
+      else next.delete(v);
     }
     return next;
   };
 
+  /**
+   * The Root's own mount reconciliation ran: later member mounts are "late" (8.3). Set after the
+   * adapter's mount effect; reset by the cleanup (StrictMode included).
+   */
+  const rootMounted = useRef(false);
+  /**
+   * Late mounts: the members' `checked` read in the first late member's mount layout effect. The
+   * adapter reads the group in a microtask, but the Items' registration re-renders the group
+   * right after the layout effects, and that re-render re-applies each Item's `checked`, erasing a
+   * click made before the Item hydrated. Every member of the commit is in the DOM by then.
+   */
+  const lateSnapshot = useRef<Map<string, boolean> | null>(null);
+
   // The residual browser paths (design section 8): one dispatch per group, from here. Items and
   // Parents that mount after the Root report through `onItemMounted`.
-  const { onItemMounted } = useNativeGroupReconciliation<ValueSet>({
+  const { onItemMounted: onMemberMounted } = useNativeGroupReconciliation<ValueSet>({
     element: fieldsetRef,
     readCurrent: () => {
-      const next = readGroup("checked");
-      // A Parent clicked before hydration means "check / uncheck all of its values" (8.1).
+      const next = readGroup("checked", base(), lateSnapshot.current ?? undefined);
+      lateSnapshot.current = null;
+      // A Parent clicked before hydration means what its click means: check / uncheck all of its
+      // values whose Items are enabled (8.1, 6.2). Read from the registry ref: the Items of this
+      // commit registered before this runs, and render has not caught up yet.
+      const disabledNow = disabledOf(summarize(itemRegistry.current));
       for (const report of parentReports.current) {
-        for (const v of report.values) {
+        for (const v of enabledValues(report.values, disabledNow)) {
           if (report.checked) next.add(v);
           else next.delete(v);
         }
@@ -277,7 +350,11 @@ export function CheckboxGroupRoot({
       parentReports.current = [];
       return next;
     },
-    readDefault: () => readGroup("defaultChecked"),
+    // Uncontrolled: start from `defaultValue`, so values with no Item return to it too (they have
+    // no `defaultChecked` to read). Controlled: from `base()`, as for the mount read; the parent
+    // decides.
+    readDefault: () =>
+      readGroup("defaultChecked", value === undefined ? (defaultSet ?? EMPTY) : base()),
     base,
     equals: setsEqual,
     onPlatformChange: (next, event) => {
@@ -288,14 +365,34 @@ export function CheckboxGroupRoot({
     },
   });
 
+  useLayoutEffect(() => {
+    rootMounted.current = true;
+    return () => {
+      rootMounted.current = false;
+    };
+  }, []);
+  const onItemMounted = (el: HTMLInputElement | null) => {
+    const late = rootMounted.current;
+    if (late && lateSnapshot.current === null) lateSnapshot.current = readDom("checked");
+    onMemberMounted(el);
+    // A snapshot the adapter did not consume (it queues one read per commit, before this).
+    if (late) {
+      queueMicrotask(() => {
+        lateSnapshot.current = null;
+      });
+    }
+  };
+
   // The state's `value` is in document order. Render cannot read the DOM, so the Items' order is
   // kept in state, refreshed after a commit only when the rendered `value` would change (a value
   // given out of document order, Items reordered or added). The first render, and the server,
   // use the value's own order.
   const [itemOrder, setItemOrder] = useState<readonly string[]>([]);
   const renderedValue = sortByOrder(optimistic, itemOrder);
-  // After every commit (Items may move without the Root re-rendering). The comparison ends the
-  // chain: the re-render it causes renders exactly the value just compared against.
+  // After every commit of the Root (a deps-less layout effect runs only when the Root itself
+  // committed: Items moved by a child that re-renders alone are picked up at the Root's next
+  // render). The comparison ends the chain: the re-render it causes renders exactly the value
+  // just compared against.
   const syncItemOrder = useEffectEvent(() => {
     const order = readItems(fieldsetRef.current, name).map((item) => item.value);
     if (!arraysEqual(sortByOrder(optimistic, order), renderedValue)) setItemOrder(order);
@@ -333,7 +430,13 @@ export function CheckboxGroupRoot({
   const context: CheckboxGroupContextValue = {
     name,
     form,
-    required: required && optimistic.size === 0,
+    required:
+      required &&
+      (items === null
+        ? optimistic.size === 0
+        : ![...optimistic].some((v) => items.get(v) === true)),
+    disabledItems,
+    registerItem,
     optimistic,
     committed,
     pending,
