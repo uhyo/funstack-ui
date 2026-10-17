@@ -119,3 +119,13 @@ and resolved question 27. Choices I made where the product owner left room:
 Verified items from "Things to verify" above: the deferred-lane claim (yes, not entangled; React
 19.3.1 `requestDeferredLane`), the implicit-submission flush (no: Firefox submits before React's
 scheduled flush, hence `flushSync` for the closed-Enter commit), the hydration path (fine).
+
+## Small fold (2026-10-17, later)
+
+- Section 3.5's `ComboboxListProps` / `ComboboxGroupProps` had `"aria-labelledby"` in the `Omit`
+  list while section 9, the parts table and the code keep it as a consumer prop merged with
+  the Label / GroupLabel id. Fixed the types to match `combobox-list.tsx` / `combobox-group.tsx`.
+- Recorded in 6.5 the accepted `autoHighlight` side effect: arming is per open / per edit
+  (`autoArmed` ref in the Root), so an active option unmounting from an outside result change
+  is cleared but not re-highlighted until the next open or edit. Deliberate: re-arming on every
+  unmount would undo the caret keys' clearing on any unrelated re-render.

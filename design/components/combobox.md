@@ -487,7 +487,8 @@ export interface ComboboxListState {
   readonly empty: boolean;
 }
 export interface ComboboxListProps
-  extends Omit<ComponentPropsWithRef<"div">, "id" | "role" | "aria-busy" | "aria-labelledby" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "role" | "aria-busy" | "className" | "style" | "children"> {
+  // `aria-labelledby` stays a consumer prop: token-merged with the Label id (section 9).
   className?: StateValue<string | undefined, ComboboxListState>;
   style?: StateValue<CSSProperties | undefined, ComboboxListState>;
   /** Usually a function of `{ query }` rendering the Options for it. */
@@ -518,7 +519,7 @@ export interface ComboboxOptionProps
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxOptionState>;
 }
 
-export interface ComboboxGroupProps extends Omit<ComponentPropsWithRef<"div">, "role" | "aria-labelledby" | …> { … }
+export interface ComboboxGroupProps extends Omit<ComponentPropsWithRef<"div">, "role" | …> { … } // `aria-labelledby` token-merged
 export interface ComboboxGroupLabelProps extends Omit<ComponentPropsWithRef<"div">, "id" | …> { … }
 export interface ComboboxEmptyProps extends Omit<ComponentPropsWithRef<"div">, "className" | "style" | "children"> { children?: StateValue<ReactNode, ComboboxListState>; … }
 export interface ComboboxStatusProps extends Omit<ComponentPropsWithRef<"div">, "role" | …> { … }
@@ -822,6 +823,18 @@ stale, not loading): a fast Enter after a keystroke therefore commits the typed 
 `allowCustomValue`) or does nothing, never a stale option (review L5). This is an urgent write
 in a layout effect (it is virtual focus; see 2) and it never dispatches anything.
 `aria-activedescendant` is never left pointing at a missing id.
+
+**Accepted side effect of `autoHighlight`.** The auto-highlight is armed once per open and once
+per edit (typing re-arms it; Home, End, Left and Right clear the active option *without*
+re-arming, so the caret keys really return visual focus to the input), and it fires once when
+the results for that edit settle. If the active option later unmounts for a reason other than an
+input edit (the results change from outside: a live data source re-renders the list, a
+`<Suspense>` boundary swaps content), the active option is cleared (never a dangling id) but
+nothing is re-highlighted until the next open or edit. Re-arming on every unmount would make the
+caret keys' clearing undone by any unrelated re-render, and auto-highlighting a list the user
+did not ask for moves virtual focus under them; a list that changes on its own while the user
+reads it is the rarer case. Accepted for v1; revisit if real result sources turn out to churn
+while settled.
 
 ---
 
