@@ -1,7 +1,8 @@
 "use client";
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useFormReset } from "../internal/use-form-reset.js";
 import { useRender } from "../internal/use-render.js";
 import { useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
@@ -33,6 +34,15 @@ function supportsSelectedContent(): boolean {
 function touchesSelected(record: MutationRecord, selected: HTMLOptionElement): boolean {
   if (record.type === "attributes" && record.target === selected) return false;
   return selected.contains(record.target);
+}
+
+/** Re-clones the selected option into `<selectedcontent>`. */
+function refresh(select: HTMLSelectElement): void {
+  // Nothing selected: assigning the value would select the placeholder (probe case 7).
+  if (select.selectedIndex === -1) return;
+  // The assignment is the re-clone trigger; it fires no event and keeps the selection.
+  const current = select.value;
+  select.value = current;
 }
 
 /**
@@ -68,17 +78,10 @@ export function SelectValue({ className, style, render, ...rest }: SelectValuePr
       return;
     }
     if (!supportsSelectedContent()) return;
-    const refresh = () => {
-      // Nothing selected: assigning the value would select the placeholder (probe case 7).
-      if (select.selectedIndex === -1) return;
-      // The assignment is the re-clone trigger; it fires no event and keeps the selection.
-      const current = select.value;
-      select.value = current;
-    };
     const observer = new MutationObserver((records) => {
       const selected = select.options[select.selectedIndex];
       if (selected === undefined) return;
-      if (records.some((record) => touchesSelected(record, selected))) refresh();
+      if (records.some((record) => touchesSelected(record, selected))) refresh(select);
     });
     observer.observe(select, {
       childList: true,
@@ -86,24 +89,29 @@ export function SelectValue({ className, style, render, ...rest }: SelectValuePr
       attributes: true,
       subtree: true,
     });
-    // A form reset changes the selection without re-cloning (Chromium 156: `form.reset()` leaves
-    // the old option's content in <selectedcontent>; memo/developer/select.md). `reset` bubbles
-    // and fires before the reset algorithm, so the refresh waits a microtask. Listening on the
-    // document follows a changed form owner; React's own reset after a form action is a
-    // `form.reset()` too.
-    const doc = select.ownerDocument;
-    const onReset = (event: Event) => {
-      if (event.target !== select.form) return;
-      queueMicrotask(() => {
-        if (!event.defaultPrevented) refresh();
-      });
-    };
-    doc.addEventListener("reset", onReset);
     return () => {
       observer.disconnect();
-      doc.removeEventListener("reset", onReset);
     };
   }, [node]);
+
+  // A form reset changes the selection without re-cloning (Chromium 156: `form.reset()` leaves
+  // the old option's content in <selectedcontent>; memo/developer/select.md). `useFormReset`
+  // listens on the select's form owner itself (so neither `stopPropagation()` on the form nor a
+  // shadow root hides the event), follows a changed owner or `form` attribute, and calls back in
+  // a microtask after an uncancelled reset. React's own reset after a form action is a
+  // `form.reset()` too.
+  const selectRef = useMemo(
+    () => ({
+      get current(): HTMLSelectElement | null {
+        return node.current?.closest("select") ?? null;
+      },
+    }),
+    [node],
+  );
+  useFormReset(selectRef, () => {
+    const select = selectRef.current;
+    if (select !== null && supportsSelectedContent()) refresh(select);
+  });
 
   const state: SelectRootState = {
     value: ctx.optimistic,

@@ -587,12 +587,15 @@ describe("Select", () => {
       action,
       gate,
       initial,
+      boundaryKey = 0,
     }: {
       mode: ControlMode | "none";
       fallback: "disabled" | "enabled";
       action: ActionFn;
       gate: Gate;
       initial?: string;
+      /** A new key remounts the boundary: the options suspend again (a "Reload"). */
+      boundaryKey?: number;
     }) {
       const [value, setValue] = useState(initial ?? "c");
       const modeProps =
@@ -613,6 +616,7 @@ describe("Select", () => {
           {(state) => (
             <>
               <Suspense
+                key={boundaryKey}
                 fallback={
                   <Select.Option value="" disabled={fallback === "disabled"}>
                     Loading…
@@ -680,6 +684,51 @@ describe("Select", () => {
       expect(screen.getByTestId("state")).toHaveTextContent("a");
       expect(dataSelected()).toEqual(["a"]);
       expect(action).not.toHaveBeenCalled();
+    });
+
+    it("without value or defaultValue: a picked value survives the options suspending again (no re-adoption)", async () => {
+      const gate = lateGate();
+      const action = vi.fn<ActionFn>();
+      let rerender!: (ui: ReactNode) => void;
+      await act(async () => {
+        ({ rerender } = render(
+          <LateSelect mode="none" fallback="disabled" action={action} gate={gate} />,
+        ));
+      });
+      await act(async () => {
+        gate.open();
+      });
+      await flush();
+      expect(sel().value).toBe("a");
+      const user = setupUser();
+      await user.selectOptions(sel(), "b");
+      await flush();
+      expect(screen.getByTestId("state")).toHaveTextContent("b");
+
+      // Reload: the options suspend again behind the disabled "" fallback, then come back.
+      const reload = lateGate();
+      await act(async () => {
+        rerender(
+          <LateSelect
+            mode="none"
+            fallback="disabled"
+            action={action}
+            gate={reload}
+            boundaryKey={1}
+          />,
+        );
+      });
+      await flush();
+      expect(sel().options).toHaveLength(1);
+      expect(screen.getByTestId("state")).toHaveTextContent("b");
+      await act(async () => {
+        reload.open();
+      });
+      await flush();
+      expect(sel().value).toBe("b");
+      expect(screen.getByTestId("state")).toHaveTextContent("b");
+      expect(dataSelected()).toEqual(["b"]);
+      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["b", "activate"]]);
     });
   });
 
@@ -859,7 +908,7 @@ describe("Select", () => {
         expect(screen.getByTestId("state")).toHaveTextContent("b");
       });
 
-      it("form.reset() returns to the first enabled option", async () => {
+      it("form.reset() returns to the adopted option (mirrored as the reset target)", async () => {
         const action = vi.fn<ActionFn>();
         render(
           <form data-testid="form">
@@ -869,7 +918,7 @@ describe("Select", () => {
         await flush();
         const user = setupUser();
         await user.selectOptions(sel(), "c");
-        expect(defaultSelected()).toEqual([]);
+        expect(defaultSelected()).toEqual(["b"]);
         await act(async () => {
           form().reset();
         });
@@ -1288,6 +1337,69 @@ describe("Select", () => {
     });
   });
 
+  describe("platform: React's automatic reset, without value or defaultValue (design 5)", () => {
+    // The adopted placeholder is the reset target, as Fizz's `selected` makes it for SSR: the
+    // browser's own reset result would be the first *enabled* option.
+    function PlainOrderForm({ submit, action }: { submit: () => Promise<void>; action: ActionFn }) {
+      return (
+        <form
+          action={async () => {
+            await submit();
+          }}
+        >
+          {/* The state as a class: an <output> would be reset by the form, under React. */}
+          <Select.Root
+            aria-label="Fruit"
+            name="fruit"
+            valueChangeAction={action}
+            className={(s) => `state-[${s.value}]`}
+          >
+            <Select.Option value="" disabled>
+              Choose
+            </Select.Option>
+            <Select.Option value="banana">Banana</Select.Option>
+          </Select.Root>
+          <button type="submit">Order</button>
+        </form>
+      );
+    }
+
+    it("a client-rendered disabled placeholder stays selected with no dispatch; after a pick, the reset returns to it", async () => {
+      let d = deferred();
+      const action = vi.fn<ActionFn>();
+      render(<PlainOrderForm submit={() => d.promise} action={action} />);
+      await flush();
+      expect(sel().value).toBe("");
+      expect(defaultSelected()).toEqual([""]);
+      const user = setupUser();
+
+      // Untouched form: React's automatic reset after the action.
+      await user.click(screen.getByRole("button", { name: "Order" }));
+      await act(async () => {
+        d.resolve();
+      });
+      await flush();
+      expect(sel().value).toBe("");
+      expect(sel()).toHaveClass("state-[]");
+      expect(action).not.toHaveBeenCalled();
+
+      // After a pick: back to the placeholder with one platform dispatch.
+      d = deferred();
+      await user.selectOptions(sel(), "banana");
+      await user.click(screen.getByRole("button", { name: "Order" }));
+      await act(async () => {
+        d.resolve();
+      });
+      await flush();
+      expect(sel().value).toBe("");
+      expect(sel()).toHaveClass("state-[]");
+      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
+        ["banana", "activate"],
+        ["", "platform"],
+      ]);
+    });
+  });
+
   describe("forms, placeholder and required", () => {
     it("contributes name=value to FormData", async () => {
       render(
@@ -1431,6 +1543,33 @@ describe("Select", () => {
         </Select.Root>,
       );
       expect(states.at(-1)).toEqual({ value: "a", selected: true, pending: false, disabled: true });
+    });
+
+    it("Option state.disabled and data-disabled include a disabled Group (as :disabled does)", () => {
+      const states = new Map<string, SelectOptionState>();
+      const track = (s: SelectOptionState) => {
+        states.set(s.value, s);
+        return undefined;
+      };
+      render(
+        <Select.Root aria-label="Fruit" defaultValue="a">
+          <Select.Option value="a" className={track} />
+          <Select.Group label="Off" disabled>
+            <Select.Option value="b" className={track} />
+          </Select.Group>
+          <Select.Group label="On">
+            <Select.Option value="c" className={track} />
+          </Select.Group>
+        </Select.Root>,
+      );
+      expect(states.get("a")?.disabled).toBe(false);
+      expect(states.get("b")?.disabled).toBe(true);
+      expect(states.get("c")?.disabled).toBe(false);
+      expect(opt("b")).toHaveAttribute("data-disabled");
+      expect(opt("b").disabled).toBe(false);
+      expect(opt("b").parentElement).toBeDisabled();
+      expect(opt("c")).not.toHaveAttribute("data-disabled");
+      expect(opt("c").parentElement).not.toBeDisabled();
     });
   });
 
@@ -1702,6 +1841,55 @@ describe("Select", () => {
         form().removeEventListener("reset", cancel);
         await act(async () => {
           form().reset();
+        });
+        await flush();
+        expect(writes[0]).toBe("a");
+        expect(sel().value).toBe("a");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it("the reset refresh listens on the form owner: unaffected by stopPropagation, follows the form attribute", async () => {
+      vi.stubGlobal("HTMLSelectedContentElement", class {});
+      try {
+        const { rerender } = render(
+          <>
+            <form id="f1" data-testid="f1" />
+            <form id="f2" data-testid="f2" />
+            <Harness mode="uncontrolled" form="f1" />
+          </>,
+        );
+        const f1 = screen.getByTestId("f1") as HTMLFormElement;
+        const f2 = screen.getByTestId("f2") as HTMLFormElement;
+        const user = setupUser();
+        await user.selectOptions(sel(), "c");
+        const writes = spyValueWrites();
+        f1.addEventListener("reset", (e) => e.stopPropagation());
+        await act(async () => {
+          f1.reset();
+        });
+        await flush();
+        expect(writes[0]).toBe("a");
+        expect(sel().value).toBe("a");
+
+        rerender(
+          <>
+            <form id="f1" data-testid="f1" />
+            <form id="f2" data-testid="f2" />
+            <Harness mode="uncontrolled" form="f2" />
+          </>,
+        );
+        await user.selectOptions(sel(), "b");
+        writes.length = 0;
+        await act(async () => {
+          f1.reset();
+        });
+        await flush();
+        expect(writes).toEqual([]);
+        expect(sel().value).toBe("b");
+        await act(async () => {
+          f2.reset();
         });
         await flush();
         expect(writes[0]).toBe("a");

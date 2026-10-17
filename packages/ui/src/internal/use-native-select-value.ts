@@ -13,17 +13,14 @@ export interface UseNativeSelectValueOptions {
   /**
    * The value a form reset must return to, mirrored into `option.defaultSelected` after every
    * commit: uncontrolled, the latest `defaultValue`; controlled, the Root's mount-time value.
-   * `undefined` mirrors nothing (uncontrolled without `defaultValue`: the browser's reset result,
-   * the first enabled option, stands).
+   * Ignored in adopt mode (`adoptDefault` set), where the target is the value adopted at mount.
    */
   readonly resetTarget: string | undefined;
   /**
    * Uncontrolled without `defaultValue` (design/components/select.md 5): adopts the browser's
-   * choice as the committed value, without a dispatch (`adopt` of `useControllableAction`). Called
-   * at mount and when late options mount while the intended option does not exist. `undefined` in
-   * every other mode.
+   * choice as the committed value, without a dispatch. `undefined` in every other mode.
    */
-  readonly adoptDefault: ((next: string) => void) | undefined;
+  readonly adoptDefault: AdoptDefault | undefined;
   /**
    * The browser changed the value on a residual path (pre-hydration pick, Firefox form-state
    * restoration, a late hydrated option, a form reset) and it differs from what the user intends.
@@ -31,6 +28,17 @@ export interface UseNativeSelectValueOptions {
    * `reason: "platform"`.
    */
   readonly onPlatformChange: (next: string, event: Event | undefined) => void;
+}
+
+export interface AdoptDefault {
+  /** `adopt` of `useControllableAction`: writes the committed value, no action. */
+  readonly adopt: (next: string) => void;
+  /**
+   * A dispatch (a pick or a platform change) has set the value. From then on the browser's
+   * default is never adopted again: late options only get the re-apply, so options that suspend
+   * again (a keyed boundary, a refetch) and come back keep the user's value.
+   */
+  readonly established: () => boolean;
 }
 
 export interface UseNativeSelectValueResult {
@@ -125,7 +133,9 @@ const read = (select: HTMLSelectElement): Snapshot => ({
  *
  * 1. Adoption (uncontrolled without `defaultValue`): at mount the browser's default becomes the
  *    committed value with no dispatch, and the mount reconciliation compares against it, so a
- *    pre-hydration pick of another option still dispatches.
+ *    pre-hydration pick of another option still dispatches. It is also the reset target (the
+ *    value Fizz marks `selected` when it comes from a `""` option). While no dispatch has set
+ *    the value, late options mounting without the state's option adopt again (loading).
  * 2. Mount reconciliation and form reset through the group adapter: one dispatch per Select, and
  *    only when the intended option exists in the DOM (a value whose option is still loading is
  *    never "reconciled" to the fallback).
@@ -174,6 +184,11 @@ export function useNativeSelectValue(
     });
   };
 
+  /** Adopt mode: the value adopted at mount, the reset target (as the mount value is, controlled). */
+  const mountAdopted = useRef<string | undefined>(undefined);
+  const resetTargetOf = (o: UseNativeSelectValueOptions): string | undefined =>
+    o.adoptDefault !== undefined ? mountAdopted.current : o.resetTarget;
+
   /** The selection read in the layout phase of a late-option commit (conventions 3.8 rule 3). */
   const lateSnapshot = useRef<Snapshot | null>(null);
 
@@ -181,8 +196,14 @@ export function useNativeSelectValue(
   //    the DOM against the adopted default.
   const adoptAtMount = useEffectEvent(() => {
     const select = ref.current;
-    if (select === null || options.adoptDefault === undefined) return;
-    adoptNow(implicitDefault(select), options.adoptDefault);
+    const adoptDefault = options.adoptDefault;
+    // `established`: StrictMode's re-run after a mount reconciliation already dispatched.
+    if (select === null || adoptDefault === undefined || adoptDefault.established()) return;
+    const value = implicitDefault(select);
+    // `""` from a select with nothing selectable is no reset target (design 6.1): only a `""`
+    // option, the placeholder react-dom and Fizz select, is mirrored.
+    mountAdopted.current = value === "" && findOption(select, "") === null ? undefined : value;
+    adoptNow(value, adoptDefault.adopt);
   });
   useLayoutEffect(() => {
     adoptAtMount();
@@ -215,7 +236,7 @@ export function useNativeSelectValue(
   useLayoutEffect(() => {
     const select = ref.current;
     if (select === null) return;
-    applySelection(select, intended(options), options.resetTarget);
+    applySelection(select, intended(options), resetTargetOf(options));
   });
 
   /** The Root's own mount effects have run: later Option mounts are late. */
@@ -226,7 +247,13 @@ export function useNativeSelectValue(
       rootMounted.current = false;
     };
   }, []);
-  /** This commit's late options were handled (snapshot, adoption, re-apply). */
+  /**
+   * This commit's late options were handled (snapshot, adoption, re-apply). A microtask window,
+   * not a per-commit flag: an Option's layout effect cannot tell which commit it belongs to (the
+   * Root does not commit with a boundary that resolves inside it). A second commit in the same
+   * task is covered by the per-report re-apply below; its hydrated options are reconciled against
+   * the first commit's snapshot (theoretical: no part triggers such a commit).
+   */
   const lateHandled = useRef(false);
 
   // 4. Late options.
@@ -240,15 +267,18 @@ export function useNativeSelectValue(
         // Every option of this commit is in the DOM already (the mutation phase precedes layout).
         lateSnapshot.current = read(select);
         const current = latest.current;
+        const adoptDefault = current.adoptDefault;
         if (
-          current.adoptDefault !== undefined &&
+          adoptDefault !== undefined &&
+          !adoptDefault.established() &&
           current.latestInFlight() === null &&
           findOption(select, intended(current)) === null
         ) {
-          // The state's option is absent (the fallback-only case): adopt the browser's default.
-          adoptNow(implicitDefault(select), current.adoptDefault);
+          // Still loading and nothing chosen yet (the fallback-only case): adopt the browser's
+          // default. Never after a dispatch: that would overwrite the user's value silently.
+          adoptNow(implicitDefault(select), adoptDefault.adopt);
         }
-        applySelection(select, intended(current), current.resetTarget);
+        applySelection(select, intended(current), resetTargetOf(current));
         // Cleared after the adapter's microtask, which a later report of this same commit may
         // queue after this point: two hops keep the snapshot for it.
         queueMicrotask(() =>
@@ -257,6 +287,13 @@ export function useNativeSelectValue(
             lateSnapshot.current = null;
           }),
         );
+      } else if (el !== null) {
+        // Per report, for an option that matters (cheap: at most the intended and the reset
+        // target's options): a second commit within the window gets its re-apply too.
+        const current = latest.current;
+        if (el.value === intended(current) || el.value === resetTargetOf(current)) {
+          applySelection(select, intended(current), resetTargetOf(current));
+        }
       }
       if (hydrated) onItemMounted(el);
     },

@@ -15,7 +15,7 @@ export interface SelectOptionState {
   readonly selected: boolean;
   /** The Root is pending and this option is the optimistic target. */
   readonly pending: boolean;
-  /** Disabled by its own prop or by `Root disabled`. */
+  /** Disabled by its own prop, a disabled `Select.Group`, or `Root disabled` (as `:disabled`). */
   readonly disabled: boolean;
 }
 
@@ -59,7 +59,7 @@ export function SelectOption({
   const ctx = useSelectContext("Select.Option");
   const selected = ctx.optimistic === value;
   const pending = ctx.pending && selected;
-  const disabled = ctx.disabled || disabledProp;
+  const disabled = ctx.disabled || ctx.groupDisabled || disabledProp;
   const hydrated = useHydratedMount();
   const { ref, node } = useSelectPartRef<HTMLOptionElement>("Select.Option", "option");
 
@@ -93,7 +93,7 @@ export function SelectOption({
     libraryProps: {
       value,
       selected: undefined,
-      // Only the Option's own prop: `Root disabled` disables the whole select natively.
+      // Only the Option's own prop: `Root disabled` and the Group disable natively themselves.
       disabled: disabledProp,
       "data-selected": dataAttr(selected),
       "data-pending": dataAttr(pending),
