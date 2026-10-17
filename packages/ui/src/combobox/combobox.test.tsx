@@ -8,6 +8,7 @@
 // 302008), ViewTransition, IME, pre-hydration typing with the real keyboard.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
+import * as React from "react";
 import { StrictMode, Suspense, startTransition, use, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
@@ -306,6 +307,22 @@ describe("Combobox", () => {
         "heading",
         expect.stringMatching(/-label$/),
       ]);
+    });
+
+    it("names the listbox only when a Label is rendered (no dangling aria-labelledby)", async () => {
+      const user = setupUser();
+      render(
+        <Combobox.Root>
+          <Combobox.Input data-testid="input" aria-label="Country" />
+          <Combobox.Popup data-testid="popup">
+            <Combobox.List data-testid="list">
+              <Combobox.Option value="a">A</Combobox.Option>
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Root>,
+      );
+      await typeText(user, "a");
+      expect(list()).not.toHaveAttribute("aria-labelledby");
     });
 
     it("derives option ids from the value with encodeURIComponent", async () => {
@@ -711,9 +728,33 @@ describe("Combobox", () => {
       // A real press outside the popup hides it before the click (light dismiss).
       fireEvent.pointerDown(trigger());
       act(() => popup().hidePopover());
-      fireEvent.click(trigger());
+      fireEvent.click(trigger(), { detail: 1 });
       await flush();
       expect(isOpen()).toBe(false);
+    });
+
+    it("the Trigger forgets a press that never clicked (pointercancel, a click without a press)", async () => {
+      const user = setupUser();
+      render(<Harness />);
+      await user.click(trigger());
+      await flush();
+      expect(isOpen()).toBe(true);
+      // A press while open, cancelled; the listbox closes some other way. The next click opens.
+      fireEvent.pointerDown(trigger());
+      fireEvent.pointerCancel(trigger());
+      act(() => popup().hidePopover());
+      await flush();
+      fireEvent.click(trigger(), { detail: 1 });
+      await flush();
+      expect(isOpen()).toBe(true);
+      // A press while open that was dragged off (no click, no cancel); the listbox closes. A
+      // click without a press (assistive technology, element.click()) reads the current state.
+      fireEvent.pointerDown(trigger());
+      act(() => popup().hidePopover());
+      await flush();
+      act(() => trigger().click());
+      await flush();
+      expect(isOpen()).toBe(true);
     });
 
     it("disabled: nothing opens, the input and buttons are disabled", async () => {
@@ -1013,6 +1054,43 @@ describe("Combobox", () => {
       expect(texts).toHaveBeenLastCalledWith("France", expect.anything());
       expect(texts.mock.lastCall![1].reason).toBe("dismiss");
       expect(texts.mock.lastCall![1].event).toBeUndefined();
+    });
+
+    it("a synchronous throw: the rollback write runs outside the transition", async () => {
+      silenceErrors();
+      const internals = (
+        React as unknown as {
+          __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: { T: unknown };
+        }
+      ).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+      const writes: { next: string; inTransition: boolean }[] = [];
+      const caught = vi.fn();
+      const user = setupUser();
+      render(
+        <TextHarness
+          mode={mode}
+          action={(next) => writes.push({ next, inTransition: internals.T != null })}
+          boundary={caught}
+          root={{
+            defaultValue: "fr",
+            defaultInputValue: "France",
+            valueChangeAction: () => {
+              throw new Error("invalid");
+            },
+          }}
+        />,
+      );
+      await user.click(input());
+      await user.clear(input());
+      await user.keyboard("ja");
+      await flush();
+      await user.keyboard("{ArrowDown}{Enter}");
+      await flush();
+      expect(caught).toHaveBeenCalledTimes(1);
+      expect(writes.at(-1)).toEqual({ next: "France", inTransition: false });
+      expect(writes.every((w) => !w.inTransition)).toBe(true);
+      if (mode === "controlled")
+        expect(screen.getByTestId("parent-text")).toHaveTextContent("France");
     });
 
     it("caught inside the action: commits (uncontrolled) / reverts without an error (controlled)", async () => {
@@ -1329,6 +1407,25 @@ describe("Combobox", () => {
   });
 
   describe("focus loss", () => {
+    it("disabled: focus leaving reverts and commits nothing", async () => {
+      const action = vi.fn<ValueAction>();
+      const texts = vi.fn<TextAction>();
+      const user = setupUser();
+      for (const allowCustomValue of [true, false]) {
+        const root = { allowCustomValue, valueChangeAction: action, inputValueChangeAction: texts };
+        const { rerender, unmount } = render(<Harness root={root} />);
+        await typeText(user, "jam");
+        texts.mockClear();
+        rerender(<Harness root={{ ...root, disabled: true }} />);
+        fireEvent.focusOut(input(), { relatedTarget: screen.getByTestId("next") });
+        await flush();
+        expect(action).not.toHaveBeenCalled();
+        expect(texts).not.toHaveBeenCalled();
+        expect(input().value).toBe("jam");
+        unmount();
+      }
+    });
+
     it("closes at once when focus moves outside, notified as dismiss", async () => {
       const openAction = vi.fn<OpenAction>();
       const hide = spyHide();
@@ -1381,14 +1478,49 @@ describe("Combobox", () => {
       expect(input()).not.toHaveAttribute("aria-activedescendant");
     });
 
-    it("keeps the active option while it stays mounted", async () => {
+    it("typing clears the active option even when it stays mounted (APG)", async () => {
       const user = setupUser();
       render(<Harness />);
       await typeText(user, "j");
       await user.keyboard("{ArrowDown}{ArrowDown}");
-      await user.keyboard("a");
-      await flush();
       expect(input()).toHaveAttribute("aria-activedescendant", option("jm").id);
+      await user.keyboard("a");
+      expect(input()).not.toHaveAttribute("aria-activedescendant");
+      await flush();
+      expect(optionTexts()).toEqual(["Japan", "Jamaica"]);
+      expect(input()).not.toHaveAttribute("aria-activedescendant");
+      expect(option("jm")).not.toHaveAttribute("data-active");
+      // The arrows start again from the top.
+      await user.keyboard("{ArrowDown}");
+      expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id);
+    });
+
+    it("Home, End, Left and Right clear the active option without being prevented", async () => {
+      const user = setupUser();
+      render(<Harness root={{ autoHighlight: true }} />);
+      await typeText(user, "j");
+      for (const key of ["Home", "End", "ArrowLeft", "ArrowRight"]) {
+        await user.keyboard("{ArrowDown}");
+        expect(input()).toHaveAttribute("aria-activedescendant");
+        expect(fireEvent.keyDown(input(), { key })).toBe(true);
+        await flush();
+        // autoHighlight does not take it back: the results did not change.
+        expect(input()).not.toHaveAttribute("aria-activedescendant");
+        expect(isOpen()).toBe(true);
+      }
+    });
+
+    it("Enter after typing past the highlight commits the typed text, not the old option", async () => {
+      const action = vi.fn<ValueAction>();
+      const user = setupUser();
+      render(<Harness root={{ allowCustomValue: true, valueChangeAction: action }} />);
+      await typeText(user, "ja");
+      await user.keyboard("{ArrowDown}");
+      await user.keyboard("p{Enter}");
+      await flush();
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action.mock.lastCall![0]).toBe("jap");
+      expect(action.mock.lastCall![1].custom).toBe(true);
     });
 
     it("autoHighlight: the first enabled option once the results are not stale", async () => {
@@ -1407,13 +1539,46 @@ describe("Combobox", () => {
       expect(input()).toHaveAttribute("aria-activedescendant", option("jm").id);
       await user.keyboard("{Backspace}f");
       await flush();
-      // Stale: the old results stay, Jamaica still active.
+      // Stale: the old results stay, nothing is active (typing cleared it; not re-highlighted).
       expect(list()).toHaveAttribute("data-stale", "");
+      expect(input()).not.toHaveAttribute("aria-activedescendant");
       await act(async () => search.resolve("f"));
       await flush();
       expect(input()).toHaveAttribute("aria-activedescendant", option("fr").id);
       await user.keyboard("{Enter}");
       expect(input().value).toBe("France");
+    });
+
+    it("autoHighlight never highlights stale results: a fast Enter commits the text or does nothing", async () => {
+      for (const allowCustomValue of [true, false]) {
+        const search = createSearch();
+        search.resolve("ja");
+        const action = vi.fn<ValueAction>();
+        const user = setupUser();
+        const { unmount } = render(
+          <Harness
+            root={{ autoHighlight: true, allowCustomValue, valueChangeAction: action }}
+            results={(query) => <search.Results query={query} />}
+          />,
+        );
+        await typeText(user, "ja");
+        expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id);
+        await user.keyboard("m");
+        await flush();
+        expect(list()).toHaveAttribute("data-stale", "");
+        expect(input()).not.toHaveAttribute("aria-activedescendant");
+        await user.keyboard("{Enter}");
+        await flush();
+        if (allowCustomValue) {
+          expect(action).toHaveBeenCalledTimes(1);
+          expect(action.mock.lastCall![0]).toBe("jam");
+        } else {
+          expect(action).not.toHaveBeenCalled();
+          expect(input().value).toBe("jam");
+          expect(isOpen()).toBe(true);
+        }
+        unmount();
+      }
     });
 
     it("forgets the active option when the listbox closes", async () => {
@@ -1443,13 +1608,18 @@ describe("Combobox", () => {
         />,
       );
       await typeText(user, "j");
-      // First load: the fallback shows, Empty does not.
+      // First load: the fallback shows, Empty does not. The listbox is busy and the Status is
+      // no live region (a listbox owns only options and groups).
       expect(screen.getByTestId("loading")).toHaveTextContent("Searching…");
+      expect(screen.getByTestId("loading")).toHaveAttribute("role", "none");
+      expect(list()).toHaveAttribute("aria-busy", "true");
+      expect(list()).not.toHaveAttribute("data-stale");
       expect(screen.queryByTestId("empty")).toBeNull();
       expect(list()).not.toHaveAttribute("data-empty");
       await act(async () => search.resolve("j"));
       await flush();
       expect(screen.queryByTestId("loading")).toBeNull();
+      expect(list()).not.toHaveAttribute("aria-busy");
       expect(screen.queryByTestId("empty")).toBeNull();
       await user.keyboard("zz");
       await flush();
@@ -1477,6 +1647,8 @@ describe("Combobox", () => {
       );
       await typeText(user, "zz");
       expect(screen.getByTestId("empty")).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Type a country");
+      expect(list()).not.toHaveAttribute("aria-busy");
     });
   });
 
@@ -1533,6 +1705,32 @@ describe("Combobox", () => {
       await flush();
       expect(notify).toHaveBeenCalledTimes(2);
       expect(notify).toHaveBeenLastCalledWith(list(), "2 results");
+    });
+
+    it("announces nothing while the Suspense fallback shows in the List, then the count", async () => {
+      const notify = stubAriaNotify();
+      const search = createSearch();
+      const user = setupUser();
+      render(
+        <Harness
+          results={(query) => (
+            <Suspense
+              fallback={<Combobox.Status data-testid="loading">Searching…</Combobox.Status>}
+            >
+              <search.Results query={query} />
+            </Suspense>
+          )}
+        />,
+      );
+      await typeText(user, "j");
+      expect(screen.getByTestId("loading")).toBeInTheDocument();
+      expect(isOpen()).toBe(true);
+      await flush();
+      expect(notify).not.toHaveBeenCalled();
+      await act(async () => search.resolve("j"));
+      await flush();
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenLastCalledWith(list(), "3 results");
     });
 
     it("uses announce(count, state), and nothing when it returns null", async () => {

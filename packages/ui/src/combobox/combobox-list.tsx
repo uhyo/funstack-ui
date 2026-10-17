@@ -36,11 +36,11 @@ export interface ComboboxListProps extends Omit<
 }
 
 /**
- * The listbox: `<div role="listbox" aria-labelledby={label}>`, the element the input's
- * `aria-controls` names. Its children are the results for the deferred `query` (the library
- * filters nothing, design 6.1); while they are for an older text it carries `aria-busy="true"`
- * and `data-stale`. Contains only Options and Groups (a `Status` rendered as a Suspense fallback
- * inside it marks the results as loading).
+ * The listbox: `<div role="listbox" aria-labelledby={label}>` (only while a `Combobox.Label` is
+ * mounted), the element the input's `aria-controls` names. Its children are the results for the
+ * deferred `query` (the library filters nothing, design 6.1); while they are for an older text it
+ * carries `aria-busy="true"` and `data-stale`. Contains only Options and Groups; a `Status`
+ * rendered as a Suspense fallback inside it marks the results as loading (`aria-busy="true"`).
  *
  * Owned keys (conventions 1.2): `id`, `role`, `aria-labelledby` (token-merged), `aria-busy`,
  * `data-stale`, `data-empty`.
@@ -70,8 +70,8 @@ export function ComboboxList({ className, style, children, render, ...rest }: Co
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
     id: ctx.ids.list,
     role: "listbox",
-    "aria-labelledby": ctx.ids.label,
-    "aria-busy": ctx.stale ? true : undefined,
+    ...(ctx.hasLabel && { "aria-labelledby": ctx.ids.label }),
+    "aria-busy": ctx.stale || ctx.loading ? true : undefined,
     "data-stale": dataAttr(ctx.stale),
     "data-empty": dataAttr(ctx.empty),
   };

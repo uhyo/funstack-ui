@@ -26,6 +26,7 @@ export interface ComboboxTriggerProps extends Omit<
   | "onClick"
   | "onPointerDown"
   | "onMouseDown"
+  | "onPointerCancel"
   | "tabIndex"
   | "aria-expanded"
   | "aria-controls"
@@ -75,8 +76,8 @@ export function useNameWarning(part: string): (element: HTMLElement) => () => vo
  * `commandfor`: the listbox is anchored to the input, never to this button (design 1).
  *
  * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-expanded`,
- * `aria-controls` (token-merged), `onClick`, `onPointerDown`, `onMouseDown`, `data-open`,
- * `data-pending`, `data-disabled`.
+ * `aria-controls` (token-merged), `onClick`, `onPointerDown`, `onPointerCancel`, `onMouseDown`,
+ * `data-open`, `data-pending`, `data-disabled`.
  */
 export function ComboboxTrigger({
   disabled: ownDisabled = false,
@@ -110,11 +111,18 @@ export function ComboboxTrigger({
       openAtPress.current = popover.intended();
       event.preventDefault();
     },
+    onPointerCancel: () => {
+      // The press never becomes a click.
+      openAtPress.current = null;
+    },
     onMouseDown: (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
     },
     onClick: (event: MouseEvent<HTMLButtonElement>) => {
-      const wasOpen = openAtPress.current ?? popover.intended();
+      // `detail === 0`: a click without a press (assistive technology, `element.click()`); a
+      // snapshot left by a press that never clicked (dragged off) does not belong to it.
+      const pressed = event.detail === 0 ? null : openAtPress.current;
+      const wasOpen = pressed ?? popover.intended();
       openAtPress.current = null;
       if (disabled) return;
       const native = event.nativeEvent;

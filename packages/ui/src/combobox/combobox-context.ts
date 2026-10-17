@@ -37,6 +37,10 @@ export interface ComboboxContextValue {
   readonly activeValue: string | null;
   /** No option is mounted and the results are settled (`Empty`, `data-empty`). */
   readonly empty: boolean;
+  /** A `Combobox.Status` is mounted inside the List (a Suspense fallback): results are loading. */
+  readonly loading: boolean;
+  /** A `Combobox.Label` is mounted (the List's `aria-labelledby` names it only then). */
+  readonly hasLabel: boolean;
   readonly disabled: boolean;
   readonly inputRef: RefObject<HTMLInputElement | null>;
   readonly listRef: RefObject<HTMLElement | null>;
@@ -44,6 +48,8 @@ export interface ComboboxContextValue {
   readonly registerOption: (value: string, entry: ComboboxOptionEntry) => () => void;
   /** Registers a mounted `Combobox.Status`; while one is mounted the results count as loading. */
   readonly registerStatus: () => () => void;
+  /** Registers a mounted `Combobox.Label`; returns the unregistration. */
+  readonly registerLabel: () => () => void;
   /** Make `value` the active option (urgent; never dispatches). */
   readonly setActive: (value: string | null) => void;
   /** Accept an option (design 5.2): urgent text write, dispatch, close when it settles. */

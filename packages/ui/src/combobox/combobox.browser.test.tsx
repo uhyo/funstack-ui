@@ -522,9 +522,10 @@ describe("Combobox (browser)", () => {
       // the iframe, so focus comes from script).
       field.focus();
       await userEvent.keyboard("jap");
-      if (field.value !== "jap") {
-        // Unprobed engine (WebKit cannot run on the development machine): if the real keyboard
+      if (field.value !== "jap" && browserName === "webkit") {
+        // WebKit only (unprobed: it cannot run on the development machine): if the real keyboard
         // does not reach into the frame, type the way the parser-built field would receive it.
+        // Chromium and Firefox must take the real keyboard path.
         console.warn(`[${browserName}] keyboard did not reach the iframe; typing by script`);
         field.value = "jap";
         field.dispatchEvent(new Event("input", { bubbles: true }));
@@ -588,6 +589,9 @@ describe("Combobox (browser)", () => {
         await flush();
         expect(action).not.toHaveBeenCalled();
         expect(input().value).toBe("に");
+        // The composed text is an edit: visual focus went back to the input (APG).
+        expect(input()).not.toHaveAttribute("aria-activedescendant");
+        await user.keyboard("{ArrowDown}");
       } else {
         // The composing keydown is ignored by the library in every engine.
         const composing = new KeyboardEvent("keydown", {

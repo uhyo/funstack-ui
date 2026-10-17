@@ -133,11 +133,13 @@ export interface ComboboxStatusProps extends Omit<
 }
 
 /**
- * A loading row or a hint: `<div role="status">`. No live-region work of its own (the result
- * count is announced with `ariaNotify`). Rendered **inside the List** (the usual Suspense
- * fallback, `<Suspense fallback={<Combobox.Status>Searching…</Combobox.Status>}>`), it marks
- * the results as loading: `Empty` stays hidden and nothing is announced while it is mounted.
- * Rendered in the Popup outside the List it is a plain hint. Owned key: `role`.
+ * A loading row or a hint. Rendered **inside the List** (the usual Suspense fallback,
+ * `<Suspense fallback={<Combobox.Status>Searching…</Combobox.Status>}>`), it marks the results
+ * as loading: `<div role="none">` (a listbox owns only options and groups, and a live region
+ * there would talk over the count; the List is `aria-busy` instead), `Empty` stays hidden and
+ * nothing is announced while it is mounted. Rendered in the Popup outside the List it is a plain
+ * hint, `<div role="status">`. No live-region work of its own either way (the result count is
+ * announced with `ariaNotify`). Owned key: `role`.
  */
 export function ComboboxStatus({
   className,
@@ -157,7 +159,7 @@ export function ComboboxStatus({
     style,
     children,
     props: rest,
-    libraryProps: { role: "status" },
+    libraryProps: { role: inList ? "none" : "status" },
   });
 }
 

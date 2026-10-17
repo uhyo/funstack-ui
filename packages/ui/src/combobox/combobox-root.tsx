@@ -129,7 +129,10 @@ export interface ComboboxRootProps {
    * focus leaves.
    */
   allowCustomValue?: boolean;
-  /** Make the first option active whenever results settle and none is (APG "automatic selection"). Default `false`. */
+  /**
+   * Make the first enabled option active when the results for an open or an edit settle (APG
+   * "automatic selection"). Stale results are never highlighted. Default `false`.
+   */
   autoHighlight?: boolean;
   /** Open the listbox on a pointer click in the input (not on focus). Default `false`. */
   openOnClick?: boolean;
@@ -326,8 +329,10 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     try {
       await valueChangeAction?.(next, details);
     } catch (error) {
-      // Walkthrough 4: the text rolls back with the optimistic value. Outside the transition by
-      // now (after an await), so the write is urgent, as every text write.
+      // Walkthrough 4: the text rolls back with the optimistic value. A synchronous throw lands
+      // here inside the Root's `startTransition` callback; yield once so the write (and the
+      // consumer's `inputValueChangeAction`) is urgent, as every text write (conventions 2.6).
+      await undefined;
       const record = textRecord.current;
       if (meta !== undefined && record !== null && record.id === meta.id) {
         textRecord.current = null;
@@ -391,6 +396,10 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   const [registry] = useState(() => new Map<string, ComboboxOptionEntry>());
   const [optionCount, setOptionCount] = useState(0);
   const [statusCount, setStatusCount] = useState(0);
+  // The same count for the announcement effect: the open commit's passive effects can run before
+  // the re-render the Status's registration scheduled (the race `registry` avoids for options).
+  const statusCountRef = useRef(0);
+  const [labelCount, setLabelCount] = useState(0);
   const warnedDuplicate = useRef(false);
 
   const registerOption = useCallback(
@@ -421,8 +430,17 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   );
 
   const registerStatus = useCallback(() => {
+    statusCountRef.current += 1;
     setStatusCount((count) => count + 1);
-    return () => setStatusCount((count) => count - 1);
+    return () => {
+      statusCountRef.current -= 1;
+      setStatusCount((count) => count - 1);
+    };
+  }, []);
+
+  const registerLabel = useCallback(() => {
+    setLabelCount((count) => count + 1);
+    return () => setLabelCount((count) => count - 1);
   }, []);
 
   const [activeValue, setActiveValue] = useState<string | null>(null);
@@ -433,6 +451,10 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   }, []);
   // The edge to activate once the open has options (ArrowDown / ArrowUp while closed).
   const pendingEdge = useRef<"first" | "last" | null>(null);
+  // `autoHighlight` (APG automatic selection) highlights once per open and once per edit, when
+  // the results for it settle. Home / End / Left / Right clear the active option without
+  // re-arming it, so the caret keys really return visual focus to the input.
+  const autoArmed = useRef(true);
 
   const orderedOptions = useCallback((): OrderedOption[] => {
     const options: OrderedOption[] = [];
@@ -453,6 +475,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     if (!popover.committed) {
       // Keep the edge of an open that is on its way (the optimistic commit comes first).
       if (!popover.intended()) pendingEdge.current = null;
+      autoArmed.current = true;
       if (current !== null) setActive(null);
       return;
     }
@@ -464,7 +487,15 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     } else if (next !== null && !enabled.some((option) => option.value === next)) {
       next = null;
     }
-    if (next === null && autoHighlight && !stale && enabled.length > 0) next = enabled[0]!.value;
+    if (next !== null) {
+      // Something is active (keys, hover): nothing to highlight for these results.
+      autoArmed.current = false;
+    } else if (autoHighlight && autoArmed.current && !stale && enabled.length > 0) {
+      // Only settled results: a stale list's first option is never auto-highlighted, so a fast
+      // Enter commits the typed text or does nothing (design L5).
+      next = enabled[0]!.value;
+      autoArmed.current = false;
+    }
     if (next !== current) setActive(next);
   });
 
@@ -513,7 +544,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
       lastAnnounced.current = null;
       return;
     }
-    if (stale || loading) return;
+    if (stale || statusCountRef.current > 0) return;
     // The registry, not `optionCount`: a commit's passive effects can run before the re-render
     // that the Options' registration scheduled.
     const count = registry.size;
@@ -660,6 +691,10 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     if (disabled) return;
     writeText(next, "activate", event);
     pendingEdge.current = null;
+    // APG: editing moves visual focus back to the input; `autoHighlight` picks the first option
+    // again once the results for the new text settle.
+    if (activeRef.current !== null) setActive(null);
+    autoArmed.current = true;
     popover.requestOpen(event, "activate");
   };
 
@@ -737,6 +772,13 @@ export function ComboboxRoot(props: ComboboxRootProps) {
         if (allowCustomValue) flushSync(() => commitText(event, false));
         return false;
       }
+      case "Home":
+      case "End":
+      case "ArrowLeft":
+      case "ArrowRight":
+        // APG: the caret keys move visual focus to the input (not prevented: the caret moves).
+        if (activeRef.current !== null) setActive(null);
+        return false;
       default:
         return false;
     }
@@ -744,6 +786,8 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   /** Focus has left the input and the popup (design 5.4). */
   const leave = (event: Event): void => {
+    // `disabled`: nothing dispatches (disabling a focused input blurs it).
+    if (disabled) return;
     const popup = popover.popupRef.current;
     if (popup !== null && isPopoverOpen(popup)) {
       popover.recordCloseIntent({ reason: "dismiss", event });
@@ -801,11 +845,14 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     stale,
     activeValue,
     empty,
+    loading,
+    hasLabel: labelCount > 0,
     disabled,
     inputRef,
     listRef,
     registerOption,
     registerStatus,
+    registerLabel,
     setActive,
     accept,
     clear,
