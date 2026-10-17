@@ -89,6 +89,16 @@ export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
    * component with more fields (Menu) passes its own.
    */
   readonly details?: (event: Event | undefined, reason: ChangeReason) => Details;
+  /**
+   * `"library"` forces library mode whatever the props (Menu, which has no JS-free mode). Default:
+   * detected from `open` / `defaultOpen` / `openChangeAction` on the first render.
+   */
+  readonly mode?: "library";
+  /**
+   * Called synchronously for every dispatch, before the action runs (Menu: cancel hover timers,
+   * read the open cause).
+   */
+  readonly onDispatch?: (next: boolean, details: Details) => void;
 }
 
 function isPopoverOpen(element: Element | null): boolean {
@@ -123,11 +133,14 @@ function clearLater(
 export function usePopoverRoot<Details extends PopoverLikeDetails>(
   options: UsePopoverRootOptions<Details>,
 ): PopoverRootValue {
-  const { component, part, open, defaultOpen, openChangeAction, details } = options;
+  const { component, part, open, defaultOpen, openChangeAction, details, onDispatch } = options;
 
   // Mode is decided once, from the first render's props (design 2).
   const isLibraryNow =
-    open !== undefined || defaultOpen !== undefined || openChangeAction !== undefined;
+    options.mode === "library" ||
+    open !== undefined ||
+    defaultOpen !== undefined ||
+    openChangeAction !== undefined;
   const [mode] = useState<PopoverMode>(isLibraryNow ? "library" : "static");
   const isLibrary = mode === "library";
   useDevWarning(
@@ -182,20 +195,26 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
       ? details(event, reason)
       : (createActionDetails(event, { reason }) as unknown as Details);
 
+  const send = (next: boolean, event: Event | undefined, reason: ChangeReason): void => {
+    const built = buildDetails(event, reason);
+    onDispatch?.(next, built);
+    dispatch(next, built);
+  };
+
   const requestOpen = (event: Event | undefined, reason: ChangeReason): void => {
     if (!isLibrary || intended()) return;
-    dispatch(true, buildDetails(event, reason));
+    send(true, event, reason);
   };
 
   const requestClose = (event: Event | undefined, reason: ChangeReason): void => {
     if (!isLibrary || !intended()) return;
-    dispatch(false, buildDetails(event, reason));
+    send(false, event, reason);
   };
 
   // Same guard as `requestClose`; a separate name because the callers mean different things.
   const notifyClosed = (event: Event | undefined, reason: ChangeReason): void => {
     if (!isLibrary || !intended()) return;
-    dispatch(false, buildDetails(event, reason));
+    send(false, event, reason);
   };
 
   // Not memoised: `dispatch` is a new function on every render (as Dialog), so parts re-render

@@ -9,6 +9,11 @@ export interface UsePopoverPopupOptions {
   readonly part: string;
   /** Element to focus on open: a ref, or a selector resolved inside the popup (design 6.1). */
   readonly initialFocus: RefObject<HTMLElement | null> | string | undefined;
+  /**
+   * Replaces `initialFocus` with a function called right before each library open (Menu: the
+   * first or last item by open cause). `null` leaves the choice to the platform.
+   */
+  readonly resolveInitialFocus?: (popup: HTMLElement) => HTMLElement | null;
   readonly keepMounted: boolean | undefined;
   /** The consumer's `transition`; decides how a library-driven close keeps its content (4.4). */
   readonly transition: ViewTransitionClass | undefined;
@@ -159,6 +164,10 @@ export function usePopoverPopup(
   // --- Opening ------------------------------------------------------------------------------
 
   const resolveFocusTarget = (element: HTMLElement): HTMLElement | null => {
+    if (options.resolveInitialFocus !== undefined) {
+      const resolved = options.resolveInitialFocus(element);
+      return resolved !== null && element.contains(resolved) ? resolved : null;
+    }
     if (initialFocus === undefined) return null;
     const target = resolveInitialFocus(element, initialFocus);
     if (target !== null && element.contains(target)) return target;
