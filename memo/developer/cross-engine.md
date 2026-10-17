@@ -78,3 +78,20 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
 - Escape hides an auto popover synchronously but its `toggle` is a task: key handlers that run
   in between must read `:popover-open`, not the library's intended state.
 - Firefox keeps keyboard focus in a removed iframe; restore `window.focus()` after iframe rows.
+
+## Issue #49 test cleanups (2026-10-17)
+
+- Menu submenu rows no longer force `side={null}` on WebKit: the default-placement WebKit row
+  passed on CI (302008 did not hang), so all submenu rows, the inline-flip row included, use the
+  shipped `flip-inline` placement everywhere. The WebKit-only 302008 row stays as a named guard
+  (opens twice under a 15 s timeout). Not runnable locally (WebKit host libs missing): the first
+  CI WebKit run must confirm the anchoring row (`s.left === m.right`) and the flip row on WebKit.
+  Popover's nested rows (`innerSide`) still use `side={null}` on WebKit; untouched (out of scope).
+- CheckboxGroup VT row: a view transition commits in its callback, after `act` returns; WebKit
+  logged the act() warning. The click and wait now run with `IS_REACT_ACT_ENVIRONMENT = false`,
+  as the Popover / Menu VT rows do.
+- Dialog browser rows: `settle(check)` loops `flush()` until the check passes (2 s cap), so a slow
+  `close` task under load no longer fails a row; `openWithTrigger()` waits for the deferred open.
+  Negative checks (still closed / still open) keep a single `flush()`.
+- Still in the WebKit CI log, not addressed: act() warnings from several Combobox rows and the
+  Menu "Tooltip on an item" row.
