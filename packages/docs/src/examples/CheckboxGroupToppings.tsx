@@ -1,5 +1,5 @@
 "use client";
-import { startTransition, useRef, useState } from "react";
+import { startTransition, useId, useRef, useState } from "react";
 import { CheckboxGroup } from "@funstack/ui/checkbox-group";
 import type { CheckboxGroupValueChangeDetails } from "@funstack/ui/checkbox-group";
 import { fakeSave } from "./fake-api.js";
@@ -23,8 +23,11 @@ function applyChange(prev: readonly string[], change: CheckboxGroupValueChangeDe
 // Parent box derives its checked / mixed state from the Items' optimistic state and its click
 // follows the APG cycle: mixed → all → none → the last combination that was saved → … Every
 // click is one `valueChangeAction` with `added` / `removed`. A failed save is caught and not
-// adopted, so the boxes roll back (the Parent to mixed) when it settles.
+// adopted, so the boxes roll back (the Parent to mixed) when it settles. `aria-controls` on the
+// Parent lists the boxes it controls, as in the APG mixed-state example (it passes through).
 export function CheckboxGroupToppings() {
+  const idPrefix = useId();
+  const itemId = (value: string) => `${idPrefix}-${value}`;
   const [selected, setSelected] = useState<string[]>(["cheese"]);
   // Read from a ref: state set inside a pending transition is not visible to a second click.
   const failNext = useRef(false);
@@ -55,13 +58,21 @@ export function CheckboxGroupToppings() {
           )}
         </CheckboxGroup.Label>
         <label className="demo-field">
-          <CheckboxGroup.Parent values={toppings.map((t) => t.value)} className="demo-checkbox" />
+          <CheckboxGroup.Parent
+            values={toppings.map((t) => t.value)}
+            aria-controls={toppings.map((t) => itemId(t.value)).join(" ")}
+            className="demo-checkbox"
+          />
           All toppings
           <span className="demo-spinner demo-checkbox-group-spinner" aria-hidden />
         </label>
         {toppings.map((topping) => (
           <label key={topping.value} className="demo-field demo-nested">
-            <CheckboxGroup.Item value={topping.value} className="demo-checkbox" />
+            <CheckboxGroup.Item
+              id={itemId(topping.value)}
+              value={topping.value}
+              className="demo-checkbox"
+            />
             {topping.label}
             <span className="demo-spinner demo-checkbox-group-spinner" aria-hidden />
           </label>

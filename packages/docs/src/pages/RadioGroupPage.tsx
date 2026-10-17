@@ -173,9 +173,9 @@ export function RadioGroupPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
+            default: "–",
             description:
-              "Forwarded to the Item's `<ViewTransition default>`. Fires only on the commit that settles an action or rolls it back, never on the check itself.",
+              "Forwarded to the Item's `<ViewTransition default>`; without it no boundary is rendered. Fires only on the commit that settles an action or rolls it back, never on the check itself.",
           },
           {
             name: "className",
