@@ -41,8 +41,10 @@ export type UrgentChangeAction<T, Details extends ActionDetails = ActionDetails>
  *   `details.event` is the platform's `close` event. Dialog is the first component to use it.
  * - `"platform"`: the browser changed the state itself: find-in-page, a form reset (`event` is
  *   the `reset` event), or interaction before hydration found at mount (`event` is `undefined`).
+ * - `"timeout"`: the library's own timer closed the component; no user gesture and no platform
+ *   event (`event` is `undefined`). Toast's auto-dismiss is the only user.
  */
-export type ChangeReason = "activate" | "dismiss" | "platform";
+export type ChangeReason = "activate" | "dismiss" | "platform" | "timeout";
 
 /** A prop value that is either a plain value or a function of the part's state. */
 export type StateValue<T, State> = T | ((state: State) => T);

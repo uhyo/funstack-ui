@@ -20,6 +20,7 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useModalRegistration } from "../internal/use-modal-registration.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
@@ -199,6 +200,9 @@ export function DialogPopup({
   // not re-open it from a commit that lands in between.
   const awaitingClose = useRef(false);
   const warnedFocus = useRef(false);
+
+  // Toast's Viewport moves its region into the topmost open modal (design/components/toast.md 4.3).
+  useModalRegistration(dialog);
 
   useDevWarning(
     !isLibrary && transition !== undefined,
