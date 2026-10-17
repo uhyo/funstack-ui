@@ -1,0 +1,2 @@
+chromium 156.0.8078.4 {"subOpenFocus":"m,s focus=si","escInSub":"m focus=","escInMenu":"(none) focus=","tabFromLastSubItem":"m,s focus=after","hideSubFromScript":"m focus=after"}
+firefox 157.0 {"subOpenFocus":"m,s focus=si","escInSub":"m focus=","escInMenu":"(none) focus=","tabFromLastSubItem":"m,s focus=after","hideSubFromScript":"m focus=after"}

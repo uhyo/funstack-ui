@@ -1,0 +1,274 @@
+
+##### chromium 156.0.8078.4
+features {
+ "hint": "hint",
+ "interestFor": true,
+ "focusgroup": true,
+ "focusgroupAttrProp": [
+  "focusGroup"
+ ],
+ "commandFor": true,
+ "menulistElement": "HTMLUnknownElement",
+ "menuitemElement": "HTMLUnknownElement",
+ "anchoredContainer": true,
+ "positionTryFallbacks": true,
+ "positionAnchorInitial": "normal",
+ "toggleEventSource": true,
+ "openPseudo": true,
+ "startVT": "function"
+}
+nesting {
+ "openMenu": "m",
+ "openSubDomChild": "m,s1",
+ "thenSubSibling_commandfor": "m,s2",
+ "esc1": "m",
+ "esc2": "(none)",
+ "jsNoSource": "s3",
+ "jsWithSource": "m,s3",
+ "outsideClick": "(none)",
+ "clickParentItemWhileSubOpen": "m",
+ "unrelatedAutoOpens": "other",
+ "invokerToggle": "m -> (none)"
+}
+focus {
+ "afterOpenByKeyboard": "t",
+ "tabFromInvoker": "i1",
+ "tab5FromInvoker": "after",
+ "openAfterTabbingOut": "m",
+ "escapeFocusReturn": "t",
+ "hidePopoverFocusReturn": "t",
+ "scriptOpenNoSourceEscapeFocus": "before",
+ "scriptOpenWithSourceEscapeFocus": "before",
+ "lightDismissFocus": "far",
+ "autofocusOnShow": "i1",
+ "itemHidePopoverFocus": "t open=(none)",
+ "tabFromCommandforInvokerFarPopover": "s2i",
+ "tabOutOfFarPopover": "before",
+ "tabAfterShowPopoverSource": "s2i"
+}
+toggleSource {
+ "log": [
+  "before:open:src=t:cancelable=true",
+  "toggle:open:src=t",
+  "before:closed:src=t:cancelable=false",
+  "toggle:closed:src=t"
+ ],
+ "cmd": "toggle-popover:src=t:cancelable=true",
+ "openAfterPreventedCommand": false
+}
+anchorPosition {
+ "t": [
+  78,
+  20,
+  127,
+  41
+ ],
+ "m": [
+  78,
+  41,
+  206,
+  139
+ ],
+ "subDom": [
+  85,
+  69,
+  199,
+  90
+ ],
+ "s1": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "subSib": [
+  85,
+  90,
+  199,
+  111
+ ],
+ "s2": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "subJs": [
+  85,
+  111,
+  199,
+  132
+ ],
+ "s3": [
+  199,
+  111,
+  275,
+  146
+ ],
+ "open": [
+  true,
+  false,
+  false,
+  true
+ ]
+}
+viewTransition {
+ "openAnims": [
+  "::view-transition-group(root)",
+  "::view-transition-new(root)",
+  "::view-transition-new(root)",
+  "::view-transition-old(root)",
+  "::view-transition-old(root)",
+  "::view-transition-new(menu)"
+ ],
+ "openRect": [
+  78,
+  41
+ ],
+ "closeAnims": [
+  "::view-transition-group(root)",
+  "::view-transition-new(root)",
+  "::view-transition-new(root)",
+  "::view-transition-old(root)",
+  "::view-transition-old(root)",
+  "::view-transition-old(menu)"
+ ],
+ "openDuringClose": false,
+ "popoverStillOpenAfterUnrelatedVT": true
+}
+
+##### firefox 157.0
+features {
+ "hint": "hint",
+ "interestFor": false,
+ "focusgroup": false,
+ "focusgroupAttrProp": [],
+ "commandFor": true,
+ "menulistElement": "HTMLUnknownElement",
+ "menuitemElement": "HTMLUnknownElement",
+ "anchoredContainer": false,
+ "positionTryFallbacks": true,
+ "positionAnchorInitial": "normal",
+ "toggleEventSource": true,
+ "openPseudo": true,
+ "startVT": "function"
+}
+nesting {
+ "openMenu": "m",
+ "openSubDomChild": "m,s1",
+ "thenSubSibling_commandfor": "m,s2",
+ "esc1": "m",
+ "esc2": "(none)",
+ "jsNoSource": "s3",
+ "jsWithSource": "m,s3",
+ "outsideClick": "(none)",
+ "clickParentItemWhileSubOpen": "m",
+ "unrelatedAutoOpens": "other",
+ "invokerToggle": "m -> (none)"
+}
+focus {
+ "afterOpenByKeyboard": "t",
+ "tabFromInvoker": "i1",
+ "tab5FromInvoker": "after",
+ "openAfterTabbingOut": "m",
+ "escapeFocusReturn": "t",
+ "hidePopoverFocusReturn": "t",
+ "scriptOpenNoSourceEscapeFocus": "before",
+ "scriptOpenWithSourceEscapeFocus": "before",
+ "lightDismissFocus": "far",
+ "autofocusOnShow": "i1",
+ "itemHidePopoverFocus": "t open=(none)",
+ "tabFromCommandforInvokerFarPopover": "s2i",
+ "tabOutOfFarPopover": "before",
+ "tabAfterShowPopoverSource": "s2i"
+}
+toggleSource {
+ "log": [
+  "before:open:src=t:cancelable=true",
+  "toggle:open:src=t",
+  "before:closed:src=t:cancelable=false",
+  "toggle:closed:src=t"
+ ],
+ "cmd": "toggle-popover:src=t:cancelable=true",
+ "openAfterPreventedCommand": false
+}
+anchorPosition {
+ "t": [
+  80,
+  20,
+  129,
+  43
+ ],
+ "m": [
+  80,
+  43,
+  214,
+  149
+ ],
+ "subDom": [
+  87,
+  73,
+  207,
+  96
+ ],
+ "s1": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "subSib": [
+  87,
+  96,
+  207,
+  119
+ ],
+ "s2": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "subJs": [
+  87,
+  119,
+  207,
+  142
+ ],
+ "s3": [
+  207,
+  119,
+  284,
+  156
+ ],
+ "open": [
+  true,
+  false,
+  false,
+  true
+ ]
+}
+viewTransition {
+ "openAnims": [
+  "::view-transition-group(root)",
+  "::view-transition-old(root)",
+  "::view-transition-old(root)",
+  "::view-transition-new(menu)",
+  "::view-transition-new(root)",
+  "::view-transition-new(root)"
+ ],
+ "openRect": [
+  80,
+  43
+ ],
+ "closeAnims": [
+  "::view-transition-group(root)",
+  "::view-transition-old(menu)",
+  "::view-transition-old(root)",
+  "::view-transition-old(root)",
+  "::view-transition-new(root)",
+  "::view-transition-new(root)"
+ ],
+ "openDuringClose": false,
+ "popoverStillOpenAfterUnrelatedVT": true
+}

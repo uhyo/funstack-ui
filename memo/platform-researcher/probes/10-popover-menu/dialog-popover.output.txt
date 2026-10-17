@@ -1,0 +1,37 @@
+chromium 156.0.8078.4 {
+ "d1:focusAfterOpen": "d1b",
+ "d1:open/modal": "true/false/open-attr=false",
+ "d1:afterEscape": "t1 open=false",
+ "d2:focusAfterOpen": "t2",
+ "d2:open/modal": "true/false/open-attr=false",
+ "d2:afterEscape": "t2 open=false",
+ "d3:focusAfterOpen": "d3b",
+ "d3:open/modal": "true/false/open-attr=false",
+ "d3:afterEscape": "t3 open=false",
+ "d4:focusNoFocusable": "d4"
+}
+  button "dialog popover" expanded=true details=""
+  button "div popover" expanded=false
+  button "dialog popover, tabindex=-1 first" expanded=false
+  dialog "" modal=true
+  button "inside" 
+firefox 157.0 {
+ "d1:focusAfterOpen": "d1b",
+ "d1:open/modal": "true/false/open-attr=false",
+ "d1:afterEscape": "t1 open=false",
+ "d2:focusAfterOpen": "t2",
+ "d2:open/modal": "true/false/open-attr=false",
+ "d2:afterEscape": "t2 open=false",
+ "d3:focusAfterOpen": "d3b",
+ "d3:open/modal": "true/false/open-attr=false",
+ "d3:afterEscape": "t3 open=false",
+ "d4:focusNoFocusable": "d4"
+}
+dialog ["focusable=true","modal=false"]
+dialog ["focusable=true","focused=true","modal=false"]
+2 dialogs after div popover open (b,c auto closed)
+[ 'a:false', 'b:false', 'c:false' ]
+<dialog id=x popover><button>i</button></dialog> showPopover => [true]
+<dialog id=x popover=manual><button>i</button></dialog> showPopover => [true]
+<dialog id=x><button>i</button></dialog> show => [false]
+<button id=t commandfor=x command=toggle-popover>t</button>< click => [true]

@@ -1,0 +1,16 @@
+[sub=auto delay=0s] hover item, hover sibling item: menu,sub focus=t | menu focus=t
+[sub=auto delay=0s] hover item, move into sub, move to far: menu,sub focus=t | menu,sub focus=t | menu focus=t
+[sub=auto delay=0s] focus item (keyboard), Escape, Escape: menu,sub focus=si | (none) focus=t | (none) focus=t
+[sub=auto delay=0s] focus item, focus sibling item: menu,sub focus=si | menu focus=i1
+[sub=auto delay=0s] focus item, ArrowRight, Tab: menu,sub focus=si | menu,sub focus=si | menu,sub focus=s1
+[sub=auto delay=normal] hover item, hover sibling item: menu,sub focus=t | menu focus=t
+[sub=auto delay=normal] hover item, move into sub, move to far: menu,sub focus=t | menu,sub focus=t | menu focus=t
+[sub=auto delay=normal] focus item (keyboard), Escape, Escape: menu,sub focus=si | (none) focus=t | (none) focus=t
+[sub=auto delay=normal] focus item, focus sibling item: menu,sub focus=si | menu focus=i1
+[sub=auto delay=normal] focus item, ArrowRight, Tab: menu,sub focus=si | menu,sub focus=si | menu,sub focus=s1
+[sub=hint delay=0s] hover item, hover sibling item: menu,sub focus=t | menu focus=t
+[sub=hint delay=0s] hover item, move into sub, move to far: menu,sub focus=t | menu,sub focus=t | menu focus=t
+[sub=hint delay=0s] focus item (keyboard), Escape, Escape: menu,sub focus=si | (none) focus=t | (none) focus=t
+[sub=hint delay=0s] focus item, focus sibling item: menu,sub focus=si | menu focus=i1
+[sub=hint delay=0s] focus item, ArrowRight, Tab: menu,sub focus=si | menu,sub focus=si | menu,sub focus=s1
+chromium 156.0.8078.4

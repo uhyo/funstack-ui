@@ -1,0 +1,45 @@
+--- all closed
+  button "popovertarget (adjacent)" invalid="false" expanded=false
+  button "commandfor toggle (far)" invalid="false" expanded=false
+  button "commandfor show (far)" invalid="false" expanded=false
+  button "menu button (explicit haspopup)" invalid="false" hasPopup="menu" expanded=false
+  paragraph "" 
+--- pc open via commandfor toggle-popover
+  button "popovertarget (adjacent)" invalid="false" expanded=false
+  button "commandfor toggle (far)" invalid="false" focused=true expanded=true details=""
+  button "commandfor show (far)" invalid="false" expanded=false
+  button "menu button (explicit haspopup)" invalid="false" hasPopup="menu" expanded=false
+  paragraph "" 
+  group "" 
+  button "pc item" invalid="false"
+--- menu open
+  button "popovertarget (adjacent)" invalid="false" expanded=false
+  button "commandfor toggle (far)" invalid="false" expanded=false
+  button "commandfor show (far)" invalid="false" expanded=false
+  button "menu button (explicit haspopup)" invalid="false" focused=true hasPopup="menu" expanded=true details=""
+  paragraph "" 
+  menu "menu button (explicit haspopup)" orientation="vertical" labelledby=["m"]
+  menuitem "Cut" invalid="false"
+  menuitem "Copy" invalid="false"
+interestfor submenu {
+ "hoverItem": "menu,sub",
+ "moveIntoSub": "menu,sub",
+ "hoverSibling": "menu,sub",
+ "keyboardFocusItem": "menu,sub focus=si",
+ "escapeAfterFocusInterest": "(none) focus=t",
+ "escape2": "(none)",
+ "clickItemWithInterestfor": "menu,sub",
+ "subPopoverType": "auto"
+}
+focusgroup=menu ArrowDown->f3  ArrowDown->f1  ArrowDown->f3  ArrowDown->f1  ArrowUp->f3  ArrowRight->f3  End->f3  Home->f1  p->f1  Tab->out  ShiftTab->f1
+tabIndex f1:tabIndex=0 f2:tabIndex=0 f3:tabIndex=0 f4:tabIndex=-1
+--- focusgroup=menu AX
+  menu "Edit" orientation="vertical"
+  button "out" invalid="false"
+  menuitem "Cut" invalid="false" focused=true
+  button "Copy" disabled=true invalid="false"
+  menuitem "Paste" invalid="false"
+  menuitem "Span item" 
+menu wrap: ArrowDown from last -> w1
+focusgroup inside popover: x2 x1
+chromium 156.0.8078.4
