@@ -22,14 +22,14 @@ function JsFreeShare() {
       <p>
         No <code>open</code>, <code>defaultOpen</code> or <code>openChangeAction</code>: the Trigger
         is a native <code>command="toggle-popover"</code> invoker. The browser opens it in the top
-        layer below the button, focuses the <code>autoFocus</code> input, and closes it on Escape, a
-        click outside or Done. The library only keeps <code>aria-expanded</code> current.
+        layer below the button, focuses the input (the first focusable element), and closes it on
+        Escape, a click outside or Done. The library only keeps <code>aria-expanded</code> current.
       </p>
       <Popover.Root>
         <Popover.Trigger className="pop-btn">Share</Popover.Trigger>
         <Popover.Popup className="pop" align="start">
           <Popover.Title>Share this page</Popover.Title>
-          <input className="pop-input" readOnly value="https://ui.funstack.work/" autoFocus />
+          <input className="pop-input" readOnly value="https://ui.funstack.work/" />
           <div className="pop-actions">
             <Popover.Close className="pop-btn">Done</Popover.Close>
           </div>
