@@ -129,7 +129,7 @@ export function TransitionsPage() {
           [
             "committed state",
             "the `transition` prop",
-            "`Tabs.Panel` swaps, `Accordion.Item` / `Panel` in library mode",
+            "`Tabs.Panel` swaps, `Accordion.Item` / `Panel` in library mode, `Dialog.Popup` / `Popover.Popup` opens and the closes their parts ask for (library mode)",
           ],
           [
             "pending ending, a snap-back",
@@ -139,7 +139,7 @@ export function TransitionsPage() {
           [
             "browser-owned state",
             "CSS: `@starting-style`, `transition-behavior: allow-discrete`",
-            "Tooltip popup, Accordion in JS-free mode (`::details-content`)",
+            "Tooltip popup, Accordion in JS-free mode (`::details-content`), a Dialog or Popover dismissed with Escape or a click outside",
           ],
         ]}
       />
