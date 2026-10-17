@@ -116,6 +116,24 @@ const flush = () =>
     await sleep(20);
   });
 
+/**
+ * Flushes until `check` passes (up to `timeout` ms), so an update that lands after an interaction
+ * (a `toggle` task, a slow engine) still happens inside `act`. `expect.poll` would observe it
+ * outside `act`, which logs React's act() warning.
+ */
+async function settle(check: () => void, timeout = 2000): Promise<void> {
+  const start = performance.now();
+  for (;;) {
+    await flush();
+    try {
+      check();
+      return;
+    } catch (error) {
+      if (performance.now() - start > timeout) throw error;
+    }
+  }
+}
+
 async function typeInto(text: string) {
   if (document.activeElement !== input()) await user.click(input());
   await user.keyboard(text);
@@ -231,7 +249,7 @@ describe("Combobox (browser)", () => {
         </>,
       );
       await user.click(input());
-      await userEvent.clear(input());
+      await user.clear(input());
       await user.keyboard("Ja");
       await flush();
       expect(isOpen()).toBe(true);
@@ -311,7 +329,7 @@ describe("Combobox (browser)", () => {
         />,
       );
       await user.click(input());
-      await userEvent.clear(input());
+      await user.clear(input());
       await user.keyboard("Jam");
       await flush();
       expect(isOpen()).toBe(true);
@@ -345,7 +363,7 @@ describe("Combobox (browser)", () => {
     await typeInto("j");
     await user.keyboard("{ArrowDown}{Enter}");
     expect(option("jp")).toHaveAttribute("data-pending", "");
-    await userEvent.clear(input());
+    await user.clear(input());
     await user.keyboard("fr");
     await expect.poll(() => optionTexts(), { timeout: 2000 }).toEqual(["France"]);
     expect(screen.getByTestId("list")).not.toHaveAttribute("data-stale");
@@ -372,7 +390,7 @@ describe("Combobox (browser)", () => {
     );
     await typeInto("j");
     await user.keyboard("{ArrowDown}{Enter}");
-    await userEvent.clear(input());
+    await user.clear(input());
     await user.keyboard("f");
     await flush();
     expect(screen.getByTestId("list")).toHaveAttribute("data-stale", "");
@@ -444,9 +462,9 @@ describe("Combobox (browser)", () => {
         );
         for (let i = 0; i < 2; i++) {
           await typeInto(i === 0 ? "j" : "a");
-          await expect.poll(() => isOpen(), { timeout: 3000 }).toBe(true);
+          await settle(() => expect(isOpen()).toBe(true), 3000);
           await user.keyboard("{Escape}");
-          await expect.poll(() => isOpen(), { timeout: 3000 }).toBe(false);
+          await settle(() => expect(isOpen()).toBe(false), 3000);
         }
         expect(screen.getByTestId("popover").matches(":popover-open")).toBe(true);
       },
@@ -655,7 +673,7 @@ describe("ViewTransition (browser)", () => {
       <Combobox.Root>
         <Combobox.Input data-testid="input" />
         <Combobox.Popup data-testid="popup" transition={transition} style={popupStyle}>
-          <Combobox.List data-testid="list">
+          <Combobox.List data-testid="list" aria-label="Country">
             {({ query }) => (search ? <search.Results query={query} /> : <Options query={query} />)}
           </Combobox.List>
         </Combobox.Popup>
