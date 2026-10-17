@@ -12,14 +12,15 @@ export function RoadmapPage() {
       />
       <h2>Roadmap & changelog</h2>
       <p className="page-intro">
-        FUNSTACK UI is experimental and has not had its first release yet. Planning happens in{" "}
+        FUNSTACK UI is experimental; its first alpha is on npm. Planning happens in{" "}
         <a href={ISSUES_URL}>GitHub issues</a>; this page is a short summary.
       </p>
 
       <h3>Changelog</h3>
       <p>
-        No release has been published. Once releases start, each one is listed on{" "}
-        <a href={`${GITHUB_URL}/releases`}>GitHub Releases</a>. Until then, the{" "}
+        The first alpha, <code>0.1.0-alpha.0</code>, is published on npm under the{" "}
+        <code>alpha</code> dist-tag: <code>npm install @funstack/ui@alpha</code>. Each release is
+        listed on <a href={`${GITHUB_URL}/releases`}>GitHub Releases</a>; between releases, the{" "}
         <a href={`${GITHUB_URL}/commits/master`}>commit history</a> is the changelog.
       </p>
 
@@ -45,24 +46,31 @@ export function RoadmapPage() {
           Browser-mode tests (Playwright) in Chromium, Firefox and WebKit for Popover, anchor
           positioning, <code>&lt;dialog&gt;</code>, native inputs and ViewTransition.
         </li>
+        <li>
+          A conditional <code>&lt;ViewTransition&gt;</code> boundary: components render one only
+          when the <code>transition</code> prop is given, so a component mounting inside a
+          transition no longer starts a document view transition (<a href={issue(35)}>#35</a>).
+        </li>
+        <li>
+          The first npm release, <code>0.1.0-alpha.0</code> (dist-tag <code>alpha</code>).
+        </li>
       </ul>
 
       <h3>Next</h3>
       <ul>
         <li>
-          A first npm release of <code>@funstack/ui</code>.
+          Popover: a non-modal overlay on the Popover API (<a href={issue(38)}>#38</a>,{" "}
+          <a href={issue(40)}>#40</a>).
+        </li>
+        <li>
+          Menu: a menu button (<a href={issue(39)}>#39</a>, <a href={issue(41)}>#41</a>).
         </li>
         <li>
           CheckboxGroup: a <code>&lt;fieldset&gt;</code> with a shared <code>name</code>, a parent
           box with mixed state, and a group-level <code>required</code> (<a href={issue(33)}>#33</a>
-          , in design).
+          ).
         </li>
-        <li>
-          The cost of a <code>&lt;ViewTransition&gt;</code> that mounts inside a transition: React
-          starts a document view transition even with <code>default="none"</code>, which delays the
-          next commit (<a href={issue(35)}>#35</a>, in research).
-        </li>
-        <li>More components, toward a full set: Popover, Menu, Select, ToggleGroup, and more.</li>
+        <li>More components after that, toward a full set: Select, ToggleGroup, and more.</li>
       </ul>
 
       <h3>Deferred</h3>

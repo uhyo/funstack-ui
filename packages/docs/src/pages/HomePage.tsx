@@ -54,8 +54,8 @@ export function HomePage() {
 
       <Callout kind="warning" title="Experimental">
         <p>
-          FUNSTACK UI is experimental. APIs change without notice, and the first release on npm has
-          not happened yet. Feedback and issues are welcome on{" "}
+          FUNSTACK UI is experimental. APIs change without notice; releases are published on npm
+          under the <code>alpha</code> dist-tag. Feedback and issues are welcome on{" "}
           <a href="https://github.com/uhyo/funstack-ui/issues">GitHub</a>.
         </p>
       </Callout>
@@ -132,7 +132,7 @@ export function HomePage() {
         <a href="/components/radio-group">RadioGroup</a>. A larger set follows; see the{" "}
         <a href="/roadmap">roadmap</a>.
       </p>
-      <CodeBlock language="bash">{`npm install @funstack/ui`}</CodeBlock>
+      <CodeBlock language="bash">{`npm install @funstack/ui@alpha`}</CodeBlock>
     </div>
   );
 }

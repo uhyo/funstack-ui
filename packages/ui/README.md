@@ -21,7 +21,7 @@ Documentation: https://ui.funstack.work
 ## Installation
 
 ```sh
-npm install @funstack/ui
+npm install @funstack/ui@alpha
 ```
 
 React 19.3 or later is required (`react` and `react-dom` are peer dependencies).

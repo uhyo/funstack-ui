@@ -17,12 +17,11 @@ export function GettingStartedPage() {
       </p>
 
       <h3>Install</h3>
-      <CodeBlock language="bash">{`npm install @funstack/ui`}</CodeBlock>
-      <Callout kind="warning" title="Not on npm yet">
+      <CodeBlock language="bash">{`npm install @funstack/ui@alpha`}</CodeBlock>
+      <Callout kind="warning" title="Alpha">
         <p>
-          <code>@funstack/ui</code> has not had its first release. Until then, build it from{" "}
-          <a href="https://github.com/uhyo/funstack-ui">the repository</a> (
-          <code>pnpm install && pnpm build</code>, then depend on <code>packages/ui</code>).
+          <code>@funstack/ui</code> is published as alpha releases under the <code>alpha</code>{" "}
+          dist-tag; there is no <code>latest</code> release yet. APIs change without notice.
         </p>
       </Callout>
       <p>

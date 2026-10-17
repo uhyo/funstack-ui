@@ -11,7 +11,7 @@ See [docs/vision.md](./docs/vision.md) for the principles behind the project.
 ## Installation
 
 ```sh
-npm install @funstack/ui
+npm install @funstack/ui@alpha
 ```
 
 React 19.3 or later is required (`react` and `react-dom` are peer dependencies).
