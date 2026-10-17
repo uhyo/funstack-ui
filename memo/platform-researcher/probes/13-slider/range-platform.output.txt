@@ -1,0 +1,47 @@
+
+######## chromium 156.0.8078.4
+keys horizontal (50, step 1)                   "ArrowRight=51 ArrowLeft=49 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+keys big (500, step 10, max 1000)              "ArrowRight=510 ArrowLeft=490 ArrowUp=510 ArrowDown=490 PageUp=600 PageDown=400 Home=0 End=1000"
+keys dir=rtl                                   "ArrowRight=49 ArrowLeft=51 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+keys vertical-lr + direction:rtl               "ArrowRight=51 ArrowLeft=49 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+keys vertical-lr (ltr)                         "ArrowRight=51 ArrowLeft=49 ArrowUp=49 ArrowDown=51 PageUp=60 PageDown=40 Home=0 End=100"
+keys with datalist                             "ArrowRight=51 ArrowLeft=49 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+events: two ArrowRight presses                 ["h:input:51","h:change:51","h:input:52","h:change:52"]
+click at 90% of track -> value                 "93"
+events: click on track                         ["h:input:93","h:change:93"]
+drag: events before mouseup                    ["h:input:58","h:input:66","h:input:74","h:input:83"]
+drag: events after mouseup                     ["h:input:83","h:change:83"]
+vertical rtl: click near top -> value          "100"
+vertical ltr: click near top -> value          "0"
+vertical box (w,h)                             [16,200]
+styled thumb width (elementFromPoint size check) {"h":8,"appearance":"none"}
+feature detection                              {"appearanceBase":false,"sliderThumb":false,"sliderTrack":false,"sliderFill":false,"webkitThumb":true,"mozThumb":false,"rangegroup":"HTMLUnknownElement","stepUpCommand":"","fieldSizing":true}
+FormData + reset                               {"fd":[["vol","73"]],"afterReset":"50"}
+value sanitisation                             {"over":"1000","offStep":"30","nan":"500","defaultNoAttrs":"50","maxNotOnStep":"4","validity":true}
+AX slider Volume                               {"value":50,"invalid":"false","focusable":true,"settable":true,"orientation":"horizontal","valuemin":0,"valuemax":100,"valuetext":"50"}
+AX slider rtl                                  {"value":50,"invalid":"false","focusable":true,"settable":true,"orientation":"horizontal","valuemin":0,"valuemax":100,"valuetext":"50"}
+AX slider vertical rtl (bottom-to-top)         {"value":50,"invalid":"false","focusable":true,"settable":true,"orientation":"vertical","valuemin":0,"valuemax":100,"valuetext":"50"}
+AX slider vertical ltr                         {"value":50,"invalid":"false","focusable":true,"focused":true,"settable":true,"orientation":"vertical","valuemin":0,"valuemax":100,"valuetext":"50"}
+AX slider list                                 {"value":50,"invalid":"false","focusable":true,"settable":true,"autocomplete":"list","orientation":"horizontal","valuemin":0,"valuemax":100,"valuetext":"50"}
+AX slider styled                               {"value":50,"invalid":"false","focusable":true,"settable":true,"orientation":"horizontal","valuemin":0,"valuemax":100,"valuetext":"50"}
+AX slider big                                  {"value":500,"invalid":"false","focusable":true,"settable":true,"orientation":"horizontal","valuemin":0,"valuemax":1000,"valuetext":"500"}
+
+######## firefox 157.0
+keys horizontal (50, step 1)                   "ArrowRight=51 ArrowLeft=49 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+keys big (500, step 10, max 1000)              "ArrowRight=510 ArrowLeft=490 ArrowUp=510 ArrowDown=490 PageUp=600 PageDown=400 Home=0 End=1000"
+keys dir=rtl                                   "ArrowRight=49 ArrowLeft=51 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+keys vertical-lr + direction:rtl               "ArrowRight=49 ArrowLeft=51 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+keys vertical-lr (ltr)                         "ArrowRight=51 ArrowLeft=49 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+keys with datalist                             "ArrowRight=51 ArrowLeft=49 ArrowUp=51 ArrowDown=49 PageUp=60 PageDown=40 Home=0 End=100"
+events: two ArrowRight presses                 ["h:input:51","h:change:51","h:input:52","h:change:52"]
+click at 90% of track -> value                 "94"
+events: click on track                         ["h:input:94","h:change:94"]
+drag: events before mouseup                    ["h:input:58","h:input:67","h:input:75","h:input:83"]
+drag: events after mouseup                     ["h:input:83","h:change:83"]
+vertical rtl: click near top -> value          "100"
+vertical ltr: click near top -> value          "0"
+vertical box (w,h)                             [20,200]
+styled thumb width (elementFromPoint size check) {"h":8,"appearance":"none"}
+feature detection                              {"appearanceBase":false,"sliderThumb":false,"sliderTrack":false,"sliderFill":false,"webkitThumb":false,"mozThumb":true,"rangegroup":"HTMLUnknownElement","stepUpCommand":"","fieldSizing":true}
+FormData + reset                               {"fd":[["vol","73"]],"afterReset":"50"}
+value sanitisation                             {"over":"1000","offStep":"30","nan":"500","defaultNoAttrs":"50","maxNotOnStep":"4","validity":true}

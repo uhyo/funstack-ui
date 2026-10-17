@@ -1,0 +1,2 @@
+chromium 156.0.8078.4 {"afterDragLo":["40","80"],"afterDragHi":["40","60"],"afterTrackClick":["40","60"],"elementAtTrack":"wrap","ghostClickAt80pct":"82","ghostFocused":"ghost"}
+firefox 157.0 {"afterDragLo":["40","80"],"afterDragHi":["40","60"],"afterTrackClick":["40","60"],"elementAtTrack":"wrap","ghostClickAt80pct":"82","ghostFocused":"ghost"}

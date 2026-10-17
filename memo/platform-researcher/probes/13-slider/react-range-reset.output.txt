@@ -1,0 +1,2 @@
+before reset   controlled 70 attr 70 | uncontrolled 70 attr 20
+after reset    controlled 70 | uncontrolled 20

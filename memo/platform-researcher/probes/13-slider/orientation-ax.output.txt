@@ -1,0 +1,4 @@
+chromium 156.0.8078.4
+horizontal + aria-orientation=vertical     {"orientation":"horizontal","valuemin":0,"valuemax":100,"value":50}
+vertical writing-mode                      {"orientation":"vertical","valuemin":0,"valuemax":100,"value":50}
+dynamic min 40                             {"orientation":"horizontal","valuemin":40,"valuemax":100,"value":60}

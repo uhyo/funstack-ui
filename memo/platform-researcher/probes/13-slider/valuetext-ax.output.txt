@@ -1,0 +1,5 @@
+chromium 156.0.8078.4
+native with valuetext            {"value":50,"valuetext":"50","valuemin":0,"valuemax":100}
+native, valuetext set later      {"value":50,"valuetext":"50","valuemin":0,"valuemax":100}
+native with aria-valuemax        {"value":3,"valuetext":"50","valuemin":0,"valuemax":10}
+aria slider                      {"value":50,"valuetext":"","valuemin":0,"valuemax":100}

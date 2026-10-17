@@ -1,0 +1,6 @@
+react 19.3.1
+after input event to 60 (actions pending)          transition-only DOM=50  optimistic DOM=60
+later, still pending                               transition-only DOM=50  optimistic DOM=60
+after drag 65,70,75 (pending)                      transition-only DOM=50  optimistic DOM=75
+native change after input, same value -> onChange calls: []
+all actions settled                                transition-only DOM=75  optimistic DOM=75
