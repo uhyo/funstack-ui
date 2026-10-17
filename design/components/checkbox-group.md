@@ -1,7 +1,10 @@
 # CheckboxGroup
 
 Status: **accepted** (2026-10-17, GitHub issue #33; the product owner accepted all eight questions
-as recommended, see the end of this document). Follows `design/conventions.md` (accepted);
+as recommended, see the end of this document; the implementation-review corrections of
+`memo/reviewer/checkbox-group.md` and the product owner's decision on disabled Items under a
+Parent (decision 9) were folded in the same day from the landed fix, a58143a). Follows
+`design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/radio-group.md` first**: it specifies the `<fieldset>` Root + `Label`
 (`<legend>`) + native-input `Item` anatomy, the one-dispatch-per-group residual browser paths
@@ -285,7 +288,13 @@ export interface CheckboxGroupValueChangeDetails extends ActionDetails {
 }
 
 export interface CheckboxGroupRootState {
-  /** Optimistic checked values, in document order of the Items. Content rendered from it must not suspend. */
+  /**
+   * Optimistic checked values, in document order of the Items **as of the Root's last render**
+   * (values with no Item last). Items reordered by a component that re-renders without the Root
+   * keep the previous order here until the Root renders again; `next` and `details` of
+   * `valueChangeAction` always read the current DOM order. The server render and the first
+   * client render use the value's own order. Content rendered from it must not suspend.
+   */
   readonly value: readonly string[];
   /** An action dispatched through this group is in flight. */
   readonly pending: boolean;
@@ -316,8 +325,10 @@ export interface CheckboxGroupRootProps
   form?: string;
   /**
    * "At least one Item must be checked." Rendered as native `required` on every Item while no
-   * value is checked, and on none once one is (section 7). Not exposed on the fieldset (ARIA
-   * allows `aria-required` on `checkbox` and `radiogroup`, not on `group`).
+   * **enabled** Item's value is checked, and on none once one is (section 7): values with no
+   * Item and checked disabled Items (neither is submitted) do not satisfy it. Until the Items
+   * have registered (server HTML, hydration render) any checked value satisfies it. Not exposed
+   * on the fieldset (ARIA allows `aria-required` on `checkbox` and `radiogroup`, not on `group`).
    */
   required?: boolean;
   /** Renders `<fieldset disabled>`: every Item and Parent is disabled and unfocusable. */
@@ -365,7 +376,11 @@ export interface CheckboxGroupItemProps
   > {
   /** The value this box contributes when checked. Must be unique within the Root. */
   value: string;
-  /** Native `disabled`: unfocusable, never dispatches, barred from validation. */
+  /**
+   * Native `disabled`: unfocusable, never dispatches, barred from validation. A `Parent` leaves
+   * a disabled Item's value alone and derives its state without it (section 6.2); a checked
+   * disabled Item does not satisfy the group's `required` (section 7).
+   */
   disabled?: boolean;
   /** Forwarded to the Item's `<ViewTransition default>`; settle commit only (section 11). Same static rule as Checkbox. */
   transition?: ViewTransitionClass;
@@ -408,6 +423,12 @@ export interface CheckboxGroupParentProps
    * The Item values this Parent controls (usually every Item of the group). Its checked and
    * mixed states are derived from them; its click checks or unchecks all of them (section 6).
    * Values with no Item are still added to / removed from the group's value.
+   *
+   * Values whose Items are disabled (their own `disabled` prop, not `Root disabled`) are left
+   * alone: the click does not change them and the derivation ignores them, so the Parent shows
+   * checked when every enabled Item is (section 6.2). When every value has only disabled Items
+   * the Parent acts on all of them (disable the Parent to make it inert). Before hydration the
+   * server-rendered state counts disabled Items too; it settles when the Items register.
    */
   values: string[];
   disabled?: boolean;
@@ -421,8 +442,8 @@ export interface CheckboxGroupParentProps
 
 Owned keys: `type`, `name` (always removed: a Parent never posts), `value`, `checked`,
 `defaultChecked`, `indeterminate` (stripped, the hook sets the property), `required` (always
-removed), `form`, `disabled`, `aria-checked`, `data-checked`, `data-indeterminate`,
-`data-pending`, `data-disabled`. `onChange` merged.
+removed), `form`, `autoComplete` (`"off"`, section 8.1), `disabled`, `aria-checked`,
+`data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`. `onChange` merged.
 
 ### 3.5 Namespace
 
@@ -444,7 +465,8 @@ export const CheckboxGroup = {
 | `value` (set of checked values) | `Root` | `ReadonlySet<string>` internally, `string[]` at the API | **Library-owned** through controlled native inputs (`checked={optimistic.has(value)}` on every Item), with the two residual browser paths (section 8). | Yes: every Item or Parent click, every platform dispatch. |
 | `pending` | `Root` | boolean | Library-owned (`useTransition`) | n/a |
 | Parent `checked` / `indeterminate` | `Parent` | derived | **Derived from `value`**; written to the DOM (`checked` prop, `el.indeterminate` through `useNativeChecked`) and re-applied after every commit. Not a fourth state: it has no prop, no default, no action. | n/a |
-| `required` on Items | `Root` | derived | Derived from the `required` prop and `optimistic.size === 0`; rendered as the native attribute. | n/a |
+| `required` on Items | `Root` | derived | Derived from the `required` prop and "no value of an enabled Item is in the optimistic set" (`optimistic.size === 0` until the Items have registered, which is what the server can compute); rendered as the native attribute (section 7). | n/a |
+| Item registry | `Root` | `Map<value, hasEnabledItem>` | Library-owned, private: each Item registers its value and its own `disabled` from a layout effect (a ref for the residual-path reads, state for render, published only when the summary changes; `null` until an Item registered so the server and hydration renders agree). Feeds the Parent's effective values and `required`. | n/a |
 | Parent restore memory | `Parent` | `readonly string[] \| null` | Library-owned, private (a ref): the last partial combination of its `values` that the group **committed**, seeded at mount. Not exposed. | n/a |
 | focus, validity, `:user-invalid` | DOM | | Browser-owned | |
 
@@ -472,7 +494,11 @@ order of the Items currently in the fieldset (read once per dispatch with
 `fieldset.querySelectorAll('input[type="checkbox"]')` filtered by `name === groupName`, which
 excludes Parents and nested groups); values with no Item keep their insertion order after them.
 Document order matches `formData.getAll(name)`, so a consumer who compares `next` with the form
-data sees the same sequence. Every comparison the library makes (the no-op rule, mount
+data sees the same sequence. `RootState.value` uses the same order but **as of the Root's last
+render**: render cannot read the DOM, so the Root keeps the Items' order in state, refreshed by a
+layout effect after each of its own commits only when the rendered value would change. Items
+moved by a child that re-renders alone are picked up at the Root's next render; the server and
+the first client render use the value's own order. Every comparison the library makes (the no-op rule, mount
 reconciliation, reset) is **set equality**; consumers should treat `next` as a set too.
 
 A controlled `value` with values that have no Item is preserved through toggles (an Item click
@@ -539,8 +565,11 @@ renders committed state in the DOM, but Items and the Parent compare against it.
 ### 6.1 Derivation
 
 ```ts
-const inSet = values.filter((v) => ctx.optimistic.has(v));
-const checked = values.length > 0 && inSet.length === values.length;
+// `effective`: the values the Parent acts on and derives from (6.2). Hydration renders use
+// every value, as the server did.
+const effective = hydrating ? values : enabledValues(values, ctx.disabledItems);
+const inSet = effective.filter((v) => ctx.optimistic.has(v));
+const checked = effective.length > 0 && inSet.length === effective.length;
 const indeterminate = inSet.length > 0 && !checked;
 ```
 
@@ -572,7 +601,8 @@ arise: the Parent never renders both.
 | unchecked, with a remembered partial combination | restore it | `added: memory`, `removed: []` |
 | unchecked, no memory | check every value | `added: values`, `removed: []` |
 
-The memory is the last **committed** partial combination of this Parent's `values` (strictly
+"Every value" in the table means the Parent's **effective** values (below). The memory is the
+last **committed** partial combination of them (strictly
 between none and all), updated in an effect on the committed set and seeded from the committed set
 at mount, which makes "the default combination of states they had when the page loaded" (APG) fall
 out of the same rule. It is committed, not optimistic, so a partial state that was only ever
@@ -586,13 +616,42 @@ state committed. The cost, documented: from "none", a user who wants "all" after
 partial clicks twice. Flagged in the questions (a `cycle={false}` prop would be a one-line
 addition if the product owner prefers two-state).
 
+**Disabled Items under a Parent** (product-owner decision 9, review M2). A disabled box is one the
+user may not change; a "select all" that changed it would make the action save a value the form
+never posts (disabled inputs are not submitted), so `next` and `FormData` would disagree. The
+Parent therefore **ignores disabled Items**:
+
+- Each Item registers its value and its **own** `disabled` prop with the Root from a layout
+  effect (`Root disabled` is not an Item's own `disabled`: it disables the Parent too, and the
+  derivation is unchanged). The Root publishes `disabledItems`: the values whose every mounted
+  Item is disabled.
+- The Parent's effective values are `enabledValues(values, disabledItems)`: `values` minus
+  `disabledItems`; **values with no Item count as enabled** (nothing disables them). The Parent's
+  `pending` (3.4) is still computed over **all** of `values`: a disabled Item's value cannot
+  differ between optimistic and committed through the Parent, so the distinction never shows. The click cycle, the derivation, the restore
+  memory and the pre-hydration report (8.1) all use them. A click from mixed checks only the
+  enabled missing values; "uncheck all" leaves a checked disabled Item checked, and the Parent
+  then shows unchecked (it derives without that Item).
+- **When every value has only disabled Items** the effective values are all of `values`: a Parent
+  the consumer left enabled over disabled Items still shows and changes their state. Disable the
+  Parent to make it inert.
+- **Hydration renders count disabled Items**, as the server did (the server cannot know which
+  Items are disabled: the registry is `null` until the Items registered). The hydrated DOM
+  `checked` is therefore comparable with the derivation for the pre-hydration report, also when a
+  Parent hydrates late, after the Items registered; the Parent settles to the enabled-only
+  derivation in the render after registration, without a dispatch or a warning.
+- An Item's `disabled` changing after mount re-registers and the Parent follows.
+
 ### 6.3 Keyboard, AT and the pre-hydration gap
 
 Native: Space toggles, the browser clears `indeterminate` on the click. AT hears `checked` from the
 DOM at once; the mixed state reaches AT through the property (HTML-AAM maps `indeterminate` to
 `aria-checked="mixed"`) after the first layout effect, so until hydration a mixed Parent is
 announced as unchecked and only `data-indeterminate` shows the dash, exactly as for Checkbox
-(section 4 there). `aria-checked` is owned and removed.
+(section 4 there). `aria-checked` is owned and removed. Before hydration the Parent's `checked`
+and `data-indeterminate` are the server's derivation over **all** of its values, disabled Items
+included (the server cannot know which Items are disabled, 6.2); the enabled-only derivation
+replaces it in the first client render after the Items register.
 
 ---
 
@@ -605,14 +664,18 @@ mandatory. The library's options, and the choice:
 | --- | --- | --- | --- | --- | --- |
 | A. `required` on every Item (RadioGroup's rule) | yes | yes | yes | each box "required" | **wrong semantics**: every box must be checked. Rejected. |
 | B. `setCustomValidity("…")` on the first Item while empty | no (needs a `requiredMessage` prop, consumer-localised) | no | yes, first box only | first box "invalid" | property must be re-applied after every commit; one more prop. |
-| C. **native `required` on every Item only while the optimistic set is empty** (chosen) | yes | partly (see below) | yes, every box while empty | each box "required" while the group is empty, nothing once one is checked | wording: the browser says "check this box", not "check at least one"; attribute flips with state. |
+| C. **native `required` on every Item only while no enabled Item is checked** (chosen) | yes | partly (see below) | yes, every box while empty | engine-dependent: the native constraint is exposed differently per engine (Chromium's accessibility tree shows an unchecked required checkbox as `invalid` and has no `required` property for a checkbox, not even with `aria-required`); the reliable announcement is the `Label` text or `aria-describedby` | wording: the browser says "check this box", not "check at least one"; attribute flips with state. |
 
 C is chosen: it keeps validation, the bubble, `:user-invalid` and the AT state native and
 localised, needs no new prop and no imperative DOM write, and expresses "at least one" exactly in
 the validity model (while nothing is checked, submitting is blocked; once something is, nothing
-is required). The attribute is rendered by the Root through context as
-`required && optimistic.size === 0`, so it follows optimistic state: unchecking the last box while
-its action is pending already marks every box required, and a rollback un-marks them.
+is required). The attribute is rendered by the Root through context as `required` and "no value
+of an **enabled** Item is in the optimistic set" (review L1): a value with no Item and a checked
+**disabled** Item are not submitted, so neither satisfies "at least one". Until the Items have
+registered (the server render, the hydration render) the rule is `optimistic.size === 0`, which
+is what the server can compute; hydration then corrects it in the first client render. It
+follows optimistic state: unchecking the last enabled box while its action is pending already
+marks every box required, and a rollback un-marks them.
 
 What is **not** done: `aria-required` on the fieldset. ARIA 1.2 lists `aria-required` for
 `checkbox`, `combobox`, `gridcell`, `listbox`, `radiogroup`, `spinbutton`, `textbox` and `tree`;
@@ -622,9 +685,11 @@ no counterpart here. The group-level announcement is therefore the consumer's: p
 
 Before hydration the attribute is whatever the server rendered: every Item `required` when the
 default set is empty, none otherwise. A user who checks one box before hydration and submits is
-blocked on the next box until hydration completes; that is over-blocking, never under-blocking,
-and only until hydration. Documented as a limitation of an action-less required group in a
-Server Component form.
+blocked on the next box until hydration completes; that is over-blocking, only until hydration.
+**Under-blocking** exists in one window: the server HTML counts any checked value, so a default
+set that holds only a value with no Item or only a checked disabled Item renders no `required`
+until hydration corrects it (the same window as the over-blocking case, in the other direction).
+Documented as a limitation of an action-less required group in a Server Component form.
 
 Disabled Items are barred from constraint validation (platform), so `Root disabled` or every Item
 disabled never blocks a submit. A `Parent` is never `required` (it is not a value).
@@ -635,11 +700,13 @@ disabled never blocks a submit. A `Parent` is never `required` (it is not a valu
 
 Both paths are the Root's single `useNativeGroupReconciliation` call on the fieldset (conventions
 3.8), with one addition to the shared hook: an `equals` option (`setsEqual`), because `Object.is`
-on two sets is always false. Recorded in the conventions feedback. `readCurrent()` returns the
-set of Items (by `name`) whose `checked` is true; `readDefault()` the same over `defaultChecked`
-(rule 5); `base()` is `latestInFlight()` with the explicit null check (rule 1), else the
-optimistic set. `onPlatformChange(next, event)` computes the patch as the diff between `next`
-and `base()` and dispatches it with `reason: "platform"`.
+on two sets is always false. Recorded in the conventions feedback. `readCurrent()` lays the
+Items' `checked` (by `name`) **over `base()`**, so values with no Item (a Parent's extra values, a
+controlled extra) survive a read that has no DOM to see them; `readDefault()` lays the Items'
+`defaultChecked` (rule 5) over `base()` in controlled mode and over **`defaultValue`** in
+uncontrolled mode (8.2); `base()` is `latestInFlight()` with the explicit null check (rule 1),
+else the optimistic set. `onPlatformChange(next, event)` computes the patch as the diff between
+`next` and `base()` and dispatches it with `reason: "platform"`.
 
 ### 8.1 Mount reconciliation, including a pre-hydration Parent click
 
@@ -652,23 +719,48 @@ In its mount layout effect (children before parent, so before the Root's reconci
 Parent compares the DOM `checked` with its derived `checked`; if they differ it reports
 `{ values, checked: el.checked }` to the Root through context and then calls `onItemMounted`.
 The Root's `readCurrent()` folds pending reports into the member read before the comparison:
-`checked: true` adds every value of that Parent, `false` removes them; reports are consumed on
-read. So "clicked All before hydration" becomes one `"platform"` dispatch with
+`checked: true` adds every **enabled** value of that Parent (`enabledValues` over the registry
+ref, which the Items of the same commit have already filled), `false` removes them; reports are
+consumed on read. A Parent checked before hydration therefore checks only the enabled values, and
+one unchecked before hydration keeps a checked disabled Item (6.2). So "clicked All before hydration" becomes one `"platform"` dispatch with
 `added: values`, and the Parent re-renders from the group rather than keeping a lone checked
 box over unchecked Items. A Parent that mounts after the Root (a late Suspense boundary) reports
 the same way and the adapter's late path (`onItemMounted` → microtask → `readCurrent()`) picks the
 report up. The Parent's `data-indeterminate` on the server is the derived value; the DOM `checked`
 is kept by hydration and never diffed (no `suppressHydrationWarning` needed, as for Checkbox).
 
+**The Parent renders `autocomplete="off"`** (owned; review H1). Firefox restores a checkbox's
+`checked` across a reload from its form state, and the Parent is not a value: a user who
+unchecks one Item (Parent mixed, DOM `checked=false`) and reloads would otherwise have Firefox
+restore the Items *and* a Parent `checked=false` that the mount read takes for a pre-hydration
+"uncheck all", emptying the group. With `autocomplete="off"` Firefox restores the Items only
+(verified with Playwright: a nameless checkbox is restored, one with `autocomplete="off"` is not;
+Chromium restores nothing on reload) and the Items' restored state is reconciled as the ordinary
+platform dispatch. Pre-hydration Item clicks made after a Parent click are overridden by the
+Parent's semantic (the report is applied after the DOM read); accepted (review L9).
+
+**Late members** (8.3): when a member mounts after the Root reconciled, the Root snapshots the
+Items' `checked` in the first late member's mount layout effect and the adapter's microtask read
+uses that snapshot. Without it the registration re-render that follows the layout effects would
+re-apply each Item's `checked` before the microtask and erase a click made before the Item
+hydrated.
+
 ### 8.2 Form reset
 
-Identical to RadioGroup 5.2 with a set: `readDefault()` is the set of Items whose
-`defaultChecked` is true; uncontrolled mode mirrors `defaultValue.has(value)` into each Item's
-`el.defaultChecked` after every commit so the latest `defaultValue` is the target; controlled
-mode keeps React's mount-time value per Item (and the per-Item caveat for Items added later
-applies) and the reset is offered to the parent as `"platform"` with the `reset` event. The
-Parent mirrors `defaultChecked` from the derivation over `defaultValue` in uncontrolled mode; its
-reset value is irrelevant after the dispatch because it re-renders from the group. A reset that
+As RadioGroup 5.2 with a set, with one difference per mode (review M1): in **uncontrolled**
+mode `readDefault()` starts from **`defaultValue`** and lays the Items' `defaultChecked` over it
+(the Items mirror `defaultValue.has(value)` into `el.defaultChecked` after every commit, so the
+overlay agrees with the start set), so that values with no Item return to `defaultValue` too: a
+Parent over `["a", "ghost"]` clicked, then `form.reset()`, ends on `defaultValue`, not on
+`{ghost}`. In **controlled** mode it starts from `base()` (values with no Item are the parent's)
+and lays the Items' mount-time `defaultChecked` over it (the per-Item caveat for Items added later
+applies); the reset is offered to the parent as `"platform"` with the `reset` event. The Parent
+mirrors `defaultChecked` from the derivation over `defaultValue` (effective values) in
+uncontrolled mode; in controlled mode its React reset target can be stale (its `values` changed,
+or it mounted after the Items with another value), so the Parent has its own `useFormReset` that
+writes its derivation back into `el.checked` in its reset microtask, which runs **before the
+Root's** (the Parent subscribed first: children mount before the parent); if the Root's microtask
+then dispatches, the re-render re-applies `checked` from the new derivation anyway (review L2). A reset that
 checks some boxes and unchecks others carries both `added` and `removed`. A cancelled `reset`
 dispatches nothing. A disabled group still follows a reset (RadioGroup 5.3).
 
@@ -883,7 +975,11 @@ controlled veto), as in the RadioGroup and Switch plans.
 | 31 | Transition types | jsdom | Observed through a consumer `<ViewTransition default={{ "fsui-checkbox-group-check": …, "fsui-checkbox-group-uncheck": … }}>` sentinel as in the Accordion tests, or by spying `addTransitionType`: check → `-check`, uncheck → `-uncheck`, mixed reset → both. |
 | 32 | Directive | build | `dist/checkbox-group/*.mjs` for Root, Label, Item, Parent and context begin with `"use client"`; `index.mjs` does not. |
 | 33 | Dev warnings | jsdom | `value` with `defaultValue`, mode switch (shared hook); Item / Parent / Label outside a Root throw; **no** warning when neither `value` nor `defaultValue` is given; **no** partial-hydration warning. |
-| 34 | AX tree | browser (Chromium, CDP) | The fieldset is a `group` named by the legend; the Parent reports `checked: "mixed"` after mount; Items in an empty required group report `required: true`, after a check `required: false`. |
+| 34 | AX tree | browser (Chromium, CDP) | The fieldset is a `group` named by the legend; the Parent reports `checked: "mixed"` after mount; Items in an empty required group are exposed as `invalid` (Chromium has no `required` property for a checkbox, not even with `aria-required`), after a check not. |
+| 36 | Parent and disabled Items (both) | jsdom | From mixed, the Parent checks only the enabled values and a disabled unchecked Item stays unchecked; "uncheck all" keeps a checked disabled Item and the Parent then shows unchecked; the restore memory is over the enabled values; every value disabled → the Parent acts on all; an Item's `disabled` prop changing re-registers; `Root disabled` leaves the derivation unchanged; SSR counts disabled Items and hydration settles without a dispatch or a warning; a Parent checked / unchecked before hydration checks only the enabled values / keeps a checked disabled Item; a late Parent hydrating after a disabled Item registered compares with the server's derivation. |
+| 37 | `required` edge cases | jsdom | A checked disabled Item does not satisfy it; a value with no Item does not; the server HTML counts any checked value and hydration corrects it. |
+| 38 | Parent `autocomplete` | jsdom | The Parent renders `autocomplete="off"` on the client and in `renderToString`; form-state restoration of the Items only (simulated before `hydrateRoot`) removes just them. |
+| 39 | Reset by mode | jsdom | Uncontrolled: a value with no Item returns to `defaultValue` too (Parent over `["a", "ghost"]`, click, `form.reset()` → `removed: ["a", "ghost"]`); controlled: a Parent whose React reset target is stale shows its derivation after a reset. |
 | 35 | Engines | browser | Tab order and Space across Chromium, Firefox, WebKit (WebKit: Option+Tab note); `:user-invalid` after a submit attempt in all three. |
 
 jsdom facts to rely on (from the Checkbox and RadioGroup suites): `input.click()` on a checkbox
@@ -910,6 +1006,7 @@ packages/ui/src/checkbox-group/
   checkbox-group.browser.test.tsx
 packages/ui/src/internal/
   use-native-group-reconciliation.ts   # add `equals?: (a: T, b: T) => boolean` (default Object.is)
+  sync-presence.ts                     # attribute-presence sync on hydration; shared with RadioGroup (review L5)
 ```
 
 Also: `src/index.ts` re-export, `tsdown.config.ts` entry, `package.json` `./checkbox-group`,
@@ -921,8 +1018,12 @@ Also: `src/index.ts` re-export, `tsdown.config.ts` entry, `package.json` `./chec
 interface CheckboxGroupContextValue {
   readonly name: string;
   readonly form: string | undefined;
-  /** `required && optimistic.size === 0`: rendered as native `required` on every Item. */
+  /** `required` while no enabled Item's value is checked (`optimistic.size === 0` until the Items registered): rendered as native `required` on every Item. */
   readonly required: boolean;
+  /** Values whose every mounted Item has its own `disabled` prop (`Root disabled` not counted); a Parent leaves them alone (6.2). Empty until the Items registered. */
+  readonly disabledItems: ReadonlySet<string>;
+  /** Stable. Each Item calls it from a layout effect with its value and its own `disabled`; returns the unregister function. */
+  readonly registerItem: (value: string, disabled: boolean) => () => void;
   readonly optimistic: ReadonlySet<string>;
   /** For per-part pending only; no part renders it. */
   readonly committed: ReadonlySet<string>;
@@ -934,7 +1035,7 @@ interface CheckboxGroupContextValue {
   readonly toggle: (value: string, checked: boolean, event: Event) => void;
   /** Parent click: a whole patch. No-op if it changes nothing against optimistic. */
   readonly apply: (patch: { added: readonly string[]; removed: readonly string[] }, event: Event) => void;
-  /** From `useNativeGroupReconciliation`; Items and Parents call it from their mount layout effect. */
+  /** Wraps `useNativeGroupReconciliation`'s (snapshots late members' `checked` first, 8.1); Items and Parents call it from their mount layout effect. */
   readonly onItemMounted: (element: HTMLInputElement | null) => void;
   /** Parent mount: the DOM differs from the derivation; folded into the next `readCurrent()` (8.1). Call before `onItemMounted`. */
   readonly reportParent: (values: readonly string[], checked: boolean) => void;
@@ -951,9 +1052,20 @@ interface CheckboxGroupContextValue {
   warn: { component: "CheckboxGroup.Root", prop: "value" } })`. `fromSet` sorts by the document
   order of the group's Items read from the fieldset at call time (5.1).
 - `dispatchPatch` (5.2) and `base()` with the explicit null check.
+- Item registry (6.2, 7): `registerItem(value, disabled)` (stable; each Item calls it from a
+  layout effect, returns the unregister function) writes a `Map<token, { value, disabled }>` ref
+  and publishes a `Map<value, hasEnabledItem>` state only when the summary changes; `null` until
+  an Item registered. `disabledItems` (context) is the set of values with no enabled Item;
+  `required` (context) is `required && (items === null ? optimistic.size === 0 :
+  ![...optimistic].some((v) => items.get(v) === true))`.
 - `useNativeGroupReconciliation<ReadonlySet<string>>({ element, readCurrent, readDefault, base,
   equals: setsEqual, onPlatformChange: (next, event) => dispatchPatch(diff(base(), next),
-  "platform", event) })`. `readCurrent()` = DOM read, then apply and clear parent reports.
+  "platform", event) })`. `readCurrent()` = Items' `checked` laid over `base()` (or over the
+  late-member snapshot, 8.1), then apply and clear parent reports through `enabledValues(report.values,
+  disabledOf(registry))`; `readDefault()` = Items' `defaultChecked` laid over `defaultValue`
+  (uncontrolled) or `base()` (controlled). `onItemMounted` wraps the adapter's: when the Root
+  has already reconciled, it snapshots `readDom("checked")` once per commit and clears it in a
+  microtask.
 - Renders `<fieldset disabled form data-pending data-disabled>` through `use-render`; tag warning.
 
 ### 14.4 Item
@@ -962,26 +1074,37 @@ interface CheckboxGroupContextValue {
 5.3, `required: ctx.required` in `libraryProps`, `aria-checked: undefined`,
 `onChange: guardCheckableChange(e, () => ctx.toggle(value, !checked, e), "CheckboxGroup.Item")`,
 `defaultChecked: ctx.defaultValue?.has(value)` to the hook, attribute presence sync in
-`onItemMounted`. `transitionTypes` are the Root's.
+`onItemMounted`. `transitionTypes` are the Root's. After `useNativeChecked`, a layout effect
+registers the Item with the Root: `useLayoutEffect(() => registerItem(value, disabledProp),
+[registerItem, value, disabledProp])`. Cost: the registrations publish the summary as state, so
+a group pays **one extra layout-time render at mount** (one per group, not per Item: the
+publish de-duplicates by comparing the summary), and one more whenever an Item's own `disabled`
+changes or Items mount or unmount.
 
 ### 14.5 Parent
 
-- Derivation of 6.1 from `values` and `ctx.optimistic`; `pending` from `ctx.committed`.
-- `memory` in a `useRef<readonly string[] | null>`; `useLayoutEffect` on `[ctx.committed, values]`
-  updates it when the committed intersection is partial; initialised in the same effect at mount.
+- `effective = hydrating ? values : enabledValues(values, ctx.disabledItems)` (`hydrating` from
+  `useSyncExternalStore` with a server snapshot of `true`), memoised; derivation of 6.1 from
+  `effective` and `ctx.optimistic`; `pending` from `ctx.committed` over `values`.
+- `memory` in a `useRef<readonly string[] | null>`; `useLayoutEffect` on `[ctx.committed,
+  effective]` updates it when the committed intersection is partial; initialised in the same
+  effect at mount.
+- Own `useFormReset(node, …)` on the input: after a reset, if `el.checked !== checked`, write the
+  derivation back (8.2).
 - `useNativeChecked({ type: "checkbox", component: "CheckboxGroup.Parent", checked, indeterminate,
   group: true, onItemMounted: (el) => { if (el && el.checked !== checked) ctx.reportParent(values, el.checked);
-  syncPresence(...); ctx.onItemMounted(el); }, defaultChecked: ctx.defaultValue === undefined ? undefined : derivedOver(ctx.defaultValue) })`.
+  syncPresence(...); ctx.onItemMounted(el); }, defaultChecked: ctx.defaultValue === undefined ? undefined : derivedOver(effective, ctx.defaultValue) })`.
 - `onChange`: `guardCheckableChange(e, () => ctx.apply(cyclePatch(), e), "CheckboxGroup.Parent")`
-  where `cyclePatch` is the table of 6.2 (`memory ∩ values` when restoring).
+  where `cyclePatch` is the table of 6.2 over `effective` (`memory ∩ effective` when restoring).
 - `libraryProps`: `type: "checkbox"`, `name: undefined`, `value: undefined`, `required: undefined`,
-  `checked`, `defaultChecked: undefined`, `indeterminate: undefined` (stripped), `aria-checked: undefined`,
-  `disabled`, `form: undefined`, the four `data-*`.
+  `autoComplete: "off"`, `checked`, `defaultChecked: undefined`, `indeterminate: undefined` (stripped),
+  `aria-checked: undefined`, `disabled`, `form: undefined`, the four `data-*`.
 
 ### 14.6 Dev warnings
 
 Shared ones (both props / mode switch, `preventDefault()`, wrong tag); parts outside a Root throw;
-duplicate Item `value` within a Root (once, from the Root's DOM read, dev only). Deliberately
+duplicate Item `value` within a Root (once, from the Root's layout effect that reads the Items,
+dev only). Deliberately
 absent: neither `value` nor `defaultValue`; a `value` with no matching Item; a Parent whose
 `values` include values with no Item; partial hydration.
 
@@ -1035,3 +1158,11 @@ feedback above was applied to `design/conventions.md` the same day.
 7. **No partial-hydration warning** for CheckboxGroup (section 8.3); one Suspense boundary is a
    docs recommendation for simplicity only.
 8. **`transition` stays on `Item` and `Parent`** for parity with the other native-input parts.
+9. **A Parent ignores disabled Items** (review M2, decided 2026-10-17 after the implementation
+   review): a click toggles only the values of enabled Items, and the derived checked / mixed
+   state is computed over enabled Items only; when every value has only disabled Items the Parent
+   acts on all of them; hydration renders count disabled Items as the server does (section 6.2).
+   Folded with the other review corrections: the Parent's `autocomplete="off"` (8.1), the
+   uncontrolled reset reading from `defaultValue` (8.2), `required` over enabled Items (7), the
+   engine-dependent AT exposure (7), `RootState.value` as of the Root's last render (3.1, 5.1),
+   and the duplicate-value warning from the Root's layout effect (14.6).

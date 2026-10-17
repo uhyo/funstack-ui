@@ -165,7 +165,7 @@ export function CheckboxGroupPage() {
             type: "boolean",
             default: "false",
             description:
-              "At least one Item must be checked: every Item is rendered `required` while nothing is checked, none once one is (see Forms).",
+              "At least one enabled Item must be checked: every Item is rendered `required` while no enabled Item is checked, none once one is (see Forms).",
           },
           {
             name: "disabled",
@@ -188,9 +188,12 @@ export function CheckboxGroupPage() {
       />
       <p>
         <code>CheckboxGroupRootState</code>: <code>{"{ value, pending, disabled }"}</code>, with{" "}
-        <code>value</code> the optimistic set as an array in document order. The Root owns{" "}
-        <code>disabled</code> and <code>form</code> and writes no <code>role</code>; other fieldset
-        props pass through (<code>aria-label</code> for a group without a Label, for example).
+        <code>value</code> the optimistic set as an array in the Items' document order as of the
+        Root's last render (Items reordered by a component that re-renders without the Root are
+        picked up at its next render; <code>next</code> always reads the current order). The Root
+        owns <code>disabled</code> and <code>form</code> and writes no <code>role</code>; other
+        fieldset props pass through (<code>aria-label</code> for a group without a Label, for
+        example).
       </p>
 
       <h4>
@@ -218,7 +221,8 @@ export function CheckboxGroupPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`: unfocusable, never dispatches, not validated.",
+            description:
+              "Native `disabled`: unfocusable, never dispatches, not validated. A Parent leaves it alone, and checked it does not satisfy `required`.",
           },
           transitionRow("Item"),
           {
@@ -261,7 +265,7 @@ export function CheckboxGroupPage() {
             name: "values",
             type: "string[]",
             description:
-              "Required. The values this Parent controls, usually every Item's value. Values with no Item are still added and removed.",
+              "Required. The values this Parent controls, usually every Item's value. Values whose Items are disabled are left alone (see Click cycle); values with no Item are still added and removed.",
           },
           {
             name: "disabled",
@@ -297,8 +301,11 @@ export function CheckboxGroupPage() {
         the DOM property, the attribute and <code>:indeterminate</code> always agree);{" "}
         <code>pending</code>: an action is in flight and one of its values is changing. The Parent
         owns <code>type</code>, <code>checked</code>, <code>defaultChecked</code>,{" "}
-        <code>indeterminate</code>, <code>disabled</code> and <code>aria-checked</code>, and always
-        removes <code>name</code>, <code>value</code>, <code>form</code> and <code>required</code>.
+        <code>indeterminate</code>, <code>disabled</code> and <code>aria-checked</code>, always
+        removes <code>name</code>, <code>value</code>, <code>form</code> and <code>required</code>,
+        and renders <code>autocomplete="off"</code> (it is not a value, so a browser restoring form
+        state on reload must not restore it). Other props pass through, such as{" "}
+        <code>aria-controls</code> with the ids of the boxes it controls (as in the example above).
       </p>
 
       <h4>Click cycle</h4>
@@ -320,6 +327,16 @@ export function CheckboxGroupPage() {
         The remembered combination is the last partial one the group <em>committed</em> (the
         mount-time value counts), never a state that was only pending and then rolled back. From
         "none", a user who wants "all" after a remembered combination clicks twice.
+      </p>
+      <p>
+        <strong>Disabled Items are left alone.</strong> "Its values" above are the values whose
+        Items are enabled: a click never checks or unchecks a disabled Item (its own{" "}
+        <code>disabled</code> prop), and the checked / mixed / unchecked state is derived without
+        them, so a Parent shows checked when every enabled Item is, whatever the disabled ones hold.
+        Values with no Item count as enabled. When every value has only disabled Items, the Parent
+        acts on all of them; disable the Parent to make it inert. <code>Root disabled</code>{" "}
+        disables everything and does not change the derivation. The server cannot know which Items
+        are disabled, so the server-rendered Parent counts them until the Items hydrate.
       </p>
 
       <h3>Data attributes and pseudo-classes</h3>
@@ -390,8 +407,10 @@ export function CheckboxGroupPage() {
         <li>
           ARIA does not allow <code>aria-required</code> on role <code>group</code>, so a required
           group is not announced as such on the fieldset: say it in the Label ("choose at least
-          one") or through <code>aria-describedby</code> on the Root. While the group is empty each
-          box is announced as required (Chromium reports them as invalid).
+          one") or through <code>aria-describedby</code> on the Root. While no enabled box is
+          checked, every box carries native <code>required</code>, which engines expose differently
+          (Chromium's accessibility tree marks the boxes invalid, not required), so the Label or
+          description is the reliable announcement.
         </li>
         <li>
           The checked state assistive technology reads is the optimistic one. A rollback is silent;
@@ -441,15 +460,20 @@ export function CheckboxGroupPage() {
             <code>required</code> means "at least one"
           </strong>
           . HTML has no group constraint, so the Root renders native <code>required</code> on every
-          Item while nothing is checked (following the optimistic state) and on none once one is.
-          Validation, the browser's localised message and <code>:user-invalid</code> stay native;
-          the message reads "check this box". Disabled boxes are not validated, so a disabled group
-          never blocks a submit.
+          Item while no enabled Item is checked (following the optimistic state) and on none once
+          one is. A checked disabled Item and a value with no Item do not count: neither is
+          submitted. Validation, the browser's localised message and <code>:user-invalid</code> stay
+          native; the message reads "check this box". Disabled boxes are not validated, so a
+          disabled group never blocks a submit.
         </li>
         <li>
-          Before hydration the attribute is whatever the server rendered: in an empty required group
-          every box is required, so a user who checks one box and submits before hydration is still
-          blocked by another box until hydration. That over-blocks, never under-blocks.
+          Before hydration the attribute is whatever the server rendered, and the server cannot know
+          which values have an enabled Item, so it counts any checked value. In an empty required
+          group every box is required, so a user who checks one box and submits before hydration is
+          still blocked by another box until hydration (over-blocking). A group whose only checked
+          values are disabled Items or have no Item renders no <code>required</code> on the server,
+          so a submit before hydration is not blocked (under-blocking, until hydration); validate on
+          the server as well.
         </li>
         <li>
           <strong>Form reset</strong> (the Reset button, <code>form.reset()</code>, or React's
@@ -461,9 +485,14 @@ export function CheckboxGroupPage() {
         <li>
           <strong>Clicks before hydration</strong> work natively, on Items and on Parents. On
           hydration the Root dispatches once for everything it finds changed, with no event; a
-          Parent clicked before hydration counts as "check all" (or "uncheck all") of its values.
-          Items that hydrate later, inside a Suspense boundary, are reconciled when they do; unlike
-          RadioGroup, a group split across Suspense boundaries works.
+          Parent clicked before hydration counts as "check all" (or "uncheck all") of its enabled
+          values. The order of those clicks is not preserved: a Parent click is applied after the
+          Items' state is read, so an Item clicked after the Parent before hydration is overridden
+          by the Parent. Items that hydrate later, inside a Suspense boundary, are reconciled when
+          they do; unlike RadioGroup, a group split across Suspense boundaries works. Firefox
+          restores the Items' checked state on reload, which is reconciled the same way; the Parent
+          is never restored (<code>autocomplete="off"</code>), so a restore cannot be taken for a
+          Parent click.
         </li>
       </ul>
 

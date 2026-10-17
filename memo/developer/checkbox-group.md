@@ -69,3 +69,40 @@ no partial-hydration warning, `transition` on Item and Parent).
 - Controlled mode, a Parent whose `values` changed after mount: its React-set `defaultChecked`
   (mount-time derivation) may disagree with the Items' after a reset that needs no dispatch, and
   nothing re-renders to correct its `checked`. Rare; would need a reset listener on the Parent.
+
+## Review fixes (memo/reviewer/checkbox-group.md, 2026-10-17)
+
+- **H1**: Parent owns `autoComplete="off"` (also removed from `CheckboxGroupParentProps`). jsdom rows:
+  SSR attribute, owned-key override, and the Firefox scenario as it now plays out (Items restored,
+  Parent not: only `removed: [c]`). No Firefox reload row: a reload inside the vitest iframe is
+  not practical.
+- **M1**: `readDefault` starts from `defaultSet ?? EMPTY` when uncontrolled, `base()` when
+  controlled.
+- **M2 (PO)**: Items register `{value, own disabled}` with the Root from a layout effect
+  (`registerItem`, stable, token per effect run). Root keeps a ref registry (current, for the
+  residual-path reads) and a state summary `Map<value, hasEnabledItem> | null` (render), set only
+  when it changes. `null` until the first registration so the server and hydration renders agree.
+  `disabledItems` = values whose every Item is own-disabled; `enabledValues(values, disabled)` in
+  the context module: values minus disabled, Item-less values kept, **all values when that leaves
+  nothing**. `Root disabled` is not counted. Parent derivation, click cycle, restore memory and
+  uncontrolled `defaultChecked` use the enabled values; `pending` still over all `values`.
+  - A Parent's **hydration render uses all values** (`useSyncExternalStore` with a server snapshot
+    `true`): the server cannot know, and the pre-hydration report compares the DOM with that
+    render's derivation. Without it a late Parent hydrating after a disabled Item registered
+    reported a phantom "uncheck all" (row added).
+  - The pre-hydration report is folded over the enabled values read from the registry ref.
+  - Cost: every group re-renders once at mount, at layout time (registration null → map). The
+    post-await test now counts mount snapshots instead of assuming one.
+- **Late-path snapshot (found while doing M2)**: the registration re-render runs right after the
+  layout effects, before the adapter's late microtask, and the Items' re-apply erased pre-hydration
+  clicks on late Items. The Root now snapshots the members' `checked` in the first late member's
+  `onItemMounted` (layout phase; all DOM of the commit is there) and `readCurrent` uses it; cleared
+  by a microtask queued after the adapter's. Generally: in a group, any re-render between a late
+  member's mount and the adapter's microtask loses the DOM read — worth a note in conventions 3.8.
+- **L1**: `required && no optimistic value has an enabled Item` once registered; before, the old
+  `size === 0` (server). Under-blocking before hydration remains when the only checked values are
+  disabled / Item-less (documented).
+- **L2**: Parent has its own `useFormReset` (merged ref) and writes its derivation back in the
+  microtask; the Root's microtask (queued later, Root effects run after) may still dispatch.
+- **L3, L4, L7, L8, L9**: comments and docs. L5: `internal/sync-presence.ts`, used by RadioGroup
+  too (directives test updated). L6: `equals option` rows in the adapter's own test file.

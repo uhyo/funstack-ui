@@ -188,12 +188,16 @@ describe("CheckboxGroup (browser)", () => {
       expect(box("a")).toHaveFocus();
       expect(action).toHaveBeenCalledTimes(1);
 
+      // Over the enabled Items {a, b} the Parent is checked: Space unchecks them and leaves the
+      // disabled "c" alone (design 6.2).
+      expect(box("all").checked).toBe(true);
       box("all").focus();
       await user.keyboard(" ");
       await flush();
       expect(action).toHaveBeenCalledTimes(2);
-      // Mixed → check all; "c" is disabled but still a value of the Parent.
-      expect(action.mock.calls[1]?.[1].added).toEqual(["c"]);
+      expect(action.mock.calls[1]?.[0]).toEqual([]);
+      expect(action.mock.calls[1]?.[1].removed).toEqual(["a", "b"]);
+      expect(box("c").checked).toBe(false);
     });
 
     it("a click cancelled by a pass-through onClick does not dispatch and the DOM reverts", async () => {
@@ -393,8 +397,10 @@ describe("CheckboxGroup (browser)", () => {
       const prop = (n: AXNode, p: string) => n.properties?.find((x) => x.name === p)?.value.value;
 
       expect((await node("Toppings", "group")).role?.value).toBe("group");
-      // Chromium's AX tree has no `required` property for a checkbox; an unchecked required box is
-      // exposed as `invalid` (design section 9), which is what assistive technology hears.
+      // Chromium's AX tree has no `required` property for a checkbox (not even with
+      // `aria-required`); an unchecked required box is exposed as `invalid` (design section 9).
+      // Other engines expose the native constraint differently, and what a screen reader then
+      // announces is not asserted here.
       expect(prop(await node("a", "checkbox"), "invalid")).toBe("true");
       expect(prop(await node("all", "checkbox"), "checked")).toBe("false");
 

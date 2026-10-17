@@ -251,9 +251,9 @@ export function DialogPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: '"none"',
+            default: "–",
             description:
-              "Library mode only. Forwarded to the `<ViewTransition>` around the dialog: animates the opening commit and content swaps while open. The close is the browser's; animate it with CSS.",
+              "Library mode only. Forwarded to the `<ViewTransition>` around the dialog; without it no boundary is rendered. It animates the opening commit and content swaps while open. The close is the browser's; animate it with CSS.",
           },
           ...functionProps("DialogPopupState"),
           renderProp("dialog", "DialogPopupState"),

@@ -93,6 +93,7 @@ Never publish or deploy from a local machine. One-time setup outside the repo:
   - `docs: clarify transition principle`
 - Commit directly to `master`; this repo does not use pull requests.
 - Stage only the files you changed with `git add <paths>`. Never use `git add -A` or `git add .`, because other agents may be working in the same checkout concurrently.
+- The git index is shared as well: don't leave staged changes behind (avoid `git mv`/`git rm` unless you commit right away), and commit with `git commit <paths>` so another agent's staged change is not swept into your commit.
 
 ### Agent memos
 

@@ -11,7 +11,12 @@ export interface CheckboxGroupContextValue {
   /** The `name` shared by every Item of the group (prop or `useId()`). */
   readonly name: string;
   readonly form: string | undefined;
-  /** `required && optimistic.size === 0`: rendered as native `required` on every Item. */
+  /**
+   * The Root's `required` while no value of an enabled Item is checked (design section 7):
+   * rendered as native `required` on every Item. Before the Items have registered (server render,
+   * hydration render) it is `required && optimistic.size === 0`, which is what the server can
+   * compute.
+   */
   readonly required: boolean;
   /** Optimistic checked values: Items and Parents render from it. */
   readonly optimistic: ReadonlySet<string>;
@@ -34,6 +39,16 @@ export interface CheckboxGroupContextValue {
   readonly toggle: (value: string, checked: boolean, event: Event) => void;
   /** Parent click: a whole patch. No-op when it changes nothing against the optimistic set. */
   readonly apply: (patch: CheckboxGroupPatch, event: Event) => void;
+  /**
+   * Values whose every mounted Item has its own `disabled` prop (`Root disabled` is not counted).
+   * A Parent leaves them alone (design 6.2). Empty until the Items registered.
+   */
+  readonly disabledItems: ReadonlySet<string>;
+  /**
+   * Stable. Each Item calls it from a layout effect with its value and its own `disabled` prop;
+   * returns the unregister function.
+   */
+  readonly registerItem: (value: string, disabled: boolean) => () => void;
   /** From `useNativeGroupReconciliation`; Items and Parents call it from their mount layout effect. */
   readonly onItemMounted: (element: HTMLInputElement | null) => void;
   /**
@@ -42,13 +57,31 @@ export interface CheckboxGroupContextValue {
    * `values` (design 8.1). Call before `onItemMounted`.
    */
   readonly reportParent: (values: readonly string[], checked: boolean) => void;
-  /** The optimistic set as the Root state's `value`: an array in document order. */
+  /**
+   * The optimistic set as the Root state's `value`: an array in the Items' document order as of
+   * the Root's last render (see `CheckboxGroupRootState.value`).
+   */
   readonly value: readonly string[];
   /**
-   * Sorts values by the document order of the group's Items (as of the last commit); values with
-   * no Item keep their iteration order, after them. Read from handlers and effects.
+   * Sorts values by the current document order of the group's Items (a DOM read); values with no
+   * Item keep their iteration order, after them. Call from handlers and effects only.
    */
   readonly sortByDocument: (values: Iterable<string>) => string[];
+}
+
+/**
+ * The values a Parent over `values` acts on and derives from: those not in `disabledItems`
+ * (values with no Item included). When that leaves nothing (every value has only disabled
+ * Items), all of `values`: a Parent the consumer left enabled over disabled Items still shows and
+ * changes their state (disable the Parent to make it inert).
+ */
+export function enabledValues(
+  values: readonly string[],
+  disabledItems: ReadonlySet<string>,
+): readonly string[] {
+  if (disabledItems.size === 0) return values;
+  const enabled = values.filter((v) => !disabledItems.has(v));
+  return enabled.length > 0 ? enabled : values;
 }
 
 export const CheckboxGroupContext = createContext<CheckboxGroupContextValue | null>(null);

@@ -93,7 +93,7 @@ const directiveFreeFiles = [
   "dialog/index.mjs",
   "radio-group/index.mjs",
   "checkbox-group/index.mjs",
-  "checkbox-group/sync-presence.mjs",
+  "internal/sync-presence.mjs",
   "popover/index.mjs",
   "internal/anchor-position.mjs",
 ];

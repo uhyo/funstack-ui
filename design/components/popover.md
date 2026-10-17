@@ -1,6 +1,8 @@
 # Popover
 
-Status: **proposed** (2026-10-17, GitHub issue #38). Follows `design/conventions.md` (accepted);
+Status: **accepted** (2026-10-17, GitHub issue #38; the product owner accepted all eight
+questions as recommended, see the end of this document; the Dialog view-transition close
+follow-up is issue #46). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/dialog.md` first**: Popover is the Dialog's two-mode model (JS-free mode
 through Invoker Commands, library mode with a library-owned open keyed on committed state)
@@ -1323,7 +1325,8 @@ Dialog option C; research question 3).
 
 ## Conventions feedback
 
-Applied in this commit on the product owner's instruction:
+All applied to `design/conventions.md` (items 1 and 2 with the proposal, items 3 to 8 at
+acceptance). Kept for the record:
 
 1. **3.5 / 5.1: the boundary wraps the top-layer element itself.** A library-driven open or close
    of a top-layer element (`showPopover()` / `hidePopover()` in a layout effect of a transition
@@ -1331,8 +1334,6 @@ Applied in this commit on the product owner's instruction:
    engine; browser-initiated opens and closes still are not.
 2. **8: `focusGroup` detection** (issue #43), with the developer's `useSyncExternalStore` form
    and the Tabs native-path markup.
-
-For the product owner to apply at acceptance:
 
 3. **4.1 `open` row.** Add Popover: Trigger emits optimistic `data-open` and `aria-expanded` in
    library mode, `aria-expanded` DOM-synced in JS-free mode; the Popup emits none
@@ -1361,7 +1362,7 @@ For the product owner to apply at acceptance:
   animates it, and Dialog 10.3 says "never the close". With the amended convention, Dialog could
   route the post-action close through the Root (`dispatch(false)`, then `close()` in the apply
   effect) and get a view-transition exit in every engine. It changes `openChangeAction(false)`
-  from a notification to an awaited call for that one path. Recommend a GitHub issue; not changed
+  from a notification to an awaited call for that one path. Filed as issue #46; not changed
   here.
 - `internal/anchor-position.ts` shared by Tooltip, Popover and Menu; Tooltip's design names the
   helper locally.
@@ -1373,32 +1374,34 @@ For the product owner to apply at acceptance:
 
 ---
 
-## Questions for the product owner
+## Decisions recorded (product owner, 2026-10-17)
+
+All eight accepted as recommended:
 
 1. **`<dialog popover>` as the default element, focus moving in** (decision 4, section 6.1),
    with `render={<div />}` as the disclosure-style variant that keeps focus on the trigger.
    Alternative: `<div popover role="dialog">` everywhere with a JS "first focusable" choice,
    which avoids the Chromium AX bug and the WebKit unknown at the cost of the research verdict
-   and a small focus algorithm in JS. Recommendation: `<dialog>`, with the WebKit contingency as
-   an implementation check.
+   and a small focus algorithm in JS. Decision: `<dialog>`, with the WebKit contingency as an
+   implementation check.
 2. **Part-initiated closes are library-owned** (decision 3): Trigger toggle and Close await
    `openChangeAction(false)` and hide in the commit, so `<ViewTransition>` can animate the exit
    and a controlled parent can veto them; dismissals stay browser-owned notifications. This
-   differs from Dialog's "close is always browser-owned" and is what Menu builds on.
-   Recommendation: accept; record the Dialog follow-up as an issue.
+   differs from Dialog's "close is always browser-owned" and is what Menu builds on. Decision:
+   accepted; the Dialog follow-up is issue #46.
 3. **JS-free mode keeps `aria-expanded` current with a DOM write** from the popup's `toggle`
    listener (section 9), the first owned attribute the library writes outside React.
    Alternative: a React state write per toggle in Root (one render per open and close), which
    Tooltip rejected for hover but is cheap for a click-driven popover; or no `aria-expanded` in
-   JS-free mode (Chromium's implicit mapping only). Recommendation: the DOM write.
-4. **No `Popover.Form` and no `lightDismiss` in v0** (section 1). Recommendation: accept; the
+   JS-free mode (Chromium's implicit mapping only). Decision: the DOM write (conventions 7.4).
+4. **No `Popover.Form` and no `lightDismiss` in v0** (section 1). Decision: accepted; the
    controlled "submit, then close" shape is documented (12.4).
 5. **`role` is an overridable default, not an owned key** (3.3), so a `<div>` popup can be a
-   `region` or `group`. Recommendation: accept.
+   `region` or `group`. Decision: accepted.
 6. **Nested focus-return rule** (6.2): the library focuses the Trigger only when focus was inside
-   the popup at the hide and the platform left it on `<body>` or inside. Recommendation: accept;
+   the popup at the hide and the platform left it on `<body>` or inside. Decision: accepted;
    Menu's submenus depend on it.
-7. **Default placement `bottom` / `center`** (section 8) versus Tooltip's `top`. Recommendation:
-   accept.
-8. **Trigger-less controlled popovers have no anchor** (2.7; `anchor` prop deferred).
-   Recommendation: accept for v0.
+7. **Default placement `bottom` / `center`** (section 8) versus Tooltip's `top`. Decision:
+   accepted.
+8. **Trigger-less controlled popovers have no anchor** (2.7; `anchor` prop deferred). Decision:
+   accepted for v0.

@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -6,7 +7,7 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 import { useCheckboxGroupContext } from "./checkbox-group-context.js";
-import { syncPresence } from "./sync-presence.js";
+import { syncPresence } from "../internal/sync-presence.js";
 
 export interface CheckboxGroupItemState {
   readonly value: string;
@@ -36,7 +37,11 @@ export interface CheckboxGroupItemProps extends Omit<
 > {
   /** The value this box contributes when checked. Must be unique within the Root. */
   value: string;
-  /** Native `disabled`: unfocusable, never dispatches, barred from constraint validation. */
+  /**
+   * Native `disabled`: unfocusable, never dispatches, barred from constraint validation. A
+   * `Parent` leaves a disabled Item's value alone and derives its state without it; a checked
+   * disabled Item does not satisfy the group's `required`.
+   */
   disabled?: boolean;
   /**
    * Forwarded to the Item's `<ViewTransition default>`. Default: no boundary. Fires only on the
@@ -81,6 +86,10 @@ export function CheckboxGroupItem({
   const pending = ctx.pending && checked !== ctx.committed.has(value);
   const disabled = ctx.disabled || disabledProp;
   const required = ctx.required;
+
+  // The Root needs every Item's own `disabled` for the Parents and `required` (design 6.2, 7).
+  const { registerItem } = ctx;
+  useLayoutEffect(() => registerItem(value, disabledProp), [registerItem, value, disabledProp]);
 
   // Group mode: element check and re-apply only; the Root reports the residual paths once.
   const inputRef = useNativeChecked({

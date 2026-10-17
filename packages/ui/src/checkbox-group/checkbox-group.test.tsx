@@ -335,6 +335,7 @@ describe("CheckboxGroup", () => {
         form: "zzz",
         checked: true,
         "aria-checked": "mixed",
+        autoComplete: "on",
       };
       render(
         <CheckboxGroup.Root aria-label="T" name="t" defaultValue={["b"]}>
@@ -373,6 +374,7 @@ describe("CheckboxGroup", () => {
       expect(parent).not.toHaveAttribute("form");
       expect(parent).not.toHaveAttribute("aria-checked");
       expect(parent).not.toBeRequired();
+      expect(parent).toHaveAttribute("autocomplete", "off");
       expect(parentShows()).toBe("mixed");
     });
 
@@ -1136,6 +1138,8 @@ describe("CheckboxGroup", () => {
       expect(serverParent).toHaveAttribute("data-indeterminate", "");
       expect(serverParent).not.toHaveAttribute("aria-checked");
       expect(serverParent).not.toHaveAttribute("name");
+      // Never restored by Firefox's form-state restoration (design 8.1).
+      expect(serverParent).toHaveAttribute("autocomplete", "off");
       expect(serverParent.indeterminate).toBe(false);
 
       render(ui, { container, hydrate: true });
@@ -1144,6 +1148,204 @@ describe("CheckboxGroup", () => {
       expect(serverParent.indeterminate).toBe(true);
       expect(parentShows()).toBe("mixed");
       expect(consoleError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Parent and disabled Items", () => {
+    async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void = () => {}) {
+      const container = document.createElement("div");
+      document.body.append(container);
+      container.innerHTML = renderToString(ui);
+      const serverParent = container.querySelector<HTMLInputElement>("input:not([name])")!;
+      const server = {
+        checked: serverParent.hasAttribute("data-checked"),
+        indeterminate: serverParent.hasAttribute("data-indeterminate"),
+      };
+      mutate(container);
+      render(ui, { container, hydrate: true });
+      await flush();
+      return server;
+    }
+
+    renderBoth("click and derivation", (mode) => {
+      it("from mixed checks only the enabled values; a disabled unchecked Item stays unchecked", async () => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode={mode}
+            initial={["a"]}
+            action={action}
+            parent={["a", "b", "c"]}
+            disabledItems={["c"]}
+          />,
+        );
+        expect(parentShows()).toBe("mixed");
+        const user = setupUser();
+        await user.click(parentBox());
+        expect(calls(action)).toEqual([[["a", "b"], "activate", ["b"], []]]);
+        // Every enabled Item is checked: the Parent shows checked over the unchecked disabled one.
+        expect(parentShows()).toBe("checked");
+        expect(box("c").checked).toBe(false);
+        expect(committedText()).toBe("a,b");
+        await user.click(parentBox());
+        expect(calls(action)[1]).toEqual([[], "activate", [], ["a", "b"]]);
+        expect(parentShows()).toBe("unchecked");
+      });
+
+      it("uncheck all keeps a checked disabled Item, and the Parent then shows unchecked", async () => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode={mode}
+            initial={["a", "b", "c"]}
+            action={action}
+            parent={["a", "b", "c"]}
+            disabledItems={["c"]}
+          />,
+        );
+        expect(parentShows()).toBe("checked");
+        const user = setupUser();
+        await user.click(parentBox());
+        expect(calls(action)).toEqual([[["c"], "activate", [], ["a", "b"]]]);
+        expect(checkedValues()).toEqual(["c"]);
+        expect(parentShows()).toBe("unchecked");
+        // No partial combination of the enabled values was ever committed: check all of them.
+        await user.click(parentBox());
+        expect(calls(action)[1]).toEqual([["a", "b", "c"], "activate", ["a", "b"], []]);
+        expect(parentShows()).toBe("checked");
+      });
+
+      it("restores the last committed partial combination of the enabled values", async () => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode={mode}
+            initial={["a", "c"]}
+            action={action}
+            parent={["a", "b", "c"]}
+            disabledItems={["c"]}
+          />,
+        );
+        expect(parentShows()).toBe("mixed");
+        const user = setupUser();
+        await user.click(parentBox());
+        await user.click(parentBox());
+        await user.click(parentBox());
+        expect(calls(action)).toEqual([
+          [["a", "b", "c"], "activate", ["b"], []],
+          [["c"], "activate", [], ["a", "b"]],
+          [["a", "c"], "activate", ["a"], []],
+        ]);
+        expect(parentShows()).toBe("mixed");
+      });
+
+      it("every value has only disabled Items: the Parent acts on all of them", async () => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode={mode}
+            initial={["b"]}
+            action={action}
+            parent={["b", "c"]}
+            disabledItems={["b", "c"]}
+          />,
+        );
+        expect(parentShows()).toBe("mixed");
+        const user = setupUser();
+        await user.click(parentBox());
+        expect(calls(action)).toEqual([[["b", "c"], "activate", ["c"], []]]);
+        expect(parentShows()).toBe("checked");
+      });
+    });
+
+    it("follows an Item's disabled prop as it changes", async () => {
+      function Group({ disabledC }: { disabledC: boolean }) {
+        return (
+          <CheckboxGroup.Root aria-label="T" defaultValue={["a", "b"]}>
+            <CheckboxGroup.Parent values={["a", "b", "c"]} aria-label="all" />
+            <CheckboxGroup.Item value="a" aria-label="a" />
+            <CheckboxGroup.Item value="b" aria-label="b" />
+            <CheckboxGroup.Item value="c" aria-label="c" disabled={disabledC} />
+          </CheckboxGroup.Root>
+        );
+      }
+      const { rerender } = render(<Group disabledC={false} />);
+      expect(parentShows()).toBe("mixed");
+      rerender(<Group disabledC />);
+      expect(parentShows()).toBe("checked");
+      rerender(<Group disabledC={false} />);
+      expect(parentShows()).toBe("mixed");
+    });
+
+    it("Root disabled is not an Item's own disabled: the derivation is unchanged", () => {
+      render(
+        <CheckboxGroup.Root aria-label="T" defaultValue={["a"]} disabled>
+          <CheckboxGroup.Parent values={["a", "b"]} aria-label="all" />
+          <CheckboxGroup.Item value="a" aria-label="a" />
+          <CheckboxGroup.Item value="b" aria-label="b" />
+        </CheckboxGroup.Root>,
+      );
+      expect(parentShows()).toBe("mixed");
+      expect(parentBox()).toBeDisabled();
+    });
+
+    it("the server counts disabled Items; hydration settles without a dispatch or a warning", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const action = vi.fn<ActionFn>();
+      const server = await hydrate(
+        <Harness
+          mode="uncontrolled"
+          initial={["a", "b"]}
+          action={action}
+          parent={["a", "b", "c"]}
+          disabledItems={["c"]}
+        />,
+      );
+      expect(server).toEqual({ checked: false, indeterminate: true });
+      expect(action).not.toHaveBeenCalled();
+      expect(parentShows()).toBe("checked");
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    renderBoth("hydration", (mode) => {
+      it("a Parent checked before hydration checks only the enabled values", async () => {
+        const action = vi.fn<ActionFn>();
+        await hydrate(
+          <StrictMode>
+            <Harness
+              mode={mode}
+              initial={["a"]}
+              action={action}
+              parent={["a", "b", "c"]}
+              disabledItems={["c"]}
+            />
+          </StrictMode>,
+          (c) => {
+            c.querySelector<HTMLInputElement>("input:not([name])")!.checked = true;
+          },
+        );
+        expect(calls(action)).toEqual([[["a", "b"], "platform", ["b"], []]]);
+        expect(checkedValues()).toEqual(["a", "b"]);
+        expect(parentShows()).toBe("checked");
+      });
+
+      it("a Parent unchecked before hydration keeps a checked disabled Item", async () => {
+        const action = vi.fn<ActionFn>();
+        await hydrate(
+          <Harness
+            mode={mode}
+            initial={["a", "b", "c"]}
+            action={action}
+            parent={["a", "b", "c"]}
+            disabledItems={["c"]}
+          />,
+          (c) => {
+            c.querySelector<HTMLInputElement>("input:not([name])")!.checked = false;
+          },
+        );
+        expect(calls(action)).toEqual([[["c"], "platform", [], ["a", "b"]]]);
+        expect(parentShows()).toBe("unchecked");
+      });
     });
   });
 
@@ -1231,6 +1433,56 @@ describe("CheckboxGroup", () => {
       });
       expect(box("a")).not.toBeRequired();
       expect(box("b")).not.toBeRequired();
+    });
+
+    it("a checked disabled Item does not satisfy it (it is not submitted)", async () => {
+      render(
+        <form data-testid="form">
+          <CheckboxGroup.Root aria-label="T" name="t" required defaultValue={["c"]}>
+            <CheckboxGroup.Item value="a" aria-label="a" />
+            <CheckboxGroup.Item value="c" aria-label="c" disabled />
+          </CheckboxGroup.Root>
+        </form>,
+      );
+      expect(box("a")).toBeRequired();
+      expect(form().checkValidity()).toBe(false);
+      expect(new FormData(form()).getAll("t")).toEqual([]);
+      const user = setupUser();
+      await user.click(box("a"));
+      expect(box("a")).not.toBeRequired();
+      expect(form().checkValidity()).toBe(true);
+    });
+
+    it("a value with no Item does not satisfy it", () => {
+      render(
+        <form data-testid="form">
+          <CheckboxGroup.Root aria-label="T" name="t" required value={["ghost"]}>
+            <CheckboxGroup.Item value="a" aria-label="a" />
+          </CheckboxGroup.Root>
+        </form>,
+      );
+      expect(box("a")).toBeRequired();
+      expect(form().checkValidity()).toBe(false);
+    });
+
+    it("the server HTML counts any checked value (it cannot know the Items); hydration corrects it", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const ui = (
+        <form data-testid="form">
+          <CheckboxGroup.Root aria-label="T" name="t" required defaultValue={["c"]}>
+            <CheckboxGroup.Item value="a" aria-label="a" />
+            <CheckboxGroup.Item value="c" aria-label="c" disabled />
+          </CheckboxGroup.Root>
+        </form>
+      );
+      const container = document.createElement("div");
+      document.body.append(container);
+      container.innerHTML = renderToString(ui);
+      expect(container.querySelector('input[value="a"]')).not.toHaveAttribute("required");
+      render(ui, { container, hydrate: true });
+      await flush();
+      expect(box("a")).toBeRequired();
+      expect(consoleError).not.toHaveBeenCalled();
     });
 
     it("a disabled group never blocks submission", () => {
@@ -1434,6 +1686,24 @@ describe("CheckboxGroup", () => {
       });
     });
 
+    it("form-state restoration of the Items only (the Parent is autocomplete=off) removes just them", async () => {
+      // Firefox, after the user unchecked "c" and reloaded: it restores the Items, not the Parent.
+      const action = vi.fn<ActionFn>();
+      await hydrate(
+        <Harness
+          mode="uncontrolled"
+          initial={["a", "b", "c"]}
+          action={action}
+          parent={["a", "b", "c"]}
+        />,
+        (c) => {
+          c.querySelector<HTMLInputElement>('input[value="c"]')!.checked = false;
+        },
+      );
+      expect(calls(action)).toEqual([[["a", "b"], "platform", [], ["c"]]]);
+      expect(parentShows()).toBe("mixed");
+    });
+
     it("a refused dispatch puts the Parent back to mixed", async () => {
       const action = vi.fn<ActionFn>();
       await hydrate(
@@ -1591,6 +1861,44 @@ describe("CheckboxGroup", () => {
           consoleError.mock.calls.filter(([m]) => String(m).startsWith("CheckboxGroup")),
         ).toEqual([]);
       });
+    });
+
+    it("a late Parent hydrating after a disabled Item registered compares with the server's derivation", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const action = vi.fn<ActionFn>();
+      function Group({ gate }: { gate: Promise<void> }) {
+        return (
+          <CheckboxGroup.Root aria-label="T" defaultValue={["a", "b"]} valueChangeAction={action}>
+            <CheckboxGroup.Item value="a" aria-label="a" />
+            <CheckboxGroup.Item value="c" aria-label="c" disabled />
+            <Suspense fallback={null}>
+              <Gate promise={gate}>
+                <CheckboxGroup.Parent values={["a", "b", "c"]} aria-label="all" />
+                <CheckboxGroup.Item value="b" aria-label="b" />
+              </Gate>
+            </Suspense>
+          </CheckboxGroup.Root>
+        );
+      }
+      const container = document.createElement("div");
+      document.body.append(container);
+      container.innerHTML = renderToString(<Group gate={fulfilled()} />);
+      const g = gate();
+      await act(async () => {
+        render(<Group gate={g.promise} />, { container, hydrate: true });
+      });
+      await act(async () => {
+        g.open();
+      });
+      await flush();
+      // Server: mixed (2 of 3). Over the enabled values the Parent is checked, but its DOM was
+      // never clicked: nothing to report.
+      expect(action).not.toHaveBeenCalled();
+      expect(checkedValues()).toEqual(["a", "b"]);
+      expect(parentShows()).toBe("checked");
+      expect(
+        consoleError.mock.calls.filter(([m]) => String(m).startsWith("CheckboxGroup")),
+      ).toEqual([]);
     });
 
     it("late Items mounted by createRoot do not dispatch", async () => {
@@ -1796,6 +2104,62 @@ describe("CheckboxGroup", () => {
         [["b", "c"], "platform", ["c"], ["a"]],
       ]);
       expect(checkedValues()).toEqual(["b", "c"]);
+    });
+
+    it("uncontrolled: a value with no Item returns to defaultValue too", async () => {
+      const action = vi.fn<ActionFn>();
+      render(
+        <form data-testid="form">
+          <CheckboxGroup.Root aria-label="T" defaultValue={["kept"]} valueChangeAction={action}>
+            <CheckboxGroup.Parent values={["a", "ghost"]} aria-label="all" />
+            <CheckboxGroup.Item value="a" aria-label="a" />
+          </CheckboxGroup.Root>
+        </form>,
+      );
+      const user = setupUser();
+      await user.click(parentBox());
+      await act(async () => {
+        form().reset();
+      });
+      await flush();
+      expect(calls(action)).toEqual([
+        [["a", "kept", "ghost"], "activate", ["a", "ghost"], []],
+        [["kept"], "platform", [], ["a", "ghost"]],
+      ]);
+      expect(checkedValues()).toEqual([]);
+      expect(parentShows()).toBe("unchecked");
+    });
+
+    it("controlled: a Parent whose React reset target is stale shows its derivation after a reset", async () => {
+      const action = vi.fn<ActionFn>();
+      function Parent() {
+        const [values, setValues] = useState(["a"]);
+        return (
+          <form data-testid="form">
+            <CheckboxGroup.Root aria-label="T" value={["a"]} valueChangeAction={action}>
+              <CheckboxGroup.Parent values={values} aria-label="all" />
+              <CheckboxGroup.Item value="a" aria-label="a" />
+              <CheckboxGroup.Item value="b" aria-label="b" />
+            </CheckboxGroup.Root>
+            <button type="button" onClick={() => setValues(["b"])}>
+              switch
+            </button>
+          </form>
+        );
+      }
+      render(<Parent />);
+      // React set the Parent's defaultChecked at mount, from its derivation over ["a"].
+      expect(parentBox().defaultChecked).toBe(true);
+      const user = setupUser();
+      await user.click(screen.getByRole("button", { name: "switch" }));
+      expect(parentShows()).toBe("unchecked");
+      await act(async () => {
+        form().reset();
+      });
+      await flush();
+      // The Items reset to the value the group already has: no dispatch, no re-render.
+      expect(action).not.toHaveBeenCalled();
+      expect(parentShows()).toBe("unchecked");
     });
 
     it("controlled: the reset returns to the mount-time values and the parent is notified", async () => {
@@ -2240,6 +2604,8 @@ describe("CheckboxGroup", () => {
         );
       }
       render(<Parent />);
+      // The mount commits (the Items' registration re-renders the group once at layout time).
+      const mountSnapshots = snapshots.length;
       const user = setupUser();
       await user.click(box("b"));
       const inFlight = snapshots.at(-1);
@@ -2248,7 +2614,7 @@ describe("CheckboxGroup", () => {
       });
       expect(inFlight).toEqual({ checked: ["a", "b"], pending: true });
       expect(snapshots.at(-1)).toEqual({ checked: ["a", "b"], pending: false });
-      expect(snapshots.slice(1).every((s) => s.checked.join() === "a,b")).toBe(true);
+      expect(snapshots.slice(mountSnapshots).every((s) => s.checked.join() === "a,b")).toBe(true);
     });
   });
 
