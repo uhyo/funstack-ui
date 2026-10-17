@@ -283,9 +283,11 @@ export function DialogPage() {
               <>
                 Runs in this button's own transition (<code>data-pending</code> on it), then closes
                 the dialog with <code>close(value)</code>. A rejection reaches the nearest Error
-                Boundary above the button and leaves the dialog open. Without <code>action</code>{" "}
-                the button is a native <code>command="request-close"</code> invoker.{" "}
-                <code>details.returnValue</code> is the <code>value</code>.
+                Boundary above the button and leaves the dialog open. If the dialog was closed and
+                opened again while the action ran, the close is dropped: it belonged to the previous
+                opening. Without <code>action</code> the button is a native{" "}
+                <code>command="request-close"</code> invoker. <code>details.returnValue</code> is
+                the <code>value</code>.
               </>
             ),
           },

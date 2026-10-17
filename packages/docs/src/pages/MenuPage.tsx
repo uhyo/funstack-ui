@@ -131,7 +131,11 @@ export function MenuPage() {
         </li>
         <li>
           If the menu was dismissed and opened again while an action ran, that action's close is
-          dropped: it belonged to the previous opening.
+          dropped: it belonged to the previous opening. The re-open itself does not show until that
+          action settles: React holds transitions started while an async action is pending, so
+          meanwhile the Trigger shows <code>aria-expanded="true"</code> and{" "}
+          <code>data-pending</code> without a menu. A slow Server Function behind an item makes this
+          visible (Popover's <code>Close</code> behaves the same).
         </li>
         <li>
           Keyboard activation goes through the item's <code>click()</code>, so{" "}
@@ -159,7 +163,8 @@ export function MenuPage() {
         action runs (on the item and on the <code>RadioGroup</code>), and a rejection rolls the
         check back. They <strong>keep the menu open</strong> by default (the APG's Space rule, and
         toggling several options is the point); <code>closeOnActivate</code> closes the menu after
-        the change settles. Re-activating the selected radio item dispatches nothing.
+        the change settles. Re-activating the selected radio item dispatches nothing; with{" "}
+        <code>closeOnActivate</code> it still closes the menu.
       </p>
       <Callout kind="warning" title="Uncontrolled state lives with the items">
         <p>
@@ -304,10 +309,12 @@ export function MenuPage() {
         <code>MenuPopupState</code>: <code>{"{ open, side, align, submenu }"}</code> (committed{" "}
         <code>open</code>). Owns <code>id</code>, <code>popover</code>, <code>role="menu"</code>,{" "}
         <code>aria-labelledby</code> (merged), <code>tabIndex={"{-1}"}</code>,{" "}
-        <code>focusgroup</code> (with the flag), <code>onKeyDown</code>, <code>onBlur</code>, the
-        submenu's pointer handlers, and <code>data-side</code> / <code>data-align</code>. Style it
-        with <code>:popover-open</code>; it emits no <code>data-open</code>. Render a{" "}
-        <code>&lt;div&gt;</code>, not a <code>&lt;dialog&gt;</code>.
+        <code>focusgroup</code> (with the flag), <code>onKeyDown</code>, <code>onBlur</code>,{" "}
+        <code>onMouseDown</code> (a press outside the items keeps focus on the current item),{" "}
+        <code>onPointerEnter</code>, <code>onPointerLeave</code>, and <code>data-side</code> /{" "}
+        <code>data-align</code>. Style it with <code>:popover-open</code>; it emits no{" "}
+        <code>data-open</code>. Render a <code>&lt;div&gt;</code>, not a <code>&lt;dialog&gt;</code>
+        .
       </p>
 
       <h4>
@@ -499,10 +506,13 @@ export function MenuPage() {
         </li>
         <li>
           <strong>Focus is real DOM focus</strong> on items (no <code>aria-activedescendant</code>).
-          Every open focuses the first item, pointer opens included (no focus ring then); a submenu
-          opened by hover keeps focus on its trigger.{" "}
+          Every open focuses the first item, pointer opens included (no focus ring then, through{" "}
+          <code>{"focus({ focusVisible: false })"}</code>; Safari may still show a ring on the first
+          item after a click); a submenu opened by hover keeps focus on its trigger.{" "}
           <strong>Moving the pointer over an item focuses it</strong>, so keyboard and pointer
-          always agree on the current item: style <code>:focus</code> as the hover state.
+          always agree on the current item: style <code>:focus</code> as the hover state. A press on
+          the menu's own space (padding, a <code>Separator</code>, a <code>GroupLabel</code>) keeps
+          focus on the current item, so the arrow keys keep working.
         </li>
         <li>
           <strong>Hover intent</strong> for submenus: the submenu opens <code>delay</code> ms (100)
