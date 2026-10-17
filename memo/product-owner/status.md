@@ -82,3 +82,6 @@
 - Menu merge CI green on all 3 engines (incl. first WebKit run).
 - Reviewer launched on Menu + useActionTrigger (#41/#47), writing memo/reviewer/menu.md, with verdicts on developer deviations 1-6.
 - Next: fixes → architect fold → close #41/#47 → wave 3 done → propose next (#46, alpha.1 = first OIDC publish).
+- Menu review: H1 (WebKit focus ring after pointer open, CI red) + M1-M3 + L1-L6 fixed (02f2f42, fa4908c, d4deae8). CI green all 3 engines at d4deae8. Architect fold 1783f7f, plus a small follow-up fold in progress (pointer-open quiet focus exception, Q6 settled: WebKit 302008 no hang).
+- Closed #41, #47. Filed #48 (stable root hook values), #49 (test leftovers). WAVE 3 DONE.
+- Next: ask the user, alpha.1 release (first OIDC publish) vs next wave.
