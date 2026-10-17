@@ -1,6 +1,8 @@
 # Menu (menu button)
 
-Status: **proposed** (2026-10-17, GitHub issue #39). Follows `design/conventions.md` (accepted);
+Status: **accepted** (2026-10-17, GitHub issue #39; the product owner accepted all eleven
+questions as recommended, see the end of this document; the shared `useActionTrigger` lands as
+a follow-up after Popover merges). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` first** (accepted): Menu is built on its internal hooks
 (`usePopoverRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
@@ -975,6 +977,8 @@ packages/ui/src/internal/
 
 ## Conventions feedback
 
+All eight items were applied to `design/conventions.md` at acceptance. Kept for the record:
+
 1. **1.1 part vocabulary.** Add `GroupLabel` ("Names a `Group`; `div` with an id, wired through
    `aria-labelledby`") and note `Separator`'s default element `hr`. `Item` gains "Menu:
    `button[role=menuitem]`".
@@ -1000,43 +1004,43 @@ packages/ui/src/internal/
 
 ---
 
-## Questions for the product owner
+## Decisions recorded (product owner, 2026-10-17)
+
+All eleven accepted as recommended:
 
 1. **Item activation closes after the action settles, with `data-pending` on the item** (2.3),
    not at once. Sync actions are indistinguishable; async ones show progress where the user
    clicked and get the view-transition exit. Alternative: close at once and run the action
-   detached (no pending surface). Recommendation: as designed.
+   detached (no pending surface). Decision: as designed.
 2. **Checkbox and radio items keep the menu open by default**; `closeOnActivate` on every item
    kind flips the default either way (`Item` defaults to closing). Radix, Base UI and macOS close
-   on toggle; the APG's Space rule and the multi-toggle use case say stay. Recommendation: stay
-   open.
+   on toggle; the APG's Space rule and the multi-toggle use case say stay. Decision: stay open.
 3. **No JS-free mode; always library mode** (2.1). A pre-hydration click opens an empty menu that
    fills on hydration (as Dialog / Popover library mode). Alternative: always-mounted children
    so items are in the server HTML (inert buttons before hydration; every row menu's items in
-   the DOM at load). Recommendation: as designed; revisit if a consumer needs server-rendered
-   items.
+   the DOM at load). Decision: as designed; revisit if a consumer needs server-rendered items.
 4. **Hover intent: timers only, `delay` 100 ms / `closeDelay` 150 ms on the submenu Root, no safe
    polygon, shared timer helper with Tooltip but not Tooltip's hook** (section 7). Also: the
-   pointer focuses items (6.2), the one piece of pointer tracking in the library. Recommendation:
-   as designed; a safe polygon is a later addition if the example app shows diagonal moves
-   failing.
+   pointer focuses items (6.2), the one piece of pointer tracking in the library. Decision: as
+   designed; a safe polygon is a later addition if the example app shows diagonal moves failing.
 5. **Tab closes the whole stack through an immediate `hidePopover()`** from `focusout` (2.2), the
    one browser-shaped close the library performs itself (no awaited `openChangeAction`, CSS exit
-   only). Recommendation: accept; a menu over a page whose focus has moved on must not linger.
+   only). Decision: accepted; a menu over a page whose focus has moved on must not linger.
 6. **Submenu `position-try-fallbacks: flip-inline` by default despite WebKit 302008**, with
    `side={null}` as the escape hatch and a contingency (drop the fallback for submenus) if the
-   first WebKit CI run hangs. Recommendation: as designed.
+   first WebKit CI run hangs. Decision: as designed.
 7. **Item activation in a submenu closes the whole stack through the root Root**, so the root
    `openChangeAction(false)` carries `"activate"` and each submenu's carries `"dismiss"` (2.2).
    Alternative: close only the submenu's chain with per-level `"activate"` dispatches (more
-   events, no benefit). Recommendation: as designed.
+   events, no benefit). Decision: as designed.
 8. **A nested `Menu.Root` is the submenu; `SubmenuTrigger` is the only new part** (section 1),
-   versus a `Submenu` / `SubmenuRoot` family. Recommendation: as designed.
-9. **`GroupLabel` and `<hr>` Separator** names and elements (section 1). Recommendation: as
-   designed; vocabulary feedback 1.
+   versus a `Submenu` / `SubmenuRoot` family. Decision: as designed.
+9. **`GroupLabel` and `<hr>` Separator** names and elements (section 1). Decision: as designed;
+   vocabulary feedback 1 applied.
 10. **`experimental_focusgroup` on `Menu.Popup` renders `focusgroup="menu wrap|nowrap"` and drops
-    `tabindex` on items on the native path** (5.2), mirroring Tabs after #43. Recommendation: as
+    `tabindex` on items on the native path** (5.2), mirroring Tabs after #43. Decision: as
     designed.
 11. **`useActionTrigger` shared hook** (section 12, feedback 2) to close the superseded-rejection
     gap for `Menu.Item`, `Popover.Close` and `Dialog.Close` at once, as part of #41.
-    Recommendation: accept; small, and the test row for it is otherwise N/A with a known gap.
+    Decision: accepted as a follow-up after Popover merges; until then the Item uses
+    `useTransition` and the superseded-rejection row records the gap (conventions 3.4).

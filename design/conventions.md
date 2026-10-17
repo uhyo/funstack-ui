@@ -5,8 +5,8 @@ with the user, see the end of this document; amended 2026-10-15 after the Toggle
 the ViewTransition correction in 5.1, the pending-is-never-disabled rule in 3.6, and the Server
 Function note in 2.4; amended 2026-10-17 after the CheckboxGroup design, #33, see resolved
 question 20; amended 2026-10-17 with the Popover design, #38: the top-layer rule in 3.5 and 5.1,
-and the `focusGroup` detection in 8, issue #43; Popover accepted the same day, see resolved
-question 24). Binding for every component design in
+and the `focusGroup` detection in 8, issue #43; Popover and Menu accepted the same day, see
+resolved questions 24 and 25). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -66,7 +66,7 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | --- | --- | --- |
 | `Root` | Owns state, context and the transition. May render no DOM (overlays) or a wrapper. | `div` or none |
 | `List` | Groups triggers; owns keyboard navigation between them. | `div` |
-| `Item` | One entry in a multi-item component (Accordion, Menu). | `div` / `details` |
+| `Item` | One entry in a multi-item component (Accordion, Menu). Menu's is a `button[role=menuitem]` with an `action`. | `div` / `details` / `button` |
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
@@ -74,7 +74,8 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child. | `label` / `legend` |
 | `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its checked/mixed state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
-| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. | as named |
+| `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
+| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role). | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
 top layer and CSS Anchor Positioning places it, so the platform does both jobs (see
@@ -260,7 +261,7 @@ exposes `reason` uses exactly these values and no synonyms:
 | --- | --- | --- |
 | `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). For native checkbox and radio inputs it is always the `click` `PointerEvent`, including Space and radio arrow keys, because React's `onChange` for them is click-driven. |
 | `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), form reset, or interaction before hydration reconciled at mount. Never a user gesture. | The platform event, or `undefined` for mount reconciliation. |
-| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, or another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover. A close through a part (`Dialog.Close`, a Form submit) is `"activate"`. | The platform's `close` or `toggle` event. |
+| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover, focus leaving the component (Tab out of a menu), the pointer leaving a hover-opened submenu, or a parent overlay closing (a submenu when its menu closes). A close through a part (`Dialog.Close`, a Form submit) is `"activate"`. | The platform's `close` or `toggle` event. |
 
 Components whose close carries a platform result add it as a serialisable field next to
 `reason`: Dialog's `details.returnValue` is `dialog.returnValue` (the `value` of the Close button
@@ -680,6 +681,13 @@ Library state never lives in `useSyncExternalStore`: a store mutation during a t
 blocking re-render and defeats both fallback avoidance and ViewTransition. Reading
 `matchMedia` for display only is fine.
 
+**Pure-trigger parts share `useActionTrigger(action)`** (decided with Menu, #39; lands as a
+follow-up once Popover is merged): a part with a bare `action` and its own transition but no
+state (`Dialog.Close`, `Popover.Close`, `Menu.Item`) runs the action through this hook, which
+applies the same superseded-rejection surfacing as `useControllableAction` (section 2.4) and
+exposes `pending`. Until it lands, those parts use `useTransition` directly and a superseded
+rejection is dropped by React (a recorded gap).
+
 ### 3.5 Library-owned vs. browser-owned state
 
 "Transition by default" is a statement about **library-owned state**: state that lives in React
@@ -877,8 +885,8 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item | Optimistic selection on triggers; committed on panels. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
-| `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`) | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4). |
+| `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab | Enum attribute with value. |
 
@@ -985,7 +993,10 @@ Accordion's `<details>` in static mode) render no `<ViewTransition>` in any case
 `transition` prop** (Accordion's static mode ignores it with a dev warning); their open/close
 happens outside any React transition and animates with `@starting-style` and
 `transition-behavior: allow-discrete` in CSS. "Every animatable part has `transition`" means every
-part whose mount, unmount or content is driven by library state.
+part whose mount, unmount or **committed** library state. A part whose only library-driven
+change is an optimistic flip that never animates (Menu's items, whose `aria-checked` lands in a
+sync render and whose settle shows nothing) has no `transition` prop; Toggle keeps its own
+because its element's content can change with the settled action.
 
 **Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
 (decision for Popover, #38, from the `vt-popover` probe in `docs/research/popover-menu.md`). A
@@ -1067,6 +1078,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | RadioGroup | `fsui-radio-group` (no direction variants) |
 | CheckboxGroup | `fsui-checkbox-group`, `fsui-checkbox-group-check` (when `details.added` is non-empty), `fsui-checkbox-group-uncheck` (when `details.removed` is non-empty; a reset may carry both) |
 | Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
+| Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1216,6 +1228,14 @@ four; action-less Checkbox, Switch and RadioGroup are the strongest candidates t
 native input already works without JS. Passing any action prop to a part from a Server Component is a type error unless the action
 is a Server Function (section 2.2).
 
+A third configuration, decided with Menu (#39): a component whose baseline **cannot** be JS-free
+(a menu needs arrow keys, typeahead and focus management that only Chromium's flagged
+`focusgroup` provides natively) runs in library mode always, with no three-prop mode switch, and
+still renders the declarative Invoker Command on its Trigger for the implicit anchor, the
+platform's `aria-expanded` mapping and a pre-hydration open that mount reconciliation fills.
+That open shows an empty popup until hydration, as Dialog's and Popover's library mode do; it
+is progressive enhancement, not a supported JS-free mode, and the component doc says so.
+
 ---
 
 ### 7.4 Attributes and events React cannot express
@@ -1271,7 +1291,7 @@ a flag (`docs/vision.md`). Mechanism:
    | --- | --- | --- | --- |
    | `popover="hint"` | Safari 27.0 (TP only) | `Tooltip.Popup experimental_hint` | Popup renders `popover="hint"` instead of the baseline type plus JS Escape/outside-click handling. |
    | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor` | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
-   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup` | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex` (#43). |
+   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup`, `Menu.Popup experimental_focusgroup` (renders `focusgroup="menu wrap\|nowrap"`; items render no `tabindex` on the native path; typeahead, activation, submenu keys and Tab stay JS) | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex` (#43). |
    | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
    | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute; camelCase like `experimental_interestFor`) | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | `Select.Root experimental_baseAppearance` | `appearance: base-select` markup; degrades to the native picker elsewhere. |
@@ -1529,6 +1549,18 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     the part-initiated close shape in 3.5, the `"dismiss"` examples in 2.2, the `Popup` element
     in 1.1, the `open` row in 4.1, the types in 5.3, the DOM-written ARIA row in 7.4) are
     applied.
+25. **Menu (#39)** accepted 2026-10-17 with all eleven questions as recommended
+    (`design/components/menu.md`): item activation closes the whole stack after the item's
+    action settles, with `data-pending` on the item and a view-transition exit; checkbox and
+    radio items keep the menu open by default (`closeOnActivate`); always library mode; hover
+    intent by timers (100 / 150 ms) on the submenu Root and pointer-move focus on items; Tab
+    closes the stack with an immediate `hidePopover()`; submenu `flip-inline` fallback kept
+    despite WebKit 302008; a nested `Menu.Root` is the submenu with `SubmenuTrigger` the only
+    new part; `GroupLabel` and `<hr>`; `experimental_focusgroup` on `Menu.Popup`; the shared
+    `useActionTrigger` as a follow-up after Popover merges. The conventions changes it asked for
+    (`GroupLabel` / `Separator` / `Item` in 1.1, `useActionTrigger` in 3.4, the always-library
+    configuration in 7.3, the committed-state wording in 5.1, the types in 5.3, the flag row in
+    8, the `checked` and `open` rows in 4.1, the `"dismiss"` examples in 2.2) are applied.
 
 ## Open questions
 
