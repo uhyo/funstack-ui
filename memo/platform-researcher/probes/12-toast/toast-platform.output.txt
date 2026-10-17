@@ -1,0 +1,42 @@
+
+######## chromium 156.0.8078.4
+1 menu still open after manual show                  true
+1 focus after manual show                            "#menuitem"
+1 events                                             ["menu:beforetoggle:open","menu:toggle:open","region:beforetoggle:open","region:toggle:open"]
+2 after Escape: menu / region open                   [false,true]
+2 Escape inside manual region: region open           true
+3 click in region: menu open?                        false
+3 focus after click in region                        "BUTTON"
+4a AX (chromium) toast nodes before modal            [{"role":"region","name":"Notifications","ignored":false},{"role":"StaticText","name":"Saved","ignored":false},{"role":"button","name":"close","ignored":false},{"role":"InlineTextBox","name":"Saved","ignored":false},{"role":"StaticText","name":"close","ignored":false},{"role":"InlineTextBox","name":"close","ignored":false}]
+4 region still open after showModal                  true
+4 hit test on toast button (dialog above)            "dlg"
+4 hit test after re-show (region above dialog)       "dlg"
+4 focus() on toast button works?                     false
+4 playwright click error                             "page.click: Timeout 1500ms exceeded."
+4 click handler ran on re-shown region over modal    false
+4 dialog still open                                  true
+4 AX (chromium) toast nodes while modal open         []
+5 inner popover (in dialog) focusable                true
+5 inner hit                                          "innerbtn"
+5 inner popover after dialog close: open / visible / rect height [true,false,0]
+6 :modal / ariaNotify / interestfor support          {"ariaNotify":"function","docAriaNotify":"function","interestFor":true,"hint":"hint","scrollsnapchange":true,"scrollend":true,"elementVT":"function"}
+
+######## firefox 157.0
+1 menu still open after manual show                  true
+1 focus after manual show                            "#menuitem"
+1 events                                             ["menu:beforetoggle:open","menu:toggle:open","region:beforetoggle:open","region:toggle:open"]
+2 after Escape: menu / region open                   [false,true]
+2 Escape inside manual region: region open           true
+3 click in region: menu open?                        false
+3 focus after click in region                        "BUTTON"
+4 region still open after showModal                  true
+4 hit test on toast button (dialog above)            "dlg"
+4 hit test after re-show (region above dialog)       "dlg"
+4 focus() on toast button works?                     false
+4 playwright click error                             "page.click: Timeout 1500ms exceeded."
+4 click handler ran on re-shown region over modal    false
+4 dialog still open                                  true
+5 inner popover (in dialog) focusable                true
+5 inner hit                                          "innerbtn"
+5 inner popover after dialog close: open / visible / rect height [true,false,0]
+6 :modal / ariaNotify / interestfor support          {"ariaNotify":"function","docAriaNotify":"function","interestFor":false,"hint":"hint","scrollsnapchange":false,"scrollend":true,"elementVT":"undefined"}

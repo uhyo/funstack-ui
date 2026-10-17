@@ -1,0 +1,2 @@
+chromium 156.0.8078.4 {"menuOpenAfterShow":true,"activeAfterMenu":"t","menuOpenAfterFocusToast":true,"activeAfterReshow":"t","menuOpenAfterReshow":true}
+firefox 157.0 {"menuOpenAfterShow":true,"activeAfterMenu":"t","menuOpenAfterFocusToast":true,"activeAfterReshow":"t","menuOpenAfterReshow":true}

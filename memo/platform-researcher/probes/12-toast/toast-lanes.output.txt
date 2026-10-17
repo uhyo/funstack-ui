@@ -1,0 +1,7 @@
+react 19.3.1
+slow async action pending                                        => slowPending=true toasts=[]
+push() outside any transition                                    => slowPending=true toasts=[plain]
+push() inside startTransition                                    => slowPending=true toasts=[plain]
+push() via queueMicrotask from inside startTransition            => slowPending=true toasts=[plain,microtask]
+push() after await inside an async startTransition               => slowPending=true toasts=[plain,microtask,afterAwait]
+slow action released                                             => slowPending=false toasts=[plain,inTransition,microtask,afterAwait]
