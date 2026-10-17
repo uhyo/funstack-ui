@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -11,8 +11,8 @@ import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
-import { useTabsContext } from "./tabs-context.js";
-import type { TabsOrientation } from "./tabs-context.js";
+import { TabsListContext, useTabsContext } from "./tabs-context.js";
+import type { TabsListContextValue, TabsOrientation } from "./tabs-context.js";
 
 export interface TabsListState {
   readonly orientation: TabsOrientation;
@@ -68,6 +68,9 @@ function focusTab(tab: HTMLElement): void {
   tab.focus({ focusVisible: true } as FocusOptions);
 }
 
+/** Engine capabilities never change while the page lives. */
+const subscribeNever = () => () => {};
+
 /**
  * The `role="tablist"` container. Owns arrow-key / Home / End navigation between Tabs: it only
  * moves focus; automatic activation happens in the Tab's focus handler.
@@ -87,12 +90,20 @@ export function TabsList({
   const ctx = useTabsContext("Tabs.List");
   const { orientation, loop, disabled, optimistic } = ctx;
 
-  // Feature detection only when the flag is on, and only in an effect (conventions 8): markup
-  // never differs between server and client.
-  const nativeFocusgroup = useRef(false);
-  useEffect(() => {
-    nativeFocusgroup.current = experimental_focusgroup && "focusgroup" in HTMLElement.prototype;
-  }, [experimental_focusgroup]);
+  // Feature detection only when the flag is on, and never during SSR or hydration (conventions
+  // 8): the server snapshot is `false`, so hydration markup matches the server and React re-renders
+  // with the client answer afterwards. The IDL attribute is camel-cased `focusGroup`
+  // (`"focusgroup" in HTMLElement.prototype` is always false, issue #43). The Tabs read it too:
+  // they drop `tabindex="-1"` on the native path (TabsListContextValue).
+  const nativeFocusgroup = useSyncExternalStore(
+    subscribeNever,
+    () => experimental_focusgroup && "focusGroup" in HTMLElement.prototype,
+    () => false,
+  );
+  const listContext = useMemo<TabsListContextValue>(
+    () => ({ focusgroup: experimental_focusgroup, nativeFocusgroup }),
+    [experimental_focusgroup, nativeFocusgroup],
+  );
 
   // A value that matches no Tab (a controlled `value` for a route without a tab, design 11.5)
   // leaves no tab with tabindex=0, so the List takes over as the tab stop exactly as for `null`.
@@ -129,7 +140,7 @@ export function TabsList({
     const move = resolveKey(event.key, orientation, rtl);
     if (move === null) return;
     // The browser moves focus itself where `focusgroup` is implemented.
-    if (nativeFocusgroup.current) return;
+    if (nativeFocusgroup) return;
 
     event.preventDefault();
     const tabs = tabsOf(list);
@@ -171,10 +182,12 @@ export function TabsList({
   };
 
   const focusgroup = experimental_focusgroup
-    ? `tablist ${orientation === "vertical" ? "block" : "inline"} ${loop ? "wrap" : "nowrap"}`
+    ? // `nomemory` + `focusgroupstart` on the selected Tab: Tab always enters on the selected tab
+      // (APG), not on the last focused one, which differs in manual activation.
+      `tablist ${orientation === "vertical" ? "block" : "inline"} ${loop ? "wrap" : "nowrap"} nomemory`
     : undefined;
 
-  return useRender<ComponentPropsWithRef<"div">, TabsListState>({
+  const element = useRender<ComponentPropsWithRef<"div">, TabsListState>({
     defaultElement: "div",
     render,
     state,
@@ -196,6 +209,8 @@ export function TabsList({
     },
     ref: listRef,
   });
+
+  return <TabsListContext value={listContext}>{element}</TabsListContext>;
 }
 
 TabsList.displayName = "TabsList";

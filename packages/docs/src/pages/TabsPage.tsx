@@ -128,8 +128,11 @@ export function TabsPage() {
             default: "false",
             description: (
               <>
-                Renders <code>focusgroup="tablist …"</code>; where the browser implements it, the
-                browser handles arrow keys, Home and End. The JS path stays active elsewhere.
+                Renders <code>focusgroup="tablist … nomemory"</code> and{" "}
+                <code>focusgroupstart</code> on the selected tab; where the browser implements it
+                (Chromium), the browser handles arrow keys, Home and End, and unselected tabs drop{" "}
+                <code>tabindex="-1"</code> after hydration (Chromium leaves negative-tabindex
+                elements out of the focusgroup). The JS path stays active elsewhere.
               </>
             ),
           },

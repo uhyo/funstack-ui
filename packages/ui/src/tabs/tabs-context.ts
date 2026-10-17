@@ -24,6 +24,20 @@ export interface TabsContextValue {
 
 export const TabsContext = createContext<TabsContextValue | null>(null);
 
+/** What a Tabs.List tells its Tabs about `experimental_focusgroup`. */
+export interface TabsListContextValue {
+  /** `experimental_focusgroup` is on: the selected Tab carries `focusgroupstart`. */
+  readonly focusgroup: boolean;
+  /**
+   * The flag is on and the engine implements `focusgroup` (detected in an effect, so false during
+   * SSR and hydration). Unselected Tabs then drop `tabindex="-1"`: Chromium leaves an element with
+   * a negative tabindex out of the focusgroup, so roving tabindex would disable the native arrows.
+   */
+  readonly nativeFocusgroup: boolean;
+}
+
+export const TabsListContext = createContext<TabsListContextValue | null>(null);
+
 export function useTabsContext(part: string): TabsContextValue {
   const context = use(TabsContext);
   if (context === null) {

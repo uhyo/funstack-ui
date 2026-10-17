@@ -66,7 +66,7 @@ export function ExperimentalPage() {
       <ul>
         <li>
           <strong>Flags never change markup between server and client.</strong> Feature detection (
-          <code>"focusgroup" in HTMLElement.prototype</code>,{" "}
+          <code>"focusGroup" in HTMLElement.prototype</code>,{" "}
           <code>"interestForElement" in element</code>) runs in an effect, and only when the flag is
           on.
         </li>

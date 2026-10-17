@@ -38,3 +38,10 @@ export const checkedMatchesWhileIndeterminate = (() => {
  */
 export const supportsDialogClosedBy =
   typeof HTMLDialogElement !== "undefined" && "closedBy" in HTMLDialogElement.prototype;
+
+/**
+ * Native roving focus (`focusgroup`); Chromium 150+ only as of 2026-10. The IDL attribute is
+ * camel-cased `focusGroup`: `"focusgroup" in HTMLElement.prototype` is always false (issue #43).
+ */
+export const supportsFocusgroup =
+  typeof HTMLElement !== "undefined" && "focusGroup" in HTMLElement.prototype;

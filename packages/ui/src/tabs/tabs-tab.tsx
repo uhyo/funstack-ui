@@ -1,4 +1,5 @@
 "use client";
+import { use } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -12,7 +13,7 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { rendersButton, resolveStateValue, useRender } from "../internal/use-render.js";
-import { useTabsContext } from "./tabs-context.js";
+import { TabsListContext, useTabsContext } from "./tabs-context.js";
 import type { TabsOrientation } from "./tabs-context.js";
 import { anchorName, panelId, tabId } from "./tabs-ids.js";
 
@@ -73,7 +74,7 @@ function movedWithinList(event: FocusEvent<HTMLElement>): boolean {
  * roving `tabindex`) and carries `anchor-name` for the Indicator.
  *
  * Owned keys (conventions 1.2): `role`, `id`, `aria-selected`, `aria-controls` (token-merged),
- * `aria-disabled`, `tabIndex`, `data-selected`, `data-pending`, `data-disabled`,
+ * `aria-disabled`, `tabIndex`, `focusgroupstart` (with `experimental_focusgroup`), `data-selected`, `data-pending`, `data-disabled`,
  * `data-orientation`, `onClick`, `onKeyDown`, `onFocus`.
  */
 export function TabsTab({
@@ -87,6 +88,7 @@ export function TabsTab({
   ...rest
 }: TabsTabProps) {
   const ctx = useTabsContext("Tabs.Tab");
+  const listCtx = use(TabsListContext);
   const selected = ctx.optimistic === value;
   const pending = ctx.pending && selected;
   const disabled = ctx.disabled || disabledProp;
@@ -116,7 +118,11 @@ export function TabsTab({
       "aria-selected": selected,
       "aria-controls": panelId(ctx.rootId, value),
       "aria-disabled": disabled ? true : undefined,
-      tabIndex: selected ? 0 : -1,
+      // Roving tabindex, except on the native `focusgroup` path, where the browser owns the tab
+      // stop and a negative tabindex would take the Tab out of the group (TabsListContextValue).
+      tabIndex: selected ? 0 : listCtx?.nativeFocusgroup ? undefined : -1,
+      // Always rendered with the flag (inert where unsupported), so markup is stable.
+      ...(listCtx?.focusgroup === true && { focusgroupstart: selected ? "" : undefined }),
       "data-selected": dataAttr(selected),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),

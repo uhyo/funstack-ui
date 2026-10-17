@@ -45,3 +45,24 @@ radio-group.browser.test.tsx) and assert the degraded sequence, including that t
 does not dispatch ("once per press" still holds for every press that moves). Docs page notes it.
 design/components/radio-group.md sections 5 and the keyboard table claim wrap + RTL in all
 engines; reported to the architect rather than edited.
+
+## `focusgroup` native path (issue #43, 2026-10-17)
+
+`Tabs.List experimental_focusgroup` never took the native path: the check was
+`"focusgroup" in HTMLElement.prototype`, always false; the IDL attribute is `focusGroup`
+(Chromium 156 reflects it as a token list, e.g. `{0:"tablist",1:"inline",2:"wrap"}`).
+`supportsFocusgroup` in `src/__tests__/engine.ts` now pins it (true only in Chromium).
+
+Fixing only the check made things worse: probing Chromium 156 showed an element with an explicit
+`tabindex="-1"` is left out of the focusgroup, so with roving tabindex the JS handler stepped
+aside and the browser moved nothing. Fix: List detects with useSyncExternalStore (server snapshot
+false, so hydration matches; replaces the ref-in-effect, which oxlint flags as set-state-in-effect
+once it became state) and provides
+`TabsListContext`; on the native path unselected Tabs render no `tabindex`. Also added `nomemory`
+to the focusgroup value and `focusgroupstart` on the selected Tab (rendered with the flag, inert
+elsewhere): without them Chromium re-enters on the last focused item, which in manual activation is
+not the selected tab (APG says the selected one). Probe results: `tablist inline wrap nomemory` +
+`focusgroupstart` on B -> Tab enters B, Shift+Tab back in enters B. Browser test
+"Tabs.List experimental_focusgroup" asserts the native path by `defaultPrevented === false` at a
+document keydown listener (JS path prevents). design/components/tabs.md and conventions.md section
+8 still describe roving tabindex unchanged on the native path; reported, not edited.

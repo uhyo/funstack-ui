@@ -5,6 +5,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
+import { browserName, supportsFocusgroup } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Tabs } from "./index.js";
 import type { TabsValueChangeDetails } from "./index.js";
@@ -148,4 +149,102 @@ describe("Tabs pointer activation", () => {
       );
     },
   );
+});
+
+describe("Tabs.List experimental_focusgroup", () => {
+  it("Chromium has native focusgroup; Firefox and WebKit do not", () => {
+    // Pins the feature check (issue #43: `"focusgroup" in HTMLElement.prototype` is always false).
+    expect(supportsFocusgroup).toBe(browserName === "chromium");
+  });
+
+  it.each([
+    ["horizontal", "ArrowRight", "ArrowLeft"],
+    ["vertical", "ArrowDown", "ArrowUp"],
+  ] as const)(
+    "%s: arrows, Home and End move focus natively where supported, by JS elsewhere",
+    async (orientation, nextKey, prevKey) => {
+      const action = vi.fn<(next: string) => void>();
+      render(
+        <Tabs.Root defaultValue="a" orientation={orientation} valueChangeAction={action}>
+          <Tabs.List aria-label="x" experimental_focusgroup>
+            <Tabs.Tab value="a">A</Tabs.Tab>
+            <Tabs.Tab value="b">B</Tabs.Tab>
+            <Tabs.Tab value="c">C</Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      const tab = (name: string) => screen.getByRole("tab", { name });
+      expect(screen.getByRole("tablist")).toHaveAttribute(
+        "focusgroup",
+        `tablist ${orientation === "vertical" ? "block" : "inline"} wrap nomemory`,
+      );
+      // Chromium leaves a tabindex=-1 element out of the focusgroup, so on the native path the
+      // unselected tabs drop it; elsewhere roving tabindex stays.
+      await expect
+        .poll(() => tab("B").getAttribute("tabindex"))
+        .toBe(supportsFocusgroup ? null : "-1");
+
+      // The JS handler calls preventDefault; the native path leaves the key to the browser's
+      // default action, so a bubble listener on the document sees it not prevented.
+      const prevented: boolean[] = [];
+      const record = (event: KeyboardEvent) => prevented.push(event.defaultPrevented);
+      document.addEventListener("keydown", record);
+      try {
+        await user.click(tab("A"));
+        await expect.poll(() => document.activeElement).toBe(tab("A"));
+
+        await user.keyboard(`{${nextKey}}`);
+        await expect.poll(() => document.activeElement).toBe(tab("B"));
+        await expect.poll(() => tab("B").getAttribute("aria-selected")).toBe("true");
+        await user.keyboard("{End}");
+        await expect.poll(() => document.activeElement).toBe(tab("C"));
+        await user.keyboard(`{${nextKey}}`); // loop defaults to true: wraps
+        await expect.poll(() => document.activeElement).toBe(tab("A"));
+        await user.keyboard(`{${prevKey}}`);
+        await expect.poll(() => document.activeElement).toBe(tab("C"));
+        await user.keyboard("{Home}");
+        await expect.poll(() => document.activeElement).toBe(tab("A"));
+        await expect.poll(() => tab("A").getAttribute("aria-selected")).toBe("true");
+      } finally {
+        document.removeEventListener("keydown", record);
+      }
+      expect(prevented).toEqual(Array(5).fill(!supportsFocusgroup));
+      expect(action.mock.calls.map(([next]) => next)).toEqual(["b", "c", "a", "c", "a"]);
+    },
+  );
+
+  it("manual activation: Tab always enters and leaves on the selected tab, one tab stop", async () => {
+    render(
+      <>
+        <button type="button">before</button>
+        <Tabs.Root defaultValue="b" activationMode="manual">
+          <Tabs.List aria-label="x" experimental_focusgroup>
+            <Tabs.Tab value="a">A</Tabs.Tab>
+            <Tabs.Tab value="b">B</Tabs.Tab>
+            <Tabs.Tab value="c">C</Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>
+        <button type="button">after</button>
+      </>,
+    );
+    const tab = (name: string) => screen.getByRole("tab", { name });
+    const button = (name: string) => screen.getByRole("button", { name });
+    await expect
+      .poll(() => tab("A").getAttribute("tabindex"))
+      .toBe(supportsFocusgroup ? null : "-1");
+
+    button("before").focus();
+    await user.keyboard("{Tab}");
+    await expect.poll(() => document.activeElement).toBe(tab("B"));
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(() => document.activeElement).toBe(tab("C"));
+    expect(tab("B")).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{Tab}");
+    await expect.poll(() => document.activeElement).toBe(button("after"));
+    // Back in: the selected tab, not the last focused one (`nomemory` + `focusgroupstart`).
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    await expect.poll(() => document.activeElement).toBe(tab("B"));
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    await expect.poll(() => document.activeElement).toBe(button("before"));
+  });
 });

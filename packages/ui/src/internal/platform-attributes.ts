@@ -23,6 +23,12 @@ declare module "react" {
      * Not in `@types/react` 19.3.0 (no DefinitelyTyped issue filed as of 2026-10-16).
      */
     focusgroup?: string | undefined;
+    /**
+     * `focusgroupstart` (Chromium 150+): marks the item a `focusgroup` enters on when focus
+     * arrives from outside (with `nomemory`, always). Boolean attribute: pass `""`.
+     * Not in `@types/react` 19.3.0 (no DefinitelyTyped issue filed as of 2026-10-17).
+     */
+    focusgroupstart?: "" | undefined;
   }
 
   interface ButtonHTMLAttributes<T> {
