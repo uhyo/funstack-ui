@@ -10,8 +10,10 @@
 // Engine branches (src/__tests__/engine.ts, memo/developer/cross-engine.md):
 // - Firefox animates no CSS exit of a popover: the exit rows branch on whether `getAnimations()`
 //   found anything when the popup was hidden.
-// - WebKit 302008: `position-try-fallbacks` on a nested popover hangs / spins, so the nested rows
-//   render the inner Popup with `side={null}` on WebKit and the nested flip runs elsewhere only.
+// - WebKit 302008 (`position-try-fallbacks` on a nested popover hangs / spins): it did not bite
+//   Menu submenus or the nested Combobox listbox on WebKit CI, so the nested rows, the flip row
+//   included, use an inline placement with its `flip-inline` fallback on all three engines
+//   (issue #56). A hang fails the row under the test timeout.
 // - `popover="hint"` is missing in Safari 27.0 (`supportsPopoverHint`); the Tooltip row expects
 //   the same either way.
 import { act, render, screen } from "@testing-library/react";
@@ -336,9 +338,6 @@ describe("focus (browser)", () => {
 });
 
 describe("nested popovers (browser)", () => {
-  /** WebKit 302008: `position-try-fallbacks` on a nested popover hangs; no inline placement there. */
-  const innerSide = browserName === "webkit" ? null : "right";
-
   function Nested({ action, innerAction }: { action?: ActionFn; innerAction?: ActionFn }) {
     return (
       <Library action={action}>
@@ -347,7 +346,7 @@ describe("nested popovers (browser)", () => {
           <Popover.Popup
             data-testid="inner"
             aria-label="Permissions"
-            side={innerSide}
+            side="right"
             align="start"
             style={box(120, 60)}
           >
@@ -412,44 +411,36 @@ describe("nested popovers (browser)", () => {
     expect(isOpen()).toBe(true);
   });
 
-  it.runIf(browserName !== "webkit")(
-    "the inner popup flips to the other side near the viewport edge (not on WebKit: 302008)",
-    async () => {
-      render(
-        <Popover.Root defaultOpen={false}>
-          <Popover.Trigger data-testid="trigger">Share</Popover.Trigger>
-          <Popover.Popup
-            data-testid="popup"
-            aria-label="Share"
-            side={null}
-            style={{ ...box(160, 80), position: "fixed", inset: "100px 0 auto auto" }}
-          >
-            <Popover.Root defaultOpen={false}>
-              <Popover.Trigger data-testid="inner-trigger" style={{ marginLeft: 100 }}>
-                More
-              </Popover.Trigger>
-              <Popover.Popup
-                data-testid="inner"
-                aria-label="More"
-                side="right"
-                style={box(300, 40)}
-              >
-                content
-              </Popover.Popup>
-            </Popover.Root>
-          </Popover.Popup>
-        </Popover.Root>,
-      );
-      await user.click(trigger());
-      await flush();
-      await user.click(screen.getByTestId("inner-trigger"));
-      await expect.poll(() => isOpen(inner())).toBe(true);
-      const t = screen.getByTestId("inner-trigger").getBoundingClientRect();
-      const p = inner().getBoundingClientRect();
-      // No room on the right: `flip-inline` places it on the left of its Trigger.
-      expect(p.right).toBeCloseTo(t.left, 0);
-    },
-  );
+  it("the inner popup flips to the other side near the viewport edge", async () => {
+    render(
+      <Popover.Root defaultOpen={false}>
+        <Popover.Trigger data-testid="trigger">Share</Popover.Trigger>
+        <Popover.Popup
+          data-testid="popup"
+          aria-label="Share"
+          side={null}
+          style={{ ...box(160, 80), position: "fixed", inset: "100px 0 auto auto" }}
+        >
+          <Popover.Root defaultOpen={false}>
+            <Popover.Trigger data-testid="inner-trigger" style={{ marginLeft: 100 }}>
+              More
+            </Popover.Trigger>
+            <Popover.Popup data-testid="inner" aria-label="More" side="right" style={box(300, 40)}>
+              content
+            </Popover.Popup>
+          </Popover.Root>
+        </Popover.Popup>
+      </Popover.Root>,
+    );
+    await user.click(trigger());
+    await flush();
+    await user.click(screen.getByTestId("inner-trigger"));
+    await expect.poll(() => isOpen(inner())).toBe(true);
+    const t = screen.getByTestId("inner-trigger").getBoundingClientRect();
+    const p = inner().getBoundingClientRect();
+    // No room on the right: `flip-inline` places it on the left of its Trigger.
+    expect(p.right).toBeCloseTo(t.left, 0);
+  });
 });
 
 describe("exit animation and the deferred unmount (browser)", () => {

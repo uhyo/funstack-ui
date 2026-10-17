@@ -95,3 +95,20 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   Negative checks (still closed / still open) keep a single `flush()`.
 - Still in the WebKit CI log, not addressed: act() warnings from several Combobox rows and the
   Menu "Tooltip on an item" row.
+
+## Issue #56 test cleanups (2026-10-17)
+
+- The Combobox act() warnings were not WebKit-only: Chromium and Firefox CI logged the same 25
+  (WebKit 26, the extra one from the WebKit-only 302008 row). Locally they only show with
+  `--reporter=default --silent=false` (the agent-run reporter hides passing tests' console).
+  Cause: four rows called `userEvent.clear` directly, outside `act`. `user.clear` now wraps it
+  (`src/__tests__/browser-user.ts`). The 302008 row's `expect.poll` after Escape became a
+  `settle()` loop of `act` flushes, as in the Dialog rows.
+- The Combobox VT rows' `Plain` List got `aria-label` (it logged the no-accessible-name warning).
+- The Menu "Tooltip on an item" row logs no act() warning in the current CI log; it logs the
+  Tooltip dev warning "trigger is not focusable" because a roving Menu.Item has tabIndex -1.
+  That is a library false positive (tooltip-root.tsx checks `tabIndex < 0`), not a test problem:
+  left as is, reported to the caller.
+- Popover nested rows: `innerSide` removed, the inner Popup uses `side="right"` everywhere and the
+  flip row runs on WebKit too. Not runnable locally: the first WebKit CI run must confirm the
+  nested rows and the flip row (`p.right ≈ t.left`).
