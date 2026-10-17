@@ -26,9 +26,12 @@
 //   dialog itself), any other popover focuses only itself with `autofocus` or an `autofocus`
 //   descendant. Chromium, Firefox and WebKit all do this for `<dialog popover>`
 //   (popover.browser.test.tsx, platform probe).
-// - No focus return on hide, no light dismiss, no close watcher and no "hide all popovers
-//   until": tests drive dismissals with `hidePopover()`, and the focus left inside a hidden
-//   popover stands in for the platform's nested-popover case.
+// - Hiding an `auto` popover hides the `auto` popovers nested in it first (DOM descendants, or
+//   opened with a `source` inside it), each with its own events: the hide half of "hide all
+//   popovers until" (design/components/menu.md 14). Opening one does not close unrelated ones.
+// - No focus return on hide, no light dismiss and no close watcher: tests drive dismissals with
+//   `hidePopover()`, and the focus left inside a hidden popover stands in for the platform's
+//   nested-popover case.
 import { installInvokerShim, registerCommandHandler } from "./invoker-shim.js";
 
 /**
@@ -122,6 +125,27 @@ function queueToggle(element: HTMLElement, open: boolean): void {
   pendingToggles.set(element, { oldState, timer });
 }
 
+function isAuto(element: Element): boolean {
+  const value = element.getAttribute("popover");
+  return value === "" || value?.toLowerCase() === "auto";
+}
+
+/**
+ * HTML "hide all popovers until": hiding an `auto` popover first hides the `auto` popovers nested
+ * in it (DOM descendants, or opened with a `source` inside it), innermost first, each with its
+ * own `beforetoggle` / `toggle` (design/components/menu.md 14, the submenu stack).
+ */
+function hideNested(element: HTMLElement): void {
+  if (!isAuto(element)) return;
+  for (const other of element.ownerDocument.querySelectorAll<HTMLElement>(`[${SHOWN_ATTRIBUTE}]`)) {
+    if (other === element || !isOpen(other) || !isAuto(other)) continue;
+    const source = sources.get(other) ?? null;
+    if (element.contains(other) || (source !== null && element.contains(source))) {
+      setOpen(other, false);
+    }
+  }
+}
+
 function setOpen(element: HTMLElement, open: boolean, source: HTMLElement | null = null): void {
   if (isOpen(element) === open) return;
   if (!element.hasAttribute("popover")) {
@@ -129,6 +153,10 @@ function setOpen(element: HTMLElement, open: boolean, source: HTMLElement | null
   }
   if (!element.isConnected) {
     throw new DOMException("The popover is not connected.", "InvalidStateError");
+  }
+  if (!open) {
+    hideNested(element);
+    if (!isOpen(element)) return;
   }
   const before = toggleEvent("beforetoggle", open ? "closed" : "open", open ? "open" : "closed");
   element.dispatchEvent(before);

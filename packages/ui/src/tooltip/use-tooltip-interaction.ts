@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useEffectEvent } from "react";
+import { createDelayedPair } from "../internal/use-delayed-pair.js";
 
 export interface TooltipInteractionOptions {
   readonly delay: number;
@@ -57,14 +58,9 @@ export function useTooltipInteraction(
     }
 
     const doc = trigger.ownerDocument;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const clear = () => {
-      if (timer !== undefined) {
-        clearTimeout(timer);
-        timer = undefined;
-      }
-    };
+    // One pending open or close at a time (the timer helper shared with Menu's hover intent).
+    const timers = createDelayedPair();
+    const clear = timers.cancel;
     const show = () => {
       if (isOpen(popup) || !popup.isConnected || !trigger.isConnected) return;
       popup.showPopover({ source: trigger });
@@ -77,18 +73,10 @@ export function useTooltipInteraction(
       listenDocument(false);
     };
     const showLater = () => {
-      clear();
-      timer = setTimeout(() => {
-        timer = undefined;
-        show();
-      }, getDelays().delay);
+      timers.open(getDelays().delay, show);
     };
     const hideLater = () => {
-      clear();
-      timer = setTimeout(() => {
-        timer = undefined;
-        hide();
-      }, getDelays().closeDelay);
+      timers.close(getDelays().closeDelay, hide);
     };
     const hideNow = () => {
       clear();

@@ -1,9 +1,10 @@
 "use client";
-import { useCallback, useTransition } from "react";
+import { useCallback } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
+import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
@@ -65,8 +66,8 @@ export function PopoverClose({
   ...rest
 }: PopoverCloseProps) {
   const ctx = usePopoverContext("Popover.Close");
-  const [pending, startOwnTransition] = useTransition();
   const { ids, popupRef, recordCloseIntent, openGeneration } = ctx;
+  const { pending, run } = useActionTrigger(openGeneration);
   const isLibrary = ctx.mode === "library";
   const hasAction = action !== undefined;
   const installClick = isLibrary || hasAction;
@@ -111,15 +112,12 @@ export function PopoverClose({
       return;
     }
     const details = createActionDetails(native, {});
-    // The open this click belongs to: if the user dismisses and re-opens the popover while the
-    // action runs, its continuation must not close the new open.
-    const generation = openGeneration();
-    startOwnTransition(async () => {
-      await action(details);
-      if (openGeneration() !== generation) return;
-      // Repeated clicks re-run the action; the first close wins (design 3.4).
-      close(native);
-    });
+    // Repeated clicks re-run the action; the first close wins (design 3.4). A close whose open
+    // was superseded by a newer one (dismissed and re-opened meanwhile) is dropped by the hook.
+    run(
+      () => action(details),
+      () => close(native),
+    );
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {

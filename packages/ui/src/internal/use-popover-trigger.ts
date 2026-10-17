@@ -1,6 +1,6 @@
 "use client";
 import { useCallback } from "react";
-import type { ComponentPropsWithRef, MouseEvent } from "react";
+import type { ComponentPropsWithRef, DOMAttributes, MouseEvent } from "react";
 import { dataAttr } from "./data-attr.js";
 import type { RenderProp } from "./types.js";
 import { rendersButton } from "./use-render.js";
@@ -15,11 +15,34 @@ export interface PopoverTriggerHookState {
   readonly disabled: boolean;
 }
 
+/** Event handlers a component layers onto the Trigger's own (Menu's keys and hover intent). */
+export type PopoverTriggerHandlers = Pick<
+  DOMAttributes<HTMLButtonElement>,
+  "onClick" | "onKeyDown" | "onPointerMove" | "onPointerEnter" | "onPointerLeave"
+>;
+
 export interface UsePopoverTriggerOptions<State> {
   /** Public name of the part for development warnings (`"Popover.Trigger"`). */
   readonly part: string;
   readonly disabled: boolean;
   readonly render: RenderProp<ComponentPropsWithRef<"button">, State> | undefined;
+  /**
+   * Extra handlers, merged in front of the Trigger's own: for a key both define, the extra one
+   * runs first (the consumer's pass-through handler still runs before both, conventions 1.2).
+   */
+  readonly handlers?: PopoverTriggerHandlers;
+  /**
+   * What a click does in library mode, after the command has been cancelled and `disabled`
+   * checked. Default: toggle against `intended()` (`requestOpen` / `requestClose`). Menu's
+   * SubmenuTrigger opens, or moves focus into an already open submenu, and never closes.
+   */
+  readonly activate?: (event: MouseEvent<HTMLElement>) => void;
+  /**
+   * How `disabled` is rendered. `"native"` (default): the `disabled` attribute, so the button is
+   * no invoker at all. `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
+   * focusable); the click handler still refuses.
+   */
+  readonly disabledAs?: "native" | "aria";
 }
 
 export interface PopoverTriggerHook {
@@ -54,7 +77,7 @@ export function usePopoverTrigger<State>(
   ctx: PopoverRootValue,
   options: UsePopoverTriggerOptions<State>,
 ): PopoverTriggerHook {
-  const { part, disabled, render } = options;
+  const { part, disabled, render, handlers, activate, disabledAs = "native" } = options;
   const isLibrary = ctx.mode === "library";
   const { ids, triggerRef, popupRef } = ctx;
 
@@ -92,27 +115,47 @@ export function usePopoverTrigger<State>(
     // only if the click was not cancelled). Enter and Space synthesise the same click.
     event.preventDefault();
     if (disabled) return;
+    if (activate !== undefined) {
+      activate(event);
+      return;
+    }
     const native = event.nativeEvent;
     if (ctx.intended()) ctx.requestClose(native, "activate");
     else ctx.requestOpen(native, "activate");
   };
 
+  // The component's handlers first, then the Trigger's (design/components/menu.md 14). The click
+  // handler is only owned when installed, so a render element keeps its own `onClick` in JS-free
+  // mode.
+  const merged: PopoverTriggerHandlers = { ...handlers };
+  if (isLibrary) {
+    const extra = handlers?.onClick;
+    merged.onClick =
+      extra === undefined
+        ? onClick
+        : (event) => {
+            extra(event);
+            onClick(event);
+          };
+  }
+  const ariaDisabled = disabledAs === "aria";
+
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     // `type` only applies to a <button>; on any other element the key is not owned.
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the browser
-    // would run its command).
-    disabled,
+    // would run its command). With `disabledAs: "aria"` it is owned as absent.
+    disabled: ariaDisabled ? undefined : disabled,
+    ...(ariaDisabled && { "aria-disabled": disabled ? true : undefined }),
     commandfor: ids.popup,
     command: "toggle-popover",
     // Library mode: optimistic. JS-free mode: "false" in React; the Popup's `toggle` listener
     // writes the DOM value, and React never rewrites an unchanged prop.
     "aria-expanded": isLibrary ? state.open : false,
-    // Only owned when installed, so a render element keeps its own `onClick` in JS-free mode.
-    ...(isLibrary && { onClick }),
+    ...merged,
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),
-    "data-disabled": dataAttr(isLibrary && disabled),
+    "data-disabled": dataAttr((isLibrary || ariaDisabled) && disabled),
   };
 
   return { state, libraryProps, ref };

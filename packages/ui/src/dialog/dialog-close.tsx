@@ -1,9 +1,10 @@
 "use client";
-import { useCallback, useTransition } from "react";
+import { useCallback } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
+import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
@@ -62,7 +63,7 @@ export function DialogClose({
   ...rest
 }: DialogCloseProps) {
   const ctx = useDialogContext("Dialog.Close");
-  const [pending, startOwnTransition] = useTransition();
+  const { pending, run } = useActionTrigger();
   const { ids, dialogRef, recordCloseIntent } = ctx;
   const hasAction = action !== undefined;
 
@@ -90,14 +91,16 @@ export function DialogClose({
     const native = event.nativeEvent;
     const returnValue = value ?? "";
     const details = createActionDetails(native, { returnValue });
-    startOwnTransition(async () => {
-      await action(details);
-      // Repeated clicks re-run the action; the first `close()` wins (design 3.4).
-      const dialog = dialogRef.current;
-      if (dialog === null || !dialog.open) return;
-      recordCloseIntent({ reason: "activate", event: native });
-      dialog.close(returnValue);
-    });
+    run(
+      () => action(details),
+      () => {
+        // Repeated clicks re-run the action; the first `close()` wins (design 3.4).
+        const dialog = dialogRef.current;
+        if (dialog === null || !dialog.open) return;
+        recordCloseIntent({ reason: "activate", event: native });
+        dialog.close(returnValue);
+      },
+    );
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {

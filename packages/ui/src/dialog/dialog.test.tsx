@@ -1197,6 +1197,34 @@ describe("Dialog", () => {
       expect(popup().open).toBe(true);
     });
 
+    it("with action: a superseded rejection still reaches the boundary (useActionTrigger, #47)", async () => {
+      const user = setupUser();
+      silenceErrors();
+      const caught = vi.fn();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      render(
+        <Harness
+          mode="uncontrolled"
+          content={
+            <ErrorCatcher onError={caught}>
+              <Dialog.Close data-testid="delete" action={() => runs[call++]!.promise}>
+                Delete
+              </Dialog.Close>
+            </ErrorCatcher>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      await user.click(screen.getByTestId("delete"));
+      await user.click(screen.getByTestId("delete"));
+      // The older run rejects while the newer one is still pending.
+      await act(async () => runs[0]!.reject(new Error("first failed")));
+      await flush();
+      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
+      await act(async () => runs[1]!.resolve());
+    });
+
     it("a disabled Close never runs its action", async () => {
       const user = setupUser();
       const closeAction = vi.fn();

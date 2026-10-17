@@ -1356,6 +1356,36 @@ describe("Popover", () => {
         expect(action).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
       });
+
+      it("a superseded rejection still reaches the boundary (useActionTrigger, #47)", async () => {
+        const user = setupUser();
+        silenceErrors();
+        const action = vi.fn<ActionFn>();
+        const caught = vi.fn();
+        const runs = [deferred(), deferred()];
+        let call = 0;
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={
+              <ErrorCatcher onError={caught}>
+                <Popover.Close data-testid="close" action={() => runs[call++]!.promise}>
+                  Archive
+                </Popover.Close>
+              </ErrorCatcher>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        await user.click(screen.getByTestId("close"));
+        await user.click(screen.getByTestId("close"));
+        // The newer run resolves first (its close is dispatched), then the older one rejects.
+        await act(async () => runs[1]!.resolve());
+        await act(async () => runs[0]!.reject(new Error("first failed")));
+        await flush();
+        expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
+      });
     });
 
     it("JS-free mode with action: hidePopover() after the action resolves", async () => {
