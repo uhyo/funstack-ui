@@ -36,6 +36,7 @@
     "./menu": "./dist/menu/index.mjs",
     "./popover": "./dist/popover/index.mjs",
     "./radio-group": "./dist/radio-group/index.mjs",
+    "./select": "./dist/select/index.mjs",
     "./switch": "./dist/switch/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",
     "./toggle": "./dist/toggle/index.mjs",

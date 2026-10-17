@@ -3,7 +3,7 @@ import { useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefObject } from "react";
 
 /** A form-associated element whose form owner the hook follows. */
-export type FormAssociatedElement = HTMLInputElement | HTMLFieldSetElement;
+export type FormAssociatedElement = HTMLInputElement | HTMLFieldSetElement | HTMLSelectElement;
 
 interface Subscription {
   readonly form: HTMLFormElement;

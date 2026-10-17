@@ -94,6 +94,19 @@ const clientFiles = [
   "menu/menu-group.mjs",
   "menu/menu-submenu-trigger.mjs",
   "internal/use-action-trigger.mjs",
+  // Every Select part, its context and helpers, and the select machinery
+  // (design/components/select.md decision 16 and 15.1).
+  "select/select-context.mjs",
+  "select/select-dom.mjs",
+  "select/select-root.mjs",
+  "select/select-trigger.mjs",
+  "select/select-value.mjs",
+  "select/select-option.mjs",
+  "select/select-group.mjs",
+  "select/select-group-label.mjs",
+  "select/select-separator.mjs",
+  "internal/use-native-select-value.mjs",
+  "internal/use-hydrated-mount.mjs",
   "internal/use-delayed-pair.mjs",
 ];
 
@@ -113,6 +126,7 @@ const directiveFreeFiles = [
   "internal/sync-presence.mjs",
   "popover/index.mjs",
   "menu/index.mjs",
+  "select/index.mjs",
   "internal/anchor-position.mjs",
 ];
 

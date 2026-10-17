@@ -13,7 +13,7 @@
 // package, so under pnpm's strict layout `declare module "csstype"` cannot resolve from here, in
 // the library's own typecheck or in a consumer's `node_modules/@funstack/ui/dist`. Every React
 // `style` prop is typed as `React.CSSProperties`, so the effect for consumers is the same.
-import type {} from "react";
+import type * as React from "react";
 
 declare module "react" {
   interface HTMLAttributes<T> {
@@ -67,6 +67,18 @@ declare module "react" {
   interface AreaHTMLAttributes<T> {
     /** `interestfor` on `<area href>` (Chromium 142+). Not in `@types/react` 19.3.0 (DefinitelyTyped #74664). */
     interestfor?: string | undefined;
+  }
+
+  namespace JSX {
+    interface IntrinsicElements {
+      /**
+       * `<selectedcontent>` (customizable select: Chromium 135+, Safari 27): inside a select's
+       * `<button>`, the browser clones the selected option's content into it. React renders the
+       * unknown lowercase tag verbatim on client and server. `Select.Value` renders it.
+       * Not in `@types/react` 19.3.0 (no DefinitelyTyped issue filed as of 2026-10-17).
+       */
+      selectedcontent: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+    }
   }
 
   interface CSSProperties {

@@ -4,8 +4,11 @@ import type { RefObject } from "react";
 import { useFormReset } from "./use-form-reset.js";
 
 export interface UseNativeGroupReconciliationOptions<T> {
-  /** The group's form-associated container (`RadioGroup.Root`'s `<fieldset>`). */
-  readonly element: RefObject<HTMLFieldSetElement | null>;
+  /**
+   * The group's form-associated element: `RadioGroup.Root`'s / `CheckboxGroup.Root`'s
+   * `<fieldset>`, or `Select.Root`'s `<select>` (whose options are the members).
+   */
+  readonly element: RefObject<HTMLFieldSetElement | HTMLSelectElement | null>;
   /** The group's value as the DOM shows it now (`checked` of the members). */
   readonly readCurrent: () => T;
   /** The value the browser resets the group to (`defaultChecked` of the members, rule 5). */

@@ -47,6 +47,19 @@ export const supportsFocusgroup =
   typeof HTMLElement !== "undefined" && "focusGroup" in HTMLElement.prototype;
 
 /**
+ * Customizable select (`appearance: base-select`): Chromium 135+ and Safari 27. Firefox (default
+ * prefs) renders the native select from the same markup (design/components/select.md 11).
+ */
+export const supportsBaseSelect =
+  typeof CSS !== "undefined" && CSS.supports("appearance", "base-select");
+
+/**
+ * `<selectedcontent>` is a known element whose content the browser clones from the selected
+ * option (Chromium 135+, Safari 27). Elsewhere it is a plain `HTMLElement` and stays empty.
+ */
+export const supportsSelectedContent = "HTMLSelectedContentElement" in globalThis;
+
+/**
  * `focus({ focusVisible })` is read (Chromium 145+, Firefox 104+, Safari 18.4+): the bindings
  * read the dictionary member before the method runs, so a detached element is enough.
  */

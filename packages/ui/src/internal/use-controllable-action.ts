@@ -49,6 +49,14 @@ export interface ControllableAction<T, Details extends ActionDetails> {
    * what the user already intends instead of on the DOM. Read it from handlers and effects only.
    */
   readonly latestInFlight: () => { readonly next: T } | null;
+  /**
+   * Uncontrolled mode only (a no-op when controlled): writes the committed value without calling
+   * the action, without an optimistic step and without a transition. For a component that adopts
+   * a default the browser chose (Select with neither `value` nor `defaultValue` takes the first
+   * enabled option, design/components/select.md 5). Call it from a layout effect so the write is
+   * flushed before paint.
+   */
+  readonly adopt: (next: T) => void;
 }
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -155,7 +163,11 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
     return count > 0 ? { next: next as T } : null;
   }
 
-  return { committed, optimistic, pending, dispatch, latestInFlight };
+  function adopt(next: T): void {
+    if (!isControlled) setInternal(next);
+  }
+
+  return { committed, optimistic, pending, dispatch, latestInFlight, adopt };
 }
 
 function useDevWarnings(

@@ -157,6 +157,20 @@ export type {
   RadioGroupItemState,
 } from "./radio-group/index.js";
 
+export { Select } from "./select/index.js";
+export type {
+  SelectRootProps,
+  SelectRootState,
+  SelectValueChangeDetails,
+  SelectTriggerProps,
+  SelectValueProps,
+  SelectOptionProps,
+  SelectOptionState,
+  SelectGroupProps,
+  SelectGroupLabelProps,
+  SelectSeparatorProps,
+} from "./select/index.js";
+
 export type {
   Action,
   ActionDetails,
