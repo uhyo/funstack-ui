@@ -70,3 +70,36 @@ merged with master after the Popover review fixes (35e57e1..1cb5854).
   open focuses Rename, Archive shows "Archiving…" then closes with one view transition each way
   and focus back on the Trigger, submenu by keyboard and Escape focus return, checkbox toggles,
   no console errors, both engines.
+
+## Review fixes (memo/reviewer/menu.md), 2026-10-17
+
+Commits 02f2f42 (fix(ui)), fa4908c (docs), d4deae8 (test). CI run 39021387650 green on
+Chromium, Firefox and WebKit.
+
+- H1: `usePopoverPopup`'s `resolveInitialFocus` may return a `QuietFocusTarget`
+  (`{ element, focusVisible: false }`). Where the engine reads `focus({ focusVisible })`
+  (getter probe on a detached element; Chromium 145, Firefox 104, Safari 18.4), the library
+  skips the `autofocus` write and calls `focus({ focusVisible: false })` after `showPopover()`.
+  Menu records `pointer` with the open cause (`click` with `detail > 0`, Trigger and
+  SubmenuTrigger). WebKit CI: `:focus-visible` is now false after a pointer open, so the row
+  asserts false everywhere. This is the one `.focus()` on open (popover design 6.1 said never).
+- M1: owned `onMouseDown` on Menu.Popup prevents the focus move when the press is on non-item
+  space (closest focusable is the popup / a `role=menu`); consumer controls (inputs) still take
+  focus. Arrow / Home / End with focus on the popup go to the first / last item (also on the
+  native focusgroup path). jsdom + browser rows (browser row fails without the fix).
+- M2: Dialog.Root generation, bumped on the open dispatch and on the Popup's native `toggle` to
+  open (PO note); Dialog.Close passes it to `useActionTrigger`. The library-mode jsdom rows pass
+  without the guard too (the re-open is entangled and `dialog.open` is still false when `then`
+  runs); the JS-free row fails without it.
+- M3: WebKit-only row with the default submenu placement (`position-try-fallbacks: flip-inline`
+  computed), opened twice, 15 s test timeout; the CI browser step has `timeout-minutes: 10`.
+  Passed on the first WebKit run: no hang. Question 6 can keep the fallback default; the
+  `side={null}` on WebKit in the other submenu rows could be dropped later.
+  Gotcha: `side={undefined}` through a helper with a default parameter becomes the default.
+- L1: CheckboxItem / RadioItem dismiss-and-reopen rows (fail without `closeStackLater`'s guard).
+- L4: hover row runs with `IS_REACT_ACT_ENVIRONMENT = false` and the raw `userEvent`; no Menu act
+  warning on WebKit now. A CheckboxGroup VT row still prints one on WebKit (not touched).
+- L6: MenuRoot value in `useMemo` with a `root` getter (no cast). It still recomputes on every
+  render because `usePopoverRoot` returns a fresh object (its `dispatch` is per render); a real
+  hit needs that shared hook (and `useControllableAction.dispatch`) to become stable.
+- PO note: MenuPopupProps omits `onMouseDown`, `onPointerEnter`, `onPointerLeave` (owned).
