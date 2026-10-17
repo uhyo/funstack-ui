@@ -92,3 +92,8 @@
 - Combobox: designed + accepted (c000b43, 7349e2d). USER decided: English default announce string, overridable (first built-in string; conventions §11). Developer implementing in a worktree.
 - Issues: #51 (upstream React/Chromium + iOS check), #52 (Chromium selectedcontent reset bug, upstream).
 - Select COMPLETE: review fixes e4aab3b..2c8871c (CI green all 3), design fold 79b7393. Combobox implementation still running (worktree).
+
+## 2026-10-17 — Wave 4 COMPLETE (#50 closed)
+- Combobox review fixes 5d92f41..bb8db8f; CI green on all 3 engines. Design nits folded in 49687f8 (aria-labelledby types; autoHighlight side effect accepted).
+- User went to bed; working decision-free items autonomously: #48 (stable root hooks), #49 (test leftovers) in developer worktrees.
+- Pending user decisions: 0.1.0-alpha.2 release (Select + Combobox); next wave (#46 Dialog VT exit, Tooltip #19-21, #45 context menu, #53); human screen-reader pass for Combobox.
