@@ -12,10 +12,10 @@
 //   Both assert the same focus outcome.
 // - Firefox animates no CSS exit of a popover: the exit rows branch on what `getAnimations()`
 //   found when the popup was hidden.
-// - WebKit 302008 (`position-try-fallbacks` on a nested popover hangs / spins): submenu Popups
-//   render `side={null}` on WebKit, and the inline-flip row runs on Chromium and Firefox only.
-//   One WebKit-only row opens a submenu with the default placement (fallbacks included), with a
-//   test timeout, to record whether the bug still bites (design 13.2, review M3).
+// - WebKit 302008 (`position-try-fallbacks` on a nested popover hangs / spins): it did not bite
+//   the submenu's default placement on WebKit CI (review M3), so every submenu row, the
+//   inline-flip row included, uses the shipped placement on all three engines (issue #49). One
+//   WebKit-only row still opens a submenu twice under a test timeout so a regression fails fast.
 // - WebKit matched `:focus-visible` on the `autofocus` item after a pointer open (review H1):
 //   a pointer open now focuses with `focus({ focusVisible: false })` where supported; the WebKit
 //   branch of that row records what WebKit does.
@@ -67,9 +67,6 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   vi.restoreAllMocks();
 });
-
-/** WebKit 302008: no inline placement (no `position-try-fallbacks`) on submenu Popups there. */
-const subSide = browserName === "webkit" ? null : undefined;
 
 const popupStyle = {
   margin: 0,
@@ -129,23 +126,16 @@ function Basic({
 function Submenu({
   sub: subProps,
   onInbox,
-  defaultPlacement = false,
 }: {
   sub?: Partial<MenuRootProps>;
   onInbox?: () => unknown;
-  /** Leave the submenu Popup's `side` unset (the shipped default), also on WebKit. */
-  defaultPlacement?: boolean;
 }) {
   return (
     <>
       <Menu.Item data-testid="rename">Rename</Menu.Item>
       <Menu.Root {...subProps}>
         <Menu.SubmenuTrigger data-testid="move">Move to</Menu.SubmenuTrigger>
-        <Menu.Popup
-          data-testid="subpopup"
-          {...(!defaultPlacement && { side: subSide })}
-          style={popupStyle}
-        >
+        <Menu.Popup data-testid="subpopup" style={popupStyle}>
           <Menu.Item data-testid="inbox" action={onInbox}>
             Inbox
           </Menu.Item>
@@ -371,12 +361,10 @@ describe("submenus (browser)", () => {
     await openSub();
     expect(item("inbox")).toHaveFocus();
     expect(isOpen()).toBe(true);
-    if (subSide !== null) {
-      const m = item("move").getBoundingClientRect();
-      const s = sub().getBoundingClientRect();
-      expect(Math.round(s.left)).toBe(Math.round(m.right));
-      expect(Math.round(s.top)).toBe(Math.round(m.top));
-    }
+    const m = item("move").getBoundingClientRect();
+    const s = sub().getBoundingClientRect();
+    expect(Math.round(s.left)).toBe(Math.round(m.right));
+    expect(Math.round(s.top)).toBe(Math.round(m.top));
   });
 
   it("Escape closes only the submenu and the library focuses its trigger", async () => {
@@ -485,37 +473,35 @@ describe("submenus (browser)", () => {
     expect(isOpen()).toBe(true);
   });
 
-  it.runIf(subSide !== null)(
-    "near the right edge the submenu flips to the inline start",
-    async () => {
-      render(
-        <div style={{ position: "fixed", top: 20, right: 10 }}>
-          <Menu.Root>
-            <Menu.Trigger data-testid="trigger">Actions</Menu.Trigger>
-            <Menu.Popup data-testid="popup" align="end" style={popupStyle}>
-              <Submenu />
-            </Menu.Popup>
-          </Menu.Root>
-        </div>,
-      );
-      await openSub();
-      const m = item("move").getBoundingClientRect();
-      const s = sub().getBoundingClientRect();
-      expect(Math.round(s.right)).toBeLessThanOrEqual(Math.round(m.left) + 1);
-    },
-  );
+  it("near the right edge the submenu flips to the inline start", async () => {
+    render(
+      <div style={{ position: "fixed", top: 20, right: 10 }}>
+        <Menu.Root>
+          <Menu.Trigger data-testid="trigger">Actions</Menu.Trigger>
+          <Menu.Popup data-testid="popup" align="end" style={popupStyle}>
+            <Submenu />
+          </Menu.Popup>
+        </Menu.Root>
+      </div>,
+    );
+    await openSub();
+    const m = item("move").getBoundingClientRect();
+    const s = sub().getBoundingClientRect();
+    expect(Math.round(s.right)).toBeLessThanOrEqual(Math.round(m.left) + 1);
+  });
 
   // WebKit 302008 (design 13.2, review M3): the shipped default placement of a submenu keeps
-  // `position-try-fallbacks: flip-inline`, which hung WebKit on nested popovers. This row runs
-  // it, twice (the original report hung on the second open), under a test timeout. CI step
-  // timeout bounds a hard hang of the page.
+  // `position-try-fallbacks: flip-inline`, which hung WebKit on nested popovers. The rows above
+  // use it on WebKit too; this one opens it twice (the original report hung on the second open)
+  // under a test timeout, so a regression fails here, by name. CI step timeout bounds a hard hang
+  // of the page.
   it.runIf(browserName === "webkit")(
     "WebKit 302008: a submenu with the default placement opens beside its trigger and closes",
     { timeout: 15_000 },
     async () => {
       render(
         <Basic>
-          <Submenu defaultPlacement />
+          <Submenu />
         </Basic>,
       );
       await openSub();
