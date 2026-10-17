@@ -356,6 +356,85 @@ function NestedDemo() {
   );
 }
 
+/* 6. Library-owned closes: ViewTransition exit and veto (#46) ------------------------------ */
+
+function TransitionDemo() {
+  const [open, setOpen] = useState(false);
+  const [refuse, setRefuse] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [last, setLast] = useState("(none yet)");
+  return (
+    <section>
+      <h3>Library-owned closes: ViewTransition exit and veto</h3>
+      <p>
+        <code>transition</code> on the Popup: the opening commit and every close a part asks for
+        (Close, the <code>method="dialog"</code> OK button, the controlled close below) run in a
+        view transition, so the exit animates in Firefox too. Escape and a click outside are
+        dismissals: the browser closes at once and <code>openChangeAction</code> only hears about
+        it. With "refuse" on, the controlled parent keeps <code>open</code> for a part's close
+        (snap-back, a real veto); a refused dismissal re-opens.
+      </p>
+      <fieldset className="dlg-flags">
+        <legend>Options</legend>
+        <label>
+          <input type="checkbox" checked={refuse} onChange={(e) => setRefuse(e.target.checked)} />{" "}
+          Refuse closes (the parent keeps <code>open</code>)
+        </label>
+        <label>
+          <input type="checkbox" checked={slow} onChange={(e) => setSlow(e.target.checked)} /> Slow{" "}
+          <code>openChangeAction</code> (800 ms): the Trigger and the Close stay pending
+        </label>
+      </fieldset>
+      <p>
+        Last change: <code>{last}</code>
+      </p>
+      <Dialog.Root
+        open={open}
+        openChangeAction={async (next, details) => {
+          logChange("transition")(next, details);
+          const { reason, returnValue } = details;
+          if (slow) await sleep(800);
+          startTransition(() => {
+            setLast(`open=${next} reason=${reason} returnValue=${JSON.stringify(returnValue)}`);
+            if (next || !refuse) setOpen(next);
+          });
+        }}
+      >
+        <Dialog.Trigger className="dlg-btn">
+          {({ pending }) => (pending ? <Spinner /> : "Open")}
+        </Dialog.Trigger>
+        <Dialog.Popup
+          className="dlg dlg-vt"
+          lightDismiss
+          transition={{
+            "fsui-dialog-open": "dlg-pop",
+            "fsui-dialog-close": "dlg-pop",
+            default: "none",
+          }}
+        >
+          <Dialog.Title>Animated close</Dialog.Title>
+          <p>Close with a button (view transition) or with Escape / a click outside (instant).</p>
+          <Dialog.Form className="dlg-actions">
+            <Dialog.Close className="dlg-btn" value="cancel">
+              {({ pending }) => (pending ? <Spinner /> : "Cancel")}
+            </Dialog.Close>
+            <button
+              type="button"
+              className="dlg-btn"
+              onClick={() => startTransition(() => setOpen(false))}
+            >
+              Controlled close
+            </button>
+            <button type="submit" className="dlg-btn dlg-primary" value="ok">
+              OK
+            </button>
+          </Dialog.Form>
+        </Dialog.Popup>
+      </Dialog.Root>
+    </section>
+  );
+}
+
 export function DialogDemo() {
   return (
     <section className="dlg-demo">
@@ -363,14 +442,16 @@ export function DialogDemo() {
       <p>
         Built on <code>&lt;dialog&gt;</code> and Invoker Commands. The stylesheet carries the
         documented recipes: enter/exit animation with <code>@starting-style</code> and{" "}
-        <code>allow-discrete</code> (the exit is instant in Firefox), and the CSS-only scroll lock{" "}
-        <code>html:has(dialog:modal) {"{ overflow: hidden }"}</code>.
+        <code>allow-discrete</code> (the exit is instant in Firefox), the CSS-only scroll lock{" "}
+        <code>html:has(dialog:modal) {"{ overflow: hidden }"}</code>, and a <code>transition</code>{" "}
+        recipe whose view transition animates library-driven closes in every engine.
       </p>
       <JsFreeConfirm />
       <LoadOnOpen />
       <FormDemo />
       <DismissDemo />
       <NestedDemo />
+      <TransitionDemo />
     </section>
   );
 }
