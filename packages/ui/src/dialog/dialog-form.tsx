@@ -34,7 +34,9 @@ export interface DialogFormProps extends Omit<
    * Any result that does not throw counts as success, including a `useActionState`-style result
    * that reports validation errors: with the default the dialog closes and those errors are never
    * seen. Throw to keep the dialog open, or set `closeOnSettle={false}` and close it yourself:
-   * a `Dialog.Close`, a submitter with `formMethod="dialog"`, or a controlled `open`.
+   * a `Dialog.Close`, a submit button in a separate `method="dialog"` form, or a controlled
+   * `open`. (A `formMethod="dialog"` submitter inside this form cannot close it: React prevents
+   * every submit of a form with a function `action` and runs the action again.)
    *
    * The dialog is not closed either when it was closed (Escape, a Close part) while the action
    * ran, also if the user re-opened it meanwhile.

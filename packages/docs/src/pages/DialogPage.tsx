@@ -368,9 +368,11 @@ export function DialogPage() {
                 without throwing. Any non-throwing result counts, including a{" "}
                 <code>useActionState</code> result that reports validation errors; set{" "}
                 <code>false</code> to keep the dialog open and close it yourself (a{" "}
-                <code>Dialog.Close</code>, a <code>formMethod="dialog"</code> submitter, or a
-                controlled <code>open</code>). The dialog is never closed when it was closed while
-                the action ran, even if the user re-opened it meanwhile.
+                <code>Dialog.Close</code>, a submit button in a separate{" "}
+                <code>method="dialog"</code> form, or a controlled <code>open</code>; a{" "}
+                <code>formMethod="dialog"</code> submitter inside this form runs the action again
+                instead). The dialog is never closed when it was closed while the action ran, even
+                if the user re-opened it meanwhile.
               </>
             ),
           },
@@ -611,8 +613,11 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
           <code>details.returnValue</code>). A dismissal is already done when the action runs: a
           parent that does not adopt <code>false</code> gets the dialog re-opened once the action
           settles, and the user sees it close and come back. Adopt a dismissal's <code>false</code>{" "}
-          unconditionally. Neither is a way to ask the user first: an action must never await input,
-          so build confirmation inside the dialog (see the callout above).
+          unconditionally. If the user dismisses the dialog while a part's close is still running
+          and you then veto that close, the dialog stays closed and you receive the dismissal (
+          <code>reason: "dismiss"</code>) right after. Neither is a way to ask the user first: an
+          action must never await input, so build confirmation inside the dialog (see the callout
+          above).
         </p>
       </Callout>
 

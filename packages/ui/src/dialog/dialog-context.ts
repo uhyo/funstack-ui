@@ -36,8 +36,8 @@ export interface DialogContextValue {
    */
   readonly requestOpen: (event: Event | undefined, reason: ChangeReason) => void;
   /**
-   * The dialog closed natively: dispatch the `false` notification unless the user (or the
-   * library's own echo) already intends `false`.
+   * The dialog closed natively (a dismissal, not the library's own `close()`): dispatch the
+   * `false` notification unless the user already intends `false`.
    */
   readonly notifyClosed: (event: Event, reason: ChangeReason, returnValue: string) => void;
   /**

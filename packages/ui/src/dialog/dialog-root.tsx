@@ -55,7 +55,9 @@ export interface DialogRootProps {
    * that keeps `open` vetoes it). A notification for a dismissal (Escape, Android back, a click
    * outside: the dialog is already closed, `returnValue` is `""`; the action runs inside the
    * Root's transition, and a controlled parent that keeps `open` gets it re-opened, which is
-   * not a veto). May be a Server Function. Rejections reach the nearest Error Boundary above
+   * not a veto). A dismissal while a part's close is in flight is not notified on its own: if that
+   * close is vetoed, the dismissal is notified (`"dismiss"`) when the veto settles, and the dialog
+   * stays closed. May be a Server Function. Rejections reach the nearest Error Boundary above
    * Root.
    *
    * A `setState` placed after your own `await` is not a Transition update; wrap it in

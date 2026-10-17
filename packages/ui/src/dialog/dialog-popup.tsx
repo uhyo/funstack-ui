@@ -204,6 +204,19 @@ export function DialogPopup({
   // the dialog is closed but its notification is not dispatched yet, so the apply effect must
   // not re-open it from a commit that lands in between.
   const awaitingClose = useRef(false);
+  // Set right before the library's own `close()` (the apply effect), consumed by the `close`
+  // event it causes: the echo is recognised by its source, not by what is intended (review L4).
+  const libraryClose = useRef(false);
+  // A dismissal (Escape, a click outside) that closed the dialog while a part-initiated close
+  // was in flight (review M1). Its notification was skipped because `false` was intended; if that
+  // close then settles with committed `true` (a controlled parent vetoed it), the apply effect
+  // sends the dismissal instead of re-opening. Valid only for the open generation it was
+  // recorded in: a re-open (Trigger, foreign invoker) supersedes it.
+  const dismissedWhilePending = useRef<{
+    readonly event: Event;
+    readonly returnValue: string;
+    readonly generation: number;
+  } | null>(null);
   const warnedFocus = useRef(false);
 
   // --- `held`: children stay mounted while the close animates (design 4.4) -----------------
@@ -325,14 +338,28 @@ export function DialogPopup({
     const element = dialogRef.current;
     if (element === null || !element.isConnected) return;
     if (!ctx.pending && ctx.latestInFlight() === null) {
+      const dismissed = dismissedWhilePending.current;
       if (ctx.committed && !element.open) {
         // Closed, but its `close` event has not arrived yet: wait for it.
-        if (!awaitingClose.current) openDialog(element);
+        if (!awaitingClose.current) {
+          dismissedWhilePending.current = null;
+          if (dismissed !== null && dismissed.generation === ctx.openGeneration()) {
+            // The user dismissed the dialog while a part's close was in flight, and that close
+            // was vetoed: the dismissal stands and is notified now (review M1), instead of the
+            // dialog coming back. A parent that keeps `open` again gets it re-opened, as for any
+            // refused dismissal.
+            ctx.notifyClosed(dismissed.event, "dismiss", dismissed.returnValue);
+          } else {
+            openDialog(element);
+          }
+        }
       } else if (!ctx.committed && element.open) {
-        // An echo: the `close` listener finds `false` intended and skips the dispatch. `close()`,
-        // not `requestClose()`: the veto point was `openChangeAction`, not `cancel`. The part's
-        // `returnValue` (design 2.3), `""` for a controlled close.
+        // The library's own close: the `close` listener recognises it by `libraryClose` and
+        // dispatches nothing. `close()`, not `requestClose()`: the veto point was
+        // `openChangeAction`, not `cancel`. The part's `returnValue` (design 2.3), `""` for a
+        // controlled close.
         ctx.recordCloseIntent(undefined);
+        libraryClose.current = true;
         element.close(ctx.takeCloseReturnValue());
         // The close commit may have unmounted the focused content before `close()`: a
         // non-modal dialog restores focus only from inside, so do it now.
@@ -341,6 +368,10 @@ export function DialogPopup({
           returnFocus(element);
         }
       }
+    }
+    // The in-flight close settled as a close: the recorded dismissal is moot.
+    if (!ctx.committed && dismissedWhilePending.current !== null && ctx.latestInFlight() === null) {
+      dismissedWhilePending.current = null;
     }
     // Content that unmounted while the dialog stays open (not a close): forget it.
     if (ctx.committed && element.open) contentProbe.forget();
@@ -385,8 +416,8 @@ export function DialogPopup({
     }
   });
 
-  // On the document, bubble phase: after React's root listener, so a consumer's `onSubmit` that
-  // calls `preventDefault()` has run (design 8.1).
+  // On the dialog's root node (the document, or a shadow root: `submit` is not composed), bubble
+  // phase: after React's root listener, so a consumer's `onSubmit` has run (design 8.1).
   const onSubmit = useEffectEvent((event: Event) => {
     const element = dialogRef.current;
     const form = event.target;
@@ -402,6 +433,10 @@ export function DialogPopup({
     }
     // The consumer blocked the submission: the form did not submit, the dialog stays open.
     if (event.defaultPrevented) return;
+    // The consumer opted out with `stopPropagation()`: the browser closes the dialog, notified
+    // as a dismissal. Checked explicitly because React's root can be this same node (FUNSTACK
+    // Static hydrates the document), where `stopPropagation()` does not stop this listener.
+    if (event.cancelBubble) return;
     // Cancel the native close; the library closes once `openChangeAction(false)` settled.
     event.preventDefault();
     ctx.requestClose(event, "activate", valueOf(submitter));
@@ -423,12 +458,12 @@ export function DialogPopup({
     }
 
     const intent = ctx.takeCloseIntent();
+    const echo = libraryClose.current;
+    libraryClose.current = false;
     if (!isLibrary) return;
 
-    // `false` already intended: the library's own `close()` (or a dismissal during a pending
-    // part-initiated close). With `transition` such a close needs no hold: the close commit's
-    // view transition carried the content out (4.4).
-    const echo = !ctx.intended();
+    // The library's own `close()` needs no notification, and with `transition` no hold either:
+    // the close commit's view transition carried the content out (4.4).
     if (!echo || transition === undefined) {
       const animations = exitAnimations(element);
       if (animations.length > 0) {
@@ -441,7 +476,20 @@ export function DialogPopup({
       }
     }
 
-    ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
+    if (echo) return;
+    // Closed by the browser: a returnValue a pending part close recorded will never be used.
+    ctx.takeCloseReturnValue();
+    if (ctx.intended()) {
+      ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
+    } else {
+      // A part's close is in flight (walkthrough 11.13): nothing more to notify unless that close
+      // is vetoed (the apply effect).
+      dismissedWhilePending.current = {
+        event: intent?.event ?? event,
+        returnValue: element.returnValue,
+        generation: ctx.openGeneration(),
+      };
+    }
   });
 
   const onBeforeToggle = useEffectEvent((event: Event) => {
@@ -454,6 +502,7 @@ export function DialogPopup({
     // `toggle`: an action settling between the open and that task would otherwise still see the
     // old generation and close the new open.
     if (newState === "open") {
+      dismissedWhilePending.current = null;
       ctx.nextOpenGeneration();
       contentProbe.forget();
     }
@@ -462,13 +511,15 @@ export function DialogPopup({
   useEffect(() => {
     if (dialog === null) return;
     const doc = dialog.ownerDocument;
+    // The document, or the shadow root the dialog lives in (`submit` does not cross it).
+    const root = dialog.getRootNode();
     // Feature detection only with the flag on, inside an effect (conventions 8).
     const nativeClosedBy = experimental_closedBy && "closedBy" in dialog;
 
     const listeners: [EventTarget, string, EventListener, boolean][] = [
       [dialog, "command", onCommand, false],
-      // Bubble phase on the document: after React's root listener (the consumer's `onSubmit`).
-      [doc, "submit", onSubmit, false],
+      // Bubble phase on the root node: after React's root listener (the consumer's `onSubmit`).
+      [root, "submit", onSubmit, false],
       [dialog, "close", onClose, false],
       [dialog, "beforetoggle", onBeforeToggle, false],
     ];
