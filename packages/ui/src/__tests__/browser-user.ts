@@ -18,6 +18,16 @@ export const user = {
     act(async () => {
       await userEvent.keyboard(text);
     }),
+  /** Tab (or Shift+Tab with `{ shift: true }`) through the real focus order. */
+  tab: (options?: { shift?: boolean }) =>
+    act(async () => {
+      await userEvent.tab(options);
+    }),
+  /** Moves the real pointer over `element`. */
+  hover: (element: Element) =>
+    act(async () => {
+      await userEvent.hover(element);
+    }),
   /** A real press on `source`, a move, and a release on `target` (Playwright `dragAndDrop`). */
   dragAndDrop: (source: Element, target: Element, options?: DragAndDropOptions) =>
     act(async () => {

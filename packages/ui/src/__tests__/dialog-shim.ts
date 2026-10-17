@@ -27,6 +27,8 @@
 //   jsdom does not attempt a navigation.
 // - `getAnimations()` returns `[]` (the deferred unmount is a browser-mode test).
 // Events queued "as tasks" use `setTimeout(0)`, so fake timers flush them deterministically.
+// The invoker emulation itself lives in invoker-shim.ts (shared with the popover shim).
+import { dispatchCommand, installInvokerShim, registerCommandHandler } from "./invoker-shim.js";
 
 const modalDialogs = new WeakSet<HTMLDialogElement>();
 const returnValues = new WeakMap<HTMLDialogElement, string>();
@@ -102,20 +104,10 @@ export function isModal(dialog: Element): boolean {
   return modalDialogs.has(dialog as HTMLDialogElement) && (dialog as HTMLDialogElement).open;
 }
 
-/** Dispatches a `command` event the way an invoker would (tests drive foreign invokers). */
-export function dispatchCommand(
-  target: Element,
-  command: string,
-  source: Element | null = null,
-): Event {
-  const event = Object.assign(new Event("command", { cancelable: true }), { command, source });
-  target.dispatchEvent(event);
-  return event;
-}
+export { dispatchCommand };
 
 /** The dialog's "is valid command steps" (HTML): invalid commands fire no `command` event. */
 function isValidDialogCommand(dialog: HTMLDialogElement, command: string): boolean {
-  if (command.startsWith("--")) return true;
   if (command === "show-modal") return !dialog.open;
   if (command === "close" || command === "request-close") return dialog.open;
   return false;
@@ -161,26 +153,19 @@ if (typeof HTMLDialogElement !== "undefined" && !("showModal" in HTMLDialogEleme
     return matches.call(this, selector);
   } as typeof matches;
 
-  // Invoker Commands: the command runs as the button's activation behaviour, after the click
-  // has been dispatched and only if it was not cancelled.
-  document.addEventListener("click", (event) => {
-    if (event.defaultPrevented) return;
-    const button = event.target instanceof Element ? event.target.closest("button") : null;
-    if (button === null || button.disabled) return;
-    if (button.type === "submit" && button.form !== null) return;
-    const id = button.getAttribute("commandfor");
-    const command = button.getAttribute("command")?.toLowerCase();
-    if (id === null || command === undefined) return;
-    const target = button.ownerDocument.getElementById(id);
-    if (!(target instanceof HTMLDialogElement)) return;
-    if (!isValidDialogCommand(target, command)) return;
-    const commandEvent = dispatchCommand(target, command, button);
-    if (commandEvent.defaultPrevented) return;
-    if (command.startsWith("--")) return;
-    if (command === "show-modal") target.showModal();
-    else if (command === "close") target.close(button.value);
-    else if (command === "request-close") target.requestClose(button.value);
+  // Invoker Commands (shared emulation in invoker-shim.ts): the command runs as the button's
+  // activation behaviour, after the click has been dispatched and only if it was not cancelled.
+  registerCommandHandler({
+    isValid: (target, command) =>
+      target instanceof HTMLDialogElement && isValidDialogCommand(target, command),
+    run: (target, command, button) => {
+      const dialog = target as HTMLDialogElement;
+      if (command === "show-modal") dialog.showModal();
+      else if (command === "close") dialog.close(button.value);
+      else if (command === "request-close") dialog.requestClose(button.value);
+    },
   });
+  installInvokerShim();
 
   // `<form method="dialog">`: after the submit event, if nobody cancelled it.
   document.addEventListener("submit", (event) => {
