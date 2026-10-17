@@ -26,13 +26,18 @@ export interface DialogCloseProps extends Omit<
   "onClick" | "value" | "className" | "style" | "children"
 > {
   /**
-   * Runs inside this part's own transition, then closes the dialog with `close(value)`. A
-   * rejection reaches the nearest Error Boundary above the Close part and leaves the dialog open.
-   * Without `action` the button is a native `command="request-close"` invoker (JS-free).
+   * Runs inside this part's own transition (`data-pending` on the button), then closes the
+   * dialog with `value` as `returnValue`: in library mode through the Root
+   * (`openChangeAction(false)` awaited, view transition if set), in JS-free mode with
+   * `close(value)`. A rejection reaches the nearest Error Boundary above the Close part and
+   * leaves the dialog open. If the dialog was dismissed and opened again while the action ran,
+   * the close is dropped: it belonged to the earlier open. Without `action` in JS-free mode the
+   * button is a native `command="request-close"` invoker.
    */
   action?: Action<[details: DialogCloseDetails]>;
-  /** Becomes `dialog.returnValue` (and `details.returnValue` of the close notification). */
+  /** Becomes `dialog.returnValue` (and `details.returnValue` of `openChangeAction(false)`). */
   value?: string;
+  /** Native `disabled`; owned, so a `render` element cannot re-enable the button. */
   disabled?: boolean;
   className?: StateValue<string | undefined, DialogCloseState>;
   style?: StateValue<CSSProperties | undefined, DialogCloseState>;
@@ -43,14 +48,16 @@ export interface DialogCloseProps extends Omit<
 const isDev = process.env.NODE_ENV !== "production";
 
 /**
- * A close button: `<button type="button" commandfor command="request-close">`. Without `action`
- * the browser closes the dialog (a close request: `cancel`, then `close`), with `value` as the
- * `returnValue`. With `action` the click is cancelled, the action runs in this part's own
- * transition (`data-pending` on the button) and the dialog closes with `close(value)` once it
- * resolves; a rejection leaves the dialog open.
+ * A close button: `<button type="button" commandfor command="request-close">`. In JS-free mode
+ * without `action` the browser closes the dialog (a close request: `cancel`, then `close`), with
+ * `value` as the `returnValue`. In library mode the click is always cancelled and the close goes
+ * through the Root (`openChangeAction(false)` awaited, then `close(value)` in the commit, inside
+ * the view transition if the Popup's `transition` is set). With `action` the action runs first in
+ * this part's own transition (`data-pending` on the button); a rejection leaves the dialog open.
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command`, `value`, `onClick` (with `action`), `data-pending`, `data-disabled`.
+ * `command`, `value`, `onClick` (library mode, or with `action`), `data-pending`,
+ * `data-disabled`.
  */
 export function DialogClose({
   action,
@@ -66,41 +73,57 @@ export function DialogClose({
   // The open-generation guard: a close from a previous opening must not close a new one.
   const { pending, run } = useActionTrigger(ctx.openGeneration);
   const { ids, dialogRef, recordCloseIntent } = ctx;
+  const isLibrary = ctx.mode === "library";
   const hasAction = action !== undefined;
+  const installClick = isLibrary || hasAction;
 
   const state: DialogCloseState = { pending, disabled };
 
   const devRef = useCallback(
     (element: HTMLElement) => {
-      if (isDev && !hasAction && element.tagName !== "BUTTON") {
+      if (isDev && !installClick && element.tagName !== "BUTTON") {
         console.error(
-          `Dialog.Close: rendered a <${element.tagName.toLowerCase()}> without \`action\`. Only a ` +
-            '<button> runs `command="request-close"`; this element will not close the dialog.',
+          `Dialog.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
+            '`action`. Only a <button> runs `command="request-close"`; this element will not ' +
+            "close the dialog.",
         );
       }
       // A cleanup, so the merged ref never calls back with `null`.
       return () => {};
     },
-    [hasAction],
+    [installClick],
   );
 
+  const close = (event: Event, returnValue: string): void => {
+    if (isLibrary) {
+      // A library-owned close (design 2.3): awaited, then `close(returnValue)` in the commit. A
+      // no-op when `false` is already intended (a repeated click, or a dismissal meanwhile).
+      ctx.requestClose(event, "activate", returnValue);
+      return;
+    }
+    // JS-free mode with `action`: a browser-owned close; there is no Root state to go through.
+    const dialog = dialogRef.current;
+    if (dialog === null || !dialog.open) return;
+    recordCloseIntent({ reason: "activate", event });
+    dialog.close(returnValue);
+  };
+
   const onClick = (event: MouseEvent<HTMLElement>) => {
-    if (action === undefined) return;
     // Cancelling the click cancels the command.
     event.preventDefault();
     if (disabled) return;
     const native = event.nativeEvent;
     const returnValue = value ?? "";
+    if (action === undefined) {
+      close(native, returnValue);
+      return;
+    }
     const details = createActionDetails(native, { returnValue });
+    // Repeated clicks re-run the action; the first close wins (design 3.4). A close whose open
+    // was superseded by a newer one (dismissed and re-opened meanwhile) is dropped by the hook.
     run(
       () => action(details),
-      () => {
-        // Repeated clicks re-run the action; the first `close()` wins (design 3.4).
-        const dialog = dialogRef.current;
-        if (dialog === null || !dialog.open) return;
-        recordCloseIntent({ reason: "activate", event: native });
-        dialog.close(returnValue);
-      },
+      () => close(native, returnValue),
     );
   };
 
@@ -111,7 +134,7 @@ export function DialogClose({
     commandfor: ids.dialog,
     command: "request-close",
     value,
-    ...(hasAction && { onClick }),
+    ...(installClick && { onClick }),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
   };

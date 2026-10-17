@@ -23,8 +23,9 @@
 //   a closed one, an unknown non-custom command) fires no event and does nothing; custom
 //   `--commands` always fire.
 // - `<form method="dialog">` (or a submitter with `formmethod="dialog"`): a submit that nobody
-//   cancelled closes the nearest dialog with the submitter's `value`, and is then cancelled so
-//   jsdom does not attempt a navigation.
+//   cancelled closes the nearest dialog with the submitter's `value` after every document
+//   listener ran (also when its propagation was stopped), and is then cancelled so jsdom does
+//   not attempt a navigation.
 // - `getAnimations()` returns `[]` (the deferred unmount is a browser-mode test).
 // Events queued "as tasks" use `setTimeout(0)`, so fake timers flush them deterministically.
 // The invoker emulation itself lives in invoker-shim.ts (shared with the popover shim).
@@ -167,20 +168,49 @@ if (typeof HTMLDialogElement !== "undefined" && !("showModal" in HTMLDialogEleme
   });
   installInvokerShim();
 
-  // `<form method="dialog">`: after the submit event, if nobody cancelled it.
-  document.addEventListener("submit", (event) => {
-    if (event.defaultPrevented) return;
+  // `<form method="dialog">`: the platform closes the dialog as the submission's default action,
+  // after the `submit` event was dispatched and only if nobody cancelled it, wherever its
+  // propagation was stopped. Emulated by a window bubble listener (the last stop of the path, so
+  // every document listener, such as the library's interception in design 8.1, runs first) and,
+  // for an event whose propagation was stopped before it got there, a microtask armed by a
+  // window capture listener. The bubble path cancels the event so jsdom does not attempt a
+  // navigation; the stopped path cannot (jsdom then logs "not implemented").
+  const dialogSubmit = (event: Event): HTMLDialogElement | null => {
+    if (event.defaultPrevented) return null;
     const form = event.target;
-    if (!(form instanceof HTMLFormElement)) return;
-    const submitter = (event as SubmitEvent).submitter as
-      | HTMLButtonElement
-      | HTMLInputElement
-      | null;
+    if (!(form instanceof HTMLFormElement)) return null;
+    const submitter = (event as SubmitEvent).submitter;
     const formMethod = submitter?.getAttribute("formmethod");
     const method = formMethod != null ? formMethod.toLowerCase() : form.method;
-    if (method !== "dialog") return;
+    return method === "dialog" ? form.closest("dialog") : null;
+  };
+  const submitterValue = (event: Event): string =>
+    ((event as SubmitEvent).submitter as HTMLButtonElement | HTMLInputElement | null)?.value ?? "";
+  const handled = new WeakSet<Event>();
+  window.addEventListener(
+    "submit",
+    (event) => {
+      for (const name of ["stopPropagation", "stopImmediatePropagation"] as const) {
+        const original = event[name];
+        event[name] = function (this: Event) {
+          original.call(this);
+          queueMicrotask(() => {
+            if (handled.has(event)) return;
+            handled.add(event);
+            const dialog = dialogSubmit(event);
+            if (dialog !== null) close(dialog, submitterValue(event));
+          });
+        };
+      }
+    },
+    true,
+  );
+  window.addEventListener("submit", (event) => {
+    if (handled.has(event)) return;
+    handled.add(event);
+    const dialog = dialogSubmit(event);
+    if (dialog === null) return;
     event.preventDefault();
-    const dialog = form.closest("dialog");
-    if (dialog !== null) close(dialog, submitter?.value ?? "");
+    close(dialog, submitterValue(event));
   });
 }

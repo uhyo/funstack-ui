@@ -16,7 +16,7 @@ export function DialogPage() {
     <div className="learn-content">
       <PageHead
         title="Dialog"
-        description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state, a transition-driven open with a pending trigger and Suspense-ready content when you do."
+        description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state; a transition-driven open with a pending trigger, Suspense-ready content, and library-owned closes with a ViewTransition exit in every engine when you do."
       />
       <h2>Dialog</h2>
       <p className="page-intro">
@@ -24,7 +24,8 @@ export function DialogPage() {
         platform supplies the top layer, the backdrop, the inert page, Escape, initial focus and
         focus return. The library adds the Async React half: opening a dialog whose content loads is
         a transition, so the trigger shows <code>data-pending</code> and the dialog opens once its
-        content is ready.
+        content is ready, and closing it with one of its parts waits for your action and can animate
+        with a view transition.
       </p>
 
       <Example
@@ -91,7 +92,16 @@ export function DialogPage() {
             'the browser runs `command="show-modal"`',
             "the click is intercepted and dispatched in the Root's transition; `showModal()` runs in the commit that mounts the content",
           ],
-          ["Close", "the browser", "the browser; `openChangeAction(false)` is a notification"],
+          [
+            "Close by a part (Close, Form, a foreign close command, controlled `open={false}`)",
+            "the browser",
+            "the click, submit or command is cancelled and dispatched in the Root's transition; `close(returnValue)` runs in the commit that ends it",
+          ],
+          [
+            "Dismissal (Escape, Android back, a click outside)",
+            "the browser",
+            "the browser, at once; `openChangeAction(false)` is a notification",
+          ],
           [
             "Popup content",
             "always mounted (in the server HTML)",
@@ -110,15 +120,18 @@ export function DialogPage() {
           [
             "`transition` on Popup",
             "no effect (development warning)",
-            "animates the opening commit and content swaps",
+            "animates opens, content swaps and every library-driven close",
           ],
         ]}
       />
       <p>
-        Open state in library mode is owned by the library in one direction only: opening is a
-        transition the library drives and awaits; closing is performed by the browser and reported
-        afterwards. See <a href="/concepts/browser-owned-state">Browser-owned state</a>. The mode is
-        decided on the first render; switching later is not supported (development warning).
+        In library mode the line is drawn between <strong>parts and dismissals</strong>, as in
+        Popover. Opening, and a close the user asks a part for, are transitions the library drives:
+        they wait for your action, a controlled parent can refuse them, and they can animate with a
+        view transition. Escape, Android back and a click outside are the browser's: the dialog goes
+        away at once and the Root hears about it afterwards. See{" "}
+        <a href="/concepts/browser-owned-state">Browser-owned state</a>. The mode is decided on the
+        first render; switching later is not supported (development warning).
       </p>
 
       <h3>Props</h3>
@@ -145,10 +158,15 @@ export function DialogPage() {
             description: (
               <>
                 Awaited for <code>true</code>: the dialog opens when it resolves and the content has
-                rendered. A notification for <code>false</code>: the dialog is already closed when
-                it runs. Runs in the Root's transition; may be a Server Function; rejections reach
-                the nearest Error Boundary above the Root. <code>details</code>: <code>reason</code>{" "}
-                (<code>"activate"</code>, <code>"dismiss"</code> or <code>"platform"</code>) and{" "}
+                rendered. Awaited for a <code>false</code> the user asked a part for (a{" "}
+                <code>Dialog.Close</code>, a <code>Dialog.Form</code> submit or settled action, a
+                foreign close command): the dialog closes with <code>details.returnValue</code> when
+                it resolves, with a view transition if the Popup has <code>transition</code>; a
+                controlled parent that keeps <code>open</code> vetoes it. A notification for a
+                dismissal (Escape, a click outside): the dialog is already closed when it runs. Runs
+                in the Root's transition; may be a Server Function; rejections reach the nearest
+                Error Boundary above the Root. <code>details</code>: <code>reason</code> (
+                <code>"activate"</code>, <code>"dismiss"</code> or <code>"platform"</code>) and{" "}
                 <code>returnValue</code> (the closing button's or submitter's <code>value</code>,{" "}
                 <code>""</code> for a dismiss, <code>undefined</code> on open). Selects library
                 mode.
@@ -196,10 +214,11 @@ export function DialogPage() {
       />
       <p>
         <code>DialogTriggerState</code>: <code>{"{ open, pending, disabled }"}</code>.{" "}
-        <code>pending</code> is true while the Root is pending: an open or a close notification in
-        flight, or a re-open requested while a close notification is still settling. The Trigger
-        owns <code>type</code>, <code>disabled</code>, <code>commandfor</code>, <code>command</code>{" "}
-        and, when it installs one, <code>onClick</code>.
+        <code>pending</code> is true while the Root is pending: an open in flight, a part's close
+        waiting for <code>openChangeAction(false)</code>, a close notification in flight, or a
+        re-open requested while a close notification is still settling. The Trigger owns{" "}
+        <code>type</code>, <code>disabled</code>, <code>commandfor</code>, <code>command</code> and,
+        when it installs one, <code>onClick</code>.
       </p>
 
       <h4>
@@ -217,7 +236,8 @@ export function DialogPage() {
                 that suspends holds the open until it is ready. <code>true</code>: children stay in{" "}
                 <code>&lt;Activity mode="hidden"&gt;</code> (state kept, effects stopped,
                 pre-rendered at low priority; not in the server HTML). Either way, unmounting waits
-                for the dialog's exit animation. Ignored in JS-free mode (always mounted).
+                for the dialog's CSS exit animation, or happens inside the close's view transition
+                when <code>transition</code> is set. Ignored in JS-free mode (always mounted).
               </>
             ),
           },
@@ -255,7 +275,7 @@ export function DialogPage() {
             type: "ViewTransitionClass",
             default: "–",
             description:
-              "Library mode only. Forwarded to the `<ViewTransition>` around the dialog; without it no boundary is rendered. It animates the opening commit and content swaps while open. The close is the browser's; animate it with CSS.",
+              "Library mode only. Forwarded to the `<ViewTransition>` around the dialog; without it no boundary is rendered. Animates the opening commit, content swaps while open, and every library-driven close (a Close part, a Form submit or settled action, a foreign close command, a controlled `open={false}`) in all engines. Dismissals (Escape, a click outside) are the browser's and animate with CSS only. Keep it static; any value makes a Root inserted by a transition run the page cross-fade.",
           },
           ...functionProps("DialogPopupState"),
           renderProp("dialog", "DialogPopupState"),
@@ -282,12 +302,15 @@ export function DialogPage() {
             description: (
               <>
                 Runs in this button's own transition (<code>data-pending</code> on it), then closes
-                the dialog with <code>close(value)</code>. A rejection reaches the nearest Error
-                Boundary above the button and leaves the dialog open. If the dialog was closed and
-                opened again while the action ran, the close is dropped: it belonged to the previous
-                opening. Without <code>action</code> the button is a native{" "}
-                <code>command="request-close"</code> invoker. <code>details.returnValue</code> is
-                the <code>value</code>.
+                the dialog with <code>value</code> as <code>returnValue</code>: in library mode
+                through the Root (<code>openChangeAction(false)</code> awaited, view transition if
+                set; the button stays pending until the dialog closes), in JS-free mode with{" "}
+                <code>close(value)</code>. A rejection reaches the nearest Error Boundary above the
+                button and leaves the dialog open. If the dialog was closed and opened again while
+                the action ran, the close is dropped: it belonged to the previous opening. Without{" "}
+                <code>action</code> the button is a native <code>command="request-close"</code>{" "}
+                invoker in JS-free mode and goes straight through the Root in library mode.{" "}
+                <code>details.returnValue</code> is the <code>value</code>.
               </>
             ),
           },
@@ -295,13 +318,13 @@ export function DialogPage() {
             name: "value",
             type: "string",
             description:
-              "Becomes `dialog.returnValue`, and `details.returnValue` of the close notification.",
+              "Becomes `dialog.returnValue`, and `details.returnValue` of `openChangeAction(false)`.",
           },
           {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`.",
+            description: "Native `disabled`; owned, so a `render` element cannot re-enable it.",
           },
           ...functionProps("DialogCloseState"),
           renderProp("button", "DialogCloseState"),
@@ -324,10 +347,13 @@ export function DialogPage() {
             description: (
               <>
                 Without <code>action</code> the form renders <code>method="dialog"</code>: a submit
-                closes the dialog natively with the submitter's <code>value</code>. A function (may
-                be a Server Function) is React's form action, passed through unwrapped; the dialog
-                closes once the action's transition has settled, including any Suspense wait it
-                causes (see <code>closeOnSettle</code>). A rejection leaves the dialog open. A
+                closes the dialog with the submitter's <code>value</code>, natively in JS-free mode
+                and through the Root in library mode (<code>openChangeAction(false)</code> awaited,
+                view transition if set). A <code>preventDefault()</code> in your{" "}
+                <code>onSubmit</code> keeps it open in both modes. A function (may be a Server
+                Function) is React's form action, passed through unwrapped; the dialog closes, in
+                the same way, once the action's transition has settled, including any Suspense wait
+                it causes (see <code>closeOnSettle</code>). A rejection leaves the dialog open. A
                 string is a plain navigating form.
               </>
             ),
@@ -396,7 +422,7 @@ export function DialogPage() {
           [
             "`data-pending`",
             "Trigger",
-            "An open, or a close notification, is in flight (library mode only).",
+            "An open, a part's close, or a close notification is in flight (library mode only).",
           ],
           ["`data-pending`", "Close", "Its `action` is in flight."],
           ["`data-disabled`", "Trigger (library mode), Close", "The `disabled` prop."],
@@ -417,9 +443,56 @@ export function DialogPage() {
 html { scrollbar-gutter: stable; }
 html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
       <p>
-        The exit animates in Chromium and Safari; Firefox closes instantly. The library keeps the
-        content mounted until the exit animation ends, so a fading dialog is never empty.
+        The CSS exit animates in Chromium and Safari; Firefox closes a dialog instantly. The library
+        keeps the content mounted until the exit animation ends, so a fading dialog is never empty,
+        and a controlled close keeps it through the fade as well.
       </p>
+
+      <h3>ViewTransition: an exit in every engine</h3>
+      <p>
+        With <code>transition</code>, the Popup renders <code>&lt;ViewTransition&gt;</code> around
+        the <code>&lt;dialog&gt;</code>. A library-driven open calls <code>showModal()</code> in the
+        layout effect of its commit and a library-driven close calls <code>close(returnValue)</code>{" "}
+        in the layout effect of its commit, so the view transition captures the dialog's box as{" "}
+        <code>::view-transition-new</code> on open and <code>::view-transition-old</code> (with its
+        content) on close. That is the only way a dialog's exit can animate in Firefox. The order
+        example below uses it.
+      </p>
+      <CodeBlock>{`<Dialog.Popup transition={{ "fsui-dialog-open": "pop", "fsui-dialog-close": "pop", default: "none" }}>`}</CodeBlock>
+      <CodeBlock language="css">{`::view-transition-new(.pop) { animation: 180ms ease-out both pop-in; }
+::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}`}</CodeBlock>
+      <ul>
+        <li>
+          Library-driven closes: a <code>Dialog.Close</code>, a <code>Dialog.Form</code> submit or
+          settled action, a foreign <code>request-close</code> / <code>close</code> command, a
+          controlled <code>open={"{false}"}</code>. Transition types: <code>fsui-dialog</code> plus{" "}
+          <code>fsui-dialog-open</code> or <code>fsui-dialog-close</code>; a controlled close
+          carries none.
+        </li>
+        <li>
+          Dismissals (Escape, a click outside) happen in the browser before React hears about them,
+          so they animate with CSS only. With <code>transition</code> set, drop the CSS{" "}
+          <code>display</code> / <code>overlay</code> transition on the dialog box: it keeps a
+          closing dialog rendered while it fades, and Chromium then captures it in the close's new
+          snapshot as well.
+        </li>
+        <li>
+          The <code>::backdrop</code> is not captured on its own: it is part of the page snapshot
+          and leaves with the root cross-fade. A backdrop that should animate with the dialog is an
+          element rendered as the Popup's first child (<code>position: fixed; inset: 0</code>;
+          clicks on it are not light dismiss).
+        </li>
+        <li>
+          A plain open with <code>transition="none"</code> starts no document view transition (the
+          content mounts under the already-mounted <code>&lt;dialog&gt;</code>). A Root inserted by
+          a transition with <code>transition</code> on its Popup, or a nested Popup with{" "}
+          <code>transition</code> that mounts with the outer content, runs the page cross-fade (
+          <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>).
+        </li>
+      </ul>
 
       <h3>Keyboard and ARIA</h3>
       <Table
@@ -444,7 +517,7 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
           ["Escape in a nested dialog", "Closes the innermost one only", "the browser"],
           [
             "Enter in a form field",
-            "Submits the Form: closes, or runs the action and then closes",
+            "Submits the Form: closes (through the Root in library mode), or runs the action and then closes",
             "the browser / Form",
           ],
         ]}
@@ -460,7 +533,9 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         <li>
           There is no focus trap: <code>showModal()</code> makes the rest of the page inert. Focus
           return is the platform's; the library only steps in when the opener has been removed
-          (focus goes to the Trigger if it is still there, else to the body).
+          (focus goes to the Trigger if it is still there, else to the body), and when a
+          library-driven close of a non-modal dialog unmounted the focused button before the dialog
+          closed (focus goes to the Trigger).
         </li>
         <li>
           For long or destructive dialogs, focus a static element so the title is heard first:{" "}
@@ -511,11 +586,13 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
           button, through <code>initialFocus</code>).
         </li>
         <li>
-          Close it with Escape, a click on the backdrop (<code>lightDismiss</code>) or the Close
-          button: the browser closes it at once, then the Root receives{" "}
-          <code>openChangeAction(false, details)</code> with <code>reason: "dismiss"</code> or{" "}
-          <code>"activate"</code> and the <code>returnValue</code>. The second open is instant (the
-          data is cached).
+          Close it with the Close button: the click is cancelled, the Trigger shows{" "}
+          <code>data-pending</code> while{" "}
+          <code>openChangeAction(false, {'{ reason: "activate", returnValue: "done" }'})</code>{" "}
+          runs, then the dialog closes in a view transition (the <code>transition</code> prop), in
+          Firefox too. Escape or a click on the backdrop (<code>lightDismiss</code>) are dismissals:
+          the browser closes the dialog at once and the Root then receives{" "}
+          <code>reason: "dismiss"</code>. The second open is instant (the data is cached).
         </li>
         <li>
           If the opening action rejects, the error reaches the Error Boundary above the Root and the
@@ -526,11 +603,16 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         To open now and show a skeleton instead, put a <code>&lt;Suspense&gt;</code> boundary inside
         the Popup: a newly mounted boundary shows its fallback immediately.
       </p>
-      <Callout kind="warning" title="Closing is not a veto">
+      <Callout kind="warning" title="A part's close is yours to refuse; a dismissal's is not">
         <p>
-          The dialog is already closed when <code>openChangeAction(false)</code> runs. A controlled
+          A close a part asks for waits for <code>openChangeAction(false)</code>: a controlled
+          parent that keeps <code>open</code> gets a plain snap-back, and the dialog never blinks
+          (for example "the save failed, keep editing", checked through{" "}
+          <code>details.returnValue</code>). A dismissal is already done when the action runs: a
           parent that does not adopt <code>false</code> gets the dialog re-opened once the action
-          settles: the user sees it close and come back. Adopt <code>false</code> unconditionally.
+          settles, and the user sees it close and come back. Adopt a dismissal's <code>false</code>{" "}
+          unconditionally. Neither is a way to ask the user first: an action must never await input,
+          so build confirmation inside the dialog (see the callout above).
         </p>
       </Callout>
 
@@ -550,8 +632,9 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         </li>
         <li>
           The action resolves and the name updates in a transition. When the form's pending state
-          ends, the Form closes the dialog with the submitter's <code>value</code> (
-          <code>"save"</code>), and the Root is notified with <code>reason: "activate"</code>.
+          ends, the Form asks the Root to close the dialog with the submitter's <code>value</code> (
+          <code>"save"</code>): <code>openChangeAction(false)</code> runs with{" "}
+          <code>reason: "activate"</code>, then the dialog closes.
         </li>
         <li>
           A name containing "fail" rejects: the Error Boundary inside the Popup shows the error and
@@ -562,6 +645,13 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         For a single "run this, then close" button without a form, such as Delete, use{" "}
         <code>Dialog.Close action</code>: it shows <code>data-pending</code> on the button and
         closes when the action resolves.
+      </p>
+      <p>
+        In library mode a <code>method="dialog"</code> submit is a library-owned close too, with the
+        submitter's <code>value</code>, after your own <code>onSubmit</code> ran. To leave such a
+        form to the browser, call <code>event.stopPropagation()</code> in its <code>onSubmit</code>:
+        the dialog then closes natively and the Root is notified with <code>reason: "dismiss"</code>
+        .
       </p>
 
       <h3>The platform paths</h3>
@@ -584,8 +674,10 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         </li>
         <li>
           <strong>Foreign invokers:</strong> in library mode, any{" "}
-          <code>&lt;button commandfor command="show-modal"&gt;</code> pointing at the dialog goes
-          through the library too.
+          <code>&lt;button commandfor command="show-modal"&gt;</code> (or{" "}
+          <code>"request-close"</code> / <code>"close"</code>) pointing at the dialog goes through
+          the library too, as the Trigger and Close parts do; a close command's <code>value</code>{" "}
+          becomes the <code>returnValue</code>.
         </li>
       </ul>
 

@@ -7,7 +7,7 @@ export function BrowserOwnedStatePage() {
     <div className="learn-content">
       <PageHead
         title="Browser-owned state"
-        description="Some state belongs to the browser: the popover top layer, <details open>, closing a <dialog>, a native input before React hears about it. FUNSTACK UI observes it instead of driving it."
+        description="Some state belongs to the browser: the popover top layer, <details open>, dismissing a <dialog>, a native input before React hears about it. FUNSTACK UI observes it instead of driving it."
       />
       <h2>Browser-owned state</h2>
       <p className="page-intro">
@@ -22,8 +22,8 @@ export function BrowserOwnedStatePage() {
         rows={[
           [
             "Examples",
-            "Toggle `pressed`, Tabs `value`, Accordion `value` in library mode, Switch and Checkbox `checked`, RadioGroup, Select and Combobox `value`, opening a Dialog in library mode, a Combobox's opens and the close after a choice",
-            "Tooltip open state (top layer), a Select's picker (`:open`), `<details open>` in Accordion's JS-free mode, a Dialog in JS-free mode, closing any Dialog, a Combobox listbox dismissed with Escape or a click outside",
+            "Toggle `pressed`, Tabs `value`, Accordion `value` in library mode, Switch and Checkbox `checked`, RadioGroup, Select and Combobox `value`, opening a Dialog or Popover in library mode and closing it with one of its parts, a Combobox's opens and the close after a choice",
+            "Tooltip open state (top layer), a Select's picker (`:open`), `<details open>` in Accordion's JS-free mode, a Dialog or Popover in JS-free mode, dismissing one with Escape or a click outside, a Combobox listbox dismissed the same way",
           ],
           [
             "Who changes it",
@@ -34,7 +34,7 @@ export function BrowserOwnedStatePage() {
           [
             "Action prop",
             "awaited; the UI waits for it",
-            "a notification after the fact (Dialog's `openChangeAction(false)`), or none",
+            "a notification after the fact (Dialog's `openChangeAction(false)` for a dismissal), or none",
           ],
           ["Styling", "`data-*` attributes", "pseudo-classes: `:popover-open`, `:open`"],
           [
@@ -91,45 +91,58 @@ export function BrowserOwnedStatePage() {
         (development warning).
       </p>
 
-      <h3>Dialog: library-owned open, browser-owned close</h3>
+      <h3>Dialog and Popover: parts vs dismissals</h3>
       <p>
-        Dialog has the same two modes as Accordion. Without <code>open</code>,{" "}
+        Dialog and Popover have the same two modes as Accordion. Without <code>open</code>,{" "}
         <code>defaultOpen</code> and <code>openChangeAction</code> the browser owns everything
         through Invoker Commands (<code>command="show-modal"</code>,{" "}
-        <code>command="request-close"</code>, <code>&lt;form method="dialog"&gt;</code>). With any
-        of them, ownership is split by direction:
+        <code>command="request-close"</code>, <code>&lt;form method="dialog"&gt;</code>; for a
+        popover <code>command="toggle-popover"</code> and <code>"hide-popover"</code>). With any of
+        them, ownership is split by <strong>who asked</strong>:
       </p>
       <Table
-        head={["", "Opening", "Closing"]}
+        head={["", "Opening, and a close a part asks for", "A dismissal"]}
         rows={[
           ["Owner", "the library", "the browser"],
           [
+            "Which",
+            "the Trigger; a Close part, a Dialog.Form submit or settled action, a foreign close command, a controlled `open={false}`",
+            "Escape, Android back, an assistive-technology dismiss, a click outside",
+          ],
+          [
             "How",
-            "the Trigger's click is cancelled and dispatched in the Root's transition; `showModal()` runs in the commit that mounts the content",
-            "Escape, Android back, a click outside, a Close button or a form submit close the dialog natively and at once",
+            "the click, submit or command is cancelled and dispatched in the Root's transition; `showModal()` / `close(returnValue)` (or `showPopover()` / `hidePopover()`) run in the commit that settles it",
+            "the browser closes the dialog or popover natively and at once",
           ],
           [
             "`openChangeAction`",
-            "`(true, details)`, awaited: the dialog opens when it resolves and the content has rendered",
-            '`(false, details)`, a notification: `reason` is `"dismiss"` or `"activate"`, `returnValue` says which button',
+            'awaited: `(true, details)` opens once it resolves and the content has rendered; `(false, details)` closes once it resolves, with `reason: "activate"` and, for a Dialog, the `returnValue`',
+            '`(false, details)`, a notification after the fact, with `reason: "dismiss"`',
           ],
           [
             "Pending",
-            "the Trigger shows `data-pending` until the dialog opens",
+            "the Trigger (and a Close with an action) shows `data-pending` until the commit",
             "the Trigger shows `data-pending` while the notification runs",
           ],
           [
             "A controlled parent that refuses",
-            "a veto: the dialog never opens",
-            "not a veto: the dialog is re-opened once the action settles",
+            "a veto: nothing opens, or the dialog stays open (snap-back)",
+            "not a veto: it is re-opened once the action settles",
+          ],
+          [
+            "Animation",
+            "`transition` (`<ViewTransition>`), in every engine, Firefox included",
+            "CSS only (`@starting-style`, `allow-discrete`); Firefox closes instantly",
           ],
         ]}
       />
       <p>
-        Closing stays with the browser on purpose: close requests can be cancelled only once per
-        user activation, a <code>method="dialog"</code> submit cannot be cancelled at all, and a
-        user who pressed Escape expects the dialog to go away now. See{" "}
-        <a href="/components/dialog">Dialog</a>.
+        The line sits where the platform lets the library cancel a step freely: a part's click
+        (which cancels its command), a <code>command</code> event, a form's <code>submit</code>. A
+        dismissal goes through a close request instead, whose <code>cancel</code> the browser
+        honours only once per user activation, and a user who pressed Escape expects the dialog to
+        go away now. So the library never promises to hold a dismissal. See{" "}
+        <a href="/components/dialog">Dialog</a> and <a href="/components/popover">Popover</a>.
       </p>
 
       <h3>Native inputs: the DOM is the optimistic state</h3>

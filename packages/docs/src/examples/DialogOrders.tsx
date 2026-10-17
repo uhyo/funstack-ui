@@ -38,8 +38,11 @@ function OrderDetails({ id }: { id: string }) {
 // Library mode: `defaultOpen={false}` (or any action prop) hands the open to the library. The
 // Popup's children render from committed state, so <OrderDetails> mounts inside the opening
 // transition and suspends: the dialog stays closed and the Trigger carries data-pending until the
-// data is ready, then the dialog opens once, complete. Closing is the browser's; the readout shows
-// the notification the Root receives.
+// data is ready, then the dialog opens once, complete. The Close button's close is library-owned
+// too: openChangeAction(false) runs first, then the dialog closes in a view transition
+// (`transition`), so the exit animates in every engine, Firefox included. Escape and a click on
+// the backdrop are dismissals: the browser closes the dialog at once and the Root is told
+// afterwards. The readout shows what the Root received.
 export function DialogOrders() {
   const [last, setLast] = useState("(none yet)");
   const record = (open: boolean, { reason, returnValue }: DialogOpenChangeDetails) => {
@@ -61,7 +64,16 @@ export function DialogOrders() {
                   </>
                 )}
               </Dialog.Trigger>
-              <Dialog.Popup className="demo-dialog" lightDismiss initialFocus="[data-autofocus]">
+              <Dialog.Popup
+                className="demo-dialog demo-dialog-vt"
+                lightDismiss
+                initialFocus="[data-autofocus]"
+                transition={{
+                  "fsui-dialog-open": "demo-dialog-pop",
+                  "fsui-dialog-close": "demo-dialog-pop",
+                  default: "none",
+                }}
+              >
                 <Dialog.Title>Order #{id}</Dialog.Title>
                 <OrderDetails id={id} />
                 <div className="demo-dialog-actions">

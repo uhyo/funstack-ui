@@ -176,3 +176,44 @@ html:has(dialog:modal) {
   display: grid;
   gap: 4px;
 }
+
+/* `transition` on the Popup: a view transition animates library-driven opens and closes (a
+   Close part, a Form, a controlled close), Firefox included. The dialog box drops its CSS
+   transition: with `display` / `overlay` in it, a closing dialog stays rendered while it fades
+   and Chromium captures it in the close's new snapshot too. Dismissals then close at once. */
+.dlg-vt,
+.dlg-vt:open {
+  opacity: 1;
+  translate: 0 0;
+  transition: none;
+}
+
+::view-transition-new(.dlg-pop) {
+  animation: 180ms ease-out both dlg-pop-in;
+}
+
+::view-transition-old(.dlg-pop) {
+  animation: 140ms ease-in both dlg-pop-out;
+}
+
+@keyframes dlg-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes dlg-pop-out {
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

@@ -65,10 +65,50 @@ html:has(.demo-dialog:modal) {
   }
 }
 
+/* With `transition`, a view transition animates the library-driven opens and closes (a Close
+   part, a Form, a controlled close), Firefox included, so the dialog box drops its CSS
+   transition. Keeping `display` / `overlay` in it would keep a closing dialog rendered while it
+   fades, and Chromium would capture it in the close's new snapshot as well. Dismissals (Escape, a
+   click on the backdrop) are the browser's and close at once; the backdrop keeps its CSS fade-in
+   and leaves with the page's root cross-fade on a library-driven close. */
+.demo-dialog-vt,
+.demo-dialog-vt:open {
+  opacity: 1;
+  translate: 0 0;
+  transition: none;
+}
+
+::view-transition-new(.demo-dialog-pop) {
+  animation: 180ms ease-out both demo-dialog-pop-in;
+}
+
+::view-transition-old(.demo-dialog-pop) {
+  animation: 140ms ease-in both demo-dialog-pop-out;
+}
+
+@keyframes demo-dialog-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes demo-dialog-pop-out {
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .demo-dialog,
   .demo-dialog::backdrop {
     transition: none;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
 

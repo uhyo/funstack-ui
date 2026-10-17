@@ -11,8 +11,9 @@ export interface DialogTriggerState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */
   readonly open: boolean;
   /**
-   * The Root's transition is pending: an open in flight, a close notification in flight, or a
-   * re-open requested while a close notification is still settling.
+   * The Root's transition is pending: an open in flight, a close a part asked for in flight
+   * (`openChangeAction(false)` awaited while the dialog is still open), a close notification in
+   * flight, or a re-open requested while a close notification is still settling.
    */
   readonly pending: boolean;
   readonly disabled: boolean;
@@ -58,9 +59,10 @@ export function DialogTrigger({
 
   const state: DialogTriggerState = {
     open: ctx.optimistic,
-    // Every Root dispatch is an open or a close notification and both belong to the Trigger
-    // (design 4.2). Not `optimistic !== committed`: a re-open while a close notification is
-    // still settling has both `true` (the close never committed) and is pending all the same.
+    // Every Root dispatch is an open, a part-initiated close or a dismissal notification, and
+    // all of them belong to the Trigger (design 4.2). Not `optimistic !== committed`: a re-open
+    // while a close notification is still settling has both `true` (the close never committed)
+    // and is pending all the same.
     pending: ctx.pending,
     disabled,
   };

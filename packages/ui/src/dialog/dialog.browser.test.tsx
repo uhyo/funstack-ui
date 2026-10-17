@@ -5,12 +5,16 @@
 // under a real drag, Escape left to a popover inside a non-modal dialog, the nested-confirm
 // pattern (design 11.10 / 12.5 as reworked after the review), `<form method="dialog">`, exit
 // animations and the deferred unmount (branching on whether the engine animates the exit;
-// Firefox does not), and the CSS scroll-lock recipe. Real keyboard and pointer input comes from
-// Playwright through `user` (`userEvent` from `vitest/browser` inside `act`).
+// Firefox does not), `<ViewTransition>` around a `showModal()` dialog for the library-owned
+// closes of #46 (design 13.3), and the CSS scroll-lock recipe. Real keyboard and pointer input
+// comes from Playwright through `user` (`userEvent` from `vitest/browser` inside `act`); the
+// ViewTransition rows click in-page outside `act`, as the Popover ones do, because `act` would
+// flush React's queue itself.
 import { act, render, screen } from "@testing-library/react";
-import { Suspense, startTransition, useRef, useState } from "react";
-import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { Suspense, startTransition, useEffect, useRef, useState } from "react";
+import type { ReactNode, ViewTransitionClass } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { supportsDialogClosedBy } from "../__tests__/engine.js";
 import { createSuspender, deferred } from "../__tests__/helpers.js";
@@ -200,6 +204,30 @@ describe("library mode (browser)", () => {
     expect(event.type).toBe("command");
     expect(event).toBeInstanceOf(CommandEvent);
     await settle(() => expect(popup().open).toBe(true));
+  });
+
+  it("a foreign request-close invoker is intercepted; its value arrives through event.source (#46)", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library action={action}>
+        <button type="button" data-testid="foreign" value="foreign">
+          Foreign close
+        </button>
+      </Library>,
+    );
+    await openWithTrigger();
+    const foreign = screen.getByTestId("foreign");
+    foreign.setAttribute("commandfor", popup().id);
+    foreign.setAttribute("command", "request-close");
+    await user.click(foreign);
+    expect(action).toHaveBeenCalledTimes(2);
+    const details = action.mock.calls[1]![1];
+    expect(details.event).toBeInstanceOf(CommandEvent);
+    expect(details.event!.defaultPrevented).toBe(true);
+    expect(details.reason).toBe("activate");
+    expect(details.returnValue).toBe("foreign");
+    await settle(() => expect(popup().open).toBe(false));
+    expect(popup().returnValue).toBe("foreign");
   });
 
   it("content that suspends holds the open; the dialog opens complete", async () => {
@@ -566,7 +594,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
     if (exitAnimations > 0) {
       // Chromium / WebKit: the dialog is still fading out; the content stays.
       expect(screen.queryByTestId("content")).not.toBeNull();
-      // The unmount is a transition the Popup starts when the animations finish: inside `act`.
+      // The unmount is a normal update the Popup makes when the animations finish: inside `act`.
       await act(async () => {
         await finished;
         await sleep(20);
@@ -576,6 +604,299 @@ describe("exit animation and the deferred unmount (browser)", () => {
       // Firefox: `display` flips at once (bug 1834877); nothing to wait for.
       expect(screen.queryByTestId("content")).toBeNull();
     }
+  });
+
+  it("a controlled close without transition keeps the content through the fade, mounted once (#46)", async () => {
+    cleanups.push(
+      addStyle(`
+        .fade, .fade::backdrop {
+          opacity: 0;
+          transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
+        }
+        .fade:open, .fade:open::backdrop { opacity: 1; }
+        @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
+      `),
+    );
+    let mounts = 0;
+    function Content() {
+      useEffect(() => {
+        mounts++;
+      }, []);
+      return <span data-testid="content">content</span>;
+    }
+    function Controlled() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <Dialog.Root open={open} openChangeAction={(next) => setOpen(next)}>
+            <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
+            <Dialog.Popup data-testid="popup" aria-label="Edit" className="fade">
+              <Content />
+            </Dialog.Popup>
+          </Dialog.Root>
+          <button
+            type="button"
+            data-testid="close-from-outside"
+            onClick={() => startTransition(() => setOpen(false))}
+          >
+            Close
+          </button>
+        </>
+      );
+    }
+    render(<Controlled />);
+    await openWithTrigger();
+    await sleep(350); // the enter fade
+    expect(mounts).toBe(1);
+    let exitAnimations = -1;
+    let finished: Promise<unknown> = Promise.resolve();
+    popup().addEventListener("close", () => {
+      void getComputedStyle(popup()).opacity;
+      const animations = popup().getAnimations({ subtree: true });
+      exitAnimations = animations.length;
+      finished = Promise.allSettled(animations.map((animation) => animation.finished));
+    });
+    // A programmatic close (the dialog's page is inert, so not a click on the page).
+    await act(async () => screen.getByTestId("close-from-outside").click());
+    expect(popup().open).toBe(false);
+    await settle(() => expect(exitAnimations).toBeGreaterThanOrEqual(0));
+    if (exitAnimations > 0) {
+      // Chromium / WebKit: the close commit held the content and it is still there mid-fade.
+      expect(screen.queryByTestId("content")).not.toBeNull();
+      await act(async () => {
+        await finished;
+        await sleep(20);
+      });
+    }
+    await settle(() => expect(screen.queryByTestId("content")).toBeNull());
+    // Never emptied and re-mounted into the fading dialog (the pre-#46 behaviour).
+    expect(mounts).toBe(1);
+  });
+});
+
+describe("ViewTransition (browser, #46)", () => {
+  type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  let actEnvironment: boolean | undefined;
+  let calls: { openAtStart: boolean }[] = [];
+  let transitions: ViewTransition[] = [];
+
+  beforeEach(() => {
+    calls = [];
+    transitions = [];
+    const original = document.startViewTransition.bind(document);
+    vi.spyOn(document, "startViewTransition").mockImplementation(((
+      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
+    ) => {
+      const element = document.querySelector<HTMLDialogElement>("[data-testid=popup]");
+      calls.push({ openAtStart: element?.open ?? false });
+      const transition = original(arg);
+      transitions.push(transition);
+      return transition;
+    }) as typeof document.startViewTransition);
+    actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
+    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
+    cleanups.push(
+      addStyle(`
+        ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
+        ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
+        @keyframes vt-pop-out { to { opacity: 0; } }
+        @keyframes vt-pop-in { from { opacity: 0; } }
+      `),
+    );
+  });
+
+  afterEach(async () => {
+    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    await Promise.allSettled(transitions.map((transition) => transition.finished));
+  });
+
+  const isOpen = () => popup().open;
+
+  /** The view-transition pseudo-element animations running now (read at `ready`). */
+  function pseudoAnimations(prefix: string): Animation[] {
+    return document
+      .getAnimations()
+      .filter((animation) =>
+        ((animation.effect as KeyframeEffect | null)?.pseudoElement ?? "").startsWith(prefix),
+      );
+  }
+
+  /**
+   * No wrapper element above the Root, so a Root inserted by a transition has the Popup's
+   * boundary at the top of the subtree. `controlled` adds an in-page button that closes the
+   * dialog through the parent (it lives inside the dialog: the page is inert while modal).
+   */
+  function Plain({
+    transition,
+    className,
+    keepMounted,
+    modal,
+    controlled = false,
+  }: {
+    transition?: ViewTransitionClass;
+    className?: string;
+    keepMounted?: boolean;
+    modal?: boolean;
+    controlled?: boolean;
+  }) {
+    const [open, setOpen] = useState(false);
+    const rootProps = controlled
+      ? { open, openChangeAction: (next: boolean) => setOpen(next) }
+      : { defaultOpen: false };
+    return (
+      <Dialog.Root {...rootProps} modal={modal}>
+        <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
+        <Dialog.Popup
+          data-testid="popup"
+          aria-label="Edit"
+          transition={transition}
+          className={className}
+          keepMounted={keepMounted}
+          style={{ width: 240, height: 120 }}
+        >
+          <span data-testid="content">content</span>
+          <Dialog.Close data-testid="close" value="cancel">
+            Cancel
+          </Dialog.Close>
+          <Dialog.Form>
+            <button type="submit" data-testid="ok" value="ok">
+              OK
+            </button>
+          </Dialog.Form>
+          {controlled && (
+            <button
+              type="button"
+              data-testid="parent-close"
+              onClick={() => startTransition(() => setOpen(false))}
+            >
+              Parent close
+            </button>
+          )}
+        </Dialog.Popup>
+      </Dialog.Root>
+    );
+  }
+
+  /** Opens through the Trigger and waits for the open's view transition (if any) to finish. */
+  async function open(): Promise<void> {
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(true);
+    await Promise.allSettled(transitions.map((t) => t.finished));
+  }
+
+  it.each([
+    ["a Dialog.Close", "close"],
+    ['a method="dialog" submit', "ok"],
+    ["a controlled open={false}", "parent-close"],
+  ])('transition="pop": the open and %s each run one view transition', async (_, testId) => {
+    render(<Plain transition="pop" controlled={testId === "parent-close"} />);
+    trigger().click();
+    await expect.poll(() => isOpen()).toBe(true);
+    await expect.poll(() => calls.length).toBe(1);
+    // Started before the dialog was shown; shown inside the update callback.
+    expect(calls[0]!.openAtStart).toBe(false);
+    await transitions[0]!.updateCallbackDone;
+    expect(isOpen()).toBe(true);
+    expect(popup().matches(":modal")).toBe(true);
+    await transitions[0]!.finished;
+
+    screen.getByTestId(testId).click();
+    await expect.poll(() => calls.length).toBe(2);
+    // The library closes inside the update callback, so the dialog is open at the start.
+    expect(calls[1]!.openAtStart).toBe(true);
+    await transitions[1]!.ready;
+    // The old snapshot carries the dialog (with its content) out, in every engine.
+    expect(pseudoAnimations("::view-transition-old").length).toBeGreaterThan(0);
+    await transitions[1]!.finished;
+    expect(isOpen()).toBe(false);
+    expect(screen.queryByTestId("content")).toBeNull();
+    const expected = testId === "close" ? "cancel" : testId === "ok" ? "ok" : "";
+    expect(popup().returnValue).toBe(expected);
+    await sleep(50);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('transition="pop": the opening commit captures the dialog shown by showModal() (10.3)', async () => {
+    render(<Plain transition="pop" />);
+    trigger().click();
+    await expect.poll(() => calls.length).toBe(1);
+    await transitions[0]!.ready;
+    // The top-layer dialog promoted inside the update callback has a new snapshot. If an engine
+    // ever stops capturing it, this row tells (design 10.3 then documents the open as CSS only).
+    expect(pseudoAnimations("::view-transition-new").length).toBeGreaterThan(0);
+    await transitions[0]!.finished;
+    expect(isOpen()).toBe(true);
+  });
+
+  it('transition="pop": an Escape runs one only for the notification commit, dialog already closed', async () => {
+    render(<Plain transition="pop" />);
+    await open();
+    expect(calls).toHaveLength(1);
+    await userEvent.keyboard("{Escape}");
+    expect(isOpen()).toBe(false);
+    await expect.poll(() => calls.length).toBe(2);
+    expect(calls[1]!.openAtStart).toBe(false);
+    await transitions[1]!.finished;
+    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
+    await sleep(50);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('transition="pop" plus a CSS exit: an Escape runs one view transition, not two', async () => {
+    cleanups.push(
+      addStyle(`
+        .fade, .fade::backdrop {
+          opacity: 0;
+          transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
+        }
+        .fade:open, .fade:open::backdrop { opacity: 1; }
+        @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
+      `),
+    );
+    render(<Plain transition="pop" className="fade" />);
+    await open();
+    await sleep(250); // the enter fade
+    await userEvent.keyboard("{Escape}");
+    // The notification commit (design 4.4); the content may be held for the CSS fade.
+    await expect.poll(() => calls.length).toBe(2);
+    await transitions[1]!.finished;
+    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
+    // Releasing the hold is a normal update: no second document view transition.
+    await sleep(100);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("without transition: no view transition for an open, a Close close or an Escape", async () => {
+    render(<Plain />);
+    await open();
+    screen.getByTestId("close").click();
+    await expect.poll(() => isOpen()).toBe(false);
+    await open();
+    await userEvent.keyboard("{Escape}");
+    await expect.poll(() => isOpen()).toBe(false);
+    await sleep(50);
+    expect(calls).toHaveLength(0);
+  });
+
+  // The close commit unmounts (or hides) the focused Close before `close()` runs; a non-modal
+  // dialog restores focus only from inside, so the library returns it (design 6.2 rule 2). The
+  // modal rows go through the platform's unconditional restore and guard against a regression.
+  describe.each([
+    [false, false],
+    [false, true],
+    [true, false],
+  ] as const)("modal=%s keepMounted=%s", (modal, keepMounted) => {
+    it('transition="pop": a Close activated with Enter returns focus to the Trigger', async () => {
+      render(<Plain transition="pop" modal={modal} keepMounted={keepMounted} />);
+      await open();
+      const close = screen.getByTestId("close");
+      close.focus();
+      expect(close).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      await expect.poll(() => isOpen()).toBe(false);
+      await Promise.allSettled(transitions.map((t) => t.finished));
+      await expect.poll(() => document.activeElement).toBe(trigger());
+    });
   });
 });
 

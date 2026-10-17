@@ -1,11 +1,12 @@
 "use client";
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useInsertionEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
 import type { DialogCloseIntent, DialogContextValue, DialogMode } from "./dialog-context.js";
@@ -47,13 +48,15 @@ export interface DialogRootProps {
    */
   defaultOpen?: boolean;
   /**
-   * Awaited for `true` (the dialog opens when it resolves and the content has rendered); a
-   * notification for `false` (the dialog is already closed; the action runs inside the Root's
-   * transition). May be a Server Function. Rejections reach the nearest Error Boundary above
+   * Awaited for `true` (the dialog opens when it resolves and the content has rendered) and for
+   * a `false` the user asked a part for (`Dialog.Close`, a `Dialog.Form` submit or settled
+   * action, a foreign close command: the dialog closes with `details.returnValue` when it
+   * resolves, with a view transition if the Popup's `transition` is set; a controlled parent
+   * that keeps `open` vetoes it). A notification for a dismissal (Escape, Android back, a click
+   * outside: the dialog is already closed, `returnValue` is `""`; the action runs inside the
+   * Root's transition, and a controlled parent that keeps `open` gets it re-opened, which is
+   * not a veto). May be a Server Function. Rejections reach the nearest Error Boundary above
    * Root.
-   *
-   * A controlled parent that does not adopt `false` gets the dialog re-opened once the action
-   * settles: closing is the browser's, this is not a veto.
    *
    * A `setState` placed after your own `await` is not a Transition update; wrap it in
    * `startTransition` (React limitation).
@@ -86,8 +89,10 @@ function clearLater(
  * Without `open`, `defaultOpen` and `openChangeAction` the Dialog runs in **JS-free mode**: the
  * Trigger is a native `command="show-modal"` invoker and the browser owns everything. With any of
  * them it runs in **library mode**: opening is a transition (the Trigger shows `data-pending`,
- * content renders from committed state, `showModal()` runs when it has committed); closing is
- * the browser's and `openChangeAction(false)` is a notification.
+ * content renders from committed state, `showModal()` runs when it has committed), and so is a
+ * close a part asks for (Close, Form, a foreign close command: `openChangeAction(false)` is
+ * awaited, `close(returnValue)` runs when it has committed). Dismissals (Escape, a click
+ * outside) are the browser's and `openChangeAction(false)` is a notification.
  */
 export function DialogRoot({
   open,
@@ -144,13 +149,32 @@ export function DialogRoot({
     generation.current++;
   }, []);
 
+  // The optimistic value of the last commit, for callers that run after an `await` (a Close
+  // action's continuation) and would otherwise read the value of the render they were created in
+  // (Popover 14.1). Through `useLatest`, as `usePopoverRoot`, so `intended` and everything built
+  // on it keep their identity (review of #48, finding 5).
+  const committedOptimistic = useLatest(optimistic);
+
   // What the user already intends: the latest in-flight dispatch, else the optimistic value
   // (conventions 3.8 rule 1). Judging no-ops against it also deduplicates the StrictMode re-run
   // of the mount reconciliation and recognises the library's own `close()` echoing back.
   const intended = useCallback(
-    (): boolean => latestInFlight()?.next ?? optimistic,
-    [latestInFlight, optimistic],
+    (): boolean => latestInFlight()?.next ?? committedOptimistic.current,
+    [latestInFlight, committedOptimistic],
   );
+
+  // The `returnValue` of a pending part-initiated close (design 2.3), handed to the apply
+  // effect's `close()`. Stale once `true` is intended again (a vetoed close snapped back, or a
+  // re-open), so the commit that shows it clears it.
+  const closeReturnValue = useRef<string | undefined>(undefined);
+  useInsertionEffect(() => {
+    if (latestInFlight()?.next ?? optimistic) closeReturnValue.current = undefined;
+  });
+  const takeCloseReturnValue = useCallback((): string => {
+    const value = closeReturnValue.current;
+    closeReturnValue.current = undefined;
+    return value ?? "";
+  }, []);
 
   const requestOpen = useCallback(
     (event: Event | undefined, reason: ChangeReason): void => {
@@ -159,6 +183,17 @@ export function DialogRoot({
       dispatch(true, createActionDetails(event, { reason, returnValue: undefined }));
     },
     [isLibrary, intended, nextOpenGeneration, dispatch],
+  );
+
+  // A library-owned close (design 2.3): `openChangeAction(false)` is awaited and the Popup's
+  // apply effect calls `close(returnValue)` in the commit that ends it.
+  const requestClose = useCallback(
+    (event: Event | undefined, reason: ChangeReason, returnValue: string): void => {
+      if (!isLibrary || !intended()) return;
+      closeReturnValue.current = returnValue;
+      dispatch(false, createActionDetails(event, { reason, returnValue }));
+    },
+    [isLibrary, intended, dispatch],
   );
 
   const notifyClosed = useCallback(
@@ -183,6 +218,9 @@ export function DialogRoot({
       committed: committedState,
       optimistic: openState,
       pending: pendingState,
+      intended,
+      requestClose,
+      takeCloseReturnValue,
       requestOpen,
       notifyClosed,
       latestInFlight,
@@ -200,6 +238,9 @@ export function DialogRoot({
       committedState,
       openState,
       pendingState,
+      intended,
+      requestClose,
+      takeCloseReturnValue,
       requestOpen,
       notifyClosed,
       latestInFlight,
