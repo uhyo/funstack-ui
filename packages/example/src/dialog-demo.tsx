@@ -370,9 +370,9 @@ function TransitionDemo() {
         <code>transition</code> on the Popup: the opening commit and every close a part asks for
         (Close, the <code>method="dialog"</code> OK button, the controlled close below) run in a
         view transition, so the exit animates in Firefox too. Escape and a click outside are
-        dismissals: the browser closes at once and <code>openChangeAction</code> only hears about
-        it. With "refuse" on, the controlled parent keeps <code>open</code> for a part's close
-        (snap-back, a real veto); a refused dismissal re-opens.
+        dismissals: the browser closes them with the CSS exit and <code>openChangeAction</code> only
+        hears about it. With "refuse" on, the controlled parent keeps <code>open</code> for a part's
+        close (snap-back, a real veto); a refused dismissal re-opens.
       </p>
       <fieldset className="dlg-flags">
         <legend>Options</legend>
@@ -413,7 +413,10 @@ function TransitionDemo() {
           }}
         >
           <Dialog.Title>Animated close</Dialog.Title>
-          <p>Close with a button (view transition) or with Escape / a click outside (instant).</p>
+          <p>
+            Close with a button (view transition) or with Escape / a click outside (CSS fade;
+            instant in Firefox).
+          </p>
           <Dialog.Form className="dlg-actions">
             <Dialog.Close className="dlg-btn" value="cancel">
               {({ pending }) => (pending ? <Spinner /> : "Cancel")}

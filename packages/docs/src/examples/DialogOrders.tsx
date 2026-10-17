@@ -41,8 +41,8 @@ function OrderDetails({ id }: { id: string }) {
 // data is ready, then the dialog opens once, complete. The Close button's close is library-owned
 // too: openChangeAction(false) runs first, then the dialog closes in a view transition
 // (`transition`), so the exit animates in every engine, Firefox included. Escape and a click on
-// the backdrop are dismissals: the browser closes the dialog at once and the Root is told
-// afterwards. The readout shows what the Root received.
+// the backdrop are dismissals: the browser closes the dialog (with the CSS exit) and the Root is
+// told afterwards. The readout shows what the Root received.
 export function DialogOrders() {
   const [last, setLast] = useState("(none yet)");
   const record = (open: boolean, { reason, returnValue }: DialogOpenChangeDetails) => {

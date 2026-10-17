@@ -56,16 +56,11 @@
 }
 
 /* With `transition`, the view transition animates library-driven opens and closes (Firefox
-   included); keep only a CSS fade for dismissals and drop the CSS enter. */
-.demo-popover-vt,
-.demo-popover-vt:popover-open {
-  translate: 0 0;
-}
-
-@starting-style {
-  .demo-popover-vt:popover-open {
-    opacity: 1;
-  }
+   included); dismissals keep the CSS exit above. While a view transition runs the CSS transition
+   is cut: otherwise a closing popover stays rendered through its fade, and Chromium and Safari
+   capture it in the close's new snapshot as well (a double image). */
+html:active-view-transition .demo-popover-vt {
+  transition: none;
 }
 
 ::view-transition-new(.pop) {

@@ -16,7 +16,7 @@ import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
-import { supportsDialogClosedBy } from "../__tests__/engine.js";
+import { browserName, supportsDialogClosedBy } from "../__tests__/engine.js";
 import { createSuspender, deferred } from "../__tests__/helpers.js";
 import { Dialog } from "./index.js";
 import type { DialogOpenChangeDetails, DialogPopupProps } from "./index.js";
@@ -842,28 +842,99 @@ describe("ViewTransition (browser, #46)", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it('transition="pop" plus a CSS exit: an Escape runs one view transition, not two', async () => {
-    cleanups.push(
-      addStyle(`
-        .fade, .fade::backdrop {
-          opacity: 0;
-          transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
-        }
-        .fade:open, .fade:open::backdrop { opacity: 1; }
-        @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
-      `),
+  /** The `::view-transition-*` pseudo-elements animating now, by name (read at `ready`). */
+  function pseudoNames(): string[] {
+    return [
+      ...new Set(
+        document
+          .getAnimations()
+          .map((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? "")
+          .filter((name) => name.startsWith("::view-transition-")),
+      ),
+    ].sort();
+  }
+
+  /** The dialog's `new` image: any `::view-transition-new` other than the root's. */
+  const dialogNewImages = () =>
+    pseudoNames().filter(
+      (name) => name.startsWith("::view-transition-new(") && name !== "::view-transition-new(root)",
     );
+
+  // The CSS exit of design 10.1 on the box, plus the recipe that cuts it while a view transition
+  // runs (review M2 of #46): without the last rule, Chromium keeps the closing dialog rendered
+  // through its fade and captures it as a live `::view-transition-new` next to the old image.
+  const cssExit = (recipe: boolean) => `
+    .fade, .fade::backdrop {
+      opacity: 0;
+      transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
+    }
+    .fade:open, .fade:open::backdrop { opacity: 1; }
+    @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
+    ${recipe ? "html:active-view-transition .fade { transition: none; }" : ""}
+  `;
+
+  it('transition="pop" plus a CSS exit and the recipe: an Escape runs one view transition, no new image of the dialog', async () => {
+    cleanups.push(addStyle(cssExit(true)));
     render(<Plain transition="pop" className="fade" />);
     await open();
     await sleep(250); // the enter fade
     await userEvent.keyboard("{Escape}");
     // The notification commit (design 4.4); the content may be held for the CSS fade.
     await expect.poll(() => calls.length).toBe(2);
+    await transitions[1]!.ready;
+    expect(dialogNewImages()).toEqual([]);
     await transitions[1]!.finished;
     await expect.poll(() => screen.queryByTestId("content")).toBeNull();
     // Releasing the hold is a normal update: no second document view transition.
     await sleep(100);
     expect(calls).toHaveLength(2);
+  });
+
+  it.each([
+    ["a Dialog.Close", "close"],
+    ["a controlled open={false}", "parent-close"],
+  ])(
+    'transition="pop" plus a CSS exit and the recipe: %s has the old image only',
+    async (_, testId) => {
+      cleanups.push(addStyle(cssExit(true)));
+      render(<Plain transition="pop" className="fade" controlled={testId === "parent-close"} />);
+      await open();
+      await sleep(250); // the enter fade
+      screen.getByTestId(testId).click();
+      await expect.poll(() => calls.length).toBe(2);
+      await transitions[1]!.ready;
+      const names = pseudoNames();
+      expect(
+        names.some(
+          (name) =>
+            name.startsWith("::view-transition-old(") && name !== "::view-transition-old(root)",
+        ),
+      ).toBe(true);
+      expect(dialogNewImages()).toEqual([]);
+      expect(getComputedStyle(popup()).display).toBe("none");
+      await transitions[1]!.finished;
+      expect(isOpen()).toBe(false);
+      await sleep(100);
+      expect(calls).toHaveLength(2);
+    },
+  );
+
+  it('characterisation: transition="pop" plus a CSS exit without the recipe has a live new image where the exit animates', async () => {
+    cleanups.push(addStyle(cssExit(false)));
+    render(<Plain transition="pop" className="fade" />);
+    await open();
+    await sleep(250);
+    screen.getByTestId("close").click();
+    await expect.poll(() => calls.length).toBe(2);
+    await transitions[1]!.ready;
+    // Chromium (and WebKit) keep the closed dialog rendered through its CSS fade, so the new
+    // snapshot captures it: a double image. Firefox closes at once (bug 1834877): old only. If
+    // this row starts failing, an engine changed and the docs' recipe may be unnecessary.
+    const fading = getComputedStyle(popup()).display !== "none";
+    // Firefox does not animate the exit (bug 1834877); Chromium and WebKit do.
+    expect(fading).toBe(browserName !== "firefox");
+    expect(dialogNewImages().length > 0).toBe(fading);
+    await transitions[1]!.finished;
   });
 
   it("without transition: no view transition for an open, a Close close or an Escape", async () => {

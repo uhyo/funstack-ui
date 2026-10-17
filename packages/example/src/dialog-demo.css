@@ -178,13 +178,11 @@ html:has(dialog:modal) {
 }
 
 /* `transition` on the Popup: a view transition animates library-driven opens and closes (a
-   Close part, a Form, a controlled close), Firefox included. The dialog box drops its CSS
-   transition: with `display` / `overlay` in it, a closing dialog stays rendered while it fades
-   and Chromium captures it in the close's new snapshot too. Dismissals then close at once. */
-.dlg-vt,
-.dlg-vt:open {
-  opacity: 1;
-  translate: 0 0;
+   Close part, a Form, a controlled close), Firefox included; dismissals (Escape, a click
+   outside) keep the CSS exit above. While a view transition runs the CSS transition is cut:
+   otherwise a closing dialog stays rendered through its fade and Chromium and Safari capture it
+   in the close's new snapshot too (a double image). */
+html:active-view-transition .dlg-vt {
   transition: none;
 }
 

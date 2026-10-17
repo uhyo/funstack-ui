@@ -463,6 +463,8 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
       <CodeBlock>{`<Dialog.Popup transition={{ "fsui-dialog-open": "pop", "fsui-dialog-close": "pop", default: "none" }}>`}</CodeBlock>
       <CodeBlock language="css">{`::view-transition-new(.pop) { animation: 180ms ease-out both pop-in; }
 ::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }
+/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
+html:active-view-transition .dialog { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }`}</CodeBlock>
@@ -476,10 +478,12 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         </li>
         <li>
           Dismissals (Escape, a click outside) happen in the browser before React hears about them,
-          so they animate with CSS only. With <code>transition</code> set, drop the CSS{" "}
-          <code>display</code> / <code>overlay</code> transition on the dialog box: it keeps a
-          closing dialog rendered while it fades, and Chromium then captures it in the close's new
-          snapshot as well.
+          so they animate with the CSS exit only: keep it. Cut it while a view transition runs (
+          <code>html:active-view-transition .dialog {"{ transition: none; }"}</code>): otherwise a
+          dialog closed by the library stays rendered through its fade, and Chromium and Safari
+          capture it in the close's new snapshot as well, a double image. The untyped selector is
+          deliberate: a controlled close carries no transition types. The cost: an unrelated view
+          transition of the page also cuts a fade in progress.
         </li>
         <li>
           The <code>::backdrop</code> is not captured on its own: it is part of the page snapshot

@@ -405,6 +405,8 @@ export function PopoverPage() {
       <CodeBlock>{`<Popover.Popup transition={{ "fsui-popover-open": "pop-in", "fsui-popover-close": "pop-out", default: "none" }}>`}</CodeBlock>
       <CodeBlock language="css">{`::view-transition-new(.pop-in) { animation: 160ms ease-out both pop-in; }
 ::view-transition-old(.pop-out) { animation: 120ms ease-in both pop-out; }
+/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
+html:active-view-transition .popover { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }`}</CodeBlock>
@@ -415,8 +417,12 @@ export function PopoverPage() {
         </li>
         <li>
           Dismissals (Escape, a click outside) happen in the browser before React hears about them,
-          so they animate with the CSS exit only. With <code>transition</code> set, drop the CSS
-          enter and keep at most a CSS fade for dismissals.
+          so they animate with the CSS exit only: keep it. Cut it while a view transition runs (
+          <code>html:active-view-transition .popover {"{ transition: none; }"}</code>): otherwise a
+          popover hidden by the library stays rendered through its fade, and Chromium and Safari
+          capture it in the close's new snapshot as well, a double image. The untyped selector is
+          deliberate: a controlled close carries no transition types. The cost: an unrelated view
+          transition of the page also cuts a fade in progress.
         </li>
         <li>
           With <code>transition="none"</code>, a plain open starts no document view transition: the

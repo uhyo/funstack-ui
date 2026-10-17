@@ -656,6 +656,59 @@ describe("ViewTransition (browser)", () => {
     expect(calls).toHaveLength(2);
   });
 
+  // The docs' CSS exit plus `transition` (review M2 of Dialog #46): Chromium (and WebKit) keep a
+  // hidden popover rendered through its fade, so a library-driven close's new snapshot captures
+  // it as a live `::view-transition-new` next to the old image (a double image). The recipe
+  // `html:active-view-transition .x { transition: none }` cuts the fade while a view transition
+  // runs. Firefox hides at once: old image only either way.
+  it.each([
+    [false, "characterisation, without the recipe: a live new image where the exit animates"],
+    [true, "with the recipe: the old image only"],
+  ])('transition="pop" plus a CSS exit, a part-initiated close (recipe=%s): %s', async (recipe) => {
+    cleanups.push(
+      addStyle(`
+        .fade {
+          opacity: 0;
+          transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
+        }
+        .fade:popover-open { opacity: 1; }
+        @starting-style { .fade:popover-open { opacity: 0; } }
+        ${recipe ? "html:active-view-transition .fade { transition: none; }" : ""}
+      `),
+    );
+    render(<Plain transition="pop" className="fade" />);
+    trigger().click();
+    await expect.poll(() => calls.length).toBe(1);
+    await transitions[0]!.finished;
+    await sleep(250); // the enter fade
+    trigger().click();
+    await expect.poll(() => calls.length).toBe(2);
+    await transitions[1]!.ready;
+    const names = new Set(
+      document
+        .getAnimations()
+        .map((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? ""),
+    );
+    const popupImages = (kind: "old" | "new") =>
+      [...names].filter(
+        (name) =>
+          name.startsWith(`::view-transition-${kind}(`) &&
+          name !== `::view-transition-${kind}(root)`,
+      );
+    expect(popupImages("old").length).toBeGreaterThan(0);
+    const fading = getComputedStyle(popup()).display !== "none";
+    if (recipe) {
+      expect(fading).toBe(false);
+      expect(popupImages("new")).toEqual([]);
+    } else {
+      // Firefox does not animate the exit (bug 1834877); Chromium and WebKit do.
+      expect(fading).toBe(browserName !== "firefox");
+      expect(popupImages("new").length > 0).toBe(fading);
+    }
+    await transitions[1]!.finished;
+    expect(isOpen()).toBe(false);
+  });
+
   // H1: with `transition` the close commit unmounts the focused Close before `hidePopover()`
   // runs, so the platform (which restores focus only from inside the popover) restores nothing.
   describe.each([

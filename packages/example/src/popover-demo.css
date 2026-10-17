@@ -59,23 +59,11 @@
 }
 
 /* 10.2 With `transition`, the view transition animates every library-driven open and close
-   (in Firefox too); keep only the CSS exit for dismissals and skip the CSS enter. */
-.pop-vt {
-  opacity: 1;
-  translate: 0 0;
-  transition:
-    opacity 120ms,
-    display 120ms allow-discrete,
-    overlay 120ms allow-discrete;
-}
-.pop-vt:not(:popover-open) {
-  opacity: 0;
-}
-@starting-style {
-  .pop-vt:popover-open {
-    opacity: 1;
-    translate: 0 0;
-  }
+   (in Firefox too); dismissals keep the CSS exit above. While a view transition runs the CSS
+   transition is cut: otherwise a closing popover stays rendered through its fade, and Chromium
+   and Safari capture it in the close's new snapshot as well (a double image). */
+html:active-view-transition .pop-vt {
+  transition: none;
 }
 ::view-transition-new(.pop) {
   animation: 160ms ease-out both pop-in;
@@ -101,8 +89,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pop,
-  .pop-vt {
+  .pop {
     transition: none;
   }
   ::view-transition-group(*),
