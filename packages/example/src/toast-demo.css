@@ -1,0 +1,168 @@
+/* Toast demo. The library ships no CSS; this is the starter stylesheet from the design
+   (design/components/toast.md, section 10.4). The region is shown with `:popover-open`; toasts
+   carry `data-pending`, `data-ending`, `data-type`; the region `data-paused`. */
+
+.toasts {
+  position: fixed;
+  inset: auto 1rem 1rem auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  inline-size: min(22rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: visible;
+  background: transparent;
+  /* The region's box never blocks the page. */
+  pointer-events: none;
+}
+.toast-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms;
+}
+.toast-slot:has([data-ending]) {
+  grid-template-rows: 0fr;
+}
+.toast {
+  min-block-size: 0;
+  overflow: hidden;
+  position: relative;
+  margin-block-start: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  color: #111827;
+  background: #fff;
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.2);
+  pointer-events: auto;
+  transition:
+    opacity 200ms,
+    translate 200ms;
+}
+@starting-style {
+  .toast {
+    opacity: 0;
+    translate: 0 1rem;
+  }
+}
+.toast[data-ending] {
+  opacity: 0;
+  translate: 0 1rem;
+}
+.toast[data-pending] {
+  cursor: progress;
+}
+.toast[data-pending] .toast-title::after {
+  content: " ⏳";
+}
+.toast[data-type="success"] {
+  border-inline-start: 4px solid #16a34a;
+}
+.toast[data-type="error"] {
+  border-inline-start: 4px solid #dc2626;
+}
+.toast:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+.toast-title {
+  font-weight: 600;
+}
+.toast-description {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+.toast-buttons {
+  position: absolute;
+  inset: 0.5rem 0.5rem auto auto;
+  display: flex;
+  gap: 0.25rem;
+}
+.toast-action,
+.toast-close {
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font: inherit;
+  background: #eef2ff;
+  color: #3730a3;
+}
+.toast-action[data-pending] {
+  opacity: 0.6;
+}
+.toast-close {
+  background: none;
+  color: #6b7280;
+}
+.toast-progress {
+  position: absolute;
+  inset: auto 0 0 0;
+  block-size: 3px;
+  background: #a5b4fc;
+  transform-origin: left;
+  animation: toast-progress 5s linear forwards;
+}
+.toasts[data-paused] .toast-progress {
+  animation-play-state: paused;
+}
+@keyframes toast-progress {
+  to {
+    transform: scaleX(0);
+  }
+}
+.toast-queued {
+  margin: 0.25rem 0 0;
+  text-align: end;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast-slot {
+    transition: none;
+  }
+}
+
+.toast-demo-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.toast-demo-buttons [data-pending] {
+  cursor: progress;
+}
+.toast-demo-menu {
+  margin: 4px 0 0;
+  inset: auto;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.2);
+  background: #fff;
+}
+.toast-demo-menu [role="menuitem"] {
+  display: block;
+  inline-size: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  background: none;
+  text-align: start;
+}
+.toast-demo-menu [role="menuitem"]:focus {
+  outline: none;
+  background: #e0e7ff;
+}
+.toast-demo-menu [role="menuitem"][data-pending] {
+  cursor: progress;
+  opacity: 0.6;
+}
+.toast-demo-dialog {
+  max-inline-size: 24rem;
+  border: 0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
