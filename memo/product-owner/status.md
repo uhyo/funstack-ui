@@ -97,3 +97,9 @@
 - Combobox review fixes 5d92f41..bb8db8f; CI green on all 3 engines. Design nits folded in 49687f8 (aria-labelledby types; autoHighlight side effect accepted).
 - User went to bed; working decision-free items autonomously: #48 (stable root hooks), #49 (test leftovers) in developer worktrees.
 - Pending user decisions: 0.1.0-alpha.2 release (Select + Combobox); next wave (#46 Dialog VT exit, Tooltip #19-21, #45 context menu, #53); human screen-reader pass for Combobox.
+
+## 2026-10-17 — alpha.2 released; wave 5 started
+- User: "When Wave 4 is completed, please release a new alpha. For the next wave, new components if possible, otherwise polish."
+- 0.1.0-alpha.2 released (69aeb80); the publish workflow succeeded.
+- Wave 5 (#54): Toast, Slider, Field/Form. Research #55 is in progress with the platform-researcher.
+- In flight: #48 and #49 (developers in worktrees), #46 Dialog VT exit design (architect).
