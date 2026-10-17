@@ -282,7 +282,6 @@ export function AccordionRoot(props: AccordionRootProps) {
       // `next` comes from the optimistic set: what the user sees and intends (design 2.2).
       dispatchChange(reduce(optimistic, item, open, exclusive), item, open, "activate", event);
     },
-    // `dispatchChange` closes over the hook's `dispatch`, which is new on every render.
     [dispatchChange, optimistic, exclusive],
   );
 
@@ -353,28 +352,41 @@ export function AccordionRoot(props: AccordionRootProps) {
 
   const id = useId();
   const name = !isLibrary && exclusive ? id : undefined;
-  const state: AccordionRootState = { pending: isLibrary && pending, disabled };
-  const rootPending = state.pending;
+  const rootPending = isLibrary && pending;
+  const state: AccordionRootState = { pending: rootPending, disabled };
   const contextCommitted = isLibrary ? committed : EMPTY;
   const contextOptimistic = isLibrary ? optimistic : EMPTY;
 
-  // Not memoised, deliberately: `dispatchChange` closes over the hook's `dispatch`, which is a
-  // new function on every render of the Root, so a `useMemo` here (design 12) could never reuse
-  // its value and the React Compiler lint flags it as unpreservable. Parts re-render with the
-  // Root, which is what happens today anyway whenever its state changes.
-  const context: AccordionRootContextValue = {
-    mode,
-    exclusive,
-    name,
-    disabled,
-    pending: rootPending,
-    committed: contextCommitted,
-    optimistic: contextOptimistic,
-    dispatch: dispatchFromTrigger,
-    dispatchFromDom,
-    registerItem,
-    registerTrigger,
-  };
+  // Memoised (design 12, #48): the hook's `dispatch` is stable, so this changes only with the
+  // open sets, pending and the props below.
+  const context = useMemo<AccordionRootContextValue>(
+    () => ({
+      mode,
+      exclusive,
+      name,
+      disabled,
+      pending: rootPending,
+      committed: contextCommitted,
+      optimistic: contextOptimistic,
+      dispatch: dispatchFromTrigger,
+      dispatchFromDom,
+      registerItem,
+      registerTrigger,
+    }),
+    [
+      mode,
+      exclusive,
+      name,
+      disabled,
+      rootPending,
+      contextCommitted,
+      contextOptimistic,
+      dispatchFromTrigger,
+      dispatchFromDom,
+      registerItem,
+      registerTrigger,
+    ],
+  );
 
   const resolvedStyle = resolveStateValue(style, state);
   const finalStyle: CSSProperties | undefined = experimental_interpolateSize

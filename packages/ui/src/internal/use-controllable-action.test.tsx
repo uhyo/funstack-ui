@@ -83,3 +83,77 @@ describe("useControllableAction: adopt", () => {
     expect(view.getByTestId("value").textContent).toBe("c|c|false");
   });
 });
+
+// #48: the hook's value only changes with its state, so the components' memoised context values
+// built on it are reused when the owner re-renders for anything else.
+describe("useControllableAction: referential stability", () => {
+  function Stable({
+    controlled,
+    action,
+    types,
+    onHook,
+  }: {
+    controlled?: string;
+    action: (next: string) => unknown;
+    types?: (next: string, prev: string) => readonly string[];
+    onHook: (hook: Hook) => void;
+  }) {
+    const hook = useControllableAction<string, ActionDetails>({
+      controlled,
+      defaultValue: undefined,
+      initialValue: "",
+      // Inline wrappers, new on every render, as the components pass them.
+      action: (next) => action(next),
+      transitionTypes: (next, prev) => types?.(next, prev) ?? [],
+      reducer: (_prev, next) => next,
+      warn: { component: "Stable", prop: "value" },
+    });
+    onHook(hook);
+    return <output data-testid="value">{hook.optimistic}</output>;
+  }
+
+  it("returns the same value across re-renders with unchanged state", () => {
+    const hooks: Hook[] = [];
+    const onHook = (h: Hook) => hooks.push(h);
+    const view = render(<Stable action={() => {}} onHook={onHook} />);
+    view.rerender(<Stable action={() => {}} onHook={onHook} />);
+    view.rerender(<Stable action={() => {}} types={() => []} onHook={onHook} />);
+    expect(hooks.length).toBeGreaterThanOrEqual(3);
+    for (const h of hooks) expect(h).toBe(hooks[0]);
+  });
+
+  it("keeps its functions when the state changes", async () => {
+    const hooks: Hook[] = [];
+    const onHook = (h: Hook) => hooks.push(h);
+    const view = render(<Stable action={() => {}} onHook={onHook} />);
+    const first = hooks[0]!;
+    await act(async () => {
+      first.dispatch("b", {} as ActionDetails);
+    });
+    expect(view.getByTestId("value").textContent).toBe("b");
+    const last = hooks.at(-1)!;
+    expect(last).not.toBe(first);
+    expect(last.committed).toBe("b");
+    expect(last.dispatch).toBe(first.dispatch);
+    expect(last.latestInFlight).toBe(first.latestInFlight);
+    expect(last.adopt).toBe(first.adopt);
+  });
+
+  it("a dispatch runs the action and transition types of the last committed render", async () => {
+    const hooks: Hook[] = [];
+    const onHook = (h: Hook) => hooks.push(h);
+    const before = vi.fn<(next: string) => unknown>();
+    const after = vi.fn<(next: string) => unknown>();
+    const types = vi.fn<(next: string, prev: string) => readonly string[]>(() => []);
+    const view = render(<Stable controlled="a" action={before} onHook={onHook} />);
+    const dispatch = hooks[0]!.dispatch;
+    // A new action and a new controlled value: the function obtained before sees both.
+    view.rerender(<Stable controlled="b" action={after} types={types} onHook={onHook} />);
+    await act(async () => {
+      dispatch("c", {} as ActionDetails);
+    });
+    expect(before).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledExactlyOnceWith("c");
+    expect(types).toHaveBeenCalledExactlyOnceWith("c", "b");
+  });
+});

@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -144,13 +144,11 @@ export function SelectRoot({
       dispatchChange(next, createActionDetails(event, { reason: "platform" })),
   });
 
-  const context: SelectContextValue = {
-    optimistic,
-    pending,
-    disabled,
-    groupDisabled: false,
-    optionMounted,
-  };
+  // Memoised (#48): every member is a state value, a prop or a stable callback.
+  const context = useMemo<SelectContextValue>(
+    () => ({ optimistic, pending, disabled, groupDisabled: false, optionMounted }),
+    [optimistic, pending, disabled, optionMounted],
+  );
   const state: SelectRootState = { value: optimistic, pending, disabled };
 
   const element = useRender<ComponentPropsWithRef<"select">, SelectRootState>({
