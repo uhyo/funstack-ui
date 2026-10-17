@@ -95,3 +95,40 @@ Working notes behind `design/components/popover.md`. Not a spec; the design doc 
 - `anchor` (ref) and a pointer anchor for #45.
 - Hover-to-open (`interestfor` + `commandfor` "hover to preview, click to pin"): #39 decides
   hover intent for submenus; Popover has no hover open in v0.
+
+## Review corrections folded in (2026-10-17)
+
+Source: `memo/reviewer/popover.md` ("Design-doc corrections"), `memo/developer/popover.md`
+("Review fixes"), commits 35e57e1 / a55c86c / 2225079. Code read as ground truth:
+`use-popover-root.ts`, `use-popover-popup.ts`, `use-exit-animation.ts`, `popover-close.tsx`,
+`popover-popup.tsx`, `popover-context.ts`, `popover-shim.ts`.
+
+What changed in the design and why I wrote it the way I did:
+
+- **6.2 rule 1** now reads "focus inside at `beforetoggle(closed)` OR focus inside the content
+  when the close commit unmounted it". The mechanism (`wrapContent` → `ContentFocusProbe`
+  layout cleanup) is in 6.2 and 14.2; the call-site obligation ("render through `wrapContent`
+  in both mounting shapes") is in 14.4 and in menu.md 14, because it is easy to forget and
+  silently loses keyboard focus. The apply effect returning focus right after `hidePopover()`
+  (not in `toggle`) is in the 2.5 snippet.
+- **4.4**: the `held` release is a normal update. I kept the reason (only transition commits start
+  document view transitions) next to the rule, and added the apply-effect release rule as a
+  named paragraph, since it was decided in code (developer item 2) and the reviewer traced it.
+- **6.1**: contingency closed; the removed fallback is described in one sentence so nobody
+  re-adds it. The jsdom shim now does the focusing steps (13.1).
+- **3.4 / 14.1**: the open generation. I wrote it as a Root concept (bumped by `send(true)` and
+  the Popup's `beforetoggle(open)`), not a Close concept, because Menu's item activation needs
+  it too. The 2.3 snippet in menu.md got the guard inline so the call site shows it.
+- **2.5 / 3.1 `defaultOpen`**: "never in the server HTML" was wrong about content and
+  `aria-expanded`; only the showing waits. Wrote a dedicated paragraph in 2.5.
+- **L7**: dropped `autoFocus` from the 2.1 example (first focusable element does it) and moved
+  12.1 to `initialFocus="[name=reason]"`. dialog.md 6.1 already recommended `initialFocus`;
+  I only added the "server-rendered only" qualifier and fixed the 3.1 `defaultOpen` comment.
+- **14 Context**: Popup context for Title/Description; Root value lists `openGeneration` /
+  `nextOpenGeneration`; `committedOptimistic` in `useInsertionEffect`; listeners in the callback
+  ref via a handlers ref.
+- A "Review corrections" table at the end of popover.md maps every item to its sections.
+
+Open (not design changes): M2 superseded rejection in `Popover.Close` until `useActionTrigger`
+(#41); the still-open 14.5 checks (`source` on `<div>`/`<a>`, Chromium AX exposure, screen
+readers).
