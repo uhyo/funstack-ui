@@ -904,11 +904,13 @@ describe("ViewTransition (browser, #46)", () => {
       await expect.poll(() => calls.length).toBe(2);
       await transitions[1]!.ready;
       const names = pseudoNames();
+      const seen = JSON.stringify({ names, display: getComputedStyle(popup()).display });
       expect(
         names.some(
           (name) =>
             name.startsWith("::view-transition-old(") && name !== "::view-transition-old(root)",
         ),
+        seen,
       ).toBe(true);
       expect(dialogNewImages()).toEqual([]);
       expect(getComputedStyle(popup()).display).toBe("none");
@@ -932,8 +934,9 @@ describe("ViewTransition (browser, #46)", () => {
     // this row starts failing, an engine changed and the docs' recipe may be unnecessary.
     const fading = getComputedStyle(popup()).display !== "none";
     // Firefox does not animate the exit (bug 1834877); Chromium and WebKit do.
-    expect(fading).toBe(browserName !== "firefox");
-    expect(dialogNewImages().length > 0).toBe(fading);
+    const seen = JSON.stringify({ names: pseudoNames(), fading });
+    expect(fading, seen).toBe(browserName !== "firefox");
+    expect(dialogNewImages().length > 0, seen).toBe(fading);
     await transitions[1]!.finished;
   });
 

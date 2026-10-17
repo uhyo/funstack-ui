@@ -695,8 +695,9 @@ describe("ViewTransition (browser)", () => {
           name.startsWith(`::view-transition-${kind}(`) &&
           name !== `::view-transition-${kind}(root)`,
       );
-    expect(popupImages("old").length).toBeGreaterThan(0);
     const fading = getComputedStyle(popup()).display !== "none";
+    const seen = JSON.stringify({ names: [...names], fading });
+    expect(popupImages("old").length, seen).toBeGreaterThan(0);
     if (recipe) {
       expect(fading).toBe(false);
       expect(popupImages("new")).toEqual([]);
