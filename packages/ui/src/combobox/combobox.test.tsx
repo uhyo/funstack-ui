@@ -325,6 +325,35 @@ describe("Combobox", () => {
       expect(list()).not.toHaveAttribute("aria-labelledby");
     });
 
+    it("warns about a List with no name, not one named by a Label or aria-label", async () => {
+      const error = silenceErrors();
+      const user = setupUser();
+      const noName = () =>
+        error.mock.calls.filter(([m]) => String(m).includes("no accessible name")).length;
+      const Box = ({ label, listLabel }: { label?: boolean; listLabel?: string }) => (
+        <Combobox.Root>
+          {label && <Combobox.Label>Country</Combobox.Label>}
+          <Combobox.Input data-testid="input" aria-label="Country" />
+          <Combobox.Popup data-testid="popup">
+            <Combobox.List data-testid="list" aria-label={listLabel}>
+              <Combobox.Option value="a">A</Combobox.Option>
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Root>
+      );
+      const first = render(<Box label />);
+      await typeText(user, "a");
+      expect(noName()).toBe(0);
+      first.unmount();
+      const second = render(<Box listLabel="Countries" />);
+      await typeText(user, "a");
+      expect(noName()).toBe(0);
+      second.unmount();
+      render(<Box />);
+      await typeText(user, "a");
+      expect(noName()).toBe(1);
+    });
+
     it("derives option ids from the value with encodeURIComponent", async () => {
       const user = setupUser();
       render(

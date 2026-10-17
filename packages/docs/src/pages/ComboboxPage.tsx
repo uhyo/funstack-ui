@@ -422,7 +422,8 @@ export function ComboboxPage() {
       <p>
         <code>ComboboxListState</code>: <code>{"{ query, stale, empty }"}</code>. Renders{" "}
         <code>&lt;div role="listbox"&gt;</code>, named by the Label (<code>aria-labelledby</code>,
-        token-merged with yours, only when a <code>Combobox.Label</code> is rendered), with{" "}
+        token-merged with yours, only when a <code>Combobox.Label</code> is rendered; without a
+        Label give the List an <code>aria-label</code>, development warns otherwise), with{" "}
         <code>aria-busy="true"</code> while stale (with <code>data-stale</code>) or loading (a{" "}
         <code>Status</code> fallback inside it), and <code>data-empty</code> when settled with no
         options.
