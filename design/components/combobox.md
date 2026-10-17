@@ -1,0 +1,1257 @@
+# Combobox
+
+Status: **proposed** (2026-10-17, wave 4, GitHub issue #50). Follows `design/conventions.md`
+(accepted); where this document and the conventions disagree, the conventions win. **Read
+`design/components/popover.md` and `design/components/menu.md` first**: Combobox is built on
+the same internal hooks (`usePopoverRoot`, `usePopoverPopup`, `useActionTrigger`), the same
+ownership split (library-owned open and part-initiated closes, browser-owned dismissals), the
+same apply effect, close intents and `<ViewTransition>` wiring around the top-layer element, and
+Menu's "stay open with `data-pending` on the item, close in the commit that ends the action"
+rule. Then `design/components/select.md` for the boundary between the two components. This
+document repeats only what differs and adds what a combobox is: a text input whose typing is
+**urgent**, a listbox whose results render from a **deferred** query inside Suspense, virtual
+focus through `aria-activedescendant`, and a selection that is a library-owned value with a
+hidden form field.
+
+Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/select-combobox.md` §6 and §7
+(binding: the APG markup, the `showPopover({ source: input })` probe table, the urgent-input
+rule, `useDeferredValue` for results, `ariaNotify`, no `<datalist>`, no Open UI combobox),
+`docs/research/popover-menu.md` (stacking, `aria-activedescendant` set aside for Combobox),
+`docs/research/react-async-apis.md` ("Transition updates can't be used to control text inputs";
+`useDeferredValue` inside a Transition), `design/components/select.md` (accepted boundary),
+`design/components/popover.md`, `design/components/menu.md`, the WAI-ARIA APG Combobox pattern
+(editable combobox with list autocomplete), prior art (React Aria `ComboBox`, Base UI `Combobox`
+and `Autocomplete`, Ark UI `Combobox`, Headless UI `Combobox`, Radix has none), and working
+notes in `memo/architect/combobox-notes.md`.
+
+Combobox is what Select cannot be: search, free text, custom and asynchronous filtering, loading
+options on open, a controlled open state, and a listbox the library owns (`select-combobox.md`
+§5). The platform gives the top layer, light dismiss, Escape, nesting under Dialog and Popover,
+the implicit anchor from `showPopover({ source: input })` and the listbox width from
+`anchor-size(width)`; the library owns the APG half (active option, keys, closing on focus loss)
+and the Async React half: **typing is the library's first urgent update**, results come from
+`useDeferredValue` so a slow search never blocks a keystroke and never flashes a fallback over
+the previous results, and picking an option is a transition with `data-pending` on the option
+and a hidden input that follows the optimistic value.
+
+## Decisions at a glance
+
+| # | Topic | Decision |
+| --- | --- | --- |
+| 1 | One component | **One `Combobox` with `allowCustomValue`**, not a separate Autocomplete (recommendation; question 1). Markup, keyboard, popover, async results and virtual focus are identical; the two differ only in what an unmatched text means on commit (reverted, or dispatched as the value). React Aria and Ark take this shape; Base UI splits. |
+| 2 | Anatomy | `Combobox.Root` (no DOM, except one `<input type="hidden">` when `name` is given), `Combobox.Label` (`label[for]`), `Combobox.Input` (`input[role=combobox]`), `Combobox.Trigger` (`button`, optional), `Combobox.Clear` (`button`, optional), `Combobox.Popup` (`div[popover=auto]`), `Combobox.List` (`div[role=listbox]`), `Combobox.Option` (`div[role=option]`), `Combobox.Group` / `Combobox.GroupLabel`, `Combobox.Empty`, `Combobox.Status` (`div[role=status]`). No Portal, Positioner, Arrow, Chips. |
+| 3 | Two library-owned states, two lanes | `value` (`string \| null`): `value` / `defaultValue` / `valueChangeAction`, a transition with `useOptimistic`, as every other value. `inputValue` (`string`): `inputValue` / `defaultInputValue` / `inputValueChangeAction`, the **urgent** state the vision reserved for this component (section 4). Same naming triple, different lane; the type of the urgent action (`UrgentChangeAction`) says it is synchronous and not awaited. No `on*` prop (question 2). |
+| 4 | Results | The library filters nothing. `query` is `useDeferredValue(inputValue)`; `Combobox.List`'s function `children` (and Root's) receive `{ query }` and render the `Option`s for it, under a consumer-owned `<Suspense>` for async search. While `inputValue !== query` the Popup and List carry `data-stale` and the List `aria-busy="true"`; the previous results stay visible. No out-of-order results: React renders only the latest deferred value (section 6). |
+| 5 | Active option | `aria-activedescendant` on the input, never DOM focus on options (research). The active option is **urgent library state** (it is focus; focus is never a transition anywhere in the library), exposed as `data-active` on the Option, revalidated whenever the mounted options change; ids are derived from the value so an option keeps its id across result sets. `autoHighlight` (default `false`) activates the first option as results settle. |
+| 6 | Open | Always library mode (`usePopoverRoot({ mode: "library" })`, Menu's configuration): no JS-free mode. Open by typing, ArrowDown / ArrowUp, Alt+ArrowDown, the Trigger, optionally a click on the input (`openOnClick`); opened with `showPopover({ source: input })` in the apply effect. Closes: an accepted option (library-owned, after the value action settles), Escape and light dismiss (browser-owned, notified `"dismiss"`), focus leaving the input and popup (immediate `hidePopover()`, Menu's Tab rule, `"dismiss"`). |
+| 7 | Accepting an option | Enter or click on an option: the input text becomes the option's label **at once** (urgent), the option shows `data-pending`, `valueChangeAction` is awaited inside the Root's transition, and the listbox closes in the commit that ends it (Menu decision 3). A rejection rolls the text and `data-selected` back and leaves the listbox open. Tab does **not** accept (manual selection; question 5). |
+| 8 | Free text | `allowCustomValue`: Enter with no active option, or focus leaving, commits the text as the value (`details.custom: true`). Without it the text reverts on focus loss to the committed value's label (React Aria's rule). |
+| 9 | Form | `name` / `form` on Root render `<input type="hidden" name value={optimistic ?? ""}>`; `required` goes on `Combobox.Input` and is native (empty text is `valueMissing`). No `setCustomValidity` (conventions 3.6). Form reset dispatches `"platform"` for both states; a pre-hydration typed text is reconciled at mount for `inputValue`. |
+| 10 | Positioning | Inline `position-area: block-end span-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)` on Popup (logical keywords: RTL-correct for free). No `side` / `align`: a listbox goes below or above its input. `style` overrides. |
+| 11 | Announcements | `ariaNotify()` on the List with the consumer's `announce(count)` string when results settle (not while stale); no live region; no default string (the library ships no text, as it ships no CSS; question 6). |
+| 12 | Pending and state exposure | `data-pending` on Input (value or open in flight), Trigger (open in flight), the optimistic target Option; `data-open` on Input and Trigger; `data-selected`, `data-active`, `data-disabled` on Option; `data-stale` on Popup and List; `data-empty` on List. |
+| 13 | ViewTransition | `transition` on `Combobox.Popup`, wrapping the `<div popover>` itself (conventions 5.1): library-driven opens and closes animate in every engine. A deferred results render also activates the boundary (React rule), so the docs recommend a type map with `default: "none"`. Types `fsui-combobox`, `fsui-combobox-open` / `-close`, `fsui-combobox-select`. |
+| 14 | Not in v1 | `multiple` (chips), inline autocompletion (`aria-autocomplete="both"`), virtualization, a built-in filter, `Separator`, `Combobox.Input` inside the popup (searchable select), context-menu-style anchors. Section 13. |
+| 15 | Files | Every part file is `"use client"`. Before hydration the Input is a plain text field (typing works and is adopted at mount); nothing opens. |
+
+---
+
+## 1. Anatomy
+
+```tsx
+import { Combobox } from "@funstack/ui/combobox";
+
+<Combobox.Root name="country" defaultValue={null} valueChangeAction={saveCountry} announce={(n) => `${n} countries`}>
+  <Combobox.Label>Country</Combobox.Label>
+  <Combobox.Input placeholder="Type to search" required />
+  <Combobox.Trigger aria-label="Show all countries" />
+  <Combobox.Clear aria-label="Clear" />
+  <Combobox.Popup className="listbox" transition={{ "fsui-combobox-open": "pop", "fsui-combobox-close": "pop", default: "none" }}>
+    <Combobox.List>
+      {({ query }) => (
+        <Suspense fallback={<Combobox.Status>Searching…</Combobox.Status>}>
+          <CountryOptions query={query} />   {/* use(searchCountries(query)) → <Combobox.Option> list */}
+        </Suspense>
+      )}
+    </Combobox.List>
+    <Combobox.Empty>No country matches.</Combobox.Empty>
+  </Combobox.Popup>
+</Combobox.Root>
+```
+
+Rendered HTML (closed, `value` is `"jp"`, text "Japan"; ids come from one `useId` in Root):
+
+```html
+<input type="hidden" name="country" value="jp">
+<label for="_r_1_-input">Country</label>
+<input id="_r_1_-input" type="text" role="combobox" autocomplete="off" required
+       aria-autocomplete="list" aria-expanded="false" aria-controls="_r_1_-list"
+       value="Japan" data-selected="">
+<button type="button" tabindex="-1" aria-label="Show all countries" aria-expanded="false" aria-controls="_r_1_-list"></button>
+<button type="button" tabindex="-1" aria-label="Clear"></button>
+<div id="_r_1_-popup" popover="auto"
+     style="position-area: block-end span-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)">
+  <!-- children render while open; shown as they will be, with "ja" typed -->
+  <div id="_r_1_-list" role="listbox" aria-labelledby="_r_1_-label">
+    <div id="_r_1_-option-jp" role="option" aria-selected="true" data-selected="" data-active="">Japan</div>
+    <div id="_r_1_-option-jm" role="option" aria-selected="false">Jamaica</div>
+  </div>
+</div>
+```
+
+| Part | Element | Role | Renders from | Notes |
+| --- | --- | --- | --- | --- |
+| `Root` | none, or `input[type=hidden]` when `name` is given | | `state` in `children(state)` | Owns `useId`, both state hooks, the deferred query, the active option, the open state (`usePopoverRoot`), the label cache, the form-reset listener. No `ref`, `className`, `style`. |
+| `Label` | `label` | | | `htmlFor` → the Input's id (owned); `id` → the List's `aria-labelledby`. |
+| `Input` | `input` | `combobox` | **urgent** text, optimistic `value` for `data-selected`, optimistic open for `aria-expanded` | `aria-autocomplete="list"`, `aria-controls`, `aria-activedescendant`, `autocomplete="off"`, `data-open`, `data-pending`, `data-selected`, `data-disabled`. The Root's `pending` lands here (the owner renders no element). |
+| `Trigger` | `button` | button | optimistic open | Optional. `tabindex="-1"` (APG: not in the Tab sequence), `aria-expanded`, `aria-controls`; click toggles and focuses the input. No `commandfor` (section 2.4). |
+| `Clear` | `button` | button | | Optional. `tabindex="-1"`; click empties the text (urgent) and dispatches `valueChangeAction(null)`. Rendered only while there is text or a value? No: always rendered; consumers hide it with `:has(input[data-selected])` or `state`. |
+| `Popup` | `div` | none (a container) | committed open | `popover="auto"`, `id`, inline placement, `data-stale`, `data-open` never (`:popover-open`). The content region; children render from committed open. Must be a DOM sibling of the Input where possible (section 7). |
+| `List` | `div` | `listbox` | `query` (deferred) | `id`, `aria-labelledby` → Label (token-merged), `aria-busy` and `data-stale` while stale, `data-empty`. Function `children` receive `{ query }`. Contains only `Option`s and `Group`s (ARIA content model), which is why `Empty` and `Status` live in Popup, outside it. |
+| `Option` | `div` | `option` | optimistic `value`, urgent active | `value` required; `label` optional (the text written into the input; default the element's `textContent` at the time of the pick); `disabled` → `aria-disabled`. `id` derived from `value`. `aria-selected`, `data-selected`, `data-active`, `data-pending`, `data-disabled`. `pointerdown` is `preventDefault()`ed so the input keeps focus. |
+| `Group` / `GroupLabel` | `div[role=group]` / `div` | group | | `aria-labelledby` → the `GroupLabel` id, as Menu. |
+| `Empty` | `div` | none | mounted-option count, stale | Renders its children only when the List has **no mounted options and the results are not stale** (section 6.3); nothing otherwise. |
+| `Status` | `div` | `status` | | A plain container for a loading fallback or a hint; no live region semantics beyond the role (announcements are `ariaNotify`, 6.4). |
+
+Why this shape:
+
+- **`Root` renders no element, but may render the hidden input.** The owner of two states and a
+  popover has no natural element (Popover's Root renders none), and the form value must live in
+  a form-associated element that is not the visible input, whose text is a *label*, not the
+  value. One `<input type="hidden">` is the smallest honest answer (research §6: "form
+  participation needs a hidden input"), and conventions 1.1's "at most one DOM element" holds.
+  A wrapper `<div>` was rejected: it is an element the consumer did not ask for, and it would
+  make the Popup's anchoring depend on the wrapper's box rather than the input's.
+- **`Popup` and `List` are separate.** The research's single `role="listbox" popover="auto"`
+  element cannot hold a "No results" or "Loading…" row: a listbox's accessibility children are
+  options and groups only. Base UI draws the same line (Popup > Status, Empty, List). The
+  popover is the Popup; the listbox is the List; `aria-controls` points at the List.
+- **`Label` is a part** because the APG combobox is named by a visible label and the List
+  should be named by the same text; the part wires `for` and `aria-labelledby` from one id.
+  It is the conventions' `Label` ("names the owner"): here the owner's name belongs on the
+  Input.
+- **`Trigger` has no `commandfor`.** A declarative command would make the Trigger the popup's
+  invoker, so the implicit anchor and the `anchor-size(width)` would be the button's, not the
+  input's, and a pre-hydration click would open an empty, mispositioned popup. The popup is
+  always opened by the library with `source: input` (section 2.4).
+- **`Clear` exists** because "clear the selection" has no keyboard-free spelling otherwise
+  (Escape closes; it does not clear, section 8), and prior art agrees (Base UI, Ark).
+- **No `Separator`** in v1: `role="separator"` is not in a listbox's content model; a visual
+  divider is a `Group` boundary styled in CSS.
+
+Every part renders exactly one element; only `Popup` renders a `<ViewTransition>` (decision 13),
+as the outermost node around the `<div popover>` and only when `transition` is given.
+
+Element constraints for `render`: `Input` must stay an `<input>` whose `type` is text-like
+(`text`, `search`; dev warning otherwise: `role="combobox"`, `aria-activedescendant` and the
+caret keys depend on it); `Popup` a `<div>` (a `<dialog>` would run the dialog focusing steps and
+pull focus out of the input); `Option` any element (it is never focused); `Trigger` / `Clear` a
+`<button>`. The library's `role`, `aria-*` wiring, ids and `data-*` go on whichever element
+renders (owned keys, conventions 1.2).
+
+---
+
+## 2. States and lanes
+
+| State | Owner | Kind | Lane | Library-owned or browser-owned |
+| --- | --- | --- | --- | --- |
+| `value` | Root (`useControllableAction<string \| null>`) | the selection | **transition** (optimistic through `useOptimistic`) | Library-owned; residual browser path: form reset (`"platform"`). `null` is a real empty state (conventions 3.1), unlike Select's `""`. |
+| `inputValue` | Root (`useState`, plus an optional controlled prop) | the text in the input | **urgent** (section 4) | Library-owned through a controlled `<input value>`; residual browser paths: typing before hydration (mount reconciliation), form reset, Firefox form-state restoration, all `"platform"`. |
+| `query` | Root, derived: `useDeferredValue(inputValue)` | what the results are for | deferred | Derived; never set. `stale = inputValue !== query`. |
+| `activeValue` | Root (`useState`) | the option `aria-activedescendant` points at, `null` for none | **urgent** | Library-owned virtual focus. Not controllable in v1. Reset to `null` when the active option unmounts (or, with `autoHighlight`, to the first option when results settle). |
+| `open` | Root (`usePopoverRoot`, library mode) | the listbox is shown | transition | Library-owned for opens and for the close after an accepted option; browser-owned for Escape and light dismiss (notified); library-performed immediate close on focus loss (Menu's Tab rule). |
+| `pending` | Root | `value` transition or `open` transition in flight | | On the Input (owner surface), the Trigger (open only), the target Option (value only). |
+| mounted options, labels | Root (refs) | registration from `Option` mount effects | n/a | Internal: the active-option revalidation, `Empty`, `ariaNotify`, and the value→label cache (2.2). |
+| focus, caret, selection in the input | DOM | | | Browser-owned. The library never calls `focus()` except from the Trigger and Clear clicks (which focus the input), and never touches the caret. |
+
+### 2.1 Why two lanes, and why the two states are separate props
+
+"Transition updates can't be used to control text inputs" (React docs; `react-async-apis.md`
+"Controlled text inputs"). A keystroke must land in the DOM in the same event, and a
+transition-lane state is restored to the old prop at the end of the event, exactly as a
+transition-only controlled `<select>` snaps back (Select 4.1). So the text is urgent, full stop.
+Everything downstream of the text is not: the results render from `useDeferredValue`, the open
+is a transition, the selection is a transition. That is the vision's "everything is transition"
+with the one documented opt-out, placed where the docs put it.
+
+`value` and `inputValue` are two props, not one, because they are two things: what is chosen and
+what is typed. Headless UI's `displayValue` and Base UI's `itemToStringLabel` exist to derive
+the second from the first; the library instead keeps both explicit and writes the text itself
+only at well-defined moments (2.2). A consumer who wants the Autocomplete shape ("the text is
+the value") sets `allowCustomValue` and reads `value`, which then equals the committed text.
+
+### 2.2 When the library writes the input text
+
+The library writes `inputValue` (as an urgent update, through `inputValueChangeAction` with the
+reason given) in exactly these cases, and nowhere else:
+
+| Moment | New text | `reason` | `details.event` |
+| --- | --- | --- | --- |
+| Typing, cut, paste, IME composition, browser autofill | the input's DOM value | `"activate"` | the `input` event |
+| An option is accepted (Enter, click) | the option's `label` prop, else its `textContent` trimmed, read **at that moment** from the DOM | `"activate"` | the `keydown` / `click` |
+| The accepted option's action rejects, or a controlled parent does not adopt the value | the text of the previous committed value (the label cache, 2.3) | `"dismiss"` | `undefined` |
+| Focus leaves with unmatched text and `allowCustomValue` is off | the committed value's label (cache), or `""` when `value` is `null` | `"dismiss"` | the `focusout` |
+| `Clear` | `""` | `"activate"` | the `click` |
+| Form reset | the hidden input's and the Input's `defaultValue` | `"platform"` | the `reset` event |
+| Mount reconciliation (typed before hydration; Firefox restoration) | the DOM value | `"platform"` | `undefined` |
+
+The library never writes the text because the **`value` prop changed** (a controlled parent
+set a new value, `defaultValue` at mount). Then the text is what the consumer passes as
+`defaultInputValue` / `inputValue`; development warns once when `value` / `defaultValue` is
+non-null at mount and neither text prop is given, because the input would show nothing for a
+selection. This keeps the Root free of an `itemToString` function (which a Server Component
+could not pass anyway) at the cost of one extra prop at the call site for a preselected value:
+
+```tsx
+<Combobox.Root defaultValue={user.countryCode} defaultInputValue={user.countryName}>
+```
+
+### 2.3 The label cache
+
+Every mounted `Option` registers `value → label` (its `label` prop, else `textContent`) in a Root
+ref map that is never cleared on unmount. Reverting the text to "the committed value's label"
+(2.2) reads the cache; when the committed value's option was never mounted (a preselected
+value whose popup never opened), the revert target is the **last text the library or the
+consumer set for that value**: at mount `defaultInputValue` / `inputValue`, afterwards the text
+written at the last settled selection. So a revert is always to a text the user has seen for
+the selection, never to the raw value.
+
+---
+
+## 3. Props and types
+
+Shared types come from `packages/ui/src/internal/types.ts` (conventions 2.2, 9.4), plus one
+new one for the urgent lane (section 4):
+
+```ts
+// packages/ui/src/internal/types.ts
+/**
+ * A change action the library calls synchronously, outside any Transition, and does not await:
+ * the urgent lane (conventions 2.6; first used by Combobox's `inputValueChangeAction`). The sync
+ * body is an urgent update, so `(next) => setText(next)` controls a text input correctly.
+ */
+export type UrgentChangeAction<T, Details extends ActionDetails = ActionDetails> =
+  (next: T, details: Details) => void;
+```
+
+### 3.1 `Combobox.Root`
+
+```ts
+export interface ComboboxValueChangeDetails extends ActionDetails {
+  /**
+   * "activate": the user accepted an option (Enter, click; `details.event` is the `keydown` or
+   * `click`), committed free text with `allowCustomValue` (Enter: the `keydown`; focus leaving:
+   * the `focusout`), or pressed Clear (`click`).
+   * "platform": a form reset (`details.event` is the `reset` event).
+   */
+  readonly reason: ChangeReason;
+  /** `true` when `next` is free text committed under `allowCustomValue`, not an option's value. */
+  readonly custom: boolean;
+}
+
+export interface ComboboxInputValueChangeDetails extends ActionDetails {
+  /**
+   * "activate": typing (the `input` event), an accepted option's label, Clear.
+   * "dismiss": a revert: focus left with unmatched text, or the selection rolled back.
+   * "platform": form reset (the `reset` event), or text found in the input at mount (`undefined`).
+   */
+  readonly reason: ChangeReason;
+}
+
+export interface ComboboxOpenChangeDetails extends ActionDetails {
+  /**
+   * "activate": typing, ArrowDown / ArrowUp / Alt+ArrowDown, the Trigger, a click on the input
+   * with `openOnClick`, an accepted option (close), a foreign `showPopover()`.
+   * "dismiss": Escape, light dismiss, focus leaving the combobox, another top-layer element.
+   * "platform": the popup was found open on mount (never, unless script opened it before hydration).
+   */
+  readonly reason: ChangeReason;
+}
+
+export interface ComboboxRootState {
+  /** Optimistic selection. Content rendered from it must not suspend. */
+  readonly value: string | null;
+  /** The text in the input (urgent). */
+  readonly inputValue: string;
+  /** The deferred text the mounted results are for. */
+  readonly query: string;
+  /** `inputValue !== query`: the results shown are for an older text. */
+  readonly stale: boolean;
+  /** The value of the option `aria-activedescendant` points at, or `null`. */
+  readonly activeValue: string | null;
+  /** Optimistic open state. */
+  readonly open: boolean;
+  /** A `valueChangeAction` or `openChangeAction` dispatched through this Combobox is in flight. */
+  readonly pending: boolean;
+  readonly disabled: boolean;
+}
+
+export interface ComboboxRootProps {
+  /** Controlled selection. `null`: nothing selected. `undefined`: uncontrolled. */
+  value?: string | null;
+  /** Initial selection in uncontrolled mode. Default `null`. */
+  defaultValue?: string | null;
+  /**
+   * Runs inside the Root's transition when the user accepts an option, commits free text
+   * (`allowCustomValue`), presses Clear, or the form resets. Awaited; the listbox closes in the
+   * commit that ends it; a rejection rolls the input text and `data-selected` back and leaves
+   * the listbox open. May be a Server Function. A `setState` after your own `await` needs
+   * `startTransition`.
+   */
+  valueChangeAction?: ChangeAction<string | null, ComboboxValueChangeDetails>;
+
+  /** Controlled input text. `undefined`: uncontrolled. */
+  inputValue?: string;
+  /** Initial input text. Default `""`. Pass the selected value's label when `defaultValue` is set. */
+  defaultInputValue?: string;
+  /**
+   * The urgent lane: called synchronously, outside any Transition, on every change of the text
+   * (typing; and the library's own writes, section 2.2). Not awaited; nothing is pending for it.
+   * A controlled parent updates its state in the body (an urgent update, which is what a
+   * controlled text input needs).
+   */
+  inputValueChangeAction?: UrgentChangeAction<string, ComboboxInputValueChangeDetails>;
+
+  open?: boolean;
+  defaultOpen?: boolean;
+  /** As Popover: awaited for opens and for the close after an accepted option; a notification for dismissals. */
+  openChangeAction?: ChangeAction<boolean, ComboboxOpenChangeDetails>;
+
+  /**
+   * Free text is a value: Enter with no active option, or focus leaving with text that is not
+   * the selected option's label, dispatches the text with `details.custom: true`. Default
+   * `false`: unmatched text reverts to the selection's label when focus leaves.
+   */
+  allowCustomValue?: boolean;
+  /** Make the first option active whenever results settle (APG "automatic selection"). Default `false`. */
+  autoHighlight?: boolean;
+  /** Open the listbox on a pointer click in the input (not on focus). Default `false`. */
+  openOnClick?: boolean;
+  /** Wrap from the last option to the first and back with the arrow keys. Default `false` (APG default; Menu wraps). */
+  loop?: boolean;
+  /**
+   * The message `ariaNotify()` announces on the List when the results settle: the number of
+   * mounted options. No announcement when absent (the library ships no strings). Ignored where
+   * `ariaNotify` is missing.
+   */
+  announce?: (count: number, state: ComboboxRootState) => string;
+
+  /** Form participation through a hidden input with this name (value `""` for `null`). */
+  name?: string;
+  form?: string;
+  /** Disables the Input, Trigger and Clear; nothing dispatches. */
+  disabled?: boolean;
+  children?: StateValue<ReactNode, ComboboxRootState>;
+}
+```
+
+No `ref`, `className`, `style` (no element of its own); no `required` (it is the Input's, native);
+no `filter` / `items` (section 6.1); no `multiple` (section 13).
+
+### 3.2 `Combobox.Input`
+
+```ts
+export interface ComboboxInputState {
+  readonly value: string | null;     // optimistic selection
+  readonly inputValue: string;
+  readonly open: boolean;            // optimistic
+  readonly pending: boolean;         // Root pending
+  readonly stale: boolean;
+  readonly disabled: boolean;
+}
+
+export interface ComboboxInputProps
+  extends Omit<
+    ComponentPropsWithRef<"input">,
+    | "value" | "defaultValue" | "onChange" | "onInput" | "onKeyDown" | "onBlur" | "onClick"
+    | "role" | "aria-autocomplete" | "aria-expanded" | "aria-controls" | "aria-activedescendant"
+    | "autoComplete" | "disabled" | "className" | "style" | "children"
+  > {
+  /** Native `required`: empty text is `valueMissing`. Pass-through, documented here because it is where validation lives. */
+  required?: boolean;
+  className?: StateValue<string | undefined, ComboboxInputState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxInputState>;
+  render?: RenderProp<ComponentPropsWithRef<"input">, ComboboxInputState>;
+}
+```
+
+A void element: no `children`. Owned keys: `id`, `type` (`"text"` unless the `render` element
+says `"search"`), `role`, `value` (the urgent text), `autoComplete` (`"off"`: the browser's own
+suggestion list would sit over the listbox), `aria-autocomplete` (`"list"`), `aria-expanded`
+(optimistic open), `aria-controls` (the List id, token-merged), `aria-activedescendant`,
+`disabled`, the handlers listed in the `Omit`, `data-open`, `data-pending`, `data-selected`
+(optimistic `value !== null`), `data-stale`, `data-disabled`. `name` passes through (a second,
+visible field for the raw text; the selection's `name` is the Root's). `placeholder`,
+`aria-describedby`, `inputMode`, `onFocus`, `onCompositionStart` and the rest pass through.
+
+### 3.3 `Combobox.Trigger`, `Combobox.Clear`
+
+```ts
+export interface ComboboxTriggerState { readonly open: boolean; readonly pending: boolean; readonly disabled: boolean; }
+export interface ComboboxTriggerProps
+  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "onPointerDown" | "tabIndex" | "aria-expanded" | "aria-controls" | "disabled" | "className" | "style" | "children"> {
+  disabled?: boolean;
+  className?: StateValue<string | undefined, ComboboxTriggerState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxTriggerState>;
+  children?: StateValue<ReactNode, ComboboxTriggerState>;
+  render?: RenderProp<ComponentPropsWithRef<"button">, ComboboxTriggerState>;
+}
+
+export interface ComboboxClearState { readonly value: string | null; readonly inputValue: string; readonly disabled: boolean; }
+export interface ComboboxClearProps
+  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "onPointerDown" | "tabIndex" | "disabled" | "className" | "style" | "children"> { … }
+```
+
+Both: `type="button"`, `tabindex="-1"` (owned: the APG keeps the combobox's trigger out of the
+Tab sequence; the input is the one stop), `pointerdown` prevented so the input is not blurred,
+`disabled` owned (own prop or Root's). Trigger: `aria-expanded`, `aria-controls`, `data-open`,
+`data-pending`; click toggles the listbox (`requestOpen` / `requestClose` against `intended()`)
+and focuses the input. An icon-only Trigger needs an `aria-label` from the consumer (dev
+warning when it has no accessible name, as Popover's Popup). Clear: click writes `""` (urgent)
+and dispatches `valueChangeAction(null, { reason: "activate", custom: false })` unless the
+optimistic value is already `null`; the listbox stays as it is.
+
+### 3.4 `Combobox.Popup`
+
+```ts
+export interface ComboboxPopupState { readonly open: boolean; /* committed */ readonly stale: boolean; readonly query: string; }
+
+export interface ComboboxPopupProps
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "onToggle" | "onBeforeToggle" | "onPointerDown" | "className" | "style" | "children"> {
+  /** As Popover: `false` (default) unmounts the children while closed; `true` keeps them in a hidden `<Activity>`. */
+  keepMounted?: boolean;
+  /**
+   * Forwarded to the `<ViewTransition default>` around the popover element itself. Animates
+   * library-driven opens and closes (typing-open, Trigger, accepted option) in every engine;
+   * dismissals are the browser's (CSS only). **A deferred results render also activates the
+   * boundary** (React: updates from `useDeferredValue` animate), so use a type map with
+   * `default: "none"` unless every result change should cross-fade. Static (conventions 5.1).
+   */
+  transition?: ViewTransitionClass;
+  className?: StateValue<string | undefined, ComboboxPopupState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxPopupState>;
+  children?: StateValue<ReactNode, ComboboxPopupState>;
+  render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxPopupState>;
+}
+```
+
+Owned keys: `id`, `popover` (`"auto"`), `data-stale`, `onPointerDown` (prevents the input's
+blur for a press anywhere in the popup: options, Empty, scrollbar; section 7.1). Inline style
+from the library (`position-area`, `position-try-fallbacks`, `min-width: anchor-size(width)`),
+consumer `style` wins per property. No `role` (a container; the List has the role), no
+`aria-modal`, no `side` / `align`, no `initialFocus` (focus never enters the popup).
+
+### 3.5 `Combobox.List`, `Combobox.Option`, `Combobox.Group`, `Combobox.GroupLabel`, `Combobox.Empty`, `Combobox.Status`
+
+```ts
+export interface ComboboxListState { readonly query: string; readonly stale: boolean; readonly empty: boolean; }
+export interface ComboboxListProps
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "role" | "aria-busy" | "aria-labelledby" | "className" | "style" | "children"> {
+  className?: StateValue<string | undefined, ComboboxListState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxListState>;
+  /** Usually a function of `{ query }` rendering the Options for it. */
+  children?: StateValue<ReactNode, ComboboxListState>;
+  render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxListState>;
+}
+
+export interface ComboboxOptionState {
+  readonly value: string;
+  /** Optimistic: this option's value is the (optimistic) selection. */
+  readonly selected: boolean;
+  /** `aria-activedescendant` points here (urgent). */
+  readonly active: boolean;
+  /** The Root is pending and this option is the optimistic target. */
+  readonly pending: boolean;
+  readonly disabled: boolean;
+}
+export interface ComboboxOptionProps
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "role" | "aria-selected" | "aria-disabled" | "onClick" | "onPointerDown" | "onPointerMove" | "className" | "style" | "children"> {
+  value: string;
+  /** The text written into the input when this option is accepted. Default: the element's trimmed `textContent` at that moment. Not used for matching: the library filters nothing. */
+  label?: string;
+  /** `aria-disabled`: shown, skippable by arrows, never accepted. */
+  disabled?: boolean;
+  className?: StateValue<string | undefined, ComboboxOptionState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxOptionState>;
+  children?: StateValue<ReactNode, ComboboxOptionState>;
+  render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxOptionState>;
+}
+
+export interface ComboboxGroupProps extends Omit<ComponentPropsWithRef<"div">, "role" | "aria-labelledby" | …> { … }
+export interface ComboboxGroupLabelProps extends Omit<ComponentPropsWithRef<"div">, "id" | …> { … }
+export interface ComboboxEmptyProps extends Omit<ComponentPropsWithRef<"div">, "className" | "style" | "children"> { children?: StateValue<ReactNode, ComboboxListState>; … }
+export interface ComboboxStatusProps extends Omit<ComponentPropsWithRef<"div">, "role" | …> { … }
+```
+
+`Option` owned keys: `id` (`${rootId}-option-${encodeURIComponent(value)}`: stable across result
+sets, valid without whitespace), `role`, `aria-selected` (optimistic), `aria-disabled`,
+`data-selected`, `data-active`, `data-pending`, `data-disabled`, `onClick`, `onPointerDown`
+(`preventDefault()`), `onPointerMove` (makes the option active, as Menu's pointer-follows rule,
+so arrows continue from the hovered option). Never `tabindex`, never focused. `label` renders
+nothing (it goes into the Root's cache). Two Options with the same `value` under one Root is a
+dev warning (duplicate ids).
+
+`Empty` renders `<div>` with its children only when `state.empty` (no mounted options) and not
+`stale`; otherwise `null`. `Status` renders `<div role="status">`.
+
+### 3.6 Namespace
+
+```ts
+export const Combobox = {
+  Root: ComboboxRoot, Label: ComboboxLabel, Input: ComboboxInput, Trigger: ComboboxTrigger, Clear: ComboboxClear,
+  Popup: ComboboxPopup, List: ComboboxList, Option: ComboboxOption, Group: ComboboxGroup, GroupLabel: ComboboxGroupLabel,
+  Empty: ComboboxEmpty, Status: ComboboxStatus,
+} as const;
+```
+
+Exports: every `Combobox<Part>Props` / `State` above, `ComboboxValueChangeDetails`,
+`ComboboxInputValueChangeDetails`, `ComboboxOpenChangeDetails`; `UrgentChangeAction` from the
+root entry.
+
+---
+
+## 4. The urgent lane: `inputValue`
+
+The vision left the urgent opt-out "undesigned until a component genuinely needs it, e.g. text
+input in a Combobox". This is that design, kept as small as possible:
+
+1. **The name is the ordinary triple.** `inputValue` / `defaultInputValue` /
+   `inputValueChangeAction`, so that the three props read as a set like every other state and
+   the "no `on*` props" rule keeps having no exceptions. What makes it urgent is its **type**,
+   `UrgentChangeAction<T, Details>` (returns `void`, documented as synchronous and not
+   awaited), not a different naming scheme. Rejected: `onInputChange` as a one-off handler
+   exception (the first `on*` in the library would be the one consumers copy), and
+   `inputValueAction` (reads as a pure trigger, not a state change).
+2. **The library calls it synchronously, outside any transition**, from the `input` event
+   handler and from its own writes (2.2), after it has set its own `useState` for the text.
+   The consumer's body runs in the event, so a controlled parent's `setInputValue(next)` is an
+   urgent update, which is what React requires for the value prop of a text input.
+3. **Not awaited, no pending, no optimistic.** The text is already in the DOM when the action
+   runs; there is nothing to wait for and nothing to roll back. A returned promise is ignored
+   (development warns once when a thenable comes back, because the author probably wanted
+   `valueChangeAction`).
+4. **Controlled `inputValue` follows the DOM, it does not gate it.** If the parent does not
+   adopt a keystroke, React restores the old prop at the end of the event (the usual controlled
+   input behaviour); the library's own `useState` is bypassed in controlled mode, so there is
+   no disagreement between the two.
+5. **What the text drives is not urgent.** The deferred `query` (section 6), the open dispatch
+   (a transition, 5.1) and the selection (a transition) all leave the urgent lane immediately.
+   This is the whole point: the keystroke commits now, everything it causes is interruptible.
+
+Entanglement caveat, documented on the component page: while any async action is pending in the
+app (a slow `valueChangeAction` of this combobox included), transitions are held (conventions
+2.3 item 5). Typing is urgent and unaffected, and a **deferred render is not a transition**:
+React still re-renders the results for the new `query` while a save is pending (verify during
+implementation: `useDeferredValue` schedules a deferred lane, not the entangled transition
+lane). The listbox *opening* while a save is pending is a transition and waits for the save;
+walkthrough 10.6.
+
+---
+
+## 5. Open, accept, close
+
+### 5.1 Opening
+
+`usePopoverRoot({ component: "combobox", mode: "library" })`: always library mode. The popup is
+shown by the apply effect with `showPopover({ source: inputRef.current })`, which (research §6
+probe table) keeps focus in the input, lets typing continue, makes clicks on the input not
+light-dismiss, nests the popup under the input's popover ancestor, and creates the implicit
+anchor the inline `position-area` and `anchor-size(width)` use.
+
+| Open cause | What happens | `reason` |
+| --- | --- | --- |
+| Typing (the `input` event, any change including to `""`) | urgent text write; `requestOpen(event, "activate")` (a no-op while already intended open) | `"activate"` |
+| ArrowDown / ArrowUp while closed | `requestOpen`; after the open commit the first / last enabled option becomes active (ArrowDown with `autoHighlight`: the first is already active) | `"activate"` |
+| Alt+ArrowDown while closed | `requestOpen`; no option becomes active | `"activate"` |
+| Trigger click | toggle against `intended()`; the input is focused | `"activate"` |
+| Pointer click in the input with `openOnClick` | `requestOpen` | `"activate"` |
+| Focus arriving in the input | nothing (APG; `openOnClick` is the pointer-only variant) | |
+| Foreign `showPopover()` / invoker | cancelled at `beforetoggle`, routed through `requestOpen` (Popover 2.2) | `"activate"` |
+| Mount with the popup already open | `"platform"` (Popover 2.4; only script can cause it here) | `"platform"` |
+
+The Popup's children mount in the open commit. If they suspend (an async search with the
+boundary *outside* the List), React holds the open with `data-pending` on the Input and
+Trigger until the results are ready; with the boundary inside the List (the anatomy example),
+the popup opens at once showing `Status`, and the results land in a later deferred render. Both
+are the consumer's layout choice (conventions 6).
+
+Open with **no options** (the first keystroke matched nothing, or `Empty` is the only child):
+the popup still opens and shows `Empty`. An empty listbox is `aria-expanded="true"` with no
+`aria-activedescendant`; the APG allows it and it is the only way "No results" can be seen.
+
+### 5.2 Accepting an option
+
+Enter with an active option, or a click on an option:
+
+```ts
+// inside the Root, called by Option's onClick and the Input's Enter handler
+function accept(option: { value: string; label: string }, event: Event): void {
+  setInputText(option.label, { reason: "activate", event });          // urgent, section 2.2
+  if (option.value === optimisticValue) { requestClose(event, "activate"); return; } // no-op dispatch, still closes
+  dispatch(option.value, createActionDetails(event, { reason: "activate", custom: false }));
+  // the Root wraps `valueChangeAction` so that, once it resolves, if this dispatch is still the
+  // latest and the open generation is unchanged: requestClose(event, "activate")
+}
+```
+
+Sequence (Menu decision 3 applied to a listbox): the text changes at once; the option gets
+`data-selected` (optimistic `aria-selected="true"`) and `data-pending`; the previous selection
+loses `data-selected`; the hidden input's `value` follows the optimistic value in the same sync
+render; `valueChangeAction` is awaited inside the Root's transition; when it resolves the Root
+requests the library-owned close, so the popup hides in the commit that ends the action (view
+transition if `transition` is set). A sync action closes in the same tick, indistinguishable
+from "close at once". A slow Server Function shows progress on the option the user picked,
+which is the vision's "pending state exposed", and a rejection leaves the listbox open with
+the text and `data-selected` rolled back (2.2) and the error in the nearest boundary.
+
+The open-generation guard (Popover 3.4) applies: if the user dismissed (Escape) and re-opened
+the listbox by typing while the action ran, the close belongs to the earlier open and is
+dropped; the value still commits. Re-accepting the already-selected option dispatches nothing
+(conventions 2.3 item 8) and closes.
+
+A **disabled** option is never accepted: Enter on it does nothing, a click does nothing (it
+is still `preventDefault()`ed on `pointerdown` so focus stays).
+
+### 5.3 Free text (`allowCustomValue`)
+
+With `allowCustomValue`:
+
+- **Enter with no active option** and text different from the committed value's label (or from
+  `""` when `value` is `null`) dispatches `valueChangeAction(text, { reason: "activate", custom:
+  true, event })`, then closes as 5.2. The `keydown` is **not** `preventDefault()`ed when the
+  listbox is closed, so a single-field search form still submits (the hidden input already
+  holds the optimistic text: the sync render is flushed before the key's default action; verify
+  during implementation in all three engines, test row "Enter submits with the new value").
+  While the listbox is open, Enter is prevented (an open listbox means the user is choosing).
+- **Focus leaving** with such text dispatches the same with the `focusout` event, after the
+  immediate close (5.4). Empty text with a non-null value dispatches `null`.
+- `Clear` is unchanged.
+
+Without `allowCustomValue`, Enter with no active option does nothing while the listbox is open
+(prevented) and is not handled while closed (the form submits with the selection's hidden
+value); focus leaving reverts the text (2.2).
+
+### 5.4 Closing
+
+| Close | Owner | What happens | `reason` |
+| --- | --- | --- | --- |
+| Accepted option (after its action settles), Trigger click while open, controlled `open={false}` | library | `requestClose`; `hidePopover()` in the apply effect of the close commit; `<ViewTransition>` if set | `"activate"` (controlled: no dispatch) |
+| Escape while open | browser (the auto popover's close watcher) | hidden at once; focus stays in the input (research); `toggle` → notification. The library does **not** intercept Escape: a second Escape therefore reaches an enclosing Dialog or Popover, which is the nesting behaviour a user expects | `"dismiss"` |
+| Light dismiss, another `auto` popover or modal dialog opening outside | browser | notification; focus wherever the platform left it; text reverted on the `focusout` that preceded it, if any | `"dismiss"` |
+| Focus leaving the input to anything outside the popup (Tab, Shift+Tab, a click elsewhere, script) | library-performed, browser-shaped | the Input's `focusout` with `relatedTarget` outside the input and the popup → `popup.hidePopover()` at once (Menu 2.2: a listbox must not linger over a page whose focus moved on), then the text revert or the custom-value commit of 5.3; `toggle` → notification. `relatedTarget === null` (window blur) closes nothing | `"dismiss"` |
+| Alt+ArrowUp while open | library | the active option, if any, is accepted (APG optional behaviour); else `requestClose` | `"activate"` |
+
+A click on an option or anywhere in the popup is not focus loss: `pointerdown` is prevented on
+the Popup (3.4), so the input never blurs and `focusout` never fires. A `focusout` whose
+`relatedTarget` is the Trigger or Clear cannot happen for the same reason.
+
+### 5.5 Controlled `open`, overlap, errors
+
+As Popover 2.5 / 4.3 with the combobox's words: a controlled parent that refuses an open gets a
+snap-back of `aria-expanded`; one that refuses the close after an accepted option keeps the
+listbox open (a real veto); one that refuses a dismissal re-opens it (not a veto). Overlapping
+value dispatches follow latest intent; `data-pending` and `data-selected` move to the latest
+option; the close waits for the latest. A rejected `openChangeAction(true)` leaves the listbox
+closed with the typed text intact.
+
+---
+
+## 6. Results: deferred query, Suspense, Empty, announcements
+
+### 6.1 The library filters nothing
+
+`Combobox.List`'s children are the results. The consumer decides what they are for a given
+`query`: a synchronous filter over a static array, a cached `use(search(query))`, a router
+loader, anything. There is no `items`, `filter`, `itemToString` or built-in matching, for three
+reasons: a built-in filter needs the option labels before the options render (an `items` array
+plus a string function, which a Server Component cannot pass and which duplicates what the
+Options already say); the Suspense-native case (results that load) has nothing to filter
+client-side; and the headless rule is that the library renders what it is given. A small
+`matches(text, query)` helper (diacritics-insensitive prefix / substring) is a possible later
+export, not a Root prop.
+
+```tsx
+// Static list, synchronous filter: the common case.
+<Combobox.List>
+  {({ query }) => countries
+    .filter((c) => c.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+    .map((c) => <Combobox.Option key={c.code} value={c.code} label={c.name}>{c.name}</Combobox.Option>)}
+</Combobox.List>
+
+// Async search: a cache keyed by query, read with use() inside a Suspense boundary.
+function CountryOptions({ query }: { query: string }) {
+  const results = use(searchCountries(query));   // cached per query; earlier promises are harmless
+  return results.map((c) => <Combobox.Option key={c.code} value={c.code} label={c.name}>{c.name}</Combobox.Option>);
+}
+```
+
+### 6.2 `query`, `stale`, and why nothing arrives out of order
+
+`query = useDeferredValue(inputValue)` in Root. React renders the List's children for the new
+query at deferred priority; if that render suspends, the previous results stay on screen (no
+fallback for an already-visible boundary under a deferred update), and `inputValue !== query`
+stays true until the new results commit, which the Popup and List expose as `data-stale` and
+the List as `aria-busy="true"`. Only the latest deferred value is ever rendered, so a slow
+response for "ja" can never overwrite the results for "jap": React skipped the "ja" render or
+threw it away, and a cache keyed by query makes the earlier promise harmless (research §6). The
+docs say explicitly what not to do: `await fetch(...)` then `setResults(...)` inside
+`inputValueChangeAction` (completion order, no stale marker, an urgent action that should not
+be async anyway).
+
+`stale` also covers the first keystrokes after a selection: the user types over "Japan", the
+results for "Japan" are shown as stale until the results for the new text land.
+
+### 6.3 `Empty`
+
+"No results" is a fact about the List's **mounted** options, which the library knows from the
+Option registry, and about staleness, which the library also knows. So `Combobox.Empty` renders
+its children exactly when the List has zero mounted options and the results are not stale, and
+nothing otherwise. The consumer's Suspense fallback (`Status`) covers the first load; `Empty`
+covers settled emptiness; stale old results cover everything in between. No condition at the
+call site, and no "No results" flashing while a search is in flight.
+
+The List carries `data-empty` under the same condition.
+
+### 6.4 Announcements: `ariaNotify`
+
+When the results settle (a commit in which `stale` went from `true` to `false`, or the mounted
+option count changed while not stale), the Root calls `list.ariaNotify(announce(count, state))`
+if `announce` is given and the method exists (Chrome 141, Firefox 150, Safari 27; Baseline
+since September 2026). No live region: `ariaNotify` is what the platform now offers for exactly
+this, and a live region inside a popover is unreliable when the popover mounts and unmounts.
+Debounced by construction: a deferred render settles once per query. Nothing is announced while
+stale or for an unchanged count. The active option itself is announced by the screen reader
+through `aria-activedescendant`.
+
+`announce` has no default string. The library ships no text, for the same reason it ships no
+CSS (it would be English, and every real app localises). The docs show the one-liner and say
+that without it the combobox announces option navigation but not result counts. Question 6.
+
+### 6.5 Active-option revalidation
+
+After every commit the Root checks the active option against the registry: if `activeValue`
+names an option that is no longer mounted, it becomes `null` (or, with `autoHighlight`, the
+first enabled option, once the results are not stale). With `autoHighlight` and settled
+results the first enabled option is active whenever none is. This is an urgent write in a
+layout effect (it is virtual focus; see 2) and it never dispatches anything.
+`aria-activedescendant` is never left pointing at a missing id.
+
+---
+
+## 7. Focus, positioning, nesting
+
+### 7.1 Focus never leaves the input
+
+The APG editable combobox keeps DOM focus in the textbox and moves virtual focus with
+`aria-activedescendant`. The library keeps that in three places: options are never focusable
+(no `tabindex`); `pointerdown` on the Popup is `preventDefault()`ed (research: without it a
+click on an option moves focus to `<body>` in every engine); the Trigger and Clear are
+`tabindex="-1"`, prevent `pointerdown`, and focus the input in their click handlers so a
+pointer user ends up where the keyboard works. Focus arriving in the input does not open the
+listbox; focus leaving closes it (5.4).
+
+Nested popover focus return (Popover 6.2) does not apply: focus is in the input before, during
+and after. The Popup hook's `wrapContent` is still used (the hook requires it), and its probe
+never fires because nothing inside the popup ever holds focus.
+
+### 7.2 Positioning
+
+The Popup renders, inline:
+
+```css
+position-area: block-end span-inline-end;
+position-try-fallbacks: flip-block;
+min-width: anchor-size(width);
+```
+
+The implicit anchor is the input (`showPopover({ source: input })`). Logical keywords, not the
+physical `side` / `align` matrix of Popover and Menu: a listbox is always below (or, flipped,
+above) its input, aligned to the input's inline-start edge, and under `direction: rtl` the
+logical form is right without any JS reading `getComputedStyle`. `min-width: anchor-size(width)`
+makes the listbox at least as wide as the input in every engine (research: verified in Chromium
+and Firefox, width = input width + border). A consumer who wants the listbox as wide as an
+input-plus-trigger group sets `anchor-name` on the group and `position-anchor` plus
+`min-width: anchor-size(--group width)` through `style`; consumer `style` wins per property.
+No `data-side` / `data-align`.
+
+The Popup should be rendered as a sibling right after the Input (or after the Trigger / Clear).
+It need not be; `showPopover({ source })` links them by reference. But Safari 27.0 inserts a far
+popover into the sequential focus order only when DOM-adjacent (Popover section 1), and that
+matters for nothing here (nothing inside is focusable), so adjacency is a recommendation for
+readers of the DOM, not a requirement.
+
+### 7.3 Inside Dialog, Popover, Menu
+
+The popup is an auto popover nested under the input's popover ancestor (research §6 and §7:
+verified inside a modal `<dialog>` and inside an auto popover). Opening it keeps the outer open;
+Escape closes only the listbox and the next Escape the outer, because the library does not
+intercept Escape (5.4); an outside click closes the stack; a combobox *outside* an open auto
+popover closes that popover when its listbox opens (unrelated auto popovers). No portal, ever
+(inside a modal Dialog a portalled listbox would be inert).
+
+Inside a `Menu.Popup` the combobox's input would be a non-item in a menu; not a supported
+composition (Menu's `focusout` would close the menu when the input is clicked, and its typeahead
+would eat keystrokes). Documented as unsupported.
+
+**WebKit 302008** (`position-try-fallbacks` on a nested popover hangs or spins): the Popup's
+`flip-block` fallback inside a Popover or Dialog is the exposure. Menu's and Select's rows under
+the same bug passed on WebKit CI, so the default keeps the fallback; the browser suite carries a
+dedicated WebKit row (12.2), and the consumer escape hatch is `style={{ positionTryFallbacks:
+"none" }}`.
+
+---
+
+## 8. Keyboard
+
+Per APG "Editable Combobox With List Autocomplete", manual selection. Handled in the Input's
+`onKeyDown`; keys not listed are the input's own (Home, End, Left, Right, Backspace, Delete,
+selection keys). Events with `ctrlKey` / `metaKey` are ignored; `altKey` is read for the two
+Alt combinations only.
+
+| Key | Listbox | Behaviour | `preventDefault` |
+| --- | --- | --- | --- |
+| Printable, Backspace, paste, cut, IME commit | any | the text changes (urgent); the listbox opens if closed (5.1); the active option is revalidated when the results land (6.5) | no (the input's own editing) |
+| ArrowDown | closed | open; after the open commit the first enabled option is active | yes |
+| ArrowDown | open | next enabled option; from the last: stays (or the first with `loop`); from none: the first | yes |
+| ArrowUp | closed | open; the last enabled option active | yes |
+| ArrowUp | open | previous enabled option; from the first: stays (or the last with `loop`); from none: the last | yes |
+| Alt+ArrowDown | closed | open, no option active | yes |
+| Alt+ArrowUp | open | accept the active option if any (5.2), else close | yes |
+| Home / End | any | the input's caret (APG); **not** first / last option | no |
+| PageUp / PageDown | open | not handled in v1 (no virtualization) | no |
+| Enter | open, active option | accept (5.2) | yes |
+| Enter | open, no active option | `allowCustomValue`: commit the text (5.3) and close; else nothing | yes |
+| Enter | closed | `allowCustomValue`: commit the text if it changed; the form may submit | no |
+| Escape | open | **platform**: the auto popover's close watcher closes it; focus stays in the input; notified `"dismiss"`. The active option is forgotten; the text is kept | no (the platform cancels the close request itself) |
+| Escape | closed | nothing; reaches an enclosing Dialog / Popover | no |
+| Tab / Shift+Tab | open | focus moves on; `focusout` closes the listbox (5.4); the text reverts or, with `allowCustomValue`, commits. **Tab does not accept the active option** (question 5) | no |
+| Space | any | a character (the input's own) | no |
+
+Disabled options are skipped by ArrowDown / ArrowUp (APG: "disabled options are not focusable"
+in a listbox), unlike Menu's focusable disabled items; they remain visible and `pointermove`
+does not activate them.
+
+Typeahead does not exist (the input *is* the typeahead).
+
+---
+
+## 9. ARIA summary
+
+| Part | Attributes |
+| --- | --- |
+| Input | `role="combobox"`, `aria-autocomplete="list"`, `aria-expanded` (optimistic open), `aria-controls` → List id, `aria-activedescendant` → the active Option id or absent, `autocomplete="off"`, `id` (the Label's `for`), `required` / `aria-describedby` pass through |
+| Label | `for` → Input id, `id` |
+| Trigger | `tabindex="-1"`, `aria-expanded`, `aria-controls` → List id, `aria-label` from the consumer (dev warning without a name) |
+| Clear | `tabindex="-1"`, `aria-label` from the consumer |
+| Popup | `popover="auto"`, `id`; no role |
+| List | `role="listbox"`, `id`, `aria-labelledby` → Label id (token-merged with the consumer's), `aria-busy="true"` while stale; no `aria-multiselectable` in v1 |
+| Option | `role="option"`, `id`, `aria-selected` (optimistic; `"true"` on the selected option only, not on the active one: the APG distinguishes selected from focused, and `aria-activedescendant` conveys focus), `aria-disabled` |
+| Group / GroupLabel | `role="group"` + `aria-labelledby`; the label has the `id` |
+| Status | `role="status"` |
+
+`Element.ariaActiveDescendantElement` is not used: the attribute form serialises, works with
+ids across a popover, and Safari 27.0 fixed the one known forwarding bug for it (research).
+Chromium's accessibility tree for this markup (research §6): `combobox autocomplete=list
+hasPopup=listbox expanded activedescendant controls`; the active option is reported as
+focused. Screen-reader pass (NVDA, JAWS, VoiceOver) in the example app before leaving
+"proposed": option navigation announced from `aria-activedescendant`, result counts from
+`ariaNotify`, the selected state, nested in a Dialog.
+
+Development warnings: an Option outside a List; a List outside a Popup; a part outside a Root
+(throws, as every component); two Options with one value; `value` / `defaultValue` set with no
+text prop (2.2); a thenable returned from `inputValueChangeAction` (section 4); a Trigger with
+no accessible name; a `render` element of the wrong kind (section 1); `transition` toggled
+between `undefined` and a value (conventions 5.1).
+
+---
+
+## 10. Async walkthroughs
+
+Notation: `T` = input text (urgent), `Q` = deferred query, `V` = committed value, `O` =
+optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `defaultValue={null}`,
+`defaultInputValue=""`, async search under a Suspense boundary inside the List.
+
+1. **Type "j", results load.** `input` event → `T="j"` (urgent), `inputValueChangeAction("j",
+   { reason: "activate" })`, `requestOpen` (transition). Sync flush: the input shows "j",
+   `aria-expanded="true"`, `data-open`, `data-pending`. Open commit: children mount, the
+   boundary mounts and shows `Status` ("Searching…") at once (a new boundary shows its
+   fallback); apply effect `showPopover({ source: input })`; focus still in the input;
+   `P=false`. The open commit already rendered `Q="j"` (the deferred value catches up in the
+   same render when there is nothing on screen to keep).
+   Results resolve → options mount; `Empty` stays hidden (count > 0); `ariaNotify("3
+   countries")`.
+2. **Type "a" while "j" results are shown.** `T="ja"` at once; `Q="j"` → `data-stale` and
+   `aria-busy` on the List, old options stay; the deferred render suspends on `search("ja")`;
+   when it resolves, the new options commit, `Q="ja"`, stale off, `ariaNotify("2 countries")`;
+   `A` was `null` and stays `null` (`autoHighlight` off).
+3. **ArrowDown, ArrowDown, Enter with a slow `valueChangeAction`.** `A="jp"` then `A="jm"`
+   (urgent; `aria-activedescendant`, `data-active`). Enter → `T="Jamaica"` (urgent, from the
+   option's `label`), dispatch `"jm"`: `O="jm"`, `data-selected` and `aria-selected` on
+   Jamaica, `data-pending` on it and on the Input, hidden input `value="jm"`; listbox open;
+   `await save("jm")`. Resolves → `requestClose`: `openChangeAction(false)` (none) → close
+   commit: with `transition` the popup's box is captured as `old`; `hidePopover()`; `V="jm"`,
+   `P=false`. Focus never moved.
+4. **Same, the save rejects.** The error reaches the boundary above `Combobox.Root`; `O`
+   reverts to `null`; the library writes `T=""` (the previous committed value's text; `reason:
+   "dismiss"`); `data-selected` leaves Jamaica; the listbox is still open with the "ja"
+   results, `A` still `"jm"`; the user can retry. (In a controlled "update on success" parent
+   that does not adopt, the same revert without the error.)
+5. **Click an option with the mouse.** `pointerdown` on the Popup prevented → no blur;
+   `pointermove` had made the option active; `click` → as 3 with the `click` event in
+   `details`.
+6. **Type while a save is pending.** As 3, before `save` resolves, type "x": `T="Jamaicax"`
+   at once (urgent); the deferred results render runs (deferred lane, not held); the listbox is
+   already open so no open dispatch. If the listbox had been closed, the open dispatch would be
+   a transition held until `save` settles: the input shows `aria-expanded="true"` /
+   `data-pending` and no popup until then (React entanglement; Menu walkthrough 11; documented).
+7. **Escape, then Tab.** Escape → the close watcher hides the popup; focus stays in the input;
+   `toggle` → `openChangeAction(false, { reason: "dismiss" })`; `A=null`; `T` unchanged
+   ("Jamaicax"). Tab → `focusout` with `relatedTarget` the next field → the popup is already
+   hidden; without `allowCustomValue` the text reverts to the committed value's label
+   ("Jamaica"); with it, `valueChangeAction("Jamaicax", { custom: true })` is dispatched with
+   the `focusout` event.
+8. **Clear.** Click → `pointerdown` prevented, the input keeps focus; `T=""`;
+   `valueChangeAction(null)`; `data-selected` leaves the Input; hidden input `value=""`.
+9. **Overlap: accept A, then accept B before A settles.** `O="a"` then `O="b"`; `data-pending`
+   moves to B; A's resolution is superseded (no close from it: not the latest); B's resolution
+   closes. `T` is B's label throughout after the second accept. A superseded rejection surfaces
+   through the shared hook.
+10. **Form reset.** `<form>` with `name="country"`, `V="jm"`, `T="Jamaica"`. `form.reset()`:
+    the browser restores the hidden input to its `defaultValue` (`""`, mirrored by the library
+    from `defaultValue`) and the visible input to its `defaultValue` (`defaultInputValue`,
+    mirrored likewise); the `reset` listener (microtask) dispatches `valueChangeAction(null, {
+    reason: "platform", event })` and writes `T` from the DOM with `"platform"`. React's
+    automatic reset after a successful `<form action>` arrives the same way.
+11. **Typed before hydration.** Server HTML: the plain input. The user types "jap" and nothing
+    opens. Hydration: react-dom keeps the DOM value of a text input it hydrates and fires no
+    `onChange`; the Root's mount layout effect reads `input.value !== defaultInputValue` → `T
+    ="jap"`, `inputValueChangeAction("jap", { reason: "platform", event: undefined })`. The
+    listbox does not open by itself (no user gesture after hydration); the next keystroke or
+    ArrowDown opens it with results for "jap". `Q` catches up on the first render after mount.
+12. **Controlled `value` changes from outside (a "Use my location" button).** The parent sets
+    `value="fr"` and `inputValue="France"` together (both props); the library writes nothing
+    itself (2.2); `data-selected` follows `O` once the transition commits. A parent that sets
+    only `value` gets the dev warning of 2.2 at mount only; later it is the parent's
+    responsibility, documented.
+13. **`autoHighlight` with a fast local filter.** Each keystroke: `T` and `Q` update (a
+    synchronous filter never suspends, so `Q` catches up in the deferred render of the same
+    frame); the layout effect finds `A` unmounted or `null` and activates the first option;
+    Enter accepts it. Typing a letter that matches nothing: `A=null`, `Empty` shows.
+
+---
+
+## 11. Form, server rendering, styling
+
+### 11.1 Form participation
+
+- `name` on Root → `<input type="hidden" name value={optimistic ?? ""} defaultValue={resetTarget}>`
+  as the Root's single element, rendered before the children. `form` passes through to it.
+  The `defaultValue` mirror (uncontrolled: the latest `defaultValue ?? ""`; controlled: the
+  mount-time `value`) is the reset target, as every native-input component (conventions 3.8
+  rule 6); react-dom does not write `defaultValue` for a controlled hidden input either.
+- The visible input's `defaultValue` attribute is mirrored the same way from
+  `defaultInputValue` (uncontrolled) or the mount-time `inputValue` (controlled), so a form
+  reset restores the text the browser way and the library's `reset` listener reads it.
+- `required` is the Input's native attribute: empty text is `valueMissing`, the browser's
+  localised message appears on submit, `:user-invalid` matches after interaction. "The text must
+  be one of the options" needs no constraint: without `allowCustomValue` the text is always a
+  selection's label or empty when focus is elsewhere. No `setCustomValidity` (conventions 3.6).
+- `useFormStatus` is not folded into `pending` (conventions 2.7).
+- `disabled` on Root disables the Input (so it is not submitted? No: a disabled *visible*
+  input is not submitted, but the hidden input is not disabled, so the selection still posts;
+  consumers who want the field dropped from submission wrap the whole thing in a `<fieldset
+  disabled>`). Never disabled while pending.
+
+### 11.2 Server rendering and before hydration
+
+Every part file is `"use client"` (context, hooks, DOM listeners); Server Components may render
+every part and pass Server Functions to `valueChangeAction` and `openChangeAction`
+(`inputValueChangeAction` too, but an urgent action that is a network call makes no sense and
+is documented against). What the server HTML contains: the hidden input with the default value,
+the Label, the Input with `defaultInputValue` as its `value`, the Trigger and Clear (inert until
+hydration), the empty `<div popover>`. Before hydration the user can type, and the text is
+adopted at mount (walkthrough 11); nothing opens, nothing is selectable. A form submitted before
+hydration posts the default selection (and, with a `name` on the Input, the raw text). This is
+progressive enhancement, not a JS-free mode, as Menu (conventions 7.3).
+
+### 11.3 Styling
+
+```css
+.listbox { margin: 0; inset: auto; max-block-size: 20rem; overflow: auto; padding: 4px; border: 0; border-radius: 8px; box-shadow: 0 8px 32px rgb(0 0 0 / .2); }
+.listbox[data-stale] [role="listbox"] { opacity: .6; }           /* old results while a search runs */
+.listbox [role="option"] { padding: 6px 10px; border-radius: 4px; }
+.listbox [role="option"][data-active] { background: var(--accent-weak); }   /* virtual focus */
+.listbox [role="option"][data-selected]::after { content: "✓"; margin-inline-start: auto; }
+.listbox [role="option"][data-pending] { cursor: progress; }
+.listbox [role="option"][aria-disabled="true"] { opacity: .4; }
+.combobox-input[data-pending] { background-image: var(--spinner); }
+.combobox-input:user-invalid { border-color: var(--danger); }
+/* Hide Clear while there is nothing to clear: */
+.combobox:has(input:placeholder-shown) .combobox-clear { display: none; }
+
+/* Enter / exit (CSS, both for library opens and dismissals): as Popover 10.1. */
+.listbox { opacity: 0; translate: 0 -4px; transition: opacity 120ms, translate 120ms, display 120ms allow-discrete, overlay 120ms allow-discrete; }
+.listbox:popover-open { opacity: 1; translate: 0 0; }
+@starting-style { .listbox:popover-open { opacity: 0; translate: 0 -4px; } }
+@media (prefers-reduced-motion: reduce) { .listbox { transition: none; } }
+```
+
+Hover styling of options is `:hover`, but since `pointermove` makes the hovered option active,
+styling `[data-active]` alone keeps keyboard and pointer in one visual state (Menu 9).
+
+### 11.4 ViewTransition
+
+`transition` on `Combobox.Popup` wraps the `<div popover>` itself (conventions 5.1 top-layer
+rule). Library-driven opens (typing, arrows, Trigger) and closes (accepted option, Trigger,
+controlled) animate in every engine. Three things specific to this component:
+
+- **Deferred results renders activate the boundary.** React starts a view transition for an
+  update from `useDeferredValue` as it does for a transition; every result change inside an
+  open popup with `transition` set would run one, and the page receives no pointer events while
+  it runs. The documented form is a type map with `default: "none"`:
+  `transition={{ "fsui-combobox-open": "pop", "fsui-combobox-close": "pop", default: "none" }}`.
+  A consumer who wants result changes to cross-fade sets a class on `default` and accepts the
+  cost.
+- The open commit is a mount of the popup's children under the always-mounted popover element
+  (shielded, no page cross-fade) and `showPopover()` in its layout effect (the box as `new`).
+- Types: every value dispatch adds `fsui-combobox` and `fsui-combobox-select`; the open and
+  close dispatches add `fsui-combobox-open` / `fsui-combobox-close`. The accept-then-close path
+  contributes `fsui-combobox-select` and `fsui-combobox-close` to the one commit that ends it.
+
+---
+
+## 12. Test plan
+
+`packages/ui/src/combobox/combobox.test.tsx` (jsdom) and `combobox.browser.test.tsx` (Chromium,
+Firefox, WebKit). "both" = `describe.each` over uncontrolled and "update on success" controlled
+wrappers for `value`; `inputValue` rows run controlled and uncontrolled as well. jsdom: the
+popover shim (with `source` recording), `user.type` for the urgent path, `createSuspender` for
+async results, fake timers where needed. jsdom has no anchor positioning, no `ariaNotify`
+(stubbed onto `Element.prototype` for the announcement rows), no close watcher (Escape rows are
+browser-mode; the dismiss path is driven with `hidePopover()`).
+
+### 12.1 jsdom
+
+| Area | Tests |
+| --- | --- |
+| Roles and ARIA | The section 1 HTML: Input `role=combobox`, `aria-autocomplete=list`, `aria-expanded`, `aria-controls` = List id, `autocomplete=off`, `id` = Label `for`; List `role=listbox`, `aria-labelledby` = Label id, consumer tokens merged; Option `role=option`, derived `id`, `aria-selected` only on the selected one, `aria-disabled`; Trigger / Clear `tabindex=-1`, `type=button`; Popup `popover=auto`, inline placement string; Status `role=status`; hidden input present only with `name`, value `""` for `null`; `required` lands on the Input; duplicate option values warn. |
+| Urgent text (both for `inputValue`) | `user.type("ja")`: the DOM value is updated per keystroke, `inputValueChangeAction` called synchronously per keystroke with the `input` event and `"activate"`, **not** inside a transition (a `useTransition` spy / `isPending` probe in the parent stays false); a controlled parent that sets state in the body keeps the input in sync; a parent that does not adopt sees the DOM restored; a thenable returned warns once. |
+| Deferred query | A List children function receives `query`; a suspending result for the new query keeps the old options mounted with `data-stale` / `aria-busy` on the List; on resolve the new options and no stale; a slow earlier query resolved after a later one never shows (cache keyed by query). |
+| Open | Typing opens (`openChangeAction(true, "activate")` with the `input` event; `showPopover` called once with `{ source: input }` after the open commit); ArrowDown / ArrowUp / Alt+ArrowDown open; focus alone does not; `openOnClick` makes a click open; Trigger click toggles and focuses the input; `disabled` opens nothing. |
+| Keyboard | The section 8 table: ArrowDown / ArrowUp move `aria-activedescendant` and `data-active`, skip disabled, stop or wrap with `loop`; Alt+ArrowUp accepts or closes; Enter accepts the active option (keydown prevented), does nothing with none (prevented while open, not prevented while closed), commits custom text with `allowCustomValue`; Home / End are not prevented; Escape is browser-mode. |
+| Accept (both) | Enter / click: the text becomes `label` (or `textContent`) at once; `valueChangeAction(value, { reason: "activate", custom: false })` with the `keydown` / `click`; `data-selected` / `aria-selected` move optimistically; hidden input value follows; with a deferred action `data-pending` on the Option and Input while the listbox stays open, `hidePopover` not yet called; on resolve `hidePopover` once and committed / parent updated. Re-accepting the selected option closes without dispatching. Disabled options never accept. |
+| Rejection (both) | The catcher above Root receives it; `O` reverts; the input text reverts to the previous label with `inputValueChangeAction(prev, { reason: "dismiss", event: undefined })`; the listbox still open; hidden input back. Caught-inside variants commit. Controlled refusal: same revert without the error. |
+| Overlap, superseded rejection (both) | Two accepts out of order: text and `data-pending` follow the latest, `hidePopover` once after the latest; the older's rejection reaches the catcher after and while the newer is pending. |
+| Custom value | `allowCustomValue`: Enter with no active option dispatches `{ custom: true }`; `focusout` with changed text dispatches with the `focusout` event; empty text with a value dispatches `null`; without the flag `focusout` reverts the text (`"dismiss"`) and dispatches nothing. |
+| Focus loss | `focusout` with `relatedTarget` outside → `hidePopover` at once, notification `"dismiss"`; `relatedTarget: null` → nothing; `pointerdown` on an Option / the Popup is `defaultPrevented` and the input keeps focus. |
+| Active-option revalidation | The active option unmounts (results change) → `aria-activedescendant` removed; with `autoHighlight` → the first enabled option once not stale; never a dangling id. |
+| Empty and Status | `Empty` renders only with zero mounted options and not stale: hidden during the Suspense fallback and while stale old results show; `data-empty` on the List likewise. |
+| Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with `announce(count)`; not while stale; not for an unchanged count; never without `announce`. |
+| Clear | Writes `""`, dispatches `null` (`"activate"`, the `click`), no dispatch when already `null`, input keeps focus. |
+| Platform path (both) | Mount reconciliation: `renderToString`, set `input.value = "jap"` before `hydrateRoot` → one `inputValueChangeAction("jap", { reason: "platform", event: undefined })`, no open, StrictMode still one; no `valueChangeAction`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → one `valueChangeAction(resetTarget, "platform")` with the `reset` event and one text write; the hidden and visible inputs carry the mirrored `defaultValue`s (uncontrolled: latest props; controlled: mount-time). |
+| Suspending content (both) | Dependent content keyed on `value` suspends on accept: old content stays, Input `data-pending`, no fallback above; then new content. Results boundary outside the List: the open waits with `data-pending` on Input and Trigger, `showPopover` not called until resolve. |
+| Function props / `render` | Every part's documented state; `render={<input type="search" />}` keeps the role and handlers; a `render={<button />}` Input warns; Popup `render={<div className />}` merges. |
+| Post-await rule | Controlled `value` parent updating after `await` inside `startTransition`; controlled `inputValue` parent with a plain `setState`. |
+| `transition` smoke | Popup renders with and without; a close after accept unmounts children in the close commit with `transition`, holds without. |
+| Directive | Every file under `src/combobox/` except `index.ts` begins with `"use client"`. |
+| Types | `UrgentChangeAction` is exported; `inputValueChangeAction` accepts any `(next, details) => void` (the thenable check is a runtime warning); `multiple` is not a prop (type test). |
+
+### 12.2 Browser mode (`combobox.browser.test.tsx`)
+
+Feature checks added to `src/__tests__/engine.ts`: `supportsAriaNotify = "ariaNotify" in
+Element.prototype` (all three stable engines; asserted true, branch kept for Playwright builds).
+
+| Row | Assertion | Engine branches |
+| --- | --- | --- |
+| Placement and width | After typing: the popup's top edge equals the input's bottom edge, its left (inline-start) edge the input's, and `getBoundingClientRect().width >= input width` (`anchor-size`). Under `dir="rtl"` on the container the inline-start edges still coincide (the right edges). Near the viewport bottom the popup flips above (`flip-block`). | none |
+| Focus stays | Click an option with the real pointer: `document.activeElement` is the input before, during and after; the selection dispatched; the popup closed after the action. Click the Trigger: input focused, popup open. Click Clear: input focused. | none |
+| Escape | Escape closes the popup, `openChangeAction(false, "dismiss")`, focus in the input, text kept; a second Escape inside a `Dialog.Popup` closes the Dialog; inside a `Popover.Popup` closes the Popover. | none |
+| Tab closes | Tab from the input: focus on the next field, popup hidden, text reverted (or custom value committed); Shift+Tab likewise. | none |
+| Typing while a save is pending | Deferred results re-render during a pending `valueChangeAction` (walkthrough 6): new options appear before the save resolves. **Verifies the lane claim of section 4**; if it fails, the design's statement is corrected to "results wait for a pending save". | none |
+| Enter submits with the new value | `allowCustomValue` inside a `<form>` with a submit spy: Enter while closed posts the typed text in `FormData` (hidden input updated before the implicit submission). | all three; document any engine where the sync flush lands after submission |
+| Nested in Popover / Dialog | Opening the listbox keeps the outer open; light dismiss closes the stack; **WebKit 302008 row**: `browserName === "webkit"`, open the listbox inside an open `Popover.Popup` twice with the default `flip-block` under a 15 s timeout so a hang fails instead of stalling. | WebKit row runs regardless |
+| Announcements | `ariaNotify` spied on the List: one call per settled result set with the `announce` string; none while stale. | `supportsAriaNotify`; otherwise assert no throw |
+| Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration, one `"platform"` text dispatch, no `valueChangeAction`, nothing opened. | none |
+| ViewTransition | With `transition={{ …, default: "none" }}`: open calls `startViewTransition` once, accept-close once with a `::view-transition-old` of the popup present, a deferred results change zero times; with `transition="pop"` a results change calls it once (documents the cost); without `transition` zero calls. | none |
+| IME | Composition (`compositionstart` … `compositionend` through Playwright's `insertText` / keyboard IME where available): the text updates per composition update, the listbox opens, Enter during composition does not accept. | Chromium (Playwright IME support); others assert the non-composition path |
+
+---
+
+## 13. Not in v1
+
+- **`multiple`** (chips, `aria-multiselectable`, a `Combobox.Chips` / `Chip` area): the value
+  becomes `string[]` with `details.added` / `removed` (CheckboxGroup's diff shape); the text
+  stays single; the keyboard gains Backspace-removes-last-chip. The anatomy leaves room (a
+  `Value` / `Chips` part before the Input). Deferred until a consumer case; question 7.
+- **Inline autocompletion** (`aria-autocomplete="both"` / `"inline"`: the input completes the
+  active option's text with the completion selected). Needs caret manipulation the library
+  would own; Base UI's `mode: "both" | "inline"`. Later.
+- **Virtualization** and PageUp / PageDown.
+- **A built-in filter / `items`** (6.1); a `matches()` helper export is the most that fits.
+- **`Combobox.Input` inside the Popup** (the "searchable select" where a button is the anchor
+  and the input lives in the popup): a different focus model (focus moves into the popup).
+  Could be a Select-like variant later.
+- **`Separator`** (not in a listbox's content model).
+- **Controlled `activeValue`**, `onHighlightChange`-style exposure: the active option is
+  observable through `data-active` and `state.activeValue`; a prop to set it is not needed
+  until a consumer asks.
+- **The Open UI customizable combobox** (`<input list>` + `<datalist>` with `appearance:
+  base`, `beforefilter`): Chromium `experimental` only, no other-vendor signals. When it ships,
+  it could become an `experimental_` rendering of the same parts; the vocabulary here (author
+  filtering, active option) is compatible on purpose.
+
+---
+
+## 14. Implementation notes
+
+```
+packages/ui/src/combobox/
+  index.ts                  # no directive; namespace + types; imports platform-attributes
+  combobox-context.ts       # "use client": ComboboxContext (root value + text + active + registry), ComboboxListContext
+  combobox-root.tsx         # "use client": usePopoverRoot({ component: "combobox", mode: "library" }), useControllableAction<string | null>, useState text + useDeferredValue, active option, registry, label cache, accept(), form reset, mount reconciliation, hidden input
+  combobox-label.tsx        # "use client"
+  combobox-input.tsx        # "use client": the controlled <input>, onInput / onKeyDown / onBlur / onClick
+  combobox-trigger.tsx      # "use client"
+  combobox-clear.tsx        # "use client"
+  combobox-popup.tsx        # "use client": usePopoverPopup, inline placement, onPointerDown
+  combobox-list.tsx         # "use client": role=listbox, aria-busy, data-stale/empty, children({ query })
+  combobox-option.tsx       # "use client": registration, pointer handlers, accept on click
+  combobox-group.tsx        # "use client": Group, GroupLabel, Empty, Status
+  combobox.test.tsx, combobox.browser.test.tsx
+packages/ui/src/internal/
+  types.ts                  # + UrgentChangeAction
+  use-form-reset.ts         # widen FormAssociatedElement with HTMLInputElement (already) — the hidden input is the subscription element
+```
+
+- **Root.** `usePopoverRoot` as Menu (always library mode; `details` factory with
+  `createActionDetails`). `useControllableAction<string | null, ComboboxValueChangeDetails>({
+  initialValue: null, transitionTypes: () => ["fsui-combobox", "fsui-combobox-select"] })`. The
+  wrapped action: `async (next, details) => { await valueChangeAction?.(next, details); if
+  (latest && openGeneration() === recorded) requestClose(details.event, "activate"); }`, with
+  `recorded` captured at dispatch; the "latest" check reuses the hook's own latest-dispatch id
+  (expose it, or compare `latestInFlight()`). Text: `const [internalText, setInternalText] =
+  useState(defaultInputValue ?? "")`, `text = inputValue ?? internalText`, `query =
+  useDeferredValue(text)`; `writeText(next, reason, event)` sets internal state (uncontrolled)
+  and calls `inputValueChangeAction` synchronously; never inside `startTransition`. Active:
+  `useState<string | null>(null)`. Registry: `Map<value, { element, label }>` in a ref plus a
+  `useState` count for `Empty` / `data-empty` (updated in Option layout effects, batched by
+  React). Label cache: a ref map, write-only on registration and on accept.
+- **Revalidation effect** (6.5): a layout effect after every commit reading the registry.
+- **Announcement effect**: a passive effect keyed on `[stale, count]`.
+- **Form reset**: `useFormReset(hiddenInputRef or inputRef, onReset)`; in the microtask read
+  both `defaultValue`s and dispatch / write.
+- **Mount reconciliation**: layout effect at mount reading `input.value`; compare with
+  `defaultInputValue ?? inputValue ?? ""`.
+- **Input handlers.** `onInput` → `writeText(target.value, "activate", nativeEvent)` then
+  `requestOpen(nativeEvent, "activate")`. `onKeyDown` per section 8, reading options from the
+  registry in DOM order (`compareDocumentPosition`), skipping `aria-disabled`. `onBlur`
+  (React's `focusout`): if `relatedTarget` is outside the input and the popup → `popup.hidePopover()`
+  with a recorded `"dismiss"` intent, then the revert / custom commit. `onClick` → `openOnClick`.
+  Composition: ignore Enter / arrows while `event.nativeEvent.isComposing`.
+- **Popup.** `usePopoverPopup(ctx, { part, initialFocus: undefined, keepMounted, transition })`;
+  `libraryProps`: `id`, `popover: "auto"`, `onPointerDown: (e) => e.preventDefault()`,
+  `data-stale`, inline `style` (consumer wins per property); content through `wrapContent`
+  as Popover 14.4.
+- **Option.** Mount layout effect registers `{ element, label: labelProp ?? textContent }` and
+  unregisters on cleanup; `onPointerMove` → set active if not disabled; `onClick` →
+  `ctx.accept(value, event)`; `onPointerDown` → `preventDefault()`.
+- **Dev warnings** per section 9.
+- **Docs site and example app.** Playground: a country picker with a fake 400 ms search
+  (`createSuspender`-style cache), a slow Server-Function-like save, `allowCustomValue` tag
+  input, a combobox inside a Dialog, and the "typed before hydration" note. Docs page: props
+  tables from the declarations, the urgent-lane explanation (section 4) as the page's first
+  concept, the `default: "none"` transition recipe, the keyboard table, the `announce`
+  one-liner.
+
+---
+
+## Conventions feedback (proposed; not applied, another session owns `conventions.md` today)
+
+1. **2.6 Urgent updates.** Replace "not provided in v0" with the urgent lane as designed in
+   section 4: an urgent state keeps the `x` / `defaultX` / `xChangeAction` triple; its action
+   is typed `UrgentChangeAction<T, Details>` (sync, called outside any transition, not awaited,
+   no pending, no optimistic); the library uses it only where React requires urgency
+   (controlled text input). Still no `on*` props. Resolved question 2 updated accordingly.
+2. **2.2 shared types / 9.4.** Add `UrgentChangeAction` to `internal/types.ts` and the root
+   entry's public types.
+3. **3.2 three values.** Add a fourth row for the urgent lane: `text` / `activeValue`-style
+   states, source `useState`, lane sync, shown by the input and the virtual focus. And a rule:
+   **virtual focus (`aria-activedescendant`) is urgent library state**, as DOM focus is
+   browser-owned and immediate; it is never a transition and never dispatches.
+4. **3.5 residual paths.** Add "text typed into a controlled text input before hydration is
+   reconciled at mount with `reason: "platform"` through the urgent action"; and "form
+   participation through a hidden input mirroring the optimistic value, with `defaultValue`
+   mirrored as the reset target" as a named pattern (Combobox; a future multi-select).
+5. **1.1 part vocabulary.** `Label` gains "`label[for]` naming an `Input` part"; add `Input`
+   (the text field of a combobox), `List` (an ARIA `listbox` inside a `Popup`; the Popup is the
+   container because a listbox may contain only options and groups), `Option` (Combobox:
+   `div[role=option]`, never focused), `Clear`, `Empty` (rendered by the library only when the
+   list has no options and is not stale), `Status` (`div[role=status]`), and the rule that a
+   Root may render exactly one hidden form element when it owns a form value but no visible
+   element.
+6. **4.1 vocabulary.** Add `active` (virtual focus on an Option, urgent), `stale` (the shown
+   results are for an older text; `aria-busy` equivalent on the listbox), `empty` (the list
+   has no options), `selected` row gains `Combobox.Option` and `Combobox.Input`
+   (`data-selected` = a non-null optimistic value), `open` row gains `Combobox.Input` /
+   `Trigger` (optimistic `aria-expanded` / `data-open`; Popup none).
+7. **5.1 ViewTransition.** Note that updates from `useDeferredValue` activate a boundary like
+   transitions do, so a part whose content re-renders from a deferred value (Combobox.Popup)
+   documents the `default: "none"` type-map form as the recommended spelling.
+8. **5.3 types.** `Combobox`: `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close`,
+   `fsui-combobox-select`.
+9. **7.3.** Combobox joins Menu as an always-library-mode component; its progressive
+   enhancement is "the text input works before hydration and is adopted at mount".
+10. **8 experimental table.** No new flag. Record `ariaNotify` as adopted without a flag (all
+    three stable engines) and the Open UI customizable combobox as a future `experimental_`
+    rendering candidate.
+11. **10.1 test rows.** Add "Urgent action (both)" as a required row for any component with an
+    urgent state: called synchronously per DOM event, outside a transition, DOM in sync for a
+    controlled parent.
+
+---
+
+## Questions for the product owner
+
+1. **One Combobox with `allowCustomValue`** (decision 1) rather than `Combobox` + `Autocomplete`
+   as Base UI does. Recommendation: one component. The two share everything but the meaning of
+   unmatched text on commit; a second namespace would duplicate twelve parts and the whole test
+   plan for one boolean's worth of behaviour, and React Aria / Ark show the single shape reads
+   fine (`allowsCustomValue` / `allowCustomValue`). Cost: a consumer building a pure search box
+   still sees `value` / `valueChangeAction` and must learn that with `allowCustomValue` the
+   value is the committed text. Alternative: ship `Autocomplete` later as a thin preset over the
+   same parts if the docs show confusion.
+2. **The urgent lane is `inputValueChangeAction: UrgentChangeAction`** (section 4), keeping the
+   triple and the no-`on*` rule, with urgency expressed by the type and the docs. Alternatives:
+   a one-off `onInputChange` handler (an `on*` exception), or `inputValueAction`. Recommendation:
+   as designed; this becomes the library-wide urgent convention (feedback 1).
+3. **`value` and `inputValue` are two explicit states; the library never derives the text from
+   the value** (2.2), so a preselected value needs `defaultInputValue` / `inputValue` at the
+   call site (dev warning otherwise). Alternative: an `itemToString` / `displayValue` function
+   on Root (Headless UI, Base UI), which a Server Component cannot pass and which duplicates the
+   Options' labels. Recommendation: as designed.
+4. **Accepting an option keeps the listbox open with `data-pending` on the option until
+   `valueChangeAction` settles** (5.2, Menu decision 3), the input text changing at once.
+   Alternative: close at once and run the action detached (prior art everywhere; no pending
+   surface, no rollback the user can see). Recommendation: as designed; sync actions are
+   indistinguishable.
+5. **Tab does not accept the active option** (section 8; manual selection). Many
+   implementations (React Aria with `autoHighlight`-like modes, Chrome's own address bar) accept
+   on Tab. Recommendation: no, because Tab is "leave" everywhere else in the library (Menu
+   closes on Tab), and `autoHighlight` + Enter covers the "accept the first match" flow. Could
+   become a prop (`selectOnTab`) if asked for.
+6. **`announce` has no default string** (6.4). Alternative: a default English `"${n} results"`
+   with override. Recommendation: no default, matching "the library ships no text"; the docs
+   show the one-liner next to every example. Flagging because it is an accessibility default
+   that is off until the consumer acts.
+7. **`multiple` deferred** (section 13) with the anatomy leaving room for `Chips`. Confirm.
+8. **No JS-free mode; the Trigger renders no `commandfor`** (section 1, 2.4): a pre-hydration
+   Trigger click does nothing, a pre-hydration keystroke is adopted at mount. Alternative:
+   `commandfor` on the Trigger for a pre-hydration open of an empty, button-anchored popup
+   (Menu's shape), at the cost of wrong anchoring and width after hydration unless the library
+   re-opens with `source: input`. Recommendation: as designed.
+9. **Escape is left to the platform** (5.4): the library never intercepts it, so Escape when the
+   listbox is closed reaches an enclosing Dialog / Popover, and there is no "second Escape clears
+   the text" (APG optional behaviour). Confirm.
+10. **The WebKit 302008 row and the `style={{ positionTryFallbacks: "none" }}` escape hatch**
+    (7.3), keeping `flip-block` by default (Menu / Select precedent). Confirm.
+11. **Conventions feedback 1 to 11** to apply on acceptance by whoever holds `conventions.md`.
