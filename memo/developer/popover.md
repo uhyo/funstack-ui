@@ -94,3 +94,43 @@ hides its nested popovers".
 - ViewTransition old-snapshot row runs on WebKit too (unprobed).
 - `ToggleEvent.source` for a foreign invoker (Safari 26.5+; Playwright WebKit is trunk).
 - Tab from a `<div>` popup's Trigger into the popup (DOM-adjacent, should pass).
+
+## Review fixes (memo/reviewer/popover.md), 2026-10-17
+
+Commits 35e57e1 (ui), a55c86c (docs), 2225079 (example).
+
+- **H1** `usePopoverPopup` returns `wrapContent(children)`: an internal `ContentFocusProbe` whose
+  layout-effect cleanup records `popup.contains(activeElement)` (React runs a deleted
+  component's layout cleanups before detaching host nodes). `beforetoggle(closed)` ORs it into
+  `focusWasInside`; the apply effect calls the shared `returnFocus` right after `hidePopover()`.
+  Cleared on open and when content unmounts while the popup stays open. Menu must render
+  `visible && wrapContent(items)` (or wrap inside its Activity) to get this for `requestClose`.
+  Failing-without-fix verified: jsdom 6 rows, browser 4 rows (keepMounted rows pass either way,
+  Activity does not remove the focused node).
+- **M1** `useExitAnimation` releases with plain `setHeld(false)`. Browser row counts
+  `startViewTransition` (fails without the fix in Chromium; Firefox animates no exit).
+- **L1** `ensureDialogFocus` / `firstTabbable` removed. popover-shim runs the popover focusing
+  steps in `showPopover()` (dialog: autofocus, first sequentially focusable, else the dialog,
+  which jsdom only focuses with a borrowed `tabindex`). Shim display rule widened to every shown
+  popover: jsdom's UA sheet hides `[popover]:not(:popover-open)` and its `:popover-open` never
+  matches, so a `<div popover>` was `display: none` even when open (the old "Trigger inside a
+  hidden popover" jsdom row was vacuous because of that; it now asserts the `blur()` call, since
+  jsdom ignores `blur()` under `display: none`).
+- **L2** `committedOptimistic` written in `useInsertionEffect`.
+- **L3** Root value gains `openGeneration()` / `nextOpenGeneration()`: bumped by `send(true)` and
+  by the Popup's `beforetoggle(open)` (all modes). Close records it at click, drops the close if
+  it changed. jsdom note: the re-open click is entangled with the Close's pending async
+  transition and commits with it.
+- **L5** listeners attach in the callback ref; they call a `handlers` ref published in an
+  insertion effect (calling `useEffectEvent` functions from a ref callback is a rules-of-hooks
+  error). The JS-free `autofocus` write moved into the callback ref too; `popup` state is gone.
+- Gate: typecheck, lint (clean, L4 warning gone), format:check, build,
+  `FUNSTACK_BROWSERS=chromium,firefox pnpm test:run` 1443 passed / 3 skipped.
+
+Design corrections for the architect (not edited by me): 4.4 "held -> false in a transition"
+is now a normal update; 6.1 fallback paragraph is obsolete (WebKit verified); 6.2 rule 1 needs
+"or focus was inside the content when the close commit unmounted it"; 14.2 hook result is
+`{ setElement, visible, wrapContent }`; 14.1 Root value gains `openGeneration` /
+`nextOpenGeneration`; 3.4 Close: stale close after dismiss + re-open is dropped; 2.5 / 3.1
+`defaultOpen` wording (content and Trigger state are in the server HTML); 13.1 shim now runs
+focusing steps.
