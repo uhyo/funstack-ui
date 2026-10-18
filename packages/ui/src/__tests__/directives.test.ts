@@ -130,6 +130,15 @@ const clientFiles = [
   "toast/toast-action.mjs",
   "toast/toast-close.mjs",
   "internal/use-modal-registration.mjs",
+  // Every Slider part and its context are client modules (design/components/slider.md,
+  // decision 12 and 14.1 "Directive").
+  "slider/slider-context.mjs",
+  "slider/slider-root.mjs",
+  "slider/slider-label.mjs",
+  "slider/slider-track.mjs",
+  "slider/slider-indicator.mjs",
+  "slider/slider-thumb.mjs",
+  "slider/slider-value.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -154,6 +163,9 @@ const directiveFreeFiles = [
   "toast/index.mjs",
   "toast/toast.mjs",
   "internal/modal-registry.mjs",
+  "slider/index.mjs",
+  // Pure arithmetic (design 15).
+  "slider/slider-arithmetic.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

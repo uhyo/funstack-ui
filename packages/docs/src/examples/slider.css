@@ -1,0 +1,123 @@
+/* Slider: the library publishes geometry as custom properties (--slider-value on each Thumb,
+   --slider-start / --slider-end on the Root) and never positions anything; this CSS does.
+   Registering the properties lets keyboard steps and rollbacks animate; a drag does not. */
+@property --slider-value {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+@property --slider-start {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+@property --slider-end {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+.demo-slider {
+  display: grid;
+  gap: 0.4rem;
+  inline-size: min(22rem, 100%);
+}
+
+.demo-slider-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-text);
+}
+
+.demo-slider-label {
+  font-weight: 600;
+}
+
+.demo-slider-track {
+  position: relative;
+  block-size: 6px;
+  margin-block: 0.75rem;
+  border-radius: 3px;
+  background: var(--color-border);
+  cursor: pointer;
+}
+
+.demo-slider-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--slider-start);
+  inset-inline-end: calc(100% - var(--slider-end));
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition:
+    --slider-start 120ms ease-out,
+    --slider-end 120ms ease-out;
+}
+
+.demo-slider-thumb {
+  position: absolute;
+  inline-size: 20px;
+  block-size: 20px;
+  inset-block-start: 50%;
+  inset-inline-start: var(--slider-value);
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--color-bg);
+  box-shadow:
+    0 0 0 2px var(--color-primary),
+    0 1px 3px rgb(0 0 0 / 0.25);
+  transition:
+    --slider-value 120ms ease-out,
+    scale 120ms;
+}
+
+[dir="rtl"] .demo-slider-thumb {
+  translate: 50% -50%;
+}
+
+.demo-slider-thumb:has(:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.demo-slider-thumb[data-dragging] {
+  scale: 1.15;
+}
+
+.demo-slider-thumb[data-pending] {
+  box-shadow:
+    0 0 0 4px var(--color-primary),
+    0 1px 3px rgb(0 0 0 / 0.25);
+  animation: demo-slider-pulse 0.8s infinite alternate;
+}
+
+@keyframes demo-slider-pulse {
+  to {
+    opacity: 0.6;
+  }
+}
+
+/* Follow the pointer exactly while dragging. */
+[data-dragging] .demo-slider-thumb,
+[data-dragging] .demo-slider-fill {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-slider-thumb,
+  .demo-slider-fill {
+    transition: none;
+    animation: none;
+  }
+}
+
+.demo-slider-results {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  color: var(--color-text);
+}
+
+.demo-slider-results[data-stale] {
+  opacity: 0.6;
+}

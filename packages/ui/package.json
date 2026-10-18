@@ -38,6 +38,7 @@
     "./popover": "./dist/popover/index.mjs",
     "./radio-group": "./dist/radio-group/index.mjs",
     "./select": "./dist/select/index.mjs",
+    "./slider": "./dist/slider/index.mjs",
     "./switch": "./dist/switch/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",
     "./toast": "./dist/toast/index.mjs",

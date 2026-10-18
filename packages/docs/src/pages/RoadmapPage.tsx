@@ -93,6 +93,13 @@ export function RoadmapPage() {
           <code>ariaNotify</code>, and a region that moves into an open modal Dialog so it stays
           interactive (<a href={issue(54)}>#54</a>).
         </li>
+        <li>
+          <a href="/components/slider">Slider</a>: the first continuous control, on a visually
+          hidden native range per thumb. Every step is a transition (<code>valueChangeAction</code>
+          ), each gesture is saved once (<code>valueCommitAction</code>) and rolls back if the save
+          fails, and the thumb under the pointer is urgent library state; multi-thumb, vertical and
+          RTL (<a href={issue(54)}>#54</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
