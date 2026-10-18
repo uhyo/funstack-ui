@@ -216,6 +216,8 @@ export function FieldRoot({
   // --- The mirror -----------------------------------------------------------------------------
 
   const [mirror, setMirror] = useState<Mirror>(INITIAL_MIRROR);
+  /** The last mirror written: `refresh` compares against it, so an unchanged read renders nothing. */
+  const mirrorRef = useRef<Mirror>(INITIAL_MIRROR);
   /** jsdom fallback for `:user-invalid` (design 2.2): `invalid` fired, cleared by a reset. */
   const attempted = useRef(false);
   /** The element the slot was last written on (a group's first member can change). */
@@ -258,7 +260,11 @@ export function FieldRoot({
             ? NONE
             : [el.validationMessage];
       const next: Mirror = { userInvalid, validity, messages };
-      setMirror((previous) => (mirrorEquals(previous, next) ? previous : next));
+      // Only a change schedules a render (a `focusout` with nothing new causes none).
+      if (!mirrorEquals(mirrorRef.current, next)) {
+        mirrorRef.current = next;
+        setMirror(next);
+      }
 
       // Stale-value suppression (design 3.2 item 2): while the Form's own submission is in
       // flight, an error is about the value it sent; compare with what the field holds now.

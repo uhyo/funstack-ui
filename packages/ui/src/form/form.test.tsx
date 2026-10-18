@@ -274,7 +274,13 @@ describe("Form: server errors", () => {
     await user.type(control("name"), "Ann");
     await user.click(submit());
     expectPending(screen.getByTestId("form"));
-    await user.type(control(), "x");
+    // An edit while the action is pending. (`user.type` here makes React log "A component
+    // suspended inside an `act` scope, but the `act` call was not awaited": user-event's own
+    // per-event sync `act` sees the pending useActionState transition suspend. A test-harness
+    // artefact; the edit itself is what matters.)
+    await act(async () => {
+      fireEvent.input(control(), { target: { value: "a@b.cx" } });
+    });
     await act(async () => d.resolve({ errors: { email: "Taken", name: "Bad name" } }));
     await flush();
     expect(screen.queryByTestId("email-error")).toBeNull();

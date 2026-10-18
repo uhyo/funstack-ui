@@ -4,7 +4,7 @@
 // branch: the action runs once (the Form's call), `useFormStatus` is pending with `data` in a
 // child and through a portal, and no automatic reset follows a result with errors.
 import { act, render, screen } from "@testing-library/react";
-import { startTransition, useActionState, useState } from "react";
+import { Suspense, startTransition, useActionState, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -156,6 +156,34 @@ describe.each(["useActionState dispatch", "plain async function"] as const)(
     });
   },
 );
+
+describe("Form: editing while the submission is in flight", () => {
+  it("real typing during a pending useActionState action: no fallback, the stale error is suppressed", async () => {
+    const calls: Deferred<Result>[] = [];
+    const run = () => {
+      const d = deferred<Result>();
+      calls.push(d);
+      return d.promise;
+    };
+    render(
+      <Suspense fallback={<p data-testid="fallback" />}>
+        <ActionStateForm run={run} seen={[]} />
+      </Suspense>,
+    );
+    await user.type(email(), "a@b.c");
+    await user.click(submit());
+    await flush();
+    expectPending(screen.getByTestId("form"));
+    await user.type(email(), "x");
+    expect(screen.queryByTestId("fallback")).toBeNull();
+    await act(async () => calls[0]!.resolve({ errors: { email: "Already registered" } }));
+    await flush();
+    expectNotPending(screen.getByTestId("form"));
+    expect(screen.queryByTestId("error")).toBeNull();
+    expect(email().value).toBe("a@b.cx");
+    expect(email().validationMessage).toBe("");
+  });
+});
 
 describe("Form: invalid submission", () => {
   it("an invalid form never reaches the action; the Field shows the error and focuses", async () => {
