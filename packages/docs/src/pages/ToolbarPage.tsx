@@ -56,12 +56,24 @@ export function ToolbarPage() {
           put at most one such control in a toolbar, and put it last.
         </p>
       </Callout>
-      <Callout title="Choices inside a toolbar: ToggleGroup, not radios">
+      <Callout title="Radios inside a toolbar trap the arrow keys">
         <p>
-          For a one-of-several choice inside a toolbar (text alignment), use an{" "}
-          <code>exclusive</code> <a href="/components/toggle-group">ToggleGroup</a>. Native radios
-          (and <a href="/components/radio-group">RadioGroup</a>) currently behave differently on the
-          JS path and the native <code>focusgroup</code> path inside a toolbar.
+          A group of native radios with one <code>name</code> (a{" "}
+          <a href="/components/radio-group">RadioGroup</a> too) is one toolbar item. The toolbar's
+          arrows land on its checked radio, or on its first radio when none is checked. On a radio,
+          every arrow key is the radio group's: it checks as it moves and wraps within the group, so
+          in a horizontal toolbar ArrowLeft / ArrowRight never leave the group (ArrowUp / ArrowDown
+          in a vertical one). Leave it with Tab or Shift+Tab, which move to the next or previous
+          toolbar item; from an unchecked radio they visit the checked one first. Both the JS path
+          and Chromium's native <code>focusgroup</code> behave this way. Radios that share a{" "}
+          <code>name</code> but belong to different forms (<code>form=</code>) are not told apart.
+        </p>
+        <p>
+          For a one-of-several choice that is transparent to the toolbar's arrows (text alignment),
+          use an <code>exclusive</code> <a href="/components/toggle-group">ToggleGroup</a>. For Up /
+          Down within the group and Left / Right through the toolbar, as in the APG Toolbar example,
+          build the group from <code>button[role="radio"]</code> elements with your own key
+          handlers: custom radios are ordinary toolbar items.
         </p>
       </Callout>
 
@@ -228,6 +240,18 @@ export function ToolbarPage() {
           ],
           ["ArrowDown / ArrowUp", "Ignored", "Next / previous item", "Same."],
           ["Home / End", "First / last item", "Same", "Same."],
+          [
+            "Any of the above on a native radio",
+            "",
+            "",
+            "The radio group's own: checks the next / previous radio, wrapping within the group.",
+          ],
+          [
+            "Tab / Shift+Tab on a native radio",
+            "",
+            "",
+            "The checked radio of its group if focus is on another one; else the next / previous toolbar item while one exists.",
+          ],
           [
             "Any of the above on a text-entry item",
             "",
