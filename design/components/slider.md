@@ -836,6 +836,8 @@ DOM write the library makes outside render is the reset mirror of 9.2.
 
 ### 9.4 Inside a `Field` (issue #60)
 
+**Accepted by the product owner** (2026-10-18): section 9.4 is accepted as proposed, including the dev warning for `Field.Root required` around a Slider. If the screen-reader pass finds group descriptions unread, moving `aria-describedby` onto each thumb input is pre-approved as a follow-up.
+
 Status: **proposed, needs product-owner acceptance** (2026-10-18). Slider was implemented in
 parallel with Field, so this wiring was deferred to #60. It follows Field 7.1 / 7.2 as corrected
 by the Field review (ae4640d: `useFieldValueChange`, no `data-pending` from the hook, per-item
