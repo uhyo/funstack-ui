@@ -5,10 +5,19 @@
 // view transition on its mount or reveal (docs/research/view-transition-mount-cost.md); those rows
 // assert the current React behaviour so a React fix is noticed.
 //
-// Interactions here are in-page `element.click()` calls, measured with `performance.now()` against
-// a MutationObserver, outside `act`: `act` would flush React's queue itself and hide exactly the
-// scheduling delay under test. IS_REACT_ACT_ENVIRONMENT is switched off for that reason.
-import { cleanup, render, screen } from "@testing-library/react";
+// "Not held back" is asserted from the mechanism, not from wall-clock time (#71: a 50 ms bound
+// failed under CPU load with no view transition anywhere). react-dom 19.3 holds a transition
+// commit exactly when `document.__reactViewTransition` (the view transition it started last) is
+// still set when the commit is ready, and then waits for its `finished`
+// (`waitingForViewTransition` in react-dom-client). The rows sample that field, and the engine's
+// `activeViewTransition` where it exists, when the second click is made and when its commit
+// lands. The `transition="none"` Tabs rows check that the probe does see a running transition.
+// Measured delays are still logged for memo/developer/view-transition-boundary.md.
+//
+// Interactions here are in-page `element.click()` calls observed with a MutationObserver, outside
+// `act`: `act` would flush React's queue itself and hide exactly the scheduling under test.
+// IS_REACT_ACT_ENVIRONMENT is switched off for that reason.
+import { render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -65,45 +74,60 @@ function when(cond: () => boolean, timeout = 3000): Promise<number> {
 
 const visible = (text: string) => () => screen.queryByText(text)?.checkVisibility() === true;
 
+type VTDocument = Document & {
+  __reactViewTransition?: ViewTransition | null;
+  activeViewTransition?: ViewTransition | null;
+};
+
+/** Whether a view transition is running that react-dom would hold a transition commit for. */
+function viewTransitionRunning(): boolean {
+  const doc = document as VTDocument;
+  return doc.__reactViewTransition != null || doc.activeViewTransition != null;
+}
+
+interface SecondCommit {
+  /** Wall-clock time from the second click to its commit; logged only, never asserted. */
+  delay: number;
+  /** A view transition was running when the second click was made. */
+  runningAtClick: boolean;
+  /** A view transition was running when the second commit was observed. */
+  runningAtCommit: boolean;
+}
+
 /**
- * Runs `first`, waits for it to commit, then immediately runs `second` and returns how long the
- * second transition commit took to land.
+ * Runs `first`, waits for it to commit, then immediately runs `second` and reports whether a
+ * view transition could hold the second commit back (and how long it took, for the log).
  */
-async function secondCommitDelay(
+async function secondCommit(
   first: () => void,
   firstDone: () => boolean,
   second: () => void,
   secondDone: () => boolean,
-): Promise<number> {
+): Promise<SecondCommit> {
   first();
   await when(firstDone);
+  const runningAtClick = viewTransitionRunning();
   const start = performance.now();
   second();
-  const end = await when(secondDone);
-  return end - start;
+  let runningAtCommit = false;
+  const end = await when(() => {
+    if (!secondDone()) return false;
+    runningAtCommit = viewTransitionRunning();
+    return true;
+  });
+  return { delay: end - start, runningAtClick, runningAtCommit };
 }
 
-function log(label: string, delay: number) {
+function log(label: string, { delay }: SecondCommit) {
   // Recorded for memo/developer/view-transition-boundary.md.
   console.info(`[${server.browser}] ${label}: second commit after ${Math.round(delay)} ms`);
 }
 
-/** Generous for CI noise, far below the ~250 ms cross-fade it guards against. */
-const NOT_DELAYED_MS = 50;
-
-/**
- * Mounts a fresh tree and measures, up to three times, keeping the best run. A held commit waits
- * for the 250 ms cross-fade on every attempt; machine noise (a parallel test run) does not repeat.
- * Every attempt counts towards `calls`.
- */
-async function bestOf(mount: () => void, run: () => Promise<number>): Promise<number> {
-  let best = Infinity;
-  for (let attempt = 0; attempt < 3 && best >= NOT_DELAYED_MS; attempt++) {
-    mount();
-    best = Math.min(best, await run());
-    cleanup();
-  }
-  return best;
+/** No startViewTransition at all, and nothing running that react-dom could hold a commit for. */
+function expectNotHeld(result: SecondCommit) {
+  expect(calls).toBe(0);
+  expect(result.runningAtClick).toBe(false);
+  expect(result.runningAtCommit).toBe(false);
 }
 
 describe("Tabs switch", () => {
@@ -122,7 +146,7 @@ describe("Tabs switch", () => {
     </Tabs.Root>
   );
   const run = () =>
-    secondCommitDelay(
+    secondCommit(
       () => screen.getByRole("tab", { name: "B" }).click(),
       visible("panel b"),
       () => screen.getByRole("tab", { name: "C" }).click(),
@@ -132,10 +156,10 @@ describe("Tabs switch", () => {
   it.each([false, true])(
     "keepMounted={%s} without transition: no startViewTransition, next commit not delayed",
     async (keepMounted) => {
-      const delay = await bestOf(() => render(tree(keepMounted, undefined)), run);
-      log(`Tabs keepMounted=${keepMounted} no transition`, delay);
-      expect(calls).toBe(0);
-      expect(delay).toBeLessThan(NOT_DELAYED_MS);
+      render(tree(keepMounted, undefined));
+      const result = await run();
+      log(`Tabs keepMounted=${keepMounted} no transition`, result);
+      expectNotHeld(result);
     },
   );
 
@@ -143,9 +167,13 @@ describe("Tabs switch", () => {
     'keepMounted={%s} with transition="none": one startViewTransition per switch (react-dom 19.3)',
     async (keepMounted) => {
       render(tree(keepMounted, "none"));
-      const delay = await run();
-      log(`Tabs keepMounted=${keepMounted} transition="none"`, delay);
+      const result = await run();
+      log(`Tabs keepMounted=${keepMounted} transition="none"`, result);
       expect(calls).toBe(2);
+      // The first switch's transition is still running at the second click (its commit is
+      // observed from inside the update callback, before `finished`), so the probe the "not
+      // held" rows rely on does see a transition that holds the next commit.
+      expect(result.runningAtClick).toBe(true);
     },
   );
 });
@@ -162,7 +190,7 @@ describe("Accordion expand", () => {
     </Accordion.Root>
   );
   const run = () =>
-    secondCommitDelay(
+    secondCommit(
       () => screen.getByText("trigger a").click(),
       visible("panel a"),
       () => screen.getByText("trigger b").click(),
@@ -170,16 +198,16 @@ describe("Accordion expand", () => {
     );
 
   it("without transition: no startViewTransition, next commit not delayed", async () => {
-    const delay = await bestOf(() => render(tree(undefined)), run);
-    log("Accordion no transition", delay);
-    expect(calls).toBe(0);
-    expect(delay).toBeLessThan(NOT_DELAYED_MS);
+    render(tree(undefined));
+    const result = await run();
+    log("Accordion no transition", result);
+    expectNotHeld(result);
   });
 
   it('with transition="none": expanding only updates always-mounted boundaries, none started', async () => {
     render(tree("none"));
-    const delay = await run();
-    log('Accordion transition="none"', delay);
+    const result = await run();
+    log('Accordion transition="none"', result);
     expect(calls).toBe(0);
   });
 });
@@ -204,7 +232,7 @@ describe("Dialog open", () => {
   }
   const dialog = (id: string) => screen.queryByTestId(id) as HTMLDialogElement | null;
   const run = () =>
-    secondCommitDelay(
+    secondCommit(
       () => screen.getByTestId("outer-trigger").click(),
       () => dialog("outer")?.open === true && screen.queryByTestId("inner-trigger") !== null,
       () => screen.getByTestId("inner-trigger").click(),
@@ -212,16 +240,16 @@ describe("Dialog open", () => {
     );
 
   it("without transition: no startViewTransition, the inner open is not delayed", async () => {
-    const delay = await bestOf(() => render(<Nested transition={undefined} />), run);
-    log("Dialog nested no transition", delay);
-    expect(calls).toBe(0);
-    expect(delay).toBeLessThan(NOT_DELAYED_MS);
+    render(<Nested transition={undefined} />);
+    const result = await run();
+    log("Dialog nested no transition", result);
+    expectNotHeld(result);
   });
 
   it('with transition="none": the nested Popup mount starts one (react-dom 19.3)', async () => {
     render(<Nested transition="none" />);
-    const delay = await run();
-    log('Dialog nested transition="none"', delay);
+    const result = await run();
+    log('Dialog nested transition="none"', result);
     expect(calls).toBeGreaterThanOrEqual(1);
   });
 
