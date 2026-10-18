@@ -180,3 +180,9 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - User suggestion: a Button with an action and pending state → #79 (filed). PO view: yes; reuse internal/use-action-trigger; never disabled while pending (like Form.Submit); type="button". Planned as wave 8 unless the user wants it sooner.
 - Next: wave 8 = Button (#79). It needs research (aria-busy, re-entry), an architect design, then the usual pipeline.
 - The user asked to file the FUNSTACK Static issue → uhyo/funstack-static#194 (build exits 0 on RSC/prerender errors). Noted on #70. Other upstream items stay human tasks; the FUNSTACK family repos are OK to file in when the user asks.
+
+## 2026-10-18 — wave 8 (#80) Button
+- Research af1993f. The architect's draft (design/components/button.md plus conventions edits) is uncommitted in the main checkout; the architect hit the Fable limit.
+- User: wait for the Fable reset (don't switch models); remove Toolbar.Button now; include focusableWhenDisabled.
+- PO: staged re-entry rollout (follow-up issue for Dialog.Close, Popover.Close, Menu.Item), no opt-out prop.
+- On reset: SendMessage design-button with these decisions → commit → implement → review.
