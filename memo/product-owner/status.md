@@ -169,3 +169,13 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
   - impl-toolbar: implementing #74/#75 on branch wave7/toolbar-radios.
   - impl-flakes: #71 on branch wave7/flakes. The Popover exit row was added to its scope.
 - Left: finish both, close #78, release 0.1.0-alpha.5.
+
+## 2026-10-18 — wave 7 done, 0.1.0-alpha.5 released
+- After the limit reset, both agents were resumed with SendMessage.
+  - Fold 0780386.
+  - #71 fixed with test-only commits 99a5713 and 9e8a629. Root causes:
+    - The wall-clock "not delayed" rows now assert `document.__reactViewTransition` / `activeViewTransition`.
+    - The exit-animation rows now hold a 60 s CSS exit and call `finish()` on it.
+- Closed: #71, #78. Release 0.1.0-alpha.5 (bump 2669c42); publish and deploy green. The npm dist-tag view lagged right after publishing.
+- User suggestion: a Button with an action and pending state → #79 (filed). PO view: yes; reuse internal/use-action-trigger; never disabled while pending (like Form.Submit); type="button". Planned as wave 8 unless the user wants it sooner.
+- Next: wave 8 = Button (#79). It needs research (aria-busy, re-entry), an architect design, then the usual pipeline.
