@@ -220,6 +220,24 @@ describe("NumberField (browser)", () => {
   });
 
   describe("wheel", () => {
+    /**
+     * A real wheel over `element`, inside one `act`, resolved only once the page has received the
+     * `wheel` event. Playwright's `mouse.wheel` (behind `userEvent.wheel`) returns when the input
+     * is sent, not when it is dispatched: Firefox delivers the wheel event to content
+     * asynchronously, so under load it can arrive after the call returns, outside the `act`
+     * (CI run 39111246442: the value was still `5` and React logged unwrapped updates).
+     */
+    async function wheelOver(element: Element, deltaY: number): Promise<void> {
+      await act(async () => {
+        const delivered = new Promise<void>((resolve) => {
+          window.addEventListener("wheel", () => resolve(), { capture: true, once: true });
+        });
+        await userEvent.wheel(element, { delta: { y: deltaY } });
+        await delivered;
+      });
+      await flush();
+    }
+
     function Tall(props: Partial<NumberFieldRootProps>) {
       return (
         <div>
@@ -234,17 +252,12 @@ describe("NumberField (browser)", () => {
       render(<Tall defaultValue={5} stepOnWheel valueCommitAction={onCommit} />);
       window.scrollTo(0, 0);
       await focusInput();
-      await act(async () => {
-        await userEvent.wheel(input(), { delta: { y: -100 } });
-      });
-      await flush();
+      await wheelOver(input(), -100);
       expect(input().value).toBe("6");
       expect(window.scrollY).toBe(0);
       await act(async () => input().blur());
       window.scrollTo(0, 0);
-      await act(async () => {
-        await userEvent.wheel(input(), { delta: { y: 100 } });
-      });
+      await wheelOver(input(), 100);
       await vi.waitFor(() => expect(window.scrollY).toBeGreaterThan(0));
       expect(input().value).toBe("6");
       expect(onCommit).toHaveBeenCalledTimes(1);
@@ -255,9 +268,7 @@ describe("NumberField (browser)", () => {
       render(<Tall defaultValue={5} />);
       window.scrollTo(0, 0);
       await focusInput();
-      await act(async () => {
-        await userEvent.wheel(input(), { delta: { y: 100 } });
-      });
+      await wheelOver(input(), 100);
       await vi.waitFor(() => expect(window.scrollY).toBeGreaterThan(0));
       expect(input().value).toBe("5");
       window.scrollTo(0, 0);
