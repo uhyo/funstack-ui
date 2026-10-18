@@ -1,6 +1,6 @@
 # ToggleGroup and Toolbar
 
-Status: **Draft — awaiting product owner acceptance** (2026-10-18, GitHub issue #66, wave 6).
+Status: **Accepted by the product owner** (2026-10-18, GitHub issue #66, wave 6). Draft 90d9375; recommendations 1-12 accepted as written.
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win. The conventions amendments this design asks for are listed at the end and were
 applied to `design/conventions.md` in the same commit, marked as pending this design's acceptance.
@@ -1162,3 +1162,5 @@ Nothing in `ChangeReason`, the action signature, the state triple or the Suspens
     unnamed `Toolbar.Root` (APG requires the name) — cheap to add if wanted.
 12. **ToggleGroup has no form participation and no `details.reason`** (no residual browser path);
     `ToggleGroupValueChangeDetails` is `{ added, removed }` and can grow.
+
+**Accepted by the product owner (2026-10-18):** recommendations 1-12 are accepted as written, together with the conventions amendments applied in 90d9375. On recommendation 6 (the library writes `tabindex` on toolbar items through the DOM), the PO decided: accepted. The DOM-discovery model matches `focusgroup`, which works on arbitrary descendants, and the JS path is its stand-in. The decision is reported to the user and can be revisited while the library is in alpha.
