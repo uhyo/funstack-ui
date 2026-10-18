@@ -2,9 +2,14 @@
 
 Status: **accepted** (2026-10-18, wave 5, GitHub issue #54; research issue #55; all eleven
 product-owner items accepted as recommended, see "Accepted by the product owner" at the end).
+The review of the implementation (`memo/reviewer/field-form.md`, merge e172925) and its fixes
+(ae4640d library and tests, 30a4bb2 docs) are folded in on 2026-10-18, see "Review corrections
+(#54)" at the end. The code under `packages/ui/src/field/`, `packages/ui/src/form/` and the
+`internal/` helpers it names is the ground truth where this document is silent.
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
 the conventions win. The conventions changes listed under "Conventions feedback (proposed)"
-were **applied** to `design/conventions.md` on 2026-10-18 (resolved question 30).
+were **applied** to `design/conventions.md` on 2026-10-18 (resolved question 30); the 3.8 hook
+rows were corrected with the review fold (`useFieldValueChange`, no `data-pending` from the hook).
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/field-form.md` (binding: native
 constraint validation as the source of validity, `:user-invalid` as the show-timing signal,
@@ -39,14 +44,14 @@ reported no errors**, so a failed submission never wipes what the user typed.
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Anatomy | `Field.Root` (`div`), `Field.Label` (`label[for]`), `Field.Control` (a native `input`, or `textarea` / `select` through `render`), `Field.Description` (`p[id]`), `Field.Error` (`div[id]`, rendered only while an error is shown). `Form.Root` (`form`), `Form.Submit` (`button[type=submit]` with `data-pending`). Any FUNSTACK form control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, Slider) placed inside a `Field.Root` is the field's control (section 7), no wrapper part needed. |
-| 2 | Validity source | Native constraints (`required`, `type`, `pattern`, `min`/`max`, `minLength`, …) plus **one custom-validity slot** the Field owns: `validate(value, formData)` (sync, re-run on every `input` / `change` in the form) and the server error for the field, both written with `setCustomValidity`. Cleared on the control's next `input`. No JS schema, no `validationMode`. |
-| 3 | When an error is shown | `invalid = userInvalid \|\| serverShown`. `userInvalid` is read from the DOM (`control.matches(":user-invalid")`) on `input`, `change`, `focusout`, `invalid` and after `reset`: the platform's heuristic (changed-then-blurred, or a submission attempt; live afterwards; cleared by a reset). `serverShown` is the field's entry in `Form.Root errors` until the user edits the control, re-armed by the next settled submission. |
+| 2 | Validity source | Native constraints (`required`, `type`, `pattern`, `min`/`max`, `minLength`, …) plus **one custom-validity slot** the Field owns: `validate(value, formData)` (sync, re-run on every `input` / `change` in the form and after a FUNSTACK control's value change that fired no event, 7.1) and the server error for the field, both written with `setCustomValidity`. Cleared on the control's next edit. No JS schema, no `validationMode`. |
+| 3 | When an error is shown | `invalid = userInvalid \|\| serverShown`. `userInvalid` is read from the DOM (`control.matches(":user-invalid")`) on `input`, `change`, `focusout`, `invalid` and after `reset`: the platform's heuristic (changed-then-blurred, or a submission attempt; live afterwards; cleared by a reset). `serverShown` is the field's entry in `Form.Root errors` until the user edits the control, re-armed by the next settled submission (each Field re-arms itself on its own `useFormStatus` edge, in the settle commit, 3.4). |
 | 4 | The display state is urgent | `invalid`, `messages` and `validity` are a **mirror of a browser-owned fact**, written with plain `useState` from the DOM event (the urgent lane of conventions 2.6, like virtual focus): the DOM already holds the truth, and the error must be in the DOM when focus moves to the field. No `transition` prop on any Field or Form part; `Field.Error` animates with CSS. |
-| 5 | ARIA | `Field.Label` is `<label for>` (for a group control it renders no `for` and the group gets `aria-labelledby`). The control carries `aria-describedby` = consumer tokens + the description id + the error id while shown, and an **explicit** `aria-invalid="true" \| "false"`. `aria-errormessage` is **not rendered in v1** (VoiceOver ignores it, NVDA would read the error twice); if it is ever added it is only ever in addition to `aria-describedby`. No live region on the error. |
+| 5 | ARIA | `Field.Label` is `<label for>` (for a group control it renders no `for` and the group gets `aria-labelledby`). The control carries `aria-describedby` = consumer tokens + the description id + the error id while invalid, and an **explicit** `aria-invalid="true" \| "false"` (for a CheckboxGroup, on every Item: ARIA 1.2 does not support it on `group`, 5.1). `aria-errormessage` is **not rendered in v1** (VoiceOver ignores it, NVDA would read the error twice); if it is ever added it is only ever in addition to `aria-describedby`. No live region on the error: focus moving to the control reads it, and when focus is already there the message is spoken through `ariaNotify()` (2.5, 3.5). |
 | 6 | The bubble | After hydration a Field cancels the control's `invalid` event **when a `Field.Error` is mounted and the control matches `:user-invalid`** (a submission attempt), renders the message instead, and focuses the first such control in document order (module-level collector, works in any form). A `checkValidity()` or `reportValidity()` call, and a Field without `Field.Error`, keep the platform's behaviour. Before hydration the bubble is the fallback. |
 | 7 | Submission | `Form.Root` renders `<form action={action}>` **unwrapped** (progressive enhancement: the server HTML posts to the Server Function) and, after hydration, intercepts `submit`: `preventDefault()` and `await action(formData)` inside the Form's own `useTransition`. react-dom then skips its own action run (and its automatic reset) and still starts the form's pending status, so `useFormStatus` and `Form.Submit` work unchanged. A submitter with its own `formaction` and a string `action` are left to React / the browser. |
-| 8 | Reset policy | `autoReset` (default `true`): the form is reset when a submission **settles with no errors** (`errors` empty at the settle commit). A submission that returns field errors leaves every value, `:user-invalid` and custom validity in place. `false`: never; the consumer resets. |
-| 9 | Server errors | `Form.Root errors` (keyed by field `name`, from `useActionState`'s result or anything else) reach each Field through context. Shown at once, `setCustomValidity`'d, cleared by the field's next edit; the Form focuses the first errored field after the settle. An error for a field whose value changed while the submission was in flight is not shown (it was about a value the user already replaced). |
+| 8 | Reset policy | `autoReset` (default `true`): the form is reset when a submission the Form ran **settles with no errors** (`errors` has no non-empty entry at the settle commit, hidden stale ones included). A submission that returns field errors leaves every value, `:user-invalid` and custom validity in place. `false`: never; the consumer resets. |
+| 9 | Server errors | `Form.Root errors` (keyed by field `name`, from `useActionState`'s result or anything else) reach each Field through context. Shown at once, `setCustomValidity`'d, cleared by the field's next edit; the Form focuses the first errored field after the settle. An error for a field whose value changed while the submission was in flight is not shown (it was about a value the user already replaced), and stays hidden until the next settle, also while the next submission is in flight (3.4). |
 | 10 | Pending | `Form.Root` and `Form.Submit`: `data-pending` while the submission's transition is pending (`useFormStatus`). `Field.Root`: `data-pending` from `useFormStatus().pending` of the enclosing form, the one deliberate exception to "a part never folds the form channel into its own `pending`", because a Field has no action of its own. Controls inside keep their own `data-pending` for their own actions. |
 | 11 | Repeat submits | Not dropped while pending: a `useActionState` dispatch queues them in order (React's own semantics; conventions 2.5 names forms as the ordered-actions case); a plain action runs concurrently. Consumers block with CSS on `Form.Submit[data-pending]`. |
 | 12 | Directives | Every part file is `"use client"` (context, `useId`, `useFormStatus`). Server Components may render all parts with serialisable props: `Form.Root action={serverFn} errors={…}`, `Field.Root name required`; `validate` is a function and needs a client component. |
@@ -112,7 +117,7 @@ message, and focused the control):
 | `Field.Control` | `input` (`textarea` / `select` through `render`) | the element's | `data-invalid`, `data-disabled`, `data-required`, `data-pending` | `id`, `name` (the Field's unless given), `disabled` / `required` (own or the Field's), `aria-describedby` (token-merged), `aria-invalid`. The native constraint attributes are ordinary pass-through. Must stay a native form control. |
 | `Field.Description` | `p` | | same four attributes | `id` = `${id}-description`; always referenced by the control's `aria-describedby` (a dangling reference is skipped, the Dialog rule), so no registration. |
 | `Field.Error` | `div` | | same four attributes | `id` = `${id}-error`; renders **nothing** while `invalid` is false. Default content: the messages (`validationMessage` for a native or custom constraint, the server's text for a server error). Its mount registers "an error element exists" so the Field knows it may cancel the bubble. |
-| `Form.Root` | `form` | form | `data-pending` | Owns the submission intercept, `errors`, the settle generation, the first-error focus and the reset policy. `children(state)` receives `{ pending }`. |
+| `Form.Root` | `form` | form | `data-pending` | Owns the submission intercept, `errors`, the submitted `FormData` (for the stale-value rule), the first-error focus, the cross-field refresh and the reset policy. `children(state)` receives `{ pending }`. |
 | `Form.Submit` | `button` | button | `data-pending`, `data-disabled` | `type="submit"`; `useFormStatus().pending` of the enclosing form. `name` / `value` pass through (the submitter's value reaches the action's `FormData`). |
 
 Why these parts:
@@ -182,16 +187,23 @@ a native constraint and unaffected).
 
 `validate` runs: once at mount (layout effect), on every `input` and `change` that bubbles to the
 **form owner** (so a cross-field rule such as "confirm equals password" is re-evaluated when the
-other field changes), after a `reset` (microtask, when the values are the reset values), and after
-a commit in which the `validate` prop changed. `value` is `formData.get(name)` when it is a
-string, else `""`; `formData` is `new FormData(form)` (or an empty `FormData` for a field with no
-form owner). `validate` is **sync in v1**; an async or debounced validator is a v2 question
-(section 12).
+other field changes), after a commit in which a FUNSTACK control inside **any** Field of the
+`Form.Root` changed its value without an event (a Combobox selection, a CheckboxGroup Parent
+checking its Items, a controlled change, a rolled-back optimistic value; the control's
+`useFieldValueChange` tells its Field, and the Field asks the Form to refresh the others, 7.1),
+on blur and on a submission attempt (the mirror's reads recompute the slot too), after a `reset`
+(microtask, when the values are the reset values), and after a commit in which the `validate`
+prop changed (by identity: keep it stable with `useCallback` or a module-level function, see the
+note under 4.1). `value` is `formData.get(name)` when it is a string, else `""`; `formData` is
+`new FormData(form)` (or an empty `FormData` for a field with no form owner). `validate` is
+**sync in v1**; an async or debounced validator is a v2 question (section 12).
 
-**`setCustomValidity` is cleared on the control's next `input`**, which is the research's finding
+**`setCustomValidity` is cleared on the control's next edit**, which is the research's finding
 2: a custom message persists until cleared and would block the next submission even after the
 user fixed the value. "Cleared" means recomputed: the server message is dropped (the field was
-edited, 3.4), and `validate` runs again on the new value.
+edited, 3.4), and `validate` runs again on the new value. An edit is an `input` or `change`
+event on the control, or a FUNSTACK control's `notifyChange(true)` for a change the user made
+with no event (a Combobox pick, 7.1).
 
 ### 2.2 When an error is shown
 
@@ -220,8 +232,10 @@ fires once per invalid control, synchronously, before `submit` would (which neve
 Where `:user-invalid` is not supported by the environment (jsdom), the Field falls back to
 "`invalid` fired for this control and it is still invalid" (cleared by reset), which is identical
 to the platform's answer for the submission-attempt case and misses only the changed-then-blurred
-case. The fallback engages only when `matches(":user-invalid")` throws; it is a test aid, not a
-browser path (section 13).
+case. The fallback engages where `CSS.supports("selector(:user-invalid)")` is false (jsdom 30's
+selector engine knows the name and silently answers `false` to `matches()`, so "when `matches`
+throws" would never have engaged; developer finding); it is a test aid, not a browser path
+(section 13).
 
 ### 2.3 `aria-invalid`, explicit
 
@@ -283,9 +297,18 @@ The collector skips the focus when something inside the same form already receiv
 the attempt (a plain `<input required>` with no Field keeps the native behaviour, bubble and
 focus, and the library does not fight it).
 
-The focus target is the control; for a group (`<fieldset>`) it is the first enabled member
-(RadioGroup: the checked radio if any, else the first; CheckboxGroup: the first item). It is
-focused with `focus()`, which scrolls it into view.
+The focus target is the control; for a group (`<fieldset>`) it is the first enabled **named**
+member (RadioGroup: the checked radio if any, else the first; CheckboxGroup: the first Item, never
+a `CheckboxGroup.Parent`, which has no `name`; the validity element is resolved the same way). It
+is focused with `focus()`, which scrolls it into view.
+
+**When focus is already on the first invalid control**, `focus()` moves nothing and nothing is
+read: this is the implicit submission (Enter in a text field that is itself the first invalid
+one), where the cancelled bubble was the platform's announcement. The collector then speaks the
+Field's messages through `element.ariaNotify()` (feature-checked; every supported engine has it,
+research survey; nothing elsewhere), once per attempt, and never after a focus move in the same
+batch. A blur-and-refocus was the alternative; it is noisier and moves the caret. Product-owner
+decision (review M2).
 
 A Field with no `Field.Error` mounted leaves the event alone: the platform shows its bubble and
 focuses the control, as before. Before hydration no listener exists, so the bubble is the
@@ -346,25 +369,36 @@ fires, so an invalid form never reaches the handler on either path.
 | `useFormStatus` | pending with `data`, `method`, `action` | pending | n/a |
 | Automatic reset | **never**; the Form resets on a settle with no errors (`autoReset`) | after every successful action (React) | n/a |
 | Errors thrown by the action | the Form's transition rejects: nearest Error Boundary above `Form.Root` | the host transition rejects: same boundary | n/a |
-| `errors` and the settle generation | yes | yes (the watcher sees the edge) | n/a |
+| `errors` and the settle edge (re-arm, focus) | yes | yes (the watcher and every Field see the edge) | n/a |
+| A `render` element's own `onSubmit` calling `preventDefault()` | cancels the submission (the Form runs nothing; React's plugin skips a prevented submit too) | same | the browser's |
 
 ### 3.2 Pending and the settle
 
 `Form.Root`'s `pending` is `isPending` of its own transition **or** the form's status seen by a
 `FormStatusWatcher` child (the Dialog.Form component, reused), so it is true on both paths and
 covers the Suspense wait of whatever the result re-renders. `data-pending` goes on the form and
-`state.pending` into `children(state)`. The settle is the watcher's `true → false` edge, read in
-an effect, as in Dialog 8.1. At the settle the Form, in this order:
+`state.pending` into `children(state)`. The settle is the status's `true → false` edge. It is
+seen twice, on purpose:
 
-1. advances the **settle generation** (a counter in the Form context; it is what re-arms
-   dismissed server errors, 3.4);
-2. computes **suppressed names**: on the intercepted path, every `errors` key whose current form
-   value differs from the value the submission sent (string entries compared element-wise through
-   `FormData.getAll`; a `File` entry counts as unchanged). Not computed on React's path, where the
-   automatic reset changed every value;
-3. if `errors` (the prop at this commit) has a non-empty, non-suppressed entry: **focuses** the
-   first registered Field with such an entry, in document order (3.5);
-4. otherwise, if `autoReset` and the submission was intercepted: `form.reset()`.
+1. **By every `Field.Root`, in the settle render.** Each Field reads `useFormStatus()` itself
+   and, on its `true → false` edge (the render-phase derived-state pattern), re-arms: `dismissed`
+   is cleared and the flight's "suppress at the next settle" flag is promoted to `suppressed`
+   (3.4). The action's result (`errors`) and the status's `NotPending` land in the **same
+   commit**, so the next errors are in the DOM, slot written, when the Form's effect runs. A Form
+   effect advancing a counter one commit later (the first draft's "settle generation") would have
+   focused a field whose new error was not rendered yet and whose slot did not block yet
+   (developer choice 1, agreed by the review).
+2. **By the Form, in its settle effect** (the `FormStatusWatcher` child, the Dialog.Form
+   component reused, as Dialog 8.1), in this order:
+   1. if any registered Field **shows** a server error at this commit (`serverShown`, which
+      already excludes dismissed and hidden stale ones): **focus** the first such Field's target
+      in document order (3.5), or announce when focus is already there;
+   2. otherwise, if `autoReset`, the submission was intercepted, and `errors` (the prop at this
+      commit, read through `latest`) has **no non-empty entry at all**, hidden stale entries
+      included: `form.reset()`. A result that flags only a value the user replaced during the
+      flight (walkthrough 5) therefore resets nothing: the user's new value stays and is
+      submitted next (developer choice 3; the first draft's "no non-empty, non-suppressed entry"
+      would have wiped it).
 
 `form.reset()` from the effect, not `requestFormReset`: the latter must run inside a transition
 and resets at that transition's commit, which here would be a second commit for the same result;
@@ -389,23 +423,35 @@ field) is the consumer's own markup; the library reserves no key for it.
 The Form never interprets a return value, so a result reaches the Fields only through this prop:
 "use `useActionState` and pass `state.errors`" is the documented pattern, and it is the one React
 itself documents for field errors. An action that **throws** does not produce `errors`: the
-transition rejects, the boundary handles it, the generation does not advance and nothing is reset.
+transition rejects, the boundary handles it, no settle effect runs and nothing is reset.
 
 ### 3.4 Server errors on a Field: shown, dismissed, re-armed, suppressed
 
-A `Field.Root` inside a `Form.Root` reads `{ errors, generation, suppressed }` from the Form
-context. For its `name`:
+A `Field.Root` inside a `Form.Root` reads `{ errors, submittedData }` from the Form context and
+keeps three flags of its own. For its `name`:
 
 - `serverMessages` = `errors[name]` normalised to `readonly string[]`.
-- `dismissed` = the user edited the control (`input` or `change` on it) **since the last settle**:
-  the Field stores the generation at which the edit happened and compares it with the current one,
-  so a settle re-arms every field at once with no reset bookkeeping, and the next submission's
-  errors are shown even when they are the same strings (the research's "clearing a server error
-  on next input", with a precise re-show rule).
-- `suppressed` = `name` is in the Form's suppressed set for this generation (3.2 item 2): the
-  user changed the value while the submission was in flight, so the error is about a value they
-  already replaced; showing it would also block the resubmission of the new value through
-  `setCustomValidity` until they edited the field again.
+- `dismissed` = the user edited the control (`input` or `change` on it, or a FUNSTACK control's
+  `notifyChange(true)`) **since the last settle**: set by the edit, cleared by the Field on its
+  own `useFormStatus` `true → false` edge (3.2), so a settle re-arms every field at once with no
+  reset bookkeeping, and the next submission's errors are shown even when they are the same
+  strings (the research's "clearing a server error on next input", with a precise re-show rule).
+- **Two hide flags for a stale value** (review M1). `suppressNext` is written during a flight:
+  every refresh while the form is pending and the Form ran the submission compares
+  `formData.getAll(name)` with `submittedData().getAll(name)` (string entries element-wise; a
+  `File` counts as unchanged) and records whether the value differs from what was sent. It is
+  reset to `false` on every `submit` event (a queued second submission sends the current values,
+  and never crosses a pending edge) and at the `false → true` edge. At the `true → false` edge it
+  is **promoted** to `suppressed`, which then stays **fixed until the next settle**. The split is
+  what keeps a hidden stale error hidden while the next submission is in flight: `errors` still
+  holds the old result during that flight, `dismissed` was cleared at the settle, and a single
+  flag cleared on `submit` re-showed "a@b.c is taken" for a value the server never judged, blocked
+  a queued second click through the slot and moved focus (the review's reproduction). The first
+  draft's per-generation set had the same frozen-until-settle property; the two flags keep it in
+  the per-Field model.
+- `suppressed`: the user changed the value while the submission was in flight, so the error is
+  about a value they already replaced; showing it would also block the resubmission of the new
+  value through `setCustomValidity` until they edited the field again.
 - `serverShown` = `serverMessages.length > 0 && !dismissed && !suppressed`.
 
 While `serverShown`, the Field writes the messages into the custom-validity slot (2.1), so the
@@ -420,21 +466,27 @@ enhancement post-back, a Server Component prop) are shown: nothing was dismissed
 suppressed. The Form does not focus on mount (3.5). A Field **outside** any `Form.Root` has no
 server-error channel (`validate` and native constraints only).
 
-Why the generation and not the `errors` object's identity: the identity changes on every render
+Why the settle edge and not the `errors` object's identity: the identity changes on every render
 for an inline object (`errors={{ email: state.emailError }}`), which would re-show a dismissed
-error on every keystroke of a controlled form. The cost of the generation rule is that an `errors`
+error on every keystroke of a controlled form. The cost of the edge rule is that an `errors`
 change that did **not** come from a submission through this Form (a consumer updating the object
 from elsewhere after the user dismissed the error) is not re-shown until the next settle;
 documented, and rare.
 
 ### 3.5 Focusing the first errored field
 
-After a settle with errors (3.2 item 3) the Form focuses the first Field, in document order, whose
-`name` has a non-empty, non-suppressed error. Fields register `{ name, getFocusTarget }` with the
-Form from a layout effect (the Form sorts by `compareDocumentPosition` at settle time, so the
-registration order does not matter). The focus target is the control, or for a group its first
-enabled member (2.5). The effect runs after the commit that rendered the errors, so the control's
-description already lists the error (2.4).
+After a settle with errors (3.2) the Form focuses the first Field, in document order, that shows a
+server error (`serverShown` at this commit). Fields register `{ getFocusTarget, showsServerError,
+serverMessages, refresh }` with the Form from a layout effect (the Form sorts by
+`compareDocumentPosition` at settle time, so the registration order does not matter). The focus
+target is the control, or for a group its first enabled named member (2.5). The effect runs after
+the commit that rendered the errors, so the control's description already lists the error (2.4).
+
+When the target **already has focus** (the user pressed Enter in that very field and the server
+rejected it), `focus()` does nothing and a changed `aria-describedby` on the focused element is
+not announced by NVDA or VoiceOver. The Form then speaks the Field's server messages through
+`target.ariaNotify()` instead (the same fallback as the collector's, 2.5; review M2,
+product-owner decision). Nothing is announced when focus moved: the description is read at focus.
 
 No focus on mount, even with initial errors: focusing on page load is the kind of focus move
 assistive-technology users complain about, and a progressive-enhancement post-back lands on a
@@ -447,17 +499,19 @@ renders that message and decides.
 - **A second submit while pending is not dropped.** A `useActionState` dispatch queues it after
   the first (React's action queue; conventions 2.5 names forms as the component class that uses
   it); a plain function runs concurrently and the consumer orders or guards it. The Form's
-  `pending` stays true until the last settles; one settle generation per watcher edge, which for
+  `pending` stays true until the last settles; one settle per status edge, which for
   queued actions is one edge for the whole run (the status does not flicker between queued
-  actions). Consumers who want to block the button do it with CSS on `Form.Submit[data-pending]`
+  actions). The queued submit's `submit` event resets every Field's `suppressNext` (3.4), since it
+  sends the values of that moment. Consumers who want to block the button do it with CSS on `Form.Submit[data-pending]`
   (conventions 3.6: never natively disabled while pending).
 - **A user reset while pending** (`<button type="reset">`): the values go back to their defaults
   and `:user-invalid` clears; every control listening to `reset` dispatches its platform change.
-  When the result arrives, its errors are about values that changed → suppressed (3.2 item 2),
-  which is the right answer for a form the user just emptied.
+  When the result arrives, its errors are about values that changed → hidden (`suppressNext`
+  promoted at the settle, 3.4), which is the right answer for a form the user just emptied, and
+  they stay hidden through the next flight.
 - **The action throws** (a network failure, a thrown redirect): the Form's transition rejects
   and the error reaches the nearest Error Boundary above `Form.Root`. Nothing is reset, no
-  generation advances, `pending` ends with the boundary's commit. A boundary inside the page
+  settle effect runs, `pending` ends with the boundary's commit. A boundary inside the page
   shell replaces the form; a consumer who wants the form to survive catches inside the action and
   returns errors, which is what `useActionState` is for.
 - **The action redirects** (a framework `redirect()` throws a special error): same as above from
@@ -518,10 +572,12 @@ export interface FieldRootProps
    * A custom constraint, written into the control with `setCustomValidity`. Sync. Receives the
    * field's submitted value (`formData.get(name)` as a string, `""` when absent) and the whole
    * form's `FormData`, so a cross-field rule can read the other field. Runs at mount, on every
-   * `input` / `change` in the form, after a reset, and when this prop changes. Return a string
-   * or strings for an error, `null` / `undefined` / `""` for none. Shown when the platform's
-   * `:user-invalid` heuristic says so, like a native constraint. Not serialisable: a Field with
-   * `validate` is rendered from a client component.
+   * `input` / `change` in the form (and a FUNSTACK control's value change), on blur, after a
+   * reset, on a submission attempt, and when this prop changes (by identity: keep it stable with
+   * `useCallback` or a module-level function). Return a string or strings for an error,
+   * `null` / `undefined` / `""` for none. Shown when the platform's `:user-invalid` heuristic
+   * says so, like a native constraint. Not serialisable: a Field with `validate` is rendered
+   * from a client component.
    */
   validate?: FieldValidate;
   className?: StateValue<string | undefined, FieldState>;
@@ -534,6 +590,21 @@ export interface FieldRootProps
 Owned keys: `data-invalid`, `data-disabled`, `data-required`, `data-pending`. `Field.Root` has no
 `id` of its own; the ids live on the parts. Nesting a `Field.Root` inside another is a dev
 warning (the inner control would register with the inner Field only).
+
+**`validate` and the prop's identity** (review L4, product-owner decision). A new `validate`
+function **takes effect at the commit in which the prop changed**, as 2.1 says: the slot effect
+is keyed on the function's identity. The review pointed out the cost: an inline function changes
+identity on every render of the Field, including both pending edges of every submission, and
+each run builds a `FormData` of the whole form (O(fields × form size) per render in a large
+form). The fix commit ae4640d read `validate` through a latest-ref instead, so a new function was
+used only from the next read (an edit, blur, reset or attempt): cheaper, but a rule that closes
+over outside state (`validate={(v) => v === other ? null : "…"}`) then stayed stale until the
+user touched the form, and the docs had to say "derive the rule from its arguments". The product
+owner chose the 2.1 semantics: a changed prop is a changed constraint and must be visible at once,
+as a changed `pattern` would be; the cost is the consumer's to avoid with `useCallback`, which the
+prop doc and the docs page recommend. The developer is reverting the latest-ref read (keeping
+the identity-keyed re-run). The JSDoc above is the intended text; the JSDoc and docs page of
+ae4640d say "takes effect at the next read" until that revert lands.
 
 ### 4.2 `Field.Label`, `Field.Description`, `Field.Error`
 
@@ -575,7 +646,11 @@ a submission.
 
 `Field.Error` registers its presence with the Field from a layout effect (2.5) and unregisters on
 unmount. It renders `null` while `invalid` is false: no element, no id in the DOM, and the
-control's `aria-describedby` does not list the error id either, so nothing dangles.
+control's `aria-describedby` does not list the error id either, so nothing dangles **while
+valid**. While invalid the error id is listed whether or not a `Field.Error` is mounted (the
+count of mounted errors is a ref, not state, and gating the token on it would cost a render for
+nothing); without one the reference dangles, which the platform ignores, as it does for an
+unmounted `Field.Description` (developer choice 5, accepted by the review as L5).
 
 ### 4.3 `Field.Control`
 
@@ -631,7 +706,8 @@ export interface FormRootProps
   errors?: FormErrors;
   /**
    * Reset the form (`form.reset()`) when a submission the Form ran settles with no non-empty
-   * entry in `errors`. Default `true`. A submission that reports errors never resets, so the
+   * entry in `errors` at all (an error hidden because the user replaced the value during the
+   * flight still counts). Default `true`. A submission that reports errors never resets, so the
    * user's input, `:user-invalid` and custom validity stay. `false`: never reset.
    */
   autoReset?: boolean;
@@ -648,7 +724,11 @@ export interface FormRootProps
 Owned keys: `action`, `method` (except with a string action), `onSubmit`, `data-pending`.
 `noValidate` passes through (the consumer opts out of interactive validation; the action then
 runs with invalid data and the Fields show nothing until a server error arrives). `onReset`
-passes through (React 19.3 fires it for every reset, the Form's included).
+passes through (React 19.3 fires it for every reset, the Form's included). A `render` element's
+own `onSubmit` is merged and runs first; if it calls `preventDefault()` the Form runs nothing
+(the conventions' veto rule, as a `preventDefault()` in `onClick` cancels a Checkbox's change;
+review L3). React's own action plugin skips a prevented submit as well, so neither path runs the
+action.
 
 ### 4.5 `Form.Submit`
 
@@ -700,7 +780,8 @@ Subpaths `@funstack/ui/field` and `@funstack/ui/form`; both re-exported from the
 | --- | --- |
 | `Field.Label` | `id`; `for` → the control id (labelable control); none for a group control, which renders `aria-labelledby` → this id |
 | the control (`Field.Control` or a FUNSTACK control's labelable element) | `id`; `aria-describedby` = consumer tokens + `${id}-description` + (`invalid` ? `${id}-error`); `aria-invalid="true" \| "false"`; `required` / `disabled` native |
-| a group control (`RadioGroup.Root`, `CheckboxGroup.Root`, multi-thumb `Slider.Root`) | `aria-labelledby` → the Label id (token-merged); `aria-describedby` and `aria-invalid` as above on the group element (global ARIA states, valid on `group` / `radiogroup`); `required` / `disabled` through the group's own props |
+| a group control (`RadioGroup.Root`, `CheckboxGroup.Root`, multi-thumb `Slider.Root`) | `aria-labelledby` → the Label id (token-merged); `aria-describedby` as above on the group element (a global property, read when focus enters the group); `required` / `disabled` through the group's own props |
+| `aria-invalid` for a group | **RadioGroup**: on the `radiogroup` fieldset (a supported role). **CheckboxGroup**: on every Item (`checkbox`), not on the fieldset: WAI-ARIA 1.2 made `aria-invalid` widget-specific and deprecated it on `group` (review L1; the first draft's "valid on `group` / `radiogroup`" held for `radiogroup` only). The Items need it explicitly anyway: the slot's `customError` sits on the first Item, which Chromium would otherwise expose as invalid too early (2.3). The fieldset keeps `data-invalid` and `aria-describedby`. The multi-thumb Slider (#60) is a `group` and gets the same treatment (each thumb's `slider` input). |
 | `Field.Description` | `id` |
 | `Field.Error` | `id`; no role, no live region |
 | `Form.Root` | nothing beyond the form; `aria-busy` is the consumer's through pass-through |
@@ -719,8 +800,10 @@ when VoiceOver supports it (for the product owner, question 4).
 Why an explicit `aria-invalid="false"`: 2.3.
 
 Why no live region: 2.5 and 4.2. The error is reached by focus after a submission attempt and by
-the next focus for a blur-time error. An error summary that is focused after a failed submission
-is a consumer pattern (section 11.6).
+the next focus for a blur-time error. The one case focus cannot reach, the control that already
+has focus (Enter pressed in it), is covered by `ariaNotify()` on that control (2.5, 3.5): one
+announcement, from the element the user is on, with no second read when focus moves. An error
+summary that is focused after a failed submission is a consumer pattern (section 11.6).
 
 ### 5.2 Keyboard
 
@@ -739,6 +822,10 @@ focuses (or activates) the labelable control. The library installs no key handle
    on the control again with "This email is already registered" in its description (3.5).
 3. The user edits: the error disappears, `aria-invalid` goes back to `"false"`, nothing is
    announced (a correction is not an event).
+4. The user presses Enter in the email field itself and the server rejects it, or the field is
+   empty and the attempt fails on it: focus is already there, so the message is spoken through
+   `ariaNotify()` ("This email is already registered" / "Please fill out this field."), once; the
+   description is unchanged for the next focus.
 
 ---
 
@@ -802,57 +889,101 @@ registers the element:
 ```ts
 // packages/ui/src/internal/use-field-control.ts  ("use client")
 export function useFieldControl(options: {
-  /** The element the Field labels, describes and listens to: the input/select/textarea, or a group's `<fieldset>` / group element. */
-  ref: RefObject<HTMLElement | null>;
-  /** `<label for>` can target it (input, select, textarea, the Combobox Input, a single Slider thumb's input). Groups pass `false`. */
+  /** `<label for>` can target the element (input, select, textarea, the Combobox Input, a single Slider thumb's input). Groups pass `false`. */
   labelable: boolean;
   /** The control's own props, so "own or the Field's" can be computed. */
   name?: string;
   disabled?: boolean;
   required?: boolean;
+  /** The consumer's own `id`: ignored inside a Field (the Field owns it), with a warning. */
+  id?: string;
   /** Dev warning tag. */
   component: string;
 }): {
-  /** `undefined` outside a Field. Spread into the part's owned (`libraryProps`) layer. */
-  readonly id: string | undefined;                 // labelable only
+  readonly inField: boolean;
+  /** Merge into the part's library ref: registers the element with the Field (the input/select/textarea, or a group's `<fieldset>`). `undefined` outside a Field. */
+  readonly ref: RefCallback<HTMLElement> | undefined;
+  readonly id: string | undefined;                 // labelable inside a Field: the Field's control id; else the consumer's
   readonly name: string | undefined;               // own ?? the Field's
   readonly disabled: boolean;                      // own || the Field's
   readonly required: boolean;                      // own || the Field's
-  readonly "aria-labelledby": string | undefined;  // groups only: the Label id
-  readonly "aria-describedby": string | undefined; // inside a Field: description (+ error while shown); token-merged by the part
-  readonly "aria-invalid": "true" | "false" | undefined;
-  readonly "data-invalid": "" | undefined;
-  readonly "data-pending": "" | undefined;         // the form channel; the part merges it with its own pending (either)
-}
+  /** Owned attributes, empty outside a Field: `id` (labelable), `aria-labelledby` (groups: the Label id), `aria-describedby` (description + error while invalid; token-merged by the part), `aria-invalid` ("true" | "false"), `data-invalid`. */
+  readonly attributes: FieldControlAttributes;
+  readonly state: FieldState | undefined;
+};
+
+/** Tells the Field, after the commit, that the control's value changed with no `input` / `change` event the Field could hear. Nothing at mount. */
+export function useFieldValueChange(value: unknown, takeEdit?: () => boolean): void;
 ```
 
-What the hook does inside a Field: registers `{ element, labelable, required, focus() }` with the
-Field from a layout effect (so `Field.Label` can drop `for` for a group, 4.2, and the Field knows
-where to attach listeners and what to focus); attaches the Field's native listeners to the element
-(`input`, `change`, `focusout`, `invalid`, all capture) and `reset` on the form owner; resolves
-the **validity element** (the element itself when it is a form control, else the first
-`willValidate` member of a `<fieldset>`'s `elements`, else the first `input` / `select` /
-`textarea` inside), which is where `validity`, `validationMessage`, `:user-invalid` and
-`setCustomValidity` are read and written. Two registrations in one Field warn in development
-(the first wins).
+What the hook does inside a Field: **registers the element from the returned ref callback**
+(not a layout effect: no extra render, and the callback returns the cleanup, so `mergeRefs`
+never calls it with `null`; StrictMode re-runs it and a change of `required` / `disabled`
+re-registers without re-attaching listeners, which are keyed on the element; developer choice
+8) with `{ element, labelable, required, disabled }`, so `Field.Label` can drop `for` for a group
+(4.2) and the Field knows where to listen and what to focus. The **Field** attaches its native
+listeners to the registered element (`input`, `change`, `focusout`, `invalid`, all capture) and
+`input` / `change` / `submit` / `reset` on the form owner, and resolves the **validity element**
+(the element itself when it is a form control, else the first `willValidate` member of a
+`<fieldset>`'s `elements` that has a `name`, else the first control inside), which is where
+`validity`, `validationMessage`, `:user-invalid` and `setCustomValidity` are read and written.
+Two registrations in one Field warn in development (the first wins).
 
-The part merges the returned attributes into its **owned** layer, so a `render` element cannot
-re-introduce another `id` or `aria-invalid` (conventions 1.2), and `aria-describedby` through
-the token-merge path so the consumer's own tokens survive. A control's `id` prop is therefore
-**owned by the Field while inside one** (a consumer `id` on a Checkbox inside a Field is a dev
-warning and ignored): `Field.Label`'s `for` must point at it.
+The hook returns **no `data-pending`**: a control inside a Field keeps its own `data-pending`
+for its own action and nothing else (conventions 2.7 and 7.3; `Field.Control`, which is a Field
+part, carries the form's). The first draft's signature comment said the part merges the form
+channel's pending with its own ("either"), contradicting 7.3 and the test row; the developer
+followed 7.3 (choice 4) and the review agreed.
+
+The part merges `attributes` into its **owned** layer, so a `render` element cannot re-introduce
+another `id` or `aria-invalid` (conventions 1.2), and `aria-describedby` through the token-merge
+path so the consumer's own tokens survive. A control's `id` prop is therefore **owned by the
+Field while inside one** (a consumer `id` on a Checkbox inside a Field is a dev warning and
+ignored): `Field.Label`'s `for` must point at it.
+
+**`useFieldValueChange` and `notifyChange`** (review H1). A Combobox pick writes the Input's text
+and the hidden input's value through React, with **no** `input` or `change` event; the same
+holds for a CheckboxGroup Parent checking its Items, a controlled value changed from outside, and
+an optimistic value rolled back by a rejected action. The Field's listeners never fire, so
+`validate` (which reads the hidden input) and a shown server error went stale: the review showed
+Enter right after a pick blocked on the old "Pick a country", with the Field's own `invalid`
+handler then clearing it (a silent failed submission), and a server error for a selection the
+user had replaced blocking Save until they typed. The fix is a second hook every owner part
+calls: `useFieldValueChange(value, takeEdit?)` is a layout effect with no deps that compares
+`value` with the last committed one and, when it changed, calls the Field context's
+`notifyChange(edit)`; `edit` is `takeEdit?.() ?? false`. The Field then refreshes (with the
+dismissal of a shown server error when `edit`, exactly as an `input` event would) and asks the
+Form to refresh its **other** Fields through `FormContext.refreshFields(source)`, so cross-field
+rules follow. **Cross-field refresh for such a change works only inside a `Form.Root`**: the
+DOM-event path reaches the other Fields through the form owner, but a change no event carried
+has no owner to bubble to, so a Field in a plain `<form>` is refreshed only by its own control.
+Which controls pass what:
+
+| Control | `value` compared | `takeEdit` |
+| --- | --- | --- |
+| `Combobox.Root` | the optimistic selection | `true` for a change its own `dispatchValue` caused (a ref set when the dispatched value differs from the optimistic one), so a pick dismisses a server error like typing; `false` for a controlled change from outside |
+| `CheckboxGroup.Root` | the sorted optimistic set plus the derived "at least one" `required` | nothing (the Items' own `change` already dismisses); covers a Parent click and the attribute flip |
+| `Checkbox`, `Switch`, `RadioGroup.Root`, `Select.Root` | the optimistic value | nothing (their native `input` / `change` already dismiss); covers a controlled change from outside and a rollback |
+| `Field.Control` | nothing | a native control's value changes only through events the Field hears |
+
+The alternative was a synthetic bubbling `change` on the Combobox's hidden input (closest to the
+platform, and visible to non-Field form code). Rejected for the library's own wiring: a
+synthetic event would reach the consumer's `onChange` on the form and every `useFormOwnerEvent`
+subscriber as if the user had typed, and the Combobox already has a dispatch the library owns;
+the hook is the same post-commit layout effect every native-input component already runs. The
+hook is also what Slider needs (#60): a pointer gesture fires no native `input` / `change`.
 
 ### 7.2 Per component
 
 | Component | Registers | `labelable` | `Field.Label` names it through | Validity element | Also inside a Field |
 | --- | --- | --- | --- | --- | --- |
 | `Field.Control` | the input / textarea / select | yes | `for` | itself | |
-| `Checkbox`, `Switch` | the `<input>` | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. `indeterminate` unaffected. |
-| `RadioGroup.Root` | the `<fieldset>` | no | `aria-labelledby` on the fieldset; `RadioGroup.Label` (legend) is for standalone use | the first enabled radio (`:user-invalid` matches every radio of a required empty group, so one suffices; `setCustomValidity` on the first blocks the group) | `name` default from the Field (else the Root's `useId`); `required` / `disabled` on the Root. Focus target: the checked radio, else the first enabled. |
-| `CheckboxGroup.Root` | the `<fieldset>` | no | `aria-labelledby` | the first enabled item | the dynamic `required` of its design is untouched (an attribute, not the slot). |
-| `Select.Root` | the `<select>` | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. Nothing changes for `<selectedcontent>`. |
-| `Combobox` | `Combobox.Input` registers the input (labelable); the Root reads the Field's Label id for the List's `aria-labelledby` when no `Combobox.Label` is mounted | yes | `for` on the Input | the Input (`required` lands there) | `Combobox.Root name` defaults from the Field (hidden input). `Combobox.Label` stays for use outside a Field. |
-| `Slider` | one thumb: the thumb's `<input type="range">` (labelable); several: the Root's group element (`aria-labelledby`) | per shape | `for` / `aria-labelledby` | the first thumb input (a range has no constraints; server errors and `validate` still work) | `Slider.Label` stays for use outside a Field. `name` defaults from the Field. |
+| `Checkbox`, `Switch` | the `<input>` | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. `indeterminate` unaffected. `useFieldValueChange(optimistic)`. |
+| `RadioGroup.Root` | the `<fieldset>` | no | `aria-labelledby` on the fieldset; `RadioGroup.Label` (legend) is for standalone use | the first enabled radio (`:user-invalid` matches every radio of a required empty group, so one suffices; `setCustomValidity` on the first blocks the group) | `name` default from the Field (else the Root's `useId`); `required` / `disabled` on the Root. `aria-invalid` on the fieldset (`radiogroup`). Focus target: the checked radio, else the first enabled. `useFieldValueChange(optimistic)`. |
+| `CheckboxGroup.Root` | the `<fieldset>` | no | `aria-labelledby` | the first enabled **named** item (never the Parent) | the dynamic "at least one" `required` of its design is untouched (an attribute, not the slot); `Field.Root required` is that `required` (choice 6). `aria-invalid` on every Item, not the fieldset (5.1, L1). Focus target: the first Item, never a `CheckboxGroup.Parent` (L2). `useFieldValueChange` keyed on the sorted set + the derived `required`. |
+| `Select.Root` | the `<select>` | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. Nothing changes for `<selectedcontent>`. `useFieldValueChange(optimistic)`. |
+| `Combobox` | `Combobox.Input` registers the input (labelable); the Root reads `FieldContext` directly for the hidden input's `name` and `disabled`, the Input's id, and the List's `aria-labelledby` when no `Combobox.Label` is mounted (choice 7) | yes | `for` on the Input | the Input (`required` lands there) | `Combobox.Root name` defaults from the Field (hidden input). `validate`'s `value` is `formData.get(name)`, the hidden input: the **selection**, not the typed text. A pick is an edit: `useFieldValueChange(selection, takeEdit)` re-runs `validate` and dismisses a server error at once (H1). `Combobox.Label` stays for use outside a Field. |
+| `Slider` | one thumb: the thumb's `<input type="range">` (labelable); several: the Root's group element (`aria-labelledby`) | per shape | `for` / `aria-labelledby` | the first thumb input (a range has no constraints; server errors and `validate` still work) | **Not integrated yet (#60).** `Slider.Label` stays for use outside a Field. `name` defaults from the Field. Needs `useFieldValueChange` (a gesture fires no native event) and, with several thumbs, `aria-invalid` per thumb input (5.1). |
 | `Toggle`, `Menu`, `Tabs`, … | nothing | | | | not form controls; a Field around them is a dev warning (no registration). |
 
 Landing Field therefore touches each of these parts with one hook call and the owned-layer merge
@@ -936,34 +1067,45 @@ exit-animated error through `useExitAnimation` is a possible v2 if a demo wants 
    the collector. No `submit`. Microtask: the collector focuses the control. The error text is in
    the DOM, the description lists it, the screen reader reads both. `pending` never turned on.
 2. **Server error round trip.** The user types `a@b.c` and submits. `submit` → the Form
-   intercepts, `pending` on (the form, the Submit, the Field). The action (a `useActionState`
-   dispatch) returns `{ errors: { email: "Already registered" } }`. The settle commit renders the
-   new `errors` prop and `NotPending` together; the Field computes `serverShown` (not dismissed:
-   the generation is still the old one at render; the Form's effect advances it after, and
-   `dismissedAt` was never set), renders the error, writes the slot. The Form's effect: generation
-   `1`, suppressed `{}` (the value is unchanged), focuses the email control. No reset.
-3. **Dismiss and resubmit.** The user types one more character: `input` → the Field recomputes
-   the slot without the server message (`validate` absent, native constraints pass), `dismissedAt
-   = 1`, `userInvalid` = false (`:user-invalid` tracks live, the value is valid), `invalid` false,
-   the error unmounts, `aria-invalid="false"`. Submit again → the server accepts → the settle with
-   empty errors → generation `2` → `autoReset`: `form.reset()`; the controls dispatch their
-   platform changes; the Field re-reads in the reset microtask: all clear.
+   intercepts, `pending` on (the form, the Submit, the Field); the Field's `false → true` edge
+   clears `suppressNext`. The action (a `useActionState` dispatch) returns `{ errors: { email:
+   "Already registered" } }`. The settle commit renders the new `errors` prop and `NotPending`
+   together; the Field sees its `true → false` edge in that render (`dismissed` cleared,
+   `suppressNext` = `false` promoted to `suppressed`), computes `serverShown`, renders the error,
+   writes the slot. The Form's effect, after the commit: the email Field shows a server error →
+   focuses the email control (it was on the Submit button). No reset.
+3. **Dismiss and resubmit.** The user types one more character: `input` → the Field sets
+   `dismissed`, recomputes the slot without the server message (`validate` absent, native
+   constraints pass), `userInvalid` = false (`:user-invalid` tracks live, the value is valid),
+   `invalid` false, the error unmounts, `aria-invalid="false"`. Submit again → the server accepts
+   → the settle with empty errors → the Field re-arms (nothing to show) → the Form's effect:
+   no Field shows an error, `errors` has no entry → `autoReset`: `form.reset()`; the controls
+   dispatch their platform changes; the Field re-reads in the reset microtask: all clear.
 4. **Same error twice.** As 2, then the user edits and submits the same bad value again: the
-   settle advances the generation to `2`, `dismissedAt` is `1`, so `serverShown` is true again
-   even though the strings are identical, and the slot blocks the next click until an edit.
+   settle render clears `dismissed`, so `serverShown` is true again even though the strings are
+   identical, and the slot blocks the next click until an edit.
 5. **Edited during the flight.** As 2, but while the action is pending the user changes the email
-   to `x@y.z`. The settle: `errors.email` is present but the submitted value (`a@b.c`) differs
-   from the current one → `suppressed = { email }` → not shown, no slot write, no focus; the
-   user submits the new value unobstructed. Had the server also flagged `name`, unchanged, that
-   one is shown and focused.
+   to `x@y.z`: the `input` refresh compares `x@y.z` with the submitted `a@b.c` → `suppressNext`
+   = `true`. The settle render promotes it: `suppressed` → not shown, no slot write; the Form's
+   effect finds no Field showing an error, but `errors` has a non-empty entry, so **no reset**
+   either (the user's new value stays); the user submits the new value unobstructed. Had the
+   server also flagged `name`, unchanged, that one is shown and focused.
+5b. **The next flight after 5** (review M1). The user submits `x@y.z`. The `submit` event and the
+   `false → true` edge reset `suppressNext`; `suppressed` stays `true`, so although `errors`
+   still holds `{ email: "a@b.c is taken" }` and `dismissed` is clear, the stale error is **not**
+   shown during the flight, the slot is empty and a queued second click is not blocked. At the
+   settle the new result replaces `errors`, `suppressNext` (`false`, the value was not changed
+   this time) becomes `suppressed`, and whatever the server said about `x@y.z` is shown.
 6. **Double click.** Two submits before the first settles, `action` a `useActionState` dispatch:
    the second is queued by React and runs after the first with the FormData it captured; the
    watcher stays pending through both; one settle; the last result's errors show. With a plain
    async function both run concurrently and the consumer's function decides what that means.
 7. **Reset button while pending.** Values go to their defaults; every FUNSTACK control and every
-   Field re-reads (`:user-invalid` false). The result's errors are suppressed (values changed).
+   Field re-reads (`:user-invalid` false) and records `suppressNext` for every value the reset
+   changed. The result's errors for those fields are hidden at the settle, and stay hidden through
+   the next flight (5b).
 8. **The action throws.** `pending` stays on until the boundary above `Form.Root` commits; no
-   generation, no reset, no focus. The form unmounts with the boundary's subtree, or stays with
+   settle effect, no reset, no focus. The form unmounts with the boundary's subtree, or stays with
    its values if the boundary is inside and the consumer renders the form again.
 9. **Content suspends after the settle.** The action's result makes a `<Suspense>`-wrapped list
    below the form re-render with new data: the settle commit waits for it, `data-pending` stays,
@@ -972,14 +1114,37 @@ exit-animated error through `useExitAnimation` is a possible v2 if a demo wants 
     the page re-renders with `useActionState`'s result as its initial state. `Field.Error` is in
     the HTML with its id in `aria-describedby`; nothing is focused (3.5); the user edits →
     hydration has happened by then, so the error dismisses as in 3.
-11. **A Field in a `Dialog.Form`.** `<Dialog.Form action={dispatch}>` is React's path: the
+11. **A Field in a `Dialog.Form`.** A plain `<Dialog.Form action={dispatch}>` is React's path: the
     automatic reset runs after a result with errors (the Dialog design documents it). The Fields
     still validate, suppress the bubble, focus the first invalid control, and show
     `data-pending`; server errors need a `Form.Root`, which composes as
-    `<Dialog.Form render={<Form.Root errors={state.errors} />} action={dispatch} closeOnSettle={false}>`
-    (the Dialog's watcher still sees the host transition's edge; the dialog is closed by the
-    consumer when the result says so, Dialog 8.1). Question 9 for the product owner asks whether
-    `Dialog.Form` should learn `errors` so this becomes one part.
+    `<Dialog.Form render={<Form.Root errors={state.errors} />} action={dispatch} closeOnSettle={false}>`.
+    Through `render`, `Form.Root` **receives the `action` as a prop and intercepts** the submit,
+    so it is `Form.Root`'s policy that applies, not React's: the action runs once (the Form's
+    call), the errors are routed to the Fields and the first is focused, the typed value is
+    kept, and the form is reset only on a settle with no errors (`autoReset`, passable on the
+    `Form.Root` element). The two refs merge (Dialog's submit-capture ref and Form.Root's), both
+    watchers see the host transition's edge, and there is no double run (verified by the review
+    and pinned by a jsdom row). What does **not** change is `Dialog.Form`'s own `closeOnSettle`:
+    its default closes the dialog when the action settles, errors or not (Dialog 8.1), so the
+    consumer passes `closeOnSettle={false}` and closes on success. Issue **#59** (product-owner
+    item 9) tracks whether `Dialog.Form` should gain `errors` / `autoReset` and close only on an
+    error-free settle, so this becomes one part. The docs' Field page has this composition; the
+    Dialog page points to it.
+12. **A Combobox pick, then Enter** (review H1). A country Field with `validate={(v) => v === ""
+    ? "Pick a country" : null}`: the user types "Jap", ArrowDown, Enter. The Combobox dispatches
+    the selection; React writes the hidden input; no event. Its `useFieldValueChange` fires in
+    the commit's layout effect with `edit = true`: the Field refreshes, `validate("jp", …)`
+    returns `null`, the slot is cleared, a shown server error for the old selection is dismissed,
+    and the Form refreshes the other Fields. Enter again submits at once. Without the hook, the
+    slot still said "Pick a country", the `invalid` event blocked the submit, and the Field's own
+    refresh in that handler then cleared it: nothing sent and nothing shown.
+13. **Enter in the invalid field** (review M2). The email field is empty and focused; the user
+    presses Enter. Implicit submission → `invalid` on the email control → cancelled, rendered,
+    collected. The microtask finds the first target already active: no focus move, so
+    `email.ariaNotify("Please fill out this field.")` once. The same when the user presses Enter
+    in a valid field and the server rejects that field: the Form's settle effect announces instead
+    of focusing.
 
 ---
 
@@ -1181,6 +1346,11 @@ browser mode if jsdom silently returns `false` instead of throwing).
 | Controls inside a Field | One row in each of `switch.test.tsx`, `checkbox.test.tsx`, `radio-group.test.tsx`, `checkbox-group.test.tsx`, `select.test.tsx`, `combobox.test.tsx`, `slider.test.tsx`: inside a `Field.Root`, the part gets the Field's `id` (or `aria-labelledby`), `name`, `aria-describedby`, `aria-invalid`, and `disabled` / `required` from the Field; its own `data-pending` is unaffected by the form's. |
 | Platform path | `form.reset()` and a `<button type="reset">` clear a shown native error (fallback mode) and recompute the slot; the automatic reset after a successful submission through React's path (a submitter with `formAction`) is observed by the Field like any reset. |
 | Directive | Every part file of `field/` and `form/` starts with `"use client"`. |
+| Value change with no event (H1) | `combobox.test.tsx`: a selection re-runs `validate` at once (Enter right after picking submits); picking another option dismisses a server error so the corrected value can be saved. `checkbox-group.test.tsx`: the focus target is the first Item, not the Parent, and a Parent click re-reads `validate` after the commit; checking a later Item clears the "at least one" error in the same commit. `field.test.tsx`: `validate` re-runs when a FUNSTACK control's value changes with no DOM event (a Checkbox controlled from outside). |
+| Stale error across flights (M1) | `form.test.tsx`: a hidden stale error stays hidden while the next submission is in flight (no message, `aria-invalid="false"`, empty slot); an error for the value sent in the next flight is shown at that settle. |
+| Announcement (M2) | `form.test.tsx`: a server error for the focused field (Enter in it) is announced on the control through a stubbed `ariaNotify`; focus moving to the errored field announces nothing extra; a failed attempt from the focused, first invalid field announces its message; nothing where `ariaNotify` is missing. |
+| Veto (L3) | `form.test.tsx`: a `render` element's `onSubmit` calling `preventDefault()` cancels the submission (the action is not called, nothing pending). |
+| `Dialog.Form` as `Form.Root` (walkthrough 11) | `form.test.tsx`: `<Dialog.Form render={<Form.Root errors />} action={dispatch} closeOnSettle={false}>`: errors shown and focused, the value not reset, the dialog stays open; success resets; the default `closeOnSettle` closes the dialog even when the result has errors (#59). |
 | N/A rows | Sync / async action, optimistic, controlled parity, post-await, superseded rejection, urgent action: no action props and no `x` / `defaultX` triple on any Field or Form part (the form's `action` is React's channel, and the display state has no consumer-facing urgent action), listed at the top of each test file. |
 
 ### 13.2 Browser mode (`field.browser.test.tsx`, `form.browser.test.tsx`, Chromium, Firefox, WebKit)
@@ -1193,7 +1363,7 @@ browser mode if jsdom silently returns `false` instead of throwing).
 | Accessibility tree (Chromium, CDP) | `aria-invalid="false"` keeps a `typeMismatch` control not `invalid`; `"true"` makes a `valueMissing` control `invalid`; the description is "description + error" while invalid. |
 | Group | A required RadioGroup inside a Field: after a submission attempt the Field is invalid, the message is the browser's radio message, focus lands on the first radio. |
 | `field-sizing` | A `textarea` with `field-sizing: content` grows with its content (height increases after typing a second line) in engines that support it (`CSS.supports("field-sizing: content")`); the row asserts the documented degraded behaviour elsewhere. |
-| Progressive enhancement | `renderToString` the Subscribe form: the server HTML has `aria-describedby`, `aria-invalid="false"`, the `for`; hydrate; nothing changes in the markup except a group Field's `for` being removed. |
+| Progressive enhancement | `renderToString` the Subscribe form **as `Form.Root`** with a fake Server Function (`$$FORM_ACTION`): the server HTML has the action's endpoint, method, encType and `$ACTION_ID` hidden input, `aria-describedby`, `aria-invalid="false"`, the `for`; with `errors` at render, `Field.Error`, `aria-invalid="true"` and the error id are in the server HTML; hydrate; no recoverable errors and nothing changes in the markup except a group Field's `for` being removed. (The first implementation rendered a plain `<form action="/subscribe">` here, review M3.) |
 | Firefox / WebKit parity | The whole display row runs in all three; where `:user-invalid` heuristics differ (Firefox updating live after the first blur is the same as Chromium today) the test asserts the common subset. |
 
 ---
@@ -1215,21 +1385,26 @@ src/form/
   form-submit.tsx         "use client": useFormStatus
   form.test.tsx, form.browser.test.tsx
 src/internal/
-  field-context.ts        "use client": FieldContext (what the parts and useFieldControl read), FormContext ({ errors, generation, suppressed, registerField })
-  use-field-control.ts    "use client": section 7.1
+  field-context.ts        "use client": FieldContext ({ ids, name, disabled, required, state, labelable, registerControl, registerError, notifyChange }), FormContext ({ errors, registerField, submittedData, refreshFields }), FormFieldRegistration ({ getFocusTarget, showsServerError, serverMessages, refresh })
+  use-field-control.ts    "use client": section 7.1: useFieldControl, useFieldValueChange, fieldInputProps, useMergedRef
   use-form-owner-event.ts "use client": useFormReset generalised to any event type on the form owner (stable subscription, rule 3.8.4); useFormReset becomes a thin wrapper, no behaviour change
-  validity.ts             directive-free: snapshotValidity(el), normaliseErrorValue(v), supportsUserInvalid()
-  focus-first-invalid.ts  directive-free: the module-level collector (add(el), one microtask per task, document-order sort, skip if focus moved into the same form)
+  use-form-reset.ts       "use client": now built on useFormOwnerEvent
+  form-status-watcher.tsx "use client": moved from dialog/dialog-form.tsx; imported by Dialog.Form and Form.Root
+  validity.ts             directive-free: snapshotValidity(el), normaliseErrorValue(v), hasAnyError(errors), supportsUserInvalid(), validityElementOf(el), focusTargetOf(el), sortByDocumentOrder()
+  focus-first-invalid.ts  directive-free: the module-level collector (collectInvalid(el, message), announce(el, message))
 ```
 
 - **The mirror state** lives in `Field.Root` as one `useState<{ userInvalid, validity, message, attempted }>` written by a single `refresh(reason)` function the listeners and effects call; it reads the validity element, computes the slot (2.1) **before** reading (`setCustomValidity` changes `validity`), and writes the state only when something changed (so a `focusout` with nothing new causes no render). The derived `invalid` / `messages` / `validity` of `FieldState` are computed in render from the mirror plus the Form context (`serverShown`) and props.
-- **Listeners** are native, attached in `useFieldControl`'s layout effect to the registered element with `capture: true` (`input`, `change`, `focusout`, `invalid`) and torn down with it; the handler bodies are `useEffectEvent`s. `invalid`: `if (!errorMounted || !matchesUserInvalid(el)) return; event.preventDefault(); refresh("invalid"); collector.add(focusTarget())`. `input` / `change`: `dismissedAt.current = form.generation; refresh("input")`. `focusout`: `refresh("blur")`. The form owner's `input` / `change` (for `validate`) and `reset` (microtask: `refresh("reset")`) go through `useFormOwnerEvent`.
-- **`matchesUserInvalid(el)`**: `try { return el.matches(":user-invalid"); } catch { return fallback(el); }` where the fallback is `attempted && !el.validity.valid`, `attempted` set in the `invalid` listener and cleared by `reset`. Decide once per module whether the selector throws (`supportsUserInvalid()`), so the try/catch is not on the hot path.
-- **The slot**: `applySlot()` = `el.setCustomValidity(serverShown ? serverMessages.join("\n") : validateMessage)`; `validateMessage` is recomputed from `validate?.(value, formData)` by the callers that may have changed it (mount, form `input` / `change`, `reset`, a commit where `validate` changed, which is a layout effect keyed on `validate`). For a `<fieldset>` control, `el` is the first validatable member; `validity` and `validationMessage` are read from the same element.
-- **`Field.Label` `for`**: `labelable` comes from the registration state (`useState` in Root written by the control's layout effect); its initial value is `true` so the server HTML and the hydration render carry `for` (8).
-- **`Form.Root`**: `useTransition` for the intercepted run; the `FormStatusWatcher` from `dialog-form.tsx` moved to `internal/form-status-watcher.tsx` and imported by both; `submission` ref `{ formData, intercepted }` written in `onSubmit` (and, for React's path, in a native capture `submit` listener so the watcher's edge still finds `intercepted: false`); the settle effect does 3.2 in order and publishes `{ errors, generation, suppressed }` as one memoised context value. `errors` is read through a ref in the settle effect (the latest committed prop). `registerField(name, getFocusTarget)` returns an unregister function; the Form sorts registrations by `compareDocumentPosition` of the focus targets at settle time.
+- **Listeners** are native, attached by `Field.Root`'s layout effect (keyed on the registered element) with `capture: true` (`input`, `change`, `focusout`, `invalid`) and torn down with it. `invalid`: `attempt = supportsUserInvalid() ? target.matches(":user-invalid") : true; if (attempt && errorCount > 0) { event.preventDefault(); messages = refresh(); collectInvalid(focusTargetOf(element), messages.join(" ")) } else refresh()`. `input` / `change`: `setDismissed(true); refresh({ dismiss: true })`. `focusout`: `refresh()`. The form owner's `input` / `change` (for `validate`, skipping events from the Field's own control), `submit` (`setSuppressNext(false)`) and `reset` (microtask, unless `defaultPrevented`: `refresh({ reset: true })`) go through `useFormOwnerEvent`.
+- **`supportsUserInvalid()`**: `CSS.supports("selector(:user-invalid)")`, decided once per module; where false (jsdom) the read is `attempted && !el.validity.valid`, `attempted` set in the `invalid` listener and cleared by `reset`. (The draft's "`matches` throws" test never engages in jsdom 30, 2.2.)
+- **The slot**: inside `refresh()`, `el.setCustomValidity(showServer ? serverMessages.join("\n") : custom.join("\n"))` where `custom` is `validate?.(value, formData)` normalised and `showServer` is `serverShown && !options.dismiss`, written **before** the validity read; a slot moved to another element (a group's first member changed) clears the old one, and the Root's unmount clears it. The slot effect is a layout effect keyed on the control, `serverShown`, the server key and (per the L4 decision, 4.1) `validate`'s identity. For a `<fieldset>` control, `el` is the first named validatable member; `validity` and `validationMessage` are read from the same element.
+- **The three flags** (3.4): `dismissed`, `suppressed`, `suppressNext` are `useState`s in `Field.Root`; the edges are detected with `previousFormPending` state compared in render (`false → true`: clear `suppressNext`; `true → false`: clear `dismissed`, `suppressed = suppressNext`, clear `suppressNext`). `refresh()` writes `suppressNext` while `formPending` and `form.submittedData()` is non-null.
+- **`notifyChange(edit)`** (7.1): `if (edit) setDismissed(true); refresh(edit ? { dismiss: true } : {}); form?.refreshFields(ownRegistration)`.
+- **`Field.Label` `for`**: `labelable` comes from the registration state (`useState` in Root written by the control's ref callback); its initial value is `true` so the server HTML and the hydration render carry `for` (8).
+- **`Form.Root`**: `useTransition` for the intercepted run; the `FormStatusWatcher` from `dialog-form.tsx` moved to `internal/form-status-watcher.tsx` and imported by both; `submission` ref `{ formData, intercepted }` written in `onSubmit` (and, for React's path, in a native capture `submit` listener so the watcher's edge still finds `intercepted: false`; cleared when a `render` element's `onSubmit` prevented the event, L3); the settle effect does 3.2 in order: first Field with `showsServerError()` in document order → `focus()`, or `announce(target, serverMessages().join(" "))` when the target is `document.activeElement`; else `autoReset && intercepted && !hasAnyError(errors)` → `form.reset()`. `errors` and `autoReset` are read through `latest` in the settle effect. The context value is `{ errors, registerField, submittedData, refreshFields }`, memoised; `refreshFields(source)` calls `refresh()` on every registration but `source`.
+- **The collector** (`focus-first-invalid.ts`): one batch per task (cleared by `setTimeout(0)`, because the browser runs a microtask checkpoint after each `invalid` listener when it dispatches them itself, so the first microtask runs before the second event fires); every add queues a microtask that focuses the batch's first target in document order (re-focusing is a no-op); the batch records `moved` and `announced` so that when the first target is already active it is announced once and never after a focus move. `announce(el, message)` calls `el.ariaNotify(message)` when it is a function and the message is non-empty.
 - **`Form.Submit`**: `useFormStatus()` + `useRender`; `type: rendersButton(render) ? "submit" : undefined`.
-- **Existing controls**: each owner part adds `const field = useFieldControl({ ref, labelable, name, disabled, required, component })` and spreads `field` into its `libraryProps` (owned) except `aria-describedby`, which goes through the token-merge path; the part's effective `name` / `disabled` / `required` become `field.name` / `field.disabled` / `field.required` (the hook already applied "own or the Field's"). RadioGroup's generated `name` falls back to the Field's before `useId`. Combobox's Root reads `FieldContext` for the List's `aria-labelledby` when no `Combobox.Label` registered. Slider passes `labelable: values.length === 1` and the thumb input / group element accordingly.
+- **Existing controls**: each owner part adds `const field = useFieldControl({ labelable, name, disabled, required, id, component })`, merges `field.ref` into its library ref (`useMergedRef`), spreads `field.attributes` into its `libraryProps` (owned) except `aria-describedby`, which goes through the token-merge path (`fieldInputProps(field)` does the spread plus `name` / `required` for a labelable native input); the part's effective `name` / `disabled` / `required` become `field.name` / `field.disabled` / `field.required` (the hook already applied "own or the Field's"); and calls `useFieldValueChange` with its optimistic value (7.1 table). RadioGroup's generated `name` falls back to the Field's before `useId`. CheckboxGroup strips `aria-invalid` from `field.attributes` for the fieldset and hands it to the Items through context. Combobox's Root reads `FieldContext` directly (7.2). Slider: #60.
 - **Dev warnings** (once per element): wrong element for a part; two controls in one Field; two `Field.Error`s; nested `Field.Root`; a consumer `id` on a control inside a Field; a `Field.Root` whose `name` differs from its control's own `name`; a Field with `validate` and no `name`.
 - **Docs site**: pages for Field and Form with the 11.1 example as a live client example and 11.2 as a Server Component example; props tables from the declarations; the CSS recipe of 6.2 including `field-sizing`.
 
@@ -1325,7 +1500,7 @@ Genuine product decisions, with recommendations; none blocks implementation.
    server errors (no slot write; a resubmit always goes to the server). **Recommendation: as
    designed**, with the "changed during the flight" suppression so the slot never blocks a value
    the user already corrected.
-6. **The stale-value suppression itself** (3.2 item 2, walkthrough 5): an error about a value the
+6. **The stale-value suppression itself** (3.4, walkthrough 5): an error about a value the
    user replaced while the submission was in flight is not shown. Alternative: show every
    returned error (React Aria's behaviour). **Recommendation: suppress**; it also makes "reset
    while pending" come out right.
@@ -1351,4 +1526,35 @@ Genuine product decisions, with recommendations; none blocks implementation.
 
 ## Accepted by the product owner
 
-2026-10-18. All eleven recommendations in "For the product owner" are accepted as recommended (items 1–11), and the conventions feedback 1–13 is to be applied to `design/conventions.md` by the architect. Item 9 (Dialog.Form `errors`/`autoReset`) becomes a follow-up issue after Field lands. Slider integration through `useFieldControl` is done once Slider is on master (it is being implemented in parallel); if Field lands first, it is a follow-up. Items 1 (intercepting submission) and 4 (no `aria-errormessage`) are reported to the user as the most visible decisions and may be revisited.
+2026-10-18. All eleven recommendations in "For the product owner" are accepted as recommended (items 1–11), and the conventions feedback 1–13 is to be applied to `design/conventions.md` by the architect. Item 9 (Dialog.Form `errors`/`autoReset`) becomes a follow-up issue after Field lands (#59). Slider integration through `useFieldControl` is done once Slider is on master (it is being implemented in parallel); if Field lands first, it is a follow-up (#60). Items 1 (intercepting submission) and 4 (no `aria-errormessage`) are reported to the user as the most visible decisions and may be revisited.
+
+---
+
+## Review corrections (#54, 2026-10-18)
+
+From `memo/reviewer/field-form.md` (review of merge e172925, implementation 9c08ed2..6801e28;
+verdict "acceptable with fixes") and the developer's notes in `memo/developer/field-form.md`
+("Implementation choices" 1–11 and "Review fixes"); code and tests in ae4640d, docs in 30a4bb2.
+M2 and L4 were decided by the product owner. Each item is folded into the sections named; this
+table is the audit trail. The architect agrees with every developer choice the review agreed
+with; L4's fix is reverted by product-owner decision, the rest stand.
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| Choice 1 | **Each Field re-arms itself on its own `useFormStatus` `true → false` edge, in the settle render**, instead of the Form advancing a generation counter from its settle effect: the result's errors and `NotPending` land in one commit, so a re-shown error (dismissed, or the same strings twice) is in the DOM with its slot written before the Form's effect focuses it. The generation would have been one commit late. The Form context is `{ errors, registerField, submittedData, refreshFields }`; no generation. Review: agree. | Decisions 3, 3.2, 3.4, 10.2–10.4, 14 |
+| Choice 2, M1 | Stale-value suppression is computed in the Field's own refresh during the flight (comparing `formData.getAll(name)` with the Form's `submittedData()`), not by the Form at settle time. Review: agree with the mechanism, but clearing one flag on `submit` was too eager: during the next flight `errors` still held the old result, `dismissed` was clear, so "a@b.c is taken" came back for a value the server never judged, blocked a queued click and moved focus. **Two flags**: `suppressNext` (written during the flight, reset on `submit` and at the `false → true` edge) is promoted to `suppressed` at `true → false`, and `suppressed` stays fixed until the next settle. | Decisions 9, 3.4, 3.6, 10.5, 10.5b, 10.7, 13.1, 14 |
+| Choice 3 | **`autoReset` resets only when `errors` has no non-empty entry at all**, hidden stale ones included. 3.2 item 4 said "no non-empty, non-suppressed entry", which would have reset the form in walkthrough 5 and wiped the value the user had just typed; the prop doc and walkthrough 5 already read the other way. Reworded. Review: agree. | Decisions 8, 3.2, 4.4, 10.5 |
+| Choice 4 | **`useFieldControl` returns no `data-pending`**; only `Field.Control` (a Field part) carries the form's. The 7.1 signature comment ("the part merges it with its own, either") contradicted 7.3, the 13.1 row and conventions 2.7; corrected. Review: agree. Conventions 3.8 row corrected too. | 7.1, 14; conventions 3.8 |
+| Choice 5, L5 | The error id is in `aria-describedby` **whenever the field is invalid**, also with no `Field.Error` mounted (a dangling IDREF is ignored, like an unmounted Description's; gating on the error count would need state for nothing). 4.2's "nothing dangles" now says "while valid". Review: acceptable. | 4.2, 5.1 |
+| Choice 6 | CheckboxGroup: `Field.Root required` is the group's "at least one" `required` (an attribute, not the slot). Review: agree. | 7.2 |
+| Choice 7, H1 | Combobox reads `FieldContext` in the Root (hidden input `name` / `disabled`, the Input's id, the List's `aria-labelledby`); the Input registers; `validate` reads the selection. Review: agree with the shape, but **a pick fired no event the Field heard**: `validate` and a server error stayed stale, Enter after a pick was a silent failed submission, and a corrected selection could not be saved. Fixed with `useFieldValueChange(value, takeEdit?)` (a no-deps layout effect comparing the committed value) calling the Field's `notifyChange(edit)`: the Field refreshes (dismissing a server error when `edit`) and the Form refreshes its other Fields (`refreshFields`). Combobox passes `edit = true` for its own dispatches; CheckboxGroup keys on the sorted set plus the derived `required`; Checkbox, Switch, RadioGroup and Select pass their optimistic value (controlled changes, rollbacks). Cross-field refresh for such a change works only inside `Form.Root`. The synthetic-`change` alternative was rejected (7.1). | Decisions 2, 2.1, 7.1, 7.2, 10.12, 13.1, 14; conventions 3.8 |
+| Choice 8 | Registration from the control's **ref callback** (returning the cleanup), not a layout effect: no extra render; StrictMode covered by a test; `required` / `disabled` changes re-register without re-attaching listeners (keyed on the element). The listeners are attached by `Field.Root`, not by the hook. Review: agree. | 7.1, 14 |
+| M2 | **When the focus target already has focus, the message is spoken through `ariaNotify()`** (feature-checked; every supported engine has it): the collector, when the first invalid control is the active element (implicit submission with Enter), and the Form's settle effect, when the first errored Field's target is active (Enter in that field, server rejects it). A changed `aria-describedby` on the focused element is not announced by NVDA or VoiceOver, and the cancelled bubble was the platform's announcement. One announcement per batch, never after a focus move. Blur-and-refocus rejected (noisier, moves the caret). Product-owner decision. | Decisions 5, 2.5, 3.5, 5.1, 5.3, 10.13, 13.1, 14 |
+| M3 | Test gaps closed: the progressive-enhancement browser row renders `Form.Root` with a fake Server Function (endpoint, method, encType, `$ACTION_ID`, errors in the server HTML, clean hydration); `Dialog.Form render={<Form.Root errors />}` rows; H1 and M1 rows. Slider's "inside a Field" row waits for #60. | 13.1, 13.2 |
+| L1 | **CheckboxGroup puts `aria-invalid` on every Item, not on the fieldset**: ARIA 1.2 made `aria-invalid` widget-specific and deprecated it on `group`; 5.1's "valid on `group` / `radiogroup`" held for `radiogroup` only. The Items needed it explicitly anyway (the slot's `customError` on the first Item would be exposed too early by Chromium, 2.3). RadioGroup keeps it on the `radiogroup`; the multi-thumb Slider (#60) follows CheckboxGroup. | Decisions 5, 5.1, 7.2, 14 |
+| L2 | A group's focus target **skips unnamed members** (a `CheckboxGroup.Parent` rendered first no longer wins), as `validityElementOf` already did. 2.5's "CheckboxGroup: the first item" is now literally true. | 2.5, 3.5, 7.2 |
+| L3 | `Form.Root` honours a `render` element's `onSubmit` that calls `preventDefault()` (merged handlers run the consumer's first): the Form runs nothing and clears its submission record; React's own plugin skips a prevented submit too. | 3.1, 4.4, 13.1, 14 |
+| L4 | The review proposed reading `validate` through a latest-ref and keying the slot effect on nothing but the control and the server state, because an inline `validate` re-ran (building a `FormData`) on every render; ae4640d did that, which changed 2.1's semantics ("a new function takes effect at the next read"). **Product-owner decision: 2.1 stands.** A changed `validate` prop takes effect at the commit in which it changed (identity-keyed re-run); the cost is avoided by the consumer with `useCallback`, which the prop doc recommends. The developer is reverting the latest-ref read; the JSDoc and docs page say "next read" until then. | 2.1, 4.1, 14 |
+| L6 | Docs: the Field page has a "`Dialog.Form` rendered as `Form.Root`" section (the Form's policy applies: errors routed, values kept, reset only on success; `closeOnSettle={false}` still needed, #59) and the Dialog page points to it; the page also states the `aria-invalid` placement for groups, the `ariaNotify` fallback, and that a Combobox pick counts as an edit (30a4bb2). | 10.11 |
+| Walkthrough 11 | Composition check: through `render`, `Form.Root` receives the `action` and intercepts, so **`Form.Root`'s `autoReset` applies and React's automatic reset does not**; refs merge, both watchers see the edge, no double run; the default `closeOnSettle` closes with errors (#59). The walkthrough said "React's path"; corrected. | 10.11, 13.1 |
+| 2.2 | Developer finding, not a review item: jsdom 30 answers `false` to `matches(":user-invalid")` instead of throwing, so the fallback is gated on `CSS.supports("selector(:user-invalid)")`. | 2.2, 14 |

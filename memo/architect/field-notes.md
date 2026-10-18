@@ -136,3 +136,39 @@ bubble and collecting for focus; it keeps `reportValidity()` meaning "show the p
 - The `Dialog.Form render={<Form.Root />}` composition: `Dialog.Form`'s owned `action` reaches
   `Form.Root` as a prop; the Popup's document `submit` listener ignores a form with a function
   action; the watcher's edge arrives from the host transition.
+
+## Review fold (2026-10-18, memo/reviewer/field-form.md; fixes ae4640d, 30a4bb2)
+
+What changed in the design versus the accepted draft, and why I agreed:
+
+- **The settle generation is gone.** The developer's per-Field edge detection (render-phase
+  derived state on `useFormStatus`) is strictly better than my Form-effect counter: the re-arm
+  lands in the same commit as the result, which is what 2.4's "error in the DOM, then focus"
+  needs. My draft would have focused a field one commit before its re-shown error existed. The
+  observable rules are unchanged, so the walkthroughs only lost the counter arithmetic.
+- **Two hide flags (M1).** The per-generation `suppressed` set in my draft happened to be frozen
+  until the next settle; the per-Field port lost that by clearing on `submit`. `suppressNext` /
+  `suppressed` restore the property in the per-Field model. Worth remembering: anything "about
+  the flight in progress" must be separate from anything "about the last result".
+- **`useFieldValueChange` (H1).** The 7.1 contract assumed every control's value change reaches
+  the Field through a DOM event. False for Combobox (React writes the hidden input), CheckboxGroup
+  Parent, controlled changes, rollbacks, and Slider gestures (#60). I chose the hook over a
+  synthetic `change` on the hidden input: a synthetic event would lie to the consumer's
+  `onChange` and to every `useFormOwnerEvent` subscriber. Limitation recorded: cross-field refresh
+  for such a change needs `Form.Root` (there is no owner to bubble to).
+- **`ariaNotify` when focus does not move (M2).** PO-accepted. It is the same channel Toast and
+  Combobox use, in every supported engine; one announcement per batch, never after a focus move.
+- **`aria-invalid` on a `group` (L1).** ARIA 1.2 made it widget-specific; I had written "valid on
+  group / radiogroup" from memory. CheckboxGroup: per Item. Multi-thumb Slider must do the same.
+- **L4 (`validate` identity).** The reviewer's latest-ref proposal is cheaper but changes the
+  prop's meaning (a new function waits for the next event). PO kept 2.1: a changed prop is a
+  changed constraint. Recorded in 4.1 with the `useCallback` recommendation; the developer is
+  reverting ae4640d's latest-ref read. Check after the revert that the JSDoc / docs page say
+  "when the prop changes" again.
+- **Conventions 3.8.** Corrected the `useFieldControl` row (no `ref` option, ref-callback
+  registration, listeners attached by the Field, no `data-pending`) and added a
+  `useFieldValueChange` row: Slider (#60) must follow both.
+
+Not changed: `aria-errormessage` stays out; no live region; the collector's microtask model
+(the developer's per-task batch is the implementation of "one microtask per task" that survives
+the browser's per-listener microtask checkpoint).
