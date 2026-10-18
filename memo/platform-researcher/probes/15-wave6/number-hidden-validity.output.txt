@@ -1,0 +1,14 @@
+
+######## chromium 156.0.8078.4
+hidden validity after value=11                       {"over":true,"msg":"Value must be less than or equal to 10.","userInvalid":false,"willValidate":true}
+requestSubmit: events / focus                        {"log":["invalid:hid:Value must be less than or equal to 10."],"focus":"hid","console":[]}
+:user-invalid on hidden after submit attempt         true
+mirrored: requestSubmit events / focus               {"log":["invalid:vis:Value must be less than or equal to 10.","invalid:hid:Value must be less than or equal to 10."],"focus":"vis","visUserInvalid":true,"console":[]}
+reset restores hidden defaultValue                   "5"
+
+######## firefox 157.0
+hidden validity after value=11                       {"over":true,"msg":"Please select a value that is no more than 10.","userInvalid":false,"willValidate":true}
+requestSubmit: events / focus                        {"log":["invalid:hid:Please select a value that is no more than 10."],"focus":"hid","console":[]}
+:user-invalid on hidden after submit attempt         true
+mirrored: requestSubmit events / focus               {"log":["invalid:vis:Please select a value that is no more than 10.","invalid:hid:Please select a value that is no more than 10."],"focus":"vis","visUserInvalid":true,"console":[]}
+reset restores hidden defaultValue                   "5"

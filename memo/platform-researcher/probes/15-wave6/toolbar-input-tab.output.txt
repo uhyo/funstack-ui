@@ -1,0 +1,7 @@
+chromium 156.0.8078.4
+Tab x3 from before           before Tab>a Tab>after Tab>m
+Tab from in, then Tab        in Tab>b Tab>after
+Shift+Tab from in            in Shift+Tab>a Shift+Tab>before
+Right from a into in, Right  a ArrowRight>in ArrowRight>in ArrowRight>in
+Left from b                  b ArrowLeft>in ArrowLeft>in
+ArrowDown on m (handled)     m ArrowDown>m true

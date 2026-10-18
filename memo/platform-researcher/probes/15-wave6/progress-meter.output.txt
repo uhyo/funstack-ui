@@ -1,0 +1,46 @@
+
+######## chromium 156.0.8078.4
+CSS.supports selectors                           {"::-webkit-progress-value":true,"::-moz-progress-bar":false,"::-webkit-meter-optimum-value":true,"::-moz-meter-bar":false,":-moz-meter-optimum":false,"::slider-fill":false,":indeterminate":true}
+styled progress 25%                              "RRBBBBBBBB"
+styled indeterminate                             "BBBBBBBBBB"
+styled meter 0.75                                "RRRRRRRBBB"
+styled progress rtl 25%                          "BBBBBBBRRR"
+styled progress vertical-lr rtl 25% (top->bottom) "BBBBBBBRRR"
+progress with child span (G = child shown)       "RRRRRRRRRR"
+child span box                                   [0,0]
+indeterminate :indeterminate / position          [true,-1,0.25]
+removeAttribute(value) -> indeterminate          [true,false]
+value clamping (progress 150/100, meter 2)       [100,1]
+transition 25->100 after 400ms (1s linear)       "RRRRRRBBBB"
+transition settled                               "RRRRRRRRRR"
+labels                                           [1,0]
+AX progressbar p                                 {"value":100,"min":0,"max":100}
+AX progressbar indeterminate                     {"min":0,"max":1}
+AX meter m                                       {"value":0.75,"min":0,"max":1}
+AX progressbar rtl                               {"value":25,"min":0,"max":100}
+AX progressbar vertical                          {"value":25,"min":0,"max":100}
+AX progressbar child                             {"value":1,"min":0,"max":1}
+AX progressbar native                            {"value":40,"min":0,"max":100}
+AX meter mlow                                    {"value":10,"min":0,"max":100}
+AX progressbar Upload                            {"value":30,"min":0,"max":100}
+AX progressbar aria progress                     {"value":30,"min":0,"max":100}
+AX progressbar aria indeterminate                {"min":0,"max":100}
+AX meter aria meter                              {"value":70,"min":0,"max":100}
+AX progressbar Labelled by label                 {"value":1,"min":0,"max":1}
+all roles                                        ["RootWebArea","none","progressbar","meter","LabelText","generic","StaticText","InlineTextBox"]
+
+######## firefox 157.0
+CSS.supports selectors                           {"::-webkit-progress-value":false,"::-moz-progress-bar":true,"::-webkit-meter-optimum-value":false,"::-moz-meter-bar":true,":-moz-meter-optimum":true,"::slider-fill":false,":indeterminate":true}
+styled progress 25%                              "RRBBBBBBBB"
+styled indeterminate                             "RRRRRRRRRR"
+styled meter 0.75                                "RRRRRRRBBB"
+styled progress rtl 25%                          "BBBBBBBRRR"
+styled progress vertical-lr rtl 25% (top->bottom) "BBBBBBBRRR"
+progress with child span (G = child shown)       "RRRRRRRRRR"
+child span box                                   [0,0]
+indeterminate :indeterminate / position          [true,-1,0.25]
+removeAttribute(value) -> indeterminate          [true,false]
+value clamping (progress 150/100, meter 2)       [100,1]
+transition 25->100 after 400ms (1s linear)       "RRRRRRRRRR"
+transition settled                               "RRRRRRRRRR"
+labels                                           [1,0]

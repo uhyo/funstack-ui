@@ -1,0 +1,50 @@
+
+######## chromium 156.0.8078.4
+focusGroup IDL                                       true
+tabIndex of items (bold, italic, dis, adis)          [0,0,0,0]
+Right x8 from bold                                   "bold Right>italic Right>adis Right>text@0 Right>text@5 Right>text@5 Right>text@5 Right>text@5 Right>text@5"
+Left from num / last                                 "last Left>num Left>num Left>num"
+text: caret at end, Right / Left                     "text@5 Right>text@5 Left>text@4 Home>text@0 End>text@5"
+Tab from text (inside group)                         "text@5 Tab>left Tab>num"
+Home/End from italic                                 "italic End>last Home>bold"
+Down/Up inside radiogroup                            "left Down>center Down>left Right>center"
+num: Up (spin) / Right                               "num Up>num Right>num"
+num value after                                      "6"
+Tab from before (memory: italic expected)            "before Tab>italic"
+Shift+Tab from after                                 "after Shift+Tab>num"
+Tab from italic leaves group                         "italic Tab>center"
+RTL Right/Left from r1                               "r1 Right>r1 Left>r2 Left>r3"
+vertical Down/Right                                  "v1 Right>v1 Down>v2 Down>v2"
+wrap: Right x2                                       "w1 Right>w2 Right>w1"
+nowrap default: Right x2 from bold-group last        "last Right>last"
+nomemory + focusgroupstart: Shift+Tab into #pressed  "after Tab>r3 Tab>v2 Tab>w1 Tab>p2 Tab> Tab>before"
+preventDefault on keydown blocks move                "w1 Right>w1"
+AX #tb                                               {"role":"toolbar","name":"Format","orientation":"horizontal"}
+AX #bold                                             {"role":"button","name":"B","pressed":"false","focusable":true}
+AX #dis                                              {"role":"button","name":"disabled","disabled":true}
+AX #adis                                             {"role":"button","name":"aria-disabled","disabled":true,"focusable":true}
+AX #align                                            {"role":"radiogroup","name":"Align"}
+AX #left                                             {"role":"radio","name":"L","checked":"true","focusable":true}
+AX #rtl                                              {"role":"toolbar","name":"","orientation":"horizontal"}
+AX #v                                                {"role":"toolbar","name":"","orientation":"vertical"}
+
+######## firefox 157.0
+focusGroup IDL                                       false
+tabIndex of items (bold, italic, dis, adis)          [0,0,0,0]
+Right x8 from bold                                   "bold Right>bold Right>bold Right>bold Right>bold Right>bold Right>bold Right>bold Right>bold"
+Left from num / last                                 "last Left>last Left>last Left>last"
+text: caret at end, Right / Left                     "text@5 Right>text@5 Left>text@4 Home>text@0 End>text@5"
+Tab from text (inside group)                         "text@5 Tab>left Tab>center"
+Home/End from italic                                 "italic End>italic Home>italic"
+Down/Up inside radiogroup                            "left Down>left Down>left Right>left"
+num: Up (spin) / Right                               "num Up>num Right>num"
+num value after                                      "6"
+Tab from before (memory: italic expected)            "before Tab>bold"
+Shift+Tab from after                                 "after Shift+Tab>last"
+Tab from italic leaves group                         "italic Tab>adis"
+RTL Right/Left from r1                               "r1 Right>r1 Left>r1 Left>r1"
+vertical Down/Right                                  "v1 Right>v1 Down>v1 Down>v1"
+wrap: Right x2                                       "w1 Right>w1 Right>w1"
+nowrap default: Right x2 from bold-group last        "last Right>last"
+nomemory + focusgroupstart: Shift+Tab into #pressed  "after Tab>r1 Tab>r2 Tab>r3 Tab>v1 Tab>v2 Tab>w1"
+preventDefault on keydown blocks move                "w1 Right>w1"

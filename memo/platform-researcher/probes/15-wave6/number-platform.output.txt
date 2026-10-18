@@ -1,0 +1,129 @@
+
+######## chromium 156.0.8078.4 lang=en locale=en-US
+type "1,5" into #dec                               {"value":"15","asNumber":15,"badInput":false,"valid":true}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"1.2345","asNumber":1.2345,"badInput":false,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":false,"valid":true}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"","asNumber":null,"badInput":false,"valid":true}
+keys #n (5, 0..10, step 1)                         "ArrowUp=6 ArrowDown=4 PageUp=5 PageDown=5 Home=5 End=5 Shift+ArrowUp=6 ArrowRight=5"
+keys #dec (1.5, step .1)                           "ArrowUp=1.6 ArrowDown=1.4"
+keys #mis (1.5, step 1): snap                      "ArrowUp=2.5 ArrowDown=0.5"
+keys #empty (min 3)                                "ArrowUp=3 ArrowDown=3"
+keys #emptyNoMin                                   "ArrowUp=1 ArrowDown=-1"
+keys #any (step any, 1.25)                         "ArrowUp=2.25 ArrowDown=0.25"
+keys #t (text spinbutton)                          "ArrowUp=5 ArrowDown=5"
+ArrowUp at max 10                                  {"value":"10","asNumber":10,"badInput":false,"valid":true}
+events: ArrowUp                                    ["n:beforeinput(insertText):5","n:input:6","n:change:6"]
+events: type '2' then blur                         ["n:beforeinput(insertText):6","n:input(insertText):62","n:change:62"]
+wheel up over unfocused #n                         {"value":"5","scrollY":0}
+wheel up over focused #n                           {"value":"6","log":["n:beforeinput(insertText):5","n:input:6"]}
+wheel down over focused #n                         {"value":"5","scrollY":0}
+wheel elsewhere while #n focused                   {"value":"5","scrollY":100}
+validity mismatch/overflow                         {"11":{"value":"11","step":false,"over":true,"under":false,"msg":"Value must be less than or equal to 10."},"10.5":{"value":"10.5","step":true,"over":true,"under":false,"msg":"Value must be less than or equal to 10."},"-1":{"value":"-1","step":false,"over":false,"under":true,"msg":"Value must be greater than or equal to 0."},"abc":{"value":"","step":false,"over":false,"under":false,"msg":""}}
+setSelectionRange on number                        "InvalidStateError"
+selectionStart on number                           null
+stepUp beyond max / stepUp(3)                      ["10","2"]
+FormData / reset                                   ["7","5"]
+spin-button pseudo                                 {"webkitInner":true,"mozAppearanceTextfield":true}
+box width default                                  177
+AX spinbutton n                                    {"value":5,"valuemin":0,"valuemax":10,"invalid":"false"}
+AX spinbutton dec                                  {"value":1.5,"valuemin":0,"valuemax":0,"invalid":"false"}
+AX spinbutton mismatch                             {"value":1.5,"valuemin":0,"valuemax":0,"invalid":"false"}
+AX spinbutton empty                                {"valuemin":3,"valuemax":10,"invalid":"false"}
+AX spinbutton emptyNoMin                           {"valuemin":0,"valuemax":0,"invalid":"false"}
+AX spinbutton any                                  {"value":1.25,"valuemin":0,"valuemax":0,"invalid":"false"}
+AX spinbutton text spin                            {"value":5,"valuemin":0,"valuemax":10,"invalid":"false"}
+
+######## chromium 156.0.8078.4 lang=de locale=de-DE
+type "1,5" into #dec                               {"value":"15","asNumber":15,"badInput":false,"valid":true}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"1.2345","asNumber":1.2345,"badInput":false,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":false,"valid":true}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"","asNumber":null,"badInput":false,"valid":true}
+
+######## chromium 156.0.8078.4 lang=en locale=de-DE
+type "1,5" into #dec                               {"value":"15","asNumber":15,"badInput":false,"valid":true}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"1.2345","asNumber":1.2345,"badInput":false,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":false,"valid":true}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"","asNumber":null,"badInput":false,"valid":true}
+
+######## chromium 156.0.8078.4 lang=de locale=en-US
+type "1,5" into #dec                               {"value":"15","asNumber":15,"badInput":false,"valid":true}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"1.2345","asNumber":1.2345,"badInput":false,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":false,"valid":true}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"","asNumber":null,"badInput":false,"valid":true}
+
+######## firefox 157.0 lang=en locale=en-US
+type "1,5" into #dec                               {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"3","asNumber":3,"badInput":false,"valid":true}
+keys #n (5, 0..10, step 1)                         "ArrowUp=6 ArrowDown=4 PageUp=5 PageDown=5 Home=5 End=5 Shift+ArrowUp=6 ArrowRight=5"
+keys #dec (1.5, step .1)                           "ArrowUp=1.6 ArrowDown=1.4"
+keys #mis (1.5, step 1): snap                      "ArrowUp=2.5 ArrowDown=0.5"
+keys #empty (min 3)                                "ArrowUp=3 ArrowDown=3"
+keys #emptyNoMin                                   "ArrowUp=1 ArrowDown=-1"
+keys #any (step any, 1.25)                         "ArrowUp=2.25 ArrowDown=0.25"
+keys #t (text spinbutton)                          "ArrowUp=5 ArrowDown=5"
+ArrowUp at max 10                                  {"value":"10","asNumber":10,"badInput":false,"valid":true}
+events: ArrowUp                                    ["n:beforeinput(insertReplacementText):5","n:input(insertReplacementText):6","n:change:6"]
+events: type '2' then blur                         ["n:beforeinput(insertText):6","n:input(insertText):62","n:change:62"]
+wheel up over unfocused #n                         {"value":"5","scrollY":0}
+wheel up over focused #n                           {"value":"5","log":[]}
+wheel down over focused #n                         {"value":"5","scrollY":100}
+wheel elsewhere while #n focused                   {"value":"5","scrollY":100}
+validity mismatch/overflow                         {"11":{"value":"11","step":false,"over":true,"under":false,"msg":"Please select a value that is no more than 10."},"10.5":{"value":"10.5","step":true,"over":true,"under":false,"msg":"Please select a value that is no more than 10."},"-1":{"value":"-1","step":false,"over":false,"under":true,"msg":"Please select a value that is no less than 0."},"abc":{"value":"","step":false,"over":false,"under":false,"msg":""}}
+setSelectionRange on number                        "InvalidStateError"
+selectionStart on number                           null
+stepUp beyond max / stepUp(3)                      ["10","2"]
+FormData / reset                                   ["7","5"]
+spin-button pseudo                                 {"webkitInner":false,"mozAppearanceTextfield":true}
+box width default                                  191
+
+######## firefox 157.0 lang=de locale=de-DE
+type "1,5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"3","asNumber":3,"badInput":false,"valid":true}
+
+######## firefox 157.0 lang=en locale=de-DE
+type "1,5" into #dec                               {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"3","asNumber":3,"badInput":false,"valid":true}
+
+######## firefox 157.0 lang=de locale=en-US
+type "1,5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.5" into #dec                               {"value":"1.5","asNumber":1.5,"badInput":false,"valid":true}
+type "1.234,5" into #dec                           {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "1e3" into #dec                               {"value":"1e3","asNumber":1000,"badInput":false,"valid":true}
+type "abc" into #dec                               {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "-" into #dec                                 {"value":"","asNumber":null,"badInput":true,"valid":false}
+type "１２" into #dec                                {"value":"12","asNumber":12,"badInput":false,"valid":true}
+type "٣" into #dec                                 {"value":"3","asNumber":3,"badInput":false,"valid":true}
