@@ -47,6 +47,8 @@
     "./tabs": "./dist/tabs/index.mjs",
     "./toast": "./dist/toast/index.mjs",
     "./toggle": "./dist/toggle/index.mjs",
+    "./toggle-group": "./dist/toggle-group/index.mjs",
+    "./toolbar": "./dist/toolbar/index.mjs",
     "./tooltip": "./dist/tooltip/index.mjs",
     "./package.json": "./package.json"
   },

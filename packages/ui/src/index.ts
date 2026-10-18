@@ -11,6 +11,30 @@ import "./internal/platform-attributes.js";
 export { Toggle } from "./toggle/index.js";
 export type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./toggle/index.js";
 
+export { ToggleGroup } from "./toggle-group/index.js";
+export type {
+  ToggleGroupRootProps,
+  ToggleGroupMultipleProps,
+  ToggleGroupExclusiveProps,
+  ToggleGroupRootState,
+  ToggleGroupValueChangeDetails,
+  ToggleGroupOrientation,
+  ToggleGroupItemProps,
+  ToggleGroupItemState,
+} from "./toggle-group/index.js";
+
+export { Toolbar } from "./toolbar/index.js";
+export type {
+  ToolbarRootProps,
+  ToolbarRootState,
+  ToolbarOrientation,
+  ToolbarButtonProps,
+  ToolbarButtonState,
+  ToolbarButtonActionDetails,
+  ToolbarSeparatorProps,
+  ToolbarSeparatorState,
+} from "./toolbar/index.js";
+
 export { Accordion } from "./accordion/index.js";
 export type {
   AccordionRootProps,

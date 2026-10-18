@@ -22,6 +22,8 @@ export default defineConfig({
     "src/form/index.ts",
     "src/progress/index.ts",
     "src/meter/index.ts",
+    "src/toggle-group/index.ts",
+    "src/toolbar/index.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives

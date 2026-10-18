@@ -157,3 +157,9 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
 - `prefers-reduced-motion` is emulated through a custom browser command
   (`emulateReducedMotion`, Playwright `page.emulateMedia`) registered in `vitest.config.ts`;
   `withReducedMotion()` in `src/__tests__/browser-commands.ts` restores it in `finally`.
+- Toolbar / ToggleGroup `focusgroup` (#66): Chromium's native `focusgroup="toolbar inline wrap"`
+  and the JS engine agree on every row tested (one stop with memory, wrap, Home / End, RTL,
+  `disabled` skipped, `aria-disabled` reached, a text input keeps its arrows and Tab / Shift+Tab
+  from it move to the next / previous item, Shift+Tab from a button leaves). Standalone group
+  with `nomemory` + `focusgroupstart` re-enters on the pressed Item on both paths. Playwright
+  refuses to click an `aria-disabled` button in every engine. WebKit (no click focus) only on CI.

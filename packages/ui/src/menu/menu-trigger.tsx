@@ -1,12 +1,13 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
+import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import type { MenuContextValue } from "./menu-context.js";
-import { edgeItem, focusItem, hasModifier } from "./menu-dom.js";
+import { edgeItem, focusItem, hasModifier, isRtl } from "./menu-dom.js";
 
 export interface MenuTriggerState {
   /** Optimistic open state. */
@@ -60,7 +61,8 @@ export function isPointerClick(event: Event): boolean {
 /**
  * The menu button: `<button type="button" commandfor command="toggle-popover"
  * aria-haspopup="menu" aria-expanded>`. A click (Enter, Space) toggles the menu through the
- * Root's transition; ArrowDown / ArrowUp open it with the first / last item focused.
+ * Root's transition; ArrowDown / ArrowUp open it with the first / last item focused (inside a
+ * vertical `Toolbar.Root`: the inline-end arrow, with the first item focused).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `commandfor`,
  * `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `data-open`,
@@ -81,12 +83,24 @@ export function MenuTrigger({
       "parent menu.",
   );
 
+  // Inside a vertical Toolbar, ArrowDown / ArrowUp are the Toolbar's: the trigger opens on the
+  // inline-end arrow instead, as a submenu trigger does (design/components/toggle-group.md 7.4).
+  const toolbar = useToolbarContext();
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (disabled || hasModifier(event)) return;
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    // No page scroll; Enter and Space stay the native click.
+    let which: "first" | "last";
+    if (toolbar?.orientation === "vertical") {
+      const openKey = isRtl(event.currentTarget) ? "ArrowLeft" : "ArrowRight";
+      if (event.key !== openKey) return;
+      which = "first";
+    } else {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      which = event.key === "ArrowDown" ? "first" : "last";
+    }
+    // No page scroll, and an enclosing Toolbar sees `defaultPrevented`; Enter and Space stay the
+    // native click.
     event.preventDefault();
-    openMenuWithFocus(menu, event.nativeEvent, event.key === "ArrowDown" ? "first" : "last");
+    openMenuWithFocus(menu, event.nativeEvent, which);
   };
 
   const { state, libraryProps, ref } = usePopoverTrigger(menu.popover, {

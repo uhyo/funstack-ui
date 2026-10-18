@@ -1,0 +1,339 @@
+"use client";
+import { useEffect, useInsertionEffect, useLayoutEffect, useState } from "react";
+import type { FocusEvent, KeyboardEvent, PointerEvent, RefObject } from "react";
+
+// The roving-focus engine shared by `Toolbar.Root` and a standalone `ToggleGroup.Root`
+// (design/components/toggle-group.md section 6, conventions 3.2 and 7.4). Items are the focusable
+// descendants of the container, found in the DOM; which one is the Tab stop is urgent library
+// state kept outside React and written to the items as `tabindex` through the DOM.
+
+export type RovingOrientation = "horizontal" | "vertical";
+
+export interface RovingFocusOptions {
+  /** `false`: the engine writes nothing and handles nothing (a ToggleGroup inside a Toolbar). Default `true`. */
+  readonly enabled?: boolean;
+  readonly orientation: RovingOrientation;
+  readonly loop: boolean;
+  /** The native `focusgroup` path is active: write no `tabindex`, handle no navigation key. */
+  readonly native: boolean;
+  /** Which item is the Tab stop when there is no usable memory. */
+  readonly entry: (items: readonly HTMLElement[]) => HTMLElement | undefined;
+  /**
+   * `true`: the last focused item stays the Tab stop after focus leaves (Toolbar). `false`: while
+   * focus is inside, the focused item is the stop (so Tab and Shift+Tab leave the container);
+   * once it leaves, the stop is re-derived from `entry` (ToggleGroup: the pressed Item).
+   */
+  readonly memory: boolean;
+}
+
+export interface RovingFocusHandlers {
+  readonly onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  readonly onFocus: (event: FocusEvent<HTMLElement>) => void;
+  readonly onBlur: (event: FocusEvent<HTMLElement>) => void;
+  readonly onPointerDown: (event: PointerEvent<HTMLElement>) => void;
+}
+
+const FOCUSABLE = [
+  "button",
+  "a[href]",
+  'input:not([type="hidden"])',
+  "select",
+  "textarea",
+  "summary",
+  '[contenteditable]:not([contenteditable="false"])',
+  "[tabindex]",
+].join(",");
+
+function isVisible(el: HTMLElement): boolean {
+  // jsdom has no `checkVisibility`; `hidden` is the part of it a test can observe there.
+  if (typeof el.checkVisibility === "function") return el.checkVisibility();
+  return el.closest("[hidden]") === null;
+}
+
+/**
+ * Whether `el` or an ancestor below `root` takes it out of `root`'s sequence: a nested toolbar
+ * (its own sequence), a popover or a dialog rendered inside the container (a `Menu.Popup`'s items
+ * are the menu's).
+ */
+function isNestedOut(el: HTMLElement, root: HTMLElement): boolean {
+  for (let node: Element | null = el; node !== null && node !== root; node = node.parentElement) {
+    if (
+      node.getAttribute("role") === "toolbar" ||
+      node.hasAttribute("popover") ||
+      node.tagName === "DIALOG"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The items of `root` in DOM order (design 6.2): its focusable descendants minus `:disabled`,
+ * `inert`, invisible, nested-toolbar / popover / dialog content, and elements whose own
+ * `tabindex="-1"` was not written by this engine (`managed`). `aria-disabled` elements are items.
+ */
+export function itemsOf(root: HTMLElement, managed: { has(el: Element): boolean }): HTMLElement[] {
+  const items: HTMLElement[] = [];
+  for (const el of root.querySelectorAll<HTMLElement>(FOCUSABLE)) {
+    if (el.matches(":disabled")) continue;
+    if (el.closest("[inert]") !== null) continue;
+    if (el.getAttribute("tabindex") === "-1" && !managed.has(el)) continue;
+    if (isNestedOut(el, root)) continue;
+    if (!isVisible(el)) continue;
+    items.push(el);
+  }
+  return items;
+}
+
+const BUTTON_LIKE_INPUTS = new Set([
+  "button",
+  "submit",
+  "reset",
+  "checkbox",
+  "radio",
+  "image",
+  "color",
+  "file",
+]);
+const ARROW_OWNING_ROLES = new Set(["textbox", "combobox", "spinbutton", "slider"]);
+
+/**
+ * An item that owns the arrow keys (design 6.3): text-like `input`s, `textarea`, `select`,
+ * `[contenteditable]`, and `role` `textbox` / `combobox` / `spinbutton` / `slider`.
+ */
+export function isTextEntryItem(el: Element): boolean {
+  const role = el.getAttribute("role");
+  if (role !== null && ARROW_OWNING_ROLES.has(role)) return true;
+  if (el instanceof HTMLInputElement) return !BUTTON_LIKE_INPUTS.has(el.type);
+  if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return true;
+  const editable = el.getAttribute("contenteditable");
+  if (editable !== null && editable !== "false") return true;
+  return el instanceof HTMLElement && el.isContentEditable === true;
+}
+
+type Move = "next" | "prev" | "first" | "last";
+
+function resolveKey(key: string, orientation: RovingOrientation, rtl: boolean): Move | null {
+  switch (key) {
+    case "Home":
+      return "first";
+    case "End":
+      return "last";
+    case "ArrowRight":
+      return orientation === "horizontal" ? (rtl ? "prev" : "next") : null;
+    case "ArrowLeft":
+      return orientation === "horizontal" ? (rtl ? "next" : "prev") : null;
+    case "ArrowDown":
+      return orientation === "vertical" ? "next" : null;
+    case "ArrowUp":
+      return orientation === "vertical" ? "prev" : null;
+    default:
+      return null;
+  }
+}
+
+function focusItem(item: HTMLElement): void {
+  // Keyboard focus: the ring shows even where the engine's heuristic would not (as Tabs).
+  item.focus({ focusVisible: true } as FocusOptions);
+}
+
+interface Engine {
+  /** The options of the last committed render (written from an insertion effect). */
+  readonly setOptions: (options: RovingFocusOptions) => void;
+  /**
+   * Re-derives the Tab stop of `root` and writes `tabindex`. `focused`: the element focus is on,
+   * if any.
+   */
+  readonly apply: (root: HTMLElement | null, focused: Element | null) => void;
+  readonly handlers: RovingFocusHandlers;
+}
+
+function createEngine(): Engine {
+  let current: HTMLElement | null = null;
+  let latestOptions: RovingFocusOptions | null = null;
+  const managed = new Set<HTMLElement>();
+
+  const active = (options: RovingFocusOptions | null): options is RovingFocusOptions =>
+    options !== null && options.enabled !== false;
+
+  /** Native path: give back every `tabindex` this engine wrote (a hydration render may have). */
+  const release = (root: HTMLElement) => {
+    for (const el of root.querySelectorAll<HTMLElement>("[tabindex]")) {
+      if (!managed.has(el)) continue;
+      managed.delete(el);
+      el.removeAttribute("tabindex");
+    }
+    current = null;
+  };
+
+  const apply = (root: HTMLElement | null, focused: Element | null) => {
+    const options = latestOptions;
+    if (root === null || !active(options)) return;
+    if (options.native) {
+      release(root);
+      return;
+    }
+    const items = itemsOf(root, managed);
+    if (!options.memory) {
+      current =
+        focused instanceof HTMLElement && items.includes(focused)
+          ? focused
+          : (options.entry(items) ?? null);
+    } else if (current === null || !items.includes(current)) {
+      current = options.entry(items) ?? null;
+    }
+    for (const el of items) {
+      managed.add(el);
+      const want = el === current ? "0" : "-1";
+      if (el.getAttribute("tabindex") !== want) el.setAttribute("tabindex", want);
+    }
+    // Elements written before that are no longer items: a stale `0` must not stay a Tab stop
+    // (it would be one again when re-enabled); one that left the container gets its own back.
+    for (const el of managed) {
+      if (items.includes(el)) continue;
+      if (!root.contains(el)) {
+        managed.delete(el);
+        if (el.isConnected) el.removeAttribute("tabindex");
+      } else if (el.getAttribute("tabindex") !== "-1") {
+        el.setAttribute("tabindex", "-1");
+      }
+    }
+  };
+
+  const onFocus = (event: FocusEvent<HTMLElement>) => {
+    const options = latestOptions;
+    if (!active(options) || options.native) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const items = itemsOf(event.currentTarget, managed);
+    if (!items.includes(target)) return;
+    current = target;
+    apply(event.currentTarget, target);
+  };
+
+  const onBlur = (event: FocusEvent<HTMLElement>) => {
+    const options = latestOptions;
+    if (!active(options) || options.native || options.memory) return;
+    // Focus moving to another item is handled by its focus event.
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    apply(event.currentTarget, null);
+  };
+
+  const onPointerDown = (event: PointerEvent<HTMLElement>) => {
+    const options = latestOptions;
+    if (!active(options) || options.native) return;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    const items = itemsOf(event.currentTarget, managed);
+    // Safari does not focus a button on click; the pointer still makes it the stop.
+    const item = items.find((el) => el.contains(target));
+    if (item === undefined) return;
+    current = item;
+    apply(
+      event.currentTarget,
+      options.memory ? item : event.currentTarget.ownerDocument.activeElement,
+    );
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    const options = latestOptions;
+    // The browser moves focus itself where `focusgroup` is implemented.
+    if (!active(options) || options.native) return;
+    const root = event.currentTarget;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const items = itemsOf(root, managed);
+    const index = items.indexOf(target);
+    if (index < 0) return;
+
+    if (isTextEntryItem(target)) {
+      // The item keeps its arrows, Home and End; Tab / Shift+Tab move to the next / previous item
+      // while one exists, as Chromium's `focusgroup="toolbar"` does (design 6.3).
+      if (event.key !== "Tab") return;
+      const next = items[index + (event.shiftKey ? -1 : 1)];
+      if (next === undefined) return;
+      event.preventDefault();
+      focusItem(next);
+      return;
+    }
+
+    const rtl = options.orientation === "horizontal" && getComputedStyle(root).direction === "rtl";
+    const move = resolveKey(event.key, options.orientation, rtl);
+    if (move === null) return;
+    event.preventDefault();
+    const last = items.length - 1;
+    let nextIndex: number;
+    switch (move) {
+      case "first":
+        nextIndex = 0;
+        break;
+      case "last":
+        nextIndex = last;
+        break;
+      case "next":
+        nextIndex = index >= last ? (options.loop ? 0 : last) : index + 1;
+        break;
+      case "prev":
+        nextIndex = index <= 0 ? (options.loop ? last : 0) : index - 1;
+        break;
+    }
+    const next = items[nextIndex];
+    if (next !== undefined && next !== target) focusItem(next);
+  };
+
+  return {
+    setOptions: (options) => {
+      latestOptions = options;
+    },
+    apply,
+    handlers: { onFocus, onBlur, onPointerDown, onKeyDown },
+  };
+}
+
+/**
+ * Roving focus over the focusable descendants of `ref`'s element (design 6.2). Writes `tabindex`
+ * (`0` on the Tab stop, `-1` on the other items) from a layout effect after every commit of the
+ * calling component, from a `MutationObserver` on the subtree and from focus / pointer events;
+ * the items render none. Returns the container's handlers for its library props.
+ */
+export function useRovingFocus(
+  ref: RefObject<HTMLElement | null>,
+  options: RovingFocusOptions,
+): RovingFocusHandlers {
+  const [engine] = useState(createEngine);
+  // Before every layout effect of the same commit (as `useLatest`): handlers and the observer
+  // read the options of the last committed render.
+  useInsertionEffect(() => {
+    engine.setOptions(options);
+  });
+  const enabled = options.enabled !== false;
+
+  // After every commit of the container (a deps-less layout effect).
+  useLayoutEffect(() => {
+    const root = ref.current;
+    engine.apply(root, root?.ownerDocument.activeElement ?? null);
+  });
+
+  // Children that change without the container re-rendering.
+  useEffect(() => {
+    const root = ref.current;
+    if (!enabled || root === null) return;
+    const observer = new MutationObserver(() => {
+      engine.apply(root, root.ownerDocument.activeElement);
+    });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["disabled", "hidden", "inert", "aria-disabled"],
+    });
+    return () => {
+      observer.disconnect();
+    };
+  }, [engine, enabled, ref]);
+
+  return engine.handlers;
+}

@@ -164,6 +164,16 @@ const clientFiles = [
   "meter/meter-indicator.mjs",
   "meter/meter-label.mjs",
   "meter/meter-value.mjs",
+  // Every ToggleGroup and Toolbar part, their contexts and the roving engine
+  // (design/components/toggle-group.md section 13).
+  "toggle-group/toggle-group-context.mjs",
+  "toggle-group/toggle-group-root.mjs",
+  "toggle-group/toggle-group-item.mjs",
+  "toolbar/toolbar-root.mjs",
+  "toolbar/toolbar-button.mjs",
+  "toolbar/toolbar-separator.mjs",
+  "internal/toolbar-context.mjs",
+  "internal/use-roving-focus.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -205,6 +215,8 @@ const directiveFreeFiles = [
   "internal/range-value.mjs",
   "internal/render-element.mjs",
   "internal/dev-warn.mjs",
+  "toggle-group/index.mjs",
+  "toolbar/index.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {
