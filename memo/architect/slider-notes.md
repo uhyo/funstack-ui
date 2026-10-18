@@ -172,3 +172,32 @@ step is waiting for its gesture's commit (`stepHeld`)", and 2.3 item 5 / 3.3 cou
 starts a transition only when there is a step action". 3.8 `useFieldControl` row: Slider's
 two-part control (labelable input in the Thumb, group element in the Root) does not fit "spread
 into the owner part's libraryProps"; decide with #60.
+
+## #60, Slider inside a Field (proposed 2026-10-18, slider.md 9.4)
+
+Decisions and the alternatives I dropped:
+
+- **Hook in the Root, attributes split through context.** The Thumb cannot call
+  `useFieldControl`: the labelable/group choice needs the count and the Field allows one
+  registration. The hook's "spread attributes into libraryProps" contract is for one-element
+  controls; for Slider the Root routes `ref` / `id` / `aria-describedby` to Thumb 0's input
+  (single) or keeps them on its own div (multi), and `aria-invalid` to every input in both
+  shapes. No hook API change needed (the Field reviewer's M4 worry about the contract was about
+  the spread convention, not the hook's shape).
+- **`thumbId(0)` = the Field's control id** rather than making Field.Label point at the
+  library id: the Field owns the control id (Field 7.1) and `Slider.Label` keeps working
+  unchanged since it reads `thumbId(0)`.
+- **Group `aria-describedby` on the Root div**, not duplicated per input: consistent with
+  RadioGroup / CheckboxGroup. If the screen-reader pass shows group descriptions unread, the
+  per-input duplication is a one-line change in the Thumb (it already merges `describedBy`).
+- **Notify at the commit, keyed on `optimistic`,** not per move: the DOM already shows `live`
+  during a drag; validating sixty times a second buys nothing; the native key path has the same
+  granularity (`change`). Cost: a controlled adopt-steps parent notifies per step; acceptable
+  (the Field's mirror compare prevents renders).
+- **`edit` from the commit reason**: `"activate"` → dismiss; `"platform"` / `"dismiss"` → not an
+  edit. A rollback keeping a shown server error is deliberate (the server judged that value).
+- **`required` not applicable**: warn rather than silently ignore.
+- **No BubbleInput**: closes the section-13 question for the library's own needs.
+
+Open for the PO: accept 9.4; the `required` warning (vs. silent ignore); group description
+placement if the SR pass disagrees.

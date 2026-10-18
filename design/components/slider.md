@@ -48,6 +48,7 @@ pointer is, like focus).
 | 11 | ViewTransition | **No `transition` prop on any part** (Select precedent): nothing mounts from library state and every move is urgent or optimistic. Types `fsui-slider`, `fsui-slider-change` (step), `fsui-slider-commit` (gesture) for consumers' own boundaries. Thumb motion and rollback animate with a CSS transition on the registered custom property, disabled under `[data-dragging]`. |
 | 12 | SSR | Every part file is `"use client"`. Server HTML carries the inputs with their values; before hydration keyboard and form submission work natively (the visuals catch up at mount through reconciliation); pointer does nothing. A plain `<input type="range">` from a Server Component remains the JS-free form slider (issue #19). |
 | 13 | Not in v1 | `largeStep` / Shift+Arrow, `step="any"`, `list` / tick marks, per-thumb `disabled`, `inverted`, a value tooltip, `<rangegroup>`, `appearance: base` (section 13). |
+| 14 | Inside a Field (#60, **proposed**, needs product-owner acceptance) | `Slider.Root` calls `useFieldControl` with `labelable: count === 1`: one thumb registers its input (the Field's control id becomes `thumbId(0)`, `Field.Label` gets `for`); several register the Root `div` (`aria-labelledby` → `Field.Label`, as CheckboxGroup). `aria-invalid` on every Thumb input, never on the group; `aria-describedby` on the input (one) or the Root (several). `name` / `disabled` from the Field; `required` not applicable (dev warning). The slot and `:user-invalid` live on the first Thumb's input. `useFieldValueChange` keyed on the optimistic values with `edit = true` for `"activate"` commits, because pointer and normalised-key gestures fire no native `input` / `change`. Section 9.4. |
 
 ---
 
@@ -833,28 +834,244 @@ No per-commit re-apply effect is needed for `value` (react-dom's `updateInput` r
 every render of the input), unlike `checked` / `indeterminate` in `useNativeChecked`; the only
 DOM write the library makes outside render is the reset mirror of 9.2.
 
-### 9.4 Inside a `Field` (issue #60, not wired yet)
+### 9.4 Inside a `Field` (issue #60)
 
-Slider was implemented in parallel with Field, so its `useFieldControl` wiring is deferred to
-#60. The review (M4) recorded what #60 has to decide first; none of it is a v1 defect:
+Status: **proposed, needs product-owner acceptance** (2026-10-18). Slider was implemented in
+parallel with Field, so this wiring was deferred to #60. It follows Field 7.1 / 7.2 as corrected
+by the Field review (ae4640d: `useFieldValueChange`, no `data-pending` from the hook, per-item
+`aria-invalid` for a `group`) and the review's M4 notes. Everything below is the Root's and the
+Thumb's; no new part, no new public prop.
 
-- **Pointer gestures fire no native `input` / `change`** (4.1, product-owner item 8). Field
-  dismisses a server error and re-runs `validate` from the control's native `input` / `change`
-  (capture listeners on the registered element and the form owner). With
-  `Form.Root errors={{ volume: "Too loud" }}` a drag to a new value would leave the error shown
-  and `setCustomValidity` set, so the next submit is blocked by a stale custom error; keyboard
-  works (native events). #60 must either add the bubbling `input` / `change` (section 13's
-  `BubbleInput` follow-up) or have the Slider call a Field hook directly at step and commit.
-  This is the decision to make before #60, not after.
-- **The labelable element and the group element live in different parts.** The thumb input's
-  `id` is library-owned (`ctx.thumbId(index)`), and the labelable-vs-group choice depends on the
-  value count, known in the Root, while the labelable element is in the Thumb. `useFieldControl`
-  must be called where the count is known (the Root) and its `id` / `aria-describedby` /
-  `aria-invalid` routed through context to the first Thumb's input (one thumb) or onto the Root
-  (several). The hook's "spread into the owner part's libraryProps" contract does not fit a
-  two-part control as written (a conventions 3.8 note for #60).
-- `aria-describedby` on the input is a plain forwarded prop; the Field's tokens need the
-  token-merge path there.
+```tsx
+<Field.Root name="volume">
+  <Field.Label>Volume</Field.Label>                 {/* label[for] → the only thumb's input */}
+  <Slider.Root defaultValue={40}>
+    <Slider.Track><Slider.Indicator /><Slider.Thumb /></Slider.Track>
+  </Slider.Root>
+  <Field.Description>Loud is above 80.</Field.Description>
+  <Field.Error />
+</Field.Root>
+
+<Field.Root name="price" validate={(_, fd) => (Number(fd.getAll("price")[1]) - Number(fd.getAll("price")[0]) > 500 ? "Narrow the range to 500 or less." : null)}>
+  <Field.Label>Price</Field.Label>                  {/* label[id]; the Root is aria-labelledby it */}
+  <Slider.Root defaultValue={[100, 900]} max={1000}>
+    <Slider.Track>
+      <Slider.Indicator />
+      <Slider.Thumb index={0} aria-label="Minimum price" />
+      <Slider.Thumb index={1} aria-label="Maximum price" />
+    </Slider.Track>
+  </Slider.Root>
+  <Field.Error />
+</Field.Root>
+```
+
+Rendered (idle; one thumb, then two):
+
+```html
+<div>                                                                   <!-- Field.Root -->
+  <label id="_f_-label" for="_f_-control">Volume</label>
+  <div data-orientation="horizontal" style="--slider-end: 40%">          <!-- Slider.Root: no role, data-invalid when shown -->
+    <div><span data-index="0"><input type="range" id="_f_-control" name="volume" value="40"
+         aria-describedby="_f_-description" aria-invalid="false"></span></div>
+  </div>
+  <p id="_f_-description">Loud is above 80.</p>
+</div>
+
+<div>
+  <label id="_g_-label">Price</label>                                     <!-- no `for` once the group registered -->
+  <div role="group" aria-labelledby="_g_-label" aria-describedby="_g_-description" …>
+    <div>
+      <span data-index="0"><input type="range" id="_s_-thumb-0" name="price" aria-label="Minimum price" aria-invalid="false" …></span>
+      <span data-index="1"><input type="range" id="_s_-thumb-1" name="price" aria-label="Maximum price" aria-invalid="false" …></span>
+    </div>
+  </div>
+</div>
+```
+
+#### 9.4.1 Where the hook runs, and how its attributes reach the inputs
+
+`Slider.Root` calls `useFieldControl({ labelable: count === 1, name, disabled, component:
+"Slider.Root" })`, where `count` is `shown.length` (known in the Root at render; the Thumb is not
+the owner part). The Root does not pass its own `id` prop to the hook: that `id` is the `div`'s
+and keeps passing through; the Field's control id is for the thumb input. The hook's single
+`attributes` object does not fit a two-element control as "spread into the owner's
+`libraryProps`", so the Root **splits it** and routes the pieces through `SliderContext`:
+
+| Piece | One thumb | Several thumbs |
+| --- | --- | --- |
+| `field.ref` (registration) | through context (`ctx.field.inputRef`); **Thumb `index` 0** merges it into its input ref (`useMergedRef`), so the registered element is the input | merged into the Root's library ref, so the registered element is the group `div` |
+| `id` (`ids.control`) | `thumbId(0)` returns the Field's control id (`thumbId = (i) => i === 0 && fieldId !== undefined ? fieldId : \`${id}-thumb-${i}\``); the Thumb renders it as today, and `Slider.Label`'s `for` (if one is mounted) agrees | unchanged library ids on every input |
+| `aria-labelledby` | none (the Field's `for` names the input) | on the Root `div`, token-merged: the Field's label id, then `Slider.Label`'s id while one is mounted, then the consumer's; the "a multi-thumb slider needs a name" warning counts the Field as a name |
+| `aria-describedby` | through context to Thumb 0's input, token-merged with the Thumb's forwarded `aria-describedby` (the consumer's tokens first, Field 4.3) | on the Root `div` (the group element, read when focus enters the group, Field 5.1: the same placement as RadioGroup / CheckboxGroup); a Thumb's own forwarded tokens stay on its input |
+| `aria-invalid` | through context to **every** Thumb's input (`ctx.field.invalid`), owned there | the same: every input, **never on the group `div`** (ARIA 1.2 deprecated `aria-invalid` on `group`; Field 5.1 / CheckboxGroup precedent) |
+| `data-invalid` | on the Root `div` (owned) and on every Thumb's styled `span` (through context), so the recipe can colour the thumb; not on the hidden input | the same |
+| `name` | `field.name` (own `name` ?? the Field's) replaces the Root's `name` in context; a Thumb's own `name` still wins per input | the same; with one name every thumb posts under it (`FormData.getAll`) |
+| `disabled` | `field.disabled` (own `||` the Field's) replaces `disabled` everywhere the Root uses it (inputs, pointer, `data-disabled`, state) | the same |
+| `required` | **not applicable**: a range always has a value and `Slider.Root` has no `required` prop (3.1). The registration reports `required: false`; `Field.Root required` on a Field whose control is a Slider logs a dev warning once ("a range is never empty; `required` has no effect") and still sets `data-required` on the Field parts (the Field's own prop) | the same |
+| `form` | unchanged pass-through; the Field reads `el.form` from the registered input, so a Slider submitting to another form validates in that form | unchanged |
+| `data-pending` | **nothing from the Field**: the Root's and the Thumb's `data-pending` stay the slider's own step / commit (Field 7.3; conventions 2.7) | the same |
+
+Why the Root registers the group `div` and not a `<fieldset>`: the Root is a `div` with
+`role="group"` (section 8); Field's `validityElementOf` and `focusTargetOf` handle a non-fieldset
+element with `querySelectorAll("input, select, textarea")`, so no element change is needed. The
+Field's capture listeners on the `div` see every input's `input` / `change` / `focusout` /
+`invalid` (the same as on a fieldset).
+
+Why the Root and not the Thumb calls the hook: the labelable-vs-group choice needs the count,
+the Field allows one registration, and `name` / `disabled` are Root props. The Thumb only
+consumes what the context gives it (ref, id, `aria-describedby`, `aria-invalid`, `data-invalid`).
+
+Why Thumb 0 is "the" labelable input and not "the first mounted Thumb": `index` is explicit and
+`index={0}` is the default; a single-thumb slider has exactly one Thumb, which is index 0 (a
+Thumb with another index renders nothing and warns, 3.2).
+
+#### 9.4.2 `Field.Label` and `Slider.Label`
+
+Inside a Field, `Field.Label` is the name: with one thumb it renders `for` → the Field's control
+id, which is the thumb input's id (above); with several, it renders no `for` once the Root
+registered `labelable: false`, and the Root carries `aria-labelledby` → the Field label id. This
+is exactly the CheckboxGroup shape (Field 4.2, 7.2). The server HTML of a multi-thumb Field
+carries `for` until hydration removes it (Field 8).
+
+`Slider.Label` stays for use outside a Field (its `for` / `id` wiring is unchanged). Inside a
+Field it still works: with one thumb both labels point at the same input (two `for`s, the
+accessible name concatenates); with several, both ids are in the Root's `aria-labelledby`. No
+warning: `Combobox.Label` has the same rule. Each thumb of a multi-thumb slider still needs its
+own `aria-label` / `aria-labelledby` (section 8); the Field names the group, not the thumbs.
+
+#### 9.4.3 The custom-validity slot and `:user-invalid`
+
+The Field writes `validate`'s result and a shown server error with `setCustomValidity` on its
+**validity element**: the registered input (one thumb) or, for the group `div`, the first named
+`willValidate` input in DOM order, which is the first Thumb's input (Track, Indicator and Value
+contain no form controls). A range has no native constraints, so `validity` is `valid` unless the
+slot is set; with the slot set, the input matches `:invalid`, and after a submission attempt (or a
+change-then-blur) `:user-invalid`, as any input does; `validationMessage` is the slot's text.
+A submit attempt then fires `invalid` on that input: the Field (with a `Field.Error` mounted)
+cancels the bubble, renders the message and the collector focuses the input (Field 2.5;
+`focusTargetOf(div)` → the first enabled named input = the first thumb). The Form's settle focus
+for a server error lands on the same input (Field 3.5).
+
+`validate`'s `value` is `formData.get(name)`: the **first** thumb's value as a string. A rule
+over several thumbs reads `formData.getAll(name)` (the example above). Per-Thumb names
+(`price-min` / `price-max`) still post correctly, but then `errors` and `validate` key on the
+Field's `name`, which no input carries: a dev warning when a Thumb's `name` differs from the
+Field's (the `useFieldControl` warning extended to the Thumb inputs through the Root).
+
+Thumbs that mount late (a Suspense boundary) can change which input is first: the Field's
+`refresh()` re-resolves the validity element on every read and clears the slot on the previous
+element (Field 14, "the slot"), so nothing needs doing here.
+
+#### 9.4.4 Gestures the Field cannot hear: `useFieldValueChange`
+
+Field dismisses a shown server error and re-runs `validate` from the control's native `input` /
+`change`. A pointer gesture fires neither (4.1: the hidden input never receives the pointer and
+the library fires no synthetic events, product-owner item 8), and neither do the JS-normalised
+keys (ArrowLeft / ArrowRight on a vertical or RTL slider, 4.2). With
+`Form.Root errors={{ volume: "Too loud" }}` a drag to a quieter value would otherwise leave the
+error shown and the slot set, so the next submit is blocked by a stale custom error (review M4).
+
+**Decision: the direct Field hook, not `BubbleInput`.** The Root calls
+
+```ts
+const lastReason = useRef<ChangeReason | null>(null);      // written by commitGesture before it dispatches
+useFieldValueChange(optimisticValues.join("\u0000"), () => lastReason.current === "activate");
+```
+
+- `value`: the optimistic values as one string (two arrays are never `Object.is`-equal). In
+  uncontrolled mode `optimistic` changes once per gesture, at the commit dispatch (2.3), and on
+  a rollback; with a controlled adopt-steps parent it changes per adopted step. During a drag the
+  thumbs show `live`, which is not in the key: the Field is told at the **commit**, which is
+  when the value is worth validating (the same granularity as the native key path's `change`;
+  a per-move refresh would build a `FormData` sixty times a second for nothing). The DOM already
+  holds the live value during the drag, so a submission attempt mid-drag validates what is shown.
+- `takeEdit`: `true` when the latest commit's `reason` was `"activate"` (pointer, key, or a
+  normalised key): the user made the change, so a shown server error is dismissed exactly as an
+  `input` event would. `"platform"` (reset, mount reconciliation) and the `"dismiss"` revert
+  report `false`: a rollback to the committed value is not an edit, so a server error about that
+  value stays shown. `lastReason` is set in `commitGesture` before the dispatch and read in the
+  layout effect of the commit's optimistic render (same task for a key, the `pointerup` task for
+  a drag).
+- A key press fires native `input` + `change` **and** notifies at the commit: the second refresh
+  is idempotent (the mirror compares before it sets state, Field 14), so no extra render.
+- Cross-field rules in other Fields follow through `Form.Root`'s `refreshFields` (Field 7.1);
+  outside a `Form.Root` only the Slider's own Field refreshes, which the Field design documents.
+
+`BubbleInput` (a synthetic bubbling `input` / `change` on the hidden input at each move) stays
+out (section 13): it needs the prototype `value` setter to get past React's tracker, re-enters
+React's dispatch from `pointermove`, and would tell every form listener the user "typed"; the
+hook is the same post-commit layout effect Combobox and CheckboxGroup already use.
+
+#### 9.4.5 Walkthroughs
+
+1. **Server error, then a drag.** `errors={{ volume: "Too loud" }}` at mount: the Field writes
+   the slot on the input, shows the error, `aria-invalid="true"` on the input, `data-invalid` on
+   the Root and the Thumb span. The user drags to 30 and releases: `commitGesture("activate")`
+   sets `lastReason`, dispatches; the optimistic render's layout effect notifies `edit = true`;
+   the Field dismisses, clears the slot, `aria-invalid="false"`; Save submits.
+2. **`validate` on a range, submit attempt.** The price example: thumbs at 100 and 900; the
+   user clicks Save. The slot holds "Narrow the range…" (written at mount and after the last
+   commit); the browser fires `invalid` on the first thumb's input; the Field cancels the bubble,
+   renders the message, focuses the first thumb (`:user-invalid` now matches it, `data-invalid`
+   on the Root). The user drags the max thumb to 500: at the commit the Field re-runs `validate`
+   → `null`, the slot clears, the error unmounts.
+3. **RTL ArrowLeft.** A horizontal slider under `dir="rtl"` inside a Field with a server error:
+   ArrowLeft is handled from `keydown` (4.2), no native events; the commit notifies with
+   `edit = true` and dismisses the error.
+4. **Rejected save.** `valueCommitAction` rejects, caught inside (uncontrolled): the value
+   reverts (`"dismiss"`), the optimistic key changes, notify with `edit = false`: `validate`
+   re-runs on the reverted value; a server error that was shown stays shown.
+5. **Form reset.** The `reset` event: the Field re-reads in its microtask (Field 2.2) and the
+   Root's `"platform"` commit notifies with `edit = false`; both read the reset values.
+
+#### 9.4.6 Tests
+
+jsdom, `slider.test.tsx`, "Inside a Field" (conventions 10.1 row), both shapes:
+
+| Row | Proves |
+| --- | --- |
+| One thumb, wiring | Inside `Field.Root name="volume" disabled`: the input's `id` is the Field's control id and `Field.Label`'s `for` equals it; `name="volume"` on the input; `disabled` on the input and `data-disabled` on the parts; `aria-describedby` = the Thumb's own tokens + the Field's description id; `aria-invalid="false"`; no `aria-labelledby` on the Root; `Slider.Label` mounted too: both `for`s equal the input id. |
+| Several thumbs, wiring | `Field.Label` has no `for` after mount; the Root has `role="group"`, `aria-labelledby` = Field label id + `Slider.Label` id (+ consumer tokens, consumer's first), `aria-describedby` = the Field's description id; **every** input has `aria-invalid="false"` and the Root `div` has none; the group-name warning does not fire with a `Field.Label` and no `Slider.Label`. |
+| `required` | `Field.Root required` around a Slider warns once; no input is `required`; `data-required` is on the Field parts. |
+| Server error and a pointer commit | `Form.Root errors={{ volume: "Too loud" }}`: `Field.Error` shows it, the (first) input's `validationMessage` is the message and `validity.customError` is true, `aria-invalid="true"` on every input, `data-invalid` on the Root and the Thumb spans; a mocked-rect press, move and release: after the commit the error is gone, the slot is `""`, `aria-invalid="false"`. |
+| `validate` and a commit | `validate` reading `getAll(name)` runs at mount (slot set), after a pointer commit (cleared when the rule passes), after a vertical / RTL `keydown` commit, and after a `"platform"` reset; `Field.Error` renders the string after a `requestSubmit()` attempt (the `invalid` event, fallback mode) and the first thumb's input is focused. |
+| Rollback | A rejected commit caught inside (uncontrolled): one notification with `edit = false`: a shown server error stays shown; `validate` saw the reverted value. |
+| Form focus | `Form.Root` settle with `errors` for the Slider's Field: focus lands on the first thumb's input (several thumbs) / the input (one). |
+| Two channels | A `valueCommitAction` in flight: `data-pending` on the Root and the moved Thumb only; the Field's `data-pending` follows the form's submission only. |
+| Late Thumb | Thumb 1 mounts after Thumb 0 inside a Field: the slot moves to no other element (index 0 stays first); the Field's listeners on the group `div` hear the new input's `change`. |
+
+Browser, `slider.browser.test.tsx`, all three engines: with `validate` returning a message, a
+real click on `Form.Submit` fires `invalid` on the first thumb's input, the Field cancels the
+bubble (no `reportValidity` UI; the collector's focus is on the thumb input), the input matches
+`:user-invalid`, and a real drag that fixes the rule clears the error and lets the next click
+submit (the action is called once with the dragged value in its `FormData`). Engine note: WebKit
+sets the user-validity flag on a submit attempt like the others (Field's browser rows already
+pin this for text inputs); the row asserts the same in all three.
+
+Type test: `required` is still not a `Slider.Root` prop; no new public prop.
+
+#### 9.4.7 Implementation notes
+
+- `slider-root.tsx`: `useFieldControl` as above; `useMergedRef(libraryRef, count > 1 ?
+  field.ref : undefined)` for the Root element; `thumbId` reads `field.id`; `name` / `disabled`
+  taken from the hook's result before everything that uses them; the Root's `libraryProps` gain
+  `aria-labelledby` (count > 1, token-merged: Field label id, `Slider.Label` id, consumer),
+  `aria-describedby` (count > 1, token-merged) and `data-invalid`; `lastReason` ref written in
+  `commitGesture`; `useFieldValueChange` as in 9.4.4; the group-name warning adds
+  `field.inField` to its "named" condition; the `required` warning through `useDevWarning`.
+- `slider-context.ts`: `field: { inputRef: RefCallback<HTMLElement> | undefined;
+  describedBy: string | undefined; invalid: "true" | "false" | undefined; dataInvalid: "" |
+  undefined } | null` (`null` outside a Field; `inputRef` and `describedBy` set only with one
+  thumb).
+- `slider-thumb.tsx`: index 0 merges `ctx.field?.inputRef` into the input ref (after the
+  consumer's `inputRef`); every Thumb puts `aria-invalid` on its input (owned) and
+  `data-invalid` on its span; `aria-describedby` on the input is the token merge of the
+  forwarded prop and `ctx.field?.describedBy`.
+- `slider-label.tsx`: unchanged (`htmlFor: single ? ctx.thumbId(0) : undefined` already yields
+  the Field's id).
+- Conventions 3.8's `useFieldControl` and `useFieldValueChange` rows already list Slider with
+  "#60"; no conventions change. The Field docs page's "FUNSTACK controls" list gains Slider; the
+  Slider page gets an "Inside a Field" example (the price range with `validate`).
 
 ---
 
@@ -986,8 +1203,9 @@ Notation: `L` = `live`, `O` = optimistic, `C` = committed, `S` = shown (2.2), `P
 - **Per-thumb `disabled`**, **`inverted`**, **`thumbAlignment`** (Base UI) and a built-in
   value tooltip: no consumer case yet.
 - **Synthetic `input` / `change` on the hidden input for pointer gestures** (Radix's
-  `BubbleInput`): a follow-up if form-level listeners turn out to matter (product-owner item 8).
-  Field is the first such listener (9.4): issue #60 decides between this and a direct Field hook.
+  `BubbleInput`): a follow-up if consumer form-level listeners turn out to matter (product-owner
+  item 8). Field, the first library listener, is served by the direct hook instead
+  (`useFieldValueChange`, 9.4.4, proposed for #60), so this stays out.
 - **`<rangegroup>`** (Open UI, Chromium Intent to Prototype) and **`appearance: base` with
   `::slider-*`** (CSS Forms 1, Chromium flag only): both could replace the hidden inputs or the
   styled parts without changing the state API; revisit at Intent to Ship (research §7 item 9).
@@ -1023,6 +1241,7 @@ Track's `getBoundingClientRect` and polyfill `setPointerCapture` / `releasePoint
 | Suspending content (both) | A controlled adopt-steps parent's content keyed on the value suspends: old content stays, no fallback above the component, `data-pending` on Root and Thumb; then new content. Any interaction that may suspend runs inside `await act(async …)`: a sync `act` around a suspending update leaves a later async transition pending forever (React logs "A component suspended inside an `act` scope, but the `act` call was not awaited"; documented as unsupported, not a React bug, review L4). |
 | Platform path (both) | Mount reconciliation: `renderToString`, set the input's value before `hydrateRoot` → one `step` + `commit` with `reason: "platform"`, `thumb: null`, `event: undefined`, StrictMode still one, none when equal; late Thumb through `onItemMounted`. Form reset: `form.reset()`, `<button type="reset">`, automatic reset after a successful `<form action>` → `defaultValue` attributes equal the reset target at the time of the `reset` event (uncontrolled: latest `defaultValue`; controlled: mount-time), one `step` + `commit` with the `reset` event, a cancelled `reset` dispatches nothing, a refusing controlled parent gets the DOM re-synced after settle; `disabled` still follows a reset. |
 | Forms | `FormData` has one entry per thumb under the Thumb's or Root's `name`; `disabled` omits them; `form` attribute honoured. |
+| Inside a Field (#60, proposed) | The 9.4.6 table: one-thumb and multi-thumb wiring (`id` / `for`, `aria-labelledby`, `aria-describedby`, per-input `aria-invalid`, `name`, `disabled`), the `required` warning, a server error dismissed by a pointer commit, `validate` over `getAll(name)` after pointer / normalised-key / reset commits and on a submit attempt (first thumb focused), a rollback notifying with `edit = false`, the Form's settle focus on the first thumb, the two pending channels apart, a late Thumb. |
 | Keyboard normalisation | Vertical: a `keydown` ArrowRight / ArrowLeft is prevented and dispatches step + commit with the `keydown`; horizontal RTL (computed `direction: rtl` on the input): ArrowLeft increases, ArrowRight decreases, prevented, step + commit with the `keydown`; horizontal LTR: not prevented, nothing dispatched by the library for `keydown`. |
 | Function props / `render` | Every part's documented state; `Slider.Value` default text, `index`, and the multi-thumb-without-children warning; Thumb `render={<div />}` keeps the input inside and the handlers; `inputRef` reaches the input; `className` / `style` merge; the `--slider-*` and `touch-action` entries lose to the consumer's `style` per property. |
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` in `valueCommitAction`. |
@@ -1042,6 +1261,7 @@ Track's `getBoundingClientRect` and polyfill `setPointerCapture` / `releasePoint
 | Firefox restoration | Reload a page with a changed range value: Firefox restores it; mount reconciliation dispatches `"platform"`. | `browserName === "firefox"` only |
 | Rollback animation | With the 6.2 CSS, the return to `value` at release transitions `--slider-value` (exactly one `transitionstart` on the thumb); during a drag no transition runs (`[data-dragging]`). The row uses a non-adopting controlled parent, the same visual move as a rejected save: a rejection unmounts the Root through the boundary, so the slide-back is not observable there (developer deviation 4). | **Open** (see Review corrections): on 330ba8c WebKit CI saw no `transitionstart` at all (`expected [] to include '--slider-value'`); 8fffbca was green on WebKit. Chromium once reported two `transitionstart`s under a loaded full run, not reproduced. |
 | No `startViewTransition` | Spy before a drag, a key press, a rejected commit: zero calls (no boundary exists). | none |
+| Inside a Field (#60, proposed) | With `validate` failing, a real `Form.Submit` click fires `invalid` on the first thumb's input, the Field cancels the bubble and focuses that input, which matches `:user-invalid`; a real drag that satisfies the rule clears the error and the next click calls the action once with the dragged value (9.4.6). | none expected; asserts the same in all three |
 
 Firefox runs the browser test files **serially** (`fileParallelism: false` on its instance,
 8fffbca): headless Firefox shares one mouse and one pointer-capture state between the pages of
@@ -1129,6 +1349,10 @@ packages/ui/src/internal/
   `htmlFor` only when `values.length === 1`.
 - **Dev warnings** per sections 1, 3, 5, 8 and conventions (both/mode switch, shape switch,
   wrong element, a Thumb outside a Root throws).
+- **Inside a Field (#60, proposed)**: the file-level changes are listed in 9.4.7 (`useFieldControl`
+  in the Root with the split attributes routed through `SliderContext.field`, `thumbId(0)` =
+  the Field's control id, `useFieldValueChange` keyed on the optimistic values with the
+  `lastReason` ref, per-input `aria-invalid` in the Thumb).
 - **Docs site and example app.** Playground: a volume slider with a fake 800 ms save and a
   failure toggle (rollback visible), a price range filtering a suspending list (the
   transition-by-default demo), a vertical slider, an RTL container, a `<form action>` with
