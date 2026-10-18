@@ -66,3 +66,26 @@ the engine already found. APG's "one such control, last" keeps it mostly unobser
 Header note; 1.1 `Item` / `Button` / `Separator`; 3.2 roving stop paragraph; 3.6 `Toolbar.Button`;
 4.1 `pending` / `pressed` / `orientation`; 5.3 types; 7.1 `toolbar-context.ts`; 7.4 row; 8 flag
 row; 9.1 files; Open questions entry.
+
+## Wave 7: #74 probe (2026-10-18)
+
+`memo/architect/probes/toolbar-radios-focusgroup.mjs` (+ `.output.txt`), Chromium 156.0.8078.4
+through the repo's Playwright install, no flag (`focusGroup` is in the prototype in that build).
+Same-`name` native radio groups inside `focusgroup="toolbar wrap"` and `toolbar block`.
+
+What changed against my open-question proposal (6e61bdb):
+
+- Confirmed: radios own all four arrows (not only the toolbar's axis) plus Home / End; the group
+  checks as it moves and wraps within itself; the toolbar's arrows land on the checked radio, else
+  the first from either side; Tab / Shift+Tab from the checked radio (or any radio when none is
+  checked) go to the adjacent toolbar item, as from a text input; memory re-enters on the radio.
+- Added: Tab from an unchecked radio with a checked sibling visits the sibling first. That is plain
+  native sequential navigation (only the checked radio is tabbable), so the JS rule replicates it;
+  it is rare (arrows check as they move, so an unchecked focused radio needs a click or script).
+- Dropped: `role="radio"` from the unit rule. Chromium treats `button[role=radio]` as plain
+  toolbar items unless they sit in their own nested focusgroup, which is a separate segment.
+- Noted: entering an unchecked group from the right lands on the **first** radio, not the last
+  (`b3` ArrowLeft → `s`).
+
+Design: section 17 (rule, test rows 25-28); #75 as section 18. The Toolbar page's callout should
+be rewritten by the implementer per 17.2 item 6.

@@ -1,0 +1,42 @@
+######## chromium 156.0.8078.4
+focusGroup IDL                                           true
+tabIndex (left, center, right, s, m, l)                  [0,0,0,0,0,0]
+Right from b1 (checked=center)                           "b1 Right>center"
+  checked                                                ["left=false","center=true","right=false"]
+Left from b2 (checked=center)                            "b2 Left>center"
+  checked                                                ["left=false","center=true","right=false"]
+Right from b2 into unchecked group                       "b2 Right>s"
+  checked                                                ["s=false","m=false","l=false"]
+Left from b3 into unchecked group                        "b3 Left>s"
+  checked                                                ["s=false","m=false","l=false"]
+Right x4 from left                                       "left Right>center Right>right Right>left Right>center"
+  checked                                                ["left=false","center=true","right=false"]
+Left x3 from right                                       "right Left>center Left>left Left>right"
+  checked                                                ["left=false","center=false","right=true"]
+Down x4 from left (perpendicular)                        "left Down>center Down>right Down>left Down>center"
+  checked                                                ["left=false","center=true","right=false"]
+Up from left                                             "left Up>right"
+  checked                                                ["left=false","center=false","right=true"]
+Home / End from center                                   "center Home>center End>center"
+  checked                                                ["left=false","center=true","right=false"]
+Right x4 from s (unchecked group)                        "s Right>m Right>l Right>s Right>m"
+  checked                                                ["s=false","m=true","l=false"]
+Tab from center (checked)                                "center Tab>b2"
+Tab from left (unchecked)                                "left Tab>center"
+Shift+Tab from center (checked)                          "center S+Tab>b1"
+Shift+Tab from right (unchecked)                         "right S+Tab>center"
+Tab from s (unchecked group)                             "s Tab>b3"
+Tab from m (unchecked group, middle)                     "m Tab>b3"
+Shift+Tab from l (unchecked group)                       "l S+Tab>b2"
+Tab x6 from b1                                           "b1 Tab>after Tab>v1 Tab> Tab>before Tab>b1 Tab>after"
+Tab from before (fresh memory?)                          "before Tab>b1"
+Tab from before after arrowing to right                  "before Tab>right"
+Tab from before after focusing m                         "before Tab>m"
+Shift+Tab from after                                     "after S+Tab>m"
+vertical: Down x3 from v1                                "v1 Down>va Down>vb Down>va"
+  checked                                                ["va=true","vb=false"]
+vertical: Right from va (perpendicular)                  "va Right>vb Left>va"
+  checked                                                ["va=true","vb=false"]
+vertical: Up from v2                                     "v2 Up>va Up>vb"
+  checked                                                ["va=false","vb=true"]
+vertical: Tab from va / vb                               "va Tab>v2 | vb Tab>v2"
