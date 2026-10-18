@@ -2,12 +2,18 @@
 // and the caret, real typing with a locale, the browser's own report on the visible input, a real
 // submit inside a Field, Enter's implicit submission, a real wheel and the page scroll, a real
 // press-and-hold, the announcements, the accessibility tree (Chromium, CDP), text typed before
-// hydration, and no document view transition. Runs in Chromium, Firefox and WebKit.
+// hydration, and no document view transition (also for a rejected commit). Chromium-only through
+// CDP (#77): a touch press-and-hold (`Input.dispatchTouchEvent`), IME composition
+// (`Input.imeSetComposition`; other engines assert the composing keydown shapes instead), and the
+// absence of the "is not focusable" console error (`Log.entryAdded`, with a positive control).
+// Runs in Chromium, Firefox and WebKit. Rows wait for the events they cause rather than for time
+// (#71).
 import { act, render, screen } from "@testing-library/react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { cdp, userEvent } from "vitest/browser";
+import { ErrorCatcher } from "../__tests__/helpers.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
 import { Field } from "../field/index.js";
@@ -38,6 +44,33 @@ const inc = () => screen.getByTestId("inc");
 
 async function focusInput(): Promise<void> {
   await act(async () => input().focus());
+}
+
+/**
+ * The centre of `element` in the top-level page's viewport, which is what CDP `Input.*`
+ * coordinates are in: the test runs in an iframe, so each frame's offset (and any scale) is added.
+ */
+function pagePoint(element: Element): { x: number; y: number } {
+  const rect = element.getBoundingClientRect();
+  let x = rect.left + rect.width / 2;
+  let y = rect.top + rect.height / 2;
+  let win: Window = window;
+  while (win.frameElement !== null) {
+    const frame = win.frameElement as HTMLElement;
+    const box = frame.getBoundingClientRect();
+    const scale = (box.width - frame.clientLeft * 2) / win.innerWidth || 1;
+    x = box.left + frame.clientLeft + x * scale;
+    y = box.top + frame.clientTop + y * scale;
+    win = win.parent;
+  }
+  return { x, y };
+}
+
+/** Resolves on the next `type` event at `target` (capture), for rows that must not race it. */
+function nextEvent(target: EventTarget, type: string): Promise<Event> {
+  return new Promise((resolve) => {
+    target.addEventListener(type, resolve, { capture: true, once: true });
+  });
 }
 
 describe("NumberField (browser)", () => {
@@ -144,6 +177,49 @@ describe("NumberField (browser)", () => {
     await user.type(input(), "5");
     await user.tab();
   });
+
+  it.runIf(browserName === "chromium")(
+    "no 'is not focusable' console error for the hidden input (CDP Log.entryAdded)",
+    async () => {
+      const session = cdp();
+      const entries: string[] = [];
+      const onEntry = (event: { entry: { text: string } }) => entries.push(event.entry.text);
+      session.on("Log.entryAdded", onEntry);
+      await session.send("Log.enable");
+      try {
+        render(
+          <>
+            <form data-testid="nf" onSubmit={(e) => e.preventDefault()}>
+              <Fixture name="quantity" defaultValue={0} min={1} />
+            </form>
+            {/* The control: a hidden invalid control Chromium does log for. */}
+            <form data-testid="control" onSubmit={(e) => e.preventDefault()}>
+              <input name="plain" required style={{ display: "none" }} />
+            </form>
+          </>,
+        );
+        await flush();
+        await act(async () => {
+          (screen.getByTestId("nf") as HTMLFormElement).requestSubmit();
+        });
+        // The control's message arrives after any message the NumberField submission caused (one
+        // ordered channel), so waiting for it bounds the wait without a timeout guess.
+        await act(async () => {
+          (screen.getByTestId("control") as HTMLFormElement).requestSubmit();
+        });
+        await vi.waitFor(() =>
+          expect(entries.some((text) => text.includes("name='plain'"))).toBe(true),
+        );
+        expect(entries.filter((text) => text.includes("not focusable"))).toEqual([
+          expect.stringContaining("name='plain'"),
+        ]);
+        expect(document.activeElement).toBe(input());
+      } finally {
+        session.off("Log.entryAdded", onEntry);
+        await session.send("Log.disable");
+      }
+    },
+  );
 
   it("inside a Field: a step mismatch blocks the submit on the visible input; a real + fixes it", async () => {
     const action = vi.fn<(formData: FormData) => void>();
@@ -272,6 +348,125 @@ describe("NumberField (browser)", () => {
       await vi.waitFor(() => expect(window.scrollY).toBeGreaterThan(0));
       expect(input().value).toBe("5");
       window.scrollTo(0, 0);
+    });
+  });
+
+  it.runIf(browserName === "chromium")(
+    "a touch hold (CDP): repeats, one commit, no focus (no keyboard), no context menu",
+    async () => {
+      const onChange = vi.fn<Fn>();
+      const onCommit = vi.fn<Fn>();
+      render(
+        <Fixture defaultValue={0} valueChangeAction={onChange} valueCommitAction={onCommit} />,
+      );
+      await flush();
+      const button = inc();
+      const pointerTypes: string[] = [];
+      button.addEventListener("pointerdown", (e) => pointerTypes.push(e.pointerType));
+      const menus: Event[] = [];
+      document.addEventListener("contextmenu", (e) => menus.push(e), true);
+      let inputFocused = false;
+      input().addEventListener("focus", () => {
+        inputFocused = true;
+      });
+      const session = cdp();
+      const point = pagePoint(button);
+      let downAt = 0;
+      let upAt = 0;
+      await act(async () => {
+        const down = nextEvent(button, "pointerdown");
+        await session.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [point],
+        });
+        await down;
+        downAt = performance.now();
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        const up = nextEvent(button, "pointerup");
+        await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await up;
+        upAt = performance.now();
+      });
+      await flush();
+      expect(pointerTypes).toEqual(["touch"]);
+      const value = Number(input().value);
+      // Measured against the press as the page saw it (#71): at least the first repeat, at most
+      // one step per elapsed interval.
+      expect(value).toBeGreaterThanOrEqual(2);
+      expect(value).toBeLessThanOrEqual(2 + Math.ceil((upAt - downAt - 400) / 60));
+      expect(onChange).toHaveBeenCalledTimes(value);
+      expect(onCommit).toHaveBeenCalledTimes(1);
+      expect(onCommit.mock.calls[0]![1].source).toBe("increment");
+      // The press is prevented: the input never received focus, so no virtual keyboard opens.
+      expect(inputFocused).toBe(false);
+      expect(document.activeElement).not.toBe(input());
+      // A long press may raise a context menu; during the hold it is always cancelled.
+      expect(menus.every((e) => e.defaultPrevented)).toBe(true);
+      expect(window.getSelection()?.toString() ?? "").toBe("");
+    },
+  );
+
+  describe("IME", () => {
+    it("composition is the draft; the Enter that confirms it does not commit", async () => {
+      const onCommit = vi.fn<Fn>();
+      render(<Fixture defaultValue={1} valueCommitAction={onCommit} />);
+      await user.clear(input());
+      if (browserName === "chromium") {
+        const session = cdp();
+        await act(async () => {
+          const composed = nextEvent(input(), "compositionupdate");
+          await session.send("Input.imeSetComposition", {
+            text: "１２",
+            selectionStart: 2,
+            selectionEnd: 2,
+          });
+          await composed;
+        });
+        await flush();
+        expect(input().value).toBe("１２");
+        expect(onCommit).not.toHaveBeenCalled();
+        // The confirming Enter arrives while composing (keyCode 229), then the text is inserted.
+        await act(async () => {
+          const keydown = nextEvent(input(), "keydown");
+          await session.send("Input.dispatchKeyEvent", {
+            type: "keyDown",
+            key: "Enter",
+            code: "Enter",
+            windowsVirtualKeyCode: 229,
+          });
+          await keydown;
+          const ended = nextEvent(input(), "compositionend");
+          await session.send("Input.insertText", { text: "１２" });
+          await ended;
+        });
+        await flush();
+        expect(onCommit).not.toHaveBeenCalled();
+        expect(input().value).toBe("１２");
+        // Nothing committed: the hidden input still holds the value before the edit.
+        expect(hidden().value).toBe("1");
+      } else {
+        // Without an IME driver: the composing keydown shapes the library ignores.
+        await user.type(input(), "12");
+        for (const init of [{ isComposing: true }, { keyCode: 229 }]) {
+          const composing = new KeyboardEvent("keydown", {
+            key: "Enter",
+            bubbles: true,
+            cancelable: true,
+            ...init,
+          });
+          await act(async () => {
+            input().dispatchEvent(composing);
+          });
+          expect(composing.defaultPrevented).toBe(false);
+        }
+        expect(onCommit).not.toHaveBeenCalled();
+      }
+      // Outside a composition Enter commits the full-width digits as 12.
+      await user.keyboard("{Enter}");
+      await flush();
+      expect(onCommit).toHaveBeenCalledTimes(1);
+      expect(onCommit.mock.calls[0]![0]).toBe(12);
+      expect(hidden().value).toBe("12");
     });
   });
 
@@ -441,6 +636,48 @@ describe("NumberField (browser)", () => {
     await user.tab();
     await flush();
     expect(input().value).toBe("9");
+    expect(start).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it("a rejected commit starts no document view transition either (boundary and rollback)", async () => {
+    const start = vi.fn();
+    if (typeof document.startViewTransition === "function") {
+      const original = document.startViewTransition.bind(document);
+      vi.spyOn(document, "startViewTransition").mockImplementation(((
+        arg: Parameters<typeof document.startViewTransition>[0],
+      ) => {
+        start();
+        return original(arg);
+      }) as typeof document.startViewTransition);
+    }
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const caught = vi.fn();
+    let reject!: (error: Error) => void;
+    const onChange = vi.fn<Fn>();
+    render(
+      <ErrorCatcher onError={caught}>
+        <Fixture
+          defaultValue={1}
+          valueChangeAction={onChange}
+          valueCommitAction={() =>
+            new Promise<void>((_resolve, rejectSave) => {
+              reject = rejectSave;
+            })
+          }
+        />
+      </ErrorCatcher>,
+    );
+    await focusInput();
+    await user.keyboard("{ArrowUp}");
+    await flush();
+    expect(input().value).toBe("2");
+    expect(screen.getByTestId("root")).toHaveAttribute("data-pending");
+    await act(async () => reject(new Error("save failed")));
+    await vi.waitFor(() => expect(caught).toHaveBeenCalledTimes(1));
+    // Uncontrolled: the rollback step ("dismiss") ran, and the boundary replaced the field.
+    expect(onChange.mock.calls.at(-1)?.[1].reason).toBe("dismiss");
+    expect(screen.queryByTestId("root")).toBeNull();
     expect(start).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });

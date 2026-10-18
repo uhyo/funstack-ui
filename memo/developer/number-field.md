@@ -108,6 +108,31 @@ All eleven deviations above were accepted. Fixed, each with a test:
 - The Field docs page says an error shown on blur can shift the layout under a click.
 - S4 (unwritten browser rows) is #77, not part of this branch.
 
+## #77: the remaining browser rows (wave 7)
+
+Written in `number-field.browser.test.tsx`, Chromium through CDP:
+- Touch hold: `Input.dispatchTouchEvent` start / end 700 ms apart at the button's centre in
+  top-level page coordinates (`pagePoint` adds each frame's offset; the test runs in an iframe,
+  which sits at 0,0 with scale 1 in headless runs today). Asserts `pointerType` touch, the tick
+  count against the press duration the page measured, one commit, the input never focused (the
+  stand-in for "no virtual keyboard") and every `contextmenu` during the hold cancelled (headless
+  Chromium raised none in 700 ms).
+- IME: `Input.imeSetComposition` puts `１２` in the draft, the confirming Enter is a keydown with
+  `windowsVirtualKeyCode: 229` followed by `Input.insertText`; no commit until a plain Enter,
+  which commits 12. Firefox / WebKit assert that both composing keydown shapes (`isComposing`,
+  `keyCode 229`) are ignored.
+- "Not focusable": `Log.enable` + `Log.entryAdded`; a NumberField submission with an invalid
+  hidden input logs nothing, a positive control (`display: none` required input) logs, and its
+  message bounds the wait (the channel is ordered).
+- `startViewTransition` stays uncalled through a rejected commit (rollback step and boundary).
+
+All rows wait for the events they cause (`nextEvent`) instead of fixed delays (#71).
+
+Moving Combobox and `focus-first-invalid.ts` onto `internal/announce.ts` was **not** done (see
+the #77 closing comment): `focus-first-invalid.ts` is directive-free and may not import the
+"use client" `announce.ts`, and the fallback region (and its delayed write) would add an
+announcement in engines without `ariaNotify` where both are silent today.
+
 ## Not done (implementation choices left open)
 
 - Combobox keeps its own `ariaNotify` call and `focus-first-invalid.ts` its own `announce`; moving
