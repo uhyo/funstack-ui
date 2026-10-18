@@ -1,0 +1,93 @@
+/* NumberField demo: the recipe of design/components/number-field.md 9.2. */
+
+.nf-root {
+  display: grid;
+  gap: 0.25rem;
+  margin-block: 0.75rem;
+  max-inline-size: 16rem;
+}
+
+.nf-group {
+  display: inline-grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
+  border: 1px solid #999;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.nf-group:has(.nf-input:focus-visible) {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.nf-input {
+  min-inline-size: 6ch;
+  border: 0;
+  padding: 0.35rem 0.5rem;
+  text-align: end;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.nf-input:focus {
+  outline: none;
+}
+
+.nf-input:user-invalid {
+  background: #fee2e2;
+}
+
+.nf-input[data-pending] {
+  background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6) 0 0 / 200% 100%;
+  animation: nf-pending 1s linear infinite;
+}
+
+@keyframes nf-pending {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.nf-step {
+  inline-size: 2.25rem;
+  border: 0;
+  background: #f3f4f6;
+  font: inherit;
+  cursor: pointer;
+}
+
+.nf-step:active {
+  background: #d1d5db;
+}
+
+.nf-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.nf-step[data-pending] {
+  cursor: progress;
+}
+
+.nf-root[data-invalid] .nf-group {
+  border-color: #dc2626;
+}
+
+.nf-label {
+  font-weight: 600;
+}
+
+.nf-status {
+  color: #555;
+  font-size: 0.875rem;
+}
+
+.nf-field-error {
+  color: #dc2626;
+}
+
+.nf-error {
+  border: 1px solid #dc2626;
+  padding: 0.5rem;
+}

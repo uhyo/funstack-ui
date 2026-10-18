@@ -15,6 +15,7 @@ import { SliderDemo } from "./slider-demo";
 import { FieldFormDemo } from "./field-form-demo";
 import { ProgressMeterDemo } from "./progress-meter-demo";
 import { ToolbarDemo } from "./toolbar-demo";
+import { NumberFieldDemo } from "./number-field-demo";
 
 export function App() {
   return (
@@ -42,6 +43,7 @@ export function App() {
       <SliderDemo />
       <ProgressMeterDemo />
       <ToolbarDemo />
+      <NumberFieldDemo />
     </main>
   );
 }
