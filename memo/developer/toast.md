@@ -130,3 +130,20 @@ issue; it is the premise of the urgent queue.
 - Flake: the browser exit row now uses a 5 s exit, asserts the held state, `finish()`es the
   captured animations and asserts the drop. A new browser row covers M1 with a paused 5 s
   progress bar.
+
+## `fallback` on `Toast.Root` (design 21, #63 M3 timer), 2026-10-18
+
+- `SuspenseGuard` now renders its children; the Root passes `fallback` (default `null`) to it:
+  `<Suspense fallback={<SuspenseGuard>{fallback}</SuspenseGuard>}>`. The guard still reports
+  mount / unmount through `setSuspended`, so the timer and announcement gating is unchanged.
+- "Parts inside the fallback gate nothing" needed no code: a fallback Title's layout effect runs
+  before the guard's (child first), so its `contentCommitted` microtask fires after
+  `suspendedRef` is set and `announceNow` returns early. On mount `announcedOnce` is false anyway.
+- Finding (design gap, small): on an **update** that re-suspends, React hides the committed
+  content with `display: none` but keeps it in the DOM, so the hidden Title and a fallback Title
+  share `ids.title`; the hidden one comes first and the toast keeps its old name ("Uploading"),
+  not the fallback's ("Loading…"). Design 21.3 says the fallback Title names the toast "while the
+  skeleton shows", which holds on mount only. The jsdom test asserts the actual behaviour.
+- Tests: jsdom "fallback on Toast.Root" (3 rows: mount suspend + reveal with timer from the
+  reveal; update re-suspends with the fallback again and timer paused; fallback Title names the
+  toast and gates nothing). No browser row: nothing here needs a real engine.

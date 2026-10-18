@@ -31,26 +31,33 @@ export interface ToastRootProps extends Omit<
   className?: StateValue<string | undefined, ToastRootState>;
   style?: StateValue<CSSProperties | undefined, ToastRootState>;
   render?: RenderProp<ComponentPropsWithRef<"div">, ToastRootState>;
+  /**
+   * Rendered by the Root's own Suspense guard while `children` suspend, in place of the
+   * invisible default. The toast's timer and announcement wait for the reveal either way.
+   * Parts inside it (a visually hidden `<Toast.Title>` giving the toast a name) gate nothing.
+   */
+  fallback?: ReactNode;
 }
 
 /**
- * The Suspense guard's fallback: renders nothing and tells the Root its content is suspended,
- * so the timer and the announcement wait for the reveal (design 3.5).
+ * The Suspense guard's fallback: renders the Root's `fallback` (nothing by default) and tells
+ * the Root its content is suspended, so the timer and the announcement wait for the reveal
+ * (design 3.5, 21).
  */
-function SuspenseGuard() {
+function SuspenseGuard({ children }: { children: ReactNode }) {
   const { setSuspended } = useToastRootContext("Toast.Root");
   useLayoutEffect(() => {
     setSuspended(true);
     return () => setSuspended(false);
   }, [setSuspended]);
-  return null;
+  return children;
 }
 
 /**
  * One toast: a focusable `div[role=dialog]` (`alertdialog` for `priority: "high"`) named by its
  * Title and described by its Description. Escape dismisses it, ArrowDown / ArrowUp move to the
- * next / previous toast. Its children render inside a Suspense guard with an invisible fallback,
- * so a toast whose content suspends does not pull the whole Viewport into a boundary above it.
+ * next / previous toast. Its children render inside a Suspense guard whose fallback is the
+ * `fallback` prop (invisible by default), so a toast whose content suspends does not pull the whole Viewport into a boundary above it.
  * When the toast closes it stays with `data-ending` (and `inert`) until its exit animations end.
  *
  * Owned keys (conventions 1.2): `role`, `tabIndex`, `aria-labelledby`, `aria-describedby`,
@@ -62,6 +69,7 @@ export function ToastRoot({
   className,
   style,
   render,
+  fallback = null,
   ...rest
 }: ToastRootProps) {
   const viewport = useToastViewportContext("Toast.Root");
@@ -257,7 +265,9 @@ export function ToastRoot({
     className,
     style,
     children: (s: ToastRootState) => (
-      <Suspense fallback={<SuspenseGuard />}>{resolveStateValue(children, s)}</Suspense>
+      <Suspense fallback={<SuspenseGuard>{fallback}</SuspenseGuard>}>
+        {resolveStateValue(children, s)}
+      </Suspense>
     ),
     props: rest,
     libraryProps,

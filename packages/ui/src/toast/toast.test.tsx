@@ -1403,6 +1403,144 @@ describe("Toast", () => {
     });
   });
 
+  describe("fallback on Toast.Root", () => {
+    function fallbackList(fallback: ReactNode): ToastViewportProps["children"] {
+      return ({ toasts }) =>
+        toasts.map((t) => (
+          <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`} fallback={fallback}>
+            <Toast.Title />
+            <Toast.Description />
+          </Toast.Root>
+        ));
+    }
+
+    it("renders the fallback while the content suspends: not pending, silent, no timer; then reveals", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const { Suspender, resolve } = createSuspender();
+      render(
+        <Suspense fallback={<div data-testid="app-fallback" />}>
+          <Harness
+            manager={manager}
+            list={fallbackList(<span data-testid="skeleton">Skeleton</span>)}
+          />
+        </Suspense>,
+      );
+      const id = await call(() =>
+        manager({ title: <Suspender value="avatar" />, description: "joined", duration: 1000 }),
+      );
+      await flush();
+      expect(screen.queryByTestId("app-fallback")).toBeNull();
+      const r = root(id);
+      // In the same commit as the add: the boundary is new, so its fallback shows at once.
+      expect(r).toContainElement(screen.getByTestId("skeleton"));
+      expectNotPending(r);
+      expect(r).not.toHaveAttribute("data-pending");
+      expect(ariaNotify).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      await act(async () => {
+        resolve("avatar", "Ada");
+        await vi.advanceTimersByTimeAsync(400);
+      });
+      await flush();
+      expect(screen.queryByTestId("skeleton")).toBeNull();
+      expect(root(id)).toHaveTextContent("Adajoined");
+      expect(ariaNotify).toHaveBeenCalledTimes(1);
+      expect(ariaNotify).toHaveBeenCalledWith("Ada joined", { priority: "normal" });
+      // The timer started at the reveal, not at the mount.
+      await act(async () => {
+        vi.advanceTimersByTime(900);
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(100);
+      });
+      expect(queryRoot(id)).toBeNull();
+    });
+
+    it("an update whose content suspends shows the fallback again and pauses the timer", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const { Suspender, resolve } = createSuspender();
+      render(
+        <Harness
+          manager={manager}
+          list={fallbackList(
+            <>
+              <span data-testid="skeleton">Skeleton</span>
+              {/* Committed after the first announcement: still announces nothing. */}
+              <Toast.Title>Loading…</Toast.Title>
+            </>,
+          )}
+        />,
+      );
+      const id = await call(() => manager({ title: "Uploading", duration: 1000 }));
+      await flush();
+      expect(ariaNotify).toHaveBeenLastCalledWith("Uploading", { priority: "normal" });
+      expect(screen.queryByTestId("skeleton")).toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(500);
+      });
+      await call(() => manager.update(id, { title: <Suspender value="done" /> }));
+      await flush();
+      expect(root(id)).toContainElement(screen.getByTestId("skeleton"));
+      expectNotPending(root(id));
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      expect(ariaNotify).toHaveBeenCalledTimes(1);
+      // The hidden committed Title keeps the shared id first in tree order, so the name stays
+      // "Uploading" here (not "Loading…"): the fallback Title names the toast on mount only.
+      expect(root(id)).toHaveAccessibleName("Uploading");
+      await act(async () => {
+        resolve("done", "Uploaded");
+        await vi.advanceTimersByTimeAsync(400);
+      });
+      await flush();
+      expect(screen.queryByTestId("skeleton")).toBeNull();
+      expect(root(id)).toHaveTextContent("Uploaded");
+      expect(ariaNotify).toHaveBeenCalledTimes(2);
+      expect(ariaNotify).toHaveBeenLastCalledWith("Uploaded", { priority: "normal" });
+      // Running again after the reveal; it closes within a full duration.
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(queryRoot(id)).toBeNull();
+    });
+
+    it("a Title inside the fallback names the toast but gates nothing", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const { Suspender, resolve } = createSuspender();
+      render(
+        <Harness manager={manager} list={fallbackList(<Toast.Title>Loading…</Toast.Title>)} />,
+      );
+      const id = await call(() => manager({ title: <Suspender value="avatar" />, duration: 1000 }));
+      await flush();
+      const r = root(id);
+      expect(r).toHaveAccessibleName("Loading…");
+      expect(ariaNotify).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      expect(ariaNotify).not.toHaveBeenCalled();
+      await act(async () => {
+        resolve("avatar", "Ada");
+        await vi.advanceTimersByTimeAsync(400);
+      });
+      await flush();
+      expect(root(id)).toHaveAccessibleName("Ada");
+      expect(ariaNotify).toHaveBeenCalledTimes(1);
+      expect(ariaNotify).toHaveBeenCalledWith("Ada", { priority: "normal" });
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(queryRoot(id)).toBeNull();
+    });
+  });
+
   describe("suspending content inside a consumer boundary", () => {
     it("announces once the consumer's Suspense reveals the Title", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });

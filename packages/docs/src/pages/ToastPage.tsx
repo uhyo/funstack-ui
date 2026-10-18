@@ -349,6 +349,13 @@ toast({ title: "Link copied" });`}</CodeBlock>
             description:
               "Required. An item of `state.toasts`; key the Root (or its wrapper) on `toast.id`.",
           },
+          {
+            name: "fallback",
+            type: "ReactNode",
+            default: "null",
+            description:
+              "Shown inside the Root while its children suspend (a skeleton). The timer and the announcement wait for the reveal; the Root is not `data-pending` meanwhile. Parts inside it (a visually hidden `Toast.Title`) name the toast but gate nothing.",
+          },
           ...functionProps("ToastRootState"),
           renderProp("div", "ToastRootState"),
         ]}
@@ -499,12 +506,22 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <h3>Suspense</h3>
       <p>
         Toast content may suspend (<code>{"title: <UserName id={id} />"}</code>). Each Root wraps
-        its children in a Suspense guard with an invisible fallback, so a suspending toast shows an
-        empty box instead of pulling the Viewport into the nearest boundary above it (a toast mounts
-        urgently, where that boundary would show its fallback). Its timer and announcement wait for
-        the content. For a skeleton, put your own <code>&lt;Suspense&gt;</code> inside the Root: the
-        toast is announced when your boundary reveals its Title and Description, but its timer
-        starts at once, because the library cannot see your fallback.
+        its children in its own Suspense boundary, so a suspending toast does not pull the Viewport
+        into the nearest boundary above it (a toast mounts urgently, where that boundary would show
+        its fallback). While the content suspends the Root shows its <code>fallback</code> prop
+        (nothing by default), in the same frame as the <code>toast()</code> call; the timer does not
+        run and nothing is announced. On the reveal the toast announces its Title and Description
+        and its timer starts. An update whose new content suspends shows the <code>fallback</code>{" "}
+        again and pauses the timer until the next reveal.
+      </p>
+      <CodeBlock>{`<Toast.Root key={t.id} toast={t} fallback={<ToastSkeleton />}>
+  <Toast.Title />
+  <Toast.Description />
+</Toast.Root>`}</CodeBlock>
+      <p>
+        Use <code>fallback</code> rather than your own <code>&lt;Suspense&gt;</code> inside the
+        Root: the toast is still announced when your boundary reveals its Title and Description, but
+        its timer starts at once, because the library cannot see your boundary's fallback.
       </p>
 
       <h3>Server Components</h3>
