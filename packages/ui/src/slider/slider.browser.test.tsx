@@ -434,25 +434,52 @@ describe("Slider (browser)", () => {
   );
 
   it("a roll back animates the registered property; a drag runs no transition", async () => {
-    // A controlled parent that never adopts: at release the thumb returns to `value`, the same
-    // move a rejected save makes (a rejection itself unmounts the Root through the boundary).
-    const starts: string[] = [];
-    render(<Fixture rootClassName="t-animated" value={20} />);
-    const listener = (e: TransitionEvent) => starts.push(e.propertyName);
+    // A controlled parent that never adopts: when the save settles the thumb returns to
+    // `value`, the same move a rejected save makes (a rejection itself unmounts the Root through
+    // the boundary). The save is held open so that the frames are deterministic: the engine
+    // paints the held gesture value before the rollback. (WebKit delivers Playwright's move and
+    // release in one frame, and a save that settles at once may roll back before any frame shows
+    // the held value: the transition would then depend on frame timing.)
+    let settle!: () => void;
+    const save = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const starts: { property: string; dragging: boolean }[] = [];
+    render(<Fixture rootClassName="t-animated" value={20} valueCommitAction={() => save} />);
+    const listener = (e: TransitionEvent) =>
+      starts.push({
+        property: e.propertyName,
+        dragging: screen.getByTestId("root").hasAttribute("data-dragging"),
+      });
     thumb().addEventListener("transitionstart", listener);
+    const frames = async (n: number) => {
+      for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r));
+    };
     try {
       const track = screen.getByTestId("track");
-      // Press and move without releasing: `[data-dragging]` switches the transition off.
       await act(async () => {
         await userEvent.dragAndDrop(thumb(), track, {
           sourcePosition: { x: 10, y: 10 },
           targetPosition: { x: 160, y: 10 },
+          steps: 5,
         });
       });
       await flush();
+      // Released, the save pending: the gesture value is held.
+      expect(input().value).toBe("80");
+      expect(screen.getByTestId("root")).toHaveAttribute("data-pending");
+      expect(screen.getByTestId("root")).not.toHaveAttribute("data-dragging");
+      await act(() => frames(3));
+      // `[data-dragging]` switched the transition off for every step of the drag. (Whether the
+      // release itself starts one depends on the engine having painted the last move.)
+      expect(starts.filter((s) => s.dragging)).toEqual([]);
+      starts.length = 0;
+      await act(async () => settle());
+      await flush();
       expect(input().value).toBe("20");
-      await expect.poll(() => starts).toContain("--slider-value");
-      expect(starts).toEqual(["--slider-value"]);
+      await expect.poll(() => starts.length).toBeGreaterThan(0);
+      await act(() => frames(3));
+      expect(starts).toEqual([{ property: "--slider-value", dragging: false }]);
     } finally {
       thumb().removeEventListener("transitionstart", listener);
     }
