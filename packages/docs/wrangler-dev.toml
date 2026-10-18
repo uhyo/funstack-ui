@@ -1,0 +1,8 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "funstack-ui-dev"
+account_id = "f23672ae6718270aa102879b0ea559a8"
+compatibility_date = "2026-10-16"
+
+[assets]
+directory = "./dist/public"
+not_found_handling = "404-page"

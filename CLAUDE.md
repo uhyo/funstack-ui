@@ -49,7 +49,10 @@ All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and 
 - `pnpm --filter docs build` - Static build into `packages/docs/dist/public` (root `pnpm build` includes it)
 - Live examples are files in `src/examples/` that render the real `@funstack/ui` (`workspace:*`) with fake async actions; pages show their source through Vite `?raw` imports, so the code shown is the code running. Examples without `"use client"` (the JS-free Accordion, the Tooltip toolbar) are deliberately Server Components.
 - Props tables are written by hand from the TypeScript declarations in `packages/ui`: update the component page whenever a public prop, state field, data attribute or default changes.
-- Deployed to Cloudflare Workers (worker `funstack-ui`, `packages/docs/wrangler.toml`) at https://ui.funstack.work by Cloudflare's own Git integration (Workers Builds), configured on the Cloudflare side, not by a GitHub workflow. Build command (from the repository root): `pnpm install --frozen-lockfile && pnpm turbo run build --filter=docs`; deploy command: `cd packages/docs && npx wrangler deploy` (assets come from `packages/docs/dist/public`). CI on push only builds the site.
+- Deployed to Cloudflare Workers, following the other FUNSTACK repositories:
+  - Production: worker `funstack-ui` (`packages/docs/wrangler.toml`) at https://ui.funstack.work, deployed by `.github/workflows/deploy-docs.yml` when a GitHub release is created (or by manual `workflow_dispatch`). It runs `pnpm turbo run build --filter=docs`, then `pnpm wrangler deploy` in `packages/docs`, using the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
+  - Dev: worker `funstack-ui-dev` (`packages/docs/wrangler-dev.toml`), deployed on every push by Cloudflare's own Git integration (Workers Builds), configured on the Cloudflare side. Build command (from the repository root): `pnpm install --frozen-lockfile && pnpm turbo run build --filter=docs`; deploy command: `cd packages/docs && npx wrangler deploy -c wrangler-dev.toml`.
+  - CI on push only builds the site.
 
 ### Browser tests
 
@@ -59,14 +62,16 @@ Engine selection: `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) picks
 
 ## Release
 
-Releases are made with the `release-funstack` skill (`.claude/skills/release-funstack/SKILL.md`): bump `version` in `packages/ui/package.json`, commit `chore: bump version to x.y.z`, then create a GitHub release with tag `x.y.z` (no `v` prefix). Creating the release triggers `.github/workflows/publish.yml`:
+Releases are made with the `release-funstack` skill (`.claude/skills/release-funstack/SKILL.md`): bump `version` in `packages/ui/package.json`, commit `chore: bump version to x.y.z`, then create a GitHub release with tag `x.y.z` (no `v` prefix). Creating the release triggers two workflows:
 
-- It builds and publishes `@funstack/ui` to npm. Versions containing `-` (for example `0.1.0-alpha.0`) are published under the prerelease name as the dist-tag; others under `latest`.
+- `.github/workflows/publish.yml` builds and publishes `@funstack/ui` to npm. Versions containing `-` (for example `0.1.0-alpha.0`) are published under the prerelease name as the dist-tag; others under `latest`.
+- `.github/workflows/deploy-docs.yml` deploys the docs site to the production worker (see Docs site).
 
 Never publish or deploy from a local machine. One-time setup outside the repo:
 
 - npm trusted publishing must be configured on npmjs.com for `@funstack/ui`, pointing at the GitHub repository `uhyo/funstack-ui` and workflow `publish.yml`. The workflow authenticates through OIDC (`id-token: write`) and needs no npm token.
-- Cloudflare Workers Builds connected to this repository for the `funstack-ui` worker (docs deployment, see Docs site), with the custom domain `ui.funstack.work` attached.
+- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets for `deploy-docs.yml` (production worker `funstack-ui`, custom domain `ui.funstack.work`).
+- Cloudflare Workers Builds connected to this repository for the `funstack-ui-dev` worker, with the deploy command `npx wrangler deploy -c wrangler-dev.toml` (see Docs site).
 
 ## Tooling
 
