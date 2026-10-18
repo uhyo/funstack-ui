@@ -1,0 +1,91 @@
+/* Toolbar and ToggleGroup demo: the starter stylesheet from the design (section 2.7). */
+
+.tb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.tb[data-orientation="vertical"] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.tb-group {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.tb-group[data-orientation="vertical"] {
+  flex-direction: column;
+}
+
+.tb-group[data-pending] {
+  cursor: progress;
+}
+
+.tb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  transition: background-color 120ms;
+}
+
+.tb-item:hover {
+  background: #f3f4f6;
+}
+
+.tb-item[data-pressed] {
+  background: #2563eb;
+  color: white;
+}
+
+.tb-item[data-pending] {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.tb-item[aria-disabled="true"],
+.tb-item:disabled {
+  opacity: 0.5;
+}
+
+.tb-item:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+/* <hr> is a block; in a horizontal toolbar it is a vertical rule. */
+.tb-sep {
+  margin: 0;
+  border: 0;
+  background: #d1d5db;
+}
+
+.tb-sep[data-orientation="vertical"] {
+  inline-size: 1px;
+  align-self: stretch;
+}
+
+.tb-sep[data-orientation="horizontal"] {
+  block-size: 1px;
+}
+
+.tb-log {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-item {
+    transition: none;
+  }
+}

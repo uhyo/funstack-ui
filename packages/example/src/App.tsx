@@ -14,6 +14,7 @@ import { Notifications, ToastDemo } from "./toast-demo";
 import { SliderDemo } from "./slider-demo";
 import { FieldFormDemo } from "./field-form-demo";
 import { ProgressMeterDemo } from "./progress-meter-demo";
+import { ToolbarDemo } from "./toolbar-demo";
 
 export function App() {
   return (
@@ -40,6 +41,7 @@ export function App() {
       <Notifications />
       <SliderDemo />
       <ProgressMeterDemo />
+      <ToolbarDemo />
     </main>
   );
 }
