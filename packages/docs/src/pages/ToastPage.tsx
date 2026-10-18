@@ -77,7 +77,9 @@ toast({ title: "Link copied" });`}</CodeBlock>
           <strong>No list element, no Portal part.</strong> Toasts are focusable <code>dialog</code>
           s (<code>alertdialog</code> for <code>priority: "high"</code>) named by their Title and
           described by their Description. The region is wherever the Viewport is rendered; its only
-          move (into a modal dialog) is the library's.
+          move (into a modal dialog) is the library's. On the client it sits inside two{" "}
+          <code>display: contents</code> wrappers: an anchor where the Viewport is rendered, and the
+          element the library moves.
         </li>
         <li>
           The Title is a <code>div</code>, not a heading: transient notifications stay out of
@@ -132,6 +134,11 @@ toast({ title: "Link copied" });`}</CodeBlock>
             "rejects, no `error`",
             "dismissed",
             "rejects with the reason (the action prop's Error Boundary gets it)",
+          ],
+          [
+            "a `success` / `error` function throws",
+            "dismissed (never left pending)",
+            "rejects with what the function threw",
           ],
         ]}
       />
@@ -304,7 +311,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
             type: "string[] | null",
             default: '["F8"]',
             description:
-              '`event.code` values and modifier names (`"altKey"`, `"ctrlKey"`, `"metaKey"`, `"shiftKey"`) that focus the newest toast. Also names the region (`"Notifications (Alt+T)"`). `null` installs no listener.',
+              '`event.code` values and modifier names (`"altKey"`, `"ctrlKey"`, `"metaKey"`, `"shiftKey"`) that focus the newest toast, with no other modifier held (Ctrl+F8 is not F8). Also names the region (`"Notifications (Alt+T)"`). `null` installs no listener.',
           },
           {
             name: "announce",
@@ -402,7 +409,11 @@ toast({ title: "Link copied" });`}</CodeBlock>
             "Root, Action",
             "The toast's promise is unsettled, or its Action's action runs (not set while its content merely suspends)",
           ],
-          ["`data-ending`", "Root", "Closed, kept (and `inert`) until its animations finish"],
+          [
+            "`data-ending`",
+            "Root",
+            "Closed, kept (and `inert`) until the animations the ending state started finish",
+          ],
           ["`data-type`", "Root", "The toast's `type`"],
           [
             "`data-paused`",
@@ -467,19 +478,22 @@ toast({ title: "Link copied" });`}</CodeBlock>
         a later menu or popover covers the region raises it to the top again. A top-layer element
         outside an open modal <code>&lt;dialog&gt;</code> is inert, so while a{" "}
         <a href="/components/dialog">Dialog</a> is open as a modal the region moves into it (and
-        back when it closes): an Undo stays clickable. Moving re-creates the region's elements, so
-        their enter animation plays again. Dialogs the library did not open are not detected.
+        back when it closes): an Undo stays clickable. The move keeps the toasts' React state (an
+        Undo in flight stays pending), but it is a DOM move: the toasts' enter animation plays again
+        and focus inside a toast is lost. Dialogs the library did not open are not detected.
       </p>
 
       <h3>Styling and animation</h3>
       <p>
         Enter with <code>@starting-style</code>, exit on <code>[data-ending]</code>: the library
-        keeps a closed toast mounted until its animations (transitions included) finish. Toasts
-        never use <code>&lt;ViewTransition&gt;</code> and no part has a <code>transition</code>{" "}
-        prop: every Toast commit is urgent, and react-dom starts view transitions for transition
-        commits only. Make the region's box click-through with <code>pointer-events: none</code> and
-        give it back to the toasts; stack visually with <code>flex-direction: column-reverse</code>{" "}
-        and <code>:nth-last-child()</code>.
+        keeps a closed toast mounted until the animations (transitions included) that{" "}
+        <code>[data-ending]</code> started finish. Animations already running in the toast, such as
+        a progress bar paused with <code>data-paused</code>, are not waited for. Toasts never use{" "}
+        <code>&lt;ViewTransition&gt;</code> and no part has a <code>transition</code> prop: every
+        Toast commit is urgent, and react-dom starts view transitions for transition commits only.
+        Make the region's box click-through with <code>pointer-events: none</code> and give it back
+        to the toasts; stack visually with <code>flex-direction: column-reverse</code> and{" "}
+        <code>:nth-last-child()</code>.
       </p>
 
       <h3>Suspense</h3>
@@ -488,7 +502,9 @@ toast({ title: "Link copied" });`}</CodeBlock>
         its children in a Suspense guard with an invisible fallback, so a suspending toast shows an
         empty box instead of pulling the Viewport into the nearest boundary above it (a toast mounts
         urgently, where that boundary would show its fallback). Its timer and announcement wait for
-        the content. For a skeleton, put your own <code>&lt;Suspense&gt;</code> inside the Root.
+        the content. For a skeleton, put your own <code>&lt;Suspense&gt;</code> inside the Root: the
+        toast is announced when your boundary reveals its Title and Description, but its timer
+        starts at once, because the library cannot see your fallback.
       </p>
 
       <h3>Server Components</h3>
