@@ -26,7 +26,12 @@ owned custom-validity slot in 3.6, `useFieldControl` and `useFormOwnerEvent` in 
 platform-string note in 11; amended 2026-10-18 with the ToggleGroup and Toolbar design, #66, **accepted
 2026-10-18**: the `Button` row and the `Item` / `Separator` notes in 1.1, the roving tab stop in 3.2 and
 7.4, `aria-disabled` in 3.6, the rows in 4.1 and 5.3, the shared context in 7.1, the flag row in 8, the
-files in 9.1). Binding for every component design in
+files in 9.1; amended 2026-10-18 with the Progress and Meter design, #68, see resolved question 32: the
+`Track` / `Indicator` / `Label` / `Value` notes in 1.1, the consumer-side lane rule in 2.6, the mirrored-state
+examples in 3.5, `complete` / `region` / `indeterminate` in 4.1, the fourth no-`transition` category in 5.1
+and the types in 5.3, the `react-server` hook list and the first use of the provider exception in 7.1 and
+7.3, the shared state types in 9.4, the two rows and the directive-free note in 10.1, the platform-string
+note in 11). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -96,16 +101,16 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
-| `Indicator` | Purely visual element that tracks state (active tab marker; the fill of a Slider, placed by the consumer's CSS from the Root's `--slider-start` / `--slider-end`). | `span` |
-| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child; for a component whose owner surface is an `Input` part (Combobox) it renders `<label for>`; for Slider it renders `label[for]` naming the only Thumb's input, or `label[id]` naming a multi-thumb Root (`role="group"`); for Field it renders `label[for]` naming the field's control, or `label[id]` that a group control (a `<fieldset>` Root) is `aria-labelledby` (the `for` is dropped once such a control registers). | `label` / `legend` |
+| `Indicator` | Purely visual element that tracks state (active tab marker; the fill of a Slider, placed by the consumer's CSS from the Root's `--slider-start` / `--slider-end`; the fill of a Progress / Meter, sized by the consumer's CSS from the Root's `--progress-value` / `--meter-value`, #68). | `span` |
+| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child; for a component whose owner surface is an `Input` part (Combobox) it renders `<label for>`; for Slider it renders `label[for]` naming the only Thumb's input, or `label[id]` naming a multi-thumb Root (`role="group"`); for Field it renders `label[for]` naming the field's control, or `label[id]` that a group control (a `<fieldset>` Root) is `aria-labelledby` (the `for` is dropped once such a control registers); for an output role that is not labelable (Progress, Meter) it renders `span[id]` and the Root references the id through `aria-labelledby` unconditionally, dangling when no Label is rendered (#68). | `label` / `legend` / `span` |
 | `Input` | The text field of a combobox-like component: `input[role=combobox]`, the owner's surface for `data-pending`, with the urgent `inputValue` state (section 2.6). | `input` |
 | `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its checked/mixed state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
 | `Option` | One choice in a native `<select>` (Select; renders optimistic `data-selected`, equal to the platform's `:checked`) or in a listbox (Combobox: `div[role=option]`, never focused, `data-active` for virtual focus). | `option` / `div` |
 | `Clear` | A `tabindex="-1"` button that empties a text field and dispatches the empty selection (Combobox). | `button` |
 | `Empty` | Content the **library** shows only when a list has no mounted options and its results are neither stale nor loading (Combobox). | `div` |
 | `Status` | A loading fallback or hint inside a popup (Combobox). Outside the `List` it is `role="status"`; **inside** the `List` it is the Suspense fallback, renders `role="none"` (a listbox may own only options and groups) and marks the list as loading: `aria-busy="true"` on the listbox, `Empty` hidden, nothing announced. | `div` |
-| `Value` | The element that shows the current value. Select: the element the browser fills with the selected option's content; it has **no `children` prop**, since the parser and the browser write its content, so the part renders it with the hydration pattern of section 7.4. Slider: a `span` rendering the shown value (`children(state)`, or one thumb's value by `index`). | `selectedcontent` / `span` |
-| `Track` | The rail a slider's thumbs move along; owns pointer interaction (a press moves the nearest thumb) and is the geometry reference for pointer math. | `div` |
+| `Value` | The element that shows the current value. Select: the element the browser fills with the selected option's content; it has **no `children` prop**, since the parser and the browser write its content, so the part renders it with the hydration pattern of section 7.4. Slider: a `span` rendering the shown value (`children(state)`, or one thumb's value by `index`). Progress / Meter: a `span`, `aria-hidden` by default (the same text is in `aria-valuetext`), showing `formattedValue` (#68). | `selectedcontent` / `span` |
+| `Track` | The rail a slider's thumbs move along; owns pointer interaction (a press moves the nearest thumb) and is the geometry reference for pointer math. For Progress / Meter: the rail of the bar, with no interaction (#68). | `div` |
 | `Thumb` | A draggable value handle (Slider, one per value, explicit `index`): a styled element **containing** a visually hidden native `<input type="range">`, which is the focusable, labelled, form-participating `slider`. | `span` + `input[type=range]` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
 | `Control` | The native form control a Field labels and describes: an `input`, or a `textarea` / `select` through `render`; must stay a native control. Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (section 3.8). | `input` |
@@ -591,6 +596,13 @@ sync prefix) escapes the scope while order is preserved; the Viewport applies th
 transition as usual. Such a state has no `UrgentChangeAction` prop and no `x` / `defaultX`
 triple, and its commits never run a view transition (5.1).
 
+The same rule holds for **consumer state that reports on a pending action** (a progress value,
+Progress #68): it is written with a plain `setState`, which after an `await` inside the action is
+urgent anyway; wrapping it in `startTransition` holds it until the very action it reports on
+settles (2.3 item 5), so the bar would sit at 0% and jump to 100%. It is the one place the
+library's "wrap it in `startTransition`" advice inverts, and component docs that display such a
+value (Progress) say so.
+
 **A mirror of a browser-owned validity fact** (fourth urgent state, Field #54). `Field.Root`
 reads `:user-invalid`, `validity` and `validationMessage` from its control on `input`, `change`,
 `focusout`, `invalid` and after `reset`, and writes them with `useState` from the DOM event,
@@ -907,8 +919,9 @@ Rules:
   (`useActionTrigger`, timers) survives it. The hydration render stays inline to match the server
   HTML and switches to the portal on the first client render (Toast 4.3, review M2).
 - A fourth kind of state, **consumer-owned, mirrored**: a controlled-only prop that the library
-  writes to a DOM property it does not own (`Checkbox`'s `indeterminate`, a future Progress
-  `value` or Dialog `returnValue`). It has no `defaultX` and no action; the library re-applies it
+  writes to a DOM property it does not own (`Checkbox`'s `indeterminate` or Dialog
+  `returnValue`; not Progress's `value`, which is rendered as attributes on a `div` with no DOM
+  property to mirror and is simply a prop, #68). It has no `defaultX` and no action; the library re-applies it
   after every commit and may suspend it while an action is pending (section 4.1).
 - A state may be **library-owned in one direction and browser-owned in the other**, or
   **library-owned for some causes of a change and browser-owned for others** (Dialog's `open`:
@@ -1101,7 +1114,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `empty` | boolean | `Combobox.List` | No mounted options, not stale and not loading; the same condition under which `Empty` renders. |
 | `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`); Combobox `Input` and `Trigger` likewise, its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
-| `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
+| `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch); Progress, every part (`value` is `null`: derived, not a DOM property, never suspended, #68) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab; every Slider part; `ToggleGroup.Root` and `Item` (the enclosing Toolbar's when inside one); `Toolbar.Root` and `Toolbar.Separator` (the separator's own, perpendicular to the toolbar's) | Enum attribute with value. |
 | `invalid` | boolean | every Field part | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). The control also carries an explicit `aria-invalid="true" \| "false"`. |
 | `required` | boolean | every Field part | `Field.Root required` or the control's own `required` (reported through its registration). |
@@ -1109,6 +1122,8 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `ending` | boolean | Toast `Root` | Closed, kept mounted (and `inert`) until the animations the ending state started finish (`exitAnimations` filtered by a baseline of the animations already running before the close, Toast 10.2; a paused progress bar does not hold the exit); CSS animates on it. |
 | `paused` | boolean | Toast `Viewport` | A viewport-wide timer pause holds (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
 | `type` | string | Toast `Root` | The toast's consumer-defined `type` (`"error"`, `"success"`, …), an enum whose vocabulary is the consumer's. |
+| `complete` | boolean | Progress, every part | The clamped value reached `max` (#68). |
+| `region` | `"optimum" \| "suboptimum" \| "even-less-good"` | Meter, every part | HTML's meter region for the value against `low` / `high` / `optimum`, the platform's words (#68). |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
 their value. Negative pairs (`data-closed`, `data-unchecked`) are not emitted; use `:not([data-open])`.
@@ -1227,7 +1242,10 @@ component's transition commit; such parts animate enter and exit in CSS (`@start
 `data-ending`). Field and Form (#54) are in this category too: a Field's state is an urgent
 mirror of browser-owned validity (2.6) and a Form's own commits change nothing the form element
 displays, so no Field or Form part has `transition`; `Field.Error` enters with
-`@starting-style`.
+`@starting-style`. A fourth category (Progress and Meter, #68): a part that displays a
+**consumer-owned value** with no library state or dispatch, whose changes arrive in the consumer's
+lane (usually urgent, 2.6) and animate through a CSS transition on a registered custom property;
+no such part has `transition`.
 
 **Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
 (decision for Popover, #38, from the `vt-popover` probe in `docs/research/popover-menu.md`). A
@@ -1328,6 +1346,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
 | ToggleGroup | `fsui-toggle-group`, `fsui-toggle-group-press` (when `details.added` is non-empty), `fsui-toggle-group-release` (when `details.removed` is non-empty; an exclusive switch carries both) |
 | Toolbar | none (`Toolbar.Button` runs through `useActionTrigger`, which attaches no types) |
+| Progress, Meter | none (no `transition` prop: a consumer-owned value in the consumer's lane, section 5.1) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1405,12 +1424,19 @@ Every `transition` example in the docs carries this block. No JS-level `matchMed
 ### 7.1 Per-file directive
 
 `"use client"` goes at the top of **each source file that uses a client-only API** (hooks other
-than `use`/`useId`, `createContext`, `startTransition`, DOM access, event props) and nowhere
+than those React's `react-server` build exports, which are `use`, `useId`, `useCallback`, `useMemo`
+and `useDebugValue`, plus `cache` and `cacheSignal` (React 19.3.1 `react.react-server.js`; #68 relaxed
+the earlier `use` / `useId`-only list to React's own, so a module whose only hook is `useMemo`, such as
+`use-render.tsx`, may drop its directive); `createContext`, `useState`, `useRef`, effects,
+`startTransition`, DOM access, event props) and nowhere
 else. Files without the directive must not import from files with it, with two exceptions:
 `index.ts` files, which only re-export, and the React 19.3 pattern of a directive-free file
 *rendering* a context provider imported from a client module (`<TabsContext value={...}>`), which
 is allowed because Server Components may render client-created contexts. No initial component
-needs the second exception; a component that does says so in its design doc. A context shared
+needed the second exception; `Progress.Root` and `Meter.Root` (#68) are its first users: a
+directive-free Root renders `<ProgressContext value>` imported from its `"use client"` context
+module and imports no other client module (the Server render row in 10.1 guards the import graph);
+a component that does this says so in its design doc. A context shared
 by **several component folders** lives in `internal/` (`internal/field-context.ts`, read by the
 Field parts, `Form.Root` and `useFieldControl` from every form control's folder; `internal/toolbar-context.ts`, read by
 `ToggleGroup.Root`, `Toolbar.Separator` and `Menu.Trigger` to find an enclosing Toolbar, #66); the one-way
@@ -1494,6 +1520,13 @@ wiring as props instead of context) are tracked in issue #19 and are not part of
 four; action-less Checkbox, Switch and RadioGroup are the strongest candidates there, since a
 native input already works without JS. Passing any action prop to a part from a Server Component is a type error unless the action
 is a Server Function (section 2.2).
+
+Progress and Meter (#68) are the first components whose **Root is itself a Server Component**:
+`Progress.Root` / `Meter.Root` are directive-free (only `useId`, arithmetic and `Intl`), render the
+client-created context provider (7.1), and their parts are client modules that read it. "JS-free"
+and "a Server Component" coincide at the Root, so function props (`getAriaValueText`,
+`children(state)`, `render`) may be passed from a Server Component and run on the server, next to
+the JS-free Accordion whose parts are all client modules.
 
 A third configuration, decided with Menu (#39): a component whose baseline **cannot** be JS-free
 (a menu needs arrow keys, typeahead and focus management that only Chromium's flagged
@@ -1688,7 +1721,8 @@ re-exports them.
   `ViewTransitionClass` (the `transition` prop's type, section 5.2).
 - Props interfaces are `interface`s extending the element props (section 1.5); state objects are
   `interface`s with readonly members. A component whose parts **all share one state object**
-  may export a single `<Component>State` (`FieldState`) instead of one alias per part (#54).
+  may export a single `<Component>State` (`FieldState`; `ProgressState` / `MeterState`, with
+  `MeterRegion` exported, #68) instead of one alias per part (#54).
 - A component whose value has two shapes may be **generic** with a default
   (`SliderRootProps<T extends SliderValue = number>`, inferred from `value` / `defaultValue`);
   the shape is fixed at mount (a switch warns in development, like a mode switch).
@@ -1719,7 +1753,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` works end to end (guards the documented pattern). |
-| Directive | Each built part file starts with `"use client"` or not, exactly as the component's design doc records (script over `dist`, run in `test:run` after `build`). |
+| Directive | Each built part file starts with `"use client"` or not, exactly as the component's design doc records (script over `dist`, run in `test:run` after `build`). A design may record a **directive-free Root** (Progress, Meter, #68). |
 | Platform path (both) | Required for every component with a residual browser path (section 3.5): mount reconciliation (`renderToString`, change the DOM before `hydrateRoot`, exactly one dispatch with `reason: "platform"` and `event === undefined`, StrictMode still one) and, for native form controls, form reset through `<button type="reset">`, `form.reset()` and React's automatic reset after a successful `<form action>` (one dispatch per state owner with the `reset` event; a cancelled `reset` dispatches nothing; a controlled parent that refuses gets the DOM re-synced after settle). |
 | Lanes | Required for a state that is urgent by design (section 2.6, Toast): with an unrelated `useTransition` action pending (a deferred), the command called inside that action's sync prefix, inside a consumer `startTransition`, and plainly, all commit before the action settles; several commands in one tick keep their order. The component also lists the rows it declares N/A for lacking an `x` / `defaultX` triple (controlled parity, post-await, optimistic, platform path, urgent action) in its top-of-file comment. |
 | Continuous control (both) | Required for a component with a step / commit pair (section 2.1, Slider): between two steps the shown value never reverts to the committed value (with a synchronous step action that has settled); a rejected commit reverts the whole gesture to its start value; a gesture that returns to its start value dispatches steps and no commit; a trailing platform `change` with an unchanged value dispatches nothing. |
@@ -1727,6 +1761,8 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Inside a Field | Required for every form control (Switch, Checkbox, RadioGroup, CheckboxGroup, Select, Combobox, Slider): rendered inside a `Field.Root`, the part's element (or group element) receives the Field's `id` (or `aria-labelledby`), `name`, `aria-describedby`, `aria-invalid`, and `disabled` / `required` from the Field; its own `data-pending` is unaffected by the form's. |
 | Validity display | Required for Field: a submission attempt with an invalid control shows the message, cancels the native bubble (the `invalid` event is `defaultPrevented`) and focuses the first invalid control in document order; a `form.reset()` clears it. The `:user-invalid` half (changed-then-blurred, live updates, `checkValidity()` showing nothing) runs in browser mode. |
 | Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
+| Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
+| Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). jsdom tests assert that components render with and without `transition`
@@ -1784,6 +1820,10 @@ question 27):
 - Field (#54) adds **no** string: `Field.Error`'s default text is the browser's own localised
   `validationMessage` (a platform string, not a library one), and the override is the function
   form of `children` (`({ validity, messages }) => …`), per `ValidityState` key.
+- Progress and Meter (#68) add **no** string either: the default `aria-valuetext` is
+  `Intl.NumberFormat`'s localised output (a platform string, like Field's `validationMessage`),
+  there is no default text while indeterminate, and the override is `getAriaValueText(value,
+  state)` (function of state), with `format` / `locale` as the serialisable path.
 
 ---
 
@@ -1963,9 +2003,30 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     state type in 9.4, the three rows in 10.1, the platform-string note in 11) are applied,
     together with the #46 fold's CSS-exit rule in 5.1.
 
+31. **ToggleGroup and Toolbar (#66)** accepted 2026-10-18 (`design/components/toggle-group.md`),
+    all twelve recommendations as recommended: the `exclusive` discriminant with multiple as the
+    default; exclusive mode deselectable by default with `deselectable={false}`; Toolbar `loop`
+    default `true` with the native `wrap` token; `Menu.Trigger` opening on the inline-end arrow in
+    a vertical Toolbar; a nested ToggleGroup transparent to the arrows; one DOM-written roving
+    `tabindex` engine shared by Toolbar and a standalone ToggleGroup; Tab from a text-entry item
+    to the next item; `Toolbar.Button` and `Toolbar.Separator` only; `Toggle` unchanged;
+    `experimental_focusgroup` on both Roots; no Label parts; no form participation and no
+    `details.reason`. The conventions changes it asked for (1.1, 3.2, 3.6, 4.1, 5.3, 7.1, 7.4, 8,
+    9.1) are applied.
+32. **Progress and Meter (#68)** accepted 2026-10-18 (`design/components/progress.md`), all eleven
+    product-owner items as recommended (optional `value` with `null` meaning indeterminate; `max`
+    100; directive-free Roots rendering the client context provider; always-referenced
+    `aria-labelledby`; no Field registration, no native variant and no English indeterminate text;
+    `getAriaValueText(value, state)`; an `aria-hidden` Value; no `transition`, types,
+    `useFormStatus` or `pending`; two pages and two subpaths) and all nine conventions proposals,
+    applied: the part notes in 1.1, the consumer-side lane rule in 2.6, the mirrored-state
+    examples in 3.5, `complete` / `region` / `indeterminate` in 4.1, the fourth no-`transition`
+    category in 5.1 and the types in 5.3, the hook list in 7.1 relaxed to React's `react-server`
+    exports (proposal 6a, the architect's choice: `use-render.tsx` may drop its directive instead
+    of the `render-element.ts` split) and the provider exception's first use in 7.1 and 7.3, the
+    shared state types in 9.4, the two rows and the directive-free note in 10.1, the
+    platform-string note in 11.
+
 ## Open questions
 
-- The ToggleGroup and Toolbar amendments above (#66) are applied pending that design's acceptance
-  (`design/components/toggle-group.md`, recommendations 1 to 12). If the product owner decides
-  against the DOM-written roving `tabindex` (recommendation 6), the 3.2 paragraph and the 7.4 row
-  are reverted and the design is reworked around item parts.
+None at present.
