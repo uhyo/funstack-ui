@@ -10,7 +10,7 @@
 // prop: there is no `x` / `defaultX` triple, nothing optimistic, and the Form never interprets a
 // return value (results reach the Fields as the `errors` prop). Rejection, overlap and suspending
 // content apply to the submission and are covered below.
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, Suspense, useActionState, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
@@ -1021,9 +1021,11 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
       );
       return (
         <Dialog.Root defaultOpen>
+          {/* Outside the Popup: the close unmounts the Popup's content (no keepMounted), on a
+              microtask after the close commit, so a readout inside it may already be gone. */}
+          <output data-testid="state">{state.errors?.email ?? ""}</output>
           <Dialog.Popup aria-label="Profile" data-testid="popup">
             <Dialog.Form action={dispatch}>
-              <span data-testid="state">{state.errors?.email ?? ""}</span>
               <button type="submit" value="save">
                 Save
               </button>
@@ -1039,5 +1041,9 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     expect(screen.getByTestId("state")).toHaveTextContent("Taken");
     expect(popup().open).toBe(false);
     expect(popup().returnValue).toBe("save");
+    // The content unmounts once the close settles (no exit animation in jsdom).
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Save", hidden: true })).toBeNull(),
+    );
   });
 });
