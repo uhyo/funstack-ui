@@ -23,8 +23,8 @@ validity mirror in 2.6, the form-channel amendments in 2.7, the reset and settle
 owned custom-validity slot in 3.6, `useFieldControl` and `useFormOwnerEvent` in 3.8, `invalid` /
 `required` in 4.1 and 4.2, the no-`transition` note and the CSS-exit rule (#46) in 5.1, the types in
 5.3, the shared context location in 7.1, the shared state type in 9.4, the three rows in 10.1, the
-platform-string note in 11; amended 2026-10-18 with the ToggleGroup and Toolbar design, #66, **draft, pending
-acceptance**: the `Button` row and the `Item` / `Separator` notes in 1.1, the roving tab stop in 3.2 and
+platform-string note in 11; amended 2026-10-18 with the ToggleGroup and Toolbar design, #66, **accepted
+2026-10-18**: the `Button` row and the `Item` / `Separator` notes in 1.1, the roving tab stop in 3.2 and
 7.4, `aria-disabled` in 3.6, the rows in 4.1 and 5.3, the shared context in 7.1, the flag row in 8, the
 files in 9.1). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
