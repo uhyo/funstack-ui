@@ -1,10 +1,15 @@
 # NumberField
 
-Status: **Accepted by the product owner** (2026-10-18, wave 6, GitHub issue #67).
-Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
-the conventions win. The conventions changes this design needs are **proposals** in the
-"Conventions proposals" section (another architect owns `conventions.md` this wave); nothing
-here edits that file.
+Status: **Accepted by the product owner** (2026-10-18, wave 6, GitHub issue #67; all fourteen
+items of "For the product owner" accepted as written, see the end of this document; the
+conventions changes are applied in 29a94c5, conventions resolved question 33, and the Field
+amendment is in `design/components/field-form.md`, "Amendment: `validityElement`").
+Implemented in c31588b (playground 0a2c701, docs bff9672); the review
+(`memo/reviewer/number-field.md`, "acceptable with minor fixes") and its fixes (6742cb0,
+36b48f4) are folded in on 2026-10-18, see "Review corrections (#67)" at the end. The code under
+`packages/ui/src/number-field/` is the ground truth where this document is silent. Follows
+`design/conventions.md` (accepted); where this document and the conventions disagree, the
+conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/wave6.md` §2 (binding: a
 visible `type="text"` input with `inputmode`, library parsing and formatting through
@@ -44,15 +49,15 @@ in Slider.
 | 3 | Lanes | The **draft text** is urgent, internal library state (`useState`, written from the `input` event; no `inputValue` triple, no `UrgentChangeAction`): a controlled text input cannot follow a transition. The **value under a held button** (`live`) is urgent too (Slider 2.2, the same `held` derivation). Steps are transitions (`useActionTrigger`); the gesture's commit is the state owner's dispatch (`useControllableAction`: optimistic, latest wins). |
 | 4 | When typed text becomes a value | On **blur**, on **Enter**, and before a step (a button press or a key with an open draft parses it first). Never per keystroke: a partial text (`-`, `1,`) is not a number. Unparsable text reverts to the committed value's text at commit, with no dispatch (React Aria's rule; 4.1). |
 | 5 | Uncontrolled commit | Uncontrolled state is written when the **commit** action resolves (Slider 2.3): a rejected save rolls the text and the hidden input back to the value before the gesture, and a `valueChangeAction` consumer hears one `"dismiss"` step. |
-| 6 | Value shape | `value: number \| null` (`null` is empty; `undefined` is uncontrolled). Typed values are **neither clamped nor snapped** (the platform's rule for `type=number`): `min` / `max` / `step` are native constraints on the hidden input (`rangeUnderflow`, `rangeOverflow`, `stepMismatch`, the browser's message). **Stepping** clamps and snaps with the spec's `stepUp()` semantics (5.5). The committed value is rounded to the format's `maximumFractionDigits`, so the text, the value and `FormData` agree (5.4). |
-| 7 | Numbers | `format: Intl.NumberFormatOptions` (`decimal`, `percent`, `currency`, `unit`), `locale` (default: the runtime's locale, with a dev warning when the document's `lang` disagrees and no `locale` was given). Parsing is library code driven by `formatToParts`: the locale's decimal, group, sign, percent, currency, unit and literal symbols and its digits; full-width digits accepted; **strict grouping** (a group separator must sit before the decimal separator and be followed by a whole group, so `1,5` under `en` is unparsable, not `15`); accounting parentheses and U+2212 as minus; percent scales by 100 (section 5). |
-| 8 | Keyboard | ArrowUp / ArrowDown `± step`; PageUp / PageDown and Shift+Arrow `± largeStep` (default `10 × step`); Home / End to `min` / `max` **only when that bound is set**; Enter commits (and lets the form's implicit submission post the committed value); every other key is native text editing. Each key press is a one-step gesture (step + commit), auto-repeat included (4.2). |
-| 9 | Buttons | `tabindex="-1"` (the input is the only Tab stop, APG), `aria-controls` → the input, built-in `aria-label` `"Increase"` / `"Decrease"` (static strings, overridden by the ordinary `aria-label` pass-through, Toast's rule), natively `disabled` when the next step would change nothing (at the bound, `readOnly`, `disabled`). **Press-and-hold**: one step on `pointerdown`, repeat after 400 ms then every 60 ms, commit at release; the press is `preventDefault()`ed so focus stays where it is and touch opens no keyboard; a `click` with no pointer gesture (assistive technology) steps once (4.3). |
-| 10 | Wheel | **Off by default**; `stepOnWheel` enables it **only while the input is focused**, through a native non-passive `wheel` listener (React's `onWheel` is passive and cannot stop the page scroll). Each wheel event is a one-step gesture (4.4). |
-| 11 | Hidden native input | `<input type="number">` right after the visible input, `aria-hidden="true" tabindex="-1"`, visually hidden; carries `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readOnly` and the canonical value (`String(number)`, `""` for empty). **Uncontrolled**: its `defaultValue` prop is the reset target (uncontrolled: the latest `defaultValue`; controlled: the mount-time value), which react-dom keeps in the `value` attribute, so the platform's own reset applies to it; the library writes its `.value` synchronously at every step and re-applies the shown value after every commit. The library always cancels its `invalid` event, so the browser never reports on an `aria-hidden` element (section 6). |
+| 6 | Value shape | `value: number \| null` (`null` is empty; `undefined` is uncontrolled). Typed values are **neither clamped nor snapped** (the platform's rule for `type=number`): `min` / `max` / `step` are native constraints on the hidden input (`rangeUnderflow`, `rangeOverflow`, `stepMismatch`, the browser's message). **Stepping** clamps and snaps with the spec's `stepUp()` semantics (5.5). Every value the field commits or steps to is rounded to the format's `maximumFractionDigits`, so the text, the value and `FormData` agree (5.4; review N1 extended it to stepped values). |
+| 7 | Numbers | `format: Intl.NumberFormatOptions` (`decimal`, `percent`, `currency`, `unit`), `locale` (default: the runtime's locale, with a dev warning when the document's `lang` disagrees and no `locale` was given). Parsing is library code driven by `formatToParts`: the locale's decimal, group, sign, percent, currency, unit and literal symbols and its digits; full-width digits accepted; **strict grouping** (a group separator must sit before the decimal separator and be followed by a whole group, so `1,5` under `en` is unparsable, not `15`); accounting parentheses and U+2212 as minus; percent scales by 100. Affixes (currency, unit, percent, literals) are stripped **at the edges only**, in every display the formatter has (`EUR`, `€`, `euros`, `km`, `kilometers`), case-insensitively; the number core stays strict (section 5.3). |
+| 8 | Keyboard | ArrowUp / ArrowDown `± step`; PageUp / PageDown and Shift+Arrow `± largeStep` (default `10 × step`); Home / End to `min` / the **largest on-grid value `≤ max`**, **only when that bound is set** and only without Shift (Shift+Home / Shift+End stay text selection); Ctrl / Meta / Alt combinations are the browser's; Enter commits (and lets the form's implicit submission post the committed value, which needs a submit button in the form, 4.1); every other key is native text editing. Each key press is a one-step gesture (step + commit), auto-repeat included (4.2). |
+| 9 | Buttons | `tabindex="-1"` (the input is the only Tab stop, APG), `aria-controls` → the input, built-in `aria-label` `"Increase"` / `"Decrease"` (static strings, overridden by the ordinary `aria-label` / `aria-labelledby` pass-through, Toast's rule), natively `disabled` when the next step from the **step base** (the parsed draft while one is open, else the shown value) would change nothing (at the bound, `readOnly`, `disabled`). **Press-and-hold**: one step on `pointerdown`, repeat after 400 ms then every 60 ms, commit at release; the press is `preventDefault()`ed so focus stays where it is and touch opens no keyboard; a `click` with no pointer gesture (assistive technology) steps once. `details.event` is `undefined` for the repeats of a hold and for a hold its bound ended (4.3). |
+| 10 | Wheel | **Off by default**; `stepOnWheel` enables it **only while the input is focused**, through a native non-passive `wheel` listener (React's `onWheel` is passive and cannot stop the page scroll). Each wheel event with a vertical delta is a one-step gesture; `deltaY === 0` (a horizontal scroll) is ignored and not prevented (4.4). |
+| 11 | Hidden native input | `<input type="number">` right after the visible input, `aria-hidden="true" tabindex="-1" autocomplete="off"`, visually hidden; carries `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readOnly` and the canonical value (`String(number)`, `""` for empty). **Uncontrolled**: its `defaultValue` prop is the reset target (uncontrolled: the latest `defaultValue`; controlled: the mount-time value), which react-dom keeps in the `value` attribute, so the platform's own reset applies to it; the library writes its `.value` synchronously at every step and re-applies the shown value after every commit. The library always cancels its `invalid` event, so the browser never reports on an `aria-hidden` element (section 6). |
 | 12 | The validity mirror | After every write to the hidden input, `visible.setCustomValidity(hidden.validationMessage)`: the visible input is invalid exactly when the hidden one is, with the browser-localised message, so `invalid`, the native bubble, the browser's focus move and `:user-invalid` all land on the visible input in every engine (research finding 5). Inside a Field the Field writes its slot (`validate`, server errors) on the **hidden** input and mirrors the same way (section 7). |
 | 13 | No `role="spinbutton"` | Accepted deviation from APG (product owner, research finding 4: VoiceOver announces "50%" or "0" for a text spinbutton, WebKit 221102 / 250380). The visible input is a plain `textbox`; stepped values are announced with `ariaNotify()` (fallback: a module-level live region). **No `aria-roledescription`** (8.2): it would replace the role name a user relies on to know they can type, and it would be the library's third built-in string for a gain the announcements already give. |
-| 14 | Forms | `name` / `form` on Root (the hidden input posts the number, never the text). Reset: the hidden input resets natively; the visible input's `defaultValue` mirror is written in the `reset` event (`useFormReset`'s `onResetEvent`); the JS-computed target is dispatched as one `"platform"` step + commit in the microtask. Mount reconciliation parses text typed before hydration (6.4). |
+| 14 | Forms | `name` / `form` on Root (the hidden input posts the number, never the text). Reset: the hidden input resets natively; the visible input's `defaultValue` mirror is written in the `reset` event (`useFormReset`'s `onResetEvent`); the JS-computed target is dispatched as one `"platform"` step + commit in the microtask. Mount reconciliation adopts the text of a still-focused input as the draft **first**, then parses text typed before hydration (4.5; review M1). Both inputs are `autocomplete="off"`, so the browser's form-state restoration never produces a hidden value the text does not show (6.1). |
 | 15 | Exposure | `data-pending` on Root, Input and the button the latest step or commit came from; `data-disabled` on every part; `data-invalid` (from a Field) on Root and Input. No `data-readonly` (`:read-only`), no `data-holding` (`:active` on the held button), no `data-editing`. `state.value` is the shown value (`live` while held, else optimistic), `state.text` the shown text. |
 | 16 | ViewTransition | **No `transition` prop on any part** (Select / Slider precedent): every change is urgent or optimistic. Types `fsui-number-field`, `fsui-number-field-change` (step), `fsui-number-field-commit` (gesture) for consumers' own boundaries. |
 | 17 | SSR | Every part file is `"use client"`; the parser / formatter and the arithmetic are directive-free modules. The server HTML carries the formatted text and the hidden input with its value and constraints; before hydration typing works (adopted at mount), a submission posts the default value, the buttons are inert. |
@@ -107,7 +112,7 @@ abbreviated):
 | --- | --- | --- | --- | --- |
 | `Root` | `div` | `group` | shown value, pending | Owns `useId`, the commit hook, the step transition, the draft text, `live`, the hold, the Label registry, the formatter and parser, form reset and mount reconciliation (through the Input's registration of the hidden input). `aria-labelledby` → the `Label` id while one is mounted, else a Field's label id, token-merged with the consumer's. `data-pending`, `data-disabled`, `data-invalid` (Field). |
 | `Label` | `label` | | | `for` → the visible input's id; registers its id with the Root from a layout effect (Combobox's Label), so the group is named by it. |
-| `Input` | `input[type=text]` **followed by** `input[type=number]` | `textbox` (the visible); the hidden one is `aria-hidden` | shown text, pending | The visible input: `id`, `value` (the shown text: the draft while editing, else the formatted value), `inputmode` (`decimal` when fractions are allowed, else `numeric`; a consumer's `inputMode` replaces it), `autocomplete="off"`, `autocorrect="off"`, `spellcheck="false"`, `disabled`, `readonly`, the Field's `aria-describedby` / `aria-invalid`, the library's `onChange`, `onKeyDown`, `onBlur`, `onCompositionStart` / `End`, a native non-passive `wheel` listener when `stepOnWheel`. The hidden input: `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readonly`, `defaultValue` (the reset target), `aria-hidden="true"`, `tabindex="-1"`, the hidden-input style, a native `invalid` listener that cancels. `ref` → the visible input; `hiddenInputRef` → the hidden one. `data-pending`, `data-disabled`, `data-invalid`. |
+| `Input` | `input[type=text]` **followed by** `input[type=number]` | `textbox` (the visible); the hidden one is `aria-hidden` | shown text, pending | The visible input: `id`, `value` (the shown text: the draft while editing, else the formatted value), `inputmode` (`decimal` when fractions are allowed, else `numeric`; a consumer's `inputMode` replaces it), `autocomplete="off"`, `autocorrect="off"`, `spellcheck="false"`, `disabled`, `readonly`, the Field's `aria-describedby` / `aria-invalid`, the library's `onChange`, `onKeyDown`, `onBlur` (composition is judged from the keydown's `isComposing` / `keyCode 229`, so the composition handlers pass through), a native non-passive `wheel` listener when `stepOnWheel`. The hidden input: `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readonly`, `defaultValue` (the reset target), `autocomplete="off"`, `aria-hidden="true"`, `tabindex="-1"`, the hidden-input style, a native `invalid` listener that cancels. `ref` → the visible input; `hiddenInputRef` → the hidden one. `data-pending`, `data-disabled`, `data-invalid`. |
 | `Increment`, `Decrement` | `button` | `button` | shown value, pending | `type="button"`, `tabindex="-1"`, `aria-controls` → the input id, `aria-label` (`"Increase"` / `"Decrease"` unless the consumer passes one), `disabled` when the prop, the Root, `readOnly` or the bound says so (`state.disabled`), the library's `onPointerDown`, `onClick`, `onContextMenu`; the hold's `pointerup` / `pointercancel` / `lostpointercapture` listeners are attached during a hold. `data-pending` when the latest step or commit came from this button, `data-disabled`. |
 
 Why this shape:
@@ -255,6 +260,7 @@ The Root has two internal entry points, Slider's, with the draft folded in:
 
 ```ts
 function step(next: number | null, source: Source, reason: ChangeReason, event: Event | undefined): boolean {
+  if (next !== null) next = formatter.round(next);                  // 5.4 for stepped values too (review N1)
   if (next === shownRef.current) return false;                      // no-op against what is shown
   liveRef.current = next; shownRef.current = next;
   setLive(next); setDraft(null);                                     // urgent
@@ -286,7 +292,16 @@ press: `gestureStart = base`, `step`, `commit`. A hold: `gestureStart = base` at
 `step` per tick, `commit` at release. The wrapped commit action is Combobox's / Slider's: on a
 rejection in uncontrolled mode, for the latest commit only, `await undefined` (leave the
 transition, conventions 2.6) then `step(committed, null, "dismiss", undefined)`, then rethrow.
-`details.source` is `null` for `"platform"` and `"dismiss"` dispatches.
+`details.source` is `null` for `"platform"` and `"dismiss"` dispatches. `details.event` is the
+DOM event of the gesture where one exists: the `focusout` or Enter `keydown` of a typed value,
+the `keydown` of a key, the `wheel` event, the `pointerdown` of a press and the `pointerup` /
+`pointercancel` / `lostpointercapture` / window `blur` of a release; it is **`undefined` for the
+repeats of a held button** (a timer has no event) and for the commit of a hold its bound ended
+(deviation 6).
+
+The Root also derives `stepBase` (the parsed draft while one is open, else `shown`): it is what
+a button press and the buttons' `disabled` state step from (4.3; review S3). A draft that
+cannot be parsed makes `stepBase` the shown value.
 
 ---
 
@@ -369,7 +384,6 @@ export interface NumberFieldInputProps
   extends Omit<
     ComponentPropsWithRef<"input">,
     | "value" | "defaultValue" | "type" | "onChange" | "onKeyDown" | "onBlur"
-    | "onCompositionStart" | "onCompositionEnd"
     | "disabled" | "readOnly" | "required" | "name" | "form" | "min" | "max" | "step" | "pattern"
     | "aria-invalid" | "className" | "style" | "children"
   > {
@@ -390,8 +404,10 @@ replaces: `inputMode`, `autoComplete="off"`, `autoCorrect="off"`, `spellCheck={f
 `enterKeyHint` (none). `name`, `form`, `min`, `max`, `step`, `required` and `pattern` are omitted
 because constraints live on the hidden input (a native constraint on the visible input would
 make it invalid for a reason the mirror does not carry); `placeholder`, `aria-label`,
-`aria-describedby`, `onFocus`, `onPaste`, `onWheel` (passive; the library's wheel listener is
-native) and the rest pass through. `ref` → the visible input.
+`aria-describedby`, `onFocus`, `onPaste`, `onCompositionStart` / `onCompositionEnd` (the
+library installs neither: it reads `isComposing` and `keyCode` on the keydown), `onWheel`
+(passive; the library's wheel listener is native) and the rest pass through. `ref` → the
+visible input. A `name` on a `render` element warns (it would post the text).
 
 ### 3.3 `NumberField.Increment`, `NumberField.Decrement`
 
@@ -417,7 +433,10 @@ export type NumberFieldDecrementProps = NumberFieldIncrementProps;
 
 Owned keys: `type="button"` (on a `<button>`), `tabIndex={-1}`, `aria-controls`, `disabled`,
 the three handlers, `data-pending`, `data-disabled`. `aria-label` is a default (`"Increase"` /
-`"Decrease"`, section 8.4) that the consumer's `aria-label` or `aria-labelledby` replaces.
+`"Decrease"`, section 8.4) that the consumer's `aria-label` replaces; with a consumer
+`aria-labelledby` the default is **omitted** (deviation 9), so the referenced element is the
+whole name. `state.disabled` is computed from the step base (the parsed draft while one is
+open), so a field showing `99` with `max 99` whose user has typed `50` has an enabled `+`.
 
 ### 3.4 `NumberField.Label`
 
@@ -454,12 +473,19 @@ Subpath `@funstack/ui/number-field`; the root entry re-exports the namespace.
 
 - Every `input` event writes the draft (2.2). Nothing is parsed, nothing is dispatched; the
   caret and the selection are the browser's.
-- **Blur** (`focusout`) and **Enter** (`keydown`, not during an IME composition, judged by
-  `event.isComposing`) commit the draft: parse (5.3) → step + commit with that event and
-  `source: "input"`. Enter is **not** `preventDefault()`ed: inside a form the implicit
-  submission follows, and the sync render of the step has already written the hidden input, so
-  the form posts the committed value (Combobox's "Enter submits with the new value" row).
-  Outside a form Enter does nothing else.
+- **Blur** (`focusout`) and **Enter** (`keydown`, not during an IME composition: judged by
+  `event.isComposing` **or `keyCode === 229`**, because WebKit fires `compositionend` before the
+  confirming keydown, which then has `isComposing === false`; Combobox's guard, review S1)
+  commit the draft: parse (5.3) → step + commit with that event and `source: "input"`. Enter is
+  **not** `preventDefault()`ed: inside a form the implicit submission follows, and the sync
+  render of the step has already written the hidden input, so the form posts the committed
+  value (Combobox's "Enter submits with the new value" row). **Implicit submission needs a
+  submit button in the form**: the hidden `type="number"` input is a second field that blocks
+  the platform's "single text field" rule, so a form whose only control is a NumberField and
+  that has no submit button does not submit on Enter (the docs say "inside a form with a submit
+  button"). Outside a form Enter does nothing else.
+- While `disabled` or `readOnly` a commit only clears the draft (nothing is dispatched from an
+  inert field; the text returns to the value; deviation 10).
 - An **unparsable** draft (`abc`, `1,5` under `en`, `1.2.3`) reverts: the draft is cleared and
   the input shows the committed value's text again; no dispatch, no error. React Aria's rule.
   The alternative, keeping the text and flagging it, needs a built-in message (the hidden input
@@ -483,9 +509,9 @@ On the visible input (`keydown`; each row is a one-step gesture: `step` then `co
 | --- | --- |
 | ArrowUp / ArrowDown | `± step` from the base (the parsed draft if one is open, else the shown value; empty counts as `0`, 5.5), snapped and clamped with `stepUp()` semantics. |
 | Shift+ArrowUp / Shift+ArrowDown, PageUp / PageDown | `± largeStep`. |
-| Home / End | `min` / `max`, **only when that bound is set**; otherwise the key is not handled and moves the caret (APG; Base UI). |
+| Home / End | `min` / the **largest on-grid value `≤ max`** (`boundValue`: with `0..5` by `2`, End is `4`, so no key can create a `stepMismatch`; deviation 1), **only when that bound is set** and **only without Shift**; otherwise the key is not handled: it moves the caret, and Shift+Home / Shift+End select text (review S2). |
 | Enter | Commits the draft (4.1). Not prevented. |
-| Alt+Arrow, Escape, Tab, everything else | Not handled. Tab leaves the field and the `focusout` commits. Escape is left to the platform (a Dialog closes); reverting the draft on Escape is section 13. |
+| Alt / Ctrl / Meta + any key, Escape, Tab, everything else | Not handled (Cmd+Arrow and Ctrl+Home are caret moves on their platforms; deviation 7). Tab leaves the field and the `focusout` commits. Escape is left to the platform (a Dialog closes); reverting the draft on Escape is section 13. |
 
 Auto-repeat: each repeated `keydown` is its own one-step gesture, as a held key on a native
 range is (Slider 4.2). `readOnly` and `disabled` handle nothing. Keys are **never** handled on
@@ -499,22 +525,28 @@ the buttons (they are not focusable).
    else), a touch press opens no keyboard and starts no selection. The library never calls
    `focus()` (research §2.2: the button is a control for the field, not a field).
 2. `setPointerCapture(pointerId)`; `hold = "increment" | "decrement"`.
-3. The base: the parsed draft if one is open (unparsable → the shown value, draft cleared),
-   else the shown value; `gestureStart = base`.
-4. One `step` now (`source` the button). Then a 400 ms timer, then a step every 60 ms (Base UI
-   1.9 and React Aria 3.53; the touch variant's 600 ms is not adopted).
+3. The base is the Root's `stepBase` (2.4): the parsed draft if one is open (unparsable → the
+   shown value, draft cleared), else the shown value; `gestureStart = base`.
+4. One `step` now (`source` the button, `event` the `pointerdown`). Then a 400 ms timer, then a
+   step every 60 ms (Base UI 1.9 and React Aria 3.53; the touch variant's 600 ms is not
+   adopted). The repeats carry **`details.event === undefined`**: a timer has no DOM event
+   (deviation 6).
 5. `pointerup`, `pointercancel`, `lostpointercapture` (on the button) and `blur` on `window`
    stop the timers, set `hold = null` and `commit` with that event. A step that would change
    nothing (the bound reached) ends the hold the same way, before the button is re-rendered
-   `disabled` (a disabled element may not deliver the release).
+   `disabled` (a disabled element may not deliver the release); that commit's `event` is the
+   tick's, `undefined`.
 6. `contextmenu` on the button is prevented while a hold is open (a touch long-press).
 
 A `click` with **no** pointer gesture before it (assistive-technology activation, `detail === 0`
 and no `pointerdown` seen for this activation) is a one-step gesture: step + commit. A `click`
 that follows the gesture is ignored (the hold already stepped). `disabled` at the bound uses
-the exact rule "the next step would change nothing" (`stepValue(shown, ±1) === shown`), which
-also covers an unreachable `max` (`0..5` by `2` stops at `4`) and an empty value (always
-steppable). While a save is pending the buttons stay enabled (conventions 3.6).
+the exact rule "the next step **from the step base** would change nothing"
+(`isAtBound(stepBase, ±1)`), which also covers an unreachable `max` (`0..5` by `2` stops at
+`4`) and an empty value (always steppable); computing it from the shown value alone would
+disable `+` on a field showing `max` whose user has typed a smaller draft, the press the step
+base exists for (review S3). While a save is pending the buttons stay enabled (conventions
+3.6).
 
 ### 4.4 Wheel
 
@@ -522,8 +554,8 @@ steppable). While a save is pending the buttons stay enabled (conventions 3.6).
 and Base UI defaults off) adds a **native, non-passive** `wheel` listener to the visible input
 (React's `onWheel` is passive) that, **only while the input is focused** (`document.activeElement`),
 `preventDefault()`s and runs a one-step gesture per event: `deltaY < 0` increments, `> 0`
-decrements, `deltaMode` and magnitude ignored (one step per event, Base UI). Unfocused, the
-page scrolls. A consumer's `onWheel` prop passes through and runs independently. A flick is
+decrements, `deltaMode` and magnitude ignored (one step per event, Base UI); `deltaY === 0` (a
+horizontal scroll) is ignored and not prevented (deviation 8). Unfocused, the page scrolls. A consumer's `onWheel` prop passes through and runs independently. A flick is
 several gestures; with a slow `valueCommitAction` that means several entangled commits, which
 the prop's docs say; the alternative (commit when the wheel idles) adds a timer for an opt-in
 feature and is not designed. Product-owner item 9.
@@ -533,7 +565,7 @@ feature and is not designed. Product-owner item 9.
 | Path | What happens | Dispatch |
 | --- | --- | --- |
 | Form reset (`form.reset()`, `<button type=reset>`, React's automatic reset) | In the `reset` event: the visible input's `defaultValue` attribute is written to `format(resetTarget)` (`onResetEvent`); the hidden input resets natively to its `defaultValue` attribute (the same target, kept there by react-dom). In the microtask: draft cleared, `step(resetTarget, null, "platform", resetEvent)` + `commit`, against the base of conventions 3.8 rule 1. A cancelled `reset` dispatches nothing. | one step + commit, `reason: "platform"`, `source: null` |
-| Mount reconciliation | Layout effect at mount: the visible input's DOM text is compared with `format(initial)`. Different and parsable to another value (typed before hydration; Firefox restoration): `"platform"` step + commit with `event: undefined`. Different but the input **is focused** (the user is still typing): adopted as the draft, no dispatch; the blur commits. Different and unparsable, or parsable to the same value (the server formatted with another locale, 5.1): no dispatch; the Input re-renders once so react-dom writes the client text (react-dom keeps a hydrated text input's DOM value, probe in the notes). The hidden input's restored `.value` is overwritten by the re-apply; the visible text is the source. | at most one |
+| Mount reconciliation | Layout effect at mount: the visible input's DOM text is compared with `format(initial)`. Equal: nothing. Different and the input **is focused** (the user is still typing, even a partial `12,` or `-`): adopted as the draft **before any parse**, no dispatch, never overwritten under the caret; the blur commits it or reverts it by the ordinary rule (review M1: the parse ran first and reset a focused partial draft to the formatted value). Otherwise, parsable to another value (typed before hydration): `"platform"` step + commit with `event: undefined`. Unparsable, or parsable to the same value: no dispatch; the library writes `visible.value = format(initial)` directly (deviation 3: a Root state bump does not re-render the Input through the memoised context, and react-dom's value tracker follows the setter). The reviewer's probe showed that react-dom itself re-syncs a hydrated input the user has **not** edited (server `en-US`, client `de-DE`: the attribute and the text become the client's with no dispatch), so this branch only ever sees text the user changed. The hidden input is `autocomplete="off"` (6.1), so no restored hidden value exists; the visible text is the source. | at most one |
 | Controlled `value` changed by the parent | Shown when no draft is open; `useFieldValueChange` tells a Field (section 7). | none |
 
 ### 4.6 No-op and overlap rules
@@ -590,13 +622,25 @@ positive form), and the numbering system's ten digits (from formatting `0`…`9`
 order:
 
 1. `trim()`, then NFKC normalisation of the input (full-width digits and `％` become ASCII;
-   NBSP and narrow NBSP are treated as the space they stand for) and of the symbols.
-2. Remove every occurrence of the `currency`, `unit`, `percentSign` and `literal` strings.
+   NBSP and narrow NBSP are treated as the space they stand for), lower-casing, and the removal
+   of bidi controls (U+061C, LRM, RLM, the isolates: `ar` puts them around signs); the symbols
+   are normalised the same way.
+2. Strip the `currency`, `unit`, `percentSign` and `literal` strings **at the edges only**
+   (longest first; again inside the sign and the accounting parentheses of step 3). An affix in
+   the middle of the number is garbage, never a group separator: `1€234` under `fr-FR` is
+   unparsable (review N3; the first draft said "every occurrence", which turned the replaced
+   affix into a space, a group separator in a space-grouping locale). The affix set covers
+   every display the formatter has for the currency (`symbol`, `narrowSymbol`, `code`, `name`
+   with its plural forms: `€`, `EUR`, `euro`, `euros`) and the unit (`short`, `long`,
+   `narrow`: `km`, `kilometer`, `kilometers`), compared case-insensitively (deviation 5).
 3. Sign: a leading or trailing ASCII `-`, U+2212 `−` or the locale's `minusSign`; accounting
    parentheses `(…)`; a `+` / `plusSign` is accepted and ignored. A sign with nothing else is
    unparsable.
 4. Map the locale's digits and ASCII digits to `0`…`9`. Any remaining character that is not a
-   digit, the decimal separator or a group separator makes the text **unparsable**.
+   digit, the decimal separator or a group separator makes the text **unparsable**. Two
+   leniencies at this level (deviation 5): any apostrophe (`'`, `’`, `ʼ`) is a group separator
+   where the locale groups with one (`de-CH`: keyboards differ), and ASCII `.` is accepted as
+   the decimal separator where the locale's is U+066B (`ar`).
 5. **Strict grouping**: group separators (the locale's, and any whitespace where the locale
    groups with a space) are accepted only **before** the decimal separator and only in the
    locale's own grouping (groups of three; the Indian two-digit groups where the locale
@@ -617,12 +661,16 @@ grouping), `ar-EG` (Arabic-Indic digits, `٫` decimal, `٬` group), `ja-JP` (ful
 
 ### 5.4 Rounding
 
-The committed value is rounded to the format's resolved `maximumFractionDigits`
-(`resolvedOptions()`; `2` for most currencies, `0` for `JPY` and for `percent` by default, `3`
-for `decimal`), applied to the number the text shows (for `percent`, to the percentage, so the
-value gets two more digits). So a typed `1.999` in a `EUR` field commits `2`, posts `2` and shows
-`2,00 €`: **what the user sees is what the form posts**. A consumer who wants more precision in
-the value than in the text sets `maximumFractionDigits` higher (the text then shows it). With
+Every value the field takes, **typed or stepped**, is rounded to the format's resolved
+`maximumFractionDigits` (`resolvedOptions()`; `2` for most currencies, `0` for `JPY` and for
+`percent` by default, `3` for `decimal`), applied to the number the text shows (for `percent`,
+to the percentage, so the value gets two more digits: with the percent default a typed `0.5`
+commits `0.01`, and `0.005` only with `maximumFractionDigits: 1`; deviation 11). So a typed
+`1.999` in a `EUR` field commits `2`, posts `2` and shows `2,00 €`, and an ArrowUp with
+`step={0.001}` in that field steps by what the text can show rather than posting `1.001` under a
+`€1.00` (review N1: `step()` rounds through `formatter.round` as `commitDraft` does): **what the
+user sees is what the form posts**. A consumer who wants more precision in the value than in the
+text sets `maximumFractionDigits` higher (the text then shows it). With
 `maximumSignificantDigits` set no rounding is applied (5.2 warns). Decimal arithmetic uses
 `toFixed`, not binary rounding, through the shared `internal/decimal.ts` (moved from
 `slider-arithmetic.ts`: `decimalsOf`, `roundTo`). Product-owner item 6.
@@ -643,12 +691,18 @@ not snap, research §2.1):
 3. Clamp: above `max` → the largest grid point `≤ max` (an unreachable `max` stays unreachable:
    `0..5` by `2` tops at `4`); below `min` → `min`.
 4. If the result moved against the direction (clamping below `before` on a step up), keep
-   `before` (no change: the button's "next step would change nothing" rule).
-5. Round to `max(decimalsOf(step), decimalsOf(min))` places.
+   `before` (no change: the button's "next step would change nothing" rule). **An empty field
+   skips this rule** (deviation 2): it has no direction to keep, and the platform's own rows
+   need the skip (empty + ArrowDown with `min 3` moves *up* from the implicit `0` to `3`).
+5. Round to `max(decimalsOf(step), decimalsOf(min))` places; the Root then rounds the result to
+   the format (5.4).
 
 Empty + ArrowUp with `min 3` → `3`; empty + ArrowDown with `min 3` → `3`; empty + ArrowDown
 with no `min` → `-1` (the platform's rows in research §2.1). `largeStep` is `n = largeStep / step`
-steps when that is a whole number, else `± largeStep` snapped the same way.
+steps when that is a whole number, else `± largeStep` snapped to the grid toward the start
+(never past `largeStep`, at least one step; `stepBy`). Home is `min`; End is the largest grid
+point `≤ max` (`boundValue`), the same clamp as step 3, so an unreachable `max` is never
+produced by a key (deviation 1).
 
 ### 5.6 Typed values: no clamp, no snap
 
@@ -668,10 +722,20 @@ changing their number. Platform first; a consumer who wants clamping does it in
 ### 6.1 The hidden native number input
 
 Rendered by `NumberField.Input` right after the visible input: `<input type="number" name
-form min max step required disabled readOnly defaultValue aria-hidden="true" tabIndex={-1}
-style={hiddenStyle} />`. Visually hidden, not `display: none`, because that is the shape the
-research probed (`number-hidden-validity.mjs`); `pointer-events: none`. It is `aria-hidden`
-and unfocusable: assistive technology sees one field.
+form min max step required disabled readOnly defaultValue autoComplete="off" aria-hidden="true"
+tabIndex={-1} style={hiddenStyle} />`. Visually hidden, not `display: none`, because that is the
+shape the research probed (`number-hidden-validity.mjs`); `pointer-events: none`. It is
+`aria-hidden` and unfocusable: assistive technology sees one field. `autocomplete="off"`
+(review N2): the visible input already has it, so the browser's form-state restoration (a
+Firefox reload, history navigation in every engine) could restore the hidden input but not the
+text; before hydration the form would then post a value the user does not see. With both off,
+nothing is restored and the two inputs agree before and after hydration; the "Firefox
+restoration" browser row is therefore moot (14.2).
+
+The Root owns both refs (`visibleRef`, `hiddenRef`, passed through context) and the Input merges
+them into its two elements; there is no registry (deviation 4). An Input that mounts after the
+Root reconciled (a Suspense boundary) reports through `onInputMounted` from its first layout
+effect, the late-mount path of `useNativeGroupReconciliation`.
 
 **Uncontrolled, ref-written** (proposal 4): the input renders `defaultValue` = the reset target
 (uncontrolled mode: the latest `defaultValue ?? ""`; controlled mode: the mount-time value),
@@ -709,6 +773,17 @@ input is then invalid exactly when the hidden one is, with the hidden one's loca
 The visible input must carry no native constraint of its own (`required`, `pattern`, `min` are
 omitted from its props, 3.2): the mirror is its only source of invalidity.
 
+**Known difference from a native number input: validity follows the committed value, not the
+draft.** The mirror changes when the hidden input changes, which is at a commit (blur, Enter, a
+step), never per keystroke (4.1: a draft is not a number, and `validate` never sees one). So
+while the user types a fix into an invalid field, the visible input stays invalid until the
+blur or Enter: `:user-invalid` styling persists in every engine, and in Firefox the validation
+bubble, which stays over the page until the control becomes valid and swallows the next click
+meanwhile, persists too (the bare-form browser row commits a valid value at the end to dismiss
+it). A native `<input type="number">` re-validates per keystroke. This follows from the accepted
+commit model and is recorded, not changed; see the open question at the end. Inside a Field the
+bubble never appears (the Field cancels `invalid`) and `Field.Error` re-evaluates at the commit.
+
 ### 6.3 The hidden input's `invalid` event
 
 A submission attempt fires `invalid` on every invalid control in tree order, and the browser
@@ -738,8 +813,11 @@ written for it.
 
 ## 7. Inside a Field
 
-Status: part of this draft. It needs one addition to the Field contract (proposal 6), owned by
-the conventions architect this wave; everything else is the Field's existing machinery.
+The one addition to the Field contract this needs (`validityElement`, conventions feedback 6)
+is applied: conventions 3.8 and `design/components/field-form.md` "Amendment:
+`validityElement`" (29a94c5); everything else is the Field's existing machinery. Every other
+control registers no `validityElement` and is unchanged (the Field computes `surface === el`
+for them).
 
 ```tsx
 <Field.Root name="quantity" validate={(v) => (Number(v) % 6 === 0 ? null : "Sold in packs of six.")}>
@@ -776,7 +854,7 @@ Rendered (idle):
 ```ts
 useFieldControl({
   labelable: true, name, disabled, required, id, component: "NumberField.Input",
-  validityElement: () => hiddenRef.current,            // new (proposal 6)
+  validityElement: () => hiddenRef.current,            // conventions 3.8 (#67)
 });
 ```
 
@@ -919,13 +997,16 @@ calls `announce(value, state)` (default `state.text`, so "2", "€ 1,50", "50%")
 - otherwise, the **fallback** the product owner asked for: `internal/announce.ts` keeps one
   module-level, visually hidden `div[role=status][aria-live=polite][aria-atomic=true]` appended
   to `document.body` on first use (React Aria's live announcer shape, a module-level element
-  like `modal-registry.ts` is a module-level store), writes the message into it and clears it
-  after a second so the same value can be announced twice. Nothing is rendered by any part;
-  the region exists only in engines without `ariaNotify`, which today means test builds.
+  like `modal-registry.ts` is a module-level store). It **clears the region, then writes the
+  message 100 ms later** (`ANNOUNCE_WRITE_DELAY`) and clears it again after a second
+  (`ANNOUNCE_CLEAR_DELAY`): some screen readers skip the first change of a region inserted in
+  the same task, and an unchanged text is not spoken again, so every message is a fresh
+  change (review N4); a newer message replaces one not yet written. Nothing is rendered by any
+  part; the region exists only in engines without `ariaNotify`, which today means test builds.
 
-`null` from `announce` announces nothing. Combobox keeps its own `ariaNotify` call in v1;
-moving it onto `announce.ts` is an implementation choice recorded in section 15, not a design
-change.
+`null` from `announce` announces nothing. Combobox keeps its own `ariaNotify` call and
+`focus-first-invalid.ts` its own `announce` in v1; moving them onto `announce.ts` (which would
+give them the fallback region) is the optional follow-up in issue #77, not a design change.
 
 ### 8.4 The two built-in strings
 
@@ -934,7 +1015,9 @@ content is a glyph (`+`, `−`, an icon) has no name otherwise, which is the acc
 conventions 11 allows a built-in string for. They are **static** (no state to depend on), so
 the override is the ordinary `aria-label` / `aria-labelledby` pass-through, Toast's
 region-name rule, not a function prop; the docs show `aria-label="Erhöhen"` next to the
-`locale="de-DE"` example. A button with real text content (`<Increment>Add one</Increment>`)
+`locale="de-DE"` example. A consumer `aria-labelledby` makes the library omit the default
+`aria-label` altogether (deviation 9; accessible-name computation would let `aria-labelledby`
+win anyway, and omitting it keeps the DOM honest). A button with real text content (`<Increment>Add one</Increment>`)
 still gets the default label, which overrides its content for assistive technology; the
 documented way to let the content name the button is to pass the same text as `aria-label`
 (the default is replaced, never removed: `aria-label=""` would leave the button nameless and is
@@ -1048,8 +1131,8 @@ step transition) can key a type map on them. A rollback carries no types.
 6. **Pre-hydration typing.** The server rendered `1`; the user types `3` and tabs away before
    hydration; at mount the text `3` differs from `1`, parses to `3`: one `"platform"` step +
    commit with `event: undefined`, `source: null`; the hidden input is written to `3`. Had the
-   user still been in the field, the text would have been adopted as the draft and committed
-   at their blur.
+   user still been in the field, even with a partial `12,`, the text would have been adopted
+   as the draft (before any parse, review M1) and committed, or reverted, at their blur.
 
 ---
 
@@ -1070,6 +1153,10 @@ step transition) can key a type map on them. A rollback carries no types.
   code (Slider 13): a step is invisible to a `<form onChange>` listener; typed commits are not
   (the visible input's native events).
 - **Wheel commit coalescing** (4.4).
+- **Validity that follows the draft** (6.2, the open question at the end).
+- **The browser rows of #77** (touch hold, IME, the CDP console check, the rejected-commit
+  `startViewTransition` case) and the optional migration of Combobox and
+  `focus-first-invalid.ts` onto `internal/announce.ts`.
 - **Formatting the draft while typing** (live grouping): a formatter under the caret is what
   the draft design avoids.
 
@@ -1092,24 +1179,24 @@ hold uses fake timers; the wheel row dispatches a `WheelEvent` on the input.
 
 | Area | Tests |
 | --- | --- |
-| Parser and formatter (pure) | The 5.3 matrix: round trips `format(parse(format(n))) === format(n)` for each locale and style; strict grouping (`1,5` `en` → unparsable; `1,234` → `1234`; `1.5` `de` → unparsable; `1.234,5` `de` → `1234.5`; `1 234,5` `fr` with U+202F and with a plain space; `1'234.5` `de-CH`; `12,34,567` `en-IN`); digits (`١٢٣` → `123`, full-width `１２` → `12`, `२` with `deva`); signs (`-1`, `−1`, `(1)` accounting, trailing minus where the locale formats it, `+1`); percent (`50` and `50%` → `0.5`; `0.5` → `0.005`); currency literals stripped (`€ 1,50`, `1,50 €`, `EUR 1.50`, `1.50 euros`); unit (`12 km`, `12 kilometers`); rounding to the resolved fraction digits (`1.999` `EUR` → `2`; `JPY` → integers; percent to two more digits); empty / whitespace → `null`; garbage → unparsable; `compact` warns. Stepping (5.5): the platform rows (`1.5` up → `2`, down → `1`; empty with `min 3` up / down → `3`; empty no `min` down → `-1`; at `max` clamps; `0..5` by `2` tops at `4` and `+` from `4` changes nothing; `0.1` steps round; `largeStep` whole and fractional multiples). |
+| Parser and formatter (pure) | The 5.3 matrix: round trips `format(parse(format(n))) === format(n)` for each locale and style; strict grouping (`1,5` `en` → unparsable; `1,234` → `1234`; `1.5` `de` → unparsable; `1.234,5` `de` → `1234.5`; `1 234,5` `fr` with U+202F and with a plain space; `1'234.5` / `1’234.5` `de-CH`; `12,34,567` `en-IN`); digits (`١٢٣` → `123`, `١٢.٥` with an ASCII `.` under `ar`, full-width `１２` → `12`, `२` with `deva`); bidi controls stripped; signs (`-1`, `−1`, `(1)` accounting, trailing minus where the locale formats it, `+1`); percent (`50` and `50%` → `0.5`; `0.5` → `0.005` **with `maximumFractionDigits: 1`**, and `0.01` with the percent default of `0`, per 5.4); affixes at the edges in every display (`€ 1,50`, `1,50 €`, `EUR 1.50`, `eur 1.50`, `1.50 euros`, `1.50 euro`; `12 km`, `12 kilometers`) and **unparsable in the middle** (`1€234` `fr-FR`); rounding to the resolved fraction digits (`1.999` `EUR` → `2`; `JPY` → integers; percent to two more digits); empty / whitespace → `null`; garbage → unparsable; `compact` warns. Stepping (5.5): the platform rows (`1.5` up → `2`, down → `1`; empty with `min 3` up / down → `3`; empty no `min` down → `-1`; at `max` clamps; `0..5` by `2` tops at `4`, End gives `4` and `+` from `4` changes nothing; `0.1` steps round; `largeStep` whole and fractional multiples); a step finer than the format (`step 0.001` in `EUR`) is rounded to the format by the Root. |
 | Roles and ARIA | The section 1 HTML: Root `role="group"` with `aria-labelledby` = Label id (+ consumer tokens first); Label `for` = visible input id; visible input `type="text"`, no `role`, no `aria-value*`, no `aria-roledescription`, `inputmode` `numeric` / `decimal` by the 8.5 rule and replaced by a consumer `inputMode`; hidden input after it with `type="number"`, `name`, `min` / `max` / `step` / `required`, `aria-hidden`, `tabindex="-1"`, no `name` on the visible; buttons `type="button"`, `tabindex="-1"`, `aria-controls`, default `aria-label`s and a consumer override; `render={<input type="number" />}` warns; dev warnings for `NaN`, `min > max`, `lang` disagreement (`document.documentElement.lang = "de"` with no `locale`), `aria-label=""` on a button. |
-| Typing (both) | `user.type("42")`: the draft per keystroke (DOM value), no dispatch, no `data-pending`; Tab → `valueChangeAction(42, { reason: "activate", source: "input" })` and `valueCommitAction(42, …)` once each with the `focusout` event; Enter → the same with the `keydown`, not `defaultPrevented`; unparsable text reverts the DOM value with no dispatch; empty → `null`; `1.0` in a field holding `1` → no dispatch, re-formatted; a value out of range or off grid dispatches as typed and the hidden input reports `rangeOverflow` / `stepMismatch`; `readOnly` typing is impossible (native) and `disabled` dispatches nothing; `isComposing` Enter does nothing. |
-| Keyboard (both) | Each 4.2 row: ArrowUp / Down, Shift+Arrow, PageUp / Down, Home / End with and without bounds (prevented only when handled), from a draft (the draft is parsed first), from empty; each a step + commit with the `keydown` and `source: "keyboard"`; auto-repeat (`repeat: true`) dispatches per event; keys on a button do nothing. |
-| Hold | Fake timers: `pointerdown` on `+` is `defaultPrevented`, captures, steps once, no commit; at 400 ms a second step, then every 60 ms; `pointerup` commits once with the final value (`source: "increment"`, the `pointerup` event); `pointercancel`, `lostpointercapture` and window `blur` each end the hold and commit; a hold reaching `max` ends itself and commits; `+` then `−` back to the start commits nothing; a second pointer is ignored; `contextmenu` during the hold is prevented; a `click` with `detail: 0` and no preceding `pointerdown` steps and commits once; a `click` after a hold is ignored; `disabled` / `readOnly` / at-bound buttons do nothing and carry `disabled` + `data-disabled`; `data-pending` lands on the button whose gesture is pending and not on the other. |
-| Wheel | With `stepOnWheel`: a `wheel` with `deltaY: -1` on the focused input steps up, `+1` down, each `defaultPrevented`, each a step + commit with `source: "wheel"`; unfocused: nothing and not prevented; without the prop: nothing; the listener is non-passive (`addEventListener` spied with `{ passive: false }`). |
-| Hidden input and the mirror | After every path (typed commit, key, hold, reset, rollback, controlled change) `hidden.value === String(shown)` (`""` for `null`) synchronously in the event and after the commit; the visible input's `validationMessage` equals the hidden one's and `validity.customError` tracks it; valid → `""`; a changed `max` prop re-mirrors; the hidden input's `defaultValue` attribute equals the reset target (latest `defaultValue` uncontrolled; mount-time controlled); `invalid` dispatched on the hidden input is `defaultPrevented`, on the visible not (bare); `hiddenInputRef` reaches it. |
+| Typing (both) | `user.type("42")`: the draft per keystroke (DOM value), no dispatch, no `data-pending`; Tab → `valueChangeAction(42, { reason: "activate", source: "input" })` and `valueCommitAction(42, …)` once each with the `focusout` event; Enter → the same with the `keydown`, not `defaultPrevented`; unparsable text reverts the DOM value with no dispatch; empty → `null`; `1.0` in a field holding `1` → no dispatch, re-formatted; a value out of range or off grid dispatches as typed and the hidden input reports `rangeOverflow` / `stepMismatch`; `readOnly` typing is impossible (native) and `disabled` dispatches nothing (a draft "committed" while inert is cleared); Enter with `isComposing` **or `keyCode: 229`** does nothing. |
+| Keyboard (both) | Each 4.2 row: ArrowUp / Down, Shift+Arrow, PageUp / Down, Home / End with and without bounds (prevented only when handled; End lands on the largest grid point `≤ max`), from a draft (the draft is parsed first), from empty; each a step + commit with the `keydown` and `source: "keyboard"`; auto-repeat (`repeat: true`) dispatches per event; **Shift+Home / Shift+End with bounds set are not handled and not prevented**; Ctrl / Meta + Arrow not handled; keys on a button do nothing. |
+| Hold | Fake timers: `pointerdown` on `+` is `defaultPrevented`, captures, steps once (`event` the `pointerdown`), no commit; at 400 ms a second step, then every 60 ms, each with `event: undefined`; `pointerup` commits once with the final value (`source: "increment"`, the `pointerup` event); `pointercancel`, `lostpointercapture` and window `blur` each end the hold and commit; a hold reaching `max` ends itself and commits with `event: undefined`; `+` then `−` back to the start commits nothing; a second pointer is ignored; `contextmenu` during the hold is prevented; a `click` with `detail: 0` and no preceding `pointerdown` steps and commits once; a `click` after a hold is ignored; `disabled` / `readOnly` / at-bound buttons do nothing and carry `disabled` + `data-disabled`; **the bound follows the draft**: `defaultValue 99, max 99`, type `50` → `+` is enabled and a press steps to `51`; `data-pending` lands on the button whose gesture is pending and not on the other. |
+| Wheel | With `stepOnWheel`: a `wheel` with `deltaY: -1` on the focused input steps up, `+1` down, each `defaultPrevented`, each a step + commit with `source: "wheel"`; `deltaY: 0` does nothing and is not prevented; unfocused: nothing and not prevented; without the prop: nothing; the listener is non-passive (`addEventListener` spied with `{ passive: false }`). |
+| Hidden input and the mirror | After every path (typed commit, key, hold, reset, rollback, controlled change) `hidden.value === String(shown)` (`""` for `null`) synchronously in the event and after the commit; the visible input's `validationMessage` equals the hidden one's and `validity.customError` tracks it; valid → `""`; a changed `max` prop re-mirrors; the hidden input's `defaultValue` attribute equals the reset target (latest `defaultValue` uncontrolled; mount-time controlled) and it carries `autocomplete="off"`; `invalid` dispatched on the hidden input is `defaultPrevented`, on the visible not (bare); `hiddenInputRef` reaches it. |
 | Steps and commits (both) | A step runs inside a transition (a parent `useTransition` probe never reports it urgently; `data-pending` is the only sign); without a `valueChangeAction` a step starts no transition and `stepHeld` holds the text until the commit; a `"dismiss"` step after a rejected commit (uncontrolled) is outside the transition (the `await undefined` yield). |
 | Async commit (both) | Deferred `valueCommitAction`: `data-pending` on Root, Input and the source button; the text, the hidden value and `state.value` hold the gesture value; uncontrolled committed state unchanged (a `children` probe) until resolve; then committed. |
 | Rejection (both) | The catcher above Root receives it and the field is gone; uncontrolled: `valueChangeAction(prev, { reason: "dismiss", source: null, event: undefined })` once; controlled: no `"dismiss"`; a retry boundary remounts with `defaultValue` / the adopted value; caught-inside commits; **mounted rollback** (update-on-success parent catching inside): `data-pending` leaves, the text and the hidden input return to the parent's value; a draft open at the rollback stays open and commits later. |
 | No snap | Between two ticks of a hold with a synchronous `valueChangeAction` (settled), the text still shows the last tick; an adopt-steps parent whose content suspends: after release the text shows the gesture value until the content resolves, never the pre-gesture value; a non-adopting controlled parent: follows during the hold, returns to `value` after release once. |
 | Overlap, superseded rejection (both) | Two commits with a slow action (a key press, then typing + blur): `data-pending` stays, the latest wins; the older's rejection reaches the catcher after and while the newer is pending. |
 | Suspending content (both) | A controlled adopt-steps parent's content keyed on the value suspends on a step: old content stays, no fallback above, `data-pending`; then new content (`await act(async …)`). |
-| Platform path (both) | Mount reconciliation: `renderToString`, set the visible input's value to `"3"` before `hydrateRoot` → one `"platform"` step + commit (`source: null`, `event: undefined`), hidden written to `3`, StrictMode still one; the input focused at hydration → adopted as the draft, no dispatch; a value formatted by another locale (`"1.234,5"` under `en`) → no dispatch and the text re-synced to `"1,234.5"`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → the visible `defaultValue` attribute equals `format(target)` at the `reset` event, the hidden resets natively, one step + commit with the `reset` event, a cancelled reset dispatches nothing, a refusing controlled parent is re-synced; a draft open at reset is cleared. |
+| Platform path (both) | Mount reconciliation: `renderToString`, set the visible input's value to `"3"` before `hydrateRoot` → one `"platform"` step + commit (`source: null`, `event: undefined`), hidden written to `3`, StrictMode still one; the input focused at hydration → adopted as the draft, no dispatch, **also when the text is unparsable (`"12,"` stays under the caret, review M1)**; a value formatted by another locale (`"1.234,5"` under `en`) → no dispatch and the text re-synced to `"1,234.5"`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → the visible `defaultValue` attribute equals `format(target)` at the `reset` event, the hidden resets natively, one step + commit with the `reset` event, a cancelled reset dispatches nothing, a refusing controlled parent is re-synced; a draft open at reset is cleared. |
 | Forms | `FormData` has `name` = `String(value)`, absent when `disabled`, `""` when `null`; `form` attribute honoured; Enter's implicit submission (a `submit` listener) sees the committed value in `FormData`; the text is never posted. |
 | Inside a Field | The 7.4 table. |
-| Announcements | `ariaNotify` stubbed on `Element.prototype`: called on the visible input once per key press, wheel event, click activation and hold release (not per tick), with `state.text` or the consumer's `announce` string, never when it returns `null`, never for a typed commit; stub removed: the fallback region exists once in `document.body` with `role="status"`, receives the text, is cleared after a second (fake timers), and is reused by a second field. |
-| Function props / `render` | Every part's documented state (`NumberFieldState` on Root / Label / Input, `NumberFieldButtonState` on the buttons with `disabled` true at the bound); `render={<input type="search" />}` keeps the handlers and the hidden sibling; button `render={<a />}` gets no `type`; `className` / `style` merge; `aria-label` on a button replaces the default. |
+| Announcements | `ariaNotify` stubbed on `Element.prototype`: called on the visible input once per key press, wheel event, click activation and hold release (not per tick), with `state.text` or the consumer's `announce` string, never when it returns `null`, never for a typed commit; stub removed: the fallback region exists once in `document.body` with `role="status"`, is empty right after the call, holds the text 100 ms later, is cleared after a further second (fake timers), speaks a repeated message as a fresh change, and is reused by a second field. |
+| Function props / `render` | Every part's documented state (`NumberFieldState` on Root / Label / Input, `NumberFieldButtonState` on the buttons with `disabled` true at the bound); `render={<input type="search" />}` keeps the handlers and the hidden sibling; button `render={<a />}` gets no `type`; `className` / `style` merge; `aria-label` on a button replaces the default and `aria-labelledby` removes it; `onCompositionStart` / `onCompositionEnd` on the Input pass through and fire. |
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` in `valueCommitAction`. |
 | Directive | Every file under `src/number-field/` except `index.ts`, `number-field-format.ts` and `number-field-arithmetic.ts` begins with `"use client"`. |
 | Types | `value` / `defaultValue` accept `number \| null`; `transition`, `inputValue`, `aria-valuenow`, `required` / `min` on `Input` are not props (type test); `NumberFieldValueChangeDetails.source` union; `hiddenInputRef` typed `Ref<HTMLInputElement>`. |
@@ -1119,20 +1206,29 @@ hold uses fake timers; the wheel row dispatches a `WheelEvent` on the input.
 | Row | Assertion | Engine branches |
 | --- | --- | --- |
 | Real keys and typing | Real ArrowUp / ArrowDown / PageUp / PageDown / Home / End on the focused input change the text per 4.2 and leave the caret where it was for unhandled keys (Home / End without bounds move the caret); typing `1,5` under `locale="de-DE"` then Tab commits `1.5` (`hidden.value === "1.5"`), under `en-US` reverts. | none |
-| Native report, bare | In a `<form>` with no Field: type `0` with `min={1}`, click submit: the browser focuses the **visible** input (`document.activeElement`), `:user-invalid` matches it, the hidden input never received focus, no "not focusable" console error (Chromium); the submission did not happen. | none; the message text differs per engine and is asserted non-empty |
+| Native report, bare | In a `<form>` with no Field: type `0` with `min={1}`, click submit: the browser focuses the **visible** input (`document.activeElement`), `:user-invalid` matches it, the hidden input never received focus (the proxy for "no 'not focusable' console error", which page JS cannot observe; the CDP `Log` check is #77); the submission did not happen. The row ends by committing a valid value, because Firefox's bubble stays over the page and swallows the next click until the control is valid (6.2). | none; the message text differs per engine and is asserted non-empty |
 | Inside a Field | The section 7 browser row. | none |
 | Enter submits with the new value | A `Form.Root` with an action spy: type `12`, Enter: the action runs once with `quantity=12`. | all three; document any engine where the sync flush lands after submission (Combobox's row passed on all three) |
 | Wheel | With `stepOnWheel` and the input focused, a real wheel over it changes the value and the page does not scroll; unfocused, the page scrolls and the value stays; without the prop the page scrolls either way. | none |
-| Real hold | A real pointer press on `+` for 700 ms: the value advanced by `1 + ceil((700 − 400) / 60)` ± 1 ticks, one commit at release; focus never left the input (`document.activeElement` before and after); no text selection; `:focus-visible` is false on the button. Touch emulation (Chromium): a press opens no keyboard (the input is not focused) and no context menu. | touch row `browserName === "chromium"` |
+| Real hold | A real pointer press on `+` held for a measured duration: the value advanced by `1 + ceil((held − 400) / 60)` ± 1 ticks (the row measures the press duration rather than assuming it, 5fe8ae6), one commit at release; focus never left the input (`document.activeElement` before and after); no text selection; `:focus-visible` is false on the button. **Not written**: touch emulation (a press opens no keyboard and no context menu); vitest's `userEvent` has no touch hold, CDP `Input.dispatchTouchEvent` can drive it (#77). | touch row `browserName === "chromium"`, when written |
 | Announcements | `ariaNotify` spied on the input: one call per key press with the formatted text; one per hold release. | `supportsAriaNotify`; otherwise the fallback region row |
 | Accessibility tree (Chromium) | CDP: the input is a `textbox` named "Quantity" with no `valuenow`; the Root a `group` named "Quantity"; the buttons named "Increase" / "Decrease"; the hidden input absent from the tree. | `browserName === "chromium"`; others assert attributes |
 | Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration; blurred before hydration → one `"platform"` step + commit; still focused → adopted as the draft, committed at blur. | WebKit may use the keyboard fallback (Combobox L4 rule) |
-| Firefox restoration | Reload a page with a changed value: Firefox restores the visible text and the hidden value; mount reconciliation dispatches `"platform"` once and the two agree. | `browserName === "firefox"` |
-| IME | Composition through Playwright's IME: the draft follows the composition; Enter during composition does not commit; `compositionend` then Enter commits. | Chromium; others the non-composition path |
-| No `startViewTransition` | Spy before a key press, a hold, a typed commit, a rejected commit: zero calls (no boundary exists). | none |
+| Firefox restoration | **Moot, not written**: both inputs are `autocomplete="off"` (6.1), so Firefox restores neither across a reload; Slider's equivalent row mostly logs "not restored" for `srcdoc` frames anyway. Recorded here instead of a row (review S4). | — |
+| IME | **Not written** (#77): composition through CDP `Input.imeSetComposition` / `Input.insertText`, or Combobox's browser pattern: the draft follows the composition; Enter during composition does not commit; `compositionend` then Enter commits; a WebKit-style confirming Enter with `keyCode 229` commits nothing. jsdom covers the `isComposing` and `keyCode 229` guards. | Chromium, when written |
+| No `startViewTransition` | Spy before a key press, a hold, a typed commit: zero calls (no boundary exists). The rejected-commit case is not written (#77). | none |
 
 Firefox runs the browser files serially (`fileParallelism: false`, #62); the hold row would
 otherwise receive another file's pointer input.
+
+Two test hazards the Field rows work around, recorded because they are properties of the
+platform and of every Field control rather than of NumberField: a click on Save right after
+typing blurs the input on `mousedown`, the Field shows the error (`:user-invalid` after change +
+blur) before `mouseup`, and with no reserved space the button moves away from the pointer so no
+click happens (the rows tab out first; the Field docs page now says to reserve the error's
+space); and Firefox's validation bubble swallows the next click (6.2). The "parent
+`useTransition` probe" row of the design is approximated: the step's awaited action keeps
+`data-pending`, and the suspending-content rows prove the step renders in a transition.
 
 ---
 
@@ -1141,19 +1237,19 @@ otherwise receive another file's pointer input.
 ```
 packages/ui/src/number-field/
   index.ts                        # no directive; namespace + types; imports platform-attributes
-  number-field-context.ts         # "use client": NumberFieldContext (shown value / text, ids, flags, step()/commit()/beginHold()/commitDraft(), registries, field slice)
-  number-field-root.tsx           # "use client": useControllableAction (commit), useActionTrigger (steps), draft / live / hold / stepHeld / pendingSource, formatter + parser (memoised), useFieldValueChange, reconciliation + reset (through the registered hidden input), announcements, warnings
+  number-field-context.ts         # "use client": NumberFieldContext (state, bounds, stepBase, pendingSource, ids, visibleRef / hiddenRef, step()/commit()/beginHold()/commitDraft(), mirror, onInputMounted, field slice)
+  number-field-root.tsx           # "use client": useControllableAction (commit), useActionTrigger (steps), draft / live / hold / stepHeld / pendingSource, stepBase, formatter + parser (memoised), useFieldValueChange, reconciliation + reset (through hiddenRef), announcements, warnings
   number-field-label.tsx          # "use client": registers its id; for=
-  number-field-input.tsx          # "use client": visible input (controlled text, handlers, wheel listener) + hidden input (uncontrolled, ref-written, invalid listener, registration), the mirror, useFieldControl with validityElement
-  number-field-increment.tsx      # "use client"
+  number-field-input.tsx          # "use client": visible input (controlled text, handlers, wheel listener) + hidden input (uncontrolled, ref-written, invalid listener, autocomplete=off), the mirror, useFieldControl with validityElement, onInputMounted
+  number-field-increment.tsx      # "use client": also holds the shared button hook `useStepButtonElement`
   number-field-decrement.tsx      # "use client"
-  use-step-button.ts              # "use client": the hold (timers, capture, release listeners), the click-without-pointer rule, shared by both buttons
-  number-field-format.ts          # no directive: createNumberFormatter(locale, options) → { format, parse, symbols, fractionDigits, allowsFractions }; the cache
-  number-field-arithmetic.ts      # no directive: stepValue, isAtBound
+  use-step-button.ts              # "use client": the hold (timers, capture, release listeners), the click-without-pointer rule
+  number-field-format.ts          # no directive: createNumberFormatter(locale, options) → { locale, format, parse, round, fractionDigits, allowsFractions, percent, warning }; the cache
+  number-field-arithmetic.ts      # no directive: stepValue, stepBy, boundValue, isAtBound
   number-field-format.test.ts, number-field.test.tsx, number-field.browser.test.tsx, number-field.types.test.tsx
 packages/ui/src/internal/
-  decimal.ts                      # no directive: decimalsOf / roundTo moved out of slider-arithmetic.ts (which re-exports or imports them)
-  announce.ts                     # "use client": announce(element, message): ariaNotify, else the module-level live region
+  decimal.ts                      # no directive: decimalsOf / roundTo moved out of slider-arithmetic.ts (which re-exports decimalsOf)
+  announce.ts                     # "use client": announce(element, message): ariaNotify, else the module-level live region (clear, write after 100 ms, clear after 1 s)
   field-context.ts                # FieldControlRegistration gains `validityElement?: () => ValidatableElement | null`
   use-field-control.ts            # the option, passed through to registerControl
   ../field/field-root.tsx         # reads validity / writes the slot on the validity element, `:user-invalid` on the element, mirrors after the slot write
@@ -1216,9 +1312,45 @@ packages/ui/src/internal/
 
 ---
 
-## Conventions proposals
+## Review corrections (#67, 2026-10-18)
 
-To be applied to `design/conventions.md` by its owner on acceptance; nothing here edits it.
+From `memo/reviewer/number-field.md` (review of c31588b..5fe8ae6, verdict "acceptable with
+minor fixes") and the developer's notes in `memo/developer/number-field.md` ("Deviations" and
+"Review fixes"); the fixes are in 6742cb0 (code and tests) and 36b48f4 (docs). Each item is
+folded into the sections named; this table is the audit trail. The architect agrees with every
+deviation the reviewer accepted; none is corrected here.
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| M1 | **Hydration overwrote a focused partial draft.** `readCurrent` parsed before it checked focus, so a user still typing `12,` or `-` at hydration had the text reset under the caret. Now the focus check comes first: a focused input's differing text is adopted as the draft whatever it parses to, and the blur resolves it. jsdom row added. | 4.5, 12.6, 14.1 |
+| S1 | **A WebKit composition-confirming Enter committed the draft**: `compositionend` fires before that keydown, which has `isComposing === false` and `keyCode === 229`. Both are now checked (Combobox's guard). | 4.1, 14.1 |
+| S2 | **Shift+Home / Shift+End jumped to the bound** instead of selecting text. Left to the browser when `shiftKey`; Shift+Arrow stays `largeStep`. | Decisions 8, 4.2, 14.1 |
+| S3 | **The buttons' `disabled` ignored an open draft** while a press steps from it: `defaultValue 99, max 99`, type `50` → `+` stayed disabled. The Root derives `stepBase` (the parsed draft, else the shown value) and the buttons' bound follows it. | Decisions 9, 2.4, 3.3, 4.3, 14.1 |
+| S4 | **Browser rows not written** (touch hold, IME, the Chromium "not focusable" console check through CDP `Log`, the rejected-commit `startViewTransition` case) are tracked in **#77**; the Firefox restoration row is moot (`autocomplete="off"` on both inputs) and is recorded in 6.1 and 14.2 instead. | 6.1, 14.2 |
+| N1 | **Stepping did not round to the format**: `step 0.001` in a `EUR` field showed `€1.00` and posted `1.001`. `step()` rounds through `formatter.round`, so 5.4 holds for stepped values too. | Decisions 6, 2.4, 5.4, 5.5, 14.1 |
+| N2 | **The hidden input lacked `autocomplete="off"`**: form-state restoration could restore it but not the visible text, posting an unseen value before hydration. Added; the restoration row is moot. | Decisions 11, 14; 6.1, 14.2 |
+| N3 | **Affixes were replaced anywhere in the text**, so `1€234` under `fr-FR` became `1234` (the replacement space is a group separator there). Affixes and literals are stripped at the edges only (and inside the sign and parentheses); in the middle the text is unparsable. | Decisions 7, 5.3, 14.1 |
+| N4 | **The fallback region was written in the task it was inserted** and a repeated text was not a change. It is cleared, written 100 ms later and cleared after a second. | 8.3, 14.1, 15 |
+| N5 | `onCompositionStart` / `onCompositionEnd` pass through `NumberField.Input` (the library installs neither); the details JSDoc and the docs say `event` is `undefined` on hold repeats and at a bound-ended hold. | 1, 2.4, 3.2, 14.1 |
+| Deviations 1 to 11 | Accepted by the reviewer and folded: (1) End → the largest grid point `≤ max`; (2) an empty value skips the against-direction rule; (3) the hydration re-sync writes `visible.value` directly; (4) no hidden-input registry, refs through context with `onInputMounted`; (5) the parser's affix-level leniencies and bidi stripping; (6) `event` undefined on hold ticks; (7) Ctrl / Meta combinations not handled; (8) `deltaY === 0` ignored; (9) a consumer `aria-labelledby` omits the default `aria-label`; (10) a commit while `disabled` / `readOnly` clears the draft; (11) the percent test row needs `maximumFractionDigits: 1` for `0.5 → 0.005`. | 4.1, 4.2, 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 6.1, 8.4, 14.1 |
+| Reports | **Firefox's bubble and `:user-invalid` persist while the user types a fix** (validity follows the committed value): recorded as a known difference in 6.2 with an open question below, no change now. **Implicit submission needs a submit button** (the hidden number input is a second field): correct platform behaviour, documented in 4.1 and on the docs page. **The Field layout shift under a click** is a property of every Field control; the Field docs page notes it, the rows tab out first. **Combobox and `focus-first-invalid.ts` keep their own announcements**; migrating them onto `announce.ts` is the optional part of #77. | 4.1, 6.2, 8.3, 14.2 |
+
+## Open question
+
+- **Should validity follow the draft while the user types a fix?** Today the visible input's
+  validity changes at commit (6.2), so an invalid field stays `:user-invalid` (and, in Firefox,
+  keeps its bubble) until blur or Enter, where a native number input re-validates per
+  keystroke. Making the mirror follow the draft would mean parsing per keystroke and writing
+  the hidden input's value (or a parallel custom message) on every `input` event: the
+  per-keystroke parse the commit model deliberately avoids (2.1), with `validate` then seeing
+  drafts too. The architect's view: leave it; the `:user-invalid` styling is the consumer's and
+  the Firefox bubble appears only for a bare form outside a Field. Worth a product-owner
+  decision only if user feedback names it.
+
+## Conventions feedback (applied to `design/conventions.md` 2026-10-18, 29a94c5)
+
+All twelve items below are applied (conventions resolved question 33; the Field amendment is
+in `design/components/field-form.md`); the list is kept as the record of what changed and why.
 
 1. **1.1 part vocabulary.** Add `Increment` / `Decrement`: "`button[type=button][tabindex=-1]`
    that steps a numeric value, with press-and-hold (NumberField); `aria-controls` → the field's
