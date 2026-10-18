@@ -81,3 +81,12 @@ Implementation of `design/components/tooltip.md` on branch `worktree-agent-ae02d
   no accessible name of its own"; the design (and this implementation) keeps an explicit prop
   with default `"description"`. Reported as ambiguous.
 - Example verified by `vite build` only, not clicked through in a browser.
+
+## #57 roving-tabindex triggers (wave 6)
+
+- Dev check now accepts `tabIndex < 0` when the trigger has an explicit `tabindex` attribute and
+  an ancestor composite (`menu`, `menubar`, `tablist`, `toolbar`, `radiogroup`, `listbox`, `grid`,
+  `treegrid`, `tree`, `[focusgroup]`). Still warns for a bare `tabindex="-1"` and for a role item
+  without any tabindex. Checked once at mount (roving tabindex values change later; fine).
+- Menu browser row "a Tooltip on an item" now asserts no "not focusable" error (Chromium items
+  have no tabindex under native focusgroup, so the row only bites in Firefox/WebKit).

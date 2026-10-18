@@ -755,6 +755,7 @@ describe("light dismiss and layering (browser)", () => {
   });
 
   it("a Tooltip on an item does not close the menu", async () => {
+    const errorSpy = vi.spyOn(console, "error");
     render(
       <Basic>
         <Menu.Item data-testid="rename">Rename</Menu.Item>
@@ -768,6 +769,8 @@ describe("light dismiss and layering (browser)", () => {
     await user.hover(item("share"));
     await expect.poll(() => isOpen(screen.getByTestId("tip"))).toBe(true);
     expect(isOpen()).toBe(true);
+    // A roving-tabindex item is keyboard-reachable: no "not focusable" warning (#57).
+    expect(errorSpy.mock.calls.filter(([m]) => String(m).includes("not focusable"))).toEqual([]);
   });
 
   it("a modal Dialog opened from an item (a DOM descendant) keeps the menu open", async () => {

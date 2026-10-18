@@ -1003,7 +1003,9 @@ if (process.env.NODE_ENV !== "production" && trigger && popup) {
     console.error(
       '[Tooltip] provides="name" with aria-label on the trigger announces the name twice. Remove aria-label.',
     );
-  if (trigger.tabIndex < 0)
+  // A roving-tabindex item (explicit tabindex="-1" inside a menu, tablist, toolbar, radiogroup,
+  // listbox, grid, tree or [focusgroup]) is reachable with the arrow keys (#57).
+  if (trigger.tabIndex < 0 && !isRovingItem(trigger))
     console.error("[Tooltip] the trigger is not focusable; keyboard users cannot open the tooltip.");
   if (popup.querySelector("a[href],button,input,select,textarea,[tabindex]"))
     console.error("[Tooltip] tooltips must not contain interactive content.");

@@ -28,6 +28,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 import { createSuspender } from "../__tests__/helpers.js";
 import { isPopoverOpen } from "../__tests__/popover-shim.js";
+import { Menu } from "../menu/index.js";
+import { Tabs } from "../tabs/index.js";
 import { Tooltip } from "./index.js";
 import type {
   TooltipPopupProps,
@@ -1040,6 +1042,63 @@ describe("Dev warnings", () => {
     rerender(<Harness trigger={{ render: <span />, className: "x" }} />);
     const calls = errorSpy.mock.calls.filter(([m]) => String(m).includes("not focusable"));
     expect(calls).toHaveLength(1);
+  });
+
+  const notFocusable = () =>
+    errorSpy.mock.calls.filter(([m]) => String(m).includes("not focusable"));
+
+  it("warns for tabindex=-1 outside a composite widget, and for an item without tabindex", () => {
+    render(<Harness trigger={{ render: <button type="button" tabIndex={-1} /> }} />);
+    expect(notFocusable()).toHaveLength(1);
+    errorSpy.mockClear();
+    render(
+      <div role="menu">
+        <Harness trigger={{ render: <span role="menuitem" /> }} />
+      </div>,
+    );
+    expect(notFocusable()).toHaveLength(1);
+  });
+
+  it("accepts a roving-tabindex Menu.Item (#57)", () => {
+    render(
+      <Menu.Root defaultOpen>
+        <Menu.Trigger>Actions</Menu.Trigger>
+        <Menu.Popup>
+          <Menu.Item>Rename</Menu.Item>
+          <Tooltip.Root>
+            <Tooltip.Trigger render={<Menu.Item data-testid="share" />}>Share</Tooltip.Trigger>
+            <Tooltip.Popup>Copy a link</Tooltip.Popup>
+          </Tooltip.Root>
+        </Menu.Popup>
+      </Menu.Root>,
+    );
+    expect(screen.getByTestId("share").tabIndex).toBe(-1);
+    expect(notFocusable()).toHaveLength(0);
+  });
+
+  it("accepts an unselected Tabs.Tab (#57)", () => {
+    render(
+      <Tabs.Root defaultValue="a">
+        <Tabs.List aria-label="Sections">
+          <Tabs.Tab value="a">A</Tabs.Tab>
+          <Tooltip.Root>
+            <Tooltip.Trigger render={<Tabs.Tab value="b" data-testid="b" />}>B</Tooltip.Trigger>
+            <Tooltip.Popup>Second section</Tooltip.Popup>
+          </Tooltip.Root>
+        </Tabs.List>
+      </Tabs.Root>,
+    );
+    expect(screen.getByTestId("b").tabIndex).toBe(-1);
+    expect(notFocusable()).toHaveLength(0);
+  });
+
+  it("accepts a role=toolbar item with tabindex=-1", () => {
+    render(
+      <div role="toolbar" aria-label="Format">
+        <Harness trigger={{ render: <button type="button" tabIndex={-1} /> }} />
+      </div>,
+    );
+    expect(notFocusable()).toHaveLength(0);
   });
 
   it("warns when the popup contains interactive content", () => {

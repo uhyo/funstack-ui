@@ -81,6 +81,23 @@ export function TooltipRoot({
 
 TooltipRoot.displayName = "TooltipRoot";
 
+/**
+ * The containers that move focus among their items with the arrow keys (roving tabindex, or a
+ * native `focusgroup`): Menu, Tabs, Toolbar, a radio group, and the other APG composites.
+ */
+const COMPOSITE =
+  '[role="menu"],[role="menubar"],[role="tablist"],[role="toolbar"],[role="radiogroup"],[role="listbox"],[role="grid"],[role="treegrid"],[role="tree"],[focusgroup]';
+
+/**
+ * Whether keyboard users can focus the trigger: it is in the tab order, or it is a
+ * roving-tabindex item (`tabindex="-1"` set explicitly, so script can focus it) inside a
+ * composite widget that moves focus to it (#57).
+ */
+function isKeyboardReachable(trigger: HTMLElement): boolean {
+  if (trigger.tabIndex >= 0) return true;
+  return trigger.hasAttribute("tabindex") && trigger.parentElement?.closest(COMPOSITE) != null;
+}
+
 /** Development-only checks that need the mounted elements (design 12.5). Each fires once. */
 function useTooltipDevWarnings(
   trigger: HTMLElement | null,
@@ -98,7 +115,7 @@ function useTooltipDevWarnings(
           '[Tooltip] provides="name" together with aria-label on the trigger announces the name twice. Remove aria-label.',
         );
       }
-      if (trigger.tabIndex < 0 && !w.focusable) {
+      if (!isKeyboardReachable(trigger) && !w.focusable) {
         w.focusable = true;
         console.error(
           "[Tooltip] The trigger is not focusable; keyboard users cannot open the tooltip. Render a <button> or a link, or set tabIndex={0}.",
