@@ -56,15 +56,24 @@ export function ToolbarPage() {
           put at most one such control in a toolbar, and put it last.
         </p>
       </Callout>
+      <Callout title="Choices inside a toolbar: ToggleGroup, not radios">
+        <p>
+          For a one-of-several choice inside a toolbar (text alignment), use an{" "}
+          <code>exclusive</code> <a href="/components/toggle-group">ToggleGroup</a>. Native radios
+          (and <a href="/components/radio-group">RadioGroup</a>) currently behave differently on the
+          JS path and the native <code>focusgroup</code> path inside a toolbar.
+        </p>
+      </Callout>
 
       <h3>Vertical toolbar</h3>
       <Example source={toolbarVerticalSource} fileName="ToolbarVertical.tsx">
         <ToolbarVertical />
       </Example>
       <p>
-        Up / Down walk the tools. A <code>Menu.Trigger</code> in a vertical toolbar opens on
-        ArrowRight (ArrowLeft under <code>direction: rtl</code>), so give its popup{" "}
-        <code>side="right"</code>; ArrowDown moves on to the next tool.
+        Up / Down walk the tools. A <code>Menu.Trigger</code> in a vertical toolbar opens on the
+        inline-end arrow: ArrowRight, or ArrowLeft under <code>direction: rtl</code>. Put its popup
+        on that side: <code>side="right"</code>, or <code>side="left"</code> in a right-to-left
+        page. ArrowDown moves on to the next tool.
       </p>
 
       <h3>Anatomy</h3>
@@ -139,8 +148,8 @@ export function ToolbarPage() {
         <code>ToolbarRootState</code> is <code>{"{ orientation }"}</code>. There is no{" "}
         <code>disabled</code>: disable items individually, or wrap the toolbar in a{" "}
         <code>&lt;fieldset disabled&gt;</code>. <code>role</code>, <code>aria-orientation</code>,{" "}
-        <code>onKeyDown</code>, <code>onFocus</code> and <code>onPointerDown</code> are the
-        library's.
+        <code>onKeyDown</code>, <code>onFocus</code>, <code>onBlur</code> and{" "}
+        <code>onPointerDown</code> are the library's and are not props.
       </p>
 
       <h4>Toolbar.Button</h4>
@@ -295,7 +304,20 @@ export function ToolbarPage() {
 .toolbar-separator[data-orientation="vertical"] { inline-size: 1px; align-self: stretch; }
 .toolbar-separator[data-orientation="horizontal"] { block-size: 1px; }
 .toolbar-button[aria-disabled="true"] { opacity: .5; }
-.toolbar-button[data-pending] { cursor: progress; }`}</CodeBlock>
+.toolbar-button[data-pending] { cursor: progress; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}`}</CodeBlock>
+      <p>
+        <code>Toolbar.Button transition</code> animates the commit that ends its action with a view
+        transition; keep the reduced-motion block above in your stylesheet. The Toolbar adds no view
+        transition types of its own.
+      </p>
     </div>
   );
 }

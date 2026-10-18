@@ -535,8 +535,9 @@ export function MenuPage() {
       <p>
         A <code>Menu.Trigger</code> inside a <a href="/components/toolbar">Toolbar</a> opens on the
         arrow key perpendicular to the toolbar's, leaving the toolbar's own arrows to it. Enter and
-        Space open it in every case. In a vertical toolbar, put the popup beside it with{" "}
-        <code>side="right"</code>.
+        Space open it in every case. In a vertical toolbar, put the popup beside it on the
+        inline-end side: <code>side="right"</code>, or <code>side="left"</code> under{" "}
+        <code>direction: rtl</code>.
       </p>
       <Table
         head={[

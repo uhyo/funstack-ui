@@ -195,7 +195,8 @@ export function ToggleGroupPage() {
         <code>{"{ value, pending, disabled, orientation }"}</code>; <code>value</code> is the
         optimistic set as an array in document order (exclusive mode: <code>[value]</code> or{" "}
         <code>[]</code>). Every other <code>&lt;div&gt;</code> prop passes through, except{" "}
-        <code>role</code> and <code>onKeyDown</code>.
+        <code>role</code> and the handlers of the roving focus (<code>onKeyDown</code>,{" "}
+        <code>onFocus</code>, <code>onBlur</code>, <code>onPointerDown</code>), which are not props.
       </p>
 
       <h4>ToggleGroup.Item</h4>

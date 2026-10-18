@@ -5,6 +5,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
 
 // A vertical toolbar. Up / Down walk the tools; on Shapes, ArrowRight opens the menu with its
 // first item focused (ArrowLeft under direction: rtl) and ArrowDown moves on to the next tool.
+// The popup sits on the inline-end side; a right-to-left page would use side="left".
 export function ToolbarVertical() {
   const [tool, setTool] = useState("select");
   return (
