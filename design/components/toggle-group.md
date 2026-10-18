@@ -9,7 +9,9 @@ review fold (#66)" and "Open questions" at the end. The code under `packages/ui/
 where this document is silent. Wave 7 (tracker #78, 2026-10-18): sections 17 and 18 make #74
 (native radios inside a Toolbar, probed in Chromium) and #75 (Tooltip's composite check) ready to
 implement; accepted in advance by the product owner on the condition, met, that the probe confirms
-the proposal.
+the proposal. Implemented in 5eef360 (library, Tooltip), 9e6feba (docs) and 2a836ec (WebKit test
+branch); the developer's three deviations (`memo/developer/toggle-group.md`, "Wave 7") are folded
+into 17.1, 17.2, 18 and rows 25, 27 and 28.
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win. The conventions amendments this design asks for are listed at the end and were
 applied to `design/conventions.md` in the same commit, marked as pending this design's acceptance.
@@ -999,10 +1001,10 @@ superseded rejection, which `useActionTrigger` gives it (tested as for `Menu.Ite
 | 22 | Safari click focus | browser | WebKit: clicking an item (which does not focus it) still makes it the Tab stop (`pointerdown` memory): Tab from outside lands on it. |
 | 23 | ViewTransition | browser | `{show && <ToggleGroup.Item />}` and `{show && <Toolbar.Button />}` mounted in a `startTransition`: `document.startViewTransition` called zero times without `transition`, once with `transition="none"` (conventions 10.1). |
 | 24 | Engine unit | jsdom | `use-roving-focus.test.tsx`: item discovery (focusable set, `[popover]` / `dialog` / nested toolbar / `inert` / `tabindex="-1"` exclusions), `entry` and `memory` modes, re-apply on observer records, `native: true` writes nothing. |
-| 25 | Radio unit, navigation (#74) | jsdom | Toolbar `b1`, a same-`name` group of three radios with the middle one checked, `b2`, a group with none checked, `b3`. ArrowRight from `b1` focuses the checked radio and checks nothing; ArrowLeft from `b2` the same; ArrowRight from `b2` and ArrowLeft from `b3` both focus the **first** radio of the unchecked group; Home / End from `b2` land on the first group's checked radio / `b3`; on a radio, every arrow and Home / End is left unhandled (`defaultPrevented` false, focus unchanged in jsdom, which has no native radio navigation); `loop` wrapping from `b3` lands on `b1`, from `b1` backwards on `b3`. |
+| 25 | Radio unit, navigation (#74) | jsdom | Toolbar `b1`, a same-`name` group of three radios with the middle one checked, `b2`, a group with none checked, `b3`. ArrowRight from `b1` focuses the checked radio and checks nothing; ArrowLeft from `b2` the same; ArrowRight from `b2` and ArrowLeft from `b3` both focus the **first** radio of the unchecked group; Home / End from `b2` land on `b1` / `b3` (the toolbar's first and last items; the native path does the same, and the probe never pressed Home from a button); a separate toolbar whose first and last items are radio units: Home / End land on their representatives; on a radio, every arrow and Home / End is left unhandled (`defaultPrevented` false, focus unchanged in jsdom, which has no native radio navigation); `loop` wrapping from `b3` lands on `b1`, from `b1` backwards on `b3`. |
 | 26 | Radio unit, Tab (#74) | jsdom | Tab from the checked radio focuses `b2`; Shift+Tab from it focuses `b1`; Tab from an unchecked radio whose sibling is checked focuses that sibling, then `b2`; Tab from any radio of the unchecked group focuses `b3`, Shift+Tab `b2`; Tab from the last unit of a toolbar with nothing after it is not handled (leaves natively). `tabindex`: `0` on the representative while its unit is the stop and `-1` on the other radios of the unit; `-1` on every radio of a unit that is not the stop; after `focusin` on an unchecked radio, `0` moves to it. A `RadioGroup.Root` (fieldset) inside the toolbar behaves the same; `RadioGroup.Root disabled` removes the unit (`:disabled`). A `button[role="radio"]` is an ordinary item (arrows walk through it). |
-| 27 | Radio unit, both paths (#74) | browser | The row-25 and row-26 sequences on Chromium native (flag on) and on the JS path (flag off, and Firefox / WebKit): identical focus and `checked` results, including arrows checking and wrapping within the group and the "trapped horizontal arrows, leave with Tab" consequence; memory re-enters on the remembered radio. |
-| 28 | Tooltip in a roving container (#75) | jsdom | A `Tooltip.Trigger` with `tabindex="-1"` written by the engine inside a standalone `ToggleGroup.Root` and inside a `Toolbar.Root` logs no #57 warning, with the check forced to run after the engine's write (a re-mount of the Trigger alone); a `tabindex="-1"` trigger under a plain `div` still warns. |
+| 27 | Radio unit, both paths (#74) | browser | The row-25 and row-26 sequences on Chromium native (flag on) and on the JS path (flag off, and Firefox / WebKit): identical focus and `checked` results, including arrows checking and wrapping within the group (WebKit: stopping at the group's last radio, the browser's own radio behaviour; the row branches on the engine for that step, `server.browser`) and the "trapped horizontal arrows, leave with Tab" consequence; memory re-enters on the remembered radio. WebKit runs on CI only. |
+| 28 | Tooltip in a roving container (#75) | jsdom | A `Tooltip.Trigger` with `tabindex="-1"` written by the engine inside a standalone `ToggleGroup.Root` and inside a `Toolbar.Root` logs no #57 warning (before the selector change the row failed with three warnings: the check runs in a passive effect, after the engine's layout effect wrote `-1` in the same mount commit, so every non-first Item's Tooltip warned); a `tabindex="-1"` trigger under a plain `div` still warns. |
 
 ViewTransition behaviour beyond row 23 is observed in the docs examples, as for every component.
 
@@ -1252,7 +1254,7 @@ item is folded into the sections named.
 | N9 | 14 row 15 asserts the first menu item has focus after the perpendicular arrow. | 14 row 15 |
 | N10 | **RTL `side` advice**: `side="left"` for a vertical toolbar's menu under `direction: rtl`. | 7.4 |
 | N11 | Reduced-motion block on the Toolbar page (`Toolbar.Button` has `transition`). | 15 |
-| N13 | Tooltip's #57 composite-role check does not know `role="group"`: it runs at mount, before the engine writes, so it does not fire today. Issue #75. | section 18 |
+| N13 | Tooltip's #57 composite-role check does not know `role="group"`. Believed at the time not to fire (check before the engine's write); it did fire, since the check is a passive effect and the engine's write a layout effect. Issue #75, fixed in 5eef360. | section 18 |
 | R3 | Native radios inside a Toolbar diverge between the paths. Issue #74; the Toolbar page advises an exclusive ToggleGroup meanwhile. | section 17 |
 
 Browser-test notes recorded by the developer: Playwright refuses to click an `aria-disabled`
@@ -1276,7 +1278,7 @@ three radios with the middle one checked, `b2`, a `name="size"` group of three w
 | Situation | Chromium `focusgroup="toolbar"` |
 | --- | --- |
 | A toolbar arrow arrives at a group from a neighbour | Lands on the **checked** radio (`b1` ArrowRight → `center`; `b2` ArrowLeft → `center`); with none checked, on the **first** radio from either direction (`b2` ArrowRight → `s`; `b3` ArrowLeft → `s`). Nothing is checked by arriving. |
-| Arrows on a radio | All four arrows move within the same-`name` group and **check as they move**, wrapping within the group (`left` ArrowRight ×4 → `center`, `right`, `left`, `center`); the perpendicular axis does the same (ArrowDown / ArrowUp in a horizontal toolbar, ArrowRight / ArrowLeft in a vertical one). The toolbar's own axis never leaves the group by arrow: `right` ArrowRight → `left`. |
+| Arrows on a radio | All four arrows move within the same-`name` group and **check as they move**, wrapping within the group in Chromium and Firefox (`left` ArrowRight ×4 → `center`, `right`, `left`, `center`); **WebKit's radio arrows stop at the group's ends** and never mirror (the browser's own radio behaviour, RadioGroup 8; seen on CI, row 27); the perpendicular axis does the same (ArrowDown / ArrowUp in a horizontal toolbar, ArrowRight / ArrowLeft in a vertical one). The toolbar's own axis never leaves the group by arrow: `right` ArrowRight → `left`. |
 | Home / End on a radio | Nothing (`center` Home → `center`, End → `center`). |
 | Tab / Shift+Tab from the checked radio, or from any radio when none is checked | The **adjacent toolbar item** (`center` Tab → `b2`, Shift+Tab → `b1`; `s` Tab → `b3`, `m` Tab → `b3`, `l` Shift+Tab → `b2`), as from a text input (6.3), not out of the toolbar. |
 | Tab / Shift+Tab from an unchecked radio with a checked sibling | The **checked sibling** first (`left` Tab → `center`; `right` Shift+Tab → `center`), which is native sequential navigation (only the checked radio of a group is tabbable), then the adjacent item. |
@@ -1293,8 +1295,9 @@ unchecked radio with a checked sibling visits that sibling before leaving, and c
 ### 17.2 The rule, JS path
 
 1. **`input[type=radio]` is an arrow-owning item** (6.3): the engine handles no arrow, Home or
-   End on it. The radio group's own navigation applies, which checks as it moves and wraps
-   within the group, on both axes. A `button[role="radio"]` or any other custom radio is an
+   End on it. The radio group's own navigation applies, which checks as it moves and, in
+   Chromium and Firefox, wraps within the group (WebKit stops at the ends, RadioGroup 8), on both
+   axes. A `button[role="radio"]` or any other custom radio is an
    ordinary item, as it is natively; a consumer's own handler on it wins through
    `defaultPrevented`.
 2. **A same-`name` radio group is one unit.** Radios under the container that share a `name`
@@ -1316,7 +1319,8 @@ unchecked radio with a checked sibling visits that sibling before leaving, and c
    ignores `tabindex`, so the group's own arrows keep working. `current` may be any radio of the
    unit; "`current` is still an item" is judged by its unit's representative being in `items`.
 6. **Consequence, native's too**: in a horizontal toolbar a radio group traps ArrowLeft /
-   ArrowRight inside itself (its arrows wrap within the group), and the user leaves it with Tab
+   ArrowRight inside itself (its arrows wrap within the group in Chromium and Firefox, and stop
+   at its ends in WebKit), and the user leaves it with Tab
    or Shift+Tab; a vertical toolbar traps ArrowUp / ArrowDown the same way. The docs keep
    advising an `exclusive` ToggleGroup, which is transparent to the arrows (7.3); the Toolbar
    page's callout changes from "radios behave differently on the two paths" to this trap and the
@@ -1326,12 +1330,15 @@ unchecked radio with a checked sibling visits that sibling before leaving, and c
 7. **Native path**: nothing to add; the browser already does all of the above. The flag's
    browser row (14 row 27) runs the same sequences on both paths.
 
-Where it lands: `itemsOf` gains the unit collapse (representative selection by `name` within the
-container) and returns unit membership for the Tab rule; `isTextEntryItem` is replaced by an
-`ownsArrows(el)` predicate that is true for text-entry items and `input[type=radio]`;
-`onKeyDown`'s Tab branch takes the unit into account; `apply` writes the unit's `tabindex` per
-item 5. `BUTTON_LIKE_INPUTS` loses `radio`. The `use-roving-focus.test.tsx` unit test gains the
-unit cases; the design's 6.2 and 6.3 are amended by reference to this section on implementation.
+Where it landed (5eef360): `collectItems(root, managed)` returns `{ items, units }`; native
+radios sharing a `name` form one unit (a radio **without** a `name` is a unit of one),
+represented in `items` by the checked radio, else the first, at the position of the unit's first
+radio; `itemsOf` stays as `collectItems(...).items`. `isTextEntryItem` became `ownsArrows`
+(`radio` removed from the button-like inputs). `apply` writes `tabindex` on the items and on
+every radio of every unit; `current` may be any radio of a unit and is kept while its unit's
+representative is an item. The Tab branch visits the checked sibling first, then the item next to
+the unit. The `use-roving-focus.test.tsx` unit test covers the unit cases; 6.2 and 6.3 are read
+with this section.
 
 ### 17.3 Test rows
 
@@ -1344,10 +1351,13 @@ unit cases; the design's 6.2 and 6.3 are amended by reference to this section on
 accepts the trigger when an ancestor has a composite role or `[focusgroup]`; a standalone
 `ToggleGroup.Root` (`role="group"`) and a `Toolbar.Root` (`role="toolbar"`, already composite)
 manage a roving `tabindex` too. Rule: **the check also accepts an ancestor with `role="group"` or
-`role="toolbar"`**, the two containers whose engine writes the attribute (6.1). The check keeps
-running at mount; the engine writes afterwards, so today it cannot fire, and the rule makes it
-correct if that ordering ever changes. Test: 14 row 28. `design/components/tooltip.md` gets a
-one-line amendment when this lands; nothing else in Tooltip changes.
+`role="toolbar"`** (`role="toolbar"` was already in its composite list; `role="group"` is added,
+5eef360), the two containers whose engine writes the attribute (6.1). The premise recorded earlier
+(the check runs at mount before the engine writes, so it could not fire) was **wrong**: Tooltip's
+check runs in a **passive effect**, after the ToggleGroup's layout effect has written
+`tabindex="-1"` in the same mount commit, so a Tooltip on a non-first Item of a standalone
+ToggleGroup did warn before the fix (row 28 failed with three warnings). Test: 14 row 28.
+`design/components/tooltip.md` carries the one-line amendment; nothing else in Tooltip changes.
 
 ## Open questions
 
