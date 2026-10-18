@@ -266,6 +266,18 @@ export type {
   SliderValueState,
 } from "./slider/index.js";
 
+export { NumberField } from "./number-field/index.js";
+export type {
+  NumberFieldRootProps,
+  NumberFieldState,
+  NumberFieldValueChangeDetails,
+  NumberFieldLabelProps,
+  NumberFieldInputProps,
+  NumberFieldIncrementProps,
+  NumberFieldDecrementProps,
+  NumberFieldButtonState,
+} from "./number-field/index.js";
+
 export { Field } from "./field/index.js";
 export type {
   FieldRootProps,

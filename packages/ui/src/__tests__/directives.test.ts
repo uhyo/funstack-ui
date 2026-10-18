@@ -174,6 +174,16 @@ const clientFiles = [
   "toolbar/toolbar-separator.mjs",
   "internal/toolbar-context.mjs",
   "internal/use-roving-focus.mjs",
+  // Every NumberField part and its context are client modules (design/components/number-field.md
+  // 10, 15), as is the announcer.
+  "number-field/number-field-context.mjs",
+  "number-field/number-field-root.mjs",
+  "number-field/number-field-label.mjs",
+  "number-field/number-field-input.mjs",
+  "number-field/number-field-increment.mjs",
+  "number-field/number-field-decrement.mjs",
+  "number-field/use-step-button.mjs",
+  "internal/announce.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -217,6 +227,11 @@ const directiveFreeFiles = [
   "internal/dev-warn.mjs",
   "toggle-group/index.mjs",
   "toolbar/index.mjs",
+  "number-field/index.mjs",
+  // Pure formatting, parsing and arithmetic (number-field.md 15).
+  "number-field/number-field-format.mjs",
+  "number-field/number-field-arithmetic.mjs",
+  "internal/decimal.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

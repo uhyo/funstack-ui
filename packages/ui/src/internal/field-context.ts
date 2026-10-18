@@ -1,6 +1,6 @@
 "use client";
 import { createContext, use } from "react";
-import type { FieldValidity, FormErrors } from "./validity.js";
+import type { FieldValidity, FormErrors, ValidatableElement } from "./validity.js";
 
 /** The state every Field part receives (design/components/field-form.md 4.1). */
 export interface FieldState {
@@ -34,6 +34,14 @@ export interface FieldControlRegistration {
   /** The control's own `required` / `disabled` props (for the Field's `data-*` state). */
   readonly required: boolean;
   readonly disabled: boolean;
+  /**
+   * Where `validity`, `validationMessage` and the custom-validity slot are read and written when
+   * that is not the registered element (NumberField: the hidden `input[type=number]` after the
+   * visible text input). `:user-invalid`, the listeners and the focus target stay on `element`;
+   * after writing the slot the Field mirrors this element's `validationMessage` into `element`
+   * (design/components/field-form.md, amendment `validityElement`). Resolved on every read.
+   */
+  readonly validityElement?: (() => ValidatableElement | null) | undefined;
 }
 
 export interface FieldContextValue {

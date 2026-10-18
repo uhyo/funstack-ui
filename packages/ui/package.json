@@ -38,6 +38,7 @@
     "./form": "./dist/form/index.mjs",
     "./menu": "./dist/menu/index.mjs",
     "./meter": "./dist/meter/index.mjs",
+    "./number-field": "./dist/number-field/index.mjs",
     "./popover": "./dist/popover/index.mjs",
     "./progress": "./dist/progress/index.mjs",
     "./radio-group": "./dist/radio-group/index.mjs",

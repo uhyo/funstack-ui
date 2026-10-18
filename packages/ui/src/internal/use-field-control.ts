@@ -6,6 +6,7 @@ import { FieldContext } from "./field-context.js";
 import type { FieldState } from "./field-context.js";
 import { mergeRefs } from "./merge-props.js";
 import { useDevWarning } from "./use-dev-warning.js";
+import type { ValidatableElement } from "./validity.js";
 
 export interface UseFieldControlOptions {
   /** `<label for>` can target the element (input, select, textarea). Groups pass `false`. */
@@ -18,6 +19,11 @@ export interface UseFieldControlOptions {
   readonly id?: string | undefined;
   /** Dev warning tag. */
   readonly component: string;
+  /**
+   * The element whose validity is real when it is not the registered one (NumberField's hidden
+   * number input; field-form.md amendment `validityElement`). Keep its identity stable.
+   */
+  readonly validityElement?: (() => ValidatableElement | null) | undefined;
 }
 
 /** The ARIA and state attributes a part spreads into its owned layer. */
@@ -84,16 +90,24 @@ export function useMergedRef<T>(
  * or the Field's" for `name` / `disabled` / `required`, and returns the owned ARIA wiring.
  */
 export function useFieldControl(options: UseFieldControlOptions): FieldControlBinding {
-  const { labelable, name, disabled = false, required = false, id, component } = options;
+  const {
+    labelable,
+    name,
+    disabled = false,
+    required = false,
+    id,
+    component,
+    validityElement,
+  } = options;
   const field = use(FieldContext);
   const registerControl = field?.registerControl;
 
   const ref = useCallback(
     (element: HTMLElement) => {
       if (registerControl === undefined) return () => {};
-      return registerControl({ element, labelable, required, disabled });
+      return registerControl({ element, labelable, required, disabled, validityElement });
     },
-    [registerControl, labelable, required, disabled],
+    [registerControl, labelable, required, disabled, validityElement],
   );
 
   useDevWarning(

@@ -246,7 +246,11 @@ export function FieldRoot({
     (options: RefreshOptions = {}): readonly string[] => {
       const registration = controlRef.current;
       if (registration === null) return NONE;
-      const el = validityElementOf(registration.element);
+      // The element whose validity is real (field-form.md amendment `validityElement`) and the
+      // element whose `:user-invalid` the user's interaction sets; the same for every control but
+      // NumberField.
+      const surface = validityElementOf(registration.element);
+      const el = registration.validityElement?.() ?? surface;
       if (el === null) return NONE;
       const { name, validate, serverMessages, serverShown, formPending, form } = latest.current;
 
@@ -263,10 +267,19 @@ export function FieldRoot({
       }
       slotElement.current = el;
       el.setCustomValidity(showServer ? serverMessages.join("\n") : custom.join("\n"));
+      // Mirror onto the surface so its `:user-invalid` read below sees the new state (the control
+      // writes the same derived value after each of its own writes).
+      if (
+        surface !== null &&
+        surface !== el &&
+        surface.validationMessage !== el.validationMessage
+      ) {
+        surface.setCustomValidity(el.validationMessage);
+      }
 
       if (options.reset === true) attempted.current = false;
       const userInvalid = supportsUserInvalid()
-        ? el.matches(":user-invalid")
+        ? (surface ?? el).matches(":user-invalid")
         : attempted.current && !el.validity.valid;
       const validity = snapshotValidity(el.validity);
       const messages = validity.valid
@@ -414,7 +427,8 @@ export function FieldRoot({
     if (!isDev || controlRef.current !== null) return;
     console.error(
       "Field.Root: no form control registered. Render a Field.Control or a FUNSTACK form " +
-        "control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox) inside it.",
+        "control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, Slider, " +
+        "NumberField) inside it.",
     );
   }, []);
 

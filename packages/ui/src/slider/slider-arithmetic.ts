@@ -2,25 +2,9 @@
 // no client-only API. The library computes exactly what the platform's range sanitisation would,
 // so the number it renders is the number the DOM holds and `FormData` posts.
 
-/** Number of decimal places of `n` as written (`0.1` → 1, `1e-7` → 7, `5` → 0). */
-export function decimalsOf(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  const text = String(n);
-  const exponent = /e-(\d+)$/i.exec(text);
-  if (exponent !== null) {
-    const mantissa = text.slice(0, exponent.index);
-    const dot = mantissa.indexOf(".");
-    return Number(exponent[1]) + (dot === -1 ? 0 : mantissa.length - dot - 1);
-  }
-  const dot = text.indexOf(".");
-  return dot === -1 ? 0 : text.length - dot - 1;
-}
+import { decimalsOf, roundTo } from "../internal/decimal.js";
 
-function roundTo(value: number, decimals: number): number {
-  if (decimals <= 0) return Math.round(value);
-  // `toFixed` takes at most 100 digits; anything near that is already exact.
-  return Number(value.toFixed(Math.min(decimals, 100)));
-}
+export { decimalsOf };
 
 /** Tolerance for grid computations on binary floating point (`0.3 / 0.1` is `2.9999999999999996`). */
 const EPSILON = 1e-9;

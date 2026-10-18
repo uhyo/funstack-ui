@@ -18,6 +18,7 @@ export default defineConfig({
     "src/combobox/index.ts",
     "src/toast/index.ts",
     "src/slider/index.ts",
+    "src/number-field/index.ts",
     "src/field/index.ts",
     "src/form/index.ts",
     "src/progress/index.ts",
