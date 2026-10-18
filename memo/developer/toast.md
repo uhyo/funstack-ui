@@ -147,3 +147,25 @@ issue; it is the premise of the urgent queue.
 - Tests: jsdom "fallback on Toast.Root" (3 rows: mount suspend + reveal with timer from the
   reveal; update re-suspends with the fallback again and timer paused; fallback Title names the
   toast and gates nothing). No browser row: nothing here needs a real engine.
+
+## #63 leftovers (L2, L3, L5, L6, L8), 2026-10-18
+
+- **L2** fixed: `subscribedManager` ref in the subscription effect; on a different manager it
+  calls `reset()` (focus out, clear timers / lastAnnounced / exitBaselines, `write([])`) after the
+  old cleanup retained the queue and before subscribing. Same manager again (StrictMode,
+  Activity) keeps entries. Id counter moved to module level so generated ids never collide
+  across managers (a stale Action `close` from the old queue would otherwise hit a new toast).
+- **L3** fixed: hover pause cleared (a) in the host-move layout effect when the host was already
+  attached and moves, (b) in the region effect when the queue is empty. Rejected
+  `region.matches(":hover")` per commit: never true in jsdom (every jsdom hover test would lose
+  its pause on the `setPaused` re-render) and a re-inserted node is not `:hover` until the next
+  pointer move anyway.
+- **L5** fixed: in `apply`'s dismiss loop an entry with no registered Root is spliced out (plus
+  its lastAnnounced / exitBaseline) instead of marked ending; still in `dismissed`, so
+  `closeAction` runs.
+- **L6** not fixed: jsdom `hasFocus()` is `Boolean(_lastFocusedElement)` (jsdom 30), false until
+  something is focused, and jsdom is top-level (`window.top === window`), so even a top-level-only
+  seed would freeze timers in consumers' jsdom tests.
+- **L8** not fixed: added a test that the second region is never `showPopover`ed (it is a closed
+  popover for one commit). A layout-effect subscription would change the hydration story.
+- The four new tests fail against the old Viewport (checked by swapping the file back).
