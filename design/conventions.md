@@ -889,6 +889,13 @@ Rules:
   it is not inert) subscribes through `useSyncExternalStore` with a server snapshot of `null`.
   Writes happen in layout effects or platform event listeners, never during render; the
   registry is never the source of truth for a component's own state (Toast #54).
+- **Relocating a portal without a remount**: `createPortal` remounts its subtree when the
+  container changes, so a region that must follow something (Toast's region, into and out of
+  the topmost modal) portals once into a **library-owned `display: contents` host element** and
+  the library moves that host with a DOM `append` (between an inline anchor rendered where the
+  component is and the current target); React never sees the move and in-flight state
+  (`useActionTrigger`, timers) survives it. The hydration render stays inline to match the server
+  HTML and switches to the portal on the first client render (Toast 4.3, review M2).
 - A fourth kind of state, **consumer-owned, mirrored**: a controlled-only prop that the library
   writes to a DOM property it does not own (`Checkbox`'s `indeterminate`, a future Progress
   `value` or Dialog `returnValue`). It has no `defaultX` and no action; the library re-applies it
@@ -1087,7 +1094,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `invalid` | boolean | every Field part | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). The control also carries an explicit `aria-invalid="true" \| "false"`. |
 | `required` | boolean | every Field part | `Field.Root required` or the control's own `required` (reported through its registration). |
 | `dragging` | boolean | Slider `Root` and the captured `Thumb` | A pointer is captured on a thumb (urgent state; keyboard never sets it). Style motion off under it (`[data-dragging] { transition: none }`). |
-| `ending` | boolean | Toast `Root` | Closed, kept mounted (and `inert`) until its exit animations finish (`useExitAnimation`); CSS animates on it. |
+| `ending` | boolean | Toast `Root` | Closed, kept mounted (and `inert`) until the animations the ending state started finish (`exitAnimations` filtered by a baseline of the animations already running before the close, Toast 10.2; a paused progress bar does not hold the exit); CSS animates on it. |
 | `paused` | boolean | Toast `Viewport` | A viewport-wide timer pause holds (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
 | `type` | string | Toast `Root` | The toast's consumer-defined `type` (`"error"`, `"success"`, …), an enum whose vocabulary is the consumer's. |
 
@@ -1349,8 +1356,8 @@ Every `transition` example in the docs carries this block. No JS-level `matchMed
 ## 6. Suspense stance
 
 - **Consumers own Suspense boundaries.** The library never wraps `children` in `<Suspense>` and
-  has no `fallback` props in v0. Boundary placement decides where fallbacks appear and whether
-  first-mount state is discarded; that is a layout decision.
+  has no `fallback` props, with the one exception in the last bullet. Boundary placement decides
+  where fallbacks appear and whether first-mount state is discarded; that is a layout decision.
 - **Suspending children are the normal case**, handled by sections 2 and 3: the update is a
   transition, content regions key off committed state, so the previous content stays and the owner
   and trigger show `data-pending` until the new content is ready.
@@ -1367,8 +1374,15 @@ Every `transition` example in the docs carries this block. No JS-level `matchMed
   generalised: a toast is mounted in an **urgent** commit from outside the consumer's tree, so a
   suspending toast would reveal the fallback of the nearest boundary *above the Viewport* (the
   app shell in the common layout) instead of keeping old content as a transition would. The
-  guard only gates the toast's timer and announcement; a visible skeleton is still the
-  consumer's own `<Suspense>` inside the Root, which catches first.
+  guard gates the toast's timer and announcement. **`fallback` exists only where the library
+  owns the boundary, which is Toast alone** (`Toast.Root fallback`, accepted 2026-10-18, #63):
+  the prop does not move a boundary, it lets the consumer style the one the library already
+  has, so the skeleton the guard can see replaces a consumer `<Suspense>` inside the Root, which
+  catches first and is invisible to the guard (its reveal is announced, but the timer runs
+  under the skeleton). The precedent risk is named so it is not taken by analogy: Dialog,
+  Popover, Tabs and every other content region are transition-mounted and keep their old UI
+  under `data-pending`, so they own no boundary and get no `fallback` prop; a request for one
+  elsewhere is a request to own a boundary, which needs the urgent-mount reason above.
 
 ---
 

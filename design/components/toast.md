@@ -6,7 +6,8 @@ owner on 2026-10-18 with the server-side no-op amendment, section 19). Implement
 2805959; fixes in eeacdbf, docs page in 906702d, the developer's reasoning in
 `memo/developer/toast.md` "Review fixes") is folded in on 2026-10-18 into the sections it touches
 and audited in "Review corrections (#54)" at the end; the leftovers are GitHub issue #63, and
-section 21 is a **proposal, not accepted**, for its timer item. The code under
+section 21 (`Toast.Root fallback`, for its timer item) was **accepted on 2026-10-18** and
+awaits implementation. The code under
 `packages/ui/src/toast/` is the ground truth where this document is silent. Follows
 `design/conventions.md` (accepted, with the section 18 amendments applied); where this document
 and the conventions disagree, the conventions win.
@@ -51,7 +52,7 @@ hiding the stack.
 | 10 | Keyboard | `hotkey` (default `["F8"]`, `event.code` / modifier names, Radix's shape, but an unlisted modifier held rejects the match: Ctrl+F8 is not F8, review L4; `null` disables) focuses the newest toast; Tab moves through toasts and their buttons in DOM order; ArrowDown / ArrowUp move between toasts; Escape dismisses the toast that contains focus. Focus leaving a dismissed toast goes to the next toast, else back to the element focused before the region was entered. The region's name is `"Notifications (F8)"` by default (`aria-label` overrides). |
 | 11 | Stacking | `limit` (default 3) visible toasts; further toasts queue in order and show as earlier ones leave (never dropped). The DOM order is chronological; visual order is CSS. |
 | 12 | Animation | Enter with `@starting-style` (CSS), exit with `data-ending` on the Root held until the animations **the ending state started** finish (animations already running before the close, a paused progress bar, are snapshotted and not waited for; review M1; a plain layout effect, not `useExitAnimation`), no `<ViewTransition>` and **no `transition` prop on any part**: every Toast commit is on the urgent lane, where react-dom never starts a view transition (conventions 5.1, third no-`transition` category). |
-| 13 | Suspense guard | `Toast.Root` wraps its children in a `<Suspense>` whose fallback renders nothing visible: a toast whose content suspends shows an empty toast (consumers add their own skeleton boundary) instead of pulling the whole Viewport, which lives in an urgent commit, into the nearest consumer boundary. The toast's timer and announcement wait for the reveal, which commits while unrelated actions are pending (retry lane; probe). A consumer's own `<Suspense>` inside the Root catches first and is invisible to the guard: its reveal is announced (Title and Description report their commit, review M3) but the timer starts at mount; section 21 proposes a `fallback` prop on the Root to close that gap (not accepted). The one deliberate exception to "the library never wraps children in `<Suspense>`" (conventions 6, feedback 6). |
+| 13 | Suspense guard | `Toast.Root` wraps its children in a `<Suspense>` whose fallback renders nothing visible: a toast whose content suspends shows an empty toast (consumers add their own skeleton boundary) instead of pulling the whole Viewport, which lives in an urgent commit, into the nearest consumer boundary. The toast's timer and announcement wait for the reveal, which commits while unrelated actions are pending (retry lane; probe). A consumer's own `<Suspense>` inside the Root catches first and is invisible to the guard: its reveal is announced (Title and Description report their commit, review M3) but the timer starts at mount; section 21 adds a `fallback` prop on the Root to close that gap (accepted 2026-10-18, implementation pending). The one deliberate exception to "the library never wraps children in `<Suspense>`" (conventions 6, feedback 6). |
 | 14 | SSR and directives | Client-only behaviour: the Viewport server-renders the empty region (`popover` serialises; no hydration issue), on the client, `toast()` calls before the Viewport mounts are buffered; on the server (`typeof document === "undefined"`) a call is a **no-op with a dev warning, never buffered** (the module-level manager would otherwise hold a queue shared between requests). No JS-free mode (a toast cannot exist without JS). Every part file is `"use client"`; `toast.ts` (the manager) has no directive and no React import. |
 
 ---
@@ -318,7 +319,7 @@ mounted looks the same as a toast without one), and the alternative, a render-ph
 rendered but not committed" flag, can be left set by a discarded render and freeze a toast
 forever. The docs say so next to the skeleton recipe; section 21 proposes a `fallback` prop on
 the Root so the skeleton can live in the library's own boundary, which does see it (GitHub issue
-#63; not accepted).
+#63; accepted 2026-10-18, implementation pending).
 
 The reveal is a Suspense retry, which commits while unrelated async actions are pending: verified
 on React 19.3.1 (`memo/architect/probes/toast-suspense-reveal.mjs`): a toast pushed urgently while
@@ -1294,6 +1295,9 @@ packages/ui/src/internal/
    (Title + Description text, a function of the toast).
 9. **10.1**: the N/A rows Toast declares (controlled parity, post-await, optimistic, platform
    path, urgent action) and the new "Lanes" row for urgent-by-design state.
+10. **6 Suspense stance** (added 2026-10-18 with section 21): the one library-owned boundary
+    gains the one `fallback` prop, under the rule "`fallback` exists only where the library owns
+    the boundary, which is Toast alone", with the precedent risk named. Applied.
 
 ---
 
@@ -1365,14 +1369,13 @@ leftovers are GitHub issue #63.
 
 ---
 
-## 21. Proposal: `fallback` on `Toast.Root` (review M3, the timer; issue #63)
+## 21. `fallback` on `Toast.Root` (review M3, the timer; issue #63): accepted
 
-Status: **proposed, needs product-owner acceptance.** Not implemented; nothing above depends on
-it, and the design stands without it. It works out the developer's suggestion from
-`memo/developer/toast.md` so the decision can be taken on an API rather than on a sentence. It
-also amends conventions 6 ("the library … has no `fallback` props in v0"), so accepting it is a
-conventions decision too (section 18 would gain an item 10); the conventions are not edited
-until then.
+Status: **accepted by the product owner on 2026-10-18** (note at the end of this section);
+**implementation pending**. Nothing above depends on it, and the design stands without it. It
+works out the developer's suggestion from `memo/developer/toast.md`. It amends conventions 6
+("no `fallback` props"), applied the same day: *`fallback` exists only where the library owns
+the boundary, which is Toast alone*, with the precedent risk named there (section 18 item 10).
 
 ### 21.1 The gap
 
