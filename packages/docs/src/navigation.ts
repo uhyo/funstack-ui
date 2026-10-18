@@ -26,12 +26,14 @@ export const conceptNavItems: NavItem[] = [
 
 export const componentNavItems: NavItem[] = [
   { path: "/components/toggle", label: "Toggle" },
+  { path: "/components/toggle-group", label: "ToggleGroup" },
   { path: "/components/tabs", label: "Tabs" },
   { path: "/components/accordion", label: "Accordion" },
   { path: "/components/tooltip", label: "Tooltip" },
   { path: "/components/dialog", label: "Dialog" },
   { path: "/components/popover", label: "Popover" },
   { path: "/components/menu", label: "Menu" },
+  { path: "/components/toolbar", label: "Toolbar" },
   { path: "/components/switch", label: "Switch" },
   { path: "/components/checkbox", label: "Checkbox" },
   { path: "/components/radio-group", label: "RadioGroup" },

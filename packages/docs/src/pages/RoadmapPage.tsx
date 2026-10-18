@@ -115,11 +115,18 @@ export function RoadmapPage() {
           reports on a pending action is written with a plain <code>setState</code> (
           <a href={issue(68)}>#68</a>).
         </li>
+        <li>
+          <a href="/components/toggle-group">ToggleGroup</a> and{" "}
+          <a href="/components/toolbar">Toolbar</a>: a set of <code>aria-pressed</code> toggles with
+          an optimistic set value (exclusive mode included), and a toolbar whose roving focus finds
+          its items in the DOM, so menu buttons, toggles, links and inputs join one Tab stop without
+          wrapper parts (<a href={issue(66)}>#66</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
       <ul>
-        <li>More components toward a full set: ToggleGroup, and more.</li>
+        <li>More components toward a full set.</li>
       </ul>
 
       <h3>Deferred</h3>

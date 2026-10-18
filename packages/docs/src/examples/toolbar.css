@@ -1,0 +1,72 @@
+/* Toolbar: the toolbar is a flex row (a column when vertical); the separator is an <hr>. */
+.demo-toolbar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.demo-toolbar[data-orientation="vertical"] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.demo-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.8em;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.demo-toolbar-button:hover {
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+
+.demo-toolbar-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demo-toolbar-button[data-pending] {
+  cursor: progress;
+}
+
+.demo-toolbar-button:focus-visible,
+.demo-toolbar-input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.demo-toolbar-input {
+  padding: 0.25em 0.4em;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+/* <hr> is a block; in a horizontal toolbar it is a vertical rule. */
+.demo-toolbar-separator {
+  margin: 0;
+  border: 0;
+  background: var(--color-border);
+}
+
+.demo-toolbar-separator[data-orientation="vertical"] {
+  inline-size: 1px;
+  align-self: stretch;
+}
+
+.demo-toolbar-separator[data-orientation="horizontal"] {
+  block-size: 1px;
+}

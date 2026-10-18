@@ -36,6 +36,8 @@ const BrowserOwnedStatePage = lazyPage(
 );
 const ExperimentalPage = lazyPage(() => import("./pages/ExperimentalPage.js"), "ExperimentalPage");
 const TogglePage = lazyPage(() => import("./pages/TogglePage.js"), "TogglePage");
+const ToggleGroupPage = lazyPage(() => import("./pages/ToggleGroupPage.js"), "ToggleGroupPage");
+const ToolbarPage = lazyPage(() => import("./pages/ToolbarPage.js"), "ToolbarPage");
 const TabsPage = lazyPage(() => import("./pages/TabsPage.js"), "TabsPage");
 const AccordionPage = lazyPage(() => import("./pages/AccordionPage.js"), "AccordionPage");
 const TooltipPage = lazyPage(() => import("./pages/TooltipPage.js"), "TooltipPage");
@@ -136,6 +138,13 @@ export const routes = [
                   page("/dialog", "/components/dialog", DialogPage, "DialogPage"),
                   page("/popover", "/components/popover", PopoverPage, "PopoverPage"),
                   page("/menu", "/components/menu", MenuPage, "MenuPage"),
+                  page("/toolbar", "/components/toolbar", ToolbarPage, "ToolbarPage"),
+                  page(
+                    "/toggle-group",
+                    "/components/toggle-group",
+                    ToggleGroupPage,
+                    "ToggleGroupPage",
+                  ),
                   page("/switch", "/components/switch", SwitchPage, "SwitchPage"),
                   page("/checkbox", "/components/checkbox", CheckboxPage, "CheckboxPage"),
                   page("/radio-group", "/components/radio-group", RadioGroupPage, "RadioGroupPage"),

@@ -1,0 +1,58 @@
+/* ToggleGroup: data attributes carry library state; :focus-visible comes from the platform. */
+.demo-toggle-group {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.demo-toggle-group[data-orientation="vertical"] {
+  flex-direction: column;
+}
+
+.demo-toggle-group[data-pending] {
+  cursor: progress;
+}
+
+.demo-toggle-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.8em;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  /* The optimistic flip is a sync commit: a plain CSS transition animates it. */
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+
+.demo-toggle-item[data-pressed] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.demo-toggle-item[data-pending] {
+  cursor: progress;
+}
+
+.demo-toggle-item[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demo-toggle-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-toggle-item {
+    transition: none;
+  }
+}

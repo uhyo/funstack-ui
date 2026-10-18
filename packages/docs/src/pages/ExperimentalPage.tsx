@@ -35,6 +35,16 @@ export function ExperimentalPage() {
             "Renders `focusgroup`; where the browser implements it, the browser moves focus with arrow keys, Home and End and the JS handler steps aside.",
           ],
           [
+            "`Toolbar.Root experimental_focusgroup`",
+            "`focusgroup`",
+            'Renders `focusgroup="toolbar inline|block wrap|nowrap"`; where the browser implements it, the browser owns the single Tab stop (with memory), arrow keys, Home and End, and the library writes no `tabindex`.',
+          ],
+          [
+            "`ToggleGroup.Root experimental_focusgroup`",
+            "`focusgroup`",
+            'Standalone groups only: renders `focusgroup="toolbar … nomemory"` and `focusgroupstart` on the first pressed Item, so Tab enters on the pressed Item. Ignored (with a development warning) on a group inside a Toolbar, where a nested focusgroup would add Tab stops.',
+          ],
+          [
             "`Accordion.Root experimental_interpolateSize`",
             "`interpolate-size`",
             "Sets `interpolate-size: allow-keywords` on the root, so `::details-content` can transition `height` to `auto`. Elsewhere the height jumps.",

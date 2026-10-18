@@ -531,6 +531,32 @@ export function MenuPage() {
         </li>
       </ul>
 
+      <h4>Inside a Toolbar</h4>
+      <p>
+        A <code>Menu.Trigger</code> inside a <a href="/components/toolbar">Toolbar</a> opens on the
+        arrow key perpendicular to the toolbar's, leaving the toolbar's own arrows to it. Enter and
+        Space open it in every case. In a vertical toolbar, put the popup beside it with{" "}
+        <code>side="right"</code>.
+      </p>
+      <Table
+        head={[
+          "Context",
+          "Opens with the first item",
+          "Opens with the last item",
+          "Left to the Toolbar",
+        ]}
+        rows={[
+          ["No toolbar", "ArrowDown", "ArrowUp", "–"],
+          ["Horizontal Toolbar", "ArrowDown", "ArrowUp", "ArrowLeft / ArrowRight"],
+          [
+            "Vertical Toolbar",
+            "ArrowRight (ArrowLeft under `direction: rtl`)",
+            "–",
+            "ArrowDown / ArrowUp",
+          ],
+        ]}
+      />
+
       <h3>Styling and animation</h3>
       <p>
         Style the popup with <code>:popover-open</code> and the items with{" "}

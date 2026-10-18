@@ -151,6 +151,12 @@ export function TogglePage() {
       <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
 
       <h3>Recipes</h3>
+      <p>
+        Several toggles that share one value (text styles, an alignment choice) are a{" "}
+        <a href="/components/toggle-group">ToggleGroup</a>: one Tab stop, arrow keys between the
+        items, and a set value with <code>added</code> / <code>removed</code> in the action's
+        details.
+      </p>
       <h4>Controlled, local state</h4>
       <CodeBlock>{`const [muted, setMuted] = useState(false);
 
