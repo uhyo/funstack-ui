@@ -137,3 +137,5 @@
 - #59 design accepted (6d13aa2: closeOnSettle error-aware under Form.Root, dev warning); impl running (worktree).
 - Research #65 done (497920a). PO answers: (a) aria-pressed for single ToggleGroup; (b) NumberField w/o spinbutton role accepted, roledescription architect's call; (c) Toolbar wrap + Menu.Trigger in toolbar: architect's call; (d) Progress/Meter on divs, not native. Upstream human-task #70.
 - Designs running in parallel: toggle-group.md (owns conventions.md), number-field.md, progress.md.
+- Polish done: #59 (32611fd, 8cbde22, fold 6f648e6), #63 (94fbcd4, fa2f399; L6/L8 left by decision), #57 (5fc2d4d), #64 (0228d8d). Master CI green.
+- Filed an issue for load-sensitive timing flakes (transition-boundary in Firefox, Menu exit in Chromium).
