@@ -130,3 +130,12 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   strict again (75, no "warn and accept"). Local, Firefox only: before 35 s / 50 s wall with
   3 failing files each run; after 60 s / 58 s / 69 s (wall 63 / 60 / 70 s), 16/16 files green
   in all three runs.
+- Slider rollback row (CI on 330ba8c, WebKit: no `transitionstart`). Diagnostic run: WebKit gets
+  Playwright's `dragAndDrop` as one `pointermove` and the `pointerup` in the same frame; the
+  move's render is not even committed before the release, so the dragged state is never painted.
+  With a commit that settles at once (no action) the release (80%, not dragging) and the rollback
+  (20%) can both land before the next style update: no transition (WebKit), or two starts when a
+  frame falls between them (seen once in Chromium). Not a library defect: a real drag paints the
+  dragged value, and the rollback runs from it. The row now holds the save on a promise (held
+  value painted, asserted `80` + `data-pending`), drags with `steps: 5`, asserts no start while
+  `[data-dragging]`, then counts only the starts after the save settles: exactly one.
