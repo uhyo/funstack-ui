@@ -8,7 +8,8 @@ import type { SliderRootState, SliderValue } from "./slider-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-export interface SliderLabelProps<T extends SliderValue = number> extends Omit<
+/** `T` defaults to `SliderValue`; pass it to narrow the state (`<Slider.Label<number>>`). */
+export interface SliderLabelProps<T extends SliderValue = SliderValue> extends Omit<
   ComponentPropsWithRef<"label">,
   "htmlFor" | "id" | "className" | "style" | "children"
 > {
@@ -24,7 +25,7 @@ export interface SliderLabelProps<T extends SliderValue = number> extends Omit<
  * thumbs, the element whose `id` the Root's `aria-labelledby` (`role="group"`) points at, emitted
  * only while a Label is mounted. Owned keys: `id`, `htmlFor`.
  */
-export function SliderLabel<T extends SliderValue = number>({
+export function SliderLabel<T extends SliderValue = SliderValue>({
   className,
   style,
   children,

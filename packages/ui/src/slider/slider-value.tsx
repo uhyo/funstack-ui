@@ -6,12 +6,16 @@ import { useRender } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderRootState, SliderValue } from "./slider-root.js";
 
-export interface SliderValueState<T extends SliderValue = number> extends SliderRootState<T> {
+/**
+ * `T` defaults to `SliderValue` (a number or an array): a part is not connected to its Root's
+ * value type. Pass it to narrow, `<Slider.Value<number>>`, or read `values`.
+ */
+export interface SliderValueState<T extends SliderValue = SliderValue> extends SliderRootState<T> {
   /** The `index` prop, or `null`. */
   readonly index: number | null;
 }
 
-export interface SliderValueProps<T extends SliderValue = number> extends Omit<
+export interface SliderValueProps<T extends SliderValue = SliderValue> extends Omit<
   ComponentPropsWithRef<"span">,
   "className" | "style" | "children"
 > {
@@ -31,7 +35,7 @@ export interface SliderValueProps<T extends SliderValue = number> extends Omit<
  * text. A plain `span`, not `<output>`: a `status` live region updating on every step would
  * chatter (the slider itself exposes its value). No owned keys.
  */
-export function SliderValuePart<T extends SliderValue = number>({
+export function SliderValuePart<T extends SliderValue = SliderValue>({
   index,
   className,
   style,

@@ -6,9 +6,9 @@
 // Covered by `slider.browser.test.tsx` instead: real keys (native stepping, RTL mirroring,
 // vertical Up / Down, Firefox's vertical ArrowRight), a real drag, the hidden input's box and
 // hit-testing, the accessibility tree, the rollback CSS transition.
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
-import { StrictMode, Suspense, startTransition, useState } from "react";
+import { Component, StrictMode, Suspense, startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -108,9 +108,8 @@ function pointer(
 }
 
 const flush = () => act(async () => {});
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** A pointer event dispatched without Testing Library's `act` wrapper. */
+/** A pointer event for `dispatchEvent` inside an awaited `act` (Testing Library's is sync). */
 function rawPointer(type: string, x: number, y = 50): PointerEvent {
   return new PointerEvent(type, {
     pointerId: 1,
@@ -120,18 +119,6 @@ function rawPointer(type: string, x: number, y = 50): PointerEvent {
     bubbles: true,
     cancelable: true,
   });
-}
-
-/** Runs `body` on React's real scheduler (no `act` queue); see the "no snap" suspense row. */
-async function withoutAct(body: () => Promise<void>): Promise<void> {
-  const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
-  const previous = env.IS_REACT_ACT_ENVIRONMENT;
-  env.IS_REACT_ACT_ENVIRONMENT = false;
-  try {
-    await body();
-  } finally {
-    env.IS_REACT_ACT_ENVIRONMENT = previous;
-  }
 }
 
 const thumbInput = (index = 0) =>
@@ -151,6 +138,26 @@ interface FixtureProps {
   /** Content under the Root, rendered from the parent's committed value. */
   below?: (value: Value) => ReactNode;
   boundary?: (error: unknown) => void;
+  /** Wrap the Root in a boundary whose fallback has a "retry" button (a remount). */
+  retry?: boolean;
+}
+
+/** An error boundary with a retry button: the slider remounts from what its parent holds. */
+class RetryBoundary extends Component<{ children: ReactNode }, { error: unknown }> {
+  state = { error: null as unknown };
+  static getDerivedStateFromError(error: unknown) {
+    return { error };
+  }
+  render() {
+    if (this.state.error !== null) {
+      return (
+        <button type="button" onClick={() => this.setState({ error: null })}>
+          retry
+        </button>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function Parts({ count, thumbs = true }: { count: number; thumbs?: boolean }) {
@@ -187,6 +194,7 @@ function Fixture({
   rootProps,
   below,
   boundary,
+  retry,
 }: FixtureProps) {
   const [value, setValue] = useState<Value>(initial);
   const count = typeof initial === "number" ? 1 : initial.length;
@@ -218,6 +226,7 @@ function Fixture({
     </Slider.Root>
   );
   if (boundary) slider = <ErrorCatcher onError={boundary}>{slider}</ErrorCatcher>;
+  if (retry) slider = <RetryBoundary>{slider}</RetryBoundary>;
   return (
     <>
       {slider}
@@ -704,7 +713,7 @@ eachMode("async commit", (mode) => {
 });
 
 eachMode("rejection", (mode) => {
-  it("reaches the boundary and rolls the thumb back to the pre-gesture value", async () => {
+  it('reaches the boundary, which replaces the slider; uncontrolled reports the revert as a "dismiss" step', async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const d = deferred();
     const caught = vi.fn();
@@ -722,6 +731,8 @@ eachMode("rejection", (mode) => {
     await act(async () => d.reject(new Error("save failed")));
     expect(caught).toHaveBeenCalledTimes(1);
     expect((caught.mock.calls[0]![0] as Error).message).toBe("save failed");
+    // The boundary is above the Root: the rollback is not a slide-back but a remount.
+    expect(screen.queryByTestId("root")).toBeNull();
     if (mode === "uncontrolled") {
       expect(onChange).toHaveBeenCalledTimes(1);
       const [next, details] = onChange.mock.calls[0]!;
@@ -735,27 +746,21 @@ eachMode("rejection", (mode) => {
     consoleError.mockRestore();
   });
 
-  it("rolls the DOM value back when the error is caught by a boundary inside the Root's parent", async () => {
+  it("after a retry the remounted slider shows the value its parent holds", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const d = deferred();
-    function Inside() {
-      const [, setV] = useState(0);
-      return (
-        <ErrorCatcher>
-          <Slider.Root data-testid="root" defaultValue={40} valueCommitAction={() => d.promise}>
-            <Parts count={1} />
-          </Slider.Root>
-          <button type="button" onClick={() => setV((n) => n + 1)}>
-            rerender
-          </button>
-        </ErrorCatcher>
-      );
-    }
-    render(<Inside />);
+    render(<Fixture mode={mode} onCommit={() => d.promise} retry />);
     press(thumbInput(), 70);
     await flush();
     await act(async () => d.reject(new Error("x")));
-    expect(screen.getByTestId("error-catcher")).toHaveTextContent("x");
+    expect(screen.queryByTestId("root")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "retry" }));
+    await flush();
+    // Uncontrolled: `defaultValue`; update on success: the parent never took 70; an adopting
+    // parent took 70 in the step and owns its own rollback.
+    const expected = mode === "adopt" ? "70" : "40";
+    expect(thumbInput().value).toBe(expected);
+    expect(thumb().style.getPropertyValue("--slider-value")).toBe(`${expected}%`);
   });
 
   it("commits when the action catches its own error", async () => {
@@ -771,6 +776,49 @@ eachMode("rejection", (mode) => {
     await flush();
     expect(thumbInput().value).toBe("60");
     expectNotPending(root());
+  });
+});
+
+describe("rollback with the slider mounted", () => {
+  it("an update-on-success parent whose save fails (handled in the action): the thumb returns to the parent's value", async () => {
+    const d = deferred();
+    const onChange = vi.fn<ChangeFn>();
+    function Parent() {
+      const [value, setValue] = useState(40);
+      return (
+        <>
+          <Slider.Root
+            data-testid="root"
+            value={value}
+            valueChangeAction={onChange}
+            valueCommitAction={async (next) => {
+              try {
+                await d.promise;
+                startTransition(() => setValue(next));
+              } catch {
+                // Reported elsewhere; the parent keeps its value.
+              }
+            }}
+          >
+            <Parts count={1} />
+          </Slider.Root>
+          <output data-testid="parent">{value}</output>
+        </>
+      );
+    }
+    render(<Parent />);
+    press(thumbInput(), 70);
+    await flush();
+    expect(thumbInput().value).toBe("70");
+    expectPending(root());
+    await act(async () => d.reject(new Error("save failed")));
+    expectNotPending(root());
+    expect(screen.getByTestId("parent")).toHaveTextContent("40");
+    expect(thumbInput().value).toBe("40");
+    expect(thumb().style.getPropertyValue("--slider-value")).toBe("40%");
+    expect(screen.getByTestId("value")).toHaveTextContent("40");
+    // A controlled slider reports no "dismiss" step: the parent owns the value.
+    expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(0);
   });
 });
 
@@ -815,23 +863,22 @@ describe("no snap", () => {
     const input = thumbInput();
     const observer = new MutationObserver(() => seen.push(input.value));
     observer.observe(root(), { attributes: true, subtree: true });
-    // On React's real scheduler: under `act`, a transition started while another one is
-    // suspended (the release's commit after the step suspended) is never retried after the
-    // ping (React 19.3.1; plain-React repro in memo/developer/slider.md). Browsers are fine.
-    await withoutAct(async () => {
+    // Awaited `act` scopes: a sync `act` around an update that suspends leaves a later
+    // transition pending forever (React does not support it; memo/developer/slider.md).
+    await act(async () => {
       track.dispatchEvent(rawPointer("pointerdown", 70));
-      await waitFor(() => expect(screen.getByTestId("parent")).toHaveTextContent("40"));
-      await sleep(20);
-      track.dispatchEvent(rawPointer("pointerup", 70));
-      await sleep(20);
-      expect(thumbInput().value).toBe("70");
-      expectPending(root());
-      expect(screen.getByTestId("suspender")).toHaveTextContent("40");
-      expect(screen.queryByTestId("fallback")).toBeNull();
-      resolve("70");
-      await waitFor(() => expect(screen.getByTestId("suspender")).toHaveTextContent("70"));
-      await waitFor(() => expectNotPending(root()));
     });
+    expect(screen.getByTestId("parent")).toHaveTextContent("40");
+    await act(async () => {
+      track.dispatchEvent(rawPointer("pointerup", 70));
+    });
+    expect(thumbInput().value).toBe("70");
+    expectPending(root());
+    expect(screen.getByTestId("suspender")).toHaveTextContent("40");
+    expect(screen.queryByTestId("fallback")).toBeNull();
+    await act(async () => resolve("70"));
+    expect(screen.getByTestId("suspender")).toHaveTextContent("70");
+    expectNotPending(root());
     expect(thumbInput().value).toBe("70");
     observer.disconnect();
     expect(seen).not.toContain("40");
@@ -1178,6 +1225,214 @@ describe("pointer", () => {
     expect(onChange.mock.calls[0]![0]).toEqual([20, 30]);
     pointer("pointerUp", thumb(1), 30);
     await flush();
+  });
+
+  it("stacked thumbs at max: a press on the top thumb moves the one that can go toward the pointer", async () => {
+    const onChange = vi.fn<ChangeFn>();
+    const onCommit = vi.fn<CommitFn>();
+    render(
+      <Slider.Root
+        data-testid="root"
+        defaultValue={[100, 100]}
+        valueChangeAction={onChange}
+        valueCommitAction={onCommit}
+        aria-label="r"
+      >
+        <Parts count={2} />
+      </Slider.Root>,
+    );
+    mockTrack();
+    // Thumb 1 is later in the DOM, so on top. A press exactly on the value decides nothing yet.
+    pointer("pointerDown", thumb(1), 100);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(thumb(1)).toHaveAttribute("data-dragging", "");
+    pointer("pointerMove", thumb(1), 60);
+    expect(thumbInput(0).value).toBe("60");
+    expect(thumbInput(1).value).toBe("100");
+    expect(thumb(0)).toHaveAttribute("data-dragging", "");
+    expect(thumb(1)).not.toHaveAttribute("data-dragging");
+    expect(document.activeElement).toBe(thumbInput(0));
+    pointer("pointerUp", thumb(1), 60);
+    await flush();
+    expect(onChange.mock.calls.map((c) => [c[0], c[1].thumb])).toEqual([[[60, 100], 0]]);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit.mock.calls[0]![0]).toEqual([60, 100]);
+    expect(onCommit.mock.calls[0]![1].thumb).toBe(0);
+    expect(root()).not.toHaveAttribute("data-dragging");
+  });
+
+  it("stacked thumbs: a press beside the value picks at once; a press on it lets the first move pick", async () => {
+    const onCommit = vi.fn<CommitFn>();
+    render(
+      <Slider.Root
+        data-testid="root"
+        defaultValue={[30, 30]}
+        valueCommitAction={onCommit}
+        aria-label="r"
+      >
+        <Parts count={2} />
+      </Slider.Root>,
+    );
+    mockTrack();
+    // Left of the stack, on the top thumb: the lower thumb moves.
+    pointer("pointerDown", thumb(1), 28);
+    expect(thumbInput(0).value).toBe("28");
+    pointer("pointerMove", thumb(1), 20);
+    pointer("pointerUp", thumb(1), 20);
+    await flush();
+    expect(onCommit.mock.calls.at(-1)![0]).toEqual([20, 30]);
+    // Back to a stack, then a press on the bottom thumb exactly on the value, moved right.
+    pointer("pointerDown", thumb(0), 30);
+    pointer("pointerUp", thumb(0), 30);
+    await flush();
+    expect(onCommit.mock.calls.at(-1)![0]).toEqual([30, 30]);
+    pointer("pointerDown", thumb(0), 30);
+    pointer("pointerMove", thumb(0), 30);
+    expect(thumb(0)).toHaveAttribute("data-dragging", "");
+    pointer("pointerMove", thumb(0), 50);
+    expect(thumbInput(1).value).toBe("50");
+    expect(thumbInput(0).value).toBe("30");
+    expect(thumb(1)).toHaveAttribute("data-dragging", "");
+    pointer("pointerUp", thumb(0), 50);
+    await flush();
+    expect(onCommit.mock.calls.at(-1)![0]).toEqual([30, 50]);
+    expect(onCommit.mock.calls.at(-1)![1].thumb).toBe(1);
+  });
+
+  it("commits the value at the pointer release, not only the last move", async () => {
+    const onChange = vi.fn<ChangeFn>();
+    const onCommit = vi.fn<CommitFn>();
+    render(
+      <Slider.Root
+        data-testid="root"
+        defaultValue={20}
+        valueChangeAction={onChange}
+        valueCommitAction={onCommit}
+      >
+        <Parts count={1} />
+      </Slider.Root>,
+    );
+    const track = mockTrack();
+    pointer("pointerDown", track, 20);
+    pointer("pointerMove", track, 40);
+    pointer("pointerUp", track, 55);
+    await flush();
+    expect(onChange.mock.calls.map((c) => [c[0], c[1].event?.type])).toEqual([
+      [40, "pointermove"],
+      [55, "pointerup"],
+    ]);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit.mock.calls[0]![0]).toBe(55);
+    // A cancel keeps the last move's value.
+    pointer("pointerDown", track, 55);
+    pointer("pointerMove", track, 60);
+    pointer("pointerCancel", track, 90);
+    await flush();
+    expect(onCommit.mock.calls.at(-1)![0]).toBe(60);
+  });
+
+  it("with no valueChangeAction, a drag does not toggle data-pending", async () => {
+    render(
+      <Slider.Root data-testid="root" defaultValue={20}>
+        <Parts count={1} />
+      </Slider.Root>,
+    );
+    const track = mockTrack();
+    const seen: string[] = [];
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        const element = record.target as Element;
+        seen.push(`${element.getAttribute("data-testid")}:${element.hasAttribute("data-pending")}`);
+      }
+    });
+    observer.observe(root(), {
+      attributes: true,
+      attributeFilter: ["data-pending"],
+      subtree: true,
+    });
+    pointer("pointerDown", track, 30);
+    pointer("pointerMove", track, 40);
+    pointer("pointerMove", track, 50);
+    pointer("pointerMove", track, 60);
+    await flush();
+    seen.push(...observer.takeRecords().map((r) => String(r.attributeName)));
+    expect(thumbInput().value).toBe("60");
+    expect(seen).toEqual([]);
+    pointer("pointerUp", track, 60);
+    await flush();
+    observer.disconnect();
+    expect(thumbInput().value).toBe("60");
+    expect(root()).not.toHaveAttribute("data-pending");
+  });
+
+  it("with no valueChangeAction, a key's input holds the value until its change", async () => {
+    const onCommit = vi.fn<CommitFn>();
+    render(
+      <Slider.Root data-testid="root" defaultValue={40} valueCommitAction={onCommit}>
+        <Parts count={1} />
+      </Slider.Root>,
+    );
+    // `input` and `change` in separate act scopes: react-dom must not restore the old value in
+    // between (Firefox fires no `change` when the value is back to what it was).
+    act(() => {
+      valueSetter.call(thumbInput(), "50");
+      thumbInput().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await flush();
+    expect(thumbInput().value).toBe("50");
+    expect(screen.getByTestId("value")).toHaveTextContent("50");
+    act(() => {
+      thumbInput().dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit.mock.calls[0]![0]).toBe(50);
+    expect(thumbInput().value).toBe("50");
+    expectNotPending(root());
+  });
+
+  it("with no actions, a non-adopting controlled parent: the release returns once, no bounce", async () => {
+    render(
+      <Slider.Root data-testid="root" value={20}>
+        <Parts count={1} />
+      </Slider.Root>,
+    );
+    const track = mockTrack();
+    pointer("pointerDown", track, 20);
+    pointer("pointerMove", track, 80);
+    await flush();
+    expect(thumbInput().value).toBe("80");
+    const seen: string[] = [];
+    const observer = new MutationObserver(() =>
+      seen.push(thumb().style.getPropertyValue("--slider-value")),
+    );
+    observer.observe(thumb(), { attributes: true, attributeFilter: ["style"] });
+    pointer("pointerUp", track, 80);
+    await flush();
+    seen.push(
+      ...observer.takeRecords().map(() => thumb().style.getPropertyValue("--slider-value")),
+    );
+    observer.disconnect();
+    expect(thumbInput().value).toBe("20");
+    // 80% may be re-rendered, but once at 20% it stays there.
+    expect(seen.slice(seen.indexOf("20%"))).toEqual(seen.filter((v) => v === "20%"));
+    expect(seen.at(-1)).toBe("20%");
+  });
+
+  it("with a valueChangeAction, each step is pending (the transition is real)", async () => {
+    const step = deferred<void>();
+    render(
+      <Slider.Root data-testid="root" defaultValue={20} valueChangeAction={() => step.promise}>
+        <Parts count={1} />
+      </Slider.Root>,
+    );
+    const track = mockTrack();
+    pointer("pointerDown", track, 30);
+    await flush();
+    expectPending(root());
+    pointer("pointerUp", track, 30);
+    await act(async () => step.resolve());
+    expectNotPending(root());
   });
 
   it("ignores the pointer when disabled, and a non-primary button", async () => {

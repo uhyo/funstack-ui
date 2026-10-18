@@ -85,7 +85,7 @@
   scale: 1.15;
 }
 
-.demo-slider-thumb[data-pending] {
+.demo-slider-thumb[data-pending]:not([data-dragging]) {
   box-shadow:
     0 0 0 4px var(--color-primary),
     0 1px 3px rgb(0 0 0 / 0.25);

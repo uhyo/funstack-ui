@@ -42,7 +42,7 @@ export function SliderPage() {
         rows={[
           [
             "Called",
-            'On every step: each pointer move, each key press, a form reset, a value found at hydration, and the revert after a failed save (`reason: "dismiss"`, uncontrolled).',
+            'On every step: the press, each pointer move and the release position, each key press, a form reset, a value found at hydration, and the revert after a failed save (`reason: "dismiss"`, uncontrolled).',
             "Once per gesture: pointer release, each key press, a form reset, a value found at hydration.",
           ],
           [
@@ -52,7 +52,7 @@ export function SliderPage() {
           ],
           [
             "Pending",
-            "`data-pending` while a step is in flight (including the Suspense wait of what it renders).",
+            "`data-pending` while a step is in flight (including the Suspense wait of what it renders). Without a `valueChangeAction` a step starts no transition and is never pending.",
             "`data-pending` on the Root and the moved thumb until the save settles.",
           ],
           [
@@ -296,8 +296,10 @@ export function SliderPage() {
         <code>SliderTrackState</code> (and <code>SliderIndicatorState</code>):{" "}
         <code>{"{ orientation, dragging, disabled }"}</code>. A press on the Track moves the nearest
         thumb, focuses its input and starts dragging it; its box is the reference for the pointer
-        maths. The Indicator renders no position: place it from <code>--slider-start</code> /{" "}
-        <code>--slider-end</code>.
+        maths. When two thumbs share a value (stacked), the one that can move toward the pointer
+        moves, whichever of them was pressed; a press exactly on the value lets the first move
+        decide. The commit uses the release position. The Indicator renders no position: place it
+        from <code>--slider-start</code> / <code>--slider-end</code>.
       </p>
 
       <h4>
@@ -319,14 +321,21 @@ export function SliderPage() {
         The Label must stay a <code>&lt;label&gt;</code> with one thumb (it names the input through{" "}
         <code>for</code>). The Value is a plain <code>span</code>, not <code>&lt;output&gt;</code>:
         a live region that updates on every step would chatter, and the slider already exposes its
-        value. <code>SliderValueState</code> is the Root's state plus <code>index</code>.
+        value. <code>SliderValueState</code> is the Root's state plus <code>index</code>. Their
+        state is not tied to the Root's value type: <code>value</code> is typed{" "}
+        <code>number | readonly number[]</code>; narrow it with{" "}
+        <code>&lt;Slider.Value&lt;number&gt;&gt;</code> or read <code>values</code>.
       </p>
 
       <h3>Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
-          ["`data-pending`", "Root", "A step or commit is in flight."],
+          [
+            "`data-pending`",
+            "Root",
+            "A step (with a `valueChangeAction`) or commit is in flight. Even a synchronous step action makes each pointer move a short pending render; for a spinner use `[data-pending]:not([data-dragging])`.",
+          ],
           ["`data-pending`", "Thumb", "The Root is pending and this is the thumb that moved."],
           ["`data-dragging`", "Root, Thumb", "A pointer is captured (on this thumb)."],
           ["`data-orientation`", "every part", "`horizontal` or `vertical`."],

@@ -4,6 +4,7 @@ import type {
   SliderRootProps,
   SliderRootState,
   SliderThumbProps,
+  SliderValue,
   SliderValueChangeDetails,
   SliderValueCommitDetails,
 } from "./index.js";
@@ -71,5 +72,31 @@ describe("SliderRootProps", () => {
     expectTypeOf<SliderThumbProps>().toHaveProperty("aria-label");
     // @ts-expect-error -- no `transition` on a Thumb either
     void (<Slider.Thumb transition="x" />);
+  });
+});
+
+describe("Slider.Value / Slider.Label state", () => {
+  it("is not tied to the Root: `value` is a number or an array unless narrowed", () => {
+    const element = (
+      <Slider.Root defaultValue={[20, 80]} aria-label="Price">
+        <Slider.Value>
+          {(state) => {
+            expectTypeOf(state.value).toEqualTypeOf<SliderValue>();
+            expectTypeOf(state.values).toEqualTypeOf<readonly number[]>();
+            return null;
+          }}
+        </Slider.Value>
+        {/* @ts-expect-error -- `value` may be an array: narrow it or read `values` */}
+        <Slider.Value>{({ value }) => value.toFixed(0)}</Slider.Value>
+        <Slider.Value<number>>{({ value }) => value.toFixed(0)}</Slider.Value>
+        <Slider.Label
+          className={(state) => {
+            expectTypeOf(state.value).toEqualTypeOf<SliderValue>();
+            return undefined;
+          }}
+        />
+      </Slider.Root>
+    );
+    void element;
   });
 });

@@ -104,7 +104,7 @@
   scale: 1.15;
 }
 
-.sl-thumb[data-pending] {
+.sl-thumb[data-pending]:not([data-dragging]) {
   box-shadow:
     0 0 0 3px #f5a623,
     0 1px 3px rgb(0 0 0 / 0.25);

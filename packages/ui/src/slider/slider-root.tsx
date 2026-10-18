@@ -41,7 +41,8 @@ export type SliderOrientation = "horizontal" | "vertical";
 export interface SliderValueChangeDetails extends ActionDetails {
   /**
    * `"activate"`: the user moved a thumb (`details.event` is the native `input` event for a key
-   * press, the `pointerdown` / `pointermove` for a drag, the `keydown` for a JS-normalised key).
+   * press, the `pointerdown` / `pointermove` / `pointerup` for a drag, the `keydown` for a
+   * JS-normalised key).
    * `"platform"`: a form reset (the `reset` event) or a value found in the inputs at mount
    * (`undefined`).
    * `"dismiss"`: the commit action rejected and the slider reverted to the committed value
@@ -109,7 +110,8 @@ export interface SliderRootProps<T extends SliderValue = number> extends Omit<
   /**
    * Runs inside the Root's step transition on every step: each pointer move, each key press,
    * each platform change, and the revert after a rejected commit (`reason: "dismiss"`,
-   * uncontrolled). Awaited; `data-pending` meanwhile. Adopt the value here in a controlled
+   * uncontrolled). Awaited; `data-pending` meanwhile (without this action a step starts no
+   * transition and is never pending). Adopt the value here in a controlled
    * parent (`setValue(next)` in the sync prefix is a transition update). Not the place for a
    * save: a pending async action entangles every transition in the app, and a drag is many
    * steps. A `setState` after your own `await` needs `startTransition`.
@@ -186,7 +188,6 @@ function writeDefaults(
 
 /** A pointer captured on a Thumb or the Track (design 4.1). */
 interface ActiveGesture {
-  readonly thumb: number;
   readonly pointerId: number;
   /** Detaches the gesture's listeners. */
   readonly detach: () => void;
@@ -246,6 +247,13 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   const [live, setLive] = useState<readonly number[] | null>(null);
   const [gestureThumb, setGestureThumb] = useState<number | null>(null);
+  /**
+   * A step was taken and its gesture's commit has not been dispatched yet. Holds `live` on
+   * screen between a key's native `input` and `change` when no step transition runs (no
+   * `valueChangeAction`): otherwise react-dom restores the controlled input to the old value
+   * after `input`, and Firefox then fires no `change`.
+   */
+  const [stepHeld, setStepHeld] = useState(false);
   const [pendingThumb, setPendingThumb] = useState<number | null>(null);
 
   /** The value of the latest step, read by the commit in the same or a later event. */
@@ -286,7 +294,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   const { pending: stepPending, run: runStep } = useActionTrigger();
 
   const optimisticValues = useMemo(() => toArray(optimistic), [optimistic]);
-  const held = gestureThumb !== null || stepPending || commitState.pending;
+  const held = gestureThumb !== null || stepHeld || stepPending || commitState.pending;
   const shown = held && live !== null ? live : optimisticValues;
   const pending = stepPending || commitState.pending;
 
@@ -320,7 +328,12 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       shownRef.current = next;
       setLive(next);
       setPendingThumb(thumb);
+      // A revert has no commit after it: the optimistic value already shows the committed one.
+      if (reason !== "dismiss") setStepHeld(true);
       const { valueChangeAction: action, fromArray: toValue, runStep: run } = latest.current;
+      // Without a step action there is nothing to run and no consumer update to keep
+      // interruptible: no transition, so `data-pending` does not blink on every pointer move.
+      if (action === undefined) return true;
       run(() => {
         for (const type of STEP_TYPES) addTransitionType(type);
         return action?.(toValue(next), createActionDetails(event, { reason, thumb }));
@@ -334,6 +347,8 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     (thumb: number | null, reason: ChangeReason, event: Event | undefined): void => {
       const start = gestureStart.current;
       gestureStart.current = null;
+      // The commit's own pending state holds `live` from here (set in this same batch).
+      setStepHeld(false);
       const next = liveRef.current;
       // Nothing changed since the gesture began (a drag out and back, a trailing `change`).
       if (start === null || next === null || equalValues(next, start)) return;
@@ -577,7 +592,38 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       };
 
       const start = valueAt(event.clientX, event.clientY);
-      const thumb = index ?? nearestThumb(shownRef.current, start);
+      const startValues = shownRef.current;
+      // A press on a Thumb that shares its value with a neighbour (stacked thumbs) moves the one
+      // that can go toward the pointer, the Track's tie rule; when the press is exactly on the
+      // value, the first move decides. Otherwise a Thumb press moves that Thumb.
+      let tied: { readonly first: number; readonly last: number; readonly at: number } | null =
+        null;
+      if (index !== null) {
+        const at = startValues[index];
+        if (at !== undefined) {
+          let first = index;
+          let last = index;
+          while (first > 0 && equalValues([startValues[first - 1] as number], [at])) first -= 1;
+          while (
+            last < startValues.length - 1 &&
+            equalValues([startValues[last + 1] as number], [at])
+          ) {
+            last += 1;
+          }
+          if (first !== last) tied = { first, last, at };
+        }
+      }
+      const resolveTie = (raw: number): number | null => {
+        if (tied === null) return null;
+        if (raw > tied.at) return tied.last;
+        if (raw < tied.at) return tied.first;
+        return null;
+      };
+      /** The thumb the gesture moves; `null` while a press on stacked thumbs is undecided. */
+      let decided: number | null =
+        index === null ? nearestThumb(startValues, start) : tied ? resolveTie(start) : index;
+      /** The thumb shown as dragging and focused meanwhile. */
+      let thumb = decided ?? index ?? 0;
       const pointerId = event.pointerId;
       try {
         element.setPointerCapture(pointerId);
@@ -585,13 +631,32 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
         // An inactive pointer id (a synthetic event): the gesture still follows the element.
       }
 
+      const decide = (raw: number): boolean => {
+        if (decided !== null) return true;
+        decided = resolveTie(raw);
+        if (decided === null) return false;
+        if (decided !== thumb) {
+          thumb = decided;
+          setGestureThumb(thumb);
+          registry.get(thumb)?.focus({ focusVisible: false } as FocusOptions);
+        }
+        return true;
+      };
+      const follow = (pointerEvent: PointerEvent): void => {
+        const raw = valueAt(pointerEvent.clientX, pointerEvent.clientY);
+        if (decide(raw)) moveTo(thumb, raw, pointerEvent);
+      };
+
       const onMove = (moveEvent: PointerEvent): void => {
         if (moveEvent.pointerId !== pointerId) return;
-        moveTo(thumb, valueAt(moveEvent.clientX, moveEvent.clientY), moveEvent);
+        follow(moveEvent);
       };
       const onEnd = (endEvent: PointerEvent): void => {
         if (endEvent.pointerId !== pointerId) return;
         detach();
+        // The release position is the gesture's last (an engine may coalesce the final move
+        // into the `pointerup`); a cancel or a lost capture keeps the last move's value.
+        if (endEvent.type === "pointerup") follow(endEvent);
         activeGesture.current = null;
         setGestureThumb(null);
         commitGesture(thumb, "activate", endEvent);
@@ -607,7 +672,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       element.addEventListener("pointercancel", onEnd);
       element.addEventListener("lostpointercapture", onEnd);
 
-      activeGesture.current = { thumb, pointerId, detach };
+      activeGesture.current = { pointerId, detach };
       setGestureThumb(thumb);
       gestureStart.current = shownRef.current;
       liveRef.current = shownRef.current;
@@ -616,7 +681,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       setLive(shownRef.current);
       // `:focus-visible` does not match after a pointer press, as on a native range.
       registry.get(thumb)?.focus({ focusVisible: false } as FocusOptions);
-      moveTo(thumb, start, event);
+      if (decided !== null) moveTo(thumb, start, event);
     },
     [commitGesture, latest, registry, shownRef, stepTo],
   );

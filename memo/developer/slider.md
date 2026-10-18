@@ -51,13 +51,12 @@ Files: `packages/ui/src/slider/*`, widened `internal/use-native-group-reconcilia
 Under `act()` (React 19.3.1, jsdom), a transition that suspended (step: parent `setValue(70)`
 renders a suspending child) followed, in a later `act`, by a second async transition
 (`startTransition(async () => { setOptimistic(v); })`) never completes after the suspended data
-resolves: both `isPending` stay true forever. On the real scheduler (no `act`) it completes. Plain
-React repro: two `useTransition`s in one component, the first `setValue` on the parent with a
-`use()`-suspending sibling, `act(() => step(70)); await act(async () => {}); act(() =>
-commit(70)); await act(async () => resolve("70"))` -> parent stays 40. The jsdom "no snap /
-suspended content" row therefore runs that part with `IS_REACT_ACT_ENVIRONMENT = false` and raw
-`dispatchEvent` (Testing Library's fireEvent wraps in act). Candidate for an upstream report (a
-human task); not filed.
+resolves: both `isPending` stay true forever. **Cause (reviewer, L4): the sync `act(() => ...)`
+around the suspending update.** React logs "A component suspended inside an `act` scope, but the
+`act` call was not awaited" and documents sync `act` + suspension as unsupported. With
+`await act(async () => ...)` everything completes. Not a React bug; nothing to report. The
+"no snap / suspended content" row now uses awaited `act` around raw `dispatchEvent`
+(`withoutAct` removed). Rule: any interaction that may suspend goes in `await act(async ...)`.
 
 ## Engines
 
@@ -71,3 +70,38 @@ machine (no host deps). CI must confirm on WebKit:
 - the pre-hydration iframe row (keyboard fallback is in place for WebKit);
 - `@property` + `transitionstart` on a custom property.
 Firefox form-state restoration across a srcdoc iframe reload happened locally (no warning).
+
+## Review fixes (2026-10-18, memo/reviewer/slider.md)
+
+- H1: horizontal + computed `direction: rtl` on the input -> ArrowLeft / ArrowRight handled from
+  `keydown` (prevented, Left = +step), same path as vertical. Read at each keydown from
+  `event.currentTarget` (no instanceof: the pre-hydration row uses an iframe realm).
+- M1: a Thumb press whose value is shared with neighbours (stacked) uses the tie rule: the
+  pointer above the value -> the last of the stack, below -> the first; exactly on the value ->
+  undecided (the pressed thumb shows `data-dragging` and focus) until the first move off the
+  value, which picks and moves focus / `data-dragging` to the chosen thumb. Track presses
+  unchanged (`nearestThumb`).
+- M2: `stepTo` starts no step transition when there is no `valueChangeAction`: nothing pending
+  during a drag. With an action each step is a real transition, so a sync action still blinks
+  `data-pending` per move; documented, the docs / example CSS style the spinner on
+  `[data-pending]:not([data-dragging])`. Pitfall found by the Firefox Home / End row: without
+  the step transition nothing held `live` between a key's native `input` and `change`, so
+  react-dom restored the controlled input to the old value after `input` and Firefox then fired
+  no `change` (Chromium does). New `stepHeld` state: set by every non-`"dismiss"` step, cleared
+  by `commitGesture`; part of `held`. jsdom row "a key's input holds the value until its change".
+- L1: rejection rows renamed; the boundary row asserts the slider is gone; a retry-boundary row
+  (per mode) asserts what the remount shows; a mounted rollback row (update-on-success parent,
+  save failure caught in the action) asserts the thumb returns to 40.
+- L2: `Slider.Value` / `Slider.Label` generics default to `SliderValue`, not `number`.
+- L3: `pointerup` steps to the release position before the commit (a step with
+  `event.type === "pointerup"` when it differs from the last move); cancel / lost capture keep
+  the last move.
+- M3 (#62): Firefox instance `fileParallelism: false`; drag row strict again. See
+  cross-engine.md.
+- Seen once (one full gate run, 70 files, other agents active): Chromium "a roll back animates
+  the registered property" got two `transitionstart`s instead of one. Not reproduced: 4/4
+  isolated, 12/12 under 4 parallel runs + CPU load, 4 more full runs green. jsdom row "release
+  returns once, no bounce" pins that the shown value does not go 80 -> 20 -> 80 at release with
+  no actions. Tried releasing `stepHeld` in a transition instead of urgently: it entangles with
+  the pending async commit and delays the superseded-rejection boundary render; reverted. Watch
+  CI for a recurrence.
