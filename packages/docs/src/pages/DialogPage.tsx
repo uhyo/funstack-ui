@@ -365,14 +365,19 @@ export function DialogPage() {
             description: (
               <>
                 With a function <code>action</code>: close the dialog once the action settles
-                without throwing. Any non-throwing result counts, including a{" "}
-                <code>useActionState</code> result that reports validation errors; set{" "}
-                <code>false</code> to keep the dialog open and close it yourself (a{" "}
-                <code>Dialog.Close</code>, a submit button in a separate{" "}
-                <code>method="dialog"</code> form, or a controlled <code>open</code>; a{" "}
-                <code>formMethod="dialog"</code> submitter inside this form runs the action again
-                instead). The dialog is never closed when it was closed while the action ran, even
-                if the user re-opened it meanwhile.
+                without throwing and, when the form is rendered as a <code>Form.Root</code> (
+                <code>{"render={<Form.Root errors={state.errors} />}"}</code>), with no field error:
+                a settle whose <code>errors</code> has a non-empty entry (hidden stale ones
+                included, the <code>autoReset</code> rule) keeps the dialog open and the Form
+                focuses the first errored field. Without a <code>Form.Root</code> the library never
+                sees a result, so any settle that does not throw counts, including a{" "}
+                <code>useActionState</code> result that reports errors: render the form as a{" "}
+                <code>Form.Root</code> to route them, throw to keep the dialog open, or set{" "}
+                <code>false</code> and close it yourself (a <code>Dialog.Close</code>, a submit
+                button in a separate <code>method="dialog"</code> form, or a controlled{" "}
+                <code>open</code>; a <code>formMethod="dialog"</code> submitter inside this form
+                runs the action again instead). The dialog is never closed when it was closed while
+                the action ran, even if the user re-opened it meanwhile.
               </>
             ),
           },
@@ -398,9 +403,13 @@ export function DialogPage() {
           {"<Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />}>"}
         </code>
         . The Form then runs the action, routes the errors to its fields and resets the form only on
-        success (React's own path resets it after every successful action); see{" "}
-        <a href="/components/field#dialog-form">Field and Form: in a Dialog</a>. Pair it with{" "}
-        <code>closeOnSettle={"{false}"}</code>, since a result with errors also settles.
+        success (React's own path resets it after every successful action), and the dialog closes
+        only on a result with no field error: errors keep it open with the first errored field
+        focused. The composition needs a function <code>action</code> (without one the form would
+        navigate; a development warning says so). The reset runs before the close, so pass{" "}
+        <code>autoReset={"{false}"}</code> on the <code>Form.Root</code> element if your exit
+        animation is visible. See{" "}
+        <a href="/components/field#dialog-form">Field and Form: in a Dialog</a>.
       </p>
 
       <h4>

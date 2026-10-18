@@ -204,9 +204,15 @@ import { Form } from "@funstack/ui/form";
       <CodeBlock>{`const [state, dispatch] = useActionState(saveProfile, {});
 
 <Dialog.Popup>
-  <Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />} closeOnSettle={false}>
-    <Field.Root name="email">…</Field.Root>
-    <Form.Submit>Save</Form.Submit>
+  <Dialog.Title>Edit profile</Dialog.Title>
+  <Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />}>
+    <Field.Root name="email">
+      <Field.Label>Email</Field.Label>
+      <Field.Control type="email" required />
+      <Field.Error />
+    </Field.Root>
+    <Dialog.Close value="cancel">Cancel</Dialog.Close>
+    <Form.Submit value="save">Save</Form.Submit>
   </Dialog.Form>
 </Dialog.Popup>`}</CodeBlock>
       <p>
@@ -216,11 +222,29 @@ import { Form } from "@funstack/ui/form";
         <code>Form.Root</code> receives the <code>action</code> and runs it, so its policy applies:
         server errors are routed to the fields and focused, and the form is reset only when the
         result has no error (<code>autoReset</code>, which you can pass on the{" "}
-        <code>Form.Root</code> element). <code>Dialog.Form</code>'s default{" "}
-        <code>closeOnSettle</code> still closes the dialog when the action settles, errors or not:
-        pass <code>closeOnSettle={"{false}"}</code> and close it yourself on success (for example
-        with a controlled <code>open</code>) to let the user fix the errors.
+        <code>Form.Root</code> element). <code>Dialog.Form</code>'s <code>closeOnSettle</code>{" "}
+        follows the same rule: a result with a field error keeps the dialog open (the typed values
+        stay and the first errored field is focused), a result with no error resets the form and
+        closes the dialog with the <code>Form.Submit</code>'s <code>value</code> as{" "}
+        <code>returnValue</code>. An action that throws keeps the dialog open and reaches the
+        nearest Error Boundary. An error hidden because the user changed that value while the action
+        ran still counts: the dialog stays open and the user submits the new value.
       </p>
+      <ul>
+        <li>
+          The reset runs before the close, so an exit animation shows the fields at their defaults.
+          With the default content (unmounted on close) the next open starts fresh anyway: pass{" "}
+          <code>autoReset={"{false}"}</code> on the <code>Form.Root</code> element if your exit is
+          visible. With <code>keepMounted</code> keep the default, since the reset is what makes the
+          next open clean.
+        </li>
+        <li>
+          The composition needs a function <code>action</code>. Without one, <code>Form.Root</code>{" "}
+          owns <code>method</code> and the form would navigate instead of closing the dialog (a
+          development warning says so); render a plain <code>Dialog.Form</code> for a{" "}
+          <code>method="dialog"</code> form.
+        </li>
+      </ul>
 
       <Callout title="A submitter with its own formAction">
         <p>
