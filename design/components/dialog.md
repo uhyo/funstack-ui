@@ -12,7 +12,10 @@ implementation notes and test plan, in "Amendment: library-owned part-initiated 
 end. The amendment is implemented (#46), and the review of that implementation
 (`memo/reviewer/dialog-46.md`; fixes in commits 56e1ea8..bcdb7e1, notes in
 `memo/developer/dialog.md`) is folded in on 2026-10-18, see "Review corrections (#46)" at the
-end. The code under `packages/ui/src/dialog/` is the ground truth where this document is silent.
+end. **Amended 2026-10-18 (issue #59): `Dialog.Form`'s settle close is error-aware when the
+form is rendered as a `Form.Root`** (no new props; accepted, implemented in 32611fd, docs in
+8cbde22, folded into row 9, 3.5, 8.1, 13.2, 14, see "Dialog.Form and Form.Root (#59)" at the
+end). The code under `packages/ui/src/dialog/` is the ground truth where this document is silent.
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win.
 
@@ -44,7 +47,7 @@ when the content is ready.
 | 6 | Content mounting | Library mode: Popup children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">` (conventions 3.7, boolean only). Unmount is deferred until the dialog's exit animations finish so a fading dialog is never empty. JS-free mode: always mounted (the markup must be complete before hydration). |
 | 7 | Initial focus | `initialFocus` on Popup (a ref or a selector). The library writes `autofocus` on the resolved element through the DOM right before `showModal()` and lets the platform's dialog focusing steps run; it never calls `.focus()` on open. Return focus is the platform's; the library only handles "the opener is gone". |
 | 8 | Dismissal | Escape and Android back are the platform's and cannot be disabled in v0 (the anti-abuse rule allows one veto per activation, which is not an API). `lightDismiss` on Popup (default `false`) closes on a backdrop click through JS `pointerdown` + `click` listeners: both the press and the click must land outside, as native `closedby="any"` requires. `experimental_closedBy` on Popup renders `closedby="any" \| "closerequest"` and skips the JS where `closedBy` is implemented. |
-| 9 | Forms | `Dialog.Form` renders `<form method="dialog">` (JS-free: submit closes with the submitter's `value` as `returnValue`; library mode: the submit is intercepted and closes through the Root) or, with `action`, `<form action={action}>` plus a status watcher that closes the dialog (through the Root in library mode) when the action's transition settles. The action is passed through unwrapped, so a Server Function keeps React's progressive enhancement. `Dialog.Close action` is the single-button form of the same thing. |
+| 9 | Forms | `Dialog.Form` renders `<form method="dialog">` (JS-free: submit closes with the submitter's `value` as `returnValue`; library mode: the submit is intercepted and closes through the Root) or, with `action`, `<form action={action}>` plus a status watcher that closes the dialog (through the Root in library mode) when the action's transition settles. The action is passed through unwrapped, so a Server Function keeps React's progressive enhancement. Field errors are not a Form prop: render the form as a `Form.Root` (`render={<Form.Root errors={state.errors} />}`), and the settle close then waits for a result with no field error (#59). `Dialog.Close action` is the single-button form of the same thing. |
 | 10 | Animation | Enter and exit with CSS (`@starting-style`, `transition-behavior: allow-discrete`, `overlay`); the CSS exit is a progressive enhancement (instant in Firefox). Popup renders `<ViewTransition>` and takes `transition`: it animates the opening commit (content mount plus `showModal()`), content changes while open, and **every library-driven close** (Close, Form, foreign close command, controlled close) in all three engines; dismissals animate with CSS only. |
 | 11 | Scroll lock | CSS only, documented: `html:has(dialog:modal) { overflow: hidden }` with `scrollbar-gutter: stable`. No attribute on `<html>`, no JS. |
 | 12 | Directives | Every part file is `"use client"` (context for ids and mode). "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration, as in Accordion. |
@@ -815,14 +818,18 @@ export interface DialogFormProps
   action?: string | ((formData: FormData) => unknown);
   /**
    * With a function `action`: close the dialog once the action's transition settles without
-   * throwing. Default `true`.
+   * throwing and, when this form is rendered as a `Form.Root`
+   * (`render={<Form.Root errors={state.errors} />}`), with no field error: a settle whose
+   * `errors` has a non-empty entry (hidden stale ones included, the `autoReset` rule) keeps
+   * the dialog open and the Form focuses the first errored field. Default `true`.
    *
-   * Any result that does not throw counts as success, including a `useActionState`-style result
-   * that reports validation errors: with the default the dialog closes and those errors are never
-   * seen. Throw to keep the dialog open, or set `closeOnSettle={false}` and close it yourself:
-   * a `Dialog.Close`, a submit button in a separate `method="dialog"` form, or a controlled
-   * `open`. (A `formMethod="dialog"` submitter inside this form cannot close it: React prevents
-   * every submit of a form with a function `action` and runs the action again.)
+   * Without a `Form.Root` the library never sees a result, so any settle that does not throw
+   * counts, including a `useActionState` result that reports errors: render the form as a
+   * `Form.Root` to route them, throw to keep the dialog open, or set `closeOnSettle={false}`
+   * and close it yourself (a `Dialog.Close`, a submit button in a separate `method="dialog"`
+   * form, or a controlled `open`). A `formMethod="dialog"` submitter inside this form cannot
+   * close it: React prevents every submit of a form with a function `action` and runs the
+   * action again.
    *
    * The dialog is not closed either when it was closed (Escape, a Close part) while the action
    * ran, also if the user re-opened it meanwhile (section 8.1).
@@ -1258,8 +1265,29 @@ the exit uses controlled inputs or `useActionState`, the usual React answer.
 
 **`closeOnSettle`** (default `true`) is whether the settle close happens at all. It exists
 because "settled" is not "succeeded": an action wired through `useActionState` that *returns*
-validation errors instead of throwing settles its transition normally, and with the default the
-dialog closes with the errors unseen. Throwing keeps the dialog open (below); otherwise set
+validation errors instead of throwing settles its transition normally, and a plain `Dialog.Form`
+never sees the result, so with the default the dialog closes with the errors unseen. The answer
+for a form with field errors is the **`Form.Root` composition** (#59):
+`<Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />}>`. `Form.Root`
+then runs the action, routes the errors to the Fields and resets only on a clean settle
+(field-form.md 3), and `Dialog.Form`'s settle close becomes **error-aware**: a child rendered
+among the form's children reads the `FormContext` (present exactly when the form is a
+`Form.Root`, in either orientation of the composition) and the close is requested only when
+`hasAnyError(errors)` is false at the settle commit, the same predicate as `autoReset`, hidden
+stale entries included, so "reset" and "close" never disagree; a settle with errors keeps the
+dialog open while `Form.Root` focuses the first errored field. Three outcomes: the action throws
+(the dialog stays open, the Error Boundary shows the error), returns errors (open, values kept,
+first errored field focused, nothing reset), or settles clean (`Form.Root` resets, then the
+settle close through the Root with `reason: "activate"` and the submitter's `value`). The reset
+runs in the settle effect and the close commits later, so an exit animation shows the fields at
+their defaults, as React's own path already does for a plain `Dialog.Form` (below); with the
+default content mounting the next open mounts fresh fields anyway, so a consumer whose exit is
+visible passes `autoReset={false}` on the `Form.Root` element (keep the default with
+`keepMounted`). The composition **needs a function `action`**: without one `Form.Root` owns
+`method` and removes the `"dialog"` `Dialog.Form` passed (merge-props' owned-key rule), leaving
+a GET-navigating form; the library warns in development.
+
+Without a `Form.Root`, throwing keeps the dialog open (below); otherwise set
 `closeOnSettle={false}`, and the Form neither records an intent nor closes anything: the
 consumer closes when the returned state says so (a `<Dialog.Close>` next to the errors, a
 submit button in a separate `method="dialog"` form, or `setOpen(false)` from the controlled
@@ -1855,7 +1883,7 @@ update-on-success). Library mode unless stated.
 | Shadow root (review L1) | The Root rendered into a shadow root: a `method="dialog"` submit is intercepted and closes through the Root (the listener sits on `getRootNode()`); with a document listener the submit never arrives and the dialog stays open. |
 | Echo by source (review L4) | A re-open that becomes intended between the library's own `close()` and its `close` event (the controlled parent flips `open` back in that gap) is not superseded: the `close` event dispatches nothing. |
 | Nested dialogs and the shared submit listener | An inner library-mode Root and, separately, an inner JS-free Root inside an outer library Popup: an inner `method="dialog"` submit closes the inner dialog only (through its own Root, or natively), the outer Popup's listener ignores it (`form.closest("dialog")` is the inner element) and the outer dialog stays open. |
-| Form part | `method="dialog"` without `action`. **Library mode:** a submit (user-event click on the submitter) does not close natively: the `submit` event is default-prevented by the library, `openChangeAction(false, { reason: "activate", returnValue: submitterValue, event: SubmitEvent })` is called, `close(submitterValue)` after it resolves; a consumer `onSubmit` that calls `preventDefault()` keeps the dialog open and dispatches nothing; a submitter with `formMethod="dialog"` in a `method="post"`-less form behaves the same; a `method="dialog"` form rendered inside the Popup without `Dialog.Form` is intercepted too. **JS-free:** the shim closes natively, as today. With a function `action`: `method` absent, the action receives `FormData`, the settle close goes through the Root in library mode (`openChangeAction(false)` with the submitter's value, then `close(submitterValue)`; fake the status through a resolved `deferred()`) and through `close()` directly in JS-free mode; not called when it throws. `closeOnSettle`: a `useActionState` validation result closes by default; with `false` the dialog stays open showing the result and a `Dialog.Close` closes it. A close since the submit (Escape during the save, then a re-open through the Trigger) blocks the settle close: the dialog ends open, `close` not called again. `method="post"` is kept with a string `action` and replaced by `"dialog"` without one. |
+| Form part | `method="dialog"` without `action`. **Library mode:** a submit (user-event click on the submitter) does not close natively: the `submit` event is default-prevented by the library, `openChangeAction(false, { reason: "activate", returnValue: submitterValue, event: SubmitEvent })` is called, `close(submitterValue)` after it resolves; a consumer `onSubmit` that calls `preventDefault()` keeps the dialog open and dispatches nothing; a submitter with `formMethod="dialog"` in a `method="post"`-less form behaves the same; a `method="dialog"` form rendered inside the Popup without `Dialog.Form` is intercepted too. **JS-free:** the shim closes natively, as today. With a function `action`: `method` absent, the action receives `FormData`, the settle close goes through the Root in library mode (`openChangeAction(false)` with the submitter's value, then `close(submitterValue)`; fake the status through a resolved `deferred()`) and through `close()` directly in JS-free mode; not called when it throws. `closeOnSettle`: a plain `Dialog.Form` closes on a `useActionState` validation result by default; with `false` the dialog stays open showing the result and a `Dialog.Close` closes it. Rendered as a `Form.Root` (`form.test.tsx`, #59): a result with errors keeps the dialog open and focuses the field; a clean settle resets and closes with `reason: "activate"` and the submitter's `value`; a hidden stale error neither closes, resets nor focuses; `closeOnSettle={false}` never closes; the reverse orientation (`<Form.Root render={<Dialog.Form />}>`) behaves the same; the composition without a function `action` warns in development. A close since the submit (Escape during the save, then a re-open through the Trigger) blocks the settle close: the dialog ends open, `close` not called again. `method="post"` is kept with a string `action` and replaced by `"dialog"` without one. |
 | Foreign close command | A `command` event with `request-close` (and with `close`) dispatched on the dialog in library mode is default-prevented and dispatches `openChangeAction(false)` with `reason: "activate"`, `details.event` the `CommandEvent`, `returnValue` the source's `value`; `close(value)` after it resolves. JS-free: records the intent only (the shim closes). |
 | Held content (jsdom) | A controlled close (`open` flipped to `false`) without `transition`: the children are still in the DOM inside the `close` spy (the close commit holds them), and gone after the `close` event with no animations (release is a normal update: assert no `startViewTransition` call with the jsdom stub, 10.1). With `transition="none"`: the children are gone inside the `close` spy. `keepMounted`: the `<Activity>` is visible inside the spy without `transition`. |
 | Light dismiss (baseline) | With `lightDismiss`: a `pointerdown` + `click` on the dialog with coordinates outside `getBoundingClientRect()` (mocked) calls `requestClose`; inside, on a descendant, or a `pointerdown` inside followed by a `click` outside (drag out) does not; without the prop nothing. Non-modal: document pointerdown + click outside closes; a click on the Trigger does not. |
@@ -2059,7 +2087,12 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   component that calls `useFormStatus()`, keeps the previous `pending` in a ref and, in an effect
   on `true → false`, calls the Form's `onSettled`, which returns early when `closeOnSettle` is
   `false`, when the dialog closed since the last `submit` (a `closedSinceSubmit` ref set by a
-  `close` listener on `form.closest("dialog")` and reset by the capture `submit` listener), or
+  `close` listener on `form.closest("dialog")` and reset by the capture `submit` listener),
+  when the result has a field error (#59: the watcher is rendered through a `DialogFormSettle`
+  child that reads `use(FormContext)` and passes `clean = form === null ||
+  !hasAnyError(form.errors)`; the child is always rendered so it can also issue the dev warning
+  for a `Form.Root` composition without a function `action`, and renders the watcher only with
+  one), or
   when the dialog is not open, and otherwise closes: library mode → `ctx.requestClose(submitted
   ?.event, "activate", submitted?.returnValue ?? "")`; static mode → records the intent and calls
   `close(submitterValue)`. The submitter's `value` comes from that native `submit` listener on
@@ -2310,7 +2343,9 @@ part-cancelled-event note for the `preventDefault()` warning (2.3). Kept for the
 
 ## Dialog.Form and Form.Root (#59)
 
-Status: **proposed** (2026-10-18). Follow-up from the Field and Form design (#54, product-owner
+Status: **accepted and implemented** (2026-10-18; accepted in 6d13aa2, implemented in 32611fd
+with the docs in 8cbde22, folded into row 9, 3.5, 8.1, 13.2 and 14 the same day; see
+"Implementation deviations" at the end of this section). Follow-up from the Field and Form design (#54, product-owner
 item 9): now that `Form.Root` exists, should `Dialog.Form` gain `errors` / `autoReset` of its own
 and close only on a settle with no errors? Inputs: field-form.md 3.1 to 3.4 and walkthrough 11,
 this document's 3.5 and 8.1, `packages/ui/src/dialog/dialog-form.tsx`,
@@ -2521,3 +2556,10 @@ hydration; before it the Server Function posts with progressive enhancement, as 
    `action` (the composition silently loses `method="dialog"`). **Recommendation: accept.**
 
 **Accepted by the product owner (2026-10-18):** recommendations 1-5 of "Dialog.Form and Form.Root (#59)" are accepted as written.
+
+### Implementation deviations (32611fd, `memo/developer/dialog.md` "#59")
+
+| Item | Deviation | Section |
+| --- | --- | --- |
+| 1 | The context-reading child (`DialogFormSettle`) is **always** rendered among the form's children, not only with a function `action`, so the development warning for `render={<Form.Root />}` without an `action` can fire (the case it exists for has no action). It renders the `FormStatusWatcher` only with a function `action`, so the settle behaviour is as designed. Agreed: the design's "the same child issues the warning" needed exactly this. | 14 |
+| 2 | One extra jsdom row pins the reverse orientation, `<Form.Root action errors render={<Dialog.Form />}>`: `useRender`'s clone hands the Form's `action` to `Dialog.Form`, whose children sit inside the `FormContext` provider, so it is detected the same way. | 13.2 |
