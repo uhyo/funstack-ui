@@ -1335,7 +1335,7 @@ deviation the reviewer accepted; none is corrected here.
 | Deviations 1 to 11 | Accepted by the reviewer and folded: (1) End → the largest grid point `≤ max`; (2) an empty value skips the against-direction rule; (3) the hydration re-sync writes `visible.value` directly; (4) no hidden-input registry, refs through context with `onInputMounted`; (5) the parser's affix-level leniencies and bidi stripping; (6) `event` undefined on hold ticks; (7) Ctrl / Meta combinations not handled; (8) `deltaY === 0` ignored; (9) a consumer `aria-labelledby` omits the default `aria-label`; (10) a commit while `disabled` / `readOnly` clears the draft; (11) the percent test row needs `maximumFractionDigits: 1` for `0.5 → 0.005`. | 4.1, 4.2, 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 6.1, 8.4, 14.1 |
 | Reports | **Firefox's bubble and `:user-invalid` persist while the user types a fix** (validity follows the committed value): recorded as a known difference in 6.2 with an open question below, no change now. **Implicit submission needs a submit button** (the hidden number input is a second field): correct platform behaviour, documented in 4.1 and on the docs page. **The Field layout shift under a click** is a property of every Field control; the Field docs page notes it, the rows tab out first. **Combobox and `focus-first-invalid.ts` keep their own announcements**; migrating them onto `announce.ts` is the optional part of #77. | 4.1, 6.2, 8.3, 14.2 |
 
-## Open question
+## Open question (resolved)
 
 - **Should validity follow the draft while the user types a fix?** Today the visible input's
   validity changes at commit (6.2), so an invalid field stays `:user-invalid` (and, in Firefox,
@@ -1346,6 +1346,9 @@ deviation the reviewer accepted; none is corrected here.
   drafts too. The architect's view: leave it; the `:user-invalid` styling is the consumer's and
   the Firefox bubble appears only for a bare form outside a Field. Worth a product-owner
   decision only if user feedback names it.
+
+  **Resolved (product owner and user, 2026-10-18): leave it.** Validity keeps following the committed
+  value. Revisit only if user feedback asks for it.
 
 ## Conventions feedback (applied to `design/conventions.md` 2026-10-18, 29a94c5)
 
