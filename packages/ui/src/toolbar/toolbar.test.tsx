@@ -16,6 +16,7 @@ import {
 import { Dialog } from "../dialog/index.js";
 import { Menu } from "../menu/index.js";
 import { Popover } from "../popover/index.js";
+import { RadioGroup } from "../radio-group/index.js";
 import { Toggle } from "../toggle/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
 import { Toolbar } from "./index.js";
@@ -751,6 +752,211 @@ describe("Toolbar", () => {
         "data-orientation",
         "horizontal",
       );
+    });
+  });
+
+  describe("native radios inside a Toolbar (#74, design 17)", () => {
+    /** Row 25/26 fixture: b1, a checked `align` group, b2, an unchecked `size` group, b3. */
+    function Radios({ loop }: { loop?: boolean }) {
+      return (
+        <>
+          <button type="button">before</button>
+          <Toolbar.Root aria-label="T" loop={loop}>
+            <Toolbar.Button>b1</Toolbar.Button>
+            <input type="radio" name="align" aria-label="left" />
+            <input type="radio" name="align" aria-label="center" defaultChecked />
+            <input type="radio" name="align" aria-label="right" />
+            <Toolbar.Button>b2</Toolbar.Button>
+            <input type="radio" name="size" aria-label="s" />
+            <input type="radio" name="size" aria-label="m" />
+            <input type="radio" name="size" aria-label="l" />
+            <Toolbar.Button>b3</Toolbar.Button>
+          </Toolbar.Root>
+          <button type="button">after</button>
+        </>
+      );
+    }
+    const radio = (name: string) => screen.getByRole("radio", { name }) as HTMLInputElement;
+    const checkedNames = () =>
+      (screen.getAllByRole("radio") as HTMLInputElement[])
+        .filter((r) => r.checked)
+        .map((r) => r.getAttribute("aria-label"));
+    const from = (el: HTMLElement, key: string, init?: KeyboardEventInit) => {
+      act(() => el.focus());
+      return press(el, key, init);
+    };
+
+    describe("navigation (row 25)", () => {
+      it.each([
+        ["b1", "ArrowRight", "center"],
+        ["b2", "ArrowLeft", "center"],
+        ["b2", "ArrowRight", "s"],
+        ["b3", "ArrowLeft", "s"],
+        ["b2", "Home", "b1"],
+        ["b2", "End", "b3"],
+      ])("%s + %s lands on %s and checks nothing", (start, key, expected) => {
+        render(<Radios />);
+        const el = screen.getByRole(start.startsWith("b") ? "button" : "radio", { name: start });
+        from(el, key);
+        const target = expected.startsWith("b")
+          ? button(expected)
+          : (radio(expected) as HTMLElement);
+        expect(target).toHaveFocus();
+        expect(checkedNames()).toEqual(["center"]);
+      });
+
+      it("Home / End land on a unit's representative", () => {
+        render(
+          <Toolbar.Root aria-label="T">
+            <input type="radio" name="a" aria-label="a1" />
+            <input type="radio" name="a" aria-label="a2" defaultChecked />
+            <Toolbar.Button>mid</Toolbar.Button>
+            <input type="radio" name="z" aria-label="z1" />
+            <input type="radio" name="z" aria-label="z2" />
+          </Toolbar.Root>,
+        );
+        // First entry is the first unit's representative.
+        expect(tabStops()).toEqual([radio("a2")]);
+        from(button("mid"), "Home");
+        expect(radio("a2")).toHaveFocus();
+        from(button("mid"), "End");
+        expect(radio("z1")).toHaveFocus();
+      });
+
+      it("on a radio, every arrow and Home / End is left to the radio group", () => {
+        render(<Radios />);
+        for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"]) {
+          const event = from(radio("center"), key);
+          expect(event.defaultPrevented).toBe(false);
+          expect(radio("center")).toHaveFocus();
+        }
+      });
+
+      it("loop wraps over units: b3 → b1, b1 → b3", () => {
+        render(<Radios />);
+        from(button("b3"), "ArrowRight");
+        expect(button("b1")).toHaveFocus();
+        from(button("b1"), "ArrowLeft");
+        expect(button("b3")).toHaveFocus();
+      });
+
+      it("a button[role=radio] is an ordinary item: the arrows walk through it", () => {
+        render(
+          <Toolbar.Root aria-label="T">
+            <Toolbar.Button>b1</Toolbar.Button>
+            <button type="button" role="radio" aria-checked="true">
+              r1
+            </button>
+            <button type="button" role="radio" aria-checked="false">
+              r2
+            </button>
+          </Toolbar.Root>,
+        );
+        const r1 = screen.getByRole("radio", { name: "r1" });
+        from(button("b1"), "ArrowRight");
+        expect(r1).toHaveFocus();
+        const event = press(r1, "ArrowRight");
+        expect(event.defaultPrevented).toBe(true);
+        expect(screen.getByRole("radio", { name: "r2" })).toHaveFocus();
+      });
+    });
+
+    describe("Tab and tabindex (row 26)", () => {
+      it("Tab / Shift+Tab from the checked radio go to the adjacent items", async () => {
+        render(<Radios />);
+        const user = setupUser();
+        act(() => radio("center").focus());
+        await user.tab();
+        expect(button("b2")).toHaveFocus();
+        act(() => radio("center").focus());
+        await user.tab({ shift: true });
+        expect(button("b1")).toHaveFocus();
+      });
+
+      it("Tab from an unchecked radio whose sibling is checked visits that sibling first", async () => {
+        render(<Radios />);
+        const user = setupUser();
+        act(() => radio("left").focus());
+        await user.tab();
+        expect(radio("center")).toHaveFocus();
+        await user.tab();
+        expect(button("b2")).toHaveFocus();
+        act(() => radio("right").focus());
+        await user.tab({ shift: true });
+        expect(radio("center")).toHaveFocus();
+      });
+
+      it.each(["s", "m", "l"])(
+        "Tab / Shift+Tab from %s (nothing checked) leave the unit",
+        async (name) => {
+          render(<Radios />);
+          const user = setupUser();
+          act(() => radio(name).focus());
+          await user.tab();
+          expect(button("b3")).toHaveFocus();
+          act(() => radio(name).focus());
+          await user.tab({ shift: true });
+          expect(button("b2")).toHaveFocus();
+        },
+      );
+
+      it("Tab from the last unit is not handled", () => {
+        render(
+          <Toolbar.Root aria-label="T">
+            <Toolbar.Button>b1</Toolbar.Button>
+            <input type="radio" name="z" aria-label="z1" defaultChecked />
+            <input type="radio" name="z" aria-label="z2" />
+          </Toolbar.Root>,
+        );
+        expect(from(radio("z1"), "Tab").defaultPrevented).toBe(false);
+        expect(from(radio("z1"), "Tab", { shiftKey: true }).defaultPrevented).toBe(true);
+        expect(button("b1")).toHaveFocus();
+      });
+
+      it("tabindex: 0 on the stop's radio, -1 on the rest of its unit and on other units", () => {
+        render(<Radios />);
+        // First entry: b1. Every radio is -1.
+        expect(tabStops()).toEqual([button("b1")]);
+        for (const name of ["left", "center", "right", "s", "m", "l"]) {
+          expect(radio(name)).toHaveAttribute("tabindex", "-1");
+        }
+        from(button("b1"), "ArrowRight"); // lands on the representative
+        expect(tabStops()).toEqual([radio("center")]);
+        // Focus on an unchecked radio moves the 0 to it.
+        act(() => radio("m").focus());
+        expect(tabStops()).toEqual([radio("m")]);
+        expect(radio("s")).toHaveAttribute("tabindex", "-1");
+        expect(radio("center")).toHaveAttribute("tabindex", "-1");
+      });
+
+      it("a RadioGroup.Root inside the toolbar is one unit; disabled removes it", () => {
+        const { rerender } = render(
+          <Toolbar.Root aria-label="T">
+            <Toolbar.Button>b1</Toolbar.Button>
+            <RadioGroup.Root aria-label="Size" defaultValue="m">
+              <RadioGroup.Item value="s" aria-label="s" />
+              <RadioGroup.Item value="m" aria-label="m" />
+            </RadioGroup.Root>
+            <Toolbar.Button>b2</Toolbar.Button>
+          </Toolbar.Root>,
+        );
+        from(button("b1"), "ArrowRight");
+        expect(radio("m")).toHaveFocus();
+        from(button("b2"), "ArrowLeft");
+        expect(radio("m")).toHaveFocus();
+        rerender(
+          <Toolbar.Root aria-label="T">
+            <Toolbar.Button>b1</Toolbar.Button>
+            <RadioGroup.Root aria-label="Size" defaultValue="m" disabled>
+              <RadioGroup.Item value="s" aria-label="s" />
+              <RadioGroup.Item value="m" aria-label="m" />
+            </RadioGroup.Root>
+            <Toolbar.Button>b2</Toolbar.Button>
+          </Toolbar.Root>,
+        );
+        from(button("b1"), "ArrowRight");
+        expect(button("b2")).toHaveFocus();
+      });
     });
   });
 });

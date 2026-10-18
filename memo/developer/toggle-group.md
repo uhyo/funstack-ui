@@ -84,3 +84,28 @@ Design: `design/components/toggle-group.md` (accepted 2026-10-18).
 - Nit 9: jsdom row 15 asserts the first menu item has focus.
 - Nit 10: RTL advice is `side="left"` (docs pages and the vertical example's comment).
 - Nit 11: reduced-motion block on the Toolbar page.
+
+## Wave 7: native radios in a Toolbar (#74) and Tooltip's check (#75)
+
+Design sections 17 and 18 (0473012), test rows 25-28.
+
+- Engine: `collectItems(root, managed)` returns `{ items, units }`; native radios sharing a `name`
+  form one unit (a radio without a `name` is a unit of one), represented in `items` by the
+  checked radio, else the first, at the position of the unit's first radio. `itemsOf` stays as
+  `collectItems(...).items`. `isTextEntryItem` became `ownsArrows` (radio removed from the
+  button-like inputs). `apply` writes `tabindex` on the items and on every radio of every unit;
+  `current` may be any radio of a unit and is kept while its unit's representative is an item.
+  The Tab branch visits the checked sibling first, then the item next to the unit.
+- Tooltip: `role="group"` added to the composite selector (`role="toolbar"` was already there).
+
+Deviations / notes:
+
+- **Row 25 "Home / End from b2 land on the first group's checked radio / b3"**: in the row's own
+  fixture `b1` is the first item, so Home from `b2` lands on `b1` (as on the native path; the probe
+  did not cover Home from a button). Tested as `b1` / `b3`, plus a separate toolbar whose first and
+  last items are radio units: Home / End land on the representatives.
+- **Row 28 premise**: the #57 check did fire before this fix. Tooltip's check runs in a passive
+  effect, after the ToggleGroup's layout effect wrote `-1` in the same mount commit, so a Tooltip
+  on a non-first Item of a standalone ToggleGroup warned (my earlier memo note "runs before the
+  engine writes" was wrong). The new test failed with 3 warnings before the selector change.
+- Row 27 (browser) passes locally on Chromium native, Chromium JS and Firefox JS; WebKit only on CI.

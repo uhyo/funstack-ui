@@ -201,6 +201,97 @@ describe.each([
   );
 });
 
+describe.each([
+  ["with experimental_focusgroup", true],
+  ["without the flag (JS path everywhere)", false],
+] as const)("native radios inside a Toolbar %s (#74, row 27)", (_label, flag) => {
+  function Radios() {
+    return (
+      <>
+        <button type="button">before</button>
+        <Toolbar.Root aria-label="T" experimental_focusgroup={flag}>
+          <Toolbar.Button>b1</Toolbar.Button>
+          <input type="radio" name="align" aria-label="left" />
+          <input type="radio" name="align" aria-label="center" defaultChecked />
+          <input type="radio" name="align" aria-label="right" />
+          <Toolbar.Button>b2</Toolbar.Button>
+          <input type="radio" name="size" aria-label="s" />
+          <input type="radio" name="size" aria-label="m" />
+          <input type="radio" name="size" aria-label="l" />
+          <Toolbar.Button>b3</Toolbar.Button>
+        </Toolbar.Root>
+        <button type="button">after</button>
+      </>
+    );
+  }
+  const radio = (name: string) => screen.getByRole("radio", { name }) as HTMLInputElement;
+  const checked = () =>
+    (screen.getAllByRole("radio") as HTMLInputElement[])
+      .filter((r) => r.checked)
+      .map((r) => r.getAttribute("aria-label"));
+
+  it("arrows land on the unit's representative, then check and wrap within the group; Tab leaves", async () => {
+    render(<Radios />);
+    const native = flag && supportsFocusgroup;
+    await expect.poll(() => button("b2").getAttribute("tabindex")).toBe(native ? null : "-1");
+
+    button("before").focus();
+    await user.keyboard("{Tab}");
+    await expect.poll(focused).toBe(button("b1"));
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(focused).toBe(radio("center"));
+    expect(checked()).toEqual(["center"]);
+    // The group's own arrows: check as they move, wrap within the group, both axes.
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(focused).toBe(radio("right"));
+    await user.keyboard("{ArrowRight}"); // trapped: wraps within the group
+    await expect.poll(focused).toBe(radio("left"));
+    await user.keyboard("{ArrowDown}");
+    await expect.poll(focused).toBe(radio("center"));
+    expect(checked()).toEqual(["center"]);
+    await user.keyboard("{Home}");
+    expect(focused()).toBe(radio("center"));
+    // Leave with Tab.
+    await user.keyboard("{Tab}");
+    await expect.poll(focused).toBe(button("b2"));
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(focused).toBe(radio("s")); // none checked: the first radio
+    expect(checked()).toEqual(["center"]);
+    await user.keyboard("{Tab}");
+    await expect.poll(focused).toBe(button("b3"));
+    await user.keyboard("{ArrowLeft}");
+    await expect.poll(focused).toBe(radio("s"));
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    await expect.poll(focused).toBe(button("b2"));
+    await user.keyboard("{ArrowLeft}");
+    await expect.poll(focused).toBe(radio("center"));
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    await expect.poll(focused).toBe(button("b1"));
+  });
+
+  it("Tab from an unchecked radio visits the checked sibling; memory re-enters on the remembered radio", async () => {
+    render(<Radios />);
+    await expect
+      .poll(() => button("b2").getAttribute("tabindex"))
+      .toBe(flag && supportsFocusgroup ? null : "-1");
+    radio("left").focus();
+    await user.keyboard("{Tab}");
+    await expect.poll(focused).toBe(radio("center"));
+    await user.keyboard("{Tab}");
+    await expect.poll(focused).toBe(button("b2"));
+
+    // Arrow into the align group and move to `right` (now checked), then leave and come back.
+    await user.keyboard("{ArrowLeft}");
+    await expect.poll(focused).toBe(radio("center"));
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(focused).toBe(radio("right"));
+    expect(checked()).toEqual(["right"]);
+    button("after").focus();
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    await expect.poll(focused).toBe(radio("right"));
+  });
+});
+
 describe("Toolbar: native focusgroup detection", () => {
   it("Chromium has native focusgroup; Firefox and WebKit do not", () => {
     expect(supportsFocusgroup).toBe(browserName === "chromium");

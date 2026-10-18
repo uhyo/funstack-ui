@@ -68,22 +68,71 @@ function isNestedOut(el: HTMLElement, root: HTMLElement): boolean {
   return false;
 }
 
+function isRadio(el: Element): el is HTMLInputElement {
+  return el instanceof HTMLInputElement && el.type === "radio";
+}
+
+/** The items of a container, with native radio groups collapsed into units (design 17.2). */
+export interface RovingItems {
+  /** The toolbar's own destinations in DOM order; a radio unit appears as its representative. */
+  readonly items: HTMLElement[];
+  /**
+   * Every native radio among the candidates → the radios of its unit (same `name` under the
+   * container, DOM order). A radio without a `name` is a unit of one.
+   */
+  readonly units: Map<HTMLElement, readonly HTMLInputElement[]>;
+}
+
+/** The unit's representative: its checked radio, else its first (design 17.2 item 2). */
+function representative(unit: readonly HTMLInputElement[]): HTMLInputElement {
+  return unit.find((radio) => radio.checked) ?? unit[0]!;
+}
+
 /**
- * The items of `root` in DOM order (design 6.2): its focusable descendants minus `:disabled`,
+ * The items of `root` (design 6.2 and 17.2): its focusable descendants minus `:disabled`,
  * `inert`, invisible, nested-toolbar / popover / dialog content, and elements whose own
  * `tabindex="-1"` was not written by this engine (`managed`). `aria-disabled` elements are items.
+ * Native radios that share a `name` form one unit, represented in `items` by its checked radio
+ * (else its first), at the position of the unit's first radio.
  */
-export function itemsOf(root: HTMLElement, managed: { has(el: Element): boolean }): HTMLElement[] {
-  const items: HTMLElement[] = [];
+export function collectItems(
+  root: HTMLElement,
+  managed: { has(el: Element): boolean },
+): RovingItems {
+  const candidates: HTMLElement[] = [];
+  const byName = new Map<string, HTMLInputElement[]>();
+  const units = new Map<HTMLElement, readonly HTMLInputElement[]>();
   for (const el of root.querySelectorAll<HTMLElement>(FOCUSABLE)) {
     if (el.matches(":disabled")) continue;
     if (el.closest("[inert]") !== null) continue;
     if (el.getAttribute("tabindex") === "-1" && !managed.has(el)) continue;
     if (isNestedOut(el, root)) continue;
     if (!isVisible(el)) continue;
-    items.push(el);
+    if (isRadio(el)) {
+      // Same form owner assumed: a `form=` attribute that splits a `name` is not handled (v1).
+      const unit = el.name === "" ? undefined : byName.get(el.name);
+      if (unit !== undefined) {
+        unit.push(el);
+        units.set(el, unit);
+        continue;
+      }
+      const created = [el];
+      if (el.name !== "") byName.set(el.name, created);
+      units.set(el, created);
+    }
+    candidates.push(el);
   }
-  return items;
+  // `candidates` holds each unit's first radio in its place; swap in the representative.
+  const items = candidates.map((el) => {
+    const unit = units.get(el);
+    return unit === undefined ? el : representative(unit);
+  });
+  return { items, units };
+}
+
+/** {@link collectItems}'s `items`: the container's destinations in DOM order. */
+export function itemsOf(root: HTMLElement, managed: { has(el: Element): boolean }): HTMLElement[] {
+  return collectItems(root, managed).items;
 }
 
 const BUTTON_LIKE_INPUTS = new Set([
@@ -91,7 +140,6 @@ const BUTTON_LIKE_INPUTS = new Set([
   "submit",
   "reset",
   "checkbox",
-  "radio",
   "image",
   "color",
   "file",
@@ -99,10 +147,12 @@ const BUTTON_LIKE_INPUTS = new Set([
 const ARROW_OWNING_ROLES = new Set(["textbox", "combobox", "spinbutton", "slider"]);
 
 /**
- * An item that owns the arrow keys (design 6.3): text-like `input`s, `textarea`, `select`,
- * `[contenteditable]`, and `role` `textbox` / `combobox` / `spinbutton` / `slider`.
+ * An item that owns the arrow keys (design 6.3 and 17.2): text-like `input`s, `textarea`,
+ * `select`, `[contenteditable]`, `role` `textbox` / `combobox` / `spinbutton` / `slider`, and a
+ * native `input[type=radio]` (its group's own arrows check as they move). A custom
+ * `[role="radio"]` is an ordinary item, as it is under native `focusgroup`.
  */
-export function isTextEntryItem(el: Element): boolean {
+export function ownsArrows(el: Element): boolean {
   const role = el.getAttribute("role");
   if (role !== null && ARROW_OWNING_ROLES.has(role)) return true;
   if (el instanceof HTMLInputElement) return !BUTTON_LIKE_INPUTS.has(el.type);
@@ -184,16 +234,26 @@ function createEngine(): Engine {
       release();
       return;
     }
-    const items = itemsOf(root, managed);
+    const { items, units } = collectItems(root, managed);
+    /** Every element the engine writes: the items and the other radios of their units. */
+    const all = new Set<HTMLElement>(items);
+    for (const radio of units.keys()) all.add(radio);
+    /** The item standing for `el`: its unit's representative for a radio, else itself. */
+    const itemOf = (el: HTMLElement): HTMLElement => {
+      const unit = units.get(el);
+      return unit === undefined ? el : representative(unit);
+    };
     if (!options.memory) {
       current =
-        focused instanceof HTMLElement && items.includes(focused)
+        focused instanceof HTMLElement && all.has(focused)
           ? focused
           : (options.entry(items) ?? null);
-    } else if (current === null || !items.includes(current)) {
+    } else if (current === null || !all.has(current) || !items.includes(itemOf(current))) {
       current = options.entry(items) ?? null;
     }
-    for (const el of items) {
+    // `current` may be any radio of its unit (focus landed on an unchecked one): `0` on it, `-1`
+    // on the unit's other radios and on every other element (design 17.2 item 5).
+    for (const el of all) {
       if (!managed.has(el)) managed.set(el, el.getAttribute("tabindex"));
       const want = el === current ? "0" : "-1";
       if (el.getAttribute("tabindex") !== want) el.setAttribute("tabindex", want);
@@ -201,7 +261,7 @@ function createEngine(): Engine {
     // Elements written before that are no longer items: a stale `0` must not stay a Tab stop
     // (it would be one again when re-enabled); one that left the container gets its own back.
     for (const el of [...managed.keys()]) {
-      if (items.includes(el)) continue;
+      if (all.has(el)) continue;
       if (!root.contains(el)) {
         restore(el);
       } else if (el.getAttribute("tabindex") !== "-1") {
@@ -215,8 +275,8 @@ function createEngine(): Engine {
     if (!active(options) || options.native) return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    const items = itemsOf(event.currentTarget, managed);
-    if (!items.includes(target)) return;
+    const { items, units } = collectItems(event.currentTarget, managed);
+    if (!items.includes(target) && !units.has(target)) return;
     current = target;
     apply(event.currentTarget, target);
   };
@@ -235,9 +295,9 @@ function createEngine(): Engine {
     if (!active(options) || options.native) return;
     const target = event.target;
     if (!(target instanceof Node)) return;
-    const items = itemsOf(event.currentTarget, managed);
+    const { items, units } = collectItems(event.currentTarget, managed);
     // Safari does not focus a button on click; the pointer still makes it the stop.
-    const item = items.find((el) => el.contains(target));
+    const item = [...items, ...units.keys()].find((el) => el.contains(target));
     if (item === undefined) return;
     current = item;
     apply(
@@ -254,14 +314,24 @@ function createEngine(): Engine {
     const root = event.currentTarget;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    const items = itemsOf(root, managed);
-    const index = items.indexOf(target);
+    const { items, units } = collectItems(root, managed);
+    const unit = units.get(target);
+    // A radio stands in `items` through its unit's representative.
+    const index = items.indexOf(unit === undefined ? target : representative(unit));
     if (index < 0) return;
 
-    if (isTextEntryItem(target)) {
+    if (ownsArrows(target)) {
       // The item keeps its arrows, Home and End; Tab / Shift+Tab move to the next / previous item
-      // while one exists, as Chromium's `focusgroup="toolbar"` does (design 6.3).
+      // while one exists, as Chromium's `focusgroup="toolbar"` does (design 6.3, 17.2 item 4).
       if (event.key !== "Tab") return;
+      // From an unchecked radio whose sibling is checked: that sibling first (only the checked
+      // radio of a group is sequentially focusable natively).
+      const checked = unit?.find((radio) => radio.checked);
+      if (checked !== undefined && checked !== target) {
+        event.preventDefault();
+        focusItem(checked);
+        return;
+      }
       const next = items[index + (event.shiftKey ? -1 : 1)];
       if (next === undefined) return;
       event.preventDefault();

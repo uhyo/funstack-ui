@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
-import { isTextEntryItem, itemsOf, useRovingFocus } from "./use-roving-focus.js";
+import { collectItems, itemsOf, ownsArrows, useRovingFocus } from "./use-roving-focus.js";
 import type { RovingFocusOptions } from "./use-roving-focus.js";
 
 function Container({
@@ -31,6 +31,34 @@ function Container({
 
 const names = (els: readonly Element[]) =>
   els.map((el) => el.textContent || el.getAttribute("aria-label"));
+
+describe("collectItems: native radio units (design 17.2)", () => {
+  it("collapses a same-name group into its checked radio, else its first; no name is a unit of one", () => {
+    render(
+      <div data-testid="root">
+        <button type="button">b1</button>
+        <input type="radio" name="align" aria-label="left" />
+        <input type="radio" name="align" aria-label="center" defaultChecked />
+        <input type="radio" name="align" aria-label="right" />
+        <button type="button">b2</button>
+        <input type="radio" name="size" aria-label="s" />
+        <input type="radio" name="size" aria-label="m" />
+        <input type="radio" aria-label="lonely" />
+        <input type="radio" name="size" aria-label="l" disabled />
+        <button type="button" role="radio" aria-checked="false">
+          custom
+        </button>
+      </div>,
+    );
+    const { items, units } = collectItems(screen.getByTestId("root"), new Set());
+    expect(names(items)).toEqual(["b1", "center", "b2", "s", "lonely", "custom"]);
+    const unitOf = (label: string) => names(units.get(screen.getByLabelText(label))!);
+    expect(unitOf("left")).toEqual(["left", "center", "right"]);
+    expect(unitOf("m")).toEqual(["s", "m"]); // the disabled radio is no member
+    expect(unitOf("lonely")).toEqual(["lonely"]);
+    expect(units.has(screen.getByRole("radio", { name: "custom" }))).toBe(false);
+  });
+});
 
 describe("itemsOf", () => {
   it("finds the focusable descendants and applies the exclusions", () => {
@@ -103,12 +131,14 @@ describe("itemsOf", () => {
   });
 });
 
-describe("isTextEntryItem", () => {
+describe("ownsArrows", () => {
   it.each([
     ["<input>", true],
     ['<input type="number">', true],
     ['<input type="range">', true],
     ['<input type="checkbox">', false],
+    ['<input type="radio">', true],
+    ['<button role="radio"></button>', false],
     ['<input type="button">', false],
     ['<input type="submit">', false],
     ["<textarea></textarea>", true],
@@ -124,7 +154,7 @@ describe("isTextEntryItem", () => {
   ])("%s → %s", (html, expected) => {
     const host = document.createElement("div");
     host.innerHTML = html;
-    expect(isTextEntryItem(host.firstElementChild!)).toBe(expected);
+    expect(ownsArrows(host.firstElementChild!)).toBe(expected);
   });
 });
 

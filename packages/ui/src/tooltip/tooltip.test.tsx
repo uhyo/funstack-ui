@@ -30,6 +30,8 @@ import { createSuspender } from "../__tests__/helpers.js";
 import { isPopoverOpen } from "../__tests__/popover-shim.js";
 import { Menu } from "../menu/index.js";
 import { Tabs } from "../tabs/index.js";
+import { ToggleGroup } from "../toggle-group/index.js";
+import { Toolbar } from "../toolbar/index.js";
 import { Tooltip } from "./index.js";
 import type {
   TooltipPopupProps,
@@ -1057,6 +1059,61 @@ describe("Dev warnings", () => {
       </div>,
     );
     expect(notFocusable()).toHaveLength(1);
+  });
+
+  describe("inside a roving container whose engine writes tabindex (#75, toggle-group.md 18)", () => {
+    /** Two tooltip Items; the second gets the engine's `tabindex="-1"`. */
+    function Group({ remount }: { remount: number }) {
+      return (
+        <ToggleGroup.Root aria-label="Style">
+          <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+          <Tooltip.Root key={remount}>
+            <Tooltip.Trigger render={<ToggleGroup.Item value="b" />}>B</Tooltip.Trigger>
+            <Tooltip.Popup>Tip</Tooltip.Popup>
+          </Tooltip.Root>
+        </ToggleGroup.Root>
+      );
+    }
+
+    it.each([
+      ["a standalone ToggleGroup.Root", (n: number) => <Group remount={n} />],
+      [
+        "a Toolbar.Root",
+        (n: number) => (
+          <Toolbar.Root aria-label="T">
+            <button type="button">first</button>
+            <Tooltip.Root key={n}>
+              <Tooltip.Trigger>Second</Tooltip.Trigger>
+              <Tooltip.Popup>Tip</Tooltip.Popup>
+            </Tooltip.Root>
+          </Toolbar.Root>
+        ),
+      ],
+    ] as const)(
+      "%s: no warning, also when the check runs after the engine's write",
+      async (_l, ui) => {
+        const { rerender } = render(ui(0));
+        const trigger = () => screen.getAllByRole("button")[1]!;
+        expect(trigger()).toHaveAttribute("tabindex", "-1");
+        // Re-mount the Tooltip alone: its element starts without the attribute; once the engine
+        // (observer) has written it, a fresh check reads `-1` under the container.
+        rerender(ui(1));
+        await act(async () => {});
+        expect(trigger()).toHaveAttribute("tabindex", "-1");
+        rerender(ui(2));
+        await act(async () => {});
+        expect(notFocusable()).toHaveLength(0);
+      },
+    );
+
+    it("a tabindex=-1 trigger under a plain div still warns", () => {
+      render(
+        <div>
+          <Harness trigger={{ render: <button type="button" tabIndex={-1} /> }} />
+        </div>,
+      );
+      expect(notFocusable()).toHaveLength(1);
+    });
   });
 
   it("accepts a roving-tabindex Menu.Item (#57)", () => {
