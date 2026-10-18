@@ -86,6 +86,13 @@ export function RoadmapPage() {
           free text, forms, and a default result-count announcement through <code>ariaNotify</code>{" "}
           (<a href={issue(50)}>#50</a>).
         </li>
+        <li>
+          <a href="/components/slider">Slider</a>: the first continuous control, on a visually
+          hidden native range per thumb. Every step is a transition (<code>valueChangeAction</code>
+          ), each gesture is saved once (<code>valueCommitAction</code>) and rolls back if the save
+          fails, and the thumb under the pointer is urgent library state; multi-thumb, vertical and
+          RTL (<a href={issue(54)}>#54</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>

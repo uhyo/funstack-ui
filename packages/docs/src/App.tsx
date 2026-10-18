@@ -47,6 +47,7 @@ const CheckboxPage = lazyPage(() => import("./pages/CheckboxPage.js"), "Checkbox
 const RadioGroupPage = lazyPage(() => import("./pages/RadioGroupPage.js"), "RadioGroupPage");
 const SelectPage = lazyPage(() => import("./pages/SelectPage.js"), "SelectPage");
 const ComboboxPage = lazyPage(() => import("./pages/ComboboxPage.js"), "ComboboxPage");
+const SliderPage = lazyPage(() => import("./pages/SliderPage.js"), "SliderPage");
 const CheckboxGroupPage = lazyPage(
   () => import("./pages/CheckboxGroupPage.js"),
   "CheckboxGroupPage",
@@ -142,6 +143,7 @@ export const routes = [
                   ),
                   page("/select", "/components/select", SelectPage, "SelectPage"),
                   page("/combobox", "/components/combobox", ComboboxPage, "ComboboxPage"),
+                  page("/slider", "/components/slider", SliderPage, "SliderPage"),
                 ],
               }),
               page("/roadmap", "/roadmap", RoadmapPage, "RoadmapPage"),

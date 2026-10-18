@@ -38,6 +38,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/checkbox-group", label: "CheckboxGroup" },
   { path: "/components/select", label: "Select" },
   { path: "/components/combobox", label: "Combobox" },
+  { path: "/components/slider", label: "Slider" },
 ];
 
 // Site-wide documentation navigation, rendered by the sidebar and the mobile menu.
