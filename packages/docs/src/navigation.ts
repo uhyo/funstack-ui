@@ -39,6 +39,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/select", label: "Select" },
   { path: "/components/combobox", label: "Combobox" },
   { path: "/components/toast", label: "Toast" },
+  { path: "/components/field", label: "Field & Form" },
 ];
 
 // Site-wide documentation navigation, rendered by the sidebar and the mobile menu.

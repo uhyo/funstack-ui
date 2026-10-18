@@ -1,0 +1,94 @@
+/* Field and Form. Every Field part carries data-invalid / data-required / data-disabled /
+   data-pending; the control also matches the platform's :user-invalid and :user-valid, which
+   work before hydration too. */
+.demo-form {
+  display: grid;
+  gap: 1rem;
+  max-inline-size: 26rem;
+}
+
+.demo-fieldset {
+  display: grid;
+  gap: 0.3rem;
+}
+
+/* A checkbox or switch first, then its label. */
+.demo-fieldset-inline {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 0.6em;
+}
+.demo-fieldset-inline .demo-field-error {
+  grid-column: 1 / -1;
+}
+
+.demo-label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.demo-fieldset[data-required] > .demo-label::after {
+  content: " *";
+  color: #dc2626;
+}
+
+.demo-input {
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+.demo-input:user-valid {
+  border-color: #16a34a;
+}
+.demo-input[data-invalid] {
+  border-color: #dc2626;
+}
+
+/* No JS auto-resize: the textarea grows with its content. */
+.demo-grow {
+  field-sizing: content;
+  min-block-size: 2lh;
+  max-block-size: 8lh;
+  resize: none;
+}
+
+.demo-description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+/* Rendered only while an error is shown: enter with @starting-style, leave instantly. */
+.demo-field-error {
+  font-size: 0.85rem;
+  color: #dc2626;
+  opacity: 1;
+  transition: opacity 150ms;
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.demo-radio-row {
+  display: flex;
+  gap: 1.2em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* The form's submission: the whole form dims, the button blocks repeat clicks with CSS. */
+.demo-form[data-pending] .demo-fieldset {
+  opacity: 0.7;
+}
+.demo-submit[data-pending] {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-field-error {
+    transition: none;
+  }
+}

@@ -93,6 +93,12 @@ export function RoadmapPage() {
           <code>ariaNotify</code>, and a region that moves into an open modal Dialog so it stays
           interactive (<a href={issue(54)}>#54</a>).
         </li>
+        <li>
+          <a href="/components/field">Field and Form</a>: labelled, described fields on native
+          constraint validation and <code>:user-invalid</code>, a styleable error instead of the
+          bubble with first-invalid focus, and a Form that runs its action in a transition, routes
+          server errors to fields and resets only on success (<a href={issue(54)}>#54</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
