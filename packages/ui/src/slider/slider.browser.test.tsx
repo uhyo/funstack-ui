@@ -11,6 +11,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { cdp, userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
+import { Field } from "../field/index.js";
+import { Form } from "../form/index.js";
 
 import { Slider } from "./index.js";
 import type {
@@ -503,5 +505,64 @@ describe("Slider (browser)", () => {
     await flush();
     expect(input().value).toBe("61");
     expect(start).not.toHaveBeenCalled();
+  });
+});
+// Design 9.4.6 (issue #60): a Slider inside a Field, with real submit clicks and a real drag.
+describe("Slider inside a Field (browser)", () => {
+  it("a failing validate blocks the submit on the first thumb; a real drag fixes it and the next click submits", async () => {
+    const action = vi.fn<(formData: FormData) => void>();
+    render(
+      <Form.Root action={action}>
+        <Field.Root
+          name="price"
+          validate={(_value, formData) => {
+            const [lo, hi] = formData.getAll("price").map(Number);
+            return hi! - lo! > 50 ? "Narrow the range to 50 or less." : null;
+          }}
+        >
+          <Field.Label>Price</Field.Label>
+          <Slider.Root data-testid="root" defaultValue={[10, 90]}>
+            <Slider.Track className="t-track" data-testid="track">
+              <Slider.Indicator className="t-fill" />
+              <Slider.Thumb index={0} className="t-thumb" data-testid="thumb-0" aria-label="Min" />
+              <Slider.Thumb index={1} className="t-thumb" data-testid="thumb-1" aria-label="Max" />
+            </Slider.Track>
+          </Slider.Root>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await flush();
+    // Observed at the target, after the Field's capture listener on the group.
+    const invalidEvents: Event[] = [];
+    input(0).addEventListener("invalid", (event) => invalidEvents.push(event));
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await flush();
+    expect(action).not.toHaveBeenCalled();
+    expect(invalidEvents).toHaveLength(1);
+    // The Field cancelled the bubble and focused the first thumb's input.
+    expect(invalidEvents[0]!.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input(0));
+    expect(input(0).matches(":user-invalid")).toBe(true);
+    expect(screen.getByTestId("error")).toHaveTextContent("Narrow the range to 50 or less.");
+    expect(screen.getByTestId("root")).toHaveAttribute("data-invalid");
+
+    // Drag the max thumb from 90 to 50 (the track is 200px wide).
+    await user.dragAndDrop(thumb(1), screen.getByTestId("track"), {
+      sourcePosition: { x: 10, y: 10 },
+      targetPosition: { x: 100, y: 10 },
+    });
+    await flush();
+    expect(input(1).value).toBe("50");
+    expect(screen.queryByTestId("error")).toBeNull();
+    expect(input(0).validationMessage).toBe("");
+    expect(input(0).matches(":user-invalid")).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await flush();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(action.mock.calls[0]![0].getAll("price")).toEqual(["10", "50"]);
   });
 });

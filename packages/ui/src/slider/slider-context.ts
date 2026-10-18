@@ -1,7 +1,21 @@
 "use client";
 import { createContext, use } from "react";
-import type { RefObject } from "react";
+import type { RefCallback, RefObject } from "react";
 import type { SliderOrientation, SliderRootState, SliderValue } from "./slider-root.js";
+
+/** What the Root routes from an enclosing `Field.Root` to its Thumbs (design 9.4.1). */
+export interface SliderFieldWiring {
+  /** One thumb only: Thumb `index` 0 merges it into its input ref (registers the input). */
+  readonly inputRef: RefCallback<HTMLElement> | undefined;
+  /** One thumb only: token-merged into Thumb 0's input `aria-describedby`. */
+  readonly describedBy: string | undefined;
+  /** On every Thumb's input (ARIA 1.2: never on the group element). */
+  readonly invalid: "true" | "false" | undefined;
+  /** On every Thumb's styled element. */
+  readonly dataInvalid: "" | undefined;
+  /** The Field's own `name`, for the Thumb's "name differs from the Field's" warning. */
+  readonly name: string | undefined;
+}
 
 export interface SliderContextValue {
   /** The Root's state, for `Slider.Label` and `Slider.Value`. */
@@ -43,6 +57,8 @@ export interface SliderContextValue {
   readonly registerThumb: (index: number, input: HTMLInputElement) => () => void;
   /** Called by each Label from a layout effect; returns the unregistration. */
   readonly registerLabel: () => () => void;
+  /** The enclosing Field's wiring (design 9.4), `null` outside a `Field.Root`. */
+  readonly field: SliderFieldWiring | null;
   /** Late-mounting Thumbs report here (useNativeGroupReconciliation). */
   readonly onItemMounted: () => void;
 }

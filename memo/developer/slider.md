@@ -105,3 +105,32 @@ Firefox form-state restoration across a srcdoc iframe reload happened locally (n
   no actions. Tried releasing `stepHeld` in a transition instead of urgently: it entangles with
   the pending async commit and delays the superseded-rejection boundary render; reverted. Watch
   CI for a recurrence.
+
+## Inside a Field (#60, 2026-10-18)
+
+Design 9.4 as accepted. Shape:
+- `Slider.Root` calls `useFieldControl({ labelable: shown.length === 1, name, disabled })` right
+  after `shown` is known; `name` / `disabled` from the binding replace the props everywhere.
+  `thumbId(0)` returns the Field's control id with one thumb. Several thumbs: `field.ref` merged
+  into the Root's library ref (`useRender` `ref`), `aria-labelledby` = Field label id + Slider
+  Label id (consumer's first through the merge), `aria-describedby` on the Root.
+- `SliderContext.field` (`SliderFieldWiring | null`): `inputRef` / `describedBy` (one thumb only),
+  `invalid` (every input), `dataInvalid` (every Thumb span), plus `name` (the Field's, for the
+  Thumb's "name differs" warning; not in 9.4.7's sketch, internal only).
+- `useFieldValueChange(optimisticValues.join("\0"), takeEdit)`. `takeEdit` **consumes**
+  `lastReason` (returns `lastReason === "activate"`, then resets it to null). Without the reset
+  the uncontrolled / update-on-success rollback that follows an `"activate"` commit would read
+  the stale `"activate"` and dismiss. `lastReason` is also written in `stepTo` (any reason), so
+  an adopt-steps controlled parent, whose optimistic value changes per step and not at the commit,
+  still reports its steps as edits.
+- `required` warning via `useDevWarning(field.inField && field.required)`.
+- Field test pitfalls: `validate`'s `formData` comes from `el.form`, so a Field without a
+  `<form>` gets an empty FormData (value `""`); wrap jsdom rows in a form.
+- Rollback row: 9.4.5 #4 says "rejects, caught inside (uncontrolled)", but an uncontrolled
+  rejection reaches the boundary and unmounts the slider (L1), and an action that catches its own
+  error commits. The observable rollback is the update-on-success controlled parent whose action
+  catches the failure (the "mounted rollback" row). The test submits the form while that save is
+  pending; React entangles the two async transitions, so the form's settle (server error shown,
+  `dismissed` cleared) lands in the same commit as the rollback, and the error stays shown only
+  because the rollback notifies `edit = false` (mutation-checked: `edit = true` fails it; `edit
+  = false` always fails the pointer-dismiss row).

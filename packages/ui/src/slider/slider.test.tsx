@@ -18,6 +18,8 @@ import {
   expectNotPending,
   expectPending,
 } from "../__tests__/helpers.js";
+import { Field } from "../field/index.js";
+import { Form } from "../form/index.js";
 import { Slider } from "./index.js";
 import type {
   SliderRootProps,
@@ -1878,5 +1880,440 @@ describe("post-await rule", () => {
     expect(screen.getByTestId("parent")).toHaveTextContent("55");
     expect(thumbInput().value).toBe("55");
     expectNotPending(root());
+  });
+});
+// --- Inside a Field (design 9.4, issue #60) ------------------------------------------------------
+
+/** A press, a move and a release on the (mocked) Track: one pointer gesture ending at `to`. */
+function drag(from: number, to: number): void {
+  const track = mockTrack();
+  pointer("pointerDown", track, from);
+  pointer("pointerMove", track, to);
+  pointer("pointerUp", track, to);
+}
+
+function FieldThumbs({ count, late = false }: { count: number; late?: boolean }) {
+  return (
+    <Slider.Track data-testid="track">
+      <Slider.Indicator />
+      {Array.from({ length: count }, (_, i) =>
+        late && i > 0 ? null : (
+          <Slider.Thumb
+            key={i}
+            index={i}
+            data-testid={`thumb-${i}`}
+            aria-label={count > 1 ? `Thumb ${i}` : undefined}
+            aria-describedby={i === 0 ? "own-hint" : undefined}
+          />
+        ),
+      )}
+    </Slider.Track>
+  );
+}
+
+describe("inside a Field.Root", () => {
+  it("one thumb: the input is the Field's labelable control (id / for, name, disabled, describedby, aria-invalid)", async () => {
+    render(
+      <Field.Root name="volume" disabled>
+        <Field.Label data-testid="field-label">Volume</Field.Label>
+        <Slider.Root data-testid="root" defaultValue={40} aria-labelledby="consumer">
+          <Slider.Label data-testid="label">Slider label</Slider.Label>
+          <FieldThumbs count={1} />
+        </Slider.Root>
+        <Field.Description data-testid="desc">Loud is above 80.</Field.Description>
+        <Field.Error />
+      </Field.Root>,
+    );
+    await flush();
+    const input = thumbInput();
+    expect(input.id).not.toBe("");
+    expect(screen.getByTestId("field-label")).toHaveAttribute("for", input.id);
+    expect(screen.getByTestId("label")).toHaveAttribute("for", input.id);
+    expect(input).toHaveAttribute("name", "volume");
+    expect(input).toBeDisabled();
+    expect(root()).toHaveAttribute("data-disabled");
+    expect(thumb()).toHaveAttribute("data-disabled");
+    expect(input).toHaveAttribute("aria-describedby", `own-hint ${screen.getByTestId("desc").id}`);
+    expect(input).toHaveAttribute("aria-invalid", "false");
+    // One thumb: the Root is not a group and the Field adds nothing to its name or description.
+    expect(root()).not.toHaveAttribute("role");
+    expect(root()).toHaveAttribute("aria-labelledby", "consumer");
+    expect(root()).not.toHaveAttribute("aria-describedby");
+    expect(root()).not.toHaveAttribute("data-invalid");
+    expect(input).toHaveAccessibleName("Volume Slider label");
+  });
+
+  it("several thumbs: the Root is the group, named by Field.Label; aria-invalid on every input, never on the group", async () => {
+    const consoleError = vi.spyOn(console, "error");
+    const { rerender } = render(
+      <Field.Root name="price">
+        <Field.Label data-testid="field-label">Price</Field.Label>
+        <Slider.Root data-testid="root" defaultValue={[20, 80]} aria-labelledby="consumer">
+          <Slider.Label data-testid="label">Range</Slider.Label>
+          <FieldThumbs count={2} />
+        </Slider.Root>
+        <Field.Description data-testid="desc">Pick a range.</Field.Description>
+      </Field.Root>,
+    );
+    await flush();
+    const fieldLabel = screen.getByTestId("field-label");
+    expect(fieldLabel).not.toHaveAttribute("for");
+    expect(root()).toHaveAttribute("role", "group");
+    expect(root()).toHaveAttribute(
+      "aria-labelledby",
+      `consumer ${fieldLabel.id} ${screen.getByTestId("label").id}`,
+    );
+    expect(root()).toHaveAttribute("aria-describedby", screen.getByTestId("desc").id);
+    expect(root()).not.toHaveAttribute("aria-invalid");
+    for (const i of [0, 1]) {
+      expect(thumbInput(i)).toHaveAttribute("aria-invalid", "false");
+      expect(thumbInput(i)).toHaveAttribute("name", "price");
+      expect(thumbInput(i).id).not.toBe(fieldLabel.getAttribute("for") ?? "");
+    }
+    // The group is described; a Thumb's own tokens stay on its input.
+    expect(thumbInput(0)).toHaveAttribute("aria-describedby", "own-hint");
+    expect(thumbInput(1)).not.toHaveAttribute("aria-describedby");
+
+    // Without a Slider.Label the Field's label is the group's name, and no warning fires.
+    rerender(
+      <Field.Root name="price">
+        <Field.Label data-testid="field-label">Price</Field.Label>
+        <Slider.Root data-testid="root" defaultValue={[20, 80]}>
+          <FieldThumbs count={2} />
+        </Slider.Root>
+      </Field.Root>,
+    );
+    await flush();
+    expect(root()).toHaveAttribute("aria-labelledby", fieldLabel.id);
+    expect(root()).toHaveAccessibleName("Price");
+    expect(consoleError.mock.calls.some((c) => String(c[0]).includes("needs a name: render"))).toBe(
+      false,
+    );
+  });
+
+  it("Field.Root required warns once (a range is never empty); no input is required", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <Field.Root name="volume" required data-testid="field">
+        <Field.Label data-testid="field-label">Volume</Field.Label>
+        <Slider.Root data-testid="root" defaultValue={40}>
+          <FieldThumbs count={1} />
+        </Slider.Root>
+      </Field.Root>,
+    );
+    await flush();
+    const warnings = consoleError.mock.calls.filter((c) =>
+      String(c[0]).includes("a range is never empty"),
+    );
+    expect(warnings).toHaveLength(1);
+    expect(thumbInput()).not.toBeRequired();
+    expect(screen.getByTestId("field")).toHaveAttribute("data-required");
+    expect(screen.getByTestId("field-label")).toHaveAttribute("data-required");
+  });
+
+  it("warns when a Thumb's name differs from the Field's", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <Field.Root name="price">
+        <Field.Label>Price</Field.Label>
+        <Slider.Root defaultValue={[20, 80]}>
+          <Slider.Track>
+            <Slider.Thumb index={0} name="price-min" aria-label="Min" />
+            <Slider.Thumb index={1} aria-label="Max" />
+          </Slider.Track>
+        </Slider.Root>
+      </Field.Root>,
+    );
+    await flush();
+    expect(
+      consoleError.mock.calls.filter((c) => String(c[0]).includes('("price-min") differs')),
+    ).toHaveLength(1);
+  });
+
+  it("a server error is shown on every input and dismissed by a pointer commit", async () => {
+    render(
+      <Form.Root action={() => {}} errors={{ volume: "Too loud" }}>
+        <Field.Root name="volume">
+          <Field.Label>Volume</Field.Label>
+          <Slider.Root data-testid="root" defaultValue={[60, 90]}>
+            <FieldThumbs count={2} />
+          </Slider.Root>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+      </Form.Root>,
+    );
+    await flush();
+    expect(screen.getByTestId("error")).toHaveTextContent("Too loud");
+    expect(thumbInput(0).validationMessage).toBe("Too loud");
+    expect(thumbInput(0).validity.customError).toBe(true);
+    for (const i of [0, 1]) {
+      expect(thumbInput(i)).toHaveAttribute("aria-invalid", "true");
+      expect(thumb(i)).toHaveAttribute("data-invalid");
+    }
+    expect(root()).toHaveAttribute("data-invalid");
+    expect(root()).not.toHaveAttribute("aria-invalid");
+
+    // A pointer gesture fires no `input` / `change`: the commit tells the Field.
+    drag(55, 30);
+    await flush();
+    expect(thumbInput(0).value).toBe("30");
+    expect(screen.queryByTestId("error")).toBeNull();
+    expect(thumbInput(0).validationMessage).toBe("");
+    expect(thumbInput(0).validity.customError).toBe(false);
+    for (const i of [0, 1]) {
+      expect(thumbInput(i)).toHaveAttribute("aria-invalid", "false");
+      expect(thumb(i)).not.toHaveAttribute("data-invalid");
+    }
+    expect(root()).not.toHaveAttribute("data-invalid");
+  });
+
+  it("validate over getAll(name) re-runs after pointer, RTL-key and reset commits; a submit attempt shows it and focuses the first thumb", async () => {
+    const action = vi.fn();
+    const validate = vi.fn((_value: unknown, formData: FormData) => {
+      const [lo, hi] = formData.getAll("price").map(Number);
+      return hi! - lo! > 50 ? "Narrow the range to 50 or less." : null;
+    });
+    render(
+      <Form.Root action={action} data-testid="form">
+        <Field.Root name="price" validate={validate}>
+          <Field.Label>Price</Field.Label>
+          <Slider.Root data-testid="root" defaultValue={[10, 90]}>
+            <FieldThumbs count={2} />
+          </Slider.Root>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+      </Form.Root>,
+    );
+    await flush();
+    // At mount: the slot is set on the first thumb's input, nothing is shown yet.
+    expect(thumbInput(0).validationMessage).toBe("Narrow the range to 50 or less.");
+    expect(screen.queryByTestId("error")).toBeNull();
+
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    await act(async () => form.requestSubmit());
+    await flush();
+    expect(action).not.toHaveBeenCalled();
+    expect(screen.getByTestId("error")).toHaveTextContent("Narrow the range to 50 or less.");
+    expect(document.activeElement).toBe(thumbInput(0));
+
+    // A pointer commit that satisfies the rule clears it (90 -> 50).
+    drag(85, 50);
+    await flush();
+    expect(thumbInput(1).value).toBe("50");
+    expect(thumbInput(0).validationMessage).toBe("");
+    expect(screen.queryByTestId("error")).toBeNull();
+
+    // RTL ArrowLeft (the library's keydown path, no native events): 50 -> 61 breaks it again.
+    thumbInput(1).style.direction = "rtl";
+    for (let i = 0; i < 11; i++) {
+      act(() => {
+        fireEvent.keyDown(thumbInput(1), { key: "ArrowLeft" });
+      });
+      await flush();
+    }
+    expect(thumbInput(1).value).toBe("61");
+    expect(thumbInput(0).validationMessage).toBe("Narrow the range to 50 or less.");
+    act(() => {
+      fireEvent.keyDown(thumbInput(1), { key: "ArrowRight" });
+    });
+    await flush();
+    expect(thumbInput(1).value).toBe("60");
+    expect(thumbInput(0).validationMessage).toBe("");
+
+    // A form reset: the "platform" commit back to [10, 90] re-runs the rule.
+    await act(async () => form.reset());
+    await flush();
+    expect(thumbInput(1).value).toBe("90");
+    expect(validate.mock.lastCall![1].getAll("price")).toEqual(["10", "90"]);
+    expect(thumbInput(0).validationMessage).toBe("Narrow the range to 50 or less.");
+  });
+
+  it("a vertical slider's ArrowRight (normalised, no native events) re-runs validate", async () => {
+    const validate = vi.fn((value: unknown) => (Number(value) > 40 ? "Too loud" : null));
+    render(
+      <form>
+        <Field.Root name="volume" validate={validate}>
+          <Field.Label>Volume</Field.Label>
+          <Slider.Root data-testid="root" defaultValue={40} orientation="vertical">
+            <FieldThumbs count={1} />
+          </Slider.Root>
+        </Field.Root>
+      </form>,
+    );
+    await flush();
+    expect(thumbInput().validationMessage).toBe("");
+    act(() => {
+      fireEvent.keyDown(thumbInput(), { key: "ArrowRight" });
+    });
+    await flush();
+    expect(thumbInput().value).toBe("41");
+    expect(validate.mock.lastCall![0]).toBe("41");
+    expect(thumbInput().validationMessage).toBe("Too loud");
+  });
+
+  it("a rolled-back commit notifies with edit = false: validate sees the reverted value, a server error shown meanwhile stays", async () => {
+    const save = deferred();
+    const submission = deferred();
+    const validate = vi.fn((_value: unknown) => null);
+    function App() {
+      const [value, setValue] = useState(40);
+      const [errors, setErrors] = useState<Record<string, string> | undefined>(undefined);
+      return (
+        <Form.Root
+          data-testid="form"
+          autoReset={false}
+          errors={errors}
+          action={async () => {
+            await submission.promise;
+            startTransition(() => setErrors({ volume: "Too loud" }));
+          }}
+        >
+          <Field.Root name="volume" validate={validate}>
+            <Field.Label>Volume</Field.Label>
+            <Slider.Root
+              data-testid="root"
+              value={value}
+              valueCommitAction={async (next) => {
+                try {
+                  await save.promise;
+                  startTransition(() => setValue(next));
+                } catch {
+                  // The parent keeps its value: the thumb rolls back.
+                }
+              }}
+            >
+              <FieldThumbs count={1} />
+            </Slider.Root>
+            <Field.Error data-testid="error" />
+          </Field.Root>
+        </Form.Root>
+      );
+    }
+    render(<App />);
+    await flush();
+    drag(40, 70);
+    await flush();
+    expect(thumbInput().value).toBe("70");
+    expectPending(root());
+
+    // The form is submitted while the save is in flight. React entangles the two async
+    // transitions, so the form settles (with a server error) in the commit that rolls back.
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    await act(async () => form.requestSubmit());
+    await act(async () => submission.resolve());
+    await flush();
+    validate.mockClear();
+    await act(async () => save.reject(new Error("save failed")));
+    await flush();
+    expect(thumbInput().value).toBe("40");
+    // The Field was told (validate re-ran on the reverted value), but not as an edit.
+    expect(validate).toHaveBeenCalled();
+    expect(validate.mock.lastCall![0]).toBe("40");
+    expect(screen.getByTestId("error")).toHaveTextContent("Too loud");
+    expect(thumbInput().validationMessage).toBe("Too loud");
+  });
+
+  it.each([1, 2])(
+    "the Form's settle focus lands on the first thumb's input (%i thumbs)",
+    async (count) => {
+      const submission = deferred();
+      function App() {
+        const [errors, setErrors] = useState<Record<string, string> | undefined>(undefined);
+        return (
+          <Form.Root
+            data-testid="form"
+            errors={errors}
+            action={async () => {
+              await submission.promise;
+              startTransition(() => setErrors({ volume: "Too loud" }));
+            }}
+          >
+            <Field.Root name="volume">
+              <Field.Label>Volume</Field.Label>
+              <Slider.Root data-testid="root" defaultValue={count === 1 ? 40 : [40, 60]}>
+                <FieldThumbs count={count} />
+              </Slider.Root>
+              <Field.Error data-testid="error" />
+            </Field.Root>
+          </Form.Root>
+        );
+      }
+      render(<App />);
+      await flush();
+      const form = screen.getByTestId("form") as HTMLFormElement;
+      await act(async () => form.requestSubmit());
+      await act(async () => submission.resolve());
+      await flush();
+      expect(screen.getByTestId("error")).toHaveTextContent("Too loud");
+      expect(document.activeElement).toBe(thumbInput(0));
+    },
+  );
+
+  it("two channels: the slider's commit pends on the Root and the moved Thumb only; the Field's data-pending follows the form", async () => {
+    const save = deferred();
+    const submission = deferred();
+    render(
+      <Form.Root data-testid="form" action={() => submission.promise}>
+        <Field.Root name="price" data-testid="field">
+          <Field.Label>Price</Field.Label>
+          <Slider.Root
+            data-testid="root"
+            defaultValue={[20, 80]}
+            valueCommitAction={() => save.promise}
+          >
+            <FieldThumbs count={2} />
+          </Slider.Root>
+        </Field.Root>
+      </Form.Root>,
+    );
+    await flush();
+    press(thumbInput(1), 70);
+    await flush();
+    expectPending(root());
+    expectPending(thumb(1));
+    expectNotPending(thumb(0));
+    expectNotPending(screen.getByTestId("field"));
+    await act(async () => save.resolve());
+    expectNotPending(root());
+
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    await act(async () => form.requestSubmit());
+    expectPending(screen.getByTestId("field"));
+    expectNotPending(root());
+    expectNotPending(thumb(0));
+    await act(async () => submission.resolve());
+  });
+
+  it("a late Thumb: the slot stays on Thumb 0's input; the Field hears the new input's change", async () => {
+    const validate = vi.fn((_value: unknown, formData: FormData) =>
+      Number(formData.getAll("price")[1]) > 80 ? "Too high" : null,
+    );
+    function App() {
+      const [late, setLate] = useState(true);
+      return (
+        <form>
+          <Field.Root name="price" validate={validate}>
+            <Field.Label>Price</Field.Label>
+            <Slider.Root data-testid="root" defaultValue={[20, 80]}>
+              <FieldThumbs count={2} late={late} />
+            </Slider.Root>
+          </Field.Root>
+          <button type="button" onClick={() => setLate(false)}>
+            show
+          </button>
+        </form>
+      );
+    }
+    render(<App />);
+    await flush();
+    expect(screen.queryByTestId("thumb-1")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "show" }));
+    await flush();
+    validate.mockClear();
+    press(thumbInput(1), 90);
+    await flush();
+    expect(validate).toHaveBeenCalled();
+    expect(thumbInput(0).validationMessage).toBe("Too high");
+    expect(thumbInput(1).validationMessage).toBe("");
   });
 });

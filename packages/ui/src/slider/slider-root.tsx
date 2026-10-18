@@ -1,8 +1,19 @@
 "use client";
-import { addTransitionType, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  addTransitionType,
+  use,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { FieldContext } from "../internal/field-context.js";
+import { mergeTokenLists } from "../internal/merge-props.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
   ActionDetails,
@@ -14,6 +25,11 @@ import type {
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import {
+  useFieldControl,
+  useFieldValueChange,
+  useMergedRef,
+} from "../internal/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/use-form-reset.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
@@ -30,7 +46,7 @@ import {
   sanitize,
 } from "./slider-arithmetic.js";
 import { SliderContext } from "./slider-context.js";
-import type { SliderContextValue } from "./slider-context.js";
+import type { SliderContextValue, SliderFieldWiring } from "./slider-context.js";
 
 /** One number (one thumb) or one number per thumb, in ascending order. */
 export type SliderValue = number | readonly number[];
@@ -205,6 +221,11 @@ interface ActiveGesture {
  * Label's id while a Label is mounted and there are several thumbs; token-merged with the
  * consumer's), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`. The custom
  * properties are merged into `style`, where the consumer's entries win.
+ *
+ * Inside a `Field.Root` (design 9.4) the Root calls `useFieldControl`: with one thumb, Thumb 0's
+ * input is the Field's labelable control; with several, the Root registers itself as the group
+ * and also owns the Field label in `aria-labelledby`, the Field's `aria-describedby` and
+ * `data-invalid`. `name` / `disabled` default from the Field.
  */
 function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T>) {
   const {
@@ -218,9 +239,9 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     minStepsBetweenThumbs = 0,
     orientation = "horizontal",
     getAriaValueText,
-    name,
+    name: nameProp,
     form,
-    disabled = false,
+    disabled: disabledProp = false,
     className,
     style,
     children,
@@ -234,7 +255,6 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   const id = useId();
   const labelId = `${id}-label`;
-  const thumbId = useCallback((index: number) => `${id}-thumb-${index}`, [id]);
 
   // The shape (one number or an array) is fixed at mount (design 3.1).
   const [shape] = useState<"number" | "array">(() => shapeOf(value ?? defaultValue) ?? "number");
@@ -298,6 +318,63 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   const shown = held && live !== null ? live : optimisticValues;
   const pending = stepPending || commitState.pending;
 
+  // --- Inside a Field.Root (design 9.4) ------------------------------------------------------
+
+  // One thumb: its input is the Field's labelable control. Several: the Root (`role="group"`)
+  // registers, `Field.Label` drops `for` and names the group through `aria-labelledby`.
+  const thumbCount = shown.length;
+  const field = useFieldControl({
+    labelable: thumbCount === 1,
+    name: nameProp,
+    disabled: disabledProp,
+    component: "Slider.Root",
+  });
+  const fieldName = use(FieldContext)?.name;
+  const name = field.name;
+  const disabled = field.disabled;
+  const fieldId = field.id;
+  const thumbId = useCallback(
+    (index: number) => (index === 0 && fieldId !== undefined ? fieldId : `${id}-thumb-${index}`),
+    [id, fieldId],
+  );
+  const rootRef = useMergedRef<HTMLElement>(undefined, thumbCount > 1 ? field.ref : undefined);
+  useDevWarning(
+    field.inField && field.required,
+    "Slider.Root: a range is never empty, so `required` on the enclosing Field.Root has no " +
+      "effect on the slider.",
+  );
+  /**
+   * The reason of the latest change the user or the platform made, consumed by the Field
+   * notification below: `"activate"` dismisses a shown server error, a rollback does not.
+   */
+  const lastReason = useRef<ChangeReason | null>(null);
+  // A pointer gesture and the JS-normalised keys fire no `input` / `change` the Field hears:
+  // tell it at the commit, when the optimistic value changes (design 9.4.4).
+  useFieldValueChange(optimisticValues.join("\u0000"), () => {
+    const edit = lastReason.current === "activate";
+    lastReason.current = null;
+    return edit;
+  });
+  const {
+    "aria-labelledby": fieldLabelledBy,
+    "aria-describedby": fieldDescribedBy,
+    "aria-invalid": fieldInvalid,
+    "data-invalid": fieldDataInvalid,
+  } = field.attributes;
+  const inField = field.inField;
+  const fieldRef = field.ref;
+  const fieldWiring = useMemo<SliderFieldWiring | null>(() => {
+    if (!inField) return null;
+    const single = thumbCount === 1;
+    return {
+      inputRef: single ? fieldRef : undefined,
+      describedBy: single ? fieldDescribedBy : undefined,
+      invalid: fieldInvalid,
+      dataInvalid: fieldDataInvalid,
+      name: fieldName,
+    };
+  }, [inField, fieldRef, thumbCount, fieldDescribedBy, fieldInvalid, fieldDataInvalid, fieldName]);
+
   /** What the thumbs show, for handlers; also written by `stepTo` ahead of the render. */
   const shownRef = useLatest(shown);
 
@@ -326,6 +403,8 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       if (equalValues(next, shownRef.current)) return false;
       liveRef.current = next;
       shownRef.current = next;
+      // A controlled parent that adopts steps changes the optimistic value per step.
+      lastReason.current = reason;
       setLive(next);
       setPendingThumb(thumb);
       // A revert has no commit after it: the optimistic value already shows the committed one.
@@ -352,6 +431,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       const next = liveRef.current;
       // Nothing changed since the gesture began (a drag out and back, a trailing `change`).
       if (start === null || next === null || equalValues(next, start)) return;
+      lastReason.current = reason;
       setPendingThumb(thumb);
       dispatch(latest.current.fromArray(next), createActionDetails(event, { reason, thumb }));
     },
@@ -726,8 +806,12 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     `Slider.Root: the value changed shape between a number and an array after mount. The shape ` +
       `is fixed at mount; remount the Slider (a \`key\`) to change the number of thumbs.`,
   );
+  // Inside a Field, `Field.Label` names the group (design 9.4.2).
   const unnamedGroup =
-    shown.length > 1 && rest["aria-label"] === undefined && rest["aria-labelledby"] === undefined;
+    shown.length > 1 &&
+    !inField &&
+    rest["aria-label"] === undefined &&
+    rest["aria-labelledby"] === undefined;
   const warnedGroupName = useRef(false);
   useEffect(() => {
     if (!isDev || warnedGroupName.current || !unnamedGroup || labelCountRef.current > 0) return;
@@ -795,6 +879,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       registerThumb,
       registerLabel,
       onItemMounted,
+      field: fieldWiring,
     }),
     [
       state,
@@ -821,13 +906,24 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       registerThumb,
       registerLabel,
       onItemMounted,
+      fieldWiring,
     ],
   );
 
+  // Several thumbs: the Field's label, then `Slider.Label` while one is mounted (the consumer's
+  // tokens come first through the merge). Only when there is one: an owned `undefined` would
+  // remove the consumer's own tokens.
+  const labelledBy =
+    count > 1 ? mergeTokenLists(fieldLabelledBy, labelCount > 0 ? labelId : undefined) : "";
   const libraryProps: Partial<ComponentPropsWithRef<"div">> & DataAttributes = {
     role: count > 1 ? "group" : undefined,
-    // Only while a Label is mounted: an owned `undefined` would remove the consumer's own tokens.
-    ...(count > 1 && labelCount > 0 ? { "aria-labelledby": labelId } : {}),
+    ...(labelledBy !== "" ? { "aria-labelledby": labelledBy } : {}),
+    // The group element is described (read when focus enters it); one thumb: its input is.
+    ...(count > 1 && fieldDescribedBy !== undefined
+      ? { "aria-describedby": fieldDescribedBy }
+      : {}),
+    // Inside a Field only (`aria-invalid` goes on the inputs, never on the group).
+    ...(inField ? { "data-invalid": fieldDataInvalid } : {}),
     "data-pending": dataAttr(pending),
     "data-dragging": dataAttr(dragging),
     "data-orientation": orientation,
@@ -844,6 +940,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     children,
     props: rest,
     libraryProps,
+    ref: rootRef,
   });
 
   return <SliderContext value={context}>{element}</SliderContext>;

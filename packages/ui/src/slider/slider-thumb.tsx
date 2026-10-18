@@ -9,7 +9,7 @@ import type {
   Ref,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { mergeRefs } from "../internal/merge-props.js";
+import { mergeRefs, mergeTokenLists } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -122,9 +122,16 @@ export function SliderThumb({
   const shownValue = value ?? ctx.min;
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Inside a Field with one thumb, Thumb 0's input is the Field's control (design 9.4.1).
+  const fieldInputRef = index === 0 ? ctx.field?.inputRef : undefined;
   const mergedInputRef = useMemo(
-    () => mergeRefs<HTMLInputElement | null>(inputRef, consumerInputRef),
-    [consumerInputRef],
+    () =>
+      mergeRefs<HTMLInputElement | null>(
+        inputRef,
+        consumerInputRef,
+        fieldInputRef as Ref<HTMLInputElement | null> | undefined,
+      ),
+    [consumerInputRef, fieldInputRef],
   );
 
   // Registration with the Root (pointer focus, reconciliation, reset), from a layout effect so
@@ -168,6 +175,13 @@ export function SliderThumb({
       `\`aria-labelledby\`), e.g. "Minimum price"; the thumb at index ${index} has none.`,
   );
 
+  const fieldName = ctx.field?.name;
+  useDevWarning(
+    inRange && name !== undefined && fieldName !== undefined && name !== fieldName,
+    `Slider.Thumb: its \`name\` ("${name}") differs from the Field.Root's ("${fieldName}"). ` +
+      "The Field reads server errors and `validate`'s value by the Field's name.",
+  );
+
   const pending = ctx.pending && ctx.pendingThumb === index;
   const dragging = ctx.draggingThumb === index;
   const state: SliderThumbState = {
@@ -195,7 +209,11 @@ export function SliderThumb({
       autoFocus={autoFocus}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
-      aria-describedby={ariaDescribedBy}
+      aria-describedby={
+        mergeTokenLists(ariaDescribedBy, index === 0 ? ctx.field?.describedBy : undefined) ||
+        undefined
+      }
+      aria-invalid={ctx.field?.invalid}
       aria-valuetext={ctx.getAriaValueText?.(shownValue, index)}
       style={ctx.orientation === "vertical" ? VERTICAL_INPUT_STYLE : HIDDEN_INPUT_STYLE}
       onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -224,6 +242,7 @@ export function SliderThumb({
       "data-dragging": dataAttr(dragging),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(ctx.disabled),
+      ...(ctx.field !== null ? { "data-invalid": ctx.field.dataInvalid } : {}),
       onPointerDown: (event: ReactPointerEvent<HTMLSpanElement>) => {
         ctx.beginGesture(index, event.nativeEvent, event.currentTarget);
       },
