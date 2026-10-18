@@ -273,12 +273,21 @@ describe("NumberField (browser)", () => {
     input().addEventListener("blur", () => {
       focusLeft = true;
     });
+    let downAt = 0;
+    let upAt = 0;
+    inc().addEventListener("pointerdown", () => (downAt = performance.now()));
+    inc().addEventListener("pointerup", () => (upAt = performance.now()));
     await user.click(inc(), { delay: 700 });
     await flush();
     const value = Number(input().value);
-    // 1 + ceil((700 - 400) / 60) = 6, give or take a tick of scheduling.
-    expect(value).toBeGreaterThanOrEqual(5);
-    expect(value).toBeLessThanOrEqual(8);
+    // One step at the press, one at 400 ms, then one per 60 ms until the release: about 6 for a
+    // 700 ms press. Measured against the press as the page saw it, so a loaded machine (late
+    // timers, a longer press) stays within bounds: at least the first repeat, at most one step
+    // per elapsed interval.
+    const held = upAt - downAt;
+    expect(held).toBeGreaterThanOrEqual(650);
+    expect(value).toBeGreaterThanOrEqual(2);
+    expect(value).toBeLessThanOrEqual(2 + Math.ceil((held - 400) / 60));
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit.mock.calls[0]![0]).toBe(value);
     expect(onCommit.mock.calls[0]![1].event?.type).toBe("pointerup");
