@@ -23,7 +23,10 @@ validity mirror in 2.6, the form-channel amendments in 2.7, the reset and settle
 owned custom-validity slot in 3.6, `useFieldControl` and `useFormOwnerEvent` in 3.8, `invalid` /
 `required` in 4.1 and 4.2, the no-`transition` note and the CSS-exit rule (#46) in 5.1, the types in
 5.3, the shared context location in 7.1, the shared state type in 9.4, the three rows in 10.1, the
-platform-string note in 11). Binding for every component design in
+platform-string note in 11; amended 2026-10-18 with the ToggleGroup and Toolbar design, #66, **draft, pending
+acceptance**: the `Button` row and the `Item` / `Separator` notes in 1.1, the roving tab stop in 3.2 and
+7.4, `aria-disabled` in 3.6, the rows in 4.1 and 5.3, the shared context in 7.1, the flag row in 8, the
+files in 9.1). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -89,7 +92,7 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | --- | --- | --- |
 | `Root` | Owns state, context and the transition. May render no DOM (overlays) or a wrapper; a Root that owns a form value but no visible element may render exactly one `<input type="hidden">` when `name` is given (Combobox); a Form's Root is the `<form>` itself. | `div` / `form` or none |
 | `List` | Groups triggers; owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (the Popup is the container, because a listbox may contain only options and groups). | `div` |
-| `Item` | One entry in a multi-item component (Accordion, Menu). Menu's is a `button[role=menuitem]` with an `action`. | `div` / `details` / `button` |
+| `Item` | One entry in a multi-item component (Accordion, Menu). Menu's is a `button[role=menuitem]` with an `action`; ToggleGroup's is a `button[aria-pressed]`, the Toggle element, whose pressed state is the Root's (#66). | `div` / `details` / `button` |
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
@@ -110,7 +113,8 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown, referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
-| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role). | as named |
+| `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending` (`useActionTrigger`) inside a composite that needs one: `Toolbar.Button`, focusable when disabled (`aria-disabled`) as the APG Toolbar example wants (#66). Not a general button component. | `button` |
+| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role); inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's (`Toolbar.Separator`, #66). | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
 top layer and CSS Anchor Positioning places it, so the platform does both jobs (see
@@ -694,6 +698,12 @@ moves focus virtually with `aria-activedescendant` (Combobox), the active item i
 browser-owned everywhere else in the library, and a transition would freeze it while any async
 action is pending (entanglement, section 2.3 item 5).
 
+**A roving Tab stop over children the library did not render is urgent library state that lives
+outside React** (Toolbar and a standalone ToggleGroup, #66): which item carries `tabindex="0"` is a
+focus fact, not a value, so it is a ref updated from `focusin` / `pointerdown` and re-derived in
+layout effects, and the attribute is written through the DOM by the container's engine (section
+7.4), never rendered by the items. No `useState`, no transition, no `data-*` attribute.
+
 **The position under a captured pointer is urgent library state** (Slider, #54), for the same
 reason: `useOptimistic` holds a value only while a transition is pending, and a step whose
 action is synchronous settles in a microtask, so between two pointer moves the thumb would
@@ -923,7 +933,8 @@ Rules:
 ### 3.6 `disabled`
 
 `disabled` is a boolean prop on the owner and on individual triggers. Native `disabled` is used
-where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs), the
+where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs; `Toolbar.Button`, whose APG example
+keeps disabled commands focusable so screen-reader users still find them, #66), the
 part sets `aria-disabled` instead. In both cases the part emits `data-disabled` and never
 dispatches for user interaction (platform dispatches from the form owner are the exception,
 section 2.3 item 7).
@@ -1081,9 +1092,9 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 
 | Name | Kind | Where | Meaning |
 | --- | --- | --- | --- |
-| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
+| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `ToggleGroup.Root` and each `ToggleGroup.Item` whose optimistic pressed state differs from its committed one; `Toolbar.Button` (its own action, #66); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
-| `pressed` | boolean | Toggle | Optimistic pressed state. |
+| `pressed` | boolean | Toggle, `ToggleGroup.Item` | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`), `Combobox.Option` (optimistic `aria-selected`; distinct from `active`), `Combobox.Input` (a non-null optimistic value) | Optimistic selection on triggers; committed on panels. |
 | `active` | boolean | `Combobox.Option` | Virtual focus: `aria-activedescendant` points here. Urgent (section 3.2), never a transition. |
 | `stale` | boolean | `Combobox.Popup`, `Combobox.List` (with `aria-busy="true"` on the listbox while stale **or loading**: a `Status` mounted inside the List; loading itself is not a data attribute in v1) | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile. |
@@ -1091,7 +1102,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`); Combobox `Input` and `Trigger` likewise, its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
-| `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab; every Slider part | Enum attribute with value. |
+| `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab; every Slider part; `ToggleGroup.Root` and `Item` (the enclosing Toolbar's when inside one); `Toolbar.Root` and `Toolbar.Separator` (the separator's own, perpendicular to the toolbar's) | Enum attribute with value. |
 | `invalid` | boolean | every Field part | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). The control also carries an explicit `aria-invalid="true" \| "false"`. |
 | `required` | boolean | every Field part | `Field.Root required` or the control's own `required` (reported through its registration). |
 | `dragging` | boolean | Slider `Root` and the captured `Thumb` | A pointer is captured on a thumb (urgent state; keyboard never sets it). Style motion off under it (`[data-dragging] { transition: none }`). |
@@ -1315,6 +1326,8 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Toast | none (no `transition` prop; every commit is urgent, section 5.1) |
 | Field, Form | none (no `transition` prop: an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
 | Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
+| ToggleGroup | `fsui-toggle-group`, `fsui-toggle-group-press` (when `details.added` is non-empty), `fsui-toggle-group-release` (when `details.removed` is non-empty; an exclusive switch carries both) |
+| Toolbar | none (`Toolbar.Button` runs through `useActionTrigger`, which attaches no types) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1399,7 +1412,8 @@ else. Files without the directive must not import from files with it, with two e
 is allowed because Server Components may render client-created contexts. No initial component
 needs the second exception; a component that does says so in its design doc. A context shared
 by **several component folders** lives in `internal/` (`internal/field-context.ts`, read by the
-Field parts, `Form.Root` and `useFieldControl` from every form control's folder); the one-way
+Field parts, `Form.Root` and `useFieldControl` from every form control's folder; `internal/toolbar-context.ts`, read by
+`ToggleGroup.Root`, `Toolbar.Separator` and `Menu.Trigger` to find an enclosing Toolbar, #66); the one-way
 rule above is unchanged, and `internal/` stays unexported.
 
 ```
@@ -1510,6 +1524,7 @@ notes"):
 | Element whose children the **parser writes before hydration** (`<selectedcontent>`: Chromium and Safari clone the selected option's children into it at parse time, so a plain element fails hydration and client-renders the whole root) | Render it with `suppressHydrationWarning` and `dangerouslySetInnerHTML={{ __html: "" }}`, so React treats the children as opaque and the attribute mismatch is silenced (verified in `docs/research/select-combobox.md` §4: hydrates with no recoverable error, later browser writes keep working); the part has no `children` prop. One such element per component at most, named in its design doc (`Select.Value`). |
 | Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
 | ARIA state the platform changes for browser-owned state and assistive technology needs explicitly (`aria-expanded` on a Popover Trigger in JS-free mode, where no React state exists) | Render the initial value and keep it current with a DOM write from the platform event through the ref (`toggle`, reading `:popover-open`), never React state. The attribute is owned, so React's value for it never changes in that mode and the DOM write is never overwritten. One attribute per component at most, named in its design doc. |
+| Roving `tabindex` over children the library did not render (`Toolbar.Root`; a standalone `ToggleGroup.Root`, #66) | The container's engine (`internal/use-roving-focus.ts`) finds the focusable descendants in the DOM and writes `tabindex` (`0` on the current stop, `-1` elsewhere) from a layout effect after each of its commits, a `MutationObserver` on its subtree and its `focusin` / `pointerdown` handlers. Items render no `tabindex` (library item parts omit the prop from their types; a consumer's `tabIndex` on a toolbar item is unsupported), an element whose own `tabindex="-1"` the engine did not write is not an item, and on the native `focusgroup` path nothing is written. Server HTML carries no `tabindex`, so before hydration every item is a Tab stop; after the first layout effect, one. |
 
 Rules of thumb: platform attribute names in source are the HTML spelling; the augmentation file
 is the only place any `declare module` appears, and that module is always `"react"`: HTML
@@ -1548,7 +1563,7 @@ a flag (`docs/vision.md`). Mechanism:
    | --- | --- | --- | --- |
    | `popover="hint"` | Safari 27.0 (TP only) | `Tooltip.Popup experimental_hint` | Popup renders `popover="hint"` instead of the baseline type plus JS Escape/outside-click handling. |
    | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor` | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
-   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup`, `Menu.Popup experimental_focusgroup` (renders `focusgroup="menu wrap\|nowrap"`; items render no `tabindex` on the native path; typeahead, activation, submenu keys and Tab stay JS) | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex` (#43). |
+   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup`, `Menu.Popup experimental_focusgroup` (renders `focusgroup="menu wrap\|nowrap"`; items render no `tabindex` on the native path; typeahead, activation, submenu keys and Tab stay JS), `Toolbar.Root experimental_focusgroup` (`focusgroup="toolbar inline\|block wrap\|nowrap"`; the engine writes no `tabindex` and handles no navigation key where native), standalone `ToggleGroup.Root experimental_focusgroup` (the `toolbar` token under an explicit `role="group"`, plus `nomemory` and `focusgroupstart` on the first pressed Item; a ToggleGroup **inside** a Toolbar renders no `focusgroup` whatever its prop says, with a dev warning, because a nested focusgroup splits the Toolbar's single Tab stop, #66) | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex` (#43). |
    | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
    | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute; camelCase like `experimental_interestFor`) | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | **none** (withdrawn 2026-10-17, Select design #50) | The markup (`<button>` + `<selectedcontent>`, rich options, `<legend>` in `<optgroup>`) is parsed everywhere and degrades to the native select; the opt-in is the consumer's CSS (`appearance: base-select`), so no library flag exists. |
@@ -1604,6 +1619,8 @@ packages/ui/src/
     use-form-reset.ts       # section 3.8
     use-native-checked.ts   # section 3.8; also exports guardCheckableChange
     use-native-group-reconciliation.ts  # section 3.8
+    toolbar-context.ts      # section 7.1: ToolbarContext, read across folders (#66)
+    use-roving-focus.ts     # section 7.4: DOM-written roving tabindex (#66)
   __tests__/
     vitest.setup.ts
     helpers.tsx             # section 10
@@ -1948,4 +1965,7 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 
 ## Open questions
 
-None at present.
+- The ToggleGroup and Toolbar amendments above (#66) are applied pending that design's acceptance
+  (`design/components/toggle-group.md`, recommendations 1 to 12). If the product owner decides
+  against the DOM-written roving `tabindex` (recommendation 6), the 3.2 paragraph and the 7.4 row
+  are reverted and the design is reworked around item parts.
