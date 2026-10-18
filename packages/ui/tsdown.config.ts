@@ -18,6 +18,8 @@ export default defineConfig({
     "src/combobox/index.ts",
     "src/toast/index.ts",
     "src/slider/index.ts",
+    "src/field/index.ts",
+    "src/form/index.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives

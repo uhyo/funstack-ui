@@ -86,7 +86,9 @@ export function ComboboxList({ className, style, children, render, ...rest }: Co
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
     id: ctx.ids.list,
     role: "listbox",
-    ...(ctx.hasLabel && { "aria-labelledby": ctx.ids.label }),
+    ...(ctx.hasLabel
+      ? { "aria-labelledby": ctx.ids.label }
+      : ctx.fieldLabelId !== undefined && { "aria-labelledby": ctx.fieldLabelId }),
     "aria-busy": ctx.stale || ctx.loading ? true : undefined,
     "data-stale": dataAttr(ctx.stale),
     "data-empty": dataAttr(ctx.empty),

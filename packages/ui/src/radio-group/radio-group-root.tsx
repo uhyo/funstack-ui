@@ -13,6 +13,7 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { RadioGroupContext } from "./radio-group-context.js";
 import type { RadioGroupContextValue } from "./radio-group-context.js";
@@ -124,7 +125,9 @@ function readGroup(
  * Carries `data-pending` while `valueChangeAction` is in flight.
  *
  * Owned keys (conventions 1.2): `role`, `aria-required`, `disabled`, `form`, `data-pending`,
- * `data-disabled`.
+ * `data-disabled`; inside a `Field.Root` also `aria-labelledby` (→ `Field.Label`, token-merged),
+ * `aria-describedby` (token-merged), `aria-invalid` and `data-invalid`, and `name` / `required` /
+ * `disabled` default from the Field.
  *
  * Keep every Item in the same Suspense boundary as its Root when server rendering. Partial
  * hydration of a group (a boundary between Root and Items that stays dehydrated while the user
@@ -138,16 +141,28 @@ export function RadioGroupRoot({
   valueChangeAction,
   name: nameProp,
   form,
-  required = false,
-  disabled = false,
+  required: requiredProp,
+  disabled: disabledProp,
   className,
   style,
   children,
   render,
   ...rest
 }: RadioGroupRootProps) {
+  // Inside a Field.Root (design/components/field-form.md 7.2) the fieldset is the Field's group
+  // control: `aria-labelledby` → `Field.Label`, the ARIA wiring, and `name` / `required` /
+  // `disabled` defaulting from the Field.
+  const field = useFieldControl({
+    labelable: false,
+    name: nameProp,
+    disabled: disabledProp,
+    required: requiredProp,
+    component: "RadioGroup.Root",
+  });
+  const required = field.required;
+  const disabled = field.disabled;
   const fallbackName = useId();
-  const name = nameProp ?? fallbackName;
+  const name = field.name ?? fallbackName;
   const fieldsetRef = useRef<HTMLFieldSetElement | null>(null);
   const warnedElement = useRef(false);
 
@@ -234,6 +249,7 @@ export function RadioGroupRoot({
       fieldsetRef.current = null;
     };
   }, []);
+  const rootRef = useMergedRef<HTMLFieldSetElement>(libraryRef, field.ref);
 
   // Memoised (#48): `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with
   // the state and the props below.
@@ -278,6 +294,7 @@ export function RadioGroupRoot({
     children,
     props: rest,
     libraryProps: {
+      ...field.attributes,
       role: "radiogroup",
       "aria-required": required ? "true" : undefined,
       disabled,
@@ -285,7 +302,7 @@ export function RadioGroupRoot({
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
     },
-    ref: libraryRef,
+    ref: rootRef,
   });
 
   return <RadioGroupContext value={context}>{element}</RadioGroupContext>;

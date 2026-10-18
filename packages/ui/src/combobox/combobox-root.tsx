@@ -1,5 +1,6 @@
 "use client";
 import {
+  use,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -13,6 +14,7 @@ import {
 import { flushSync } from "react-dom";
 import type { ReactNode, RefObject } from "react";
 import { createActionDetails } from "../internal/action-details.js";
+import { FieldContext } from "../internal/field-context.js";
 import type {
   ActionDetails,
   ChangeAction,
@@ -229,21 +231,28 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     autoHighlight = false,
     openOnClick = false,
     loop = false,
-    name,
     form,
-    disabled = false,
     children,
   } = props;
+
+  // Inside a Field.Root (design/components/field-form.md 7.2): the Input is the Field's control
+  // (its id is the Field's, so `Field.Label` points at it), the hidden input's `name` and
+  // `disabled` default from the Field, and the List is named by `Field.Label` when no
+  // `Combobox.Label` is mounted.
+  const field = use(FieldContext);
+  const name = props.name ?? field?.name;
+  const disabled = (props.disabled ?? false) || (field?.disabled ?? false);
+  const fieldControlId = field?.ids.control;
 
   const id = useId();
   const ids = useMemo(
     () => ({
-      input: `${id}-input`,
+      input: fieldControlId ?? `${id}-input`,
       label: `${id}-label`,
       list: `${id}-list`,
       optionPrefix: `${id}-option-`,
     }),
-    [id],
+    [id, fieldControlId],
   );
 
   const popover = usePopoverRoot<ComboboxOpenChangeDetails>({
@@ -847,6 +856,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     empty,
     loading,
     hasLabel: labelCount > 0,
+    fieldLabelId: field?.ids.label,
     disabled,
     inputRef,
     listRef,

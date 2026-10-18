@@ -24,6 +24,8 @@ import {
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import type { UrgentChangeAction } from "../index.js";
+import { Field } from "../field/index.js";
+import { Form } from "../form/index.js";
 import { Combobox } from "./index.js";
 import type {
   ComboboxClearState,
@@ -2353,3 +2355,70 @@ function createSearch() {
     },
   };
 }
+// design/components/field-form.md 13.1, "Controls inside a Field".
+describe("Combobox inside a Field.Root", () => {
+  it("the Input is the Field's control; the List is named by Field.Label; name / disabled / required from the Field", async () => {
+    const own = deferred();
+    const submission = deferred();
+    render(
+      <Form.Root action={() => submission.promise}>
+        <Field.Root name="country" required data-testid="root">
+          <Field.Label data-testid="label">Country</Field.Label>
+          <Combobox.Root valueChangeAction={() => own.promise}>
+            <Combobox.Input data-testid="input" />
+            <Combobox.Popup>
+              <Combobox.List data-testid="list">
+                <Combobox.Option value="jp" data-testid="opt-jp">
+                  Japan
+                </Combobox.Option>
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Root>
+          <Field.Description data-testid="desc">Where you live.</Field.Description>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    const i = input();
+    expect(screen.getByTestId("label")).toHaveAttribute("for", i.id);
+    expect(i).toHaveAccessibleName("Country");
+    expect(i).toBeRequired();
+    expect(i).toHaveAttribute("aria-describedby", screen.getByTestId("desc").id);
+    expect(i).toHaveAttribute("aria-invalid", "false");
+    expect(hidden()).toHaveAttribute("name", "country");
+
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(i).toHaveAttribute("aria-invalid", "true");
+    expect(document.activeElement).toBe(i);
+
+    await typeText(user, "j");
+    expect(list()).toHaveAttribute("aria-labelledby", screen.getByTestId("label").id);
+    await user.click(option("jp"));
+    expectPending(i);
+    expectNotPending(screen.getByTestId("root"));
+    await act(async () => own.resolve());
+    expect(hidden()).toHaveValue("jp");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expectPending(screen.getByTestId("root"));
+    expectNotPending(i);
+    await act(async () => submission.resolve());
+  });
+
+  it("Field disabled disables the Input", async () => {
+    render(
+      <Field.Root name="country" disabled>
+        <Field.Label>Country</Field.Label>
+        <Combobox.Root>
+          <Combobox.Input data-testid="input" />
+        </Combobox.Root>
+      </Field.Root>,
+    );
+    await act(async () => {});
+    expect(input()).toBeDisabled();
+  });
+});

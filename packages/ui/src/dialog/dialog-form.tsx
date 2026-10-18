@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { useFormStatus } from "react-dom";
+import { FormStatusWatcher } from "../internal/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
@@ -51,30 +51,6 @@ export interface DialogFormProps extends Omit<
   style?: StateValue<CSSProperties | undefined, DialogFormState>;
   children?: StateValue<ReactNode, DialogFormState>;
   render?: RenderProp<ComponentPropsWithRef<"form">, DialogFormState>;
-}
-
-interface FormStatusWatcherProps {
-  readonly onPendingChange: (pending: boolean) => void;
-  readonly onSettled: () => void;
-}
-
-/**
- * Observes React's form channel (design 8.1): `useFormStatus().pending` covers the action's
- * whole transition, including the Suspense wait of what it re-renders. On `true → false` the
- * submission succeeded (a rejection unmounts the form through the nearest Error Boundary, so the
- * edge is never seen).
- */
-function FormStatusWatcher({ onPendingChange, onSettled }: FormStatusWatcherProps) {
-  const { pending } = useFormStatus();
-  const previous = useRef(false);
-  useEffect(() => {
-    const was = previous.current;
-    previous.current = pending;
-    if (was === pending) return;
-    onPendingChange(pending);
-    if (was && !pending) onSettled();
-  }, [pending, onPendingChange, onSettled]);
-  return null;
 }
 
 /**

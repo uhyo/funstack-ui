@@ -139,6 +139,19 @@ const clientFiles = [
   "slider/slider-indicator.mjs",
   "slider/slider-thumb.mjs",
   "slider/slider-value.mjs",
+  // Every Field and Form part, their shared contexts and hooks are client modules
+  // (design/components/field-form.md, decision 12 and 14).
+  "field/field-root.mjs",
+  "field/field-label.mjs",
+  "field/field-control.mjs",
+  "field/field-description.mjs",
+  "field/field-error.mjs",
+  "form/form-root.mjs",
+  "form/form-submit.mjs",
+  "internal/field-context.mjs",
+  "internal/use-field-control.mjs",
+  "internal/use-form-owner-event.mjs",
+  "internal/form-status-watcher.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -166,6 +179,10 @@ const directiveFreeFiles = [
   "slider/index.mjs",
   // Pure arithmetic (design 15).
   "slider/slider-arithmetic.mjs",
+  "field/index.mjs",
+  "form/index.mjs",
+  "internal/validity.mjs",
+  "internal/focus-first-invalid.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {

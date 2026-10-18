@@ -12,6 +12,7 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
+import { fieldInputProps, useFieldControl, useMergedRef } from "../internal/use-field-control.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 
@@ -25,7 +26,7 @@ export interface CheckboxState {
   readonly indeterminate: boolean;
   /** An action dispatched by this Checkbox is in flight (including the resulting render). */
   readonly pending: boolean;
-  /** The `disabled` prop. */
+  /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
 }
 
@@ -106,7 +107,9 @@ export interface CheckboxProps extends Omit<
  *
  * Owned keys (a `render` element's value is overridden): `type`, `checked`, `defaultChecked`,
  * `indeterminate` (stripped), `aria-checked` (always removed), `disabled`, `data-checked`,
- * `data-indeterminate`, `data-pending`, `data-disabled`. `role` passes through. Event handlers
+ * `data-indeterminate`, `data-pending`, `data-disabled`; inside a `Field.Root` also `id`,
+ * `name`, `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`, and
+ * `disabled` / `name` / `required` default from the Field. `role` passes through. Event handlers
  * are merged rather than owned: a `render` element's own `onChange` (or `onClick`) runs first,
  * then the library's; an `onClick` that calls `preventDefault()` cancels the change (nothing is
  * dispatched).
@@ -116,13 +119,25 @@ export function Checkbox({
   defaultChecked,
   indeterminate = false,
   checkedChangeAction,
-  disabled = false,
+  disabled: disabledProp,
   transition,
   className,
   style,
   render,
   ...rest
 }: CheckboxProps) {
+  // Inside a Field.Root (design/components/field-form.md 7.2) the Field owns the id and the ARIA
+  // wiring, and `name` / `required` / `disabled` default from it.
+  const field = useFieldControl({
+    labelable: true,
+    name: rest.name,
+    disabled: disabledProp,
+    required: rest.required,
+    id: rest.id,
+    component: "Checkbox",
+  });
+  const disabled = field.disabled;
+
   const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     boolean,
     CheckboxCheckedChangeDetails
@@ -158,6 +173,8 @@ export function Checkbox({
     disabled,
   };
 
+  const ref = useMergedRef<HTMLInputElement>(inputRef, field.ref);
+
   const element = useRender<ComponentPropsWithRef<"input">, CheckboxState>({
     defaultElement: "input",
     render,
@@ -165,11 +182,12 @@ export function Checkbox({
     className,
     style,
     children: undefined,
-    ref: inputRef,
+    ref,
     // Pass-through layer: a `render` element's own props win over these (`role` included).
     props: rest,
     // Library-controlled layer (owned keys, conventions 1.2).
     libraryProps: {
+      ...fieldInputProps(field),
       type: "checkbox",
       // The DOM state is the optimistic state (conventions 3.2).
       checked: optimistic,

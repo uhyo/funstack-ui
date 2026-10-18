@@ -41,6 +41,8 @@ export interface ComboboxContextValue {
   readonly loading: boolean;
   /** A `Combobox.Label` is mounted (the List's `aria-labelledby` names it only then). */
   readonly hasLabel: boolean;
+  /** The enclosing `Field.Label`'s id: names the List when no `Combobox.Label` is mounted. */
+  readonly fieldLabelId: string | undefined;
   readonly disabled: boolean;
   readonly inputRef: RefObject<HTMLInputElement | null>;
   readonly listRef: RefObject<HTMLElement | null>;

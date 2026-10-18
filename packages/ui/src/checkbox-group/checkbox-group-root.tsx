@@ -21,6 +21,7 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
 import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
@@ -196,7 +197,10 @@ function readItems(fieldset: HTMLFieldSetElement | null, name: string): HTMLInpu
  * (design/components/checkbox-group.md 14.3). Carries `data-pending` while `valueChangeAction`
  * is in flight. Its implicit role is `group`; no `role` is written.
  *
- * Owned keys (conventions 1.2): `disabled`, `form`, `data-pending`, `data-disabled`.
+ * Owned keys (conventions 1.2): `disabled`, `form`, `data-pending`, `data-disabled`; inside a
+ * `Field.Root` also `aria-labelledby` (→ `Field.Label`, token-merged), `aria-describedby`
+ * (token-merged), `aria-invalid` and `data-invalid`, and `name` / `required` / `disabled` default
+ * from the Field.
  *
  * Unlike RadioGroup, Items may hydrate after their Root (a Suspense boundary between them): a
  * click before an Item hydrated is reconciled when it does.
@@ -207,16 +211,28 @@ export function CheckboxGroupRoot({
   valueChangeAction,
   name: nameProp,
   form,
-  required = false,
-  disabled = false,
+  required: requiredProp,
+  disabled: disabledProp,
   className,
   style,
   children,
   render,
   ...rest
 }: CheckboxGroupRootProps) {
+  // Inside a Field.Root (design/components/field-form.md 7.2) the fieldset is the Field's group
+  // control: `aria-labelledby` → `Field.Label`, the ARIA wiring, and `name` / `required` ("at
+  // least one") / `disabled` defaulting from the Field.
+  const field = useFieldControl({
+    labelable: false,
+    name: nameProp,
+    disabled: disabledProp,
+    required: requiredProp,
+    component: "CheckboxGroup.Root",
+  });
+  const required = field.required;
+  const disabled = field.disabled;
   const fallbackName = useId();
-  const name = nameProp ?? fallbackName;
+  const name = field.name ?? fallbackName;
   const fieldsetRef = useRef<HTMLFieldSetElement | null>(null);
   const warnedElement = useRef(false);
   const warnedDuplicate = useRef(false);
@@ -426,6 +442,7 @@ export function CheckboxGroupRoot({
       fieldsetRef.current = null;
     };
   }, []);
+  const rootRef = useMergedRef<HTMLFieldSetElement>(libraryRef, field.ref);
 
   const context: CheckboxGroupContextValue = {
     name,
@@ -477,12 +494,13 @@ export function CheckboxGroupRoot({
     children,
     props: rest,
     libraryProps: {
+      ...field.attributes,
       disabled,
       form,
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
     },
-    ref: libraryRef,
+    ref: rootRef,
   });
 
   return <CheckboxGroupContext value={context}>{element}</CheckboxGroupContext>;

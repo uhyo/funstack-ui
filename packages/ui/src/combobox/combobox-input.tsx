@@ -10,6 +10,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { optionId, useComboboxContext } from "./combobox-context.js";
@@ -66,7 +67,9 @@ const isDev = process.env.NODE_ENV !== "production";
  * Owned keys (conventions 1.2): `id`, `type`, `role`, `value`, `autoComplete`,
  * `aria-autocomplete`, `aria-expanded`, `aria-controls` (token-merged), `aria-activedescendant`,
  * `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `data-open`, `data-pending`,
- * `data-selected`, `data-stale`, `data-disabled`.
+ * `data-selected`, `data-stale`, `data-disabled`; inside a `Field.Root` (whose control id it
+ * takes) also `required` (own or the Field's), `aria-describedby` (token-merged), `aria-invalid`
+ * and `data-invalid`.
  */
 export function ComboboxInput({ className, style, render, ...rest }: ComboboxInputProps) {
   const ctx = useComboboxContext("Combobox.Input");
@@ -106,9 +109,23 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     [inputRef, triggerRef],
   );
 
+  // Inside a Field.Root (design/components/field-form.md 7.2) the Input is the Field's control:
+  // the Root already took the Field's id for it; `required` and the ARIA wiring land here.
+  const field = useFieldControl({
+    labelable: true,
+    required: rest.required,
+    disabled: ctx.disabled,
+    id: rest.id,
+    component: "Combobox.Input",
+  });
+  const fieldRef = field.ref;
+  const mergedRef = useMergedRef<HTMLElement>(ref, fieldRef);
+
   const searchType = isValidElement<{ type?: unknown }>(render) && render.props.type === "search";
 
   const libraryProps: ComponentPropsWithRef<"input"> & DataAttributes = {
+    ...field.attributes,
+    ...(field.inField && { required: field.required }),
     id: ids.input,
     type: searchType ? "search" : "text",
     role: "combobox",
@@ -148,7 +165,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     children: undefined,
     props: rest,
     libraryProps,
-    ref,
+    ref: mergedRef,
   });
 }
 
