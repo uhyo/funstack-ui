@@ -83,6 +83,31 @@ Implementation of design/components/number-field.md (accepted 2026-10-18) and th
   on a settle whose result has errors"), unrelated (no Field / NumberField involved); passes
   when rerun.
 
+## Review fixes (memo/reviewer/number-field.md, branch wave6/number-field-fixes)
+
+All eleven deviations above were accepted. Fixed, each with a test:
+
+- M1: `readCurrent` checks focus first, so a focused input's text at hydration (even
+  unparsable, `12,`) is adopted as the draft and never overwritten under the caret; the blur
+  resolves it. jsdom row "focused, unparsable text at hydration stays as the draft".
+- S1: `keyCode === 229` counts as composing (WebKit's composition-confirming Enter).
+- S2: Shift+Home / Shift+End are left to the browser (text selection).
+- S3: the buttons' bound state is computed from the parsed draft while one is open
+  (`stepBase` on the context), since a press steps from it.
+- N1: `step()` rounds with `formatter.round` (5.4 for stepped values too), so a step finer than
+  the format posts what the text shows.
+- N2: the hidden input has `autocomplete="off"` (no form-state restoration the text hides).
+- N3: affixes (currency, unit, percent) and literals are stripped at the edges only (also inside
+  the sign and the parentheses); in the middle they make the text unparsable (`1€234` under
+  `fr-FR` was `1234`).
+- N4: the fallback region is cleared and the message written `ANNOUNCE_WRITE_DELAY` (100 ms)
+  later, so a freshly inserted region's first message and a repeat of the same text are both a
+  fresh change.
+- N5: `onCompositionStart` / `onCompositionEnd` pass through `NumberField.Input`; the details
+  JSDoc and the docs say `event` is `undefined` on hold repeats and at a bound-ended hold.
+- The Field docs page says an error shown on blur can shift the layout under a click.
+- S4 (unwritten browser rows) is #77, not part of this branch.
+
 ## Not done (implementation choices left open)
 
 - Combobox keeps its own `ariaNotify` call and `focus-first-invalid.ts` its own `announce`; moving

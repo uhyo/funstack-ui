@@ -143,8 +143,9 @@ export function NumberFieldPage() {
         <li>
           The committed value is <strong>rounded to what the text shows</strong> (the format's
           maximum fraction digits): <code>1.999</code> in a euro field commits <code>2</code> and
-          shows <code>2,00 €</code>, so what the user sees is what the form posts. Set{" "}
-          <code>maximumFractionDigits</code> higher for more precision.{" "}
+          shows <code>2,00 €</code>, so what the user sees is what the form posts. Stepped values
+          are rounded the same way (a <code>step</code> finer than the format cannot post a digit
+          the text hides). Set <code>maximumFractionDigits</code> higher for more precision.{" "}
           <code>notation: "compact"</code> cannot be parsed back and logs a development warning.
         </li>
       </ul>
@@ -159,9 +160,10 @@ export function NumberFieldPage() {
         and snap, with the HTML <code>stepUp()</code> rules: an off-grid value snaps in the
         direction of the step, the step base is <code>min</code> (else <code>0</code>; give{" "}
         <code>min</code> when the grid matters), and a button is <code>disabled</code> when its next
-        step would change nothing (an unreachable <code>max</code> stays unreachable: <code>0</code>
-        –<code>5</code> by <code>2</code> stops at <code>4</code>). To clamp typed values, do it in
-        a controlled parent's <code>valueChangeAction</code>.
+        step would change nothing (judged from the draft while one is open; an unreachable{" "}
+        <code>max</code> stays unreachable: <code>0</code>–<code>5</code> by <code>2</code> stops at{" "}
+        <code>4</code>). To clamp typed values, do it in a controlled parent's{" "}
+        <code>valueChangeAction</code>.
       </p>
 
       <h3>Anatomy</h3>
@@ -289,9 +291,11 @@ export function NumberFieldPage() {
         <code>"dismiss"</code> (the revert after a failed save, steps only), and <code>source</code>{" "}
         one of <code>"input"</code>, <code>"increment"</code>, <code>"decrement"</code>,{" "}
         <code>"keyboard"</code>, <code>"wheel"</code>, or <code>null</code> on platform paths and
-        the revert. The Root owns <code>role="group"</code> and <code>aria-labelledby</code> (your
-        tokens, then the Label's id, then a Field label's). There is no <code>transition</code> prop
-        on any part; the dispatches carry the types <code>fsui-number-field</code> plus{" "}
+        the revert. <code>event</code> is the DOM event, and <code>undefined</code> for the repeats
+        of a held button, a hold that ended at its bound, hydration and the revert. The Root owns{" "}
+        <code>role="group"</code> and <code>aria-labelledby</code> (your tokens, then the Label's
+        id, then a Field label's). There is no <code>transition</code> prop on any part; the
+        dispatches carry the types <code>fsui-number-field</code> plus{" "}
         <code>fsui-number-field-change</code> (step) or <code>fsui-number-field-commit</code>{" "}
         (gesture) for your own boundaries.
       </p>
@@ -326,7 +330,8 @@ export function NumberFieldPage() {
         <code>max</code>, <code>step</code>, <code>required</code> and <code>pattern</code> are not
         props: constraints live on the hidden input, and a constraint on the visible one would make
         it invalid for a reason nobody reports. <code>placeholder</code>, <code>aria-*</code>,{" "}
-        <code>onFocus</code>, <code>onPaste</code> and the rest pass through.
+        <code>onFocus</code>, <code>onPaste</code>, <code>onCompositionStart</code> /{" "}
+        <code>onCompositionEnd</code> and the rest pass through.
       </p>
 
       <h4>
@@ -381,7 +386,7 @@ export function NumberFieldPage() {
           ["Shift+Arrow, PageUp / PageDown", "± largeStep."],
           [
             "Home / End",
-            "`min` / the largest step at or below `max`, only when that bound is set; otherwise the caret moves.",
+            "`min` / the largest step at or below `max`, only when that bound is set; otherwise the caret moves. Shift+Home / Shift+End always select text.",
           ],
           [
             "Enter",

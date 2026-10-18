@@ -90,7 +90,9 @@ import { Form } from "@funstack/ui/form";
             <code>Field.Error</code> is rendered only while an error is shown
           </strong>
           . Write it once, unconditionally; its text is the browser's message, a server error, or
-          what your function <code>children</code> return.
+          what your function <code>children</code> return. An error that appears on blur can shift
+          the layout, so a click right after typing (the click's press is the blur) may miss a
+          button that moved; reserve the error's space if that matters.
         </li>
         <li>
           <code>Field.Description</code> is always referenced by the control, rendered or not.
