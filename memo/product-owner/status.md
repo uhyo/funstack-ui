@@ -179,3 +179,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Closed: #71, #78. Release 0.1.0-alpha.5 (bump 2669c42); publish and deploy green. The npm dist-tag view lagged right after publishing.
 - User suggestion: a Button with an action and pending state → #79 (filed). PO view: yes; reuse internal/use-action-trigger; never disabled while pending (like Form.Submit); type="button". Planned as wave 8 unless the user wants it sooner.
 - Next: wave 8 = Button (#79). It needs research (aria-busy, re-entry), an architect design, then the usual pipeline.
+- The user asked to file the FUNSTACK Static issue → uhyo/funstack-static#194 (build exits 0 on RSC/prerender errors). Noted on #70. Other upstream items stay human tasks; the FUNSTACK family repos are OK to file in when the user asks.
