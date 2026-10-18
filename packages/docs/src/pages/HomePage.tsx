@@ -42,6 +42,7 @@ export function HomePage() {
           Headless React components, and the first UI library that is <strong>Async React</strong>
           -native.
         </p>
+        <img src="/FUNSTACK_UI_Hero_small.png" alt="FUNSTACK UI" className="hero-image" />
         <div className="hero-buttons">
           <a href="/getting-started" className="button primary">
             Get started

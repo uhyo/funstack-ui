@@ -10,7 +10,9 @@ export default function Root({ children }: { children: ReactNode }) {
             are rendered per page by PageHead / PageMeta and hoisted into <head> by React. */}
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="FUNSTACK UI" />
-        <meta name="twitter:card" content="summary" />
+        <meta property="og:image" content="https://ui.funstack.work/FUNSTACK_UI_Hero_small.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="https://ui.funstack.work/FUNSTACK_UI_Hero_small.png" />
       </head>
       <body>{children}</body>
     </html>
