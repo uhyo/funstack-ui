@@ -158,3 +158,14 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
   - #77: NumberField browser rows and announce.ts migration
 - Open question: should NumberField validity follow the draft? The Firefox bubble and :user-invalid persist while the user types a fix. The architect says leave it; it was raised with the user.
 - Wave 7 candidates: #74, #72 and #77; new components are still to be chosen.
+
+## 2026-10-18 — wave 7 (#78) in progress; usage limit hit
+
+- Done:
+  - #72 docs RSC guard (0f12348). The upstream report text is linked from #70.
+  - #77 NumberField browser rows (cc0451f). The announce.ts migration was skipped: the directive rule forbids the import, and it would change behaviour.
+  - #74/#75 design finalized and accepted (0473012).
+- Running at the limit; resume both with SendMessage:
+  - impl-toolbar: implementing #74/#75 on branch wave7/toolbar-radios.
+  - impl-flakes: #71 on branch wave7/flakes. The Popover exit row was added to its scope.
+- Left: finish both, close #78, release 0.1.0-alpha.5.
