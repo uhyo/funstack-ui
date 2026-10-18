@@ -31,6 +31,10 @@ focus-first-invalid,form-status-watcher}`. Docs page `/components/field`, playgr
   `useFormStatus` is pending with `data` in a child and a portal, no automatic reset. With a
   `useActionState` dispatch the Form's transition and the status stay pending until the queued
   action settles (entanglement), and a second queued submit keeps one pending period.
+- jsdom + user-event: `user.type` while a `useActionState` submission is pending logs "A
+  component suspended inside an `act` scope, but the `act` call was not awaited" (user-event's
+  per-event sync `act` sees the pending transition suspend). The jsdom row uses `fireEvent.input`
+  inside an async `act`; the browser row types for real and shows no fallback and no warning.
 - Chromium AX through CDP from vitest browser mode: the test runs in an iframe, so
   `Accessibility.getFullAXTree` needs each frame's `frameId` (`Page.getFrameTree`).
 
