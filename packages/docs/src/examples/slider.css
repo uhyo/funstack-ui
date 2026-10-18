@@ -92,6 +92,13 @@
   animation: demo-slider-pulse 0.8s infinite alternate;
 }
 
+/* Inside a Field: the thumbs carry the Field's data-invalid. */
+.demo-slider-thumb[data-invalid] {
+  box-shadow:
+    0 0 0 2px #dc2626,
+    0 1px 3px rgb(0 0 0 / 0.25);
+}
+
 @keyframes demo-slider-pulse {
   to {
     opacity: 0.6;

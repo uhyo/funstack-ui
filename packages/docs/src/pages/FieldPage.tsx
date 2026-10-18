@@ -76,11 +76,13 @@ import { Form } from "@funstack/ui/form";
         </li>
         <li>
           <strong>Any FUNSTACK form control is a Field's control</strong> without a wrapper:
-          Checkbox, Switch, RadioGroup, CheckboxGroup, Select and Combobox. A group (RadioGroup,
-          CheckboxGroup) is named by <code>Field.Label</code> through <code>aria-labelledby</code>{" "}
-          instead of <code>for</code>. A RadioGroup carries <code>aria-invalid</code> on its{" "}
-          <code>radiogroup</code>; a CheckboxGroup on every item, because ARIA 1.2 does not support
-          it on a <code>group</code>.
+          Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox and Slider (see{" "}
+          <a href="/components/slider#inside-a-field">Slider inside a Field</a>). A group
+          (RadioGroup, CheckboxGroup, a Slider with several thumbs) is named by{" "}
+          <code>Field.Label</code> through <code>aria-labelledby</code> instead of <code>for</code>.
+          A RadioGroup carries <code>aria-invalid</code> on its <code>radiogroup</code>; a
+          CheckboxGroup and a Slider on every item, because ARIA 1.2 does not support it on a{" "}
+          <code>group</code>.
         </li>
         <li>
           <strong>

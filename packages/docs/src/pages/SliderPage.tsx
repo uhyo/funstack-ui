@@ -2,6 +2,8 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
+import { SliderField } from "../examples/SliderField.js";
+import sliderFieldSource from "../examples/SliderField.tsx?raw";
 import { SliderPrice } from "../examples/SliderPrice.js";
 import sliderPriceSource from "../examples/SliderPrice.tsx?raw";
 import { SliderVolume } from "../examples/SliderVolume.js";
@@ -398,8 +400,9 @@ export function SliderPage() {
       <ul>
         <li>
           Each thumb posts its value: <code>volume=73</code>, or{" "}
-          <code>price=100&amp;price=300</code> with one Root <code>name</code>. A range is never
-          invalid and nothing is <code>required</code>.
+          <code>price=100&amp;price=300</code> with one Root <code>name</code>. A range has no
+          native constraint and nothing is <code>required</code>; a Field's <code>validate</code>{" "}
+          can make it invalid (<a href="#inside-a-field">Inside a Field</a>).
         </li>
         <li>
           <strong>Form reset</strong> works although react-dom keeps a controlled input's{" "}
@@ -426,6 +429,47 @@ export function SliderPage() {
 
 // A Server Function as the save, straight from a Server Component:
 <Slider.Root defaultValue={settings.volume} valueCommitAction={saveVolume}>…</Slider.Root>`}</CodeBlock>
+
+      <h3 id="inside-a-field">Inside a Field</h3>
+      <Example
+        source={sliderFieldSource}
+        fileName="SliderField.tsx"
+        css={sliderCss}
+        cssFileName="slider.css"
+      >
+        <SliderField />
+      </Example>
+      <ul>
+        <li>
+          A Slider inside a <code>Field.Root</code> is the Field's control with no new prop.{" "}
+          <strong>One thumb</strong>: its input takes the Field's control id, so{" "}
+          <code>Field.Label</code>'s <code>for</code> names it, and the Field's description and
+          error describe it. <strong>Several thumbs</strong>: the Root (<code>role="group"</code>)
+          is named by <code>Field.Label</code> through <code>aria-labelledby</code> and described by
+          the Field; each thumb still needs its own <code>aria-label</code>.
+        </li>
+        <li>
+          <code>name</code> and <code>disabled</code> default from the Field. <code>validate</code>
+          's <code>value</code> is the first thumb's; read every thumb with{" "}
+          <code>formData.getAll(name)</code>. <code>Field.Root required</code> has no effect (a
+          range is never empty) and logs a development warning.
+        </li>
+        <li>
+          An error sets <code>aria-invalid="true"</code> on every thumb's input (never on the group)
+          and <code>data-invalid</code> on the Root and every Thumb. The message lives in the first
+          thumb's custom validity, so a blocked submission focuses the first thumb.
+        </li>
+        <li>
+          A drag and the library-handled keys fire no native events, so the Slider tells the Field
+          at each <strong>commit</strong> (the release, or the key press): <code>validate</code>{" "}
+          re-runs and a shown server error is dismissed, as typing would. A rolled-back save or a
+          form reset re-runs <code>validate</code> but does not dismiss a server error.
+        </li>
+        <li>
+          The two channels stay separate: the Slider's own save is its <code>data-pending</code>,
+          the form's submission is the Field's.
+        </li>
+      </ul>
     </div>
   );
 }
