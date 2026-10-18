@@ -2,6 +2,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BuildEntryFunction } from "@funstack/static/server";
+import { guardBuild } from "./buildGuard.js";
 import { collectSitePaths } from "./entries.js";
 import { SITE_URL } from "./pageMeta.js";
 
@@ -18,5 +19,10 @@ ${urls}
 }
 
 export default (async ({ build, outDir }) => {
-  await Promise.all([build(), writeFile(path.join(outDir, "sitemap.xml"), generateSitemap())]);
+  // guardBuild fails the build on Server Components and prerender errors, which @funstack/static
+  // only logs (#72).
+  await Promise.all([
+    guardBuild(build, outDir),
+    writeFile(path.join(outDir, "sitemap.xml"), generateSitemap()),
+  ]);
 }) satisfies BuildEntryFunction;
