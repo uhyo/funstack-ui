@@ -20,10 +20,10 @@ export function SliderPage() {
       <p className="page-intro">
         A slider (WAI-ARIA Slider and Slider (Multi-Thumb) patterns) and the library's first
         continuous control. Each thumb is a styleable element containing a visually hidden native{" "}
-        <code>&lt;input type="range"&gt;</code>, so the role, the value and bounds, every key
-        (including RTL mirroring), labels, forms and <code>disabled</code> are the platform's. The
-        library adds the styleable thumb and track, pointer dragging, several thumbs that cannot
-        cross, and the Async React half: a drag produces many <strong>steps</strong> and one{" "}
+        <code>&lt;input type="range"&gt;</code>, so the role, the value and bounds, every key (RTL
+        mirroring included), labels, forms and <code>disabled</code> are the platform's. The library
+        adds the styleable thumb and track, pointer dragging, several thumbs that cannot cross, and
+        the Async React half: a drag produces many <strong>steps</strong> and one{" "}
         <strong>commit</strong>.
       </p>
 
@@ -343,18 +343,21 @@ export function SliderPage() {
 [data-dragging] .thumb { transition: none; }`}</CodeBlock>
 
       <h3>Keyboard and ARIA</h3>
-      <p>Every key is the browser's, except one normalisation for vertical sliders.</p>
+      <p>
+        Every key is the browser's, except ArrowLeft / ArrowRight on vertical and on RTL sliders,
+        which the library normalises.
+      </p>
       <Table
         head={["Key", "Horizontal", "Vertical"]}
         rows={[
           [
             "ArrowRight / ArrowUp",
-            "+ step (Right is − step under RTL)",
+            "+ step (Right is − step under RTL: by the library)",
             "+ step (Right: by the library)",
           ],
           [
             "ArrowLeft / ArrowDown",
-            "− step (Left is + step under RTL)",
+            "− step (Left is + step under RTL: by the library)",
             "− step (Left: by the library)",
           ],
           ["PageUp / PageDown", "± 10 % of the range", "same"],
@@ -366,7 +369,10 @@ export function SliderPage() {
         <li>
           Each key press is one step and one commit. Firefox decreases a vertical range on
           ArrowRight; the library handles ArrowLeft / ArrowRight on vertical sliders so every engine
-          follows the APG (Right increases).
+          follows the APG (Right increases). Under RTL (the input's computed <code>direction</code>)
+          the track is mirrored, so ArrowLeft increases; Chromium and Firefox mirror a native range,
+          Safari does not, so the library handles these two keys there as well. Left-to-right
+          horizontal keys stay native.
         </li>
         <li>
           No <code>aria-valuemin</code>, <code>aria-valuemax</code>, <code>aria-valuenow</code> or{" "}
@@ -402,7 +408,8 @@ export function SliderPage() {
         </li>
         <li>
           Pointer gestures fire no native <code>input</code> / <code>change</code> events, so a{" "}
-          <code>&lt;form onChange&gt;</code> listener sees keyboard changes only.
+          <code>&lt;form onChange&gt;</code> listener sees keyboard changes only, and not ArrowLeft
+          / ArrowRight on vertical or RTL sliders (handled from the <code>keydown</code>).
         </li>
       </ul>
       <CodeBlock>{`// Submit on release:

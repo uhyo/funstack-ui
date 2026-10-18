@@ -131,6 +131,8 @@ describe("Slider (browser)", () => {
       await user.keyboard("{ArrowLeft}");
       await flush();
       expect(input().value).toBe("51");
+      // Normalised in JS (WebKit does not mirror a native range), as for the vertical keys.
+      expect(onCommit.mock.calls[0]![1].event?.type).toBe("keydown");
       await user.keyboard("{ArrowRight}");
       await user.keyboard("{ArrowRight}");
       await flush();

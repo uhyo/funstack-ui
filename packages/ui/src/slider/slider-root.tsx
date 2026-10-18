@@ -492,15 +492,26 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
         step: inc,
         gap: g,
       } = latest.current;
-      if (axis !== "vertical" || off) return;
+      if (off) return;
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
-      // Firefox decreases a vertical range on ArrowRight; the APG says increase (design 7).
+      // Vertical: Firefox decreases a vertical range on ArrowRight; the APG says increase.
+      // Horizontal RTL: the track is mirrored (min on the right), so ArrowLeft increases;
+      // Chromium and Firefox mirror a native range, WebKit does not (design 7). LTR stays native.
+      let increaseKey: "ArrowLeft" | "ArrowRight";
+      if (axis === "vertical") {
+        increaseKey = "ArrowRight";
+      } else {
+        // Read at the keydown: the direction may come from any ancestor and change at any time.
+        const input = event.currentTarget as Element | null;
+        if (input === null || getComputedStyle(input).direction !== "rtl") return;
+        increaseKey = "ArrowLeft";
+      }
       event.preventDefault();
       const before = shownRef.current;
       const current = before[index];
       if (current === undefined) return;
-      const delta = event.key === "ArrowRight" ? inc : -inc;
+      const delta = event.key === increaseKey ? inc : -inc;
       const next = replaceAt(
         before,
         index,

@@ -1248,7 +1248,50 @@ describe("keyboard normalisation", () => {
     expect(thumbInput().value).toBe("40");
   });
 
-  it("horizontal: keydown is left to the browser", async () => {
+  it("horizontal RTL: ArrowLeft increases, ArrowRight decreases, prevented, step + commit", async () => {
+    const onChange = vi.fn<ChangeFn>();
+    const onCommit = vi.fn<CommitFn>();
+    render(
+      <Slider.Root
+        data-testid="root"
+        defaultValue={40}
+        valueChangeAction={onChange}
+        valueCommitAction={onCommit}
+      >
+        <Parts count={1} />
+      </Slider.Root>,
+    );
+    // jsdom does not inherit `direction` from a `dir` ancestor; the computed style is what counts.
+    thumbInput().style.direction = "rtl";
+    let notPrevented = true;
+    act(() => {
+      notPrevented = fireEvent.keyDown(thumbInput(), { key: "ArrowLeft" });
+    });
+    await flush();
+    expect(notPrevented).toBe(false);
+    expect(thumbInput().value).toBe("41");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0]![1].event?.type).toBe("keydown");
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit.mock.calls[0]![0]).toBe(41);
+    expect(onCommit.mock.calls[0]![1].event?.type).toBe("keydown");
+    act(() => {
+      fireEvent.keyDown(thumbInput(), { key: "ArrowRight" });
+    });
+    act(() => {
+      fireEvent.keyDown(thumbInput(), { key: "ArrowRight" });
+    });
+    await flush();
+    expect(thumbInput().value).toBe("39");
+    expect(onCommit).toHaveBeenCalledTimes(3);
+    // Other keys stay native.
+    act(() => {
+      notPrevented = fireEvent.keyDown(thumbInput(), { key: "ArrowUp" });
+    });
+    expect(notPrevented).toBe(true);
+  });
+
+  it("horizontal LTR: keydown is left to the browser", async () => {
     const onChange = vi.fn<ChangeFn>();
     render(
       <Slider.Root data-testid="root" defaultValue={40} valueChangeAction={onChange}>

@@ -112,3 +112,13 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
 - Popover nested rows: `innerSide` removed, the inner Popup uses `side="right"` everywhere and the
   flip row runs on WebKit too. Not runnable locally: the first WebKit CI run must confirm the
   nested rows and the flip row (`p.right ≈ t.left`).
+
+## Slider (2026-10-18, #54 review)
+
+- Native `input[type=range]` keys under RTL: Chromium and Firefox mirror ArrowLeft / ArrowRight
+  on a horizontal range; WebKit does not (`RangeInputType::handleKeydownEvent` maps Left to
+  −step, Right to +step, no direction check; CI on 6cef8e7 showed '49' for '51'). The Slider now
+  handles both keys from `keydown` when the input's computed `direction` is `rtl` (horizontal),
+  as it already did for vertical (Firefox decreases a vertical range on ArrowRight). WebKit's
+  `isVertical` is only `appearance: slider-vertical`, so for our writing-mode vertical input it
+  does Up +, Down −; the JS normalisation covers Left / Right.
