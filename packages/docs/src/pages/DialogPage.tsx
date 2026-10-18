@@ -392,6 +392,16 @@ export function DialogPage() {
         folded into any other part's state. The Form owns <code>action</code>, and{" "}
         <code>method</code> unless <code>action</code> is a string.
       </p>
+      <p>
+        With field errors from <code>useActionState</code>, render it as a <code>Form.Root</code>:{" "}
+        <code>
+          {"<Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />}>"}
+        </code>
+        . The Form then runs the action, routes the errors to its fields and resets the form only on
+        success (React's own path resets it after every successful action); see{" "}
+        <a href="/components/field#dialog-form">Field and Form: in a Dialog</a>. Pair it with{" "}
+        <code>closeOnSettle={"{false}"}</code>, since a result with errors also settles.
+      </p>
 
       <h4>
         <code>Dialog.Title</code>, <code>Dialog.Description</code>

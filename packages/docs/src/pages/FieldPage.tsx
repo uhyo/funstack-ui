@@ -78,7 +78,9 @@ import { Form } from "@funstack/ui/form";
           <strong>Any FUNSTACK form control is a Field's control</strong> without a wrapper:
           Checkbox, Switch, RadioGroup, CheckboxGroup, Select and Combobox. A group (RadioGroup,
           CheckboxGroup) is named by <code>Field.Label</code> through <code>aria-labelledby</code>{" "}
-          instead of <code>for</code>.
+          instead of <code>for</code>. A RadioGroup carries <code>aria-invalid</code> on its{" "}
+          <code>radiogroup</code>; a CheckboxGroup on every item, because ARIA 1.2 does not support
+          it on a <code>group</code>.
         </li>
         <li>
           <strong>
@@ -109,8 +111,10 @@ import { Form } from "@funstack/ui/form";
           <strong>A submission attempt</strong> with an invalid field: the Field cancels the
           browser's validation bubble (only when a <code>Field.Error</code> is mounted), renders the
           message, and the first invalid control in document order is focused. Its description,
-          error included, is read at focus. A field without <code>Field.Error</code> keeps the
-          browser's bubble; so does every field before hydration.
+          error included, is read at focus. When focus is already there (Enter pressed in that
+          field), the message is announced with <code>ariaNotify()</code> instead, where the browser
+          has it. A field without <code>Field.Error</code> keeps the browser's bubble; so does every
+          field before hydration.
         </li>
         <li>
           <code>form.checkValidity()</code> shows nothing and <code>reportValidity()</code> shows
@@ -136,9 +140,11 @@ import { Form } from "@funstack/ui/form";
         message is written into the control with <code>setCustomValidity</code>, so it blocks
         submission, matches <code>:invalid</code> / <code>:user-invalid</code> and is shown like a
         native constraint. It runs at mount, on every <code>input</code> / <code>change</code>{" "}
-        anywhere in the form (cross-field rules stay current), after a reset, and when the prop
-        changes. A field with <code>validate</code> is rendered from a client component (a function
-        is not serialisable).
+        anywhere in the form and on a FUNSTACK control's value change (cross-field rules stay
+        current), on blur, after a reset and on a submission attempt. A new function (an inline one
+        on every render) is not run by the render itself; it is used from the next of these events,
+        so derive the rule from its two arguments rather than from outside state. A field with{" "}
+        <code>validate</code> is rendered from a client component (a function is not serialisable).
       </p>
 
       <h3>Submission and server errors</h3>
@@ -163,8 +169,9 @@ import { Form } from "@funstack/ui/form";
           shows its errors again, even identical strings.
         </li>
         <li>
-          After a submission with errors, the first field with an error is focused. Errors present
-          at mount (a progressive-enhancement post-back, a Server Component prop) are shown without
+          After a submission with errors, the first field with an error is focused (its message is
+          announced with <code>ariaNotify()</code> when focus is already on it). Errors present at
+          mount (a progressive-enhancement post-back, a Server Component prop) are shown without
           moving focus.
         </li>
         <li>
@@ -188,6 +195,30 @@ import { Form } from "@funstack/ui/form";
           if you need to; the button is never disabled.
         </li>
       </ul>
+      <h4 id="dialog-form">
+        In a Dialog: <code>Dialog.Form</code> rendered as <code>Form.Root</code>
+      </h4>
+      <CodeBlock>{`const [state, dispatch] = useActionState(saveProfile, {});
+
+<Dialog.Popup>
+  <Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />} closeOnSettle={false}>
+    <Field.Root name="email">…</Field.Root>
+    <Form.Submit>Save</Form.Submit>
+  </Dialog.Form>
+</Dialog.Popup>`}</CodeBlock>
+      <p>
+        <code>Dialog.Form</code> renders a plain React form, which takes React's path: the form is
+        reset after every successful action, also one that returned field errors. Rendered as{" "}
+        <code>Form.Root</code> (<code>render={"{<Form.Root errors={state.errors} />}"}</code>),{" "}
+        <code>Form.Root</code> receives the <code>action</code> and runs it, so its policy applies:
+        server errors are routed to the fields and focused, and the form is reset only when the
+        result has no error (<code>autoReset</code>, which you can pass on the{" "}
+        <code>Form.Root</code> element). <code>Dialog.Form</code>'s default{" "}
+        <code>closeOnSettle</code> still closes the dialog when the action settles, errors or not:
+        pass <code>closeOnSettle={"{false}"}</code> and close it yourself on success (for example
+        with a controlled <code>open</code>) to let the user fix the errors.
+      </p>
+
       <Callout title="A submitter with its own formAction">
         <p>
           A <code>Form.Submit formAction={"{fn}"}</code> (or any button with a{" "}
@@ -220,7 +251,9 @@ import { Form } from "@funstack/ui/form";
         <li>
           Combobox: the <code>Combobox.Input</code> is the control, the hidden input takes the
           Field's <code>name</code>, and the listbox is named by <code>Field.Label</code> when no{" "}
-          <code>Combobox.Label</code> is rendered.
+          <code>Combobox.Label</code> is rendered. <code>validate</code> reads the selection (the
+          hidden input), and picking an option counts as an edit: it re-runs <code>validate</code>{" "}
+          and dismisses a server error, like typing.
         </li>
         <li>
           "Submit on change":{" "}
@@ -455,7 +488,9 @@ form[data-pending]           { cursor: progress; }
       <p>
         <code>FormRootState</code>: <code>{"{ pending }"}</code>. Owns <code>action</code>,{" "}
         <code>method</code>, <code>onSubmit</code> and <code>data-pending</code>.{" "}
-        <code>noValidate</code> and <code>onReset</code> pass through.
+        <code>noValidate</code> and <code>onReset</code> pass through. A <code>render</code>{" "}
+        element's own <code>onSubmit</code> runs first; calling <code>preventDefault()</code> in it
+        cancels the submission.
       </p>
 
       <h4>
