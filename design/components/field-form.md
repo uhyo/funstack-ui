@@ -10,6 +10,8 @@ Follows `design/conventions.md` (accepted); where this document and the conventi
 the conventions win. The conventions changes listed under "Conventions feedback (proposed)"
 were **applied** to `design/conventions.md` on 2026-10-18 (resolved question 30); the 3.8 hook
 rows were corrected with the review fold (`useFieldValueChange`, no `data-pending` from the hook).
+Amended 2026-10-18 with the NumberField design (#67): the registration's optional
+`validityElement` and the Field-side mirror, see 7.1 and "Amendment: `validityElement`" at the end.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/field-form.md` (binding: native
 constraint validation as the source of validity, `:user-invalid` as the show-timing signal,
@@ -930,6 +932,15 @@ listeners to the registered element (`input`, `change`, `focusout`, `invalid`, a
 `validity`, `validationMessage`, `:user-invalid` and `setCustomValidity` are read and written.
 Two registrations in one Field warn in development (the first wins).
 
+**Amendment (#67, NumberField).** The registration may carry `validityElement?: () =>
+ValidatableElement | null`. When given, `validity`, `validationMessage` and the custom-validity
+slot are read and written on that element instead of the resolved validity element, while
+`:user-invalid`, the capture listeners and the focus target stay on the registered element;
+after writing its slot the Field mirrors `validityElement.validationMessage` into the
+registered element's `setCustomValidity`, so its own `:user-invalid` read in the same handler
+sees the new state. Controls that register no `validityElement` are unchanged. See the
+amendment section at the end, `design/components/number-field.md` 7.1 and conventions 3.6 / 3.8.
+
 The hook returns **no `data-pending`**: a control inside a Field keeps its own `data-pending`
 for its own action and nothing else (conventions 2.7 and 7.3; `Field.Control`, which is a Field
 part, carries the form's). The first draft's signature comment said the part merges the form
@@ -1565,3 +1576,24 @@ with; L4's fix is reverted by product-owner decision, the rest stand.
 | L6 | Docs: the Field page has a "`Dialog.Form` rendered as `Form.Root`" section (the Form's policy applies: errors routed, values kept, reset only on success; `closeOnSettle={false}` still needed, #59) and the Dialog page points to it; the page also states the `aria-invalid` placement for groups, the `ariaNotify` fallback, and that a Combobox pick counts as an edit (30a4bb2). | 10.11 |
 | Walkthrough 11 | Composition check: through `render`, `Form.Root` receives the `action` and intercepts, so **`Form.Root`'s `autoReset` applies and React's automatic reset does not**; refs merge, both watchers see the edge, no double run; the default `closeOnSettle` closes with errors (#59). The walkthrough said "React's path"; corrected. | 10.11, 13.1 |
 | 2.2 | Developer finding, not a review item: jsdom 30 answers `false` to `matches(":user-invalid")` instead of throwing, so the fallback is gated on `CSS.supports("selector(:user-invalid)")`. | 2.2, 14 |
+
+---
+
+## Amendment: `validityElement` (#67, 2026-10-18)
+
+Accepted with the NumberField design (`design/components/number-field.md` 7.1, product-owner
+item 10; conventions 3.6 and 3.8). NumberField's user surface is a visible `input[type=text]`
+and its form control is a visually hidden `input[type=number]` right after it, so the element
+the Field labels, listens to and focuses is not the element whose `ValidityState` is real.
+`FieldControlRegistration` gains one optional field and `Field.Root` one line:
+
+| Field operation | Before | With `validityElement` |
+| --- | --- | --- |
+| `validity` snapshot, `messages` | `validityElementOf(element)` | `registration.validityElement?.() ?? validityElementOf(element)`: `rangeUnderflow`, `rangeOverflow`, `stepMismatch`, `valueMissing`, `customError` are the hidden input's, so `Field.Error`'s function `children` can branch on them |
+| `:user-invalid` | `validityElementOf(element).matches(":user-invalid")` | unchanged: the registered element (the visible input), where typing and a submission attempt set the user-interacted flag; the control's own mirror makes it invalid whenever the hidden one is |
+| `setCustomValidity(custom)` (the slot, 2.1) | on the validity element | on the `validityElement`, **followed by** `element.setCustomValidity(validityElement.validationMessage)` when the two differ, so the `:user-invalid` read in the same `refresh` sees the new state; identical to the control's own mirror, so the two writers never disagree |
+| `invalid` listener, bubble cancellation, focus target (2.5, 3.5) | `element` | unchanged |
+| `name`, `required`, `disabled` returned by `useFieldControl` | spread on the control | unchanged; the part decides which element carries them (NumberField: `name` and `required` on the hidden input, `disabled` on both and the buttons) |
+
+Combobox, Slider and the native controls register no `validityElement`, so nothing changes for
+them; the "Inside a Field" test row gains NumberField (conventions 10.1).
