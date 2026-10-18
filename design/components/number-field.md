@@ -1,6 +1,6 @@
 # NumberField
 
-Status: **Draft — awaiting product owner acceptance** (2026-10-18, wave 6, GitHub issue #67).
+Status: **Accepted by the product owner** (2026-10-18, wave 6, GitHub issue #67).
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
 the conventions win. The conventions changes this design needs are **proposals** in the
 "Conventions proposals" section (another architect owns `conventions.md` this wave); nothing
@@ -1341,3 +1341,8 @@ which needs the conventions owner.
     `step="any"`, a scrub area, Escape reverting, iPhone `inputmode="text"`, `compact` parsing
     (section 13). **Recommendation: as listed.**
 14. **Conventions proposals 1 to 12** to be applied by the conventions owner on acceptance.
+
+**Accepted by the product owner (2026-10-18):** recommendations 1-14 are accepted as written.
+- Item 3, platform constraints instead of clamping typed values: accepted. Typed values stay as typed, and the browser's validity message reports them.
+- Item 5, strict grouping in the parser: accepted.
+- Item 10, the `validityElement` addition to the Field contract: accepted. The conventions owner (design-toolbar) applies it together with proposals 1-12.
