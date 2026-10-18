@@ -9,8 +9,10 @@ library-owned**, so the `<ViewTransition>` exit runs in every engine, Firefox in
 Popover; dismissals stay the browser's. The amendment is folded into the sections it touches
 (2.3, 2.5, 3.1, 3.3 to 3.5, 4, 7, 8.1, 10.3, 11, 13, 14) and summarised, with the developer's
 implementation notes and test plan, in "Amendment: library-owned part-initiated closes" at the
-end. The code under `packages/ui/src/dialog/` predates the amendment until the developer lands
-it; where this document and that code disagree, this document is the intent.
+end. The amendment is implemented (#46), and the review of that implementation
+(`memo/reviewer/dialog-46.md`; fixes in commits 56e1ea8..bcdb7e1, notes in
+`memo/developer/dialog.md`) is folded in on 2026-10-18, see "Review corrections (#46)" at the
+end. The code under `packages/ui/src/dialog/` is the ground truth where this document is silent.
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win.
 
@@ -310,22 +312,39 @@ event and the Root dispatches the notification unless `false` is already intende
 dialog.addEventListener("close", (event) => {
   if (event.target !== dialog) return;                    // same filter as every native listener (14)
   const intent = takeCloseIntent();                       // JS-free mode and foreign closes only, now
-  root.notifyClosed({
-    event: intent?.event ?? event,
-    reason: intent?.reason ?? "dismiss",
-    returnValue: dialog.returnValue,
-  });                                                     // skipped when `false` is already intended (echo)
+  const echo = libraryClose.current;                      // set by the apply effect right before its own close()
+  libraryClose.current = false;
+  if (echo) return;                                       // the library's close: nothing to notify
+  root.takeCloseReturnValue();                            // a pending part's value will never be applied now
+  if (root.intended()) {
+    root.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", dialog.returnValue);
+  } else {                                                // a part's close is in flight (11.13): keep the
+    dismissedWhilePending.current = {                     // dismissal for the apply effect, this opening only
+      event: intent?.event ?? event, returnValue: dialog.returnValue, generation: root.openGeneration(),
+    };
+  }
 });
 ```
 
-`notifyClosed` skips the dispatch when `false` is already intended: the library's own `close()`
-for a controlled parent or a settled part-initiated close echoing back, or a dismissal that lands
-while a part-initiated close is pending (one `openChangeAction(false)`, not two; walkthrough
-11.13). Otherwise it runs the normal dispatch with `next = false`: optimistic `false` at once
-(the Trigger loses `data-open`), the action awaited inside the transition, uncontrolled state
-committed after it. The Trigger shows `data-pending` while the notification action runs (the
-Root is pending, section 4.2), which is what a consumer who persists "dismissed" through a
-Server Function wants to style.
+`notifyClosed` is called **only for closes the library did not cause**. The library's own
+`close()` (a settled part-initiated close, a controlled close, a refused pre-hydration open) is
+recognised **by its source**: the apply effect sets the `libraryClose` marker right before
+calling `close()`, and the `close` listener consumes it a task later. (The first implementation
+recognised the echo by `!intended()`. That took a re-open that became intended in the task
+between `close()` and its `close` event, a non-modal Trigger click in that gap, for a dismissal
+and dispatched `false` over the user's re-open; review L4.) A browser close also drops the
+`returnValue` a pending part close had recorded: the dialog closed with the browser's value, and
+the part's will never be applied. Then, with `true` still intended, the notification is the
+normal dispatch with `next = false`: optimistic `false` at once (the Trigger loses `data-open`),
+the action awaited inside the transition, uncontrolled state committed after it. The Trigger
+shows `data-pending` while the notification action runs (the Root is pending, section 4.2),
+which is what a consumer who persists "dismissed" through a Server Function wants to style.
+
+With `false` already intended, a part-initiated close is in flight and the dismissal is **not
+dispatched at first** (one `openChangeAction(false)`, not two). The Popup records it with the
+current open generation, and the apply effect (2.5) sends it as a `"dismiss"` notification if
+that close later settles vetoed (walkthrough 11.13): the parent was asked about the part's close
+only, and the user's dismissal must not be undone by a veto that never concerned it (review M1).
 
 Close intents survive for the paths the library does not own. The `close` event carries no
 source, so the Popup records what caused a browser-owned close just before it happens and the
@@ -334,7 +353,7 @@ source, so the Popup records what caused a browser-owned close just before it ha
 | Cause | Recorded by | `reason` | `details.event` |
 | --- | --- | --- | --- |
 | JS-free mode: `Dialog.Close` (or any `request-close` / `close` invoker), a `method="dialog"` submit, `Dialog.Close action` / `Dialog.Form action` after the action settled | the Popup's `command` / `submit` listeners; the Close part and the Form's watcher before `close()` | n/a (no Root state; the intent only keeps the listeners' logic identical across modes) | |
-| Library mode: a part-initiated close performed by the apply effect | the apply effect records `undefined` before `close()` | no dispatch (echo; `false` is intended anyway) | |
+| Library mode: a close performed by the apply effect (a settled part-initiated close, a controlled close, a refused pre-hydration open) | the apply effect records `undefined` and sets the `libraryClose` marker before `close()` | no dispatch (an echo, recognised by the marker) | |
 | Library mode: Escape, back, AT dismiss, backdrop click (`lightDismiss` or `closedby="any"`), the JS fallbacks, script | nothing | `"dismiss"` | the `close` `Event` |
 
 An intent that does not result in a close is cleared by a single `setTimeout(0)` scheduled when
@@ -348,7 +367,10 @@ runs. If the parent keeps `open={true}`, then after the action settles optimisti
 `showModal()` again: the dialog re-opens, with focus moved back into it. This is conventions 3.5
 ("it follows the browser, it does not gate it"), the same behaviour as a refused find-in-page
 reveal in Accordion, and it is **not a veto mechanism**: the user sees the dialog close and come
-back. The docs say so and recommend adopting a dismissal's `false` unconditionally.
+back. The docs say so and recommend adopting a dismissal's `false` unconditionally. One case
+keeps the dismissal instead: when it landed while a part's close was in flight and the parent
+then vetoed *that* close, the apply effect notifies the stored dismissal rather than re-opening
+(11.13); a parent that refuses the dismissal too gets the usual re-open.
 
 **A controlled parent that refuses a part-initiated close** (keeps `open={true}` after a Close
 click, a Form submit or settle) gets a plain snap-back: nothing was closed, the Trigger's
@@ -403,17 +425,29 @@ useLayoutEffect(() => {
   const dialog = ref.current!;
   if (!dialog.isConnected) return;
   if (!root.pending && root.latestInFlight() === null) {
+    const dismissed = dismissedWhilePending.current;
     if (committedOpen && !dialog.open) {
       if (!awaitingClose.current) {                     // closed, but its `close` event has not arrived yet: wait
-        applyInitialFocus(dialog, initialFocus);        // writes `autofocus`, section 6
-        modal ? dialog.showModal() : dialog.show();
+        dismissedWhilePending.current = null;
+        if (dismissed !== null && dismissed.generation === root.openGeneration()) {
+          root.notifyClosed(dismissed.event, "dismiss", dismissed.returnValue);
+                                                        // a dismissal during a part close the parent vetoed
+                                                        // (11.13): send it, do not re-open
+        } else {
+          applyInitialFocus(dialog, initialFocus);      // writes `autofocus`, section 6
+          modal ? dialog.showModal() : dialog.show();
+        }
       }
     } else if (!committedOpen && dialog.open) {
-      recordCloseIntent(undefined);                     // echo: the close listener will skip
+      recordCloseIntent(undefined);
+      libraryClose.current = true;                      // echo by source: the close listener will skip (2.3)
       dialog.close(root.takeCloseReturnValue());        // the part's value (2.3), "" for a controlled close;
                                                         // not requestClose(): the veto point was openChangeAction
       if (contentHadFocus.current) returnFocus(dialog); // the close commit unmounted the focused content (6.2)
     }
+  }
+  if (!committedOpen && dismissedWhilePending.current !== null && root.latestInFlight() === null) {
+    dismissedWhilePending.current = null;               // the in-flight close settled as a close: moot
   }
   if (committedOpen && dialog.open) contentHadFocus.current = false;  // content left while open: not a close
   if (held && !committedOpen && !waiting() && !awaitingClose.current && !dialog.open) release(); // 4.4
@@ -433,7 +467,9 @@ This one effect covers: the normal open (committed flipped by the user's dispatc
 on mount, a controlled parent opening the dialog programmatically (`setOpen(true)` from a menu,
 a route, a timer; no Trigger needed), a controlled parent closing it (`setOpen(false)` after its
 own form logic), **a part-initiated close after `openChangeAction(false)` settled** (2.3), the
-re-open of a refused dismissal, and the close after a rejected or refused pre-hydration open.
+re-open of a refused dismissal, the notification of a dismissal that landed during a
+part-initiated close the parent then vetoed (2.3, 11.13), and the close after a rejected or
+refused pre-hydration open.
 It also returns focus after a close whose commit already unmounted the focused content (6.2) and
 releases a `held` that no exit animation is going to release (4.4). The library **never renders
 the `open` attribute** (research: removing it by
@@ -637,9 +673,9 @@ export interface DialogPopupProps
   /**
    * Library mode only. Forwarded to the `<ViewTransition default>` around the dialog. Animates
    * the opening commit, content changes while open, and every library-driven close (a Close
-   * part, a Form submit or settled action, a controlled `open={false}`), in all engines;
-   * dismissals (Escape, a click outside) are the browser's and animate with CSS only. Ignored
-   * (dev warning) in JS-free mode.
+   * part, a Form submit or settled action, a foreign close command, a controlled
+   * `open={false}`), in all engines; dismissals (Escape, a click outside) are the browser's and
+   * animate with CSS only. Ignored (dev warning) in JS-free mode.
    *
    * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
    * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
@@ -773,7 +809,8 @@ export interface DialogFormProps
    * in JS-free mode with `close(value)`. A rejection leaves the dialog open. Without `action`
    * the form renders `method="dialog"`: submitting closes the dialog, natively in JS-free mode
    * and through the Root in library mode (a `preventDefault()` in your own `onSubmit` blocks
-   * both). A string `action` (a URL) is a plain navigating form.
+   * both; `stopPropagation()` there leaves the close to the browser, notified as a dismissal).
+   * A string `action` (a URL) is a plain navigating form.
    */
   action?: string | ((formData: FormData) => unknown);
   /**
@@ -783,7 +820,9 @@ export interface DialogFormProps
    * Any result that does not throw counts as success, including a `useActionState`-style result
    * that reports validation errors: with the default the dialog closes and those errors are never
    * seen. Throw to keep the dialog open, or set `closeOnSettle={false}` and close it yourself:
-   * a `Dialog.Close`, a submitter with `formMethod="dialog"`, or a controlled `open`.
+   * a `Dialog.Close`, a submit button in a separate `method="dialog"` form, or a controlled
+   * `open`. (A `formMethod="dialog"` submitter inside this form cannot close it: React prevents
+   * every submit of a form with a function `action` and runs the action again.)
    *
    * The dialog is not closed either when it was closed (Escape, a Close part) while the action
    * ran, also if the user re-opened it meanwhile (section 8.1).
@@ -963,9 +1002,12 @@ no `transition`) also fires for a dismissal's *notification* commit, which lands
 apply effect (2.5), after every commit, releases `held` when all of: `held` is set, committed is
 `false`, no `holdUntil` wait is running, no `close` event is pending (`awaitingClose`) and the
 dialog is not open. Cost: one extra invisible commit per dismissal without an exit animation.
-The `close` listener tells the two closes apart as Popover's `toggle` listener does: when
-`false` is already intended at the `close` event (an echo of the library's own `close()`) and
-`transition` is set, it skips the animation read; otherwise it reads and holds or releases.
+The `close` listener tells the two closes apart **by source**: when the event is the echo of
+the library's own `close()` (the `libraryClose` marker the apply effect set, 2.3) and
+`transition` is set, it skips the animation read; otherwise it reads and holds or releases. A
+dismissal that lands during an in-flight part close is a browser close and is read and held like
+any other (the first implementation keyed the echo on `!intended()` and skipped the hold there,
+so a settle during the fade unmounted the content inside the fading box; review L3).
 
 `keepMounted` uses the same flag: `<Activity mode={committed || held ? "visible" : "hidden"}>`
 (a hidden `<Activity>` is `display: none` and would blank the fading box like an unmount). The
@@ -1175,8 +1217,11 @@ Without `action` the Form renders `method="dialog"`. In **JS-free mode** the pla
 dialog on submit, fires `submit` then `close`, sets `returnValue` from the submitter, and nothing
 runs in the library except the `submit` listener that records the intent (section 2.3). In
 **library mode** the same markup is intercepted (2.3): the Popup's `submit` listener, which runs
-**after** the consumer's React `onSubmit` (it is attached to the document in the bubble phase;
-React's root listener sits below it), leaves a submit the consumer already `preventDefault()`ed
+**after** the consumer's React `onSubmit` (it is attached in the bubble phase to the dialog's
+root node, `dialog.getRootNode()`: the document, or the shadow root the dialog lives in, since
+`submit` does not cross a shadow boundary; React's container is inside that node, so React's
+listener runs first, or is the same node and was registered earlier), leaves a submit the
+consumer already `preventDefault()`ed
 alone (the form did not submit, so the dialog stays open, exactly as natively), and otherwise
 cancels the native submission and calls `requestClose(event, "activate", submitter?.value ??
 "")`: `openChangeAction(false)` is awaited and the apply effect closes the dialog with that
@@ -1184,11 +1229,14 @@ cancels the native submission and calls `requestClose(event, "activate", submitt
 validation runs before `submit` fires, so an invalid form never reaches the listener and stays
 open in both modes. The listener applies to any `method="dialog"` form inside the Popup and to
 a submitter with `formmethod="dialog"`, Form part or not, because the platform's close would
-have too. A submit the consumer `stopPropagation()`s in React never reaches the document
-listener; it then closes natively and is notified as a `"dismiss"` (the intent recorder on the
-dialog saw it, but the dialog-level record is consumed only in JS-free mode), which the docs
-list as the one way to opt a form out of the library-owned close. A script `form.submit()`
-fires no `submit` event and closes natively (notified `"dismiss"`), as before.
+have too. A submit the consumer `stopPropagation()`s in React is left alone as well: it never
+reaches the listener when React's container sits below the root node, and when React's root
+**is** the document (FUNSTACK Static hydrates with `hydrateRoot(document, …)`, this repo's docs
+site included) `stopPropagation()` cannot stop a listener on the same node, so the listener also
+returns when `event.cancelBubble` is set (review M3). Either way the form closes the dialog
+natively and the close is notified as a `"dismiss"`, which the docs list as the one way to opt a
+form out of the library-owned close. A script `form.submit()` fires no `submit` event and closes
+natively (notified `"dismiss"`), as before.
 
 With `action`, React overrides `method` and calls the action with the `FormData`; the dialog does
 **not** close by itself (verified). The Form renders `<form action={action}>` with the action
@@ -1214,8 +1262,11 @@ validation errors instead of throwing settles its transition normally, and with 
 dialog closes with the errors unseen. Throwing keeps the dialog open (below); otherwise set
 `closeOnSettle={false}`, and the Form neither records an intent nor closes anything: the
 consumer closes when the returned state says so (a `<Dialog.Close>` next to the errors, a
-submitter with `formMethod="dialog"`, or `setOpen(false)` from the controlled parent once
-`state.ok`).
+submit button in a separate `method="dialog"` form, or `setOpen(false)` from the controlled
+parent once `state.ok`). A `formMethod="dialog"` submitter *inside* the action form is not an
+option: React prevents every submit of a form with a function `action` and runs the action
+again, so it neither closes the dialog nor reaches the Popup's listener as a closing submit
+(reviewer probe P8; an older version of this text suggested it).
 
 **A close since the submit blocks the settle close.** The Form listens to the dialog's `close`
 event and remembers whether the dialog closed after the last `submit`; the settle close is
@@ -1360,8 +1411,8 @@ What the boundary sees, and does not:
 | Trigger's `data-open` flip on click, and its snap-back | sync (optimistic) | never | CSS transition on `[data-open]` |
 | Opening commit: children mount, then `showModal()` in the layout effect of the same commit | transition, `fsui-dialog-open` | yes: `update` on the dialog (hidden → shown in the top layer) and `enter` on the children; **the `::backdrop` is a pseudo-element and is not captured** | `transition` prop, **or** the CSS enter in 10.1, not both for the same open |
 | Content swap while open (a Suspense boundary inside the dialog resolving, a `children` change) | transition | yes | `transition` prop |
-| **Library-driven close** (Close part, Form submit or settle, foreign close command; `fsui-dialog-close`; a controlled close carries no types): children unmount and `close(returnValue)` in the same commit | transition | yes: the dialog's box as `old`, content included, in Chromium, Firefox and WebKit (the Popover probe and CI verified the same mechanism for a top-layer `<dialog popover>`; the `showModal()` case is an implementation check, 14); **the `::backdrop` is not captured on its own**: it is part of the root snapshot, so it fades with the UA root cross-fade and vanishes at once if the page disables that cross-fade (conventions 5.1 page-policy CSS) | `transition` prop |
-| Dismissal (Escape, light dismiss): `close()` by the browser, then a notification commit, `fsui-dialog-close`, with the dialog already `display: none` or fading | notification commit | the dialog is already closed; nothing visible to animate | CSS exit in 10.1 (not in Firefox) |
+| **Library-driven close** (Close part, Form submit or settle, foreign close command; `fsui-dialog-close`; a controlled close carries no types): children unmount and `close(returnValue)` in the same commit | transition | yes: the dialog's box as `old`, content included, in Chromium, Firefox and WebKit (CI, 13.3); **the `::backdrop` is not captured on its own**: it is part of the root snapshot, so it fades with the UA root cross-fade and vanishes at once if the page disables that cross-fade (conventions 5.1 page-policy CSS). With the 10.1 CSS exit on the dialog, Chromium keeps the closed box rendered through its fade, so the `new` snapshot carries a live, fading copy next to the `old` image (a double image) unless the recipe below cuts the fade | `transition` prop, with the recipe below when the CSS exit is kept |
+| Dismissal (Escape, light dismiss): `close()` by the browser, then a notification commit, `fsui-dialog-close`, with the dialog already `display: none` or fading | notification commit | without a CSS exit the dialog is already `display: none` and there is nothing to animate; with one, the commit usually lands inside the fade (the notification action is instant or absent), so in Chromium it captures the fading box in **both** snapshots (reviewer probe P4); the recipe below cuts the fade at the transition, which hands the rest of the exit to the `old` snapshot | CSS exit in 10.1 (not in Firefox), with the recipe below |
 | `held` → `false` after a CSS exit | normal update (not a transition), no types | never: the children exit inside a hidden dialog; a transition here would start a second, invisible document view transition (4.4) | nothing |
 
 The opening row (a top-layer `<dialog>` promoted inside a React view transition) is still an
@@ -1377,16 +1428,38 @@ mount cost) and the opening row is documented as "CSS only".
 ```css
 ::view-transition-new(.fsui-dialog-in) { animation: 200ms ease-out both fsui-scale-in; }
 ::view-transition-old(.fsui-dialog-out) { animation: 150ms ease-in both fsui-scale-out; }
+/* Keep the CSS exit of 10.1 for dismissals, but not while a view transition runs. */
+html:active-view-transition .dialog { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 ```
 
-When `transition` is set, the docs recommend leaving the CSS `display` / `overlay` transition off
-the dialog (the view transition is the animation for every library-driven change) and keeping,
-at most, a CSS exit for dismissals and a `::backdrop` fade. That combination runs exactly one
+**The recipe: keep the CSS exit, cut it while a view transition runs.** When `transition` is
+set, the view transition is the animation for every library-driven change, and the CSS exit of
+10.1 stays for dismissals, which happen in the browser before React hears about them. The two
+must not run at the same time: in Chromium a `<dialog>` with the `display` / `overlay`
+transition stays rendered through its fade after `close()`, so a library-driven close's view
+transition captures the fading dialog as a live `::view-transition-new(…)` next to the
+`::view-transition-old(…)` image, and the user sees a double image (reviewer probe P4). The
+rule `html:active-view-transition .dialog { transition: none; }` removes it: the box is
+`display: none` when the new snapshot is taken, and the `old` image alone carries the exit.
+(The first version of this section recommended "at most a CSS exit for dismissals"; that CSS
+runs for library closes too, and the docs then dropped the CSS exit altogether, which left a
+dismissal with no exit animation at all. Review M2.) Per engine (13.3): Chromium 156 shows the
+double image without the rule and the old image only with it; Firefox animates no CSS exit and
+never had a new image; WebKit has the box `display: none` by the transition's `ready` with or
+without the rule, so it never showed a double image either. The selector is deliberately
+**untyped**: `html:active-view-transition-type(fsui-dialog-close)` would miss a controlled
+close, which carries no types (P5), whereas the untyped form covers every kind of close (P6).
+The cost is that an unrelated view transition of the page (a route change while a dismissed
+dialog is still fading) also cuts that fade. Cutting a running CSS transition settles the
+animations the `close` listener holds the content on (`Promise.allSettled`, 4.4), so `held`
+releases at once; for a dismissal the rest of the fade is handed to the notification commit's
+`old` snapshot, which cross-fades out with the root (P5). That combination runs exactly one
 document view transition per dismissal (the notification commit) and one per library-driven
-close. The backdrop deserves one sentence in the docs: with the page's root cross-fade disabled,
+close, with one image of the dialog each. Popover's recipe needs the same rule (Popover 10.2).
+The backdrop deserves one sentence in the docs: with the page's root cross-fade disabled,
 a dialog whose backdrop should fade out with a library-driven close renders an element backdrop
 as the first child of Popup (`position: fixed; inset: 0`; inside the dialog, so clicks on it are
 not light dismiss, section 1), which the view transition captures with the dialog's box.
@@ -1507,18 +1580,35 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
     content, as a dismissal does today.
 13. **Dismissal during a pending part-initiated close.** As 11 with a slow
     `openChangeAction(false)`: `O=false`, `P=true`, `C=true`, the dialog still open. Escape →
-    the platform closes it and restores focus → `close` event: `intended()` is `false` → no
-    dispatch (the user's intent is already "close"; one `openChangeAction(false)`, not two);
-    `held` may be set for the CSS fade (no `transition`). Action resolves → `C=false` → the
-    apply effect finds the dialog closed → nothing; with `transition` set the commit still
-    starts an (invisible) view transition for the unmount, as Popover 11.8.
+    the platform closes it and restores focus → `close` event: not the library's own
+    (`libraryClose` unset) → the part's pending `returnValue` is dropped; `intended()` is
+    `false` → **nothing is sent at first** (the user's intent is already "close"; one
+    `openChangeAction(false)`, not two); the Popup records the dismissal (`event`,
+    `returnValue`, the current open generation); `held` may be set for the CSS fade (no
+    `transition`). Then one of:
+    - The action settles with `false` adopted → `C=false` → the apply effect finds the dialog
+      closed → nothing, and the record is cleared (moot); with `transition` set the commit
+      still starts an (invisible) view transition for the unmount, as Popover 11.8.
+    - The action settles **vetoed** (the parent kept `open={true}`, 14) → `O` reverts to
+      `true`, `C` is still `true`, the dialog is closed and nothing is in flight → the apply
+      effect finds the record with the current generation and calls `notifyClosed(event,
+      "dismiss", returnValue)` **instead of `showModal()`**: `openChangeAction(false, { reason:
+      "dismiss", returnValue: "", event: closeEvent })`, `O=false`, `P=true`; the dialog stays
+      closed. In total `openChangeAction` saw `[true, false ("activate", "cancel"), false
+      ("dismiss", "")]`. A parent that refuses the dismissal too gets the usual re-open of 5.
+      (Before review M1 the veto re-opened a dialog the user had just dismissed, focus pulled
+      back in, and the parent never heard of the dismissal.)
+    - The Trigger re-opens the dialog before the action settles (8): the open bumps the
+      generation at `beforetoggle` and clears the record, so the dismissal is superseded; the
+      dialog ends open, which is what the user asked for last.
 14. **Controlled parent vetoes a part-initiated close.** As 11 with `openChangeAction={(next,
     { returnValue }) => { if (next || returnValue !== "cancel" || !dirty) setOpen(next); }}`: the
     action resolves, the parent keeps `open={true}`, `O` reverts to `true`, `C` never changed,
     the apply effect sees `C=true` and the dialog open → nothing. The Trigger's `data-open`
     snapped back; the dialog never blinked; focus stayed where it was. A real veto, available
     because this close was library-owned; the docs show it with the usual "adopt `false`
-    unless …" shape and note that a *dismissal* refused the same way re-opens (5).
+    unless …" shape and note that a *dismissal* refused the same way re-opens (5), and that a
+    dismissal which landed during the vetoed close is sent, not undone (13).
 15. **`method="dialog"` submit, consumer `onSubmit` validates.** Submit → React's `onSubmit`
     runs first (root listener): invalid → `preventDefault()`; the Popup's document-level
     listener sees `defaultPrevented` → nothing; the form did not submit, the dialog stays open
@@ -1757,6 +1847,14 @@ update-on-success). Library mode unless stated.
 | Close part | Without `action`: `command="request-close"`, `value` rendered. **Library mode (both):** the click is default-prevented and goes through the Root: `openChangeAction(false, { reason: "activate", returnValue: value, event: click })` is called **before** `close`, `close(value)` only after it resolves (a `deferred()` action: the dialog is still open and the Trigger `data-pending` meanwhile; the Close button `data-pending` too), the resulting `close` event dispatches nothing more (one call), `dialog.returnValue` is the value. Rejecting `openChangeAction(false)` uncaught: the catcher above Root gets it, `close` was never called (the component is replaced). Controlled parent keeping `open`: `close` never called, the dialog stays open, `data-open` back on the Trigger. With `action`: `data-pending` while the deferred action runs, `openChangeAction(false)` not called until it resolves, nothing on reject (error in the catcher inside the dialog). **JS-free:** without `action` the command runs natively; with `action`, `close(value)` is called directly on resolve. `render={<a href />}` in library mode closes through the click handler. |
 | Close part, stale close | A `Dialog.Close` action pending; Escape closes the dialog; the Trigger re-opens it; the action resolves: `openChangeAction` saw `[true, false ("dismiss"), true]` and no fourth call, `close` is not called on the new open (open-generation guard), the action ran once. JS-free variant unchanged (holds `toggle` back). A superseded click's rejection reaches the catcher (one row; it fails without the shared hook). |
 | Close part, dismissal during a pending close | `requestClose` pending (deferred `openChangeAction(false)`), then `requestClose()` on the dialog (Escape): one `openChangeAction(false)` in total, the first with `"activate"`; after it resolves `close` is not called again; the dialog ends closed. |
+| Close part, dismissal then veto (11.13, review M1) | Controlled: a Close click with a deferred `openChangeAction(false)`, then `requestClose()` on the dialog, then the parent settles without adopting: `openChangeAction` saw `[true ("activate"), false ("activate", value), false ("dismiss", "")]`, the third `event` is the `close` event; `showModal` was called once (never re-opened); the dialog ends closed, content unmounted, Trigger neither `data-pending` nor `data-open`. Variant: the Trigger re-opens between the Escape and the settle: `[true, false ("activate"), true]`, no `"dismiss"`, the dialog ends open. |
+| Close part with `action`, controlled veto | The action runs once, `openChangeAction(false)` is called, the parent keeps `open`: `close` never called, `showModal` once (no blink), `data-open` back on the Trigger. |
+| Re-open during a pending part close (reviewer P2) | Uncontrolled, non-modal: a Trigger click while `openChangeAction(false)` runs: `[true, false ("activate"), true]`, `close` never called, `data-open` back, the dialog stays open. Uncontrolled only: a controlled harness that adopts in arrival order ends with the superseded `false` (conventions 2.5). |
+| Walkthrough 11.16 | A controlled `setOpen(false)` while a Close `action` runs: one `openChangeAction(false)`, one `close(value)`, the dialog closed with `returnValue` the Close's value. |
+| Submit opt-out on a document root (review M3) | A `document` `submit` listener registered **before** mount that calls `stopPropagation()` (stands for React's root on the document, FUNSTACK Static): the library does not cancel the submit (`cancelBubble`), the shim closes natively, notified `"dismiss"`. Fails without the `cancelBubble` check. |
+| Shadow root (review L1) | The Root rendered into a shadow root: a `method="dialog"` submit is intercepted and closes through the Root (the listener sits on `getRootNode()`); with a document listener the submit never arrives and the dialog stays open. |
+| Echo by source (review L4) | A re-open that becomes intended between the library's own `close()` and its `close` event (the controlled parent flips `open` back in that gap) is not superseded: the `close` event dispatches nothing. |
+| Nested dialogs and the shared submit listener | An inner library-mode Root and, separately, an inner JS-free Root inside an outer library Popup: an inner `method="dialog"` submit closes the inner dialog only (through its own Root, or natively), the outer Popup's listener ignores it (`form.closest("dialog")` is the inner element) and the outer dialog stays open. |
 | Form part | `method="dialog"` without `action`. **Library mode:** a submit (user-event click on the submitter) does not close natively: the `submit` event is default-prevented by the library, `openChangeAction(false, { reason: "activate", returnValue: submitterValue, event: SubmitEvent })` is called, `close(submitterValue)` after it resolves; a consumer `onSubmit` that calls `preventDefault()` keeps the dialog open and dispatches nothing; a submitter with `formMethod="dialog"` in a `method="post"`-less form behaves the same; a `method="dialog"` form rendered inside the Popup without `Dialog.Form` is intercepted too. **JS-free:** the shim closes natively, as today. With a function `action`: `method` absent, the action receives `FormData`, the settle close goes through the Root in library mode (`openChangeAction(false)` with the submitter's value, then `close(submitterValue)`; fake the status through a resolved `deferred()`) and through `close()` directly in JS-free mode; not called when it throws. `closeOnSettle`: a `useActionState` validation result closes by default; with `false` the dialog stays open showing the result and a `Dialog.Close` closes it. A close since the submit (Escape during the save, then a re-open through the Trigger) blocks the settle close: the dialog ends open, `close` not called again. `method="post"` is kept with a string `action` and replaced by `"dialog"` without one. |
 | Foreign close command | A `command` event with `request-close` (and with `close`) dispatched on the dialog in library mode is default-prevented and dispatches `openChangeAction(false)` with `reason: "activate"`, `details.event` the `CommandEvent`, `returnValue` the source's `value`; `close(value)` after it resolves. JS-free: records the intent only (the shim closes). |
 | Held content (jsdom) | A controlled close (`open` flipped to `false`) without `transition`: the children are still in the DOM inside the `close` spy (the close commit holds them), and gone after the `close` event with no animations (release is a normal update: assert no `startViewTransition` call with the jsdom stub, 10.1). With `transition="none"`: the children are gone inside the `close` spy. `keepMounted`: the `<Activity>` is visible inside the spy without `transition`. |
@@ -1790,8 +1888,18 @@ at the start, click in-page outside `act`, await `finished` in `afterEach`), all
   controlled `open={false}`.
 - `transition="pop"`: an Escape runs one view transition only for the notification commit,
   with the dialog already closed at the start.
-- `transition="pop"` plus the CSS exit of 10.1: an Escape runs one view transition, not two
-  (the `held` release is a normal update), in Chromium and WebKit; Firefox has no CSS exit.
+- `transition="pop"` plus the CSS exit of 10.1 **and the recipe** (`html:active-view-transition
+  .fade { transition: none }`): an Escape runs one view transition, not two (the `held` release
+  is a normal update), and at `ready` there is no `::view-transition-new` image of the dialog
+  group; a `Dialog.Close` and a controlled `open={false}` each have the dialog `display: none` at
+  `ready` and the old image only. Pseudo-element names come from `document.getAnimations()` at
+  `ready` (the dialog's group is `_t_N_`) and are reported in the failure message. In WebKit the
+  names are not reliable (it lists the group's animation under `::view-transition-new(_t_N_)`
+  while the box has no new image: a mislabel or a stale open animation, worth a look by someone
+  with WebKit), so the WebKit branch asserts `display` only.
+- Characterisation: the same CSS **without** the recipe has a live new image of the fading
+  dialog (`display: block`) at `ready` in Chromium and in no other engine (Firefox animates no
+  exit; WebKit has the box `display: none` by `ready`). Pins the artifact the recipe exists for.
 - Without `transition`: no view transition for an open, a Close close or an Escape.
 - `modal={false}`, `transition="pop"`, default mounting: a `Dialog.Close` activated with Enter
   returns focus to the Trigger (the close commit unmounted the focused button before `close()`;
@@ -1829,7 +1937,9 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   directive-free.
 - **Context.** `{ mode: "static" | "library", ids: { dialog, title, description }, modal,
   committed, optimistic, pending, intended(), requestOpen(event, reason), requestClose(event,
-  reason, returnValue), notifyClosed(event, reason, returnValue), takeCloseReturnValue(),
+  reason, returnValue), notifyClosed(event, reason, returnValue) (called only for closes the
+  library did not cause: the `close` listener returns first on the `libraryClose` echo),
+  takeCloseReturnValue(),
   latestInFlight, triggerRef, dialogRef (RefObject<HTMLDialogElement | null>),
   recordCloseIntent(intent | undefined), takeCloseIntent(), openGeneration(),
   nextOpenGeneration() }`. `intended()` is `latestInFlight()?.next ?? committedOptimistic`,
@@ -1865,22 +1975,29 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
     `requestClose(event, "activate", source.value ?? "")` (`event.source` is the invoker; the
     jsdom invoker shim sets it); in static mode `request-close` / `close` →
     `recordCloseIntent({ reason: "activate", event })` only.
-  - `submit`, **on the document, bubble phase** (after React's root `onSubmit`; filtered to a
-    form whose `closest("dialog")` is this dialog): if `form.method === "dialog"` or the
-    submitter's `formmethod` attribute is `dialog`: library mode → return if
-    `event.defaultPrevented` (the consumer blocked the submission), else `preventDefault()` +
-    `requestClose(event, "activate", submitter?.value ?? "")`; static mode → record the
-    `"activate"` intent as before (a dialog-level listener is fine for static mode; one
-    document listener serving both keeps the code in one place).
+  - `submit`, **on the dialog's root node, bubble phase** (`dialog.getRootNode()`: the
+    document, or the shadow root the dialog lives in, since `submit` is not composed, review L1;
+    after React's root `onSubmit`; filtered to a form whose `closest("dialog")` is this dialog):
+    if `form.method === "dialog"` or the submitter's `formmethod` attribute is `dialog`: library
+    mode → return if `event.defaultPrevented` (the consumer blocked the submission) or if
+    `event.cancelBubble` (the consumer's `stopPropagation()`; checked explicitly because React's
+    root can be this same node, FUNSTACK Static, where `stopPropagation()` does not stop this
+    listener, review M3), else `preventDefault()` + `requestClose(event, "activate",
+    submitter?.value ?? "")`; static mode → record the `"activate"` intent as before (a
+    dialog-level listener is fine for static mode; one root-node listener serving both keeps the
+    code in one place).
   - `beforetoggle` (synchronous): `newState === "closed"` → set `awaitingClose` (the re-open race
-    guard, 2.5); `newState === "open"` → `nextOpenGeneration()` (3.4). No `cancel` listener:
+    guard, 2.5); `newState === "open"` → `nextOpenGeneration()` (3.4) and clear
+    `dismissedWhilePending` (a re-open supersedes a stored dismissal, 11.13). No `cancel` listener:
     stale intents are cleared by the `setTimeout(0)` scheduled at `recordCloseIntent`, which
     clears only while the dialog is still open (2.3).
-  - `close`: clear `awaitingClose`, focus fallback (6.2 rule 1), then in library mode: `echo =
-    !intended()`; if `!echo || transition === undefined` read `exitAnimations(dialog)` and
-    `holdUntil` / `release` (4.4); then `notifyClosed(intent?.event ?? event, intent?.reason ??
-    "dismiss", dialog.returnValue)` (a no-op when `false` is intended). In static mode nothing
-    else.
+  - `close`: clear `awaitingClose`, focus fallback (6.2 rule 1), `intent = takeCloseIntent()`,
+    `echo = libraryClose.current` (consumed: echo by source, review L4), then in library mode:
+    if `!echo || transition === undefined` read `exitAnimations(dialog)` and `holdUntil` /
+    `release` (4.4); then, unless `echo`: `takeCloseReturnValue()` (a pending part's value is
+    dropped), and `intended()` ? `notifyClosed(intent?.event ?? event, intent?.reason ??
+    "dismiss", dialog.returnValue)` : `dismissedWhilePending = { event, returnValue, generation:
+    openGeneration() }` (a part's close is in flight, 11.13). In static mode nothing else.
   - `keydown` Escape (non-modal only, no `closedBy` support or flag off) → `preventDefault()` +
     `requestClose()`, unless the Escape belongs to an inner layer (section 9): walking from
     `event.target` up to the dialog finds an open `<dialog>` or an open `auto` / `hint` popover,
@@ -1896,11 +2013,18 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
     dialog (the React `onToggle` prop never fires after hydration, a native listener does),
     reading `dialog.open` rather than `newState` (coalescing rule) and guarding every decision
     on `dialog.open`, as the Tooltip effect does with `:popover-open`.
+- **Popup, refs.** `awaitingClose` (2.5), `libraryClose` (set right before the apply effect's
+  own `close()`, consumed by the `close` listener), `dismissedWhilePending` (`{ event,
+  returnValue, generation } | null`: a dismissal recorded while a part's close was in flight;
+  cleared on `beforetoggle` open, when the close settles as `false`, and when consumed).
 - **Popup, effects.** (1) Mount reconciliation layout effect (2.4), once. (2) The apply effect
-  (2.5) after every commit: open / close as before, `close(takeCloseReturnValue())` for the
-  close branch, the focus return right after `close()` when the content probe fired (6.2 rule
-  2), and the `held` release rule (4.4). (3) `initialFocus` write inside (2) right before
-  `show*()`, removal right after. (4) The listener effect above, re-subscribed when the element
+  (2.5) after every commit: open as before, except that with committed `true`, the dialog closed
+  and a `dismissedWhilePending` record of the current open generation, it dispatches
+  `notifyClosed(record.event, "dismiss", record.returnValue)` instead of `showModal()` (11.13);
+  the close branch sets `libraryClose` and calls `close(takeCloseReturnValue())`; the focus
+  return right after `close()` when the content probe fired (6.2 rule 2); the record is dropped
+  when committed is `false` with nothing in flight; and the `held` release rule (4.4). (3)
+  `initialFocus` write inside (2) right before `show*()`, removal right after. (4) The listener effect above, re-subscribed when the element
   changes. (5) `held` (4.4, `useExitAnimation`): `holdDuringRender()` when committed flips
   `true → false` in library mode with `transition === undefined` (the previous-committed
   pattern, as `usePopoverPopup`).
@@ -1998,11 +2122,14 @@ expects it set to the invoker).
   that only `setOpen(next)`s in its sync prefix costs one commit.
 - **A `method="dialog"` form is intercepted in library mode.** The platform's "submit closes" is
   replaced by the library's close with the same `returnValue`. A consumer who wants the native
-  close back has JS-free mode, or `stopPropagation()` in `onSubmit` (documented as the opt-out).
+  close back has JS-free mode, or `stopPropagation()` in `onSubmit` (documented as the opt-out;
+  honoured through `event.cancelBubble`, because React's root may be the same node the listener
+  is on, 8.1).
 - **Dismissals still animate with CSS only.** In Firefox an Escape closes a dialog instantly,
   as before; only the closes a part asks for get the view transition. The docs say which is
   which, and the `::backdrop` note in 10.3 explains why a backdrop fade needs either the root
-  cross-fade or an element backdrop.
+  cross-fade or an element backdrop. The CSS exit is kept next to `transition` and cut while a
+  view transition runs (the 10.3 recipe), so the two never show a double image in Chromium.
 - **Not changed:** the Trigger stays open-only (no `toggle` command for dialogs, and a modal
   dialog's Trigger is inert while open); `Dialog.Form` keeps `closedSinceSubmit` rather than the
   open-generation guard (it already covers the re-open case and reads the `close` event the Form
@@ -2025,9 +2152,10 @@ Order of work that keeps the test suite green between steps:
    return in the apply effect; `visible = committed || held`); the apply effect's close branch
    passes `takeCloseReturnValue()`; the `command` listener cancels `request-close` / `close` in
    library mode and calls `requestClose` with `event.source?.value`; the `submit` listener moves
-   to the document (bubble) and, in library mode, cancels and calls `requestClose` unless
-   `defaultPrevented`. Keep every `event.target` / `closest("dialog")` filter. Update the
-   `transition` and part doc comments.
+   to the document (bubble; since review L1 the dialog's root node) and, in library mode, cancels
+   and calls `requestClose` unless `defaultPrevented` (or `cancelBubble`, review M3). Keep
+   every `event.target` / `closest("dialog")` filter. Update the `transition` and part doc
+   comments.
 4. **Close** (`dialog-close.tsx`): `onClick` installed in library mode or with `action`;
    library mode → `requestClose`; static + action → the current direct `close()`. Dev warning
    only in static mode without `action`.
@@ -2079,6 +2207,26 @@ hook); folded into the sections named.
 | --- | --- | --- |
 | M2 | `Dialog.Close` drops a stale close: the Root carries an open-generation counter (bumped on the open dispatch and on the Popup's native `beforetoggle` to open, synchronous inside `showModal()` / `show()`; `toggle` is queued and arrived too late, 03ab818) and the Close passes it to `useActionTrigger`, as `Popover.Close` does (02f2f42). Load-bearing for JS-free / native re-opens; in library mode React's entanglement already holds the re-open. | 3.4, 13.2, 14 |
 | L2 | The Close part runs through the shared `useActionTrigger` (ac7064e); the superseded-rejection gap recorded for v0 is closed. | 3.4, 14 |
+
+## Review corrections (#46, 2026-10-18)
+
+From `memo/reviewer/dialog-46.md` (review of the #46 implementation, commits 4e6b9f2..7258b53)
+and the developer's fix notes in `memo/developer/dialog.md` "#46 review fixes"; code and jsdom
+rows in 56e1ea8, recipe, docs and browser rows in 5dcce5f, the WebKit correction in bcdb7e1. M1
+was decided by the product owner (option a). Each item is folded into the sections named; this
+table is the audit trail.
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| M1 | A dismissal that lands while a part's close is in flight is remembered (`dismissedWhilePending`: event, `returnValue`, open generation) instead of being lost. If that close settles vetoed (committed `true`, the dialog closed, nothing in flight), the apply effect sends the stored dismissal as `openChangeAction(false, { reason: "dismiss" })` instead of re-opening with `showModal()`; the dialog stays closed. A parent that refuses the dismissal too gets the usual re-open; a Trigger re-open in between bumps the generation and supersedes the dismissal. Before: the veto re-opened a dialog the user had dismissed and the parent never heard of the dismissal. | 2.3, 2.5, 11.13, 11.14, 13.2, 14 |
+| M2 | With `transition` plus the 10.1 CSS exit, Chromium keeps a closed dialog rendered through its fade and the close's view transition captures it as a live `::view-transition-new` next to the `old` image (a double image), for part closes and for dismissals whose notification commit lands inside the fade. The 10.3 table row "nothing visible to animate" was wrong for a CSS exit. Recipe: keep the CSS exit and add `html:active-view-transition .dialog { transition: none; }`, untyped on purpose (a controlled close carries no types); cost: an unrelated page view transition also cuts a fade. Chromium-only: Firefox has no CSS exit, WebKit has the box `display: none` by `ready`. Replaces "at most a CSS exit for dismissals". Popover's recipe had the same artifact and gets the same rule. | 10.3, 13.3, Amendment trade-offs; popover.md 10.2, 13.3 |
+| M3 | The `stopPropagation()` opt-out did nothing when React's root is the document (FUNSTACK Static `hydrateRoot(document, …)`): the library's listener is on the same node, which `stopPropagation()` does not stop. The listener now also returns on `event.cancelBubble`. | 8.1, 14, Amendment trade-offs |
+| L1 | The `submit` listener is on `dialog.getRootNode()` (the document, or the shadow root the dialog lives in; `submit` is not composed), still after React's container. | 8.1, 14 |
+| L2 | `closeOnSettle` doc: "a submit button in a separate `method="dialog"` form". A `formMethod="dialog"` submitter inside a Form with a function `action` re-runs the action (React prevents every submit of such a form) and never closes. | 3.5, 8.1 |
+| L3 | A dismissal during an in-flight part close with `transition` set was treated as an echo and not held; fixed with L4 (the hold is skipped only for a real echo). Moot with the M2 recipe, correct without it. | 4.4 |
+| L4 | The library's own `close()` is recognised by source (the `libraryClose` marker set in the apply effect, consumed by the `close` listener), not by `!intended()`, so a re-open that becomes intended in the task between `close()` and its `close` event is not superseded. A browser close drops a pending part's `returnValue` (`takeCloseReturnValue()`), so it cannot be applied to a later close. `notifyClosed` is called only for closes the library did not cause. | 2.3, 2.5, 4.4, 14 |
+| L5 | jsdom rows for reviewer P2 (re-open during a pending part close, uncontrolled), walkthrough 11.16, a Close `action` plus a controlled veto, nested library / JS-free inner Roots with the shared submit listener; browser rows assert the pseudo-images (old only with the recipe; the characterisation row pins the double image without it in Chromium). | 13.2, 13.3 |
+| WebKit | The 5dcce5f commit message said WebKit also shows the double image; CI showed the box is `display: none` at `ready` there with or without the recipe, and that WebKit's `getAnimations()` pseudo-element names are unreliable (the group's animation listed under `::view-transition-new`). Docs and this design name Chromium only; the WebKit rows assert `display`. | 10.3, 13.3 |
 
 ---
 

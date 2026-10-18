@@ -161,3 +161,29 @@ Decisions I went back and forth on:
 
 Not touched: the docs site and the example app (the running code is what they show); listed
 for the developer in the amendment section.
+
+## #46 review fold, 2026-10-18
+
+Folded `memo/reviewer/dialog-46.md` (fixes 56e1ea8..bcdb7e1, `memo/developer/dialog.md` "#46
+review fixes") into `design/components/dialog.md` and the shared recipe into `popover.md`,
+checking each claim against `dialog-popup.tsx` / `dialog-root.tsx` and the test rows:
+
+- M1 (option a): `dismissedWhilePending` on the Popup, keyed on the open generation; the apply
+  effect sends `notifyClosed(event, "dismiss", returnValue)` instead of `showModal()` when the
+  vetoed close settles. Walkthrough 11.13 now has three endings (adopted, vetoed, re-opened).
+- L4 changes a sentence I had written in 2.3 ("`notifyClosed` skips the dispatch when `false` is
+  already intended"): echo is by source (`libraryClose`) now, and `notifyClosed` is called only
+  for closes the library did not cause. The `!intended()` echo was my design; the gap (a re-open
+  intended in the task between `close()` and `close`) was real, if narrow.
+- M2: my "at most a CSS exit for dismissals" in 10.3 / Popover 10.2 was wrong twice: that CSS
+  runs for library closes too (double image in Chromium), and the dismissal row's "nothing
+  visible to animate" assumed no CSS exit. The recipe (`html:active-view-transition .x {
+  transition: none }`) is untyped because a controlled close has no types; cost accepted and
+  stated. WebKit: the box is `display: none` by `ready`, so no double image; its
+  `getAnimations()` pseudo names are unreliable (worth a WebKit look, noted in 13.3).
+- M3 / L1: the listener is on `dialog.getRootNode()` and honours `cancelBubble`. I had assumed
+  React's container is always below `document`; FUNSTACK Static hydrates the document itself.
+- Conventions: nothing in `design/conventions.md` says "at most a CSS exit", so no change is
+  required there; 5.1 could gain one sentence pointing at the recipe as the general rule for
+  "CSS exit kept next to `transition`" (reported to the PO, not edited: another architect may be
+  in that file).

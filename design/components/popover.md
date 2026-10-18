@@ -4,7 +4,9 @@ Status: **accepted** (2026-10-17, GitHub issue #38; the product owner accepted a
 questions as recommended, see the end of this document; the Dialog view-transition close
 follow-up is issue #46). **Implemented** (#40); the review's corrections
 (`memo/reviewer/popover.md`, fixes in commit 35e57e1) are folded in, see "Review corrections"
-at the end. The code under `packages/ui/src/popover/` and `src/internal/use-popover-*.ts` is the
+at the end; the Dialog #46 review's M2 (keep the CSS exit next to `transition`, cut it while a
+view transition runs) applies to Popover too and is folded into 10.2 and 13.3 (2026-10-18, commit
+5dcce5f). The code under `packages/ui/src/popover/` and `src/internal/use-popover-*.ts` is the
 ground truth where this document is silent. Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/dialog.md` first**: Popover is the Dialog's two-mode model (JS-free mode
@@ -970,8 +972,8 @@ Firefox this is the only way a popover exit can animate.
 | Trigger's `data-open` / `aria-expanded` flip on click, and its snap-back | sync (optimistic) | never | CSS on `[data-open]` |
 | Opening commit: children mount, then `showPopover()` in the layout effect | transition, `fsui-popover-open` | yes: the popup's box as `new` (a `<dialog popover>` has no `::backdrop` of its own while shown as a popover) | `transition` prop, **or** the CSS enter in 10.1, not both for the same open |
 | Content swap while open | transition | yes | `transition` prop |
-| **Library-driven close** (Trigger, Close, controlled `open={false}`): children unmount and `hidePopover()` in the same commit | transition, `fsui-popover-close` (none for a controlled close) | yes: the popup's box as `old`, content included, in Chromium, Firefox and WebKit (CI) | `transition` prop |
-| Dismissal (Escape, click outside): hidden by the browser, then a notification commit | notification commit, `fsui-popover-close` | the popup is already hidden; nothing visible to animate | CSS exit in 10.1 (not in Firefox) |
+| **Library-driven close** (Trigger, Close, controlled `open={false}`): children unmount and `hidePopover()` in the same commit | transition, `fsui-popover-close` (none for a controlled close) | yes: the popup's box as `old`, content included, in Chromium, Firefox and WebKit (CI). With the 10.1 CSS exit on the popup, Chromium keeps the hidden box rendered through its fade, so the `new` snapshot carries a live, fading copy next to the `old` image (a double image) unless the recipe below cuts the fade | `transition` prop, with the recipe below when the CSS exit is kept |
+| Dismissal (Escape, click outside): hidden by the browser, then a notification commit | notification commit, `fsui-popover-close` | without a CSS exit the popup is already `display: none` and there is nothing to animate; with one, the commit usually lands inside the fade, so in Chromium it captures the fading box in both snapshots; the recipe below cuts the fade at the transition and hands the rest of the exit to the `old` snapshot (Dialog 10.3) | CSS exit in 10.1 (not in Firefox), with the recipe below |
 | `held` → `false` after a CSS exit | normal update (not a transition), no types | never: the children exit inside a hidden popup; a transition here would start a second, invisible document view transition (review M1) | nothing |
 
 Mount cost (#35): a plain open starts no document view transition even with `transition` set,
@@ -990,16 +992,30 @@ pointer events while one runs.
 ```css
 ::view-transition-new(.pop-in) { animation: 160ms ease-out both pop-in; }
 ::view-transition-old(.pop-out) { animation: 120ms ease-in both pop-out; }
+/* Keep the CSS exit of 10.1 for dismissals, but not while a view transition runs. */
+html:active-view-transition .popover { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 ```
 
-When `transition` is set, the docs recommend leaving the CSS `display` / `overlay` transition
-off the popover (the view transition is the animation for every library-driven change) and
-keeping, at most, a CSS exit for dismissals. That combination runs exactly one document view
-transition per dismissal (the notification commit); the later `held` release is a normal update
-and starts none (browser row "a dismissal runs one view transition, not two").
+**The recipe: keep the CSS exit, cut it while a view transition runs** (shared with Dialog
+10.3, where the reasoning and the per-engine evidence live; Dialog #46 review M2). When
+`transition` is set, the view transition is the animation for every library-driven change and
+the CSS exit of 10.1 stays for dismissals. They must not overlap: in Chromium a popover with the
+`display` / `overlay` transition stays rendered through its fade after `hidePopover()`, so a
+library-driven close's view transition captures the fading popup as a live
+`::view-transition-new(…)` next to the `old` image, a double image (probed in Chromium 156 with
+the docs recipe, same shape as Dialog's). `html:active-view-transition .popover { transition:
+none; }` removes it: the box is `display: none` when the new snapshot is taken. The selector is
+untyped on purpose, because a controlled close carries no types; the cost is that an unrelated
+page view transition also cuts a dismissal's fade in progress. Firefox animates no CSS exit and
+never had a new image; WebKit has the box `display: none` by `ready` either way. (The first
+version of this paragraph recommended "at most a CSS exit for dismissals", which runs for
+library closes too.) That combination runs exactly one document view transition per dismissal
+(the notification commit) and one per library-driven close, with one image of the popup each;
+the later `held` release is a normal update and starts none (browser row "a dismissal runs one
+view transition, not two").
 
 ---
 
@@ -1282,7 +1298,7 @@ asserting the documented degraded behaviour rather than skipping:
 | Initial focus and return | A raw platform probe (no library) asserts that `showPopover()` on a `<dialog>` moves focus inside, in every engine. With the `<dialog>` default, focus is inside the popup after a library open (`initialFocus` target, else first focusable, else the popup); Escape returns focus to the Trigger. With `render={<div />}`, focus stays on the Trigger and Tab enters the popup. A `Popover.Close` activated from the keyboard with `transition="pop"` (content unmounted in the close commit) returns focus to the Trigger (6.2, H1). | None for focus: WebKit verified (CI run 39006036945). Tab-into-popup is asserted only with a DOM-adjacent Popup (Safari WPT gap). |
 | Nested popovers | Opening the inner keeps the outer open; Escape closes the inner only and **the library** focuses the inner Trigger (every engine: the platform restores nothing for a nested popover); an outside click closes both and leaves focus alone; a second Escape closes the outer and the platform focuses the outer Trigger. | None for placement since 6e48fe6 (issue #56): the inner Popup uses an inline `side` with its `flip-inline` fallback on all three engines and the fallback-flip assertion (inner popup near the viewport edge flips to the other side) runs on WebKit too. WebKit 302008 (`position-try-fallbacks` on a nested popover hangs / spins) did not bite on CI; the Menu suite keeps the named WebKit guard row for it, and a hang here fails the row under the test timeout. |
 | Exit animation and deferred unmount | With the 10.1 CSS and no `transition`: after a part-initiated close the children stay mounted until `getAnimations()` settle, and after a dismissal likewise; `held` clears. | Firefox has no CSS exit: branch on `popup.getAnimations({ subtree: true }).length === 0` right after the hide and assert the children unmount with the close commit. |
-| ViewTransition | With `transition="pop"`: a library open calls `document.startViewTransition` once and the popup is `:popover-open` when the update callback has run; a part-initiated close calls it once and the old snapshot exists (`document.getAnimations()` includes a `::view-transition-old(…)` pseudo during the transition); a dismissal calls it only for the notification commit with the popup already hidden; **`transition="pop"` plus the 10.1 CSS exit: a dismissal calls it once, not twice** (the `held` release is a normal update; fails without the M1 fix in Chromium, Firefox animates no exit). Without `transition`: zero calls for an open and a close. A `Popover.Root` inserted by a transition with `transition="none"` calls it once (conventions 10.1 mount row); a plain open with `"none"` calls it zero times. | None: the old-snapshot row passes on all three engines (WebKit on CI). |
+| ViewTransition | With `transition="pop"`: a library open calls `document.startViewTransition` once and the popup is `:popover-open` when the update callback has run; a part-initiated close calls it once and the old snapshot exists (`document.getAnimations()` includes a `::view-transition-old(…)` pseudo during the transition); a dismissal calls it only for the notification commit with the popup already hidden; **`transition="pop"` plus the 10.1 CSS exit: a dismissal calls it once, not twice** (the `held` release is a normal update; fails without the M1 fix in Chromium, Firefox animates no exit). Without `transition`: zero calls for an open and a close. A `Popover.Root` inserted by a transition with `transition="none"` calls it once (conventions 10.1 mount row); a plain open with `"none"` calls it zero times. **`transition="pop"` plus the 10.1 CSS exit, a part-initiated close** (`it.each` over the recipe): with `html:active-view-transition .fade { transition: none }` the popup is `display: none` at `ready` and only the old image of its group exists; the characterisation variant without the recipe has a live new image of the fading popup in Chromium (pseudo-element names read from `document.getAnimations()` at `ready`, reported in the failure message). | None for the mechanism: the old-snapshot row passes on all three engines (WebKit on CI). The recipe rows branch per engine: the live new image exists in Chromium only (Firefox animates no exit; WebKit has the box `display: none` by `ready`, and its pseudo-element names are unreliable, so it asserts `display` only, as Dialog 13.3). |
 | Stack interactions | A Tooltip (`manual`, and `hint` where `supportsPopoverHint`) opened inside the popup does not close it; a modal Dialog opened from inside keeps it open and Escape closes the Dialog first; opening an unrelated `auto` popover closes it with `"dismiss"`. | `supportsPopoverHint` for the hint variant (Safari 27.0 maps it to `manual`; same assertion). |
 | Accessibility | `aria-modal="false"` and `role="dialog"` present on the `<dialog>` (attribute assertions; no AX tree access in vitest browser mode, Chromium's `modal=true` exposure without the attribute is #44). | none |
 
@@ -1557,6 +1573,13 @@ item is folded into the section named; this list is the audit trail.
 | Deviation 7 | The no-name warning checks `dialog`, `alertdialog` and `menu` roles only. | 9 |
 | Deviation 8 | `resolveInitialFocus(popup)` takes no `cause`; Menu's `details` factory uses `createActionDetails`. | 14.1, 14.2, 15, menu.md 14 |
 | M2 | `Popover.Close` dropped a superseded rejection (`useTransition` keeps the newest thenable). Closed by the shared `useActionTrigger` (ac7064e, #41; conventions 3.4), which also carries the open-generation guard; one jsdom row fails without it. | 3.4 (closed 2026-10-17) |
+
+From the Dialog #46 review (`memo/reviewer/dialog-46.md` M2, 2026-10-18; code, docs and the
+browser row in 5dcce5f, the WebKit correction in bcdb7e1):
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| Dialog #46 M2 | With `transition` plus the 10.1 CSS exit, Chromium captures a library-closed popup, still rendered through its fade, as a live `::view-transition-new` next to the `old` image (a double image; probed with the docs recipe). The recipe keeps the CSS exit and adds `html:active-view-transition .popover { transition: none; }` (untyped: a controlled close carries no types; cost: an unrelated page view transition also cuts a fade). Replaces "at most a CSS exit for dismissals"; the dismissal row's "nothing visible to animate" was wrong for a CSS exit. Chromium only: Firefox has no CSS exit, WebKit has the box `display: none` by `ready`. Docs `popover.css` / PopoverPage and the playground carry the rule. | 10.2, 13.3 |
 
 ---
 
