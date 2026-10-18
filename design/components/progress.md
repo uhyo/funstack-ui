@@ -1,6 +1,6 @@
 # Progress and Meter
 
-Status: **Draft — awaiting product owner acceptance** (2026-10-18, wave 6, GitHub issue #68;
+Status: **Accepted by the product owner** (2026-10-18, wave 6, GitHub issue #68;
 research issue #65, `docs/research/wave6.md` §3). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. This document does not
 edit the conventions: what it asks of them is listed under "Conventions proposals".
@@ -1059,3 +1059,8 @@ Genuine product decisions, with recommendations; none blocks implementation.
     **Recommendation: two**; Field & Form share a page because they are used together, Progress
     and Meter are not.
 12. **Conventions proposals 1 to 9** to hand to the conventions owner on acceptance.
+
+**Accepted by the product owner (2026-10-18):** recommendations 1-12 are accepted as written.
+- Item 2, `max` defaults to 100: accepted.
+- Item 3, a directive-free Root that renders the client context provider: accepted as the pattern for future presentational components.
+- Item 12, the conventions proposals: they go to the wave's conventions owner (the ToggleGroup/Toolbar architect).
