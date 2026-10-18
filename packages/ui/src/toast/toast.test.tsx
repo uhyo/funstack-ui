@@ -256,6 +256,42 @@ describe("Toast", () => {
       expect(region()).toHaveAttribute("data-empty", "");
     });
 
+    it("a dismissed toast that never rendered leaves at once, never as an ending Root (#63 L5)", async () => {
+      const seen = new Set<string>();
+      const closeAction = vi.fn();
+      render(
+        <Harness
+          manager={manager}
+          limit={1}
+          list={({ toasts }) =>
+            toasts.map((t) => {
+              seen.add(t.id);
+              return renderToast(t);
+            })
+          }
+        />,
+      );
+      const a = await call(() => manager({ title: "A", duration: null }));
+      const b = await call(() => manager({ title: "B", duration: null, closeAction }));
+      await call(() => manager({ title: "C", duration: null }));
+      expect([...seen]).toEqual([a]);
+      // Queued beyond `limit`: dismissed without rendering, `closeAction` still runs.
+      await call(() => manager.dismiss(b));
+      await flush();
+      expect([...seen]).toEqual([a]);
+      expect(closeAction).toHaveBeenCalledWith(
+        expect.objectContaining({ id: b, reason: "dismiss" }),
+      );
+      // dismiss(): the visible one exits, the queued one (C) is never rendered.
+      await call(() => manager.dismiss());
+      expect([...seen]).toEqual([a]);
+      expect(roots()).toHaveLength(0);
+      // Added and dismissed in one tick: never rendered either.
+      await call(() => manager.dismiss(manager({ title: "D" })));
+      expect([...seen]).toEqual([a]);
+      expect(region()).toHaveAttribute("data-empty", "");
+    });
+
     it("dismiss() then toast() in one tick shows the new toast (dismissals apply in order)", async () => {
       const first = vi.fn();
       const second = vi.fn();
@@ -1183,6 +1219,25 @@ describe("Toast", () => {
       expect(queryRoot(id)).toBeNull();
     });
 
+    it("a hover pause ends when the region empties under the pointer (#63 L3)", async () => {
+      render(<Harness manager={manager} />);
+      const a = await call(() => manager({ title: "A", duration: 1000 }));
+      act(() => {
+        fireEvent.pointerEnter(region());
+      });
+      expect(region()).toHaveAttribute("data-paused", "");
+      // The Close click is under the pointer; the hidden region gets no `pointerleave`.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`close-${a}`));
+      });
+      expect(queryRoot(a)).toBeNull();
+      expect(region()).not.toHaveAttribute("data-paused");
+      const b = await call(() => manager({ title: "B", duration: 1000 }));
+      expect(region()).not.toHaveAttribute("data-paused");
+      await advance(1000);
+      expect(queryRoot(b)).toBeNull();
+    });
+
     it("pauses only the pending toast's timer while its siblings run", async () => {
       const d = deferred();
       render(<Harness manager={manager} />);
@@ -1914,6 +1969,49 @@ describe("Toast", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("another Toast.Viewport"));
     });
 
+    it("two Viewports mounted in one commit: the second region is never shown (#63 L8)", async () => {
+      silenceErrors();
+      await call(() => manager({ title: "Early", duration: null }));
+      const show = vi.spyOn(HTMLElement.prototype, "showPopover");
+      render(
+        <>
+          <Toast.Viewport manager={manager} data-testid="one">
+            {({ toasts }) => toasts.map((t) => <p key={t.id}>{String(t.title)}</p>)}
+          </Toast.Viewport>
+          <Toast.Viewport manager={manager} data-testid="two">
+            {({ toasts }) => toasts.map((t) => <p key={t.id}>{String(t.title)}</p>)}
+          </Toast.Viewport>
+        </>,
+      );
+      await flush();
+      expect(screen.getByTestId("one").textContent).toBe("Early");
+      expect(screen.queryByTestId("two")).toBeNull();
+      expect(show.mock.contexts).toEqual([screen.getByTestId("one")]);
+    });
+
+    it("a manager prop change swaps the queues without mixing them (#63 L2)", async () => {
+      const other = createToastManager();
+      // `other` holds a toast retained from an earlier Viewport.
+      const earlier = render(<Harness manager={other} />);
+      const b = await call(() => other({ title: "B", duration: null }));
+      earlier.unmount();
+      const { rerender } = render(<Harness manager={manager} />);
+      const a = await call(() => manager({ title: "A", duration: null }));
+      rerender(<Harness manager={other} />);
+      await flush();
+      expect(queryRoot(a)).toBeNull();
+      expect(root(b)).toHaveTextContent("B");
+      // The old manager's commands no longer reach this Viewport, and the new one's do not
+      // touch the old queue.
+      await call(() => manager({ title: "A2", duration: null }));
+      expect(roots()).toHaveLength(1);
+      await call(() => other.dismiss());
+      expect(roots()).toHaveLength(0);
+      rerender(<Harness manager={manager} />);
+      await flush();
+      expect(roots().map((r) => r.querySelector("div")?.textContent)).toEqual(["A", "A2"]);
+    });
+
     it("a second Viewport added later never renders its region", async () => {
       const error = silenceErrors();
       const seen: HTMLElement[] = [];
@@ -2079,6 +2177,21 @@ describe("Toast", () => {
       await flush();
       expect(region().closest("dialog")).toBeNull();
       expect(region().matches(":popover-open")).toBe(true);
+    });
+
+    it("a move into a modal Dialog ends the hover pause (#63 L3)", async () => {
+      const user = setupUser();
+      render(<Harness manager={manager} before={<WithDialog />} />);
+      await call(() => manager({ title: "A", duration: null }));
+      act(() => {
+        fireEvent.pointerEnter(region());
+      });
+      expect(region()).toHaveAttribute("data-paused", "");
+      await user.click(screen.getByTestId("open-dialog"));
+      await tasks();
+      await flush();
+      expect(screen.getByTestId("dialog").contains(region())).toBe(true);
+      expect(region()).not.toHaveAttribute("data-paused");
     });
 
     it("shows the region again after a move hid it (a removal hides a popover)", async () => {

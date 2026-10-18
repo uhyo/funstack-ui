@@ -188,6 +188,12 @@ const isDev = process.env.NODE_ENV !== "production";
 
 let warnedServer = false;
 
+/**
+ * Generated ids are unique across managers, so a Viewport whose `manager` prop changes never
+ * mistakes a late close from the old queue (an Undo settling) for one of the new queue's toasts.
+ */
+let nextId = 0;
+
 /** On the server every method is a no-op, never buffered (design 13, product-owner amendment). */
 function onServer(): boolean {
   if (typeof document !== "undefined") return false;
@@ -225,7 +231,6 @@ export function createToastManager(): ToastManager {
   /** Commands of the current tick, flushed together from one microtask. */
   let batch: ToastCommand[] = [];
   let scheduled = false;
-  let nextId = 0;
 
   const flush = (): void => {
     scheduled = false;

@@ -470,9 +470,18 @@ export function ToastViewport({
         for (let i = 0; i < next.length; i++) {
           const entry = next[i]!;
           if (entry.ending) continue;
-          if (command.id !== undefined && entry.options.id !== command.id) continue;
+          const id = entry.options.id;
+          if (command.id !== undefined && id !== command.id) continue;
           dismissed.push(entry);
-          next[i] = withFlags(entry, { ending: true });
+          if (roots.current.has(id)) {
+            next[i] = withFlags(entry, { ending: true });
+          } else {
+            // Never rendered (queued beyond `limit`, or added in this tick): nothing to
+            // animate, so it leaves at once instead of mounting once as an ending Root.
+            next.splice(i--, 1);
+            lastAnnounced.current.delete(id);
+            exitBaselines.current.delete(id);
+          }
         }
         continue;
       }
@@ -597,10 +606,23 @@ export function ToastViewport({
       }));
   };
 
+  /** Forgets the queue of the previous manager (its own copy is retained by that manager). */
+  const reset = (): void => {
+    moveFocusOut(new Set(entriesRef.current.filter((e) => !e.ending).map((e) => e.options.id)));
+    for (const timer of timers.current.values()) {
+      if (timer.handle !== null) clearTimeout(timer.handle);
+    }
+    timers.current.clear();
+    lastAnnounced.current.clear();
+    exitBaselines.current.clear();
+    write([]);
+  };
+
   const handlers = useLatest({
     apply,
     restore,
     retain,
+    reset,
     close,
     drop,
     setActionPending,
@@ -639,7 +661,16 @@ export function ToastViewport({
 
   // --- Subscription ---------------------------------------------------------------------------
 
+  const subscribedManager = useRef<ToastManager | null>(null);
   useEffect(() => {
+    // A new `manager`: the previous one kept its toasts on unsubscribe (the previous run's
+    // cleanup); start empty so the new one's retained toasts are restored and no command of
+    // one queue reaches the other's toasts. The same manager again (StrictMode, Activity) keeps
+    // the entries.
+    if (subscribedManager.current !== null && subscribedManager.current !== manager) {
+      handlers.current.reset();
+    }
+    subscribedManager.current = manager;
     const unsubscribe = toastManagerInternals(manager).subscribe(listener.current!);
     if (unsubscribe === null) {
       setRejected(true);
@@ -653,7 +684,7 @@ export function ToastViewport({
     }
     setRejected(false);
     return unsubscribe;
-  }, [manager]);
+  }, [manager, handlers]);
 
   // --- Lifecycle, pause sources, hotkey --------------------------------------------------------
 
@@ -729,7 +760,12 @@ export function ToastViewport({
   useLayoutEffect(() => {
     if (host === null || !portalled) return;
     const target = container ?? anchorRef.current;
-    if (target !== null && host.parentNode !== target) target.append(host);
+    if (target === null || host.parentNode === target) return;
+    const moved = host.parentNode !== null;
+    target.append(host);
+    // A moved region gets no `pointerleave` (review L3): drop the hover pause; a pointer still
+    // over it enters it again on its next move.
+    if (moved) setPause("hover", false);
   });
 
   // --- After every commit: region, timers, queued announcements, orphan exits ----------------
@@ -768,6 +804,9 @@ export function ToastViewport({
         // A render element without popover support; nothing to show.
       }
     }
+    // An emptied region is hidden, often right under the pointer (its last toast's Close), and
+    // a hidden element gets no `pointerleave` (review L3): the next toast must not start paused.
+    if (current.length === 0 && pauses.current.hover) setPause("hover", false);
     addedSinceEffect.current = false;
 
     const { visible, queued } = partition(current, latest.current.limit);
