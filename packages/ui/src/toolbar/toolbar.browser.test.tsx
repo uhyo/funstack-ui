@@ -244,7 +244,13 @@ describe.each([
     // The group's own arrows: check as they move, wrap within the group, both axes.
     await user.keyboard("{ArrowRight}");
     await expect.poll(focused).toBe(radio("right"));
-    await user.keyboard("{ArrowRight}"); // trapped: wraps within the group
+    await user.keyboard("{ArrowRight}"); // trapped: never leaves the group
+    if (browserName === "webkit") {
+      // WebKit's own radio navigation stops at the group's last radio instead of wrapping
+      // (memo/developer/cross-engine.md); the toolbar still does not take the key.
+      await expect.poll(focused).toBe(radio("right"));
+      await user.keyboard("{ArrowLeft}{ArrowLeft}");
+    }
     await expect.poll(focused).toBe(radio("left"));
     await user.keyboard("{ArrowDown}");
     await expect.poll(focused).toBe(radio("center"));

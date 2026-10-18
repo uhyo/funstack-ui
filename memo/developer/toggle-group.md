@@ -109,3 +109,7 @@ Deviations / notes:
   on a non-first Item of a standalone ToggleGroup warned (my earlier memo note "runs before the
   engine writes" was wrong). The new test failed with 3 warnings before the selector change.
 - Row 27 (browser) passes locally on Chromium native, Chromium JS and Firefox JS; WebKit only on CI.
+- WebKit's radio-group arrows do not wrap (CI, row 27). Browser behaviour, not the toolbar's; the
+  browser row branches on `browserName === "webkit"` for that step and the Toolbar page says
+  "wrapping, except in Safari". The design's 17.1 / 17.2 "wraps within the group" holds for
+  Chromium and Firefox only.

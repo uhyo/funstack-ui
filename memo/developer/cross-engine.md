@@ -169,3 +169,7 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   radios inside a toolbar keep their arrows under native focusgroup but not on the JS path - open,
   #74. New rows on both paths: vertical `block nowrap`, Menu.Trigger in horizontal and vertical
   toolbars.
+- Native radios in a Toolbar (#74, row 27, CI run 39115153067): WebKit's own radio-group arrow
+  navigation does not wrap (ArrowRight on the last radio of a group stays there); Chromium and
+  Firefox wrap. Not the toolbar's doing (it leaves radio arrows alone on every path); the browser
+  row branches on `browserName === "webkit"` for that one step.

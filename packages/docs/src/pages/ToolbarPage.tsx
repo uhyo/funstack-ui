@@ -61,12 +61,13 @@ export function ToolbarPage() {
           A group of native radios with one <code>name</code> (a{" "}
           <a href="/components/radio-group">RadioGroup</a> too) is one toolbar item. The toolbar's
           arrows land on its checked radio, or on its first radio when none is checked. On a radio,
-          every arrow key is the radio group's: it checks as it moves and wraps within the group, so
-          in a horizontal toolbar ArrowLeft / ArrowRight never leave the group (ArrowUp / ArrowDown
-          in a vertical one). Leave it with Tab or Shift+Tab, which move to the next or previous
-          toolbar item; from an unchecked radio they visit the checked one first. Both the JS path
-          and Chromium's native <code>focusgroup</code> behave this way. Radios that share a{" "}
-          <code>name</code> but belong to different forms (<code>form=</code>) are not told apart.
+          every arrow key is the radio group's: it checks as it moves and stays within the group
+          (wrapping, except in Safari), so in a horizontal toolbar ArrowLeft / ArrowRight never
+          leave the group (ArrowUp / ArrowDown in a vertical one). Leave it with Tab or Shift+Tab,
+          which move to the next or previous toolbar item; from an unchecked radio they visit the
+          checked one first. Both the JS path and Chromium's native <code>focusgroup</code> behave
+          this way. Radios that share a <code>name</code> but belong to different forms (
+          <code>form=</code>) are not told apart.
         </p>
         <p>
           For a one-of-several choice that is transparent to the toolbar's arrows (text alignment),
@@ -244,7 +245,7 @@ export function ToolbarPage() {
             "Any of the above on a native radio",
             "",
             "",
-            "The radio group's own: checks the next / previous radio, wrapping within the group.",
+            "The radio group's own: checks the next / previous radio, staying within the group (it wraps, except in Safari).",
           ],
           [
             "Tab / Shift+Tab on a native radio",
