@@ -134,3 +134,6 @@
 - User: "Let's proceed with Wave 6." Tracker #69. Components: ToggleGroup/Toolbar (#66), NumberField (#67), Progress/Meter (#68); research #65.
 - Polish in parallel: #57 + #64 (one developer), #63 (one developer). #59 goes to the architect once Field/Form design questions are in hand.
 - Every code change goes to a work branch with branch CI green before master (see the CI policy above).
+- #59 design accepted (6d13aa2: closeOnSettle error-aware under Form.Root, dev warning); impl running (worktree).
+- Research #65 done (497920a). PO answers: (a) aria-pressed for single ToggleGroup; (b) NumberField w/o spinbutton role accepted, roledescription architect's call; (c) Toolbar wrap + Menu.Trigger in toolbar: architect's call; (d) Progress/Meter on divs, not native. Upstream human-task #70.
+- Designs running in parallel: toggle-group.md (owns conventions.md), number-field.md, progress.md.
