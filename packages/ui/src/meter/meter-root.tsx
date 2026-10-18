@@ -41,6 +41,8 @@ export interface MeterRootProps extends Omit<
   | "aria-valuemax"
   | "aria-valuenow"
   | "aria-valuetext"
+  | "defaultValue"
+  | "defaultChecked"
   | "className"
   | "style"
   | "children"

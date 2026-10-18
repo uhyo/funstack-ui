@@ -56,7 +56,10 @@ export function MeterPage() {
         non-finite value warns in development and renders as <code>min</code>. The parts are the
         same as Progress's (<code>div</code> rail, <code>span</code> fill, <code>span[id]</code>{" "}
         label, <code>span[aria-hidden]</code> value), with <code>data-region</code> instead of{" "}
-        <code>data-indeterminate</code> / <code>data-complete</code>.
+        <code>data-indeterminate</code> / <code>data-complete</code>. From a Server Component, pass
+        functions to the Root only: the parts are client components, so format a part's content in
+        the Root's <code>children(state)</code>, as the storage example does (see{" "}
+        <a href="/components/progress">Progress, Server Components</a>).
       </p>
 
       <h3>Regions</h3>
@@ -121,25 +124,29 @@ export function MeterPage() {
             name: "max",
             type: "number",
             default: "100",
-            description: "The end of the range (the platform's default is 1).",
+            description:
+              "The end of the range (the platform's default is 1). `max <= min` warns in development and renders 0%.",
           },
           {
             name: "low",
             type: "number",
             default: "min",
-            description: "Upper bound of the low part of the range.",
+            description:
+              "Upper bound of the low part of the range. A non-finite number counts as absent (the default applies).",
           },
           {
             name: "high",
             type: "number",
             default: "max",
-            description: "Lower bound of the high part of the range.",
+            description:
+              "Lower bound of the high part of the range. A non-finite number counts as absent (the default applies).",
           },
           {
             name: "optimum",
             type: "number",
             default: "(min + max) / 2",
-            description: "The best value; decides which part of the range is `optimum`.",
+            description:
+              "The best value; decides which part of the range is `optimum`. A non-finite number counts as absent (the default applies).",
           },
           {
             name: "format",
@@ -165,9 +172,11 @@ export function MeterPage() {
         ]}
       />
       <p>
-        Owned: <code>role</code>, the four ARIA values (always present), <code>data-region</code>,
-        and <code>aria-labelledby</code> (your tokens, then the Label's id). Your <code>style</code>{" "}
-        wins over the custom properties per property.
+        Owned: <code>role</code>, <code>aria-valuemin</code>, <code>aria-valuemax</code> and{" "}
+        <code>aria-valuenow</code> (always), <code>aria-valuetext</code> (unless{" "}
+        <code>getAriaValueText</code> returns <code>null</code> or <code>undefined</code>),{" "}
+        <code>data-region</code>, and <code>aria-labelledby</code> (your tokens, then the Label's
+        id). Your <code>style</code> wins over the custom properties per property.
       </p>
       <h4>
         <code>Meter.Track</code>, <code>Meter.Indicator</code>, <code>Meter.Label</code>,{" "}

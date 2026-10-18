@@ -15,7 +15,10 @@ export function ProgressUpload() {
   const [sent, setSent] = useState(0);
   const [pending, startUpload] = useTransition();
 
-  const upload = () =>
+  const upload = () => {
+    // Reset before the action, outside it: a write in its synchronous prefix would be held.
+    setSize(null);
+    setSent(0);
     startUpload(async () => {
       for await (const progress of fakeUpload("report.pdf")) {
         setSize(progress.total); // after an await: urgent
@@ -23,6 +26,7 @@ export function ProgressUpload() {
         // Not: startTransition(() => setSent(progress.sent)), which is held until the end.
       }
     });
+  };
 
   return (
     <div className="demo-stack">

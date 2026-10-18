@@ -13,6 +13,13 @@ Implemented per design/components/progress.md (accepted 2026-10-18).
   `resetWarnOnce()` for tests.
 - Non-finite `low` / `high` / `optimum` are treated as absent (not in the design; mirrors the
   platform's attribute parser). Degenerate range: clamp yields `min`.
+- `defaultValue` / `defaultChecked` are omitted from both Roots' props (review S3, reverses my
+  earlier "the DOM attribute passes through" deviation: react-dom drops it on a `div`, so it was a
+  silent no-op that looked like the uncontrolled spelling). The type test uses
+  `@ts-expect-error`.
+- Docs fixes after review: the indeterminate ring draws a fixed arc (a registered property with
+  an `initial-value` never takes the `var()` fallback); ProgressUpload resets `size` / `sent`
+  urgently before starting the action.
 - Import-graph test in `directives.test.ts` walks the Roots' runtime imports over the sources
   and asserts the only client module reached is the context.
 

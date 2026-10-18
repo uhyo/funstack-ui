@@ -126,8 +126,8 @@ export function ProgressPage() {
         so it ran on the server, once: the <code>getAriaValueText</code> function was passed from a
         Server Component (it never crosses to the browser), <code>Intl</code> formatted the numbers
         where the data is, and the arithmetic is not in the client bundle. The parts read the Root
-        through a context, so they are small client modules; a Root with no parts ships only the
-        context module.
+        through a context, so they are small client modules; which of them reach the browser depends
+        on how your bundler emits client references.
       </p>
       <Example
         source={progressJobsSource}

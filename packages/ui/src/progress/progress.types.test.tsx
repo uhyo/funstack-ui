@@ -1,4 +1,3 @@
-import type { ComponentPropsWithRef } from "react";
 import { describe, expectTypeOf, it } from "vitest";
 import { Meter } from "../meter/index.js";
 import type { MeterRegion, MeterRootProps, MeterState } from "../meter/index.js";
@@ -21,10 +20,13 @@ describe("Progress / Meter props", () => {
   it("has no transition, defaultValue or valueChangeAction", () => {
     // @ts-expect-error no transition prop
     void (<Progress.Root transition="none" />);
-    // Controlled only: `defaultValue` is nothing but the DOM attribute every `div` accepts.
-    expectTypeOf<ProgressRootProps["defaultValue"]>().toEqualTypeOf<
-      ComponentPropsWithRef<"div">["defaultValue"]
-    >();
+    // Controlled only: the DOM `defaultValue` / `defaultChecked` would do nothing on a `div`.
+    // @ts-expect-error no defaultValue
+    void (<Progress.Root defaultValue={3} />);
+    // @ts-expect-error no defaultValue
+    void (<Meter.Root value={1} defaultValue={3} />);
+    // @ts-expect-error no defaultChecked
+    void (<Progress.Root defaultChecked />);
     // @ts-expect-error output-only: no action
     void (<Meter.Root value={1} valueChangeAction={() => {}} />);
     // @ts-expect-error owned

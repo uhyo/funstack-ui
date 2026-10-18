@@ -34,13 +34,6 @@ function isInstalled(name: BrowserName): boolean {
 }
 
 /**
- * Engines for the browser project.
- * - `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) selects them explicitly; a missing
- *   build then fails loudly.
- * - In CI (`CI` set) all three run.
- * - Locally, every engine whose Playwright build is installed runs; Chromium always does.
- */
-/**
  * Emulates `prefers-reduced-motion` for the test page (and its frames). Declared for the tests in
  * src/__tests__/browser-commands.ts; a test that turns it on turns it off in `finally`.
  */
@@ -48,6 +41,13 @@ const emulateReducedMotion: BrowserCommand<[reduce: boolean]> = async (context, 
   await context.page.emulateMedia({ reducedMotion: reduce ? "reduce" : "no-preference" });
 };
 
+/**
+ * Engines for the browser project.
+ * - `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) selects them explicitly; a missing
+ *   build then fails loudly.
+ * - In CI (`CI` set) all three run.
+ * - Locally, every engine whose Playwright build is installed runs; Chromium always does.
+ */
 function selectBrowsers(): BrowserName[] {
   const requested = process.env["FUNSTACK_BROWSERS"];
   if (requested) {
