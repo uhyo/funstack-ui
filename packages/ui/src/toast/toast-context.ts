@@ -21,6 +21,11 @@ export interface ToastViewportContextValue {
   readonly announce: (id: string, text: string | null, priority: ToastPriority) => void;
   /** The Viewport's `announce` prop, read at announcement time. */
   readonly announcer: () => ((toast: ToastItem) => string | null) | undefined;
+  /**
+   * The animations that ran in the toast before it was marked ending (kept until it is dropped
+   * or replaced): its exit waits only for the others.
+   */
+  readonly exitBaseline: (id: string) => ReadonlySet<Animation> | undefined;
 }
 
 export const ToastViewportContext = createContext<ToastViewportContextValue | null>(null);
@@ -43,6 +48,11 @@ export interface ToastRootContextValue {
   readonly registerDescription: (element: HTMLElement | null) => void;
   /** An Action part's run is (no longer) in flight; `token` identifies the part. */
   readonly setActionPending: (token: object, pending: boolean) => void;
+  /**
+   * A Title or Description committed: mounted, or shown again by a Suspense boundary inside the
+   * Root (the consumer's skeleton), so the Root announces the text that now exists.
+   */
+  readonly contentCommitted: () => void;
   /** The Suspense guard mounted (`true`) or unmounted (`false`). */
   readonly setSuspended: (suspended: boolean) => void;
   /** Close this toast. */

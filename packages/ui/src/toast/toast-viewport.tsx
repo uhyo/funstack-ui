@@ -67,8 +67,8 @@ export interface ToastViewportProps extends Omit<
   duration?: number | null;
   /**
    * Keys that focus the newest toast: `event.code` values and modifier names (`"altKey"`,
-   * `"ctrlKey"`, `"metaKey"`, `"shiftKey"`), all of which must match. Default `["F8"]`; `null`
-   * installs no listener.
+   * `"ctrlKey"`, `"metaKey"`, `"shiftKey"`), all of which must match, with no other modifier
+   * held. Default `["F8"]`; `null` installs no listener.
    */
   hotkey?: readonly string[] | null;
   /**
@@ -108,12 +108,30 @@ function regionLabel(hotkey: readonly string[] | null): string {
   return `Notifications (${hotkeyLabel(hotkey)})`;
 }
 
+/** The listed keys and modifiers, and no unlisted modifier (Ctrl+F8 is not F8). */
 function matchesHotkey(hotkey: readonly string[], event: KeyboardEvent): boolean {
-  return hotkey.every((key) =>
-    key in MODIFIER_NAMES
-      ? (event as unknown as Record<string, unknown>)[key] === true
-      : event.code === key,
-  );
+  const flags = event as unknown as Record<string, unknown>;
+  for (const modifier of Object.keys(MODIFIER_NAMES)) {
+    if ((flags[modifier] === true) !== hotkey.includes(modifier)) return false;
+  }
+  return hotkey.every((key) => key in MODIFIER_NAMES || event.code === key);
+}
+
+/** No store: `useSyncExternalStore` only tells the hydration render from a client render. */
+const subscribeNothing = (): (() => void) => () => {};
+const onClient = (): boolean => true;
+const onServerOrHydrating = (): boolean => false;
+
+/**
+ * The element the region is portalled into for its whole client life. The library moves this
+ * element (between its inline anchor and the topmost modal dialog); React never sees the move, so
+ * the toasts keep their state (an Undo in flight stays pending). `display: contents`: no box.
+ */
+function createHost(): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  const host = document.createElement("div");
+  host.style.display = "contents";
+  return host;
 }
 
 /** One queue entry: the toast's options and the flags its `ToastItem` is built from. */
@@ -234,7 +252,17 @@ export function ToastViewport({
   // The latest queue, written together with every `setEntries`: the dispatchers read and write
   // it synchronously so a burst of commands composes (and side effects stay out of updaters).
   const entriesRef = useRef<readonly Entry[]>(entries);
-  const [rejected, setRejected] = useState(false);
+  const listener = useRef<ToastListener | null>(null);
+  listener.current ??= {
+    restore: (toasts: readonly RetainedToast[]) => handlers.current.restore(toasts),
+    apply: (commands: readonly ToastCommand[]) => handlers.current.apply(commands),
+    retain: () => handlers.current.retain(),
+  };
+  // A second Viewport on a taken manager renders nothing from its first render on (the effect
+  // below confirms or clears it once the subscription is attempted).
+  const [rejected, setRejected] = useState(() =>
+    toastManagerInternals(manager).isTaken(listener.current!),
+  );
   const [, startCloseTransition] = useTransition();
 
   const regionRef = useRef<HTMLElement | null>(null);
@@ -251,6 +279,8 @@ export function ToastViewport({
   /** Where focus goes back to once the last toast holding it leaves (design 7). */
   const returnTarget = useRef<HTMLElement | null>(null);
   const lastAnnounced = useRef(new Map<string, string | null>());
+  /** Per closing toast: the animations already running before `data-ending` applied. */
+  const exitBaselines = useRef(new Map<string, ReadonlySet<Animation>>());
   const announceBatch = useRef<{ text: string; priority: ToastPriority }[]>([]);
   const addedSinceEffect = useRef(false);
   const mounted = useRef(false);
@@ -367,19 +397,31 @@ export function ToastViewport({
 
   // --- Queue writes ---------------------------------------------------------------------------
 
-  const close = (ids: readonly string[], reason: ChangeReason, event: Event | undefined): void => {
-    const wanted = new Set(ids);
-    const closing = entriesRef.current.filter((e) => !e.ending && wanted.has(e.options.id));
-    if (closing.length === 0) return;
-    const closingIds = new Set(closing.map((e) => e.options.id));
-    moveFocusOut(closingIds);
-    write(
-      entriesRef.current.map((e) =>
-        closingIds.has(e.options.id) ? withFlags(e, { ending: true }) : e,
-      ),
-    );
-    syncTimers();
-    for (const entry of closing) {
+  /**
+   * Records the animations running in each closing toast before `data-ending` applies: the exit
+   * waits only for the ones the ending state started, not for a running progress bar.
+   */
+  const snapshotExitBaselines = (ids: Iterable<string>): void => {
+    for (const id of ids) {
+      const element = roots.current.get(id);
+      if (element === undefined || !element.isConnected) continue;
+      if (typeof element.getAnimations !== "function") continue;
+      exitBaselines.current.set(id, new Set(element.getAnimations({ subtree: true })));
+    }
+  };
+
+  const clearTimer = (id: string): void => {
+    const timer = timers.current.get(id);
+    if (timer?.handle != null) clearTimeout(timer.handle);
+    timers.current.delete(id);
+  };
+
+  const scheduleCloseActions = (
+    closed: readonly Entry[],
+    reason: ChangeReason,
+    event: Event | undefined,
+  ): void => {
+    for (const entry of closed) {
       const closeAction = entry.options.closeAction;
       if (closeAction === undefined) continue;
       const details = createActionDetails(event, { id: entry.options.id, reason });
@@ -394,17 +436,46 @@ export function ToastViewport({
     }
   };
 
+  const close = (ids: readonly string[], reason: ChangeReason, event: Event | undefined): void => {
+    const wanted = new Set(ids);
+    const closing = entriesRef.current.filter((e) => !e.ending && wanted.has(e.options.id));
+    if (closing.length === 0) return;
+    const closingIds = new Set(closing.map((e) => e.options.id));
+    moveFocusOut(closingIds);
+    snapshotExitBaselines(closingIds);
+    write(
+      entriesRef.current.map((e) =>
+        closingIds.has(e.options.id) ? withFlags(e, { ending: true }) : e,
+      ),
+    );
+    syncTimers();
+    scheduleCloseActions(closing, reason, event);
+  };
+
   const drop = (id: string): void => {
     const next = entriesRef.current.filter((e) => !(e.ending && e.options.id === id));
     if (next.length === entriesRef.current.length) return;
     lastAnnounced.current.delete(id);
+    exitBaselines.current.delete(id);
     write(next);
   };
 
   const apply = (commands: readonly ToastCommand[]): void => {
-    let next = [...entriesRef.current];
-    const dismissals: (string | undefined)[] = [];
+    const next = [...entriesRef.current];
+    // Dismissals apply in order: each closes the toasts open at that point of the batch, never
+    // one added after it in the same tick. Their side effects run after the loop.
+    const dismissed: Entry[] = [];
     for (const command of commands) {
+      if (command.kind === "dismiss") {
+        for (let i = 0; i < next.length; i++) {
+          const entry = next[i]!;
+          if (entry.ending) continue;
+          if (command.id !== undefined && entry.options.id !== command.id) continue;
+          dismissed.push(entry);
+          next[i] = withFlags(entry, { ending: true });
+        }
+        continue;
+      }
       const index = next.findIndex((e) => e.options.id === command.id);
       const existing = index === -1 ? undefined : next[index]!;
       if (command.kind === "add") {
@@ -421,7 +492,14 @@ export function ToastViewport({
           );
           continue;
         }
-        if (existing !== undefined) next.splice(index, 1);
+        if (existing !== undefined) {
+          // An ending toast replaced by a new one with its id (the keyed Root may be reused):
+          // a fresh timer, a fresh announcement, no exit.
+          next.splice(index, 1);
+          clearTimer(command.id);
+          lastAnnounced.current.delete(command.id);
+          exitBaselines.current.delete(command.id);
+        }
         next.push(
           makeEntry(options, {
             promisePending: command.pending,
@@ -430,7 +508,7 @@ export function ToastViewport({
           }),
         );
         addedSinceEffect.current = true;
-      } else if (command.kind === "update") {
+      } else {
         if (existing === undefined) {
           if (isDev && !command.settle) {
             console.error(`toast.update: no toast with id "${command.id}"; the update is ignored.`);
@@ -446,17 +524,20 @@ export function ToastViewport({
           actionPending: existing.actionPending,
           ending: false,
         });
-      } else {
-        dismissals.push(command.id);
       }
     }
-    write(next);
-    if (dismissals.length > 0) {
-      const ids = dismissals.includes(undefined)
-        ? next.filter((e) => !e.ending).map((e) => e.options.id)
-        : (dismissals as string[]);
-      close(ids, "dismiss", undefined);
+    if (dismissed.length === 0) {
+      write(next);
+      return;
     }
+    // Toasts that leave the DOM: not one replaced by a later add with its id in this batch.
+    const stays = new Set(next.filter((e) => !e.ending).map((e) => e.options.id));
+    const leaving = new Set(dismissed.map((e) => e.options.id).filter((id) => !stays.has(id)));
+    moveFocusOut(leaving);
+    snapshotExitBaselines(leaving);
+    write(next);
+    syncTimers();
+    scheduleCloseActions(dismissed, "dismiss", undefined);
   };
 
   const setActionPending = (id: string, pending: boolean): void => {
@@ -493,6 +574,10 @@ export function ToastViewport({
   // The callbacks below read only refs, so one context value serves the Viewport's whole life.
   const restore = (toasts: readonly RetainedToast[]): void => {
     if (entriesRef.current.length > 0) return;
+    // Already announced by the previous Viewport: not again on every remount.
+    for (const t of toasts) {
+      if (t.announced !== undefined) lastAnnounced.current.set(t.options.id, t.announced);
+    }
     write(
       toasts.map((t) =>
         makeEntry(t.options, { promisePending: t.pending, actionPending: false, ending: false }),
@@ -501,9 +586,21 @@ export function ToastViewport({
     addedSinceEffect.current = true;
   };
 
+  const retain = (): readonly RetainedToast[] => {
+    const announced = lastAnnounced.current;
+    return entriesRef.current
+      .filter((e) => !e.ending)
+      .map((e) => ({
+        options: e.options,
+        pending: e.promisePending,
+        announced: announced.has(e.options.id) ? announced.get(e.options.id) : undefined,
+      }));
+  };
+
   const handlers = useLatest({
     apply,
     restore,
+    retain,
     close,
     drop,
     setActionPending,
@@ -533,6 +630,7 @@ export function ToastViewport({
         all[index + direction]?.element.focus();
       },
       announce: (id, text, priority) => handlers.current.queueAnnouncement(id, text, priority),
+      exitBaseline: (id) => exitBaselines.current.get(id),
       announcer: () => latest.current.announce,
     }),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- refs only (`sortedRoots` reads refs)
@@ -540,16 +638,6 @@ export function ToastViewport({
   );
 
   // --- Subscription ---------------------------------------------------------------------------
-
-  const listener = useRef<ToastListener | null>(null);
-  listener.current ??= {
-    restore: (toasts: readonly RetainedToast[]) => handlers.current.restore(toasts),
-    apply: (commands: readonly ToastCommand[]) => handlers.current.apply(commands),
-    retain: () =>
-      entriesRef.current
-        .filter((e) => !e.ending)
-        .map((e) => ({ options: e.options, pending: e.promisePending })),
-  };
 
   useEffect(() => {
     const unsubscribe = toastManagerInternals(manager).subscribe(listener.current!);
@@ -570,6 +658,7 @@ export function ToastViewport({
   // --- Lifecycle, pause sources, hotkey --------------------------------------------------------
 
   useEffect(() => {
+    if (rejected) return;
     mounted.current = true;
     const doc = regionRef.current?.ownerDocument ?? document;
     const view = doc.defaultView ?? window;
@@ -598,11 +687,11 @@ export function ToastViewport({
       for (const timer of map.values()) if (timer.handle !== null) clearTimeout(timer.handle);
       map.clear();
     };
-  }, [handlers]);
+  }, [handlers, rejected]);
 
   const hotkeyKey = hotkey === null ? null : hotkey.join("\u0000");
   useEffect(() => {
-    if (hotkeyKey === null) return;
+    if (hotkeyKey === null || rejected) return;
     const keys = hotkeyKey.split("\u0000");
     const doc = regionRef.current?.ownerDocument ?? document;
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -620,7 +709,28 @@ export function ToastViewport({
     doc.addEventListener("keydown", onKeyDown);
     return () => doc.removeEventListener("keydown", onKeyDown);
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- `sortedRoots` reads refs only
-  }, [hotkeyKey]);
+  }, [hotkeyKey, rejected]);
+
+  // --- The portal host (design 4.3) ------------------------------------------------------------
+
+  // The hydration render matches the server's inline region; every later render portals into
+  // `host`, whose place the library changes without React noticing.
+  const portalled = useSyncExternalStore(subscribeNothing, onClient, onServerOrHydrating);
+  const [host] = useState(createHost);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (host === null) return;
+    return () => host.remove();
+  }, [host]);
+
+  // Before the region effect below: a move hides the popover (removal steps), which that effect
+  // shows again in the same commit.
+  useLayoutEffect(() => {
+    if (host === null || !portalled) return;
+    const target = container ?? anchorRef.current;
+    if (target !== null && host.parentNode !== target) target.append(host);
+  });
 
   // --- After every commit: region, timers, queued announcements, orphan exits ----------------
 
@@ -750,7 +860,15 @@ export function ToastViewport({
 
   if (rejected) return null;
   const content = <ToastViewportContext value={context}>{region}</ToastViewportContext>;
-  return container === null ? content : createPortal(content, container);
+  if (!portalled || host === null) return content;
+  return (
+    <>
+      <div ref={anchorRef} style={ANCHOR_STYLE} />
+      {createPortal(content, host)}
+    </>
+  );
 }
+
+const ANCHOR_STYLE: CSSProperties = { display: "contents" };
 
 ToastViewport.displayName = "ToastViewport";

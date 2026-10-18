@@ -83,12 +83,16 @@ export interface ToastCloseDetails extends ActionDetails {
 export interface ToastPromiseOptions<T> {
   /** Shown at once, with `data-pending`; no timer until the promise settles. */
   readonly pending: ToastOptions;
-  /** Replaces the toast when the promise fulfils; omitted: the toast is dismissed. */
+  /**
+   * Replaces the toast when the promise fulfils; omitted: the toast is dismissed. A function that
+   * throws dismisses the toast, and the returned promise rejects with what it threw.
+   */
   readonly success?: ToastOptions | ((value: T) => ToastOptions) | undefined;
   /**
    * Replaces the toast when the promise rejects; the returned promise then resolves with
    * `undefined` (the toast is the handler). Omitted: the toast is dismissed and the returned
-   * promise rejects with the same reason.
+   * promise rejects with the same reason. A function that throws dismisses the toast, and the
+   * returned promise rejects with what it threw.
    */
   readonly error?: ToastOptions | ((reason: unknown) => ToastOptions) | undefined;
   readonly id?: string | undefined;
@@ -151,6 +155,11 @@ export interface ToastListener {
 export interface RetainedToast {
   readonly options: ToastOptions & { readonly id: string };
   readonly pending: boolean;
+  /**
+   * The text last announced for it (`null`: silenced), so the next Viewport does not announce
+   * it again; `undefined` when nothing was announced yet.
+   */
+  readonly announced?: string | null | undefined;
 }
 
 export interface ToastManagerInternals {
@@ -160,6 +169,8 @@ export interface ToastManagerInternals {
    * the second-Viewport case.
    */
   readonly subscribe: (listener: ToastListener) => (() => void) | null;
+  /** Whether a listener other than `listener` is subscribed (read during render). */
+  readonly isTaken: (listener: ToastListener) => boolean;
 }
 
 const internals = new WeakMap<ToastManager, ToastManagerInternals>();
@@ -272,17 +283,23 @@ export function createToastManager(): ToastManager {
     dispatch({ kind: "add", id, options: options.pending, pending: true });
     // The returned promise is built from the same `then`, so it settles in the same tick as the
     // toast's update and an awaiting action prop is pending exactly as long as the toast.
+    // A `success` / `error` function that throws dismisses the toast (it must not stay pending
+    // forever) and the returned promise rejects with what it threw: the operation's outcome is
+    // known, but its message is not, and the `error` message would misreport a fulfilment.
+    const settle = <V>(options: ToastOptions | ((value: V) => ToastOptions), value: V): void => {
+      let resolved: ToastOptions;
+      try {
+        resolved = resolveOptions(options, value);
+      } catch (thrown) {
+        dismiss(id);
+        throw thrown;
+      }
+      dispatch({ kind: "update", id, options: resolved, settle: true });
+    };
     return Promise.resolve(input).then(
       (value) => {
         if (success === undefined) dismiss(id);
-        else {
-          dispatch({
-            kind: "update",
-            id,
-            options: resolveOptions(success, value),
-            settle: true,
-          });
-        }
+        else settle(success, value);
         return value;
       },
       (reason: unknown) => {
@@ -290,7 +307,7 @@ export function createToastManager(): ToastManager {
           dismiss(id);
           throw reason;
         }
-        dispatch({ kind: "update", id, options: resolveOptions(error, reason), settle: true });
+        settle(error, reason);
         return undefined;
       },
     );
@@ -322,6 +339,7 @@ export function createToastManager(): ToastManager {
         listener = null;
       };
     },
+    isTaken: (candidate) => listener !== null && listener !== candidate,
   });
 
   return manager;

@@ -84,6 +84,9 @@ export function ToastRoot({
   const [suspended, setSuspendedState] = useState(false);
 
   const idRef = useLatest(id);
+  // The Root's announcement effect has run once: later Title / Description commits are reveals.
+  const announcedOnce = useRef(false);
+  const revealQueued = useRef(false);
 
   const setActionPending = useCallback(
     (token: object, pending: boolean) => {
@@ -121,6 +124,36 @@ export function ToastRoot({
 
   const pending = item.pending || actionPending;
   const priority = item.priority ?? "normal";
+
+  // Announce once the content has committed un-suspended (design 5): the Title and Description
+  // text exists now. The Viewport skips text it already announced for this toast and speaks the
+  // batch a microtask later.
+  const announceNow = (): void => {
+    if (item.ending || suspendedRef.current) return;
+    const resolver = item.announce ?? viewport.announcer();
+    let text: string | null;
+    if (resolver !== undefined) text = resolver(item);
+    else {
+      text = [titleRef.current?.textContent, descriptionRef.current?.textContent]
+        .map((t) => (t ?? "").trim())
+        .filter((t) => t !== "")
+        .join(" ");
+    }
+    viewport.announce(item.id, text, priority);
+  };
+  const announceRef = useLatest(announceNow);
+
+  // A Title or Description inside the consumer's own `<Suspense>` commits after the Root (the
+  // boundary's retry does not re-run the Root's effect). Read once the whole reveal committed,
+  // so a Title and a Description revealed together are announced as one text.
+  const contentCommitted = useCallback(() => {
+    if (!announcedOnce.current || revealQueued.current) return;
+    revealQueued.current = true;
+    queueMicrotask(() => {
+      revealQueued.current = false;
+      announceRef.current();
+    });
+  }, [announceRef]);
   const state = useMemo<ToastRootState>(
     () => ({ toast: item, pending, ending: item.ending, type: item.type, priority }),
     [item, pending, priority],
@@ -133,11 +166,22 @@ export function ToastRoot({
       state,
       registerTitle,
       registerDescription,
+      contentCommitted,
       setActionPending,
       setSuspended,
       close,
     }),
-    [item, ids, state, registerTitle, registerDescription, setActionPending, setSuspended, close],
+    [
+      item,
+      ids,
+      state,
+      registerTitle,
+      registerDescription,
+      contentCommitted,
+      setActionPending,
+      setSuspended,
+      close,
+    ],
   );
 
   const rootRef = useCallback(
@@ -152,29 +196,24 @@ export function ToastRoot({
     [viewport, id],
   );
 
-  // Announce once the content has committed un-suspended (design 5): the Title and Description
-  // text exists now. The Viewport skips text it already announced for this toast and speaks the
-  // batch a microtask later. A layout effect, so toasts announce in queue order (before the
-  // Viewport's own effect announces the queued ones).
+  // A layout effect, so toasts announce in queue order (before the Viewport's own effect
+  // announces the queued ones).
   useLayoutEffect(() => {
-    if (item.ending || suspendedRef.current) return;
-    const resolver = item.announce ?? viewport.announcer();
-    let text: string | null;
-    if (resolver !== undefined) text = resolver(item);
-    else {
-      text = [titleRef.current?.textContent, descriptionRef.current?.textContent]
-        .map((t) => (t ?? "").trim())
-        .filter((t) => t !== "")
-        .join(" ");
-    }
-    viewport.announce(item.id, text, priority);
-  }, [item, suspended, priority, viewport]);
+    announcedOnce.current = true;
+    announceRef.current();
+  }, [item, suspended, priority, announceRef]);
 
-  // Exit (design 10.2): keep the ending toast until its animations settle, then drop it.
+  // Exit (design 10.2): keep the ending toast until the animations the ending state started
+  // settle, then drop it. Animations that ran before (a progress bar, paused with the region or
+  // not) are not waited for: the Viewport recorded them just before marking the toast ending.
   useLayoutEffect(() => {
     if (!item.ending) return;
     const element = elementRef.current;
-    const animations = element === null ? [] : exitAnimations(element);
+    const baseline = viewport.exitBaseline(item.id);
+    const animations =
+      element === null
+        ? []
+        : exitAnimations(element).filter((animation) => !baseline?.has(animation));
     if (animations.length === 0) {
       viewport.drop(item.id);
       return;

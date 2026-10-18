@@ -70,3 +70,63 @@ Implemented from `design/components/toast.md` (accepted) and the conventions ame
 A Menu opened while an unrelated async action is pending does not open until that action
 settles (transition held), so a toast.promise from that menu is necessarily later. Not a Toast
 issue; it is the premise of the urgent queue.
+
+## Review fixes (memo/reviewer/toast.md), 2026-10-18
+
+- **H1, dismissals in order.** `apply` marks entries ending inside the loop: `dismiss()` closes
+  what is open at that point of the batch, `dismiss(id)` likewise; an add after it is untouched.
+  Side effects after the loop: `moveFocusOut` and the exit baselines only for ids that actually
+  leave (a `dismiss(id); toast({ id })` pair keeps its keyed Root), `closeAction` for every
+  dismissed entry (the replaced one included, `reason: "dismiss"`). The "ending entry replaced"
+  branch clears the id's timer (fresh duration), `lastAnnounced` (L7) and exit baseline.
+- **M1, exit hold.** Rule: wait only for animations that were not running just before the toast
+  was marked ending. The Viewport snapshots `root.getAnimations({ subtree: true })` (a style
+  flush) in `close` / `apply` before `write`; the Root's exit effect takes the snapshot
+  (`exitBaseline`, kept until drop or replacement so a StrictMode effect re-run sees it too) and filters `exitAnimations(element)` by it. Why a snapshot and not
+  `startTime` / `pending`: a progress bar paused under `[data-paused]` has `startTime === null`
+  exactly like a just-created animation, so the timeline cannot tell them apart; identity can.
+  A transition the ending style retargets is a new `CSSTransition` object, so it is waited for.
+  Cost: one `getAnimations` per close, in the closing handler.
+- **M2, no remount on the modal move.** `createPortal` remounts when its container changes
+  (`updatePortal` compares `containerInfo`), so "same element type" alone does not help. The
+  region now always portals into a library-created `host` (`div`, `display: contents`) that the
+  library moves with `append`: into the topmost modal, or back into an inline anchor
+  (`<div style="display: contents">`, rendered where the Viewport is). React never sees the move.
+  Hydration: `useSyncExternalStore(…, () => true, () => false)` renders the region inline for
+  the hydration render (matches the server HTML), then switches to the portal; the queue is
+  empty then (subscription is a passive effect), so that one remount loses nothing. The move
+  effect is declared before the region effect, which re-shows the popover the DOM move hid.
+  Test note: the jsdom popover shim keeps a popover open across a synchronous `append`; one row
+  stubs `append` to hide like a browser.
+- **M3, consumer `<Suspense>` inside the Root.** Title and Description call
+  `root.contentCommitted()` from a `[]` layout effect (mount, and re-show after a boundary hid
+  them). After the Root's first announcement effect has run, this queues one microtask that
+  re-runs the announcement (so a Title and Description revealed together announce one text).
+  Timer: **not** fixed. Nothing committed tells the library that a consumer boundary shows its
+  fallback: the Title inside it never mounts, which looks the same as a toast without a Title.
+  Detecting it needs a render-phase flag ("Title rendered but not committed"), which a discarded
+  render can leave set and freeze the toast forever. A clean option for the architect: a
+  `fallback` prop on `Toast.Root` rendered by the library's own guard boundary (the guard then
+  knows), replacing the consumer's own `<Suspense>`.
+- **M4, throwing `success` / `error`.** `settle` wraps `resolveOptions`: on a throw it
+  dismisses the toast and rethrows, so the returned promise rejects with what was thrown. Not the
+  `error` toast: the operation's outcome is known and an error message would misreport a
+  fulfilment; the bug reaches the awaiting action's boundary.
+- **L1.** `RetainedToast.announced` carries the last announced text; `restore` seeds
+  `lastAnnounced`, so a remounted Viewport does not repeat it.
+- **L4.** `matchesHotkey` requires every unlisted modifier to be up.
+- **L7.** See H1 (replaced branch clears `lastAnnounced`).
+- **L8 (partial).** `rejected` starts from `internals.isTaken(listener)` (read in render), so a
+  Viewport added while another holds the manager renders nothing from its first render; the
+  lifecycle and hotkey effects install no listeners while rejected. Two Viewports mounted in the
+  same commit still render the second region once (neither has subscribed yet), and the server
+  always renders it.
+- Not done: L2 (manager prop change), L3 (hover pause stuck when the region leaves under the
+  pointer; the modal move no longer remounts, but the DOM move still delivers no
+  `pointerleave`), L5 (queued toast dismissed renders once as ending), L6 (`blurred` initial
+  state: `document.hasFocus()` is false in an unfocused iframe (Storybook, sandboxes, vitest
+  browser mode) and in jsdom until something is focused, so seeding it would pause every timer
+  there until a click; the blur event is the reliable signal).
+- Flake: the browser exit row now uses a 5 s exit, asserts the held state, `finish()`es the
+  captured animations and asserts the drop. A new browser row covers M1 with a paused 5 s
+  progress bar.

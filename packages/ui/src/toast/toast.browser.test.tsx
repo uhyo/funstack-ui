@@ -278,7 +278,9 @@ describe("modal dialog (browser)", () => {
 
 describe("enter and exit (browser)", () => {
   it("animates the enter; holds the closed toast with data-ending until its animations settle", async () => {
-    cleanups.push(addStyle(STARTER_CSS));
+    // A long exit, so the held state is asserted without racing the clock; the test then
+    // finishes the exit itself.
+    cleanups.push(addStyle(STARTER_CSS + ".toast[data-ending] { transition-duration: 5s; }"));
     render(<Viewport />);
     const id = await call(() => manager({ title: "Saved", duration: null }));
     expect(root(id).getAnimations().length).toBeGreaterThan(0);
@@ -293,12 +295,48 @@ describe("enter and exit (browser)", () => {
     const element = root(id);
     expect(element).toHaveAttribute("data-ending", "");
     expect(element.inert).toBe(true);
-    expect(element.getAnimations().length).toBeGreaterThan(0);
+    const exits = element.getAnimations();
+    expect(exits.length).toBeGreaterThan(0);
     expect(isOpen(region())).toBe(true);
     await act(async () => {
-      await Promise.allSettled(element.getAnimations().map((a) => a.finished));
+      for (const animation of exits) animation.finish();
+      await Promise.allSettled(exits.map((a) => a.finished));
       await sleep(20);
     });
+    expect(queryRoot(id)).toBeNull();
+    expect(isOpen(region())).toBe(false);
+  });
+
+  it("does not wait for an animation that ran before the close (a progress bar)", async () => {
+    cleanups.push(
+      addStyle(
+        PLAIN_CSS +
+          `@keyframes toast-progress { from { scale: 1 1; } to { scale: 0 1; } }
+           .progress { height: 2px; background: black; transform-origin: left;
+                       animation: toast-progress 5s linear; }
+           .toasts[data-paused] .progress { animation-play-state: paused; }`,
+      ),
+    );
+    render(
+      <>
+        <Toast.Viewport manager={manager} className="toasts" data-testid="viewport">
+          {({ toasts }: ToastViewportState) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t} className="toast" data-testid={`toast-${t.id}`}>
+                <Toast.Title />
+                <div className="progress" />
+                <Toast.Close data-testid={`close-${t.id}`}>Close</Toast.Close>
+              </Toast.Root>
+            ))
+          }
+        </Toast.Viewport>
+      </>,
+    );
+    const id = await call(() => manager({ title: "Saved", duration: null }));
+    expect(root(id).getAnimations({ subtree: true }).length).toBeGreaterThan(0);
+    // The click rests the pointer over the region: the progress bar is paused too.
+    await user.click(screen.getByTestId(`close-${id}`));
+    await flush();
     expect(queryRoot(id)).toBeNull();
     expect(isOpen(region())).toBe(false);
   });

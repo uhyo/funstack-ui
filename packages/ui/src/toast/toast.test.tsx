@@ -13,6 +13,7 @@
 // In `toast.browser.test.tsx`: top layer and re-raise, the move into a real modal dialog, enter /
 // exit animations, `ariaNotify` existence, no view transition, real focus.
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, useState, useTransition } from "react";
 import type { ReactNode } from "react";
@@ -255,6 +256,69 @@ describe("Toast", () => {
       expect(region()).toHaveAttribute("data-empty", "");
     });
 
+    it("dismiss() then toast() in one tick shows the new toast (dismissals apply in order)", async () => {
+      const first = vi.fn();
+      const second = vi.fn();
+      render(<Harness manager={manager} />);
+      const a = await call(() => manager({ title: "A", closeAction: first }));
+      const b = await call(() => {
+        manager.dismiss();
+        return manager({ title: "Saved", closeAction: second });
+      });
+      await flush();
+      expect(queryRoot(a)).toBeNull();
+      expect(root(b)).toHaveTextContent("Saved");
+      expect(root(b)).not.toHaveAttribute("data-ending");
+      expect(first).toHaveBeenCalledTimes(1);
+      expect(first.mock.calls[0]![0]).toMatchObject({ id: a, reason: "dismiss" });
+      expect(second).not.toHaveBeenCalled();
+    });
+
+    it("dismiss(id) then toast({ id }) in one tick replaces the toast; the old one closes", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const first = vi.fn();
+      const second = vi.fn();
+      render(<Harness manager={manager} />);
+      await call(() => manager({ id: "sync", title: "Syncing", closeAction: first }));
+      await act(async () => {
+        vi.advanceTimersByTime(4000);
+      });
+      await call(() => {
+        manager.dismiss("sync");
+        manager({ id: "sync", title: "Synced", closeAction: second });
+      });
+      await flush();
+      expect(root("sync")).toHaveTextContent("Synced");
+      expect(root("sync")).not.toHaveAttribute("data-ending");
+      expect(first).toHaveBeenCalledTimes(1);
+      expect(first.mock.calls[0]![0]).toMatchObject({ id: "sync", reason: "dismiss" });
+      expect(second).not.toHaveBeenCalled();
+      // A fresh timer: not what was left of the replaced toast's.
+      await act(async () => {
+        vi.advanceTimersByTime(4999);
+      });
+      expect(queryRoot("sync")).not.toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      await flush();
+      expect(queryRoot("sync")).toBeNull();
+      expect(second.mock.calls[0]![0]).toMatchObject({ reason: "timeout" });
+    });
+
+    it("toast() then dismiss() in one tick closes the new toast too", async () => {
+      const closeAction = vi.fn();
+      render(<Harness manager={manager} />);
+      const id = await call(() => {
+        const added = manager({ title: "Gone", closeAction });
+        manager.dismiss();
+        return added;
+      });
+      await flush();
+      expect(queryRoot(id)).toBeNull();
+      expect(closeAction.mock.calls[0]![0]).toMatchObject({ id, reason: "dismiss" });
+    });
+
     it("renders `limit` toasts in chronological order and queues the rest in order", async () => {
       let last: ToastViewportState | undefined;
       render(
@@ -423,6 +487,56 @@ describe("Toast", () => {
       await expect(r2).resolves.toBe(1);
       await flush();
       expect(roots()).toHaveLength(0);
+    });
+
+    it("a throwing success function dismisses the toast; the returned promise rejects", async () => {
+      render(<Harness manager={manager} />);
+      const bug = new TypeError("r is undefined");
+      const d = deferred<undefined>();
+      let result!: Promise<unknown>;
+      await call(() => {
+        result = manager.promise(d.promise, {
+          id: "p",
+          pending: { title: "Saving" },
+          success: () => {
+            throw bug;
+          },
+          error: { title: "Failed" },
+        });
+      });
+      expectPending(root("p"));
+      const settled = result.then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+      await act(async () => d.resolve(undefined));
+      await flush();
+      expect(await settled).toBe(bug);
+      expect(queryRoot("p")).toBeNull();
+    });
+
+    it("a throwing error function dismisses the toast; the returned promise rejects", async () => {
+      render(<Harness manager={manager} />);
+      const bug = new TypeError("bad message");
+      const d = deferred();
+      let result!: Promise<unknown>;
+      await call(() => {
+        result = manager.promise(d.promise, {
+          id: "p",
+          pending: { title: "Saving" },
+          error: () => {
+            throw bug;
+          },
+        });
+      });
+      const settled = result.then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+      await act(async () => d.reject(new Error("network")));
+      await flush();
+      expect(await settled).toBe(bug);
+      expect(queryRoot("p")).toBeNull();
     });
 
     it("announces on settle with the new text and priority", async () => {
@@ -882,6 +996,24 @@ describe("Toast", () => {
     });
   });
 
+  describe("viewport remount", () => {
+    it("does not announce a restored toast again", async () => {
+      const { unmount } = render(<Harness manager={manager} />);
+      const id = await call(() => manager({ title: "Archived", duration: null }));
+      await flush();
+      expect(ariaNotify).toHaveBeenCalledTimes(1);
+      unmount();
+      render(<Harness manager={manager} />);
+      await flush();
+      expect(root(id)).toHaveTextContent("Archived");
+      expect(ariaNotify).toHaveBeenCalledTimes(1);
+      // A changed text is still announced.
+      await call(() => manager.update(id, { title: "Archived 2" }));
+      await flush();
+      expect(ariaNotify).toHaveBeenLastCalledWith("Archived 2", { priority: "normal" });
+    });
+  });
+
   describe("timers", () => {
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
@@ -1130,6 +1262,31 @@ describe("Toast", () => {
       expect(root(id)).toHaveFocus();
     });
 
+    it("ignores the hotkey with an unlisted modifier held (Ctrl+F8 is not F8)", async () => {
+      render(<Harness manager={manager} />);
+      const id = await call(() => manager({ title: "A", duration: null }));
+      for (const modifier of ["ctrlKey", "altKey", "shiftKey", "metaKey"]) {
+        const event = new KeyboardEvent("keydown", {
+          key: "F8",
+          code: "F8",
+          [modifier]: true,
+          cancelable: true,
+          bubbles: true,
+        });
+        act(() => {
+          document.body.dispatchEvent(event);
+        });
+        expect(event.defaultPrevented).toBe(false);
+        expect(root(id)).not.toHaveFocus();
+      }
+      act(() => {
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "F8", code: "F8", bubbles: true }),
+        );
+      });
+      expect(root(id)).toHaveFocus();
+    });
+
     it("ArrowDown / ArrowUp move between toasts without wrapping", async () => {
       const user = setupUser();
       render(<Harness manager={manager} />);
@@ -1246,6 +1403,43 @@ describe("Toast", () => {
     });
   });
 
+  describe("suspending content inside a consumer boundary", () => {
+    it("announces once the consumer's Suspense reveals the Title", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const { Suspender, resolve } = createSuspender();
+      render(
+        <Harness
+          manager={manager}
+          list={({ toasts }) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t} data-testid="root">
+                <Suspense fallback={<span>Loading…</span>}>
+                  <Toast.Title />
+                  <Toast.Description />
+                </Suspense>
+              </Toast.Root>
+            ))
+          }
+        />,
+      );
+      await call(() =>
+        manager({ title: <Suspender value="x" />, description: "joined", duration: null }),
+      );
+      await flush();
+      expect(screen.getByTestId("root")).toHaveTextContent("Loading…");
+      expect(ariaNotify).not.toHaveBeenCalled();
+      await act(async () => {
+        resolve("x", "Ada");
+        await vi.advanceTimersByTimeAsync(400);
+      });
+      await flush();
+      expect(screen.getByTestId("root")).toHaveTextContent("Ada");
+      // One announcement for the Title and Description revealed together.
+      expect(ariaNotify).toHaveBeenCalledTimes(1);
+      expect(ariaNotify).toHaveBeenCalledWith("Ada joined", { priority: "normal" });
+    });
+  });
+
   describe("announcements", () => {
     it("announces after the add commit, not synchronously, with Title and Description text", async () => {
       render(<Harness manager={manager} />);
@@ -1354,6 +1548,41 @@ describe("Toast", () => {
       const id = await call(() => manager({ title: "A" }));
       await call(() => manager.dismiss(id));
       expect(region().matches(":popover-open")).toBe(false);
+    });
+
+    it("waits only for animations the ending state started, not a running progress bar", async () => {
+      const timing = { getComputedTiming: () => ({ endTime: 5000 }) };
+      // A progress bar that never finishes while the test runs (paused under data-paused).
+      const progress = { finished: new Promise<void>(() => {}), effect: timing };
+      let finishExit!: () => void;
+      const exit = {
+        finished: new Promise<void>((resolve) => {
+          finishExit = resolve;
+        }),
+        effect: { getComputedTiming: () => ({ endTime: 200 }) },
+      };
+      let withExit = true;
+      vi.spyOn(Element.prototype, "getAnimations").mockImplementation(function (this: Element) {
+        if (!this.hasAttribute("role")) return [];
+        const list: unknown[] = [progress];
+        if (withExit && this.hasAttribute("data-ending")) list.push(exit);
+        return list as Animation[];
+      });
+      render(<Harness manager={manager} />);
+      const a = await call(() => manager({ title: "A", duration: null }));
+      await call(() => manager.dismiss(a));
+      expect(root(a)).toHaveAttribute("data-ending", "");
+      await act(async () => finishExit());
+      await flush();
+      expect(queryRoot(a)).toBeNull();
+
+      // No exit animation of its own: dropped at once, the progress bar notwithstanding.
+      withExit = false;
+      const b = await call(() => manager({ title: "B", duration: null }));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`close-${b}`));
+      });
+      expect(queryRoot(b)).toBeNull();
     });
 
     it("keeps ending toasts in position (exiting toasts stay in state.toasts)", async () => {
@@ -1547,6 +1776,29 @@ describe("Toast", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("another Toast.Viewport"));
     });
 
+    it("a second Viewport added later never renders its region", async () => {
+      const error = silenceErrors();
+      const seen: HTMLElement[] = [];
+      const { rerender } = render(<Toast.Viewport manager={manager} data-testid="one" />);
+      await flush();
+      rerender(
+        <>
+          <Toast.Viewport manager={manager} data-testid="one" />
+          <Toast.Viewport
+            manager={manager}
+            data-testid="two"
+            ref={(el) => {
+              if (el) seen.push(el);
+            }}
+          />
+        </>,
+      );
+      await flush();
+      expect(seen).toHaveLength(0);
+      expect(screen.queryByTestId("two")).toBeNull();
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("another Toast.Viewport"));
+    });
+
     it("buffers calls made before the Viewport mounts, rendered once under StrictMode", async () => {
       await act(async () => {
         manager({ title: "Early 1" });
@@ -1622,6 +1874,36 @@ describe("Toast", () => {
         '<section class="toasts" popover="manual" aria-label="Notifications (F8)" data-empty=""></section>',
       );
     });
+    it("hydrates the server's inline region, then portals it and renders toasts", async () => {
+      const app = (
+        <div data-testid="app">
+          <Toast.Viewport manager={manager} data-testid="viewport">
+            {({ toasts }) => toasts.map((t) => renderToast(t))}
+          </Toast.Viewport>
+        </div>
+      );
+      const container = document.createElement("div");
+      container.innerHTML = renderToString(app);
+      document.body.append(container);
+      const recoverable: unknown[] = [];
+      const error = vi.spyOn(console, "error");
+      let hydrated!: ReturnType<typeof hydrateRoot>;
+      await act(async () => {
+        hydrated = hydrateRoot(container, app, {
+          onRecoverableError: (e) => recoverable.push(e),
+        });
+      });
+      try {
+        const id = await call(() => manager({ title: "Hydrated", duration: null }));
+        expect(recoverable).toEqual([]);
+        expect(error).not.toHaveBeenCalled();
+        expect(root(id)).toHaveTextContent("Hydrated");
+        expect(screen.getByTestId("app").contains(region())).toBe(true);
+        expect(region().matches(":popover-open")).toBe(true);
+      } finally {
+        act(() => hydrated.unmount());
+      }
+    });
   });
 
   describe("modal registry", () => {
@@ -1646,7 +1928,6 @@ describe("Toast", () => {
       render(<Harness manager={manager} before={<WithDialog />} />);
       const id = await call(() => manager({ title: "A", duration: null }));
       expect(region().closest("dialog")).toBeNull();
-      const show = vi.spyOn(HTMLElement.prototype, "showPopover");
       await user.click(screen.getByTestId("open-dialog"));
       await tasks();
       await flush();
@@ -1654,15 +1935,97 @@ describe("Toast", () => {
       expect(dialog.matches(":modal")).toBe(true);
       expect(dialog.contains(region())).toBe(true);
       expect(region().matches(":popover-open")).toBe(true);
-      expect(show).toHaveBeenCalled();
       expect(root(id)).toHaveTextContent("A");
-      show.mockClear();
       await user.click(screen.getByTestId("close-dialog"));
       await tasks();
       await flush();
       expect(region().closest("dialog")).toBeNull();
       expect(region().matches(":popover-open")).toBe(true);
+    });
+
+    it("shows the region again after a move hid it (a removal hides a popover)", async () => {
+      const user = setupUser();
+      render(<Harness manager={manager} before={<WithDialog />} />);
+      await call(() => manager({ title: "A", duration: null }));
+      // The shim keeps a popover open across a synchronous move; a browser hides it.
+      const append = Element.prototype.append;
+      vi.spyOn(Element.prototype, "append").mockImplementation(function (
+        this: Element,
+        ...nodes: (Node | string)[]
+      ) {
+        for (const node of nodes) {
+          if (node instanceof HTMLElement) {
+            for (const popover of node.querySelectorAll<HTMLElement>("[popover]")) {
+              if (popover.matches(":popover-open")) popover.hidePopover();
+            }
+          }
+        }
+        append.apply(this, nodes);
+      });
+      const show = vi.spyOn(HTMLElement.prototype, "showPopover");
+      await user.click(screen.getByTestId("open-dialog"));
+      await tasks();
+      await flush();
+      expect(screen.getByTestId("dialog").contains(region())).toBe(true);
       expect(show).toHaveBeenCalled();
+      expect(region().matches(":popover-open")).toBe(true);
+    });
+
+    it("keeps the toasts' state across the move: an Undo in flight stays pending", async () => {
+      // The Undo opens a confirmation dialog with an urgent update while it is still pending (a
+      // transition update would wait for the Undo itself).
+      const d = deferred();
+      const closeAction = vi.fn();
+      function UrgentDialog() {
+        const [open, setOpen] = useState(false);
+        return (
+          <>
+            <button type="button" data-testid="urgent-open" onClick={() => setOpen(true)}>
+              Confirm
+            </button>
+            <Dialog.Root open={open} openChangeAction={setOpen}>
+              <Dialog.Popup data-testid="dialog">
+                <Dialog.Title>Confirm undo?</Dialog.Title>
+              </Dialog.Popup>
+            </Dialog.Root>
+          </>
+        );
+      }
+      render(<Harness manager={manager} before={<UrgentDialog />} />);
+      const id = await call(() =>
+        manager({
+          title: "Archived",
+          duration: 30,
+          action: { label: "Undo", action: () => d.promise },
+          closeAction,
+        }),
+      );
+      const element = root(id);
+      const action = screen.getByTestId(`action-${id}`);
+      await act(async () => {
+        fireEvent.click(action);
+      });
+      expectPending(action);
+      act(() => {
+        fireEvent.click(screen.getByTestId("urgent-open"));
+      });
+      await tasks();
+      await flush();
+      expect(screen.getByTestId("dialog").contains(region())).toBe(true);
+      // The same elements, still pending, so the timer stays paused.
+      expect(root(id)).toBe(element);
+      expect(screen.getByTestId(`action-${id}`)).toBe(action);
+      expectPending(action);
+      expectPending(element);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      expect(closeAction).not.toHaveBeenCalled();
+      await act(async () => d.resolve());
+      await flush();
+      expect(queryRoot(id)).toBeNull();
+      expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
 
     it("warns when the Viewport is rendered inside a Dialog", async () => {

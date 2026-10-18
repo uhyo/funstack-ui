@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -25,6 +26,9 @@ export interface ToastTitleProps extends Omit<
  */
 export function ToastTitle({ children, className, style, render, ...rest }: ToastTitleProps) {
   const root = useToastRootContext("Toast.Title");
+  // Mounted, or revealed by a Suspense boundary inside the Root: announce the text now present.
+  const { contentCommitted } = root;
+  useLayoutEffect(() => contentCommitted(), [contentCommitted]);
   return useRender<ComponentPropsWithRef<"div">, ToastRootState>({
     defaultElement: "div",
     render,

@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -32,6 +33,9 @@ export function ToastDescription({
 }: ToastDescriptionProps) {
   const root = useToastRootContext("Toast.Description");
   const content = children ?? root.toast.description;
+  // Mounted, or revealed by a Suspense boundary inside the Root: announce the text now present.
+  const { contentCommitted } = root;
+  useLayoutEffect(() => contentCommitted(), [contentCommitted]);
   const element = useRender<ComponentPropsWithRef<"p">, ToastRootState>({
     defaultElement: "p",
     render,
