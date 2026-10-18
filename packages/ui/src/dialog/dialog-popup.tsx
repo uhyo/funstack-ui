@@ -16,6 +16,7 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useContentFocusProbe } from "../internal/content-focus-probe.js";
+import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -649,7 +650,12 @@ export function DialogPopup({
   const state: DialogPopupState = { open: ctx.committed, modal };
   const visible = ctx.committed || exit.held;
 
-  const content = (s: DialogPopupState): ReactNode => {
+  // Not part of an enclosing Toolbar (the engine excludes `dialog`): parts inside the dialog must
+  // not see the Toolbar either.
+  const content = (s: DialogPopupState): ReactNode => (
+    <ToolbarContext value={null}>{contentOf(s)}</ToolbarContext>
+  );
+  const contentOf = (s: DialogPopupState): ReactNode => {
     if (!isLibrary) return resolveStateValue(children, s);
     if (keepMounted === true) {
       // The mode changes with committed state, inside the Root's transition (conventions 5.5);

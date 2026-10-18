@@ -13,7 +13,9 @@ import {
   expectPending,
   setupUser,
 } from "../__tests__/helpers.js";
+import { Dialog } from "../dialog/index.js";
 import { Menu } from "../menu/index.js";
+import { Popover } from "../popover/index.js";
 import { Toggle } from "../toggle/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
 import { Toolbar } from "./index.js";
@@ -347,14 +349,14 @@ describe("Toolbar", () => {
       expect(button("Three")).toHaveFocus();
     });
 
-    it("first entry skips an aria-disabled first item", () => {
+    it("first entry lands on an aria-disabled first item, as native focusgroup does", () => {
       render(
         <Toolbar.Root aria-label="T">
           <Toolbar.Button disabled>Dead</Toolbar.Button>
           <Toolbar.Button>Live</Toolbar.Button>
         </Toolbar.Root>,
       );
-      expect(tabStops()).toEqual([button("Live")]);
+      expect(tabStops()).toEqual([button("Dead")]);
     });
 
     it("a click (pointerdown) makes the item the stop", () => {
@@ -590,6 +592,8 @@ describe("Toolbar", () => {
       press(button("Insert"), "ArrowRight");
       await flush();
       expect(isOpen()).toBe(true);
+      // Opened with the first item focused (Enter would focus it too; the point is the arrow).
+      expect(screen.getByRole("menuitem", { name: "Image" })).toHaveFocus();
     });
 
     it("vertical RTL: ArrowLeft opens", async () => {
@@ -601,6 +605,7 @@ describe("Toolbar", () => {
       press(button("Insert"), "ArrowLeft");
       await flush();
       expect(isOpen()).toBe(true);
+      expect(screen.getByRole("menuitem", { name: "Image" })).toHaveFocus();
     });
 
     it("vertical: Enter still opens", async () => {
@@ -672,6 +677,80 @@ describe("Toolbar", () => {
       press(button("Insert"), "ArrowDown");
       await flush();
       expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
+    });
+  });
+
+  describe("popups inside a Toolbar reset its context (review finding 4)", () => {
+    it("Popover.Popup: a ToggleGroup runs its own engine, a Separator and a Menu.Trigger see no Toolbar", async () => {
+      render(
+        <Toolbar.Root aria-label="T" orientation="vertical">
+          <Toolbar.Button>Before</Toolbar.Button>
+          <Popover.Root defaultOpen>
+            <Popover.Trigger>More</Popover.Trigger>
+            <Popover.Popup data-testid="popover">
+              <ToggleGroup.Root aria-label="Inner" defaultValue={["b"]}>
+                <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+                <ToggleGroup.Item value="b">B</ToggleGroup.Item>
+              </ToggleGroup.Root>
+              <Toolbar.Separator data-testid="sep" />
+              <Menu.Root>
+                <Menu.Trigger>Inner menu</Menu.Trigger>
+                <Menu.Popup data-testid="inner-menu">
+                  <Menu.Item>First</Menu.Item>
+                </Menu.Popup>
+              </Menu.Root>
+            </Popover.Popup>
+          </Popover.Root>
+        </Toolbar.Root>,
+      );
+      await flush();
+      const group = screen.getByRole("group", { name: "Inner" });
+      // Its own orientation and engine: one Tab stop on the pressed Item.
+      expect(group).toHaveAttribute("data-orientation", "horizontal");
+      expect(button("B")).toHaveAttribute("tabindex", "0");
+      expect(button("A")).toHaveAttribute("tabindex", "-1");
+      // A plain separator (vertical), not perpendicular to the vertical toolbar.
+      expect(screen.getByTestId("sep")).toHaveAttribute("aria-orientation", "vertical");
+      // The Menu.Trigger opens on ArrowDown, not on the vertical toolbar's ArrowRight.
+      const trigger = button("Inner menu");
+      act(() => trigger.focus());
+      press(trigger, "ArrowRight");
+      await flush();
+      expect(screen.getByTestId("inner-menu").matches(":popover-open")).toBe(false);
+      press(trigger, "ArrowDown");
+      await flush();
+      expect(screen.getByTestId("inner-menu").matches(":popover-open")).toBe(true);
+      expect(screen.getByRole("menuitem", { name: "First" })).toHaveFocus();
+    });
+
+    it("Dialog.Popup and Menu.Popup reset it too", async () => {
+      render(
+        <Toolbar.Root aria-label="T" orientation="vertical">
+          <Dialog.Root defaultOpen>
+            <Dialog.Trigger>Open</Dialog.Trigger>
+            <Dialog.Popup aria-label="D">
+              <Toolbar.Separator data-testid="dialog-sep" />
+              <ToggleGroup.Root aria-label="In dialog">
+                <ToggleGroup.Item value="x">X</ToggleGroup.Item>
+              </ToggleGroup.Root>
+            </Dialog.Popup>
+          </Dialog.Root>
+          <Menu.Root defaultOpen>
+            <Menu.Trigger>Menu</Menu.Trigger>
+            <Menu.Popup>
+              <Toolbar.Separator data-testid="menu-sep" />
+              <Menu.Item>Item</Menu.Item>
+            </Menu.Popup>
+          </Menu.Root>
+        </Toolbar.Root>,
+      );
+      await flush();
+      expect(screen.getByTestId("dialog-sep")).toHaveAttribute("aria-orientation", "vertical");
+      expect(screen.getByTestId("menu-sep")).toHaveAttribute("aria-orientation", "vertical");
+      expect(screen.getByRole("group", { name: "In dialog" })).toHaveAttribute(
+        "data-orientation",
+        "horizontal",
+      );
     });
   });
 });

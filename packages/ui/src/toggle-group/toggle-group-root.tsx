@@ -50,7 +50,15 @@ export interface ToggleGroupRootState {
 
 interface ToggleGroupRootBaseProps extends Omit<
   ComponentPropsWithRef<"div">,
-  "role" | "onKeyDown" | "defaultValue" | "className" | "style" | "children"
+  | "role"
+  | "onKeyDown"
+  | "onFocus"
+  | "onBlur"
+  | "onPointerDown"
+  | "defaultValue"
+  | "className"
+  | "style"
+  | "children"
 > {
   /** Axis of the arrow keys and `data-orientation`. Default `"horizontal"`. Ignored inside a Toolbar (dev warning). */
   orientation?: ToggleGroupOrientation;
@@ -215,7 +223,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
     "ToggleGroup.Root: `loop` is ignored inside a Toolbar.Root; the Toolbar's `loop` applies.",
   );
   useDevWarning(
-    inToolbar && focusgroupProp !== undefined,
+    inToolbar && focusgroupProp === true,
     "ToggleGroup.Root: `experimental_focusgroup` is ignored inside a Toolbar.Root. A nested " +
       "focusgroup would split the Toolbar's single Tab stop; set the flag on the Toolbar.Root.",
   );

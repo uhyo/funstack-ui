@@ -361,6 +361,84 @@ describe("ToggleGroup", () => {
 
   describe("overlap (row 5)", () => {
     it.each([
+      ["while Italic is pending", false],
+      ["after Italic resolved", true],
+    ] as const)(
+      "Bold's save fails %s: Bold rolls back, Italic's pending press re-applies on the reverted base",
+      async (_label, italicFirst) => {
+        // Controlled "update on success": a failed save (caught by the consumer, so the group
+        // stays mounted) leaves the parent's value alone, which is the rejection's rollback.
+        const deferreds = [deferred(), deferred()];
+        let calls = 0;
+        render(
+          <Harness mode="controlled" action={() => deferreds[calls++]!.promise} catchErrors />,
+        );
+        const user = setupUser();
+        await user.click(item("bold"));
+        await user.click(item("italic"));
+        expect(item("bold")).toHaveAttribute("aria-pressed", "true");
+        expect(item("italic")).toHaveAttribute("aria-pressed", "true");
+
+        const settle = [
+          () => deferreds[0]!.reject(new Error("bold failed")),
+          () => deferreds[1]!.resolve(),
+        ];
+        for (const step of italicFirst ? [settle[1]!, settle[0]!] : settle) {
+          await act(async () => {
+            step();
+          });
+        }
+        expect(screen.getByTestId("error")).toHaveTextContent("bold failed");
+        expect(item("bold")).toHaveAttribute("aria-pressed", "false");
+        expect(item("italic")).toHaveAttribute("aria-pressed", "true");
+        expect(committedText()).toHaveTextContent("italic");
+        expectNotPending(root());
+      },
+    );
+
+    it("pending presses re-base on a committed value that changed under them", async () => {
+      // React keeps every optimistic update of an async action scope until the whole scope
+      // settles, so the rejection's rollback is only visible at the end (test above). The
+      // re-basing itself shows when the committed value changes while presses are pending: the
+      // patches re-apply on the new base, rather than a stale whole set replacing it.
+      const deferreds = [deferred(), deferred()];
+      let calls = 0;
+      function Parent() {
+        const [value, setValue] = useState<string[]>([]);
+        return (
+          <>
+            <button type="button" onClick={() => setValue(["underline"])}>
+              external
+            </button>
+            <ToggleGroup.Root
+              aria-label="x"
+              value={value}
+              valueChangeAction={() => deferreds[calls++]!.promise}
+            >
+              <ToggleGroup.Item value="bold">bold</ToggleGroup.Item>
+              <ToggleGroup.Item value="italic">italic</ToggleGroup.Item>
+              <ToggleGroup.Item value="underline">underline</ToggleGroup.Item>
+            </ToggleGroup.Root>
+          </>
+        );
+      }
+      render(<Parent />);
+      const user = setupUser();
+      await user.click(item("bold"));
+      await user.click(item("italic"));
+      await user.click(item("external"));
+      expect(item("underline")).toHaveAttribute("aria-pressed", "true");
+      expect(item("bold")).toHaveAttribute("aria-pressed", "true");
+      expect(item("italic")).toHaveAttribute("aria-pressed", "true");
+      await act(async () => {
+        deferreds[0]!.resolve();
+        deferreds[1]!.resolve();
+      });
+      expect(item("underline")).toHaveAttribute("aria-pressed", "true");
+      expect(item("bold")).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it.each([
       ["2 then 1", [1, 0]],
       ["1 then 2", [0, 1]],
     ] as const)("Bold then Italic resolved %s commits both", async (_label, order) => {

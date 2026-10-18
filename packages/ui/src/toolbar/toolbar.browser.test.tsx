@@ -7,6 +7,7 @@ import type { ViewTransitionClass } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsFocusgroup } from "../__tests__/engine.js";
+import { Menu } from "../menu/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
 import { Toolbar } from "./index.js";
 
@@ -103,6 +104,101 @@ describe.each([
     await user.keyboard("{ArrowRight}");
     await expect.poll(focused).toBe(button("Cut"));
   });
+
+  it("first entry lands on an aria-disabled first item (review finding 1)", async () => {
+    render(
+      <>
+        <button type="button">before</button>
+        <Toolbar.Root aria-label="T" experimental_focusgroup={flag}>
+          <Toolbar.Button disabled>Dead</Toolbar.Button>
+          <Toolbar.Button>Live</Toolbar.Button>
+        </Toolbar.Root>
+      </>,
+    );
+    await expect.poll(() => button("Live").getAttribute("tabindex")).toBe(native ? null : "-1");
+    button("before").focus();
+    await user.keyboard("{Tab}");
+    await expect.poll(focused).toBe(button("Dead"));
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(focused).toBe(button("Live"));
+  });
+
+  it("vertical with loop={false}: Up / Down move, the ends do not wrap, Left / Right do nothing", async () => {
+    render(
+      <>
+        <button type="button">before</button>
+        <Toolbar.Root
+          aria-label="Tools"
+          orientation="vertical"
+          loop={false}
+          experimental_focusgroup={flag}
+        >
+          <Toolbar.Button>Select</Toolbar.Button>
+          <Toolbar.Button>Draw</Toolbar.Button>
+          <Toolbar.Button>Erase</Toolbar.Button>
+        </Toolbar.Root>
+      </>,
+    );
+    if (flag) {
+      expect(screen.getByRole("toolbar")).toHaveAttribute("focusgroup", "toolbar block nowrap");
+    }
+    await expect.poll(() => button("Draw").getAttribute("tabindex")).toBe(native ? null : "-1");
+    button("before").focus();
+    await user.keyboard("{Tab}");
+    await expect.poll(focused).toBe(button("Select"));
+    await user.keyboard("{ArrowUp}"); // no wrap
+    expect(focused()).toBe(button("Select"));
+    await user.keyboard("{ArrowDown}");
+    await expect.poll(focused).toBe(button("Draw"));
+    await user.keyboard("{ArrowRight}"); // the other axis
+    expect(focused()).toBe(button("Draw"));
+    await user.keyboard("{End}");
+    await expect.poll(focused).toBe(button("Erase"));
+    await user.keyboard("{ArrowDown}"); // no wrap
+    expect(focused()).toBe(button("Erase"));
+    await user.keyboard("{Home}");
+    await expect.poll(focused).toBe(button("Select"));
+  });
+
+  it.each(["horizontal", "vertical"] as const)(
+    "%s: a Menu.Trigger opens on its perpendicular arrow with the first item focused; the toolbar arrows move on",
+    async (orientation) => {
+      render(
+        <Toolbar.Root aria-label="T" orientation={orientation} experimental_focusgroup={flag}>
+          <Toolbar.Button>Before</Toolbar.Button>
+          <Menu.Root>
+            <Menu.Trigger>Insert</Menu.Trigger>
+            <Menu.Popup data-testid="popup" side={orientation === "vertical" ? "right" : "bottom"}>
+              <Menu.Item>Image</Menu.Item>
+              <Menu.Item>Table</Menu.Item>
+            </Menu.Popup>
+          </Menu.Root>
+          <Toolbar.Button>After</Toolbar.Button>
+        </Toolbar.Root>,
+      );
+      const [next, open] =
+        orientation === "horizontal" ? ["ArrowRight", "ArrowDown"] : ["ArrowDown", "ArrowRight"];
+      const popup = screen.getByTestId("popup");
+      button("Insert").focus();
+      // The toolbar's own arrow moves past the trigger without opening the menu.
+      await user.keyboard(`{${next}}`);
+      await expect.poll(focused).toBe(button("After"));
+      expect(popup.matches(":popover-open")).toBe(false);
+
+      button("Insert").focus();
+      await user.keyboard(`{${open}}`);
+      await expect.poll(() => popup.matches(":popover-open")).toBe(true);
+      await expect.poll(focused).toBe(screen.getByRole("menuitem", { name: "Image" }));
+      // Inside the menu, the arrows are the menu's, not the toolbar's.
+      await user.keyboard("{ArrowDown}");
+      await expect.poll(focused).toBe(screen.getByRole("menuitem", { name: "Table" }));
+      await user.keyboard("{Escape}");
+      await expect.poll(() => popup.matches(":popover-open")).toBe(false);
+      await expect.poll(focused).toBe(button("Insert"));
+      await user.keyboard(`{${next}}`);
+      await expect.poll(focused).toBe(button("After"));
+    },
+  );
 });
 
 describe("Toolbar: native focusgroup detection", () => {

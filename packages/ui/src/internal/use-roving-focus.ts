@@ -152,18 +152,28 @@ interface Engine {
 function createEngine(): Engine {
   let current: HTMLElement | null = null;
   let latestOptions: RovingFocusOptions | null = null;
-  const managed = new Set<HTMLElement>();
+  /**
+   * Elements this engine wrote `tabindex` on, with the attribute value they had before the first
+   * write (`null`: none). Restored when the engine lets go of an element (native path, element
+   * left the container): React does not re-write a `tabIndex` prop it believes it rendered, so a
+   * `[tabindex="0"]` widget would otherwise become unreachable.
+   */
+  const managed = new Map<HTMLElement, string | null>();
+
+  const restore = (el: HTMLElement) => {
+    const original = managed.get(el);
+    managed.delete(el);
+    if (!el.isConnected || original === undefined) return;
+    if (original === null) el.removeAttribute("tabindex");
+    else el.setAttribute("tabindex", original);
+  };
 
   const active = (options: RovingFocusOptions | null): options is RovingFocusOptions =>
     options !== null && options.enabled !== false;
 
   /** Native path: give back every `tabindex` this engine wrote (a hydration render may have). */
-  const release = (root: HTMLElement) => {
-    for (const el of root.querySelectorAll<HTMLElement>("[tabindex]")) {
-      if (!managed.has(el)) continue;
-      managed.delete(el);
-      el.removeAttribute("tabindex");
-    }
+  const release = () => {
+    for (const el of [...managed.keys()]) restore(el);
     current = null;
   };
 
@@ -171,7 +181,7 @@ function createEngine(): Engine {
     const options = latestOptions;
     if (root === null || !active(options)) return;
     if (options.native) {
-      release(root);
+      release();
       return;
     }
     const items = itemsOf(root, managed);
@@ -184,17 +194,16 @@ function createEngine(): Engine {
       current = options.entry(items) ?? null;
     }
     for (const el of items) {
-      managed.add(el);
+      if (!managed.has(el)) managed.set(el, el.getAttribute("tabindex"));
       const want = el === current ? "0" : "-1";
       if (el.getAttribute("tabindex") !== want) el.setAttribute("tabindex", want);
     }
     // Elements written before that are no longer items: a stale `0` must not stay a Tab stop
     // (it would be one again when re-enabled); one that left the container gets its own back.
-    for (const el of managed) {
+    for (const el of [...managed.keys()]) {
       if (items.includes(el)) continue;
       if (!root.contains(el)) {
-        managed.delete(el);
-        if (el.isConnected) el.removeAttribute("tabindex");
+        restore(el);
       } else if (el.getAttribute("tabindex") !== "-1") {
         el.setAttribute("tabindex", "-1");
       }

@@ -163,3 +163,9 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   from it move to the next / previous item, Shift+Tab from a button leaves). Standalone group
   with `nomemory` + `focusgroupstart` re-enters on the pressed Item on both paths. Playwright
   refuses to click an `aria-disabled` button in every engine. WebKit (no click focus) only on CI.
+- Toolbar review follow-up (#66 fixes): the parity claim above was limited to the rows tested. Two
+  divergences were found by the reviewer: (1) first entry on an `aria-disabled` first item (native
+  enters it; JS skipped it) - fixed, JS now enters it too, browser row on both paths; (2) native
+  radios inside a toolbar keep their arrows under native focusgroup but not on the JS path - open,
+  #74. New rows on both paths: vertical `block nowrap`, Menu.Trigger in horizontal and vertical
+  toolbars.

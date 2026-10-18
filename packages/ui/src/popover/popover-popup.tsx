@@ -8,6 +8,7 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
+import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -154,7 +155,13 @@ export function PopoverPopup({
     } else {
       node = visible ? wrapContent(resolveStateValue(children, s)) : null;
     }
-    return <PopoverPopupContext value={s}>{node}</PopoverPopupContext>;
+    // Popup content is not part of an enclosing Toolbar's sequence (the engine excludes
+    // `[popover]`), so parts inside it must not see the Toolbar either.
+    return (
+      <PopoverPopupContext value={s}>
+        <ToolbarContext value={null}>{node}</ToolbarContext>
+      </PopoverPopupContext>
+    );
   };
 
   const libraryProps: ComponentPropsWithRef<"dialog"> & DataAttributes = {

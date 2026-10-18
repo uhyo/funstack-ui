@@ -10,6 +10,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import { mergeRefs } from "../internal/merge-props.js";
+import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
@@ -131,7 +132,12 @@ export function ComboboxPopup({
     } else {
       node = visible ? wrapContent(resolveStateValue(children, s)) : null;
     }
-    return <ComboboxPopupContext value={true}>{node}</ComboboxPopupContext>;
+    // Not part of an enclosing Toolbar (the engine excludes `[popover]`).
+    return (
+      <ComboboxPopupContext value={true}>
+        <ToolbarContext value={null}>{node}</ToolbarContext>
+      </ComboboxPopupContext>
+    );
   };
 
   const element = useRender<ComponentPropsWithRef<"div">, ComboboxPopupState>({

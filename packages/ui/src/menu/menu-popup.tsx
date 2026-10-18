@@ -13,6 +13,7 @@ import type {
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { mergeRefs } from "../internal/merge-props.js";
+import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
@@ -312,7 +313,12 @@ export function MenuPopup({
     } else {
       node = visible ? wrapContent(resolveStateValue(children, s)) : null;
     }
-    return <MenuListContext value={listContext}>{node}</MenuListContext>;
+    // Not part of an enclosing Toolbar: a Menu.Trigger or ToggleGroup in here sees no Toolbar.
+    return (
+      <MenuListContext value={listContext}>
+        <ToolbarContext value={null}>{node}</ToolbarContext>
+      </MenuListContext>
+    );
   };
 
   const element = useRender<ComponentPropsWithRef<"div">, MenuPopupState>({

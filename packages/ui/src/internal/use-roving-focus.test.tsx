@@ -224,6 +224,45 @@ describe("useRovingFocus", () => {
     expect(screen.getByText("b")).not.toHaveAttribute("tabindex");
   });
 
+  it("switching to native restores a tabindex the consumer rendered (review finding 2)", () => {
+    // The hydration render runs the JS path (server snapshot), then the native path takes over.
+    // React will not re-write `tabIndex={0}`, so the engine must put the original value back.
+    const items = (
+      <>
+        <button type="button">a</button>
+        <div role="spinbutton" aria-label="spin" tabIndex={0}>
+          spin
+        </div>
+      </>
+    );
+    const { rerender } = render(<Container>{items}</Container>);
+    expect(screen.getByRole("spinbutton")).toHaveAttribute("tabindex", "-1");
+    rerender(<Container options={{ native: true }}>{items}</Container>);
+    expect(screen.getByRole("spinbutton")).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText("a")).not.toHaveAttribute("tabindex");
+  });
+
+  it("an element moved out of the container gets its own tabindex back", async () => {
+    render(
+      <>
+        <Container>
+          <button type="button">a</button>
+          <div role="spinbutton" aria-label="spin" tabIndex={0}>
+            spin
+          </div>
+        </Container>
+        <div data-testid="outside" />
+      </>,
+    );
+    const spin = screen.getByRole("spinbutton");
+    expect(spin).toHaveAttribute("tabindex", "-1");
+    // A DOM move the container does not render (a portal library, a drag-and-drop list).
+    await act(async () => {
+      screen.getByTestId("outside").appendChild(spin);
+    });
+    expect(spin).toHaveAttribute("tabindex", "0");
+  });
+
   it("enabled: false writes nothing", () => {
     render(
       <Container options={{ enabled: false }}>

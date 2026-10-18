@@ -19,6 +19,7 @@ export interface ToolbarRootProps extends Omit<
   | "aria-orientation"
   | "onKeyDown"
   | "onFocus"
+  | "onBlur"
   | "onPointerDown"
   | "className"
   | "style"
@@ -40,9 +41,13 @@ export interface ToolbarRootProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, ToolbarRootState>;
 }
 
-/** First entry: the first item that is not `aria-disabled`, else the first item (APG). */
-function firstEnabled(items: readonly HTMLElement[]): HTMLElement | undefined {
-  return items.find((el) => el.getAttribute("aria-disabled") !== "true") ?? items[0];
+/**
+ * First entry: the first item. Natively `disabled` controls are not items; `aria-disabled` ones
+ * are, and are entered like any other, as Chromium's native `focusgroup` does (the APG allows
+ * focusable disabled items in a toolbar).
+ */
+function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
+  return items[0];
 }
 
 /** Engine capabilities never change while the page lives. */
@@ -78,7 +83,7 @@ export function ToolbarRoot({
     orientation,
     loop,
     native,
-    entry: firstEnabled,
+    entry: firstItem,
     memory: true,
   });
 
