@@ -52,7 +52,7 @@ hiding the stack.
 | 10 | Keyboard | `hotkey` (default `["F8"]`, `event.code` / modifier names, Radix's shape, but an unlisted modifier held rejects the match: Ctrl+F8 is not F8, review L4; `null` disables) focuses the newest toast; Tab moves through toasts and their buttons in DOM order; ArrowDown / ArrowUp move between toasts; Escape dismisses the toast that contains focus. Focus leaving a dismissed toast goes to the next toast, else back to the element focused before the region was entered. The region's name is `"Notifications (F8)"` by default (`aria-label` overrides). |
 | 11 | Stacking | `limit` (default 3) visible toasts; further toasts queue in order and show as earlier ones leave (never dropped). The DOM order is chronological; visual order is CSS. |
 | 12 | Animation | Enter with `@starting-style` (CSS), exit with `data-ending` on the Root held until the animations **the ending state started** finish (animations already running before the close, a paused progress bar, are snapshotted and not waited for; review M1; a plain layout effect, not `useExitAnimation`), no `<ViewTransition>` and **no `transition` prop on any part**: every Toast commit is on the urgent lane, where react-dom never starts a view transition (conventions 5.1, third no-`transition` category). |
-| 13 | Suspense guard | `Toast.Root` wraps its children in a `<Suspense>` whose fallback renders nothing visible: a toast whose content suspends shows an empty toast (consumers add their own skeleton boundary) instead of pulling the whole Viewport, which lives in an urgent commit, into the nearest consumer boundary. The toast's timer and announcement wait for the reveal, which commits while unrelated actions are pending (retry lane; probe). A consumer's own `<Suspense>` inside the Root catches first and is invisible to the guard: its reveal is announced (Title and Description report their commit, review M3) but the timer starts at mount; section 21 adds a `fallback` prop on the Root to close that gap (accepted 2026-10-18, implementation pending). The one deliberate exception to "the library never wraps children in `<Suspense>`" (conventions 6, feedback 6). |
+| 13 | Suspense guard | `Toast.Root` wraps its children in a `<Suspense>` whose fallback renders nothing visible: a toast whose content suspends shows an empty toast (consumers add their own skeleton boundary) instead of pulling the whole Viewport, which lives in an urgent commit, into the nearest consumer boundary. The toast's timer and announcement wait for the reveal, which commits while unrelated actions are pending (retry lane; probe). A consumer's own `<Suspense>` inside the Root catches first and is invisible to the guard: its reveal is announced (Title and Description report their commit, review M3) but the timer starts at mount; section 21's `fallback` prop on the Root closes that gap (accepted and implemented 2026-10-18, ada1cba). The one deliberate exception to "the library never wraps children in `<Suspense>`" (conventions 6, feedback 6). |
 | 14 | SSR and directives | Client-only behaviour: the Viewport server-renders the empty region (`popover` serialises; no hydration issue), on the client, `toast()` calls before the Viewport mounts are buffered; on the server (`typeof document === "undefined"`) a call is a **no-op with a dev warning, never buffered** (the module-level manager would otherwise hold a queue shared between requests). No JS-free mode (a toast cannot exist without JS). Every part file is `"use client"`; `toast.ts` (the manager) has no directive and no React import. |
 
 ---
@@ -317,9 +317,9 @@ What does not work is the **timer**: it starts at mount, while the skeleton show
 committed tells the library that a consumer boundary is showing its fallback (a Title that never
 mounted looks the same as a toast without one), and the alternative, a render-phase "Title
 rendered but not committed" flag, can be left set by a discarded render and freeze a toast
-forever. The docs say so next to the skeleton recipe; section 21 proposes a `fallback` prop on
-the Root so the skeleton can live in the library's own boundary, which does see it (GitHub issue
-#63; accepted 2026-10-18, implementation pending).
+forever. The docs say so next to the skeleton recipe; section 21's `fallback` prop on the Root lets
+the skeleton live in the library's own boundary, which does see it (GitHub issue #63; accepted
+and implemented 2026-10-18, ada1cba).
 
 The reveal is a Suspense retry, which commits while unrelated async actions are pending: verified
 on React 19.3.1 (`memo/architect/probes/toast-suspense-reveal.mjs`): a toast pushed urgently while
@@ -1129,7 +1129,7 @@ rule (no controlled state; the queue is not an `x` / `defaultX` triple), optimis
 | Timers | Default 5000; Viewport `duration`; per-toast `duration`; `null` persistent; action toasts persistent by default and timed with `duration`; starts only when visible (queued beyond `limit`) and un-suspended; `update` with a new `duration` restarts. |
 | Pausing | `pointerenter` / `pointerleave`, `focusin` / `focusout`, `visibilitychange` (hidden / visible), window `blur` / `focus` pause and resume with the remaining time; `data-paused` on the Viewport; a `pending` toast's timer alone is paused while its siblings run; the hover pause ends when the region empties under the pointer (#63 L3). |
 | Keyboard | F8 focuses the newest toast and `preventDefault()`s; does nothing with no toasts; `hotkey={null}` installs no listener; `["altKey", "KeyT"]`; ArrowDown / ArrowUp between Roots, no wrap; Escape dismisses the toast containing focus; focus goes to the next toast, else previous, else the element focused before F8 (and before a Tab-in, through `relatedTarget`), else body; Ctrl+F8 (an unlisted modifier) is ignored (review L4). |
-| Suspending content | A title that suspends: Root rendered with no `data-pending`, nothing announced, timer not started, the Viewport's other toasts unaffected and no consumer boundary above the Viewport shows its fallback; on reveal: announced, timer started. A consumer `<Suspense>` inside the Root shows its own fallback, and the toast is announced once that boundary reveals the Title (review M3; the timer is not gated by it, #63). |
+| Suspending content | A title that suspends: Root rendered with no `data-pending`, nothing announced, timer not started, the Viewport's other toasts unaffected and no consumer boundary above the Viewport shows its fallback; on reveal: announced, timer started. A consumer `<Suspense>` inside the Root shows its own fallback, and the toast is announced once that boundary reveals the Title (review M3; the timer is not gated by it, #63). `fallback` on the Root (section 21, #63): rendered while the content suspends, not pending, silent, no timer; reveal announces and starts the timer; an `update` that re-suspends shows it again and pauses the timer; a fallback Title names the toast on mount and gates nothing. |
 | Announcements | `document.ariaNotify` stubbed: called after the add commit (not synchronously in the click), with Title + Description text and `{ priority }`; `announce` option and prop override, `null` silences; two adds in one tick → one call with both texts and the higher priority; `update` with unchanged text → no call; dismissal → no call; absent `ariaNotify` → no throw. |
 | Exit | On close the Root stays with `data-ending` and `inert`; dropped in the same effect in jsdom (no animations); the region's `hidePopover` shim is called when the last item is dropped; `ending` items keep their position; an animation running before the close (a progress bar, `getAnimations` stubbed on the Root) is not waited for (review M1). |
 | Function props and `render` | `className` / `style` / `children` / `render` on Viewport, Root, Action, Close receive the documented state; `render={<article />}` keeps the handlers and forwards `ref`. |
@@ -1380,9 +1380,11 @@ leftovers are GitHub issue #63.
 
 ## 21. `fallback` on `Toast.Root` (review M3, the timer; issue #63): accepted
 
-Status: **accepted by the product owner on 2026-10-18** (note at the end of this section);
-**implementation pending**. Nothing above depends on it, and the design stands without it. It
-works out the developer's suggestion from `memo/developer/toast.md`. It amends conventions 6
+Status: **accepted by the product owner on 2026-10-18** (note at the end of this section) and
+**implemented the same day** (ada1cba: `toast-root.tsx`, three jsdom rows in `toast.test.tsx`,
+the docs props row and Suspense paragraph; developer notes in `memo/developer/toast.md`). The
+one finding from the implementation, the fallback Title's naming on an update, is folded into
+21.3. Nothing above depends on it, and the design stands without it. It works out the developer's suggestion from `memo/developer/toast.md`. It amends conventions 6
 ("no `fallback` props"), applied the same day: *`fallback` exists only where the library owns
 the boundary, which is Toast alone*, with the precedent risk named there (section 18 item 10).
 
@@ -1416,9 +1418,12 @@ export interface ToastRootProps … {
 </Toast.Root>
 ```
 
-Implementation: `<Suspense fallback={<SuspenseGuard>{fallback}</SuspenseGuard>}>`; the guard
-component keeps reporting its mount and unmount to the Root as today and renders `fallback`
-(default `null`). About five lines in `toast-root.tsx`.
+Implementation (as shipped): `<Suspense fallback={<SuspenseGuard>{fallback}</SuspenseGuard>}>`;
+the guard component keeps reporting its mount and unmount to the Root through `setSuspended`,
+so the timer and announcement gating is unchanged, and renders its children, the Root's
+`fallback` (default `null`). "Parts inside the fallback gate nothing" needed no code: a fallback
+Title's layout effect runs before the guard's (child first), so its `contentCommitted` microtask
+fires after the suspended flag is set and the announcement returns early.
 
 ### 21.3 Semantics
 
@@ -1476,9 +1481,12 @@ component keeps reporting its mount and unmount to the Root as today and renders
   library chose to own the boundary precisely so that the timer and announcement would be right.
 - **Built-in strings.** Unchanged: the fallback is the consumer's node; the library ships no
   skeleton and no text (conventions 11).
-- **Tests to add** (16.1 "Suspending content"): `fallback` rendered while the title suspends,
-  no `data-pending`, nothing announced, timer not started; on reveal, announced and timer
-  started; an `update` whose content suspends shows `fallback` again and pauses the timer. Docs
-  page: the prop row and the Suspense paragraph (which today says the timer starts at once).
+- **Tests** (jsdom, `toast.test.tsx` "fallback on Toast.Root"; no browser row, nothing needs a
+  real engine): `fallback` rendered while the title suspends, no `data-pending`, nothing
+  announced, timer not started, no consumer boundary above the Viewport shows its fallback; on
+  reveal, announced and timer started from the reveal; an `update` whose content suspends shows
+  `fallback` again and pauses the timer, and the toast keeps its old name; a Title inside the
+  fallback names the toast on mount and gates nothing. Docs page: the prop row and the Suspense
+  paragraph (which no longer says the timer starts at once).
 
-**Accepted by the product owner** (2026-10-18). Section 21 is accepted as proposed: `fallback?: ReactNode` on `Toast.Root`, with the narrow conventions 6 rule "`fallback` exists only where the library owns the boundary (Toast alone)". The architect amends conventions 6 (and the 4.1 `ending` wording); a developer implements it with the tests listed above. Closes the M3 timer item of #63.
+**Accepted by the product owner** (2026-10-18). Section 21 is accepted as proposed: `fallback?: ReactNode` on `Toast.Root`, with the narrow conventions 6 rule "`fallback` exists only where the library owns the boundary (Toast alone)". The architect amended conventions 6 (and the 4.1 `ending` wording); implemented in ada1cba with the tests listed above. Closes the M3 timer item of #63.
