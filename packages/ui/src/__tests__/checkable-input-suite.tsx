@@ -9,6 +9,8 @@ import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState }
 import type { ComponentPropsWithRef, ComponentType, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Field } from "../field/index.js";
+import { Form } from "../form/index.js";
 import type { SwitchCheckedChangeDetails, SwitchProps, SwitchState } from "../switch/switch.js";
 import {
   createSuspender,
@@ -1345,6 +1347,73 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       expect(ref.current?.tagName).toBe("INPUT");
       unmount();
       expect(ref.current).toBeNull();
+    });
+  });
+
+  // design/components/field-form.md 13.1, "Controls inside a Field".
+  describe(`${name} inside a Field.Root`, () => {
+    it("gets the Field's id, name, ARIA wiring, disabled and required; its own data-pending stays its own", async () => {
+      const own = deferred();
+      const submission = deferred();
+      render(
+        <Form.Root action={() => submission.promise}>
+          <Field.Root name="terms" required data-testid="root">
+            <Field.Label data-testid="label">Accept</Field.Label>
+            <Control checkedChangeAction={() => own.promise} data-testid="control" />
+            <Field.Description data-testid="desc">Read them first.</Field.Description>
+            <Field.Error data-testid="error" />
+          </Field.Root>
+          <Form.Submit>Save</Form.Submit>
+        </Form.Root>,
+      );
+      await act(async () => {});
+      const el = screen.getByTestId("control") as HTMLInputElement;
+      const label = screen.getByTestId("label");
+      expect(label).toHaveAttribute("for", el.id);
+      expect(el).toHaveAccessibleName("Accept");
+      expect(el).toHaveAttribute("name", "terms");
+      expect(el).toBeRequired();
+      expect(el).toHaveAttribute("aria-describedby", screen.getByTestId("desc").id);
+      expect(el).toHaveAttribute("aria-invalid", "false");
+
+      const user = setupUser();
+      // A submission attempt while unchecked: the Field shows the error, focuses the control.
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await act(async () => {});
+      expect(el).toHaveAttribute("aria-invalid", "true");
+      expect(el).toHaveAttribute("data-invalid", "");
+      expect(screen.getByTestId("error")).toBeInTheDocument();
+      expect(document.activeElement).toBe(el);
+
+      // Its own action: its own data-pending, not the Field's.
+      await user.click(el);
+      expectPending(el);
+      expectNotPending(screen.getByTestId("root"));
+      await act(async () => own.resolve());
+      expectNotPending(el);
+      expect(screen.queryByTestId("error")).toBeNull();
+
+      // The form's submission: the Field's data-pending, not the control's.
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expectPending(screen.getByTestId("root"));
+      expectNotPending(el);
+      await act(async () => submission.resolve());
+    });
+
+    it("Field disabled disables it; its own id is ignored with a warning", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      render(
+        <Field.Root name="n" disabled>
+          <Field.Label>N</Field.Label>
+          <Control id="mine" data-testid="control" />
+        </Field.Root>,
+      );
+      await act(async () => {});
+      const el = screen.getByTestId("control");
+      expect(el).toBeDisabled();
+      expect(el).toHaveAttribute("data-disabled", "");
+      expect(el.id).not.toBe("mine");
+      expect(error).toHaveBeenCalledWith(expect.stringContaining(`${name}: the \`id\` prop`));
     });
   });
 }

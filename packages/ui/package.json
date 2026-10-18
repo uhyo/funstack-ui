@@ -34,6 +34,8 @@
     "./checkbox-group": "./dist/checkbox-group/index.mjs",
     "./combobox": "./dist/combobox/index.mjs",
     "./dialog": "./dist/dialog/index.mjs",
+    "./field": "./dist/field/index.mjs",
+    "./form": "./dist/form/index.mjs",
     "./menu": "./dist/menu/index.mjs",
     "./popover": "./dist/popover/index.mjs",
     "./radio-group": "./dist/radio-group/index.mjs",

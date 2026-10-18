@@ -13,6 +13,7 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeSelectValue } from "../internal/use-native-select-value.js";
+import { fieldInputProps, useFieldControl, useMergedRef } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
 import type { SelectContextValue } from "./select-context.js";
@@ -87,13 +88,15 @@ export interface SelectRootProps extends Omit<
  * `value={optimistic}`: react-dom restores a controlled select to its props after every event,
  * and only the sync-lane optimistic value survives that restore.
  *
- * Owned keys (conventions 1.2): `value`, `disabled`, `data-pending`, `data-disabled`, `onChange`.
+ * Owned keys (conventions 1.2): `value`, `disabled`, `data-pending`, `data-disabled`, `onChange`;
+ * inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby`
+ * (token-merged) and `data-invalid`, and `disabled` / `name` / `required` default from the Field.
  */
 export function SelectRoot({
   value,
   defaultValue,
   valueChangeAction,
-  disabled = false,
+  disabled: disabledProp,
   className,
   style,
   children,
@@ -104,6 +107,18 @@ export function SelectRoot({
     "Select.Root",
     "select",
   );
+  // Inside a Field.Root (design/components/field-form.md 7.2) the Field owns the id and the ARIA
+  // wiring, and `name` / `required` / `disabled` default from it.
+  const field = useFieldControl({
+    labelable: true,
+    name: rest.name,
+    disabled: disabledProp,
+    required: rest.required,
+    id: rest.id,
+    component: "Select.Root",
+  });
+  const disabled = field.disabled;
+  const rootRef = useMergedRef<HTMLSelectElement>(libraryRef, field.ref);
 
   const { optimistic, pending, dispatch, latestInFlight, adopt } = useControllableAction<
     string,
@@ -160,6 +175,7 @@ export function SelectRoot({
     children,
     props: rest,
     libraryProps: {
+      ...fieldInputProps(field),
       value: optimistic,
       disabled,
       "data-pending": dataAttr(pending),
@@ -173,7 +189,7 @@ export function SelectRoot({
         dispatchChange(next, createActionDetails(event.nativeEvent, { reason: "activate" }));
       },
     },
-    ref: libraryRef,
+    ref: rootRef,
   });
 
   return <SelectContext value={context}>{element}</SelectContext>;

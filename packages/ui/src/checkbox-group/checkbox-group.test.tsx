@@ -25,6 +25,8 @@ import {
   setupUser,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { Field } from "../field/index.js";
+import { Form } from "../form/index.js";
 import { CheckboxGroup } from "./index.js";
 import type {
   CheckboxGroupItemState,
@@ -2696,5 +2698,60 @@ describe("CheckboxGroup", () => {
       await user.click(box("b"));
       expect(consoleError).not.toHaveBeenCalled();
     });
+  });
+});
+// design/components/field-form.md 13.1, "Controls inside a Field".
+describe("CheckboxGroup inside a Field.Root", () => {
+  it("is named by Field.Label (aria-labelledby), takes name / required (at least one) and the ARIA wiring; its own data-pending stays its own", async () => {
+    const own = deferred();
+    const submission = deferred();
+    render(
+      <Form.Root action={() => submission.promise}>
+        <Field.Root name="toppings" required data-testid="root">
+          <Field.Label data-testid="label">Toppings</Field.Label>
+          <CheckboxGroup.Root valueChangeAction={() => own.promise} data-testid="group">
+            <label>
+              <CheckboxGroup.Item value="a" /> A
+            </label>
+            <label>
+              <CheckboxGroup.Item value="b" /> B
+            </label>
+          </CheckboxGroup.Root>
+          <Field.Description data-testid="desc">Pick one.</Field.Description>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    const group = screen.getByTestId("group");
+    expect(screen.getByTestId("label")).not.toHaveAttribute("for");
+    expect(group).toHaveAttribute("aria-labelledby", screen.getByTestId("label").id);
+    expect(group).toHaveAccessibleName("Toppings");
+    expect(group).toHaveAttribute("aria-describedby", screen.getByTestId("desc").id);
+    expect(group).toHaveAttribute("aria-invalid", "false");
+    const boxes = screen.getAllByRole("checkbox");
+    for (const box of boxes) {
+      expect(box).toHaveAttribute("name", "toppings");
+      expect(box).toBeRequired();
+    }
+
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(group).toHaveAttribute("aria-invalid", "true");
+    expect(document.activeElement).toBe(boxes[0]);
+
+    await user.click(boxes[1]!);
+    expectPending(group);
+    expectNotPending(screen.getByTestId("root"));
+    await act(async () => own.resolve());
+    expect(screen.queryByTestId("error")).toBeNull();
+    for (const box of boxes) expect(box).not.toBeRequired();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expectPending(screen.getByTestId("root"));
+    expectNotPending(group);
+    await act(async () => submission.resolve());
   });
 });

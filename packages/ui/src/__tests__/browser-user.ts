@@ -18,6 +18,11 @@ export const user = {
     act(async () => {
       await userEvent.keyboard(text);
     }),
+  /** Real key presses into `element` (`userEvent.type`; focuses it first). */
+  type: (element: Element, text: string) =>
+    act(async () => {
+      await userEvent.type(element, text);
+    }),
   /** Selects the field's text and deletes it (`userEvent.clear`). */
   clear: (element: Element) =>
     act(async () => {

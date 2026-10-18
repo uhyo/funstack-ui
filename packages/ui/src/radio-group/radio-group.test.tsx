@@ -24,6 +24,8 @@ import {
   setupUser,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { Field } from "../field/index.js";
+import { Form } from "../form/index.js";
 import { RadioGroup } from "./index.js";
 import type {
   RadioGroupItemState,
@@ -1881,5 +1883,73 @@ describe("RadioGroup", () => {
       await user.click(radio("b"));
       expect(consoleError).not.toHaveBeenCalled();
     });
+  });
+});
+// design/components/field-form.md 13.1, "Controls inside a Field".
+describe("RadioGroup inside a Field.Root", () => {
+  it("is named by Field.Label (aria-labelledby), takes name / required / disabled and the ARIA wiring; its own data-pending stays its own", async () => {
+    const own = deferred();
+    const submission = deferred();
+    render(
+      <Form.Root action={() => submission.promise}>
+        <Field.Root name="plan" required data-testid="root">
+          <Field.Label data-testid="label">Plan</Field.Label>
+          <RadioGroup.Root valueChangeAction={() => own.promise} data-testid="group">
+            <label>
+              <RadioGroup.Item value="free" /> Free
+            </label>
+            <label>
+              <RadioGroup.Item value="pro" /> Pro
+            </label>
+          </RadioGroup.Root>
+          <Field.Description data-testid="desc">Later.</Field.Description>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    const group = screen.getByTestId("group");
+    expect(screen.getByTestId("label")).not.toHaveAttribute("for");
+    expect(group).toHaveAttribute("aria-labelledby", screen.getByTestId("label").id);
+    expect(group).toHaveAttribute("aria-describedby", screen.getByTestId("desc").id);
+    expect(group).toHaveAttribute("aria-invalid", "false");
+    expect(group).toHaveAttribute("aria-required", "true");
+    const radios = screen.getAllByRole("radio");
+    for (const radio of radios) {
+      expect(radio).toHaveAttribute("name", "plan");
+      expect(radio).toBeRequired();
+    }
+
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(group).toHaveAttribute("aria-invalid", "true");
+    expect(document.activeElement).toBe(radios[0]);
+
+    await user.click(radios[1]!);
+    expectPending(group);
+    expectNotPending(screen.getByTestId("root"));
+    await act(async () => own.resolve());
+    expect(screen.queryByTestId("error")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expectPending(screen.getByTestId("root"));
+    expectNotPending(group);
+    await act(async () => submission.resolve());
+  });
+
+  it("Field disabled disables the fieldset", async () => {
+    render(
+      <Field.Root name="plan" disabled>
+        <Field.Label>Plan</Field.Label>
+        <RadioGroup.Root data-testid="group">
+          <RadioGroup.Item value="a" aria-label="A" />
+        </RadioGroup.Root>
+      </Field.Root>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId("group")).toBeDisabled();
+    expect(screen.getByTestId("group")).toHaveAttribute("data-disabled", "");
   });
 });

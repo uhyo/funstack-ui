@@ -12,6 +12,7 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
+import { fieldInputProps, useFieldControl, useMergedRef } from "../internal/use-field-control.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 
@@ -20,7 +21,7 @@ export interface SwitchState {
   readonly checked: boolean;
   /** An action dispatched by this Switch is in flight (including the resulting render). */
   readonly pending: boolean;
-  /** The `disabled` prop. */
+  /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
 }
 
@@ -94,7 +95,9 @@ export interface SwitchProps extends Omit<
  *
  * Owned keys (a `render` element's value is overridden): `type`, `role`, `checked`,
  * `defaultChecked`, `aria-checked` (always removed), `disabled`, `data-checked`, `data-pending`,
- * `data-disabled`. Event handlers are merged rather than owned: a `render` element's own
+ * `data-disabled`; inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`,
+ * `aria-describedby` (token-merged) and `data-invalid`, and `disabled` / `name` / `required`
+ * default from the Field. Event handlers are merged rather than owned: a `render` element's own
  * `onChange` (or `onClick`) runs first, then the library's; an `onClick` that calls
  * `preventDefault()` cancels the change (nothing is dispatched).
  */
@@ -102,13 +105,25 @@ export function Switch({
   checked,
   defaultChecked,
   checkedChangeAction,
-  disabled = false,
+  disabled: disabledProp,
   transition,
   className,
   style,
   render,
   ...rest
 }: SwitchProps) {
+  // Inside a Field.Root (design/components/field-form.md 7.2) the Field owns the id and the ARIA
+  // wiring, and `name` / `required` / `disabled` default from it.
+  const field = useFieldControl({
+    labelable: true,
+    name: rest.name,
+    disabled: disabledProp,
+    required: rest.required,
+    id: rest.id,
+    component: "Switch",
+  });
+  const disabled = field.disabled;
+
   const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     boolean,
     SwitchCheckedChangeDetails
@@ -134,6 +149,8 @@ export function Switch({
 
   const state: SwitchState = { checked: optimistic, pending, disabled };
 
+  const ref = useMergedRef<HTMLInputElement>(inputRef, field.ref);
+
   const element = useRender<ComponentPropsWithRef<"input">, SwitchState>({
     defaultElement: "input",
     render,
@@ -141,11 +158,12 @@ export function Switch({
     className,
     style,
     children: undefined,
-    ref: inputRef,
+    ref,
     // Pass-through layer: a `render` element's own props win over these.
     props: rest,
     // Library-controlled layer (owned keys, conventions 1.2).
     libraryProps: {
+      ...fieldInputProps(field),
       type: "checkbox",
       role: "switch",
       // The DOM state is the optimistic state (conventions 3.2): react-dom restores a controlled

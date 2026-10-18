@@ -32,6 +32,8 @@ import {
   setupUser,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { Field } from "../field/index.js";
+import { Form } from "../form/index.js";
 import { Select } from "./index.js";
 import type {
   SelectOptionState,
@@ -1978,5 +1980,64 @@ describe("Select", () => {
       await user.selectOptions(screen.getByRole("combobox", { name: "Fruit" }), "b");
       expect(consoleError).not.toHaveBeenCalled();
     });
+  });
+});
+// design/components/field-form.md 13.1, "Controls inside a Field".
+describe("Select inside a Field.Root", () => {
+  it("gets the Field's id, name, required, disabled and ARIA wiring; its own data-pending stays its own", async () => {
+    const own = deferred();
+    const submission = deferred();
+    render(
+      <Form.Root action={() => submission.promise}>
+        <Field.Root name="fruit" required data-testid="root">
+          <Field.Label data-testid="label">Fruit</Field.Label>
+          <Select.Root defaultValue="" valueChangeAction={() => own.promise} data-testid="select">
+            <Select.Option value="">Choose…</Select.Option>
+            <Select.Option value="apple">Apple</Select.Option>
+          </Select.Root>
+          <Field.Description data-testid="desc">Any.</Field.Description>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    const select = screen.getByTestId("select") as HTMLSelectElement;
+    expect(screen.getByTestId("label")).toHaveAttribute("for", select.id);
+    expect(select).toHaveAccessibleName("Fruit");
+    expect(select).toHaveAttribute("name", "fruit");
+    expect(select).toBeRequired();
+    expect(select).toHaveAttribute("aria-describedby", screen.getByTestId("desc").id);
+    expect(select).toHaveAttribute("aria-invalid", "false");
+
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(select).toHaveAttribute("aria-invalid", "true");
+    expect(document.activeElement).toBe(select);
+
+    await user.selectOptions(select, "apple");
+    expectPending(select);
+    expectNotPending(screen.getByTestId("root"));
+    await act(async () => own.resolve());
+    expect(screen.queryByTestId("error")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expectPending(screen.getByTestId("root"));
+    expectNotPending(select);
+    await act(async () => submission.resolve());
+  });
+
+  it("Field disabled disables the select", async () => {
+    render(
+      <Field.Root name="fruit" disabled>
+        <Field.Label>Fruit</Field.Label>
+        <Select.Root data-testid="select">
+          <Select.Option value="a">A</Select.Option>
+        </Select.Root>
+      </Field.Root>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId("select")).toBeDisabled();
   });
 });
