@@ -139,3 +139,7 @@
 - Designs running in parallel: toggle-group.md (owns conventions.md), number-field.md, progress.md.
 - Polish done: #59 (32611fd, 8cbde22, fold 6f648e6), #63 (94fbcd4, fa2f399; L6/L8 left by decision), #57 (5fc2d4d), #64 (0228d8d). Master CI green.
 - Filed an issue for load-sensitive timing flakes (transition-boundary in Firefox, Menu exit in Chromium).
+
+## 2026-10-18 — usage limit hit mid-wave 6, resumed
+
+impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and design-numberfield were interrupted by the session limit; all four resumed via SendMessage after the reset.
