@@ -17,6 +17,7 @@ import type {
   FieldContextValue,
   FieldControlRegistration,
   FieldState,
+  FormFieldRegistration,
 } from "../internal/field-context.js";
 import { collectInvalid } from "../internal/focus-first-invalid.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -62,7 +63,9 @@ export interface FieldRootProps extends Omit<
    * A custom constraint, written into the control with `setCustomValidity`. Sync. Receives the
    * field's submitted value (`formData.get(name)` as a string, `""` when absent) and the whole
    * form's `FormData`, so a cross-field rule can read the other field. Runs at mount, on every
-   * `input` / `change` in the form, after a reset, and when this prop changes. Return a string
+   * `input` / `change` in the form (and a FUNSTACK control's value change), on blur, after a
+   * reset and on a submission attempt; a new function takes effect at the next of these, so
+   * derive the rule from its arguments rather than from outside state. Return a string
    * or strings for an error, `null` / `undefined` / `""` for none. Shown when the platform's
    * `:user-invalid` heuristic says so, like a native constraint. Not serialisable: a Field with
    * `validate` is rendered from a client component.
@@ -200,16 +203,27 @@ export function FieldRoot({
   const serverKey = serverMessages.join("\n");
   /** The user edited the control since the last settled submission. */
   const [dismissed, setDismissed] = useState(false);
-  /** The user changed the value while the submission was in flight (intercepted path). */
+  /**
+   * The errors shown now answer a value the user had already changed during their flight
+   * (intercepted path). Fixed from one settle to the next, so a hidden stale error stays hidden
+   * while the next submission is in flight (the `errors` prop still holds that result).
+   */
   const [suppressed, setSuppressed] = useState(false);
+  /** The user changed the value during the flight in progress: becomes `suppressed` at its settle. */
+  const [suppressNext, setSuppressNext] = useState(false);
   // The settle edge of the enclosing form, seen in the render that commits the result (the
   // action's result and `useFormStatus`'s NotPending land together), so the next submission's
   // errors are shown in that same commit, before the Form's settle effect focuses them.
   const [previousFormPending, setPreviousFormPending] = useState(formPending);
   if (previousFormPending !== formPending) {
     setPreviousFormPending(formPending);
-    if (formPending) setSuppressed(false);
-    else setDismissed(false);
+    if (formPending) {
+      setSuppressNext(false);
+    } else {
+      setDismissed(false);
+      setSuppressed(suppressNext);
+      setSuppressNext(false);
+    }
   }
   const serverShown = serverMessages.length > 0 && !dismissed && !suppressed;
 
@@ -225,12 +239,13 @@ export function FieldRoot({
 
   const latest = useLatest({ name, validate, serverMessages, serverShown, formPending, form });
 
+  /** Re-reads the slot and the mirror; returns the messages the Field shows for the control. */
   const refresh = useCallback(
-    (options: RefreshOptions = {}) => {
+    (options: RefreshOptions = {}): readonly string[] => {
       const registration = controlRef.current;
-      if (registration === null) return;
+      if (registration === null) return NONE;
       const el = validityElementOf(registration.element);
-      if (el === null) return;
+      if (el === null) return NONE;
       const { name, validate, serverMessages, serverShown, formPending, form } = latest.current;
 
       const owner = el.form;
@@ -270,18 +285,22 @@ export function FieldRoot({
       // flight, an error is about the value it sent; compare with what the field holds now.
       const submitted = formPending && name !== undefined ? (form?.submittedData() ?? null) : null;
       if (submitted !== null && name !== undefined) {
-        setSuppressed(
+        setSuppressNext(
           !arraysEqual(entryStrings(formData.getAll(name)), entryStrings(submitted.getAll(name))),
         );
       }
+      return showServer ? serverMessages : messages;
     },
     [latest],
   );
 
-  // The slot follows the server error and `validate` (and is written once the control is known).
+  // The slot follows the server error (and is written once the control is known). `validate` is
+  // read through `latest`, not a dependency: an inline function would otherwise re-run it (and
+  // build a `FormData`) on every render of the Field. A new function takes effect at the next
+  // read (an edit anywhere in the form, a blur, a reset, a submission attempt).
   useLayoutEffect(() => {
     refresh();
-  }, [refresh, control, serverShown, serverKey, validate]);
+  }, [refresh, control, serverShown, serverKey]);
 
   // Clear the slot when the control goes away (it may be reused outside the Field).
   useLayoutEffect(
@@ -309,8 +328,8 @@ export function FieldRoot({
       if (!supportsUserInvalid()) attempted.current = true;
       if (attempt && errorCount.current > 0) {
         event.preventDefault();
-        refresh();
-        collectInvalid(focusTargetOf(element));
+        const messages = refresh();
+        collectInvalid(focusTargetOf(element), messages.join(" "));
         return;
       }
       refresh();
@@ -348,7 +367,7 @@ export function FieldRoot({
   // A new submission sends the current values: nothing differs from it yet (a queued second
   // submit arrives while the status stays pending, so the pending edge alone would miss it).
   useFormOwnerEvent(ownerRef, "submit", () => {
-    setSuppressed(false);
+    setSuppressNext(false);
   });
   useFormOwnerEvent(ownerRef, "reset", (event) => {
     queueMicrotask(() => {
@@ -357,15 +376,36 @@ export function FieldRoot({
     });
   });
 
-  // Registration with the Form, for the first-error focus after a settle (design 3.5).
+  // Registration with the Form, for the first-error focus after a settle (design 3.5) and the
+  // refresh of the other Fields on a change no DOM event carried.
   const registerField = form?.registerField;
+  const formRegistration = useRef<FormFieldRegistration | null>(null);
   useLayoutEffect(() => {
     if (registerField === undefined) return;
-    return registerField({
+    const registration: FormFieldRegistration = {
       getFocusTarget: () => focusTargetOf(controlRef.current?.element ?? null),
       showsServerError: () => latest.current.serverShown,
-    });
-  }, [registerField, latest]);
+      serverMessages: () => latest.current.serverMessages,
+      refresh: () => {
+        refresh();
+      },
+    };
+    formRegistration.current = registration;
+    const unregister = registerField(registration);
+    return () => {
+      unregister();
+      if (formRegistration.current === registration) formRegistration.current = null;
+    };
+  }, [registerField, latest, refresh]);
+
+  const notifyChange = useCallback(
+    (edit: boolean) => {
+      if (edit) setDismissed(true);
+      refresh(edit ? { dismiss: true } : {});
+      latest.current.form?.refreshFields(formRegistration.current);
+    },
+    [refresh, latest],
+  );
 
   // Development: a Field around something that is not a form control (Toggle, Menu, ...).
   useEffect(() => {
@@ -405,8 +445,19 @@ export function FieldRoot({
       labelable,
       registerControl,
       registerError,
+      notifyChange,
     }),
-    [ids, name, disabled, required, memoState, labelable, registerControl, registerError],
+    [
+      ids,
+      name,
+      disabled,
+      required,
+      memoState,
+      labelable,
+      registerControl,
+      registerError,
+      notifyChange,
+    ],
   );
 
   const element$ = useRender<ComponentPropsWithRef<"div">, FieldState>({

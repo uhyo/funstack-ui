@@ -89,3 +89,36 @@ focus-first-invalid,form-status-watcher}`. Docs page `/components/field`, playgr
   the CDP row (`describe.runIf(chromium)`, a test-tool limit). Watch the first WebKit CI run:
   the collector focus after a real click, `:user-invalid` after `userEvent.clear`, the
   `field-sizing` row (Safari 26.2+ supports it), the bubble-dismiss typing.
+
+## Review fixes (memo/reviewer/field-form.md, 2026-10-18)
+
+- **H1, `notifyChange`.** `FieldContextValue.notifyChange(edit)` plus `useFieldValueChange(value,
+  takeEdit?)` (use-field-control.ts): a layout effect that tells the Field after any commit in
+  which the control's optimistic value changed (not at mount). The Field refreshes (with dismiss
+  when `edit`) and asks the Form to refresh its other Fields (`FormContext.refreshFields`; a plain
+  `<form>` without `Form.Root` gets no cross-field refresh for a change no DOM event carried).
+  Combobox passes `edit = true` for changes its own `dispatchValue` caused (a ref set when the
+  dispatched value differs from the optimistic one). Checkbox, Switch, RadioGroup, Select pass
+  nothing (their native `input` / `change` already dismiss); for them it covers controlled
+  changes from outside (tested with a controlled Checkbox) and rollbacks. CheckboxGroup keys it
+  on the sorted optimistic set plus the derived `required`.
+- **CheckboxGroup Parent / derived `required` was not a reproducible gap in jsdom:** user-event
+  wraps each dispatched event in `act`, so React has flushed the click's optimistic render before
+  `input` / `change` fire. In browsers React handles a checkbox's change in `click`, which also
+  precedes `input` / `change`. The notify is kept as the defensive path.
+- **M1.** `suppressed` is frozen between settles; `suppressNext` is written by `refresh` during
+  the flight, reset on `submit` and at the `false → true` edge, promoted at `true → false`.
+- **M2.** `announce(el, message)` in focus-first-invalid.ts (`el.ariaNotify`, feature-checked).
+  The collector batch records `moved` / `announced` so later microtasks of the same batch neither
+  announce after a focus move nor announce twice. Form settle: announces the Field's server
+  messages when the target is already `activeElement`.
+- **L1.** CheckboxGroup: `aria-invalid` moved from the fieldset to every Item (owned there inside
+  a Field); the fieldset keeps `data-invalid` / `aria-describedby`. Items need it explicitly
+  anyway: the slot's `customError` on the first item would otherwise be exposed as invalid by
+  Chromium too early (design 2.3). RadioGroup keeps it on `radiogroup` (supported).
+- **L4.** `validate` read through `latest`; the slot effect is keyed on control / server state
+  only. Behaviour change: a new `validate` function takes effect at the next read (edit anywhere
+  in the form, blur, reset, attempt), not at the render. Design 2.1 / the prop doc said "when the
+  prop changes"; docs and JSDoc updated, field.test row adjusted. Architect should confirm.
+- L3: `defaultPrevented` → `submission.current = null` and return (React's own action plugin
+  also skips a prevented submit).

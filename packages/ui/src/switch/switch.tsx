@@ -12,7 +12,12 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { fieldInputProps, useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import {
+  fieldInputProps,
+  useFieldControl,
+  useFieldValueChange,
+  useMergedRef,
+} from "../internal/use-field-control.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 
@@ -135,6 +140,9 @@ export function Switch({
     transitionTypes: (next) => transitionTypes("switch", next ? "on" : "off"),
     warn: { component: "Switch", prop: "checked" },
   });
+  // Inside a Field: a value React writes with no event (a rejected action rolling back, a
+  // controlled change) re-reads validity and `validate` after the commit.
+  useFieldValueChange(optimistic);
 
   const inputRef = useNativeChecked({
     type: "checkbox",

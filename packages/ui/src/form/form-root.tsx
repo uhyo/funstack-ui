@@ -4,6 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, FormEvent, ReactNode } from 
 import { dataAttr } from "../internal/data-attr.js";
 import { FormContext } from "../internal/field-context.js";
 import type { FormContextValue, FormFieldRegistration } from "../internal/field-context.js";
+import { announce } from "../internal/focus-first-invalid.js";
 import { FormStatusWatcher } from "../internal/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
@@ -118,6 +119,12 @@ export function FormRoot({
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (typeof action !== "function") return; // a navigating form: the browser's
+    // A `render` element's own `onSubmit` (merged, it runs first) vetoed the submission
+    // (conventions: a `preventDefault()` in the consumer's handler cancels the library's work).
+    if (event.defaultPrevented) {
+      submission.current = null;
+      return;
+    }
     const native = event.nativeEvent as SubmitEvent;
     const submitter = native.submitter;
     // A per-button action: React's own path (and its automatic reset).
@@ -147,10 +154,20 @@ export function FormRoot({
     if (form === null) return;
     const shown = [...fields.current]
       .filter((field) => field.showsServerError())
-      .map((field) => field.getFocusTarget())
-      .filter((target): target is HTMLElement => target !== null && target.isConnected);
+      .map((field) => ({ field, target: field.getFocusTarget() }))
+      .filter(
+        (entry): entry is { field: FormFieldRegistration; target: HTMLElement } =>
+          entry.target !== null && entry.target.isConnected,
+      );
     if (shown.length > 0) {
-      sortByDocumentOrder(shown, (target) => target)[0]!.focus();
+      const first = sortByDocumentOrder(shown, (entry) => entry.target)[0]!;
+      // Focus already there (the user pressed Enter in that field): `focus()` does nothing and
+      // nothing reads the new description, so the message is announced instead (design 5.3).
+      if (first.target.ownerDocument.activeElement === first.target) {
+        announce(first.target, first.field.serverMessages().join(" "));
+      } else {
+        first.target.focus();
+      }
       return;
     }
     const { errors, autoReset } = latest.current;
@@ -162,9 +179,13 @@ export function FormRoot({
     return current?.intercepted === true ? current.formData : null;
   }, []);
 
+  const refreshFields = useCallback((source: FormFieldRegistration | null) => {
+    for (const field of fields.current) if (field !== source) field.refresh();
+  }, []);
+
   const context = useMemo<FormContextValue>(
-    () => ({ errors, registerField, submittedData }),
-    [errors, registerField, submittedData],
+    () => ({ errors, registerField, submittedData, refreshFields }),
+    [errors, registerField, submittedData, refreshFields],
   );
 
   const state: FormRootState = { pending };

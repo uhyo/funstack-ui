@@ -2729,17 +2729,21 @@ describe("CheckboxGroup inside a Field.Root", () => {
     expect(group).toHaveAttribute("aria-labelledby", screen.getByTestId("label").id);
     expect(group).toHaveAccessibleName("Toppings");
     expect(group).toHaveAttribute("aria-describedby", screen.getByTestId("desc").id);
-    expect(group).toHaveAttribute("aria-invalid", "false");
+    // ARIA 1.2: `aria-invalid` is not supported on role `group`; the Items carry it (review L1).
+    expect(group).not.toHaveAttribute("aria-invalid");
     const boxes = screen.getAllByRole("checkbox");
     for (const box of boxes) {
       expect(box).toHaveAttribute("name", "toppings");
       expect(box).toBeRequired();
+      expect(box).toHaveAttribute("aria-invalid", "false");
     }
 
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Save" }));
     await act(async () => {});
-    expect(group).toHaveAttribute("aria-invalid", "true");
+    expect(group).not.toHaveAttribute("aria-invalid");
+    expect(group).toHaveAttribute("data-invalid");
+    for (const box of boxes) expect(box).toHaveAttribute("aria-invalid", "true");
     expect(document.activeElement).toBe(boxes[0]);
 
     await user.click(boxes[1]!);
@@ -2753,5 +2757,76 @@ describe("CheckboxGroup inside a Field.Root", () => {
     expectPending(screen.getByTestId("root"));
     expectNotPending(group);
     await act(async () => submission.resolve());
+  });
+
+  // Review H1 (the same gap in CheckboxGroup) and L2.
+  it("focuses the first item, not the Parent; a Parent click re-reads validate after the commit", async () => {
+    const action = vi.fn();
+    render(
+      <Form.Root action={action}>
+        <Field.Root
+          name="toppings"
+          validate={(_value, formData) =>
+            formData.getAll("toppings").length < 2 ? "Pick two." : null
+          }
+        >
+          <Field.Label>Toppings</Field.Label>
+          <CheckboxGroup.Root data-testid="group">
+            <CheckboxGroup.Parent values={["a", "b"]} aria-label="All" />
+            <CheckboxGroup.Item value="a" aria-label="A" />
+            <CheckboxGroup.Item value="b" aria-label="B" />
+          </CheckboxGroup.Root>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(action).not.toHaveBeenCalled();
+    expect(screen.getByTestId("error")).toHaveTextContent("Pick two.");
+    expect(document.activeElement).toBe(screen.getByRole("checkbox", { name: "A" }));
+
+    // The Parent checks both Items; their `checked` is written by React after the Parent's own
+    // `change`, and the Field re-reads it in that commit (no blur needed).
+    await user.click(screen.getByRole("checkbox", { name: "All" }));
+    expect(screen.getByRole("checkbox", { name: "B" })).toBeChecked();
+    expect(screen.queryByTestId("error")).toBeNull();
+    expect(
+      (screen.getByRole("checkbox", { name: "A" }) as HTMLInputElement).validationMessage,
+    ).toBe("");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it("required: checking a later Item clears the error in the same commit", async () => {
+    render(
+      <Form.Root action={() => {}}>
+        <Field.Root name="toppings" required>
+          <Field.Label>Toppings</Field.Label>
+          <CheckboxGroup.Root>
+            <CheckboxGroup.Item value="a" aria-label="A" />
+            <CheckboxGroup.Item value="b" aria-label="B" />
+          </CheckboxGroup.Root>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(screen.getByTestId("error")).toBeInTheDocument();
+    // "B" is checked by the click; "A" (where validity is read) loses `required` only when React
+    // re-renders the group.
+    await user.click(screen.getByRole("checkbox", { name: "B" }));
+    expect(screen.queryByTestId("error")).toBeNull();
+    for (const box of screen.getAllByRole("checkbox")) {
+      expect(box).toHaveAttribute("aria-invalid", "false");
+    }
   });
 });

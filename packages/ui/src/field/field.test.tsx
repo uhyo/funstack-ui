@@ -410,7 +410,7 @@ describe("Field: validate", () => {
     expect(confirm.validity.customError).toBe(true);
   });
 
-  it("re-runs after a reset and when the prop changes; null clears it", async () => {
+  it("re-runs after a reset and, after the prop changes, at the next read (blur); null clears it", async () => {
     function Harness() {
       const [banned, setBanned] = useState("x");
       return (
@@ -431,6 +431,10 @@ describe("Field: validate", () => {
     expect(c.validationMessage).toBe("Banned.");
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Change" }));
+    // Read through a latest ref (review L4): a new function is not re-run by the render alone.
+    expect(c.validity.customError).toBe(true);
+    await user.click(c);
+    await user.tab();
     expect(c.validity.customError).toBe(false);
     await user.clear(c);
     await user.type(c, "y");
@@ -457,6 +461,34 @@ describe("Field: validate", () => {
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(screen.getByTestId("error")).toHaveTextContent("Too short. Needs a digit.");
+  });
+
+  it("re-runs when a FUNSTACK control's value changes with no DOM event (controlled from outside)", async () => {
+    function Harness() {
+      const [accepted, setAccepted] = useState(false);
+      return (
+        <TestForm>
+          <Field.Root
+            name="terms"
+            validate={(value) => (value === "" ? "Accept the terms." : null)}
+          >
+            <Field.Label>Terms</Field.Label>
+            <Checkbox checked={accepted} data-testid="c" />
+          </Field.Root>
+          <button type="button" onClick={() => setAccepted(true)}>
+            Accept all
+          </button>
+        </TestForm>
+      );
+    }
+    render(<Harness />);
+    await flush();
+    const c = screen.getByTestId("c") as HTMLInputElement;
+    expect(c.validationMessage).toBe("Accept the terms.");
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Accept all" }));
+    expect(c.checked).toBe(true);
+    expect(c.validationMessage).toBe("");
   });
 });
 

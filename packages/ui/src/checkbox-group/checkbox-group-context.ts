@@ -11,6 +11,8 @@ export interface CheckboxGroupContextValue {
   /** The `name` shared by every Item of the group (prop or `useId()`). */
   readonly name: string;
   readonly form: string | undefined;
+  /** Inside a `Field.Root`: the Field's `aria-invalid`, rendered on every Item. Else `undefined`. */
+  readonly fieldInvalid: "true" | "false" | undefined;
   /**
    * The Root's `required` while no value of an enabled Item is checked (design section 7):
    * rendered as native `required` on every Item. Before the Items have registered (server render,

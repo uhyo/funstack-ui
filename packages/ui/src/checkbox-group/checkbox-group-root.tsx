@@ -21,7 +21,11 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import {
+  useFieldControl,
+  useFieldValueChange,
+  useMergedRef,
+} from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
 import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
@@ -444,14 +448,24 @@ export function CheckboxGroupRoot({
   }, []);
   const rootRef = useMergedRef<HTMLFieldSetElement>(libraryRef, field.ref);
 
+  const itemsRequired =
+    required &&
+    (items === null ? optimistic.size === 0 : ![...optimistic].some((v) => items.get(v) === true));
+  // Inside a Field: the Items' `checked` and derived `required` are written by React after the
+  // click's `change` (a Parent checks Items with no event of their own), so the Field re-reads
+  // validity and `validate` after the commit (design/components/field-form.md 7.2).
+  useFieldValueChange(`${[...optimistic].sort().join("\u0000")}|${String(itemsRequired)}`);
+
+  // `aria-invalid` is not supported on role `group` (ARIA 1.2 made it widget-specific): inside a
+  // Field it goes on every Item (a `checkbox`) instead; the fieldset keeps `data-invalid` and
+  // `aria-describedby`, read when focus enters the group.
+  const { "aria-invalid": fieldInvalid, ...groupAttributes } = field.attributes;
+
   const context: CheckboxGroupContextValue = {
     name,
     form,
-    required:
-      required &&
-      (items === null
-        ? optimistic.size === 0
-        : ![...optimistic].some((v) => items.get(v) === true)),
+    fieldInvalid,
+    required: itemsRequired,
     disabledItems,
     registerItem,
     optimistic,
@@ -494,7 +508,7 @@ export function CheckboxGroupRoot({
     children,
     props: rest,
     libraryProps: {
-      ...field.attributes,
+      ...groupAttributes,
       disabled,
       form,
       "data-pending": dataAttr(pending),

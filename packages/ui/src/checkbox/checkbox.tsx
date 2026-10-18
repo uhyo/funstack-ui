@@ -12,7 +12,12 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { fieldInputProps, useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import {
+  fieldInputProps,
+  useFieldControl,
+  useFieldValueChange,
+  useMergedRef,
+} from "../internal/use-field-control.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 
@@ -149,6 +154,9 @@ export function Checkbox({
     transitionTypes: (next) => transitionTypes("checkbox", next ? "check" : "uncheck"),
     warn: { component: "Checkbox", prop: "checked" },
   });
+  // Inside a Field: a value React writes with no event (a rejected action rolling back, a
+  // controlled change) re-reads validity and `validate` after the commit.
+  useFieldValueChange(optimistic);
 
   // Suspended while pending (conventions 4.1): the browser clears the property on the click, and
   // the parent may not have recomputed yet. Restored on settle if the parent still says mixed.

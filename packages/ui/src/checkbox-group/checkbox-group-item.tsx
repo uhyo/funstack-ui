@@ -69,7 +69,8 @@ export interface CheckboxGroupItemProps extends Omit<
  * Owned keys (conventions 1.2; a `render` element's value is overridden): `type`, `name`,
  * `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`
  * (computed by the Root from its `required` prop), `aria-checked` (removed), `data-checked`,
- * `data-pending`, `data-disabled`. `onChange` is merged: a `render` element's own handler runs
+ * `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-invalid` (the Field's).
+ * `onChange` is merged: a `render` element's own handler runs
  * first, then the library's. `role` passes through.
  */
 export function CheckboxGroupItem({
@@ -139,6 +140,8 @@ export function CheckboxGroupItem({
       "data-checked": dataAttr(checked),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
+      // Inside a Field (owned there): the group's invalid state, since the fieldset cannot carry it.
+      ...(ctx.fieldInvalid === undefined ? {} : { "aria-invalid": ctx.fieldInvalid }),
       onChange: (event: ChangeEvent<HTMLInputElement>) => {
         // A natively disabled box fires no click; this covers `render` elements that do not
         // honour `disabled`.

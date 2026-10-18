@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cdp } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
+import { Form } from "../form/index.js";
 import { RadioGroup } from "../radio-group/index.js";
 import { Field } from "./index.js";
 
@@ -362,5 +363,81 @@ describe("Field: progressive enhancement", () => {
     expect(input.outerHTML).toBe(before);
     expect(emailLabel).toHaveAttribute("for", input.id);
     expect(planLabel).not.toHaveAttribute("for");
+  });
+
+  it("Form.Root with a Server Function and errors: the server HTML posts to it and shows the error", async () => {
+    // A stand-in for a Server Function reference: react-dom's server renderer asks it for the
+    // form attributes through `$$FORM_ACTION` (what a bundler's server reference provides).
+    const calls: FormData[] = [];
+    const subscribe = Object.assign(
+      async (formData: FormData) => {
+        calls.push(formData);
+      },
+      {
+        $$FORM_ACTION: () => ({
+          action: "/__sf/subscribe",
+          method: "POST",
+          encType: "multipart/form-data",
+          name: "$ACTION_ID_subscribe",
+          data: null,
+        }),
+      },
+    );
+    function App() {
+      return (
+        <Form.Root action={subscribe} errors={{ email: "Already registered." }}>
+          <Field.Root name="email" required>
+            <Field.Label>Email</Field.Label>
+            <Field.Control type="email" defaultValue="a@b.c" />
+            <Field.Description>We never share it.</Field.Description>
+            <Field.Error data-testid="pe-error" />
+          </Field.Root>
+          <Form.Submit>Subscribe</Form.Submit>
+        </Form.Root>
+      );
+    }
+    const html = renderToString(<App />);
+    const container = document.createElement("div");
+    container.dataset["pe"] = "";
+    container.innerHTML = html;
+    document.body.append(container);
+    const form = container.querySelector("form")!;
+    const input = container.querySelector("input[type=email]")!;
+    const error = container.querySelector("[data-testid=pe-error]")!;
+    // Before hydration the form posts to the Server Function (progressive enhancement).
+    expect(form).toHaveAttribute("action", "/__sf/subscribe");
+    expect(form.method).toBe("post");
+    expect(form.enctype).toBe("multipart/form-data");
+    expect(container.querySelector('input[type=hidden][name="$ACTION_ID_subscribe"]')).not.toBe(
+      null,
+    );
+    // The server error is in the server HTML, wired to the control.
+    expect(error).toHaveTextContent("Already registered.");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input.getAttribute("aria-describedby")!.split(" ")).toContain(error.id);
+    expect(input).toHaveAttribute("data-invalid");
+    const before = input.outerHTML;
+
+    const recoverable: unknown[] = [];
+    await act(async () => {
+      root = hydrateRoot(container, <App />, {
+        onRecoverableError: (e) => recoverable.push(e),
+      });
+    });
+    await flush();
+    expect(recoverable).toEqual([]);
+    expect(container.querySelector("input[type=email]")).toBe(input);
+    expect(input.outerHTML).toBe(before);
+    expect(error.isConnected).toBe(true);
+    expect(error).toHaveTextContent("Already registered.");
+    // Hydrated: the server error is in the custom validity, so a resubmission is blocked.
+    expect((input as HTMLInputElement).validationMessage).toBe("Already registered.");
+    // The user's edit dismisses it; the Form then runs the action itself.
+    await user.clear(input);
+    await user.type(input, "new@b.c");
+    await settle(() => expect(container.querySelector("[data-testid=pe-error]")).toBe(null));
+    await user.click(container.querySelector("button")!);
+    await settle(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.get("email")).toBe("new@b.c");
   });
 });

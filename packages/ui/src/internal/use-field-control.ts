@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useMemo } from "react";
+import { use, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import type { Ref, RefCallback } from "react";
 import { dataAttr } from "./data-attr.js";
 import { FieldContext } from "./field-context.js";
@@ -139,4 +139,27 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
     attributes,
     state,
   };
+}
+
+/**
+ * Tells the enclosing Field (if any) that the control's value changed, after the commit that
+ * wrote it to the DOM (design/components/field-form.md 2.1: `validate` and the mirror follow the
+ * value). Needed where the DOM changes without an `input` / `change` event the Field hears: a
+ * Combobox selection (React writes the hidden input), a CheckboxGroup's derived `required`, a
+ * Parent checking Items, a rejected action rolling the value back. Nothing at mount.
+ *
+ * `takeEdit` is read when the value changed: `true` when the user made this change (a shown
+ * server error is dismissed, like an `input` event would). Native controls whose own events
+ * already dismiss pass nothing.
+ */
+export function useFieldValueChange(value: unknown, takeEdit?: () => boolean): void {
+  const notifyChange = use(FieldContext)?.notifyChange;
+  const previous = useRef(value);
+  // No deps: compares with the last committed value after every commit of the caller.
+  useLayoutEffect(() => {
+    if (Object.is(previous.current, value)) return;
+    previous.current = value;
+    const edit = takeEdit?.() ?? false;
+    notifyChange?.(edit);
+  });
 }

@@ -13,7 +13,11 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import {
+  useFieldControl,
+  useFieldValueChange,
+  useMergedRef,
+} from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { RadioGroupContext } from "./radio-group-context.js";
 import type { RadioGroupContextValue } from "./radio-group-context.js";
@@ -177,6 +181,9 @@ export function RadioGroupRoot({
     transitionTypes: () => transitionTypes("radio-group"),
     warn: { component: "RadioGroup.Root", prop: "value" },
   });
+  // Inside a Field: a value React writes with no event (a rejected action rolling back, a
+  // controlled change) re-reads validity and `validate` after the commit.
+  useFieldValueChange(optimistic);
   // Deliberately no warning when neither `value` nor `defaultValue` is given: an unchecked group
   // is the HTML default (design decision 2).
 

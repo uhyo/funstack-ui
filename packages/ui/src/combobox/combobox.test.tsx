@@ -26,6 +26,7 @@ import type { ControlMode } from "../__tests__/helpers.js";
 import type { UrgentChangeAction } from "../index.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
+import type { FormErrors } from "../form/index.js";
 import { Combobox } from "./index.js";
 import type {
   ComboboxClearState,
@@ -2407,6 +2408,98 @@ describe("Combobox inside a Field.Root", () => {
     expectPending(screen.getByTestId("root"));
     expectNotPending(i);
     await act(async () => submission.resolve());
+  });
+
+  // Review H1: React writes the hidden input with no `input` / `change` event; the Field is told
+  // after the commit.
+  function Country({
+    errors,
+    validate,
+    action,
+    cities = false,
+  }: {
+    errors?: FormErrors;
+    validate?: (value: string) => string | null;
+    action: (formData: FormData) => unknown;
+    cities?: boolean;
+  }) {
+    return (
+      <Form.Root action={action} errors={errors} autoReset={false}>
+        <Field.Root name="country" validate={validate} data-testid="root">
+          <Field.Label>Country</Field.Label>
+          <Combobox.Root openOnClick>
+            <Combobox.Input data-testid="input" />
+            <Combobox.Popup>
+              <Combobox.List>
+                <Combobox.Option value="jp" data-testid="opt-jp">
+                  Japan
+                </Combobox.Option>
+                <Combobox.Option value="fr" data-testid="opt-fr">
+                  France
+                </Combobox.Option>
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Root>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+        {cities && (
+          <Field.Root
+            name="city"
+            validate={(_value, formData) =>
+              formData.get("country") === "" ? "Pick a country first." : null
+            }
+          >
+            <Field.Label>City</Field.Label>
+            <Field.Control data-testid="city" />
+          </Field.Root>
+        )}
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>
+    );
+  }
+
+  it("a selection re-runs validate at once: Enter right after picking submits", async () => {
+    const action = vi.fn();
+    render(
+      <Country action={action} validate={(v) => (v === "" ? "Pick a country." : null)} cities />,
+    );
+    await act(async () => {});
+    expect(input().validationMessage).toBe("Pick a country.");
+    expect((screen.getByTestId("city") as HTMLInputElement).validationMessage).toBe(
+      "Pick a country first.",
+    );
+    const user = setupUser();
+    await typeText(user, "Jap");
+    await user.keyboard("{ArrowDown}{Enter}");
+    await act(async () => {});
+    expect(hidden()).toHaveValue("jp");
+    expect(input().validationMessage).toBe("");
+    // A cross-field rule on another Field of the Form follows too.
+    expect((screen.getByTestId("city") as HTMLInputElement).validationMessage).toBe("");
+    await user.keyboard("{Enter}");
+    await act(async () => {});
+    expect(action).toHaveBeenCalledTimes(1);
+    expect((action.mock.calls[0]![0] as FormData).get("country")).toBe("jp");
+    expect(screen.queryByTestId("error")).toBeNull();
+  });
+
+  it("picking another option dismisses a server error, so the corrected value can be saved", async () => {
+    const action = vi.fn();
+    render(<Country action={action} errors={{ country: "We do not ship there." }} />);
+    await act(async () => {});
+    expect(screen.getByTestId("error")).toHaveTextContent("We do not ship there.");
+    const user = setupUser();
+    await user.click(input());
+    await user.click(option("fr"));
+    await act(async () => {});
+    expect(hidden()).toHaveValue("fr");
+    expect(screen.queryByTestId("error")).toBeNull();
+    expect(input()).toHaveAttribute("aria-invalid", "false");
+    expect(input().validationMessage).toBe("");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(action).toHaveBeenCalledTimes(1);
+    expect((action.mock.calls[0]![0] as FormData).get("country")).toBe("fr");
   });
 
   it("Field disabled disables the Input", async () => {

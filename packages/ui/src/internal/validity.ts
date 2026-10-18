@@ -143,7 +143,8 @@ export function validityElementOf(el: Element | null): ValidatableElement | null
 
 /**
  * What the Field focuses (design 2.5): the control itself, or for a group the checked radio if
- * any, else the first enabled member.
+ * any, else the first enabled named member (a group's first item, not a CheckboxGroup Parent,
+ * which has no name), else the first enabled member.
  */
 export function focusTargetOf(el: Element | null): HTMLElement | null {
   if (el === null) return null;
@@ -161,7 +162,13 @@ export function focusTargetOf(el: Element | null): HTMLElement | null {
   const checkedRadio = members.find(
     (m) => m instanceof HTMLInputElement && m.type === "radio" && m.checked,
   );
-  return checkedRadio ?? members.find(isValidatable) ?? members[0] ?? null;
+  return (
+    checkedRadio ??
+    members.find((m) => isValidatable(m) && m.name !== "") ??
+    members.find(isValidatable) ??
+    members[0] ??
+    null
+  );
 }
 
 /** Sorts elements into document order. */

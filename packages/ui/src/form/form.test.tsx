@@ -24,6 +24,7 @@ import {
   setupUser,
 } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
+import { Dialog } from "../dialog/index.js";
 import type { CheckboxCheckedChangeDetails } from "../checkbox/index.js";
 import { Field } from "../field/index.js";
 import { Form } from "./index.js";
@@ -291,6 +292,146 @@ describe("Form: server errors", () => {
     expect(control().value).toBe("a@b.cx");
   });
 
+  // Review M1: the hide flag of a result stays fixed until the next settle.
+  it("a suppressed error stays hidden while the next submission is in flight", async () => {
+    const first = deferred<ActionResult>();
+    const second = deferred<ActionResult>();
+    const runs = [first, second];
+    let call = 0;
+    render(<ActionStateForm run={() => runs[call++]!.promise} />);
+    const user = setupUser();
+    await user.type(control(), "a@b.c");
+    await user.click(submit());
+    await act(async () => {
+      fireEvent.input(control(), { target: { value: "x@y.z" } });
+    });
+    await act(async () => first.resolve({ errors: { email: "a@b.c is taken" } }));
+    await flush();
+    expect(screen.queryByTestId("email-error")).toBeNull();
+
+    // Submit "x@y.z": the `errors` prop still holds the first result during this flight.
+    await act(async () => {
+      submit().click();
+    });
+    await flush();
+    expectPending(screen.getByTestId("form"));
+    expect(screen.queryByTestId("email-error")).toBeNull();
+    expect(control()).toHaveAttribute("aria-invalid", "false");
+    expect(control().validationMessage).toBe("");
+
+    await act(async () => second.resolve({}));
+    await flush();
+    expect(call).toBe(2);
+    expect(screen.queryByTestId("email-error")).toBeNull();
+  });
+
+  it("an error for the value sent in the next flight is shown at that settle", async () => {
+    const first = deferred<ActionResult>();
+    const second = deferred<ActionResult>();
+    const runs = [first, second];
+    let call = 0;
+    render(<ActionStateForm run={() => runs[call++]!.promise} />);
+    const user = setupUser();
+    await user.type(control(), "a@b.c");
+    await user.click(submit());
+    await act(async () => {
+      fireEvent.input(control(), { target: { value: "x@y.z" } });
+    });
+    await act(async () => first.resolve({ errors: { email: "a@b.c is taken" } }));
+    await flush();
+    await act(async () => {
+      submit().click();
+    });
+    await act(async () => second.resolve({ errors: { email: "x@y.z is taken" } }));
+    await flush();
+    expect(screen.getByTestId("email-error")).toHaveTextContent("x@y.z is taken");
+    expect(document.activeElement).toBe(control());
+  });
+
+  describe("announcement when focus does not move (review M2)", () => {
+    function stubAriaNotify() {
+      const notify = vi.fn();
+      Object.defineProperty(Element.prototype, "ariaNotify", {
+        configurable: true,
+        value: function (this: Element, message: string) {
+          notify(this, message);
+        },
+      });
+      return notify;
+    }
+    afterEach(() => {
+      delete (Element.prototype as { ariaNotify?: unknown }).ariaNotify;
+    });
+
+    it("a server error for the focused field (Enter in it) is announced on the control", async () => {
+      const notify = stubAriaNotify();
+      render(<ActionStateForm run={async () => ({ errors: { email: "Taken" } })} />);
+      const user = setupUser();
+      await user.type(control(), "a@b.c{Enter}");
+      await flush();
+      expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
+      expect(document.activeElement).toBe(control());
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(control(), "Taken");
+    });
+
+    it("focus moving to the errored field announces nothing extra", async () => {
+      const notify = stubAriaNotify();
+      render(<ActionStateForm run={async () => ({ errors: { email: "Taken" } })} />);
+      const user = setupUser();
+      await user.type(control(), "a@b.c");
+      await user.click(submit());
+      await flush();
+      expect(document.activeElement).toBe(control());
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a failed attempt from the focused, first invalid field announces its message", async () => {
+      const notify = stubAriaNotify();
+      const action = vi.fn();
+      render(
+        <Form.Root action={action}>
+          <Field.Root name="code" validate={(v) => (v.length < 3 ? "Too short." : null)}>
+            <Field.Label>Code</Field.Label>
+            <Field.Control data-testid="code-control" />
+            <Field.Error data-testid="code-error" />
+          </Field.Root>
+          <Field.Root name="other" validate={() => "Other."}>
+            <Field.Label>Other</Field.Label>
+            <Field.Control data-testid="other-control" />
+            <Field.Error />
+          </Field.Root>
+          <Form.Submit>Save</Form.Submit>
+        </Form.Root>,
+      );
+      await flush();
+      const user = setupUser();
+      await user.type(control("code"), "a{Enter}");
+      await flush();
+      expect(action).not.toHaveBeenCalled();
+      expect(screen.getByTestId("code-error")).toHaveTextContent("Too short.");
+      expect(document.activeElement).toBe(control("code"));
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(control("code"), "Too short.");
+
+      // Focus elsewhere: it moves to the first invalid field, no announcement.
+      notify.mockClear();
+      await user.click(submit());
+      await flush();
+      expect(document.activeElement).toBe(control("code"));
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("does nothing where ariaNotify is missing", async () => {
+      render(<ActionStateForm run={async () => ({ errors: { email: "Taken" } })} />);
+      const user = setupUser();
+      await user.type(control(), "a@b.c{Enter}");
+      await flush();
+      expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
+      expect(document.activeElement).toBe(control());
+    });
+  });
+
   it("an error whose name has no Field focuses nothing and resets nothing", async () => {
     render(<ActionStateForm run={async () => ({ errors: { form: "Server down" } })} />);
     const user = setupUser();
@@ -524,6 +665,23 @@ describe("Form: function props and render", () => {
     expect(button).toHaveTextContent("Save");
   });
 
+  it("a render element's onSubmit preventDefault() cancels the submission (review L3)", async () => {
+    const action = vi.fn();
+    render(
+      <Form.Root action={action} render={<form onSubmit={(event) => event.preventDefault()} />}>
+        <EmailField />
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    const user = setupUser();
+    await user.type(control(), "a@b.c");
+    await user.click(submit());
+    await flush();
+    expect(action).not.toHaveBeenCalled();
+    expectNotPending(submit());
+    expect(control().value).toBe("a@b.c");
+  });
+
   it("Form.Submit is never disabled while pending; disabled is owned and marked", async () => {
     const d = deferred();
     render(
@@ -630,5 +788,76 @@ describe("Form: platform path", () => {
     fireEvent.input(control(), { target: { value: "" } });
     await flush();
     expect(screen.getByTestId("email-error")).toBeInTheDocument();
+  });
+});
+
+// Walkthrough 11 and review M3: `Dialog.Form` rendered as `Form.Root` takes the Form's policy.
+describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
+  function DialogWithForm({
+    run,
+    closeOnSettle,
+  }: {
+    run: (formData: FormData) => Promise<ActionResult>;
+    closeOnSettle?: boolean;
+  }) {
+    const [state, dispatch] = useActionState(
+      (_prev: ActionResult, formData: FormData) => run(formData),
+      {},
+    );
+    return (
+      <Dialog.Root defaultOpen>
+        <Dialog.Popup aria-label="Profile" data-testid="popup">
+          <Dialog.Form
+            data-testid="form"
+            render={<Form.Root errors={state.errors} />}
+            action={dispatch}
+            closeOnSettle={closeOnSettle}
+          >
+            <EmailField />
+            <Form.Submit>Save</Form.Submit>
+          </Dialog.Form>
+        </Dialog.Popup>
+      </Dialog.Root>
+    );
+  }
+
+  it("errors: shown and focused, not reset, the dialog stays open; success resets", async () => {
+    const run = vi.fn(async (formData: FormData): Promise<ActionResult> =>
+      formData.get("email") === "bad" ? { errors: { email: "Taken" } } : {},
+    );
+    render(<DialogWithForm run={run} closeOnSettle={false} />);
+    const popup = screen.getByTestId("popup") as HTMLDialogElement;
+    expect(popup.open).toBe(true);
+    const user = setupUser();
+    await user.type(control(), "bad");
+    await user.click(submit());
+    await flush();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
+    // React's own path would have reset the form after this successful action.
+    expect(control().value).toBe("bad");
+    expect(document.activeElement).toBe(control());
+    expect(popup.open).toBe(true);
+
+    await user.clear(control());
+    await user.type(control(), "good");
+    expect(screen.queryByTestId("email-error")).toBeNull();
+    await user.click(submit());
+    await flush();
+    expect(run).toHaveBeenCalledTimes(2);
+    // autoReset: no error in the result.
+    expect(control().value).toBe("");
+  });
+
+  it("the default closeOnSettle closes the dialog even when the result has errors", async () => {
+    const run = vi.fn(async (): Promise<ActionResult> => ({ errors: { email: "Taken" } }));
+    render(<DialogWithForm run={run} />);
+    const popup = screen.getByTestId("popup") as HTMLDialogElement;
+    const user = setupUser();
+    await user.type(control(), "x");
+    await user.click(submit());
+    await flush();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(popup.open).toBe(false);
   });
 });

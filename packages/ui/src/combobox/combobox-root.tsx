@@ -15,6 +15,7 @@ import { flushSync } from "react-dom";
 import type { ReactNode, RefObject } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { FieldContext } from "../internal/field-context.js";
+import { useFieldValueChange } from "../internal/use-field-control.js";
 import type {
   ActionDetails,
   ChangeAction,
@@ -379,6 +380,8 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     committedRef.current = selection.committed;
   });
 
+  /** The next change of the optimistic selection comes from the user (a dispatch). */
+  const userEdit = useRef(false);
   const dispatchValue = (
     next: string | null,
     event: Event | undefined,
@@ -397,8 +400,18 @@ export function ComboboxRoot(props: ComboboxRootProps) {
       options.text === undefined
         ? null
         : { id: dispatchId, value: next, text: options.text, settled: false };
+    if (next !== selection.optimistic) userEdit.current = true;
     selection.dispatch(next, details);
   };
+
+  // Inside a Field: React writes the hidden input with no `input` / `change` event, so the Field
+  // is told after the commit (its `validate` reads the hidden input; a user's pick dismisses a
+  // shown server error like typing would).
+  useFieldValueChange(selection.optimistic, () => {
+    const edit = userEdit.current;
+    userEdit.current = false;
+    return edit;
+  });
 
   // --- Option registry and the active option (design 2, 6.5) --------------------------------
 

@@ -50,6 +50,14 @@ export interface FieldContextValue {
   readonly registerControl: (registration: FieldControlRegistration) => () => void;
   /** A `Field.Error` is mounted (the Field may cancel the platform bubble). */
   readonly registerError: () => () => void;
+  /**
+   * The control's value changed in the DOM without an `input` / `change` event the Field could
+   * hear (a Combobox selection, a CheckboxGroup's derived `required`, a rolled-back optimistic
+   * value): re-reads the slot and the mirror after the commit that wrote it, and refreshes the
+   * other Fields of the `Form.Root` (cross-field rules). `edit`: the user made the change, so a
+   * shown server error is dismissed as by an `input` event. Call from a layout effect.
+   */
+  readonly notifyChange: (edit: boolean) => void;
 }
 
 export const FieldContext = createContext<FieldContextValue | null>(null);
@@ -66,6 +74,10 @@ export interface FormFieldRegistration {
   readonly getFocusTarget: () => HTMLElement | null;
   /** The Field shows a server error at the latest commit. */
   readonly showsServerError: () => boolean;
+  /** The server messages shown, for an announcement when focus does not move. */
+  readonly serverMessages: () => readonly string[];
+  /** Re-runs `validate` and re-reads validity (another Field's control changed). */
+  readonly refresh: () => void;
 }
 
 export interface FormContextValue {
@@ -76,6 +88,8 @@ export interface FormContextValue {
    * else `null`: the stale-value suppression of design 3.2 item 2 is computed against it.
    */
   readonly submittedData: () => FormData | null;
+  /** Refreshes every registered Field except `source` (a change no DOM event carried). */
+  readonly refreshFields: (source: FormFieldRegistration | null) => void;
 }
 
 export const FormContext = createContext<FormContextValue | null>(null);

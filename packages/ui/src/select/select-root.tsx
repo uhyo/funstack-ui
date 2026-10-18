@@ -13,7 +13,12 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeSelectValue } from "../internal/use-native-select-value.js";
-import { fieldInputProps, useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import {
+  fieldInputProps,
+  useFieldControl,
+  useFieldValueChange,
+  useMergedRef,
+} from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
 import type { SelectContextValue } from "./select-context.js";
@@ -131,6 +136,9 @@ export function SelectRoot({
     transitionTypes: () => transitionTypes("select"),
     warn: { component: "Select.Root", prop: "value" },
   });
+  // Inside a Field: a value React writes with no event (a rejected action rolling back, a
+  // controlled change) re-reads validity and `validate` after the commit.
+  useFieldValueChange(optimistic);
   // Deliberately no warning when neither `value` nor `defaultValue` is given: the browser's
   // first-option default is adopted (design decision 3, product-owner decision 4).
 
