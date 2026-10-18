@@ -1348,3 +1348,7 @@ Genuine product decisions, with recommendations; none blocks implementation.
     it**; cross-field rules are the first thing every form needs and `setCustomValidity` is the
     platform's own slot for them.
 12. **Conventions feedback 1 to 13** to apply on acceptance by whoever holds `conventions.md`.
+
+## Accepted by the product owner
+
+2026-10-18. All eleven recommendations in "For the product owner" are accepted as recommended (items 1–11), and the conventions feedback 1–13 is to be applied to `design/conventions.md` by the architect. Item 9 (Dialog.Form `errors`/`autoReset`) becomes a follow-up issue after Field lands. Slider integration through `useFieldControl` is done once Slider is on master (it is being implemented in parallel); if Field lands first, it is a follow-up. Items 1 (intercepting submission) and 4 (no `aria-errormessage`) are reported to the user as the most visible decisions and may be revisited.
