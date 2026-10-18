@@ -1,9 +1,15 @@
 # Toast
 
-Status: **proposed** (2026-10-17, GitHub issue #54, wave 5). Follows `design/conventions.md`
-(accepted); where this document and the conventions disagree, the conventions win, except for the
-amendments listed in "Conventions feedback", which need the product owner's acceptance together
-with this design.
+Status: **accepted** (proposed 2026-10-17, GitHub issue #54, wave 5; accepted by the product
+owner on 2026-10-18 with the server-side no-op amendment, section 19). Implemented in
+3266e4e..fa6e481 (merged at 03404ef). The review of that implementation (`memo/reviewer/toast.md`,
+2805959; fixes in eeacdbf, docs page in 906702d, the developer's reasoning in
+`memo/developer/toast.md` "Review fixes") is folded in on 2026-10-18 into the sections it touches
+and audited in "Review corrections (#54)" at the end; the leftovers are GitHub issue #63, and
+section 21 is a **proposal, not accepted**, for its timer item. The code under
+`packages/ui/src/toast/` is the ground truth where this document is silent. Follows
+`design/conventions.md` (accepted, with the section 18 amendments applied); where this document
+and the conventions disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/toast.md` (primary; its three
 findings are binding: the inert toaster under a modal dialog, the urgent queue, `ariaNotify()`),
@@ -35,17 +41,17 @@ hiding the stack.
 | --- | --- | --- |
 | 1 | Anatomy | `toast()` (a function, the queue's only input), `Toast.Viewport` (the region: `<section popover="manual">`, owns the queue, timers, hotkey, focus), `Toast.Root` (`div[role=dialog|alertdialog][tabindex=0]`, one per toast), `Toast.Title` (`div`), `Toast.Description` (`p`), `Toast.Action` (`button` with an `action` prop), `Toast.Close` (`button`). No Provider, no Portal part, no list element. |
 | 2 | Imperative input, declarative output | The queue is fed imperatively (`toast(options)` returns an id; `toast.promise`, `toast.update`, `toast.dismiss`) and rendered declaratively: the consumer's Viewport `children(state)` maps `state.toasts` to parts. Section 2 justifies this against the vision: toasts are produced in action bodies and outlive the component that produced them, and no `on*` handler exists anywhere in the API. |
-| 3 | Urgent queue | Every queue mutation (add, update, dismiss, drop after exit) is a normal (urgent) update, dispatched from a microtask so a `toast()` call inside a `startTransition` scope escapes it (research §7). The third documented urgent state after a controlled text input and virtual focus (conventions 2.6). Order is preserved. |
+| 3 | Urgent queue | Every queue mutation (add, update, dismiss, drop after exit) is a normal (urgent) update, dispatched from a microtask so a `toast()` call inside a `startTransition` scope escapes it (research §7). The third documented urgent state after a controlled text input and virtual focus (conventions 2.6). Order is preserved, dismissals included: a `toast.dismiss()` closes the toasts open at that point of the batch and never one added later in the same tick (review H1). |
 | 4 | Promise toasts | `toast.promise(promise, { pending, success, error })` shows `pending` at once with `data-pending`, swaps to `success` / `error` when the promise settles (urgent `update`), announces on settle, and starts the timer only then. It returns a promise that mirrors `promise`, **except** that a rejection is resolved (with `undefined`) when `error` was given: the error toast is the handler the consumer asked for. Returning the promise lets one call feed both the toast and the awaited action prop of the part that started the work (section 3.1). |
 | 5 | Undo | `Toast.Action` is a pure-trigger action prop (`useActionTrigger`, like `Menu.Item`): `data-pending` on the Action and the Root while it runs, the toast's timer paused, the toast closed with `reason: "activate"` when it resolves (`closeOnSettle`, default `true`); a rejection keeps the toast and reaches the nearest Error Boundary above the Viewport. |
 | 6 | `closeAction` | A per-toast action called when the toast leaves, with `details.reason`: `"activate"` (the Action part settled), `"dismiss"` (Close part, Escape, `toast.dismiss()`, a promise toast with no message for its outcome), or `"timeout"` (the timer elapsed; a new `ChangeReason` value, conventions feedback 1). Run inside the Viewport's own transition, not awaited by anything visible: the "commit the deletion when the Undo window elapses" pattern (section 9.3). |
-| 7 | Top layer | One `popover="manual"` region, shown while it has toasts (exiting ones included), hidden when empty. Re-raised (`hidePopover(); showPopover()`) when a toast is added while it is already open, so a later-opened menu or popover does not cover new toasts. While a library `Dialog` is modal, the region is portalled into the topmost open modal `<dialog>` (a module-level registry Dialog writes to) and moved back when it closes, because a top-layer region outside a modal dialog is inert and absent from the accessibility tree (research finding 1). |
+| 7 | Top layer | One `popover="manual"` region, shown while it has toasts (exiting ones included), hidden when empty. Re-raised (`hidePopover(); showPopover()`) when a toast is added while it is already open, so a later-opened menu or popover does not cover new toasts. While a library `Dialog` is modal, the region is inside the topmost open modal `<dialog>` and back inline when it closes, because a top-layer region outside a modal dialog is inert and absent from the accessibility tree (research finding 1). Mechanism: the region always portals into a library-owned `display: contents` host element that the library itself moves with a DOM `append` (React never sees the move, so the toasts keep their React state: an Undo in flight stays pending; review M2) between an inline anchor and the topmost modal (a module-level registry Dialog writes to). |
 | 8 | Announcements | `document.ariaNotify(text, { priority })` after the toast's content has committed un-suspended, coalesced per microtask, `priority: "high"` for `priority: "high"` toasts. No live region anywhere. The text defaults to the Title and Description text (`textContent` of the parts), overridable per toast or per Viewport through `announce(toast)` (built-in strings rule, conventions 11). |
 | 9 | Timers | `duration` default 5000 ms; `null` for persistent. A toast with an `action` defaults to persistent (WCAG 2.2.1; product-owner question 3). Paused while the pointer is over the region, focus is inside it, the document is hidden, the window is blurred, the toast is `pending`, or it is queued beyond `limit`; resumed with the remaining time. |
-| 10 | Keyboard | `hotkey` (default `["F8"]`, `event.code` / modifier names, Radix's shape; `null` disables) focuses the newest toast; Tab moves through toasts and their buttons in DOM order; ArrowDown / ArrowUp move between toasts; Escape dismisses the toast that contains focus. Focus leaving a dismissed toast goes to the next toast, else back to the element focused before the region was entered. The region's name is `"Notifications (F8)"` by default (`aria-label` overrides). |
+| 10 | Keyboard | `hotkey` (default `["F8"]`, `event.code` / modifier names, Radix's shape, but an unlisted modifier held rejects the match: Ctrl+F8 is not F8, review L4; `null` disables) focuses the newest toast; Tab moves through toasts and their buttons in DOM order; ArrowDown / ArrowUp move between toasts; Escape dismisses the toast that contains focus. Focus leaving a dismissed toast goes to the next toast, else back to the element focused before the region was entered. The region's name is `"Notifications (F8)"` by default (`aria-label` overrides). |
 | 11 | Stacking | `limit` (default 3) visible toasts; further toasts queue in order and show as earlier ones leave (never dropped). The DOM order is chronological; visual order is CSS. |
-| 12 | Animation | Enter with `@starting-style` (CSS), exit with `data-ending` on the Root held until its `getAnimations()` finish (`useExitAnimation`), no `<ViewTransition>` and **no `transition` prop on any part**: every Toast commit is on the urgent lane, where react-dom never starts a view transition (conventions 5.1, third no-`transition` category). |
-| 13 | Suspense guard | `Toast.Root` wraps its children in a `<Suspense>` whose fallback renders nothing visible: a toast whose content suspends shows an empty toast (consumers add their own skeleton boundary) instead of pulling the whole Viewport, which lives in an urgent commit, into the nearest consumer boundary. The toast's timer and announcement wait for the reveal, which commits while unrelated actions are pending (retry lane; probe). The one deliberate exception to "the library never wraps children in `<Suspense>`" (conventions 6, feedback 6). |
+| 12 | Animation | Enter with `@starting-style` (CSS), exit with `data-ending` on the Root held until the animations **the ending state started** finish (animations already running before the close, a paused progress bar, are snapshotted and not waited for; review M1; a plain layout effect, not `useExitAnimation`), no `<ViewTransition>` and **no `transition` prop on any part**: every Toast commit is on the urgent lane, where react-dom never starts a view transition (conventions 5.1, third no-`transition` category). |
+| 13 | Suspense guard | `Toast.Root` wraps its children in a `<Suspense>` whose fallback renders nothing visible: a toast whose content suspends shows an empty toast (consumers add their own skeleton boundary) instead of pulling the whole Viewport, which lives in an urgent commit, into the nearest consumer boundary. The toast's timer and announcement wait for the reveal, which commits while unrelated actions are pending (retry lane; probe). A consumer's own `<Suspense>` inside the Root catches first and is invisible to the guard: its reveal is announced (Title and Description report their commit, review M3) but the timer starts at mount; section 21 proposes a `fallback` prop on the Root to close that gap (not accepted). The one deliberate exception to "the library never wraps children in `<Suspense>`" (conventions 6, feedback 6). |
 | 14 | SSR and directives | Client-only behaviour: the Viewport server-renders the empty region (`popover` serialises; no hydration issue), on the client, `toast()` calls before the Viewport mounts are buffered; on the server (`typeof document === "undefined"`) a call is a **no-op with a dev warning, never buffered** (the module-level manager would otherwise hold a queue shared between requests). No JS-free mode (a toast cannot exist without JS). Every part file is `"use client"`; `toast.ts` (the manager) has no directive and no React import. |
 
 ---
@@ -82,7 +88,7 @@ toast({ title: "Link copied" });
 | Part | Element | Role / ARIA | Data attributes | Notes |
 | --- | --- | --- | --- | --- |
 | `toast` | – | – | – | A function with methods: `toast(options): string`, `toast.promise(promise, options): Promise`, `toast.update(id, options)`, `toast.dismiss(id?)`. Bound to the default manager; `createToastManager()` makes an isolated one for a second root or a test. |
-| `Viewport` | `section` with `popover="manual"` | `region` (named section), `aria-label="Notifications (F8)"` by default | `data-paused`, `data-empty` | Owns the queue state, timers, hotkey, pause, focus return, the portal into a modal dialog, re-raise, announcements. `children` is a function of `ToastViewportState` (or a node, for a fixed layout). |
+| `Viewport` | `section` with `popover="manual"` | `region` (named section), `aria-label="Notifications (F8)"` by default | `data-paused`, `data-empty` | Owns the queue state, timers, hotkey, pause, focus return, the portal host (on the client the region sits inside two `display: contents` `div`s: an anchor where the Viewport is rendered and the host the library moves into a modal dialog, section 4.3), re-raise, announcements. `children` is a function of `ToastViewportState` (or a node, for a fixed layout). |
 | `Root` | `div` | `dialog`; `alertdialog` when `priority === "high"`; `tabindex="0"`; `aria-labelledby` → Title id, `aria-describedby` → Description id (both always emitted; a dangling IDREF falls through to `aria-label`) | `data-type` (the toast's `type`), `data-pending`, `data-ending` | One per `ToastItem`; takes `toast`. Renders the Suspense guard around `children`. Keyboard: Escape, ArrowUp / ArrowDown. |
 | `Title` | `div` | id for `aria-labelledby` | – | `children` defaults to `toast.title`. Not a heading: a transient notification should not appear in heading navigation. |
 | `Description` | `p` | id for `aria-describedby` | – | `children` defaults to `toast.description`; renders nothing when both are absent. |
@@ -186,6 +192,7 @@ Timeline, with `archive(id)` taking two seconds:
 | `archive` resolves | `update` to the `success` options (urgent): `data-pending` gone, "Archived" announced, the Undo button appears; the timer starts (or not: an `action` toast is persistent by default, section 6). | The item's action resolves (the returned promise mirrors `archive`), so the menu closes on settle. |
 | `archive` rejects | `update` to the `error` options: announced with `priority: "high"`, Root becomes `alertdialog`. **The returned promise resolves** (with `undefined`), because `error` was given: the toast is the handler. | The item's action resolves, the menu closes. No Error Boundary involved. |
 | `archive` rejects, no `error` option | The pending toast is dismissed (`reason: "dismiss"`). The returned promise **rejects** with the same reason: nothing is swallowed. | The item's action rejects: the menu stays open and the error reaches the nearest boundary (conventions 2.4). |
+| `success` or `error` is a function that throws | The toast is dismissed (`reason: "dismiss"`), never left `pending`. The returned promise **rejects with what the function threw** (review M4). Not the `error` toast: the operation's outcome is known, its message is not, and an error message would misreport a fulfilment. | The item's action rejects: the consumer's bug reaches the boundary. |
 
 Rules:
 
@@ -194,7 +201,10 @@ Rules:
   pending for exactly as long as the toast does.
 - `success` and `error` are options objects or functions of the value / reason; both optional.
   An omitted `success` dismisses the toast on fulfilment, an omitted `error` dismisses it on
-  rejection and rethrows, as in the table.
+  rejection and rethrows, as in the table. A `success` or `error` **function that throws**
+  dismisses the toast and the returned promise rejects with what it threw (review M4; before the
+  fix the throw escaped `then` before anything was dispatched and the toast stayed `data-pending`
+  forever).
 - `toast.promise` is sugar over `add` + `update` + `dismiss`; there is no Suspense involved
   (research §7), so the pending-to-settled swap is an urgent re-render of the same `Root`
   (same `id`, same DOM node, keyed by the consumer on `t.id`). Section 10.3 says why that is not
@@ -261,9 +271,13 @@ Every write to the queue is a normal `setState` in the Viewport, never inside a 
 | `toast()`, `toast.update()`, `toast.dismiss()` from consumer code | the manager, in a `queueMicrotask` callback | urgent (DefaultLane); a call made inside a `startTransition` scope is no longer inside it when the microtask runs (research probe `toast-lanes.mjs`: a microtask dispatch commits at once while an unrelated action is pending; a synchronous one is held until it settles) |
 | `toast.promise` settle | the promise's `then` | urgent |
 | Close part, Escape, Action settle, timer | the Viewport's own handlers and effects | urgent |
-| Drop after exit animation | `useExitAnimation`'s release | urgent |
+| Drop after exit animation | the Root's exit layout effect, once the animations the ending state started have settled (section 10.2) | urgent |
 
-The microtask preserves order (React applies queued updates in dispatch order) and costs one
+The microtask preserves order (React applies queued updates in dispatch order, and the Viewport
+applies one tick's commands in order, **dismissals included**: `toast.dismiss(); toast({ title })`
+in one action body shows the new toast, `toast.dismiss("sync"); toast({ id: "sync", … })`
+replaces the old one; review H1, where the first implementation applied the dismissals after the
+adds, so the new toast closed at once and its `closeAction` ran with `"dismiss"`) and costs one
 tick: a toast is on screen in the same frame as the click that produced it. The cost of the lane
 is the one the research names: Toast's commits never start a document view transition, so its
 animation is CSS (section 10).
@@ -290,6 +304,21 @@ guard is mounted:
 - the timer has not started and nothing has been announced;
 - when the content commits, the Root announces (reading the Title and Description text that now
   exists) and starts the timer.
+
+A consumer boundary inside the Root changes what the guard can see: its fallback never mounts, so
+to the Root the toast looks like one whose content committed at once. What still works is the
+**announcement**. `Toast.Title` and `Toast.Description` report their commit to the Root from a
+`[]` layout effect (mount, and re-show after a boundary inside the Root hid them); after the
+Root's first announcement effect has run, such a report queues one microtask that re-runs the
+announcement, so a Title and a Description revealed together are announced as one text, and the
+text the guard would have missed is spoken when the consumer's skeleton gives way (review M3).
+What does not work is the **timer**: it starts at mount, while the skeleton shows. Nothing
+committed tells the library that a consumer boundary is showing its fallback (a Title that never
+mounted looks the same as a toast without one), and the alternative, a render-phase "Title
+rendered but not committed" flag, can be left set by a discarded render and freeze a toast
+forever. The docs say so next to the skeleton recipe; section 21 proposes a `fallback` prop on
+the Root so the skeleton can live in the library's own boundary, which does see it (GitHub issue
+#63; not accepted).
 
 The reveal is a Suspense retry, which commits while unrelated async actions are pending: verified
 on React 19.3.1 (`memo/architect/probes/toast-suspense-reveal.mjs`): a toast pushed urgently while
@@ -355,13 +384,31 @@ one exists, and back when it closes:
   element right after `showModal()` and removes it from the `close` event (and on unmount). The
   registry is the library's second module-level store after the default toast manager, and the
   same "write from a layout effect, read through `useSyncExternalStore`" shape.
-- The Viewport reads `useSyncExternalStore(subscribe, getTopmost, () => null)` and renders the
-  region with `createPortal(region, topmost)` when non-null, inline otherwise. SSR renders inline
-  (react-dom's server renderer has no portals; the server snapshot is `null`).
-- A move remounts the region's DOM. Removing a popover from the document hides it, so the apply
-  effect re-runs `showPopover()` after every container change. Focus inside a toast at that
-  moment is lost; the dialog's own focusing steps take it anyway. The toasts' `@starting-style`
-  replays on the move (the elements are new); acceptable, and the only visible cost.
+- The region is **always portalled into a library-owned host element** on the client: a `div`
+  with `display: contents` that the Viewport creates once (`useState`) and `createPortal`s the
+  region into for its whole client life. The library moves the host itself, with a DOM `append`,
+  in a layout effect that runs on every commit: into the topmost modal (read with
+  `useSyncExternalStore(subscribe, getTopmost, () => null)`) when there is one, back into an
+  inline **anchor** (`<div style="display: contents">`, rendered where the Viewport is) when
+  there is none. React never sees the move, so every Root, Action and `useActionTrigger` keeps
+  its state across it: an Undo in flight stays `data-pending` and its toast's timer stays paused
+  (review M2). The first shape, `container === null ? region : createPortal(region, container)`,
+  remounted the whole subtree on each move (as `createPortal` also does when its container
+  changes: react-dom compares `containerInfo`), which cleared the Action's pending flag and let a
+  timed Undo toast expire during the undo.
+- A move is still a DOM move. Removing a popover from the document hides it, so the host-move
+  effect is declared before the region effect, which runs `showPopover()` again in the same
+  commit. Focus inside a toast at that moment is lost (a removal fires no `focusout`; the
+  per-commit effect clears the focus pause when focus is no longer inside); the dialog's own
+  focusing steps take it anyway. The toasts' `@starting-style` replays on the move (the elements
+  were removed and re-inserted); acceptable, and the only visible cost. The two wrappers have no
+  box and no role.
+- Hydration: the server renders the region inline (react-dom's server renderer has no portals).
+  The hydration render matches it (`useSyncExternalStore(subscribeNothing, () => true, () =>
+  false)`: the server snapshot, used for the hydration render too, says "inline"), then the
+  first client render switches to the anchor plus the portal: one remount, with an empty queue
+  (the manager subscription is a passive effect, so nothing is in the queue yet and nothing is
+  lost). A client-only root portals from its first render.
 - Toasts added while the dialog is open are inside the dialog's subtree and therefore
   interactive and exposed; `document.ariaNotify()` announces them regardless (section 5).
 
@@ -388,9 +435,11 @@ What is announced, and when:
 
 | Event | Text | Priority | When |
 | --- | --- | --- | --- |
-| Toast added (or shown from the queue beyond `limit`: announced on **add**, the message is timely even if the box is not yet visible) | `announce(toast)` | `toast.priority` (`"normal"` default, `"high"` → `{ priority: "high" }`) | In an effect after the Root's content has committed un-suspended (section 3.5), never in the click handler (macOS VoiceOver drops an announcement that coincides with the click's own events, research §2) |
+| Toast added (or shown from the queue beyond `limit`: announced on **add**, the message is timely even if the box is not yet visible) | `announce(toast)` | `toast.priority` (`"normal"` default, `"high"` → `{ priority: "high" }`) | In an effect after the Root's content has committed un-suspended (section 3.5; a Title or Description revealed by a consumer boundary inside the Root reports its commit and is announced then, review M3), never in the click handler (macOS VoiceOver drops an announcement that coincides with the click's own events, research §2) |
 | `toast.update` / promise settle | the new text, only if it differs from the last announced text for that id | the new priority | same |
 | Dismissal, timeout | nothing | – | – |
+| Viewport remount with retained toasts (section 14 item 11) | nothing: the manager carries the last announced text per toast (`RetainedToast.announced`) and the next Viewport seeds its "last announced" map from it (review L1) | – | – |
+| `toast({ id })` on an **ending** toast with the same text | the text again: the replaced entry's last-announced text is cleared (review L7) | the new priority | as for an add |
 | Several toasts in one task | one call with the texts joined by `" "` in dispatch order | the highest priority among them | one microtask after the last effect |
 
 `announce` resolves in this order: the toast's own `announce` option, the Viewport's `announce`
@@ -417,7 +466,7 @@ viewport-wide fact).
 
 | | |
 | --- | --- |
-| Starts | when the toast is visible (within `limit`), its content has committed un-suspended, and it is not `pending`; `duration` is read then, so an `update` that changes `duration` restarts |
+| Starts | when the toast is visible (within `limit`), its content has committed un-suspended **as far as the library's guard can see** (a consumer `<Suspense>` inside the Root is not seen: the timer runs while its skeleton shows, section 3.5 and 21), and it is not `pending`; `duration` is read then, so an `update` that changes `duration` restarts; a `toast({ id })` that replaces an ending toast gets a fresh timer |
 | `duration` | ms; Viewport `duration` is the default (5000); `null` is persistent. A toast with an `action` is persistent unless `duration` is given (decision 9, question 3) |
 | Paused while | pointer over the region (`pointerenter` / `pointerleave` on the section; touch lifts the pointer, so a tap does not stick), focus inside the region (`focusin` / `focusout`), `document.hidden`, window `blur`, the toast `pending` (promise unsettled or Action running) |
 | Resumed | with the remaining time; `data-paused` on the Viewport while any viewport-wide pause condition holds (so a visible progress bar can pause with it) |
@@ -438,7 +487,7 @@ bar follow the real timer.
 
 | Key | Where | Effect |
 | --- | --- | --- |
-| `hotkey` (default F8) | document | If the region has toasts: `preventDefault()`, remember `document.activeElement`, focus the newest visible toast's Root. If it has none: nothing (the browser keeps the key). `hotkey={null}` installs no listener. |
+| `hotkey` (default F8) | document | The match requires every listed key and modifier **and no unlisted modifier** (Ctrl+F8, Alt+F8 and Shift+F8 are not F8; Radix accepts them, review L4), so a browser or OS chord that shares the key is left alone. If the region has toasts: `preventDefault()`, remember `document.activeElement`, focus the newest visible toast's Root. If it has none: nothing (the browser keeps the key). `hotkey={null}` installs no listener. |
 | Tab / Shift+Tab | region | Platform sequential focus through each toast and its buttons in DOM order; leaving the region with Shift+Tab from the first toast (or Tab from the last control) goes wherever the DOM order leads, as with any top-layer element in its DOM position. Nothing is trapped. |
 | ArrowDown / ArrowUp | a toast Root or anything inside it | Focus the next / previous toast's Root (DOM order, no wrap). `preventDefault()`. |
 | Escape | a toast Root or anything inside it | Dismiss that toast (`reason: "dismiss"`); then the focus rule below. The region is `manual`, so the platform does nothing on Escape, and no other popover closes. |
@@ -475,7 +524,15 @@ choice, is a menu accelerator on Windows.
 - Exiting toasts stay in `state.toasts` with `ending: true` until their animations finish
   (section 10.2), so a stack can animate the gap closing (`grid-template-rows: 1fr → 0fr`).
 - A `toast.update` on an id keeps its position. A `toast()` with an explicit `id` that already
-  exists is an update (useful for "one toast per key": `toast({ id: "sync", … })`).
+  exists is an update (useful for "one toast per key": `toast({ id: "sync", … })`). A `toast()`
+  with the `id` of an **ending** toast replaces it: the ending entry is removed and a new one
+  appended, with a fresh timer and a fresh announcement (its last-announced text is cleared,
+  review L7) and no exit hold for the old one. When both happen in one tick
+  (`toast.dismiss("sync"); toast({ id: "sync", … })`) the keyed Root is reused, so focus is not
+  moved out and no exit baseline is taken, but the replaced entry's `closeAction` still runs with
+  `"dismiss"`.
+- The commands of one tick apply in order, dismissals included (section 3.4, review H1): a
+  `toast.dismiss()` never touches a toast added after it in the same batch.
 
 ---
 
@@ -490,6 +547,7 @@ choice, is a menu accelerator on Windows.
 | Escape in the toast | `"dismiss"` | the keydown | library |
 | `toast.dismiss(id)` / `toast.dismiss()` | `"dismiss"` | `undefined` | consumer code |
 | Promise toast settled with no message for that outcome | `"dismiss"` | `undefined` | library |
+| Promise toast whose `success` / `error` function threw (section 3.1) | `"dismiss"` | `undefined` | library |
 | Timer elapsed | `"timeout"` | `undefined` | library |
 
 `Toast.Close` is `"dismiss"`, not `"activate"` as Dialog's Close part is, deliberately: a
@@ -552,10 +610,27 @@ A toast mounts in an urgent commit; `@starting-style` animates insertion in ever
 ### 10.2 Exit: `data-ending` and the held item
 
 When a toast closes, the Viewport marks the item `ending: true` (urgent) instead of removing it.
-The Root renders `data-ending`; in its layout effect it reads `exitAnimations(element)` (the
-shared helper: a style flush, then the finite animations in the subtree) and holds the item until
-they settle through `useExitAnimation`, then the Viewport drops it. No animations: dropped in the
-same effect. The region hides only when the last item is dropped.
+Right before that write, still in the closing handler, the Viewport **snapshots the animations
+already running** in the toast (`root.getAnimations({ subtree: true })`, a style flush; kept per
+id as the *exit baseline* until the toast is dropped or replaced). The Root renders
+`data-ending`; in its layout effect it reads `exitAnimations(element)` (the shared helper: a
+style flush, then the finite animations in the subtree), **drops every animation in the
+baseline**, waits for the rest with `Promise.allSettled`, then asks the Viewport to drop the
+item. Nothing left to wait for: dropped in the same effect. The region hides only when the last
+item is dropped.
+
+The rule is therefore: **the exit waits only for animations the ending state started.** They are
+compared by animation object, not by `startTime` or `pending`: a progress bar paused under
+`[data-paused]` (section 15.6, the documented recipe) has `startTime === null` exactly like a
+just-created animation, so the timeline cannot tell them apart and identity can. A transition
+the ending style retargets is a new `CSSTransition` object, so it is waited for. Without the
+baseline, Close clicked over a 5 s progress bar held the invisible, inert toast (and the region,
+and `data-empty`) until the pointer left and the bar finished (review M1). Cost: one
+`getAnimations()` per close, in the closing handler. The hold is a plain layout effect rather
+than `useExitAnimation`: the item lives in the Viewport's queue, and the hook's `held` flag would
+need a re-render to observe the release (a `true` → `false` pair batched into one render would
+never drop). An ending entry with no registered Root (never shown) is dropped by the Viewport's
+own layout effect.
 
 ```css
 .toast[data-ending] { opacity: 0; translate: 0 1rem; }
@@ -659,7 +734,9 @@ export interface ToastCloseDetails extends ActionDetails { readonly id: string; 
 
 export interface ToastPromiseOptions<T> {
   readonly pending: ToastOptions;
+  /** Omitted: dismissed on fulfilment. A function that throws dismisses the toast and the returned promise rejects with what it threw. */
   readonly success?: ToastOptions | ((value: T) => ToastOptions);
+  /** Omitted: dismissed on rejection, the returned promise rejects with the reason. A throwing function: as for `success`. */
   readonly error?: ToastOptions | ((reason: unknown) => ToastOptions);
   readonly id?: string;
 }
@@ -691,7 +768,7 @@ export interface ToastViewportProps extends Omit<HTMLAttributes<HTMLElement>, "c
   readonly manager?: ToastManager;          // default: the module-level one
   readonly limit?: number;                  // default 3
   readonly duration?: number | null;        // default 5000
-  readonly hotkey?: readonly string[] | null; // default ["F8"]; event.code values and modifier names ("altKey")
+  readonly hotkey?: readonly string[] | null; // default ["F8"]; event.code values and modifier names ("altKey"); unlisted modifiers must be up
   readonly announce?: (toast: ToastItem) => string | null;
   readonly children?: StateValue<ReactNode, ToastViewportState>;
   readonly className?: StateValue<string | undefined, ToastViewportState>;
@@ -755,7 +832,9 @@ Action, Close }`, plus the named exports `toast` and `createToastManager` from
 | `closeAction` in flight | Viewport `useTransition` | transition | transition | none (nothing visible waits) |
 | Suspended content | Root, from the guard | internal | – | none; gates timer and announcement |
 | Focus-return target | Viewport ref | internal | – | none |
-| Modal container | module registry, read with `useSyncExternalStore` | library-owned, urgent | urgent | none |
+| Modal container | module registry, read with `useSyncExternalStore`; the region's host `div` is moved by the library (section 4.3), never re-created | library-owned, urgent | urgent | none |
+| Exit baseline (the animations running before the close) | Viewport ref map, per ending id | internal | – | none; filters the exit hold (section 10.2) |
+| Content committed (a Title / Description inside a consumer boundary) | Root, from the parts' layout effects | internal | – | none; re-runs the announcement (section 3.5) |
 
 `pending` on a Root has one meaning (conventions 4.1): work this toast reports on is in flight,
 whether the promise given to `toast.promise` or an action dispatched through its Action part.
@@ -773,7 +852,12 @@ It is not set while content is merely suspended (that is the guard's job, and no
 - **Hydration**: the Viewport subscribes to the manager in an effect and drains the buffer of
   `toast()` calls made **on the client** before it mounted (a Server Function result handled
   during hydration, a store firing early). Order preserved. The buffer is client-only (next
-  bullet).
+  bullet). The hydration render keeps the region inline to match the server HTML; the first
+  client render after it moves the region into the portal host (section 4.3).
+- **A second Viewport on a taken manager** renders nothing from its first render (`isTaken`,
+  read during render) and installs no document listeners. Two Viewports mounted in the same
+  commit still render the second region once (neither has subscribed yet), and the server always
+  renders it: the dev-warning case, cosmetic (review L8, partial; #63).
 - **Server Components**: `<Toast.Viewport>` needs a function child, so it is rendered from a
   Client Component file (`notifications.tsx`) that a Server Component layout renders. `toast()`
   is client code; a Server Function returns data and the client calls `toast()` with it (section
@@ -819,18 +903,43 @@ It is not set while content is merely suspended (that is the guard's job, and no
 8. **`toast.update` on an ending or unknown id.** Ignored (dev warning for unknown).
 9. **Timer elapses while the user is mid-Tab into the region.** `focusin` paused it first; the
    pause is applied synchronously in the event, before any timer callback can run.
-10. **Modal opens with focus inside a toast.** The region moves into the dialog (remount), the
-    dialog's focusing steps take focus; the Viewport's focus-return target is cleared on the
-    `focusout` the remount causes. On the dialog's close, the region moves back and the dialog
-    returns focus to its own opener.
+10. **Modal opens with focus inside a toast.** The library moves the region's host into the
+    dialog (a DOM move, no remount: a pending Undo stays pending, its timer paused), the dialog's
+    focusing steps take focus; the Viewport's focus pause and focus-return target are cleared by
+    the per-commit effect (a removal fires no `focusout`). On the dialog's close, the host moves
+    back and the dialog returns focus to its own opener.
 11. **The Viewport unmounts with toasts in it.** Timers cleared, the manager keeps the items;
     a Viewport mounted later renders them (a route-level Viewport remounting on navigation does
-    not lose an Undo). `closeAction`s do not run for an unmount.
+    not lose an Undo). `closeAction`s do not run for an unmount. The manager also carries the
+    last announced text per toast, so the later Viewport does not announce them again (review
+    L1).
 12. **StrictMode.** The subscribe effect runs twice; the manager's `subscribe` is idempotent per
     Viewport instance and the buffer is drained once.
 13. **A toast whose content suspends, then the promise toast settles before the reveal.** The
     `update` replaces the content; the guard unmounts with it; announcement and timer wait for the
     new content's commit.
+14. **`toast.dismiss(); toast({ title: "Saved", closeAction })` in one action body.** Both
+    commands land in one microtask batch and apply in order: the dismissal closes what was open,
+    the add appends "Saved", which shows and keeps its `closeAction` for later (review H1). The
+    explicit-id variant, `toast.dismiss("sync"); toast({ id: "sync", … })`, replaces the toast:
+    the old entry's `closeAction` runs with `"dismiss"`, the new one has a fresh timer and
+    announcement, and the keyed Root is reused (section 8). `toast(); toast.dismiss()` in one
+    tick closes the new toast too: order, not kind, decides.
+15. **`toast.promise` whose `success` renderer throws** (`success: (r) => ({ title: r.name })`
+    with `r` undefined). The toast is dismissed and the returned promise rejects with the
+    `TypeError`; the awaiting action prop rejects and its boundary shows it. Before the fix the
+    toast stayed `data-pending` forever (review M4).
+16. **Title inside the consumer's `<Suspense>` in the Root** (`title: <Avatar />` behind a
+    skeleton). The Root commits with the skeleton, nothing is announced, the timer starts
+    (section 3.5); when the avatar's data arrives the boundary reveals the Title, which reports
+    its commit, and the toast is announced then (review M3). The timer gap is section 21's
+    proposal.
+17. **Undo in flight when a modal opens, timed toast** (the 9.3 Gmail shape with
+    `duration: 8000`, an Undo that opens a confirm `Dialog` and awaits it). The host moves into
+    the dialog; the Action keeps its `useActionTrigger` state, the Root keeps `data-pending`, the
+    timer stays paused; the Undo settles, the toast closes with `"activate"`, `deleteForReal`
+    never runs. Before the fix the remount reset the pending flag and the timer could expire
+    during the undo (review M2).
 
 ---
 
@@ -1002,9 +1111,9 @@ rule (no controlled state; the queue is not an `x` / `defaultX` triple), optimis
 | Area | What the test proves |
 | --- | --- |
 | Roles and ARIA | Viewport is a `region` named "Notifications (F8)" with `popover="manual"`; `aria-label` overrides; the name follows a custom `hotkey`; Root is `dialog`, `alertdialog` for `priority: "high"`, `tabindex="0"`, `aria-labelledby` / `aria-describedby` resolve to Title / Description; `data-type`; Title is not a heading. |
-| Queue | `toast()` returns an id and renders a Root; explicit existing `id` updates; `update` changes content in place (same DOM node); `dismiss(id)`, `dismiss()`; `limit` renders N and `state.queued` counts the rest, a dismissal promotes the next in order; chronological DOM order. |
+| Queue | `toast()` returns an id and renders a Root; explicit existing `id` updates; `update` changes content in place (same DOM node); `dismiss(id)`, `dismiss()`; `limit` renders N and `state.queued` counts the rest, a dismissal promotes the next in order; chronological DOM order; `dismiss()` then `toast()` in one tick shows the new toast, `dismiss(id)` then `toast({ id })` replaces it (the old `closeAction` runs with `"dismiss"`), `toast()` then `dismiss()` closes the new one too (review H1). |
 | Lanes | With an unrelated `useTransition` action pending (deferred), `toast()` called inside that action's sync prefix, inside a consumer `startTransition`, and plainly, all render before the action settles; order of three calls in one tick preserved. |
-| Promise | `toast.promise`: pending options rendered with `data-pending` at once; `success` on resolve (object and function forms), `error` on reject; omitted `success` / `error` dismiss; the returned promise resolves with the value, resolves `undefined` on rejection with `error` given, rejects with the reason without it; `ariaNotify` called on settle with the new text and priority. |
+| Promise | `toast.promise`: pending options rendered with `data-pending` at once; `success` on resolve (object and function forms), `error` on reject; omitted `success` / `error` dismiss; the returned promise resolves with the value, resolves `undefined` on rejection with `error` given, rejects with the reason without it; `ariaNotify` called on settle with the new text and priority; a throwing `success` / `error` function dismisses the toast and the returned promise rejects with what it threw (review M4). |
 | Sync action | `Toast.Action` calls `action(details)` with `details.id` and `details.event` the native click / keydown; `closeAction` receives `{ id, reason }`; Close dispatches `"dismiss"`; a disabled Action never dispatches; a default from `toast.action` and a prop `action` both work; no Action rendered without either. |
 | Async action | While the Undo promise is unresolved: `data-pending` on Action and Root, the toast's timer does not elapse (fake timers advanced past `duration`); after resolve: the toast closes with `reason: "activate"`; `closeOnSettle={false}` keeps it. |
 | Rejection | Undo rejects: the toast stays, `data-pending` gone, the error reaches an `<ErrorCatcher>` around the Viewport's list; caught-inside variant resolves and closes (the documented trap); caught-and-rethrown keeps the toast (15.3). |
@@ -1012,13 +1121,13 @@ rule (no controlled state; the queue is not an `x` / `defaultX` triple), optimis
 | `closeAction` | Called once per close with each reason (`"activate"`, `"dismiss"` for Close / Escape / `dismiss()`, `"timeout"`); runs in a transition (a `useTransition` probe inside it is not needed; assert it is not called synchronously inside the dismissal click, and that its rejection reaches the boundary above the Viewport); not called on Viewport unmount. |
 | Timers | Default 5000; Viewport `duration`; per-toast `duration`; `null` persistent; action toasts persistent by default and timed with `duration`; starts only when visible (queued beyond `limit`) and un-suspended; `update` with a new `duration` restarts. |
 | Pausing | `pointerenter` / `pointerleave`, `focusin` / `focusout`, `visibilitychange` (hidden / visible), window `blur` / `focus` pause and resume with the remaining time; `data-paused` on the Viewport; a `pending` toast's timer alone is paused while its siblings run. |
-| Keyboard | F8 focuses the newest toast and `preventDefault()`s; does nothing with no toasts; `hotkey={null}` installs no listener; `["altKey", "KeyT"]`; ArrowDown / ArrowUp between Roots, no wrap; Escape dismisses the toast containing focus; focus goes to the next toast, else previous, else the element focused before F8 (and before a Tab-in, through `relatedTarget`), else body. |
-| Suspending content | A title that suspends: Root rendered with no `data-pending`, nothing announced, timer not started, the Viewport's other toasts unaffected and no consumer boundary above the Viewport shows its fallback; on reveal: announced, timer started. A consumer `<Suspense>` inside the Root shows its own fallback. |
+| Keyboard | F8 focuses the newest toast and `preventDefault()`s; does nothing with no toasts; `hotkey={null}` installs no listener; `["altKey", "KeyT"]`; ArrowDown / ArrowUp between Roots, no wrap; Escape dismisses the toast containing focus; focus goes to the next toast, else previous, else the element focused before F8 (and before a Tab-in, through `relatedTarget`), else body; Ctrl+F8 (an unlisted modifier) is ignored (review L4). |
+| Suspending content | A title that suspends: Root rendered with no `data-pending`, nothing announced, timer not started, the Viewport's other toasts unaffected and no consumer boundary above the Viewport shows its fallback; on reveal: announced, timer started. A consumer `<Suspense>` inside the Root shows its own fallback, and the toast is announced once that boundary reveals the Title (review M3; the timer is not gated by it, #63). |
 | Announcements | `document.ariaNotify` stubbed: called after the add commit (not synchronously in the click), with Title + Description text and `{ priority }`; `announce` option and prop override, `null` silences; two adds in one tick → one call with both texts and the higher priority; `update` with unchanged text → no call; dismissal → no call; absent `ariaNotify` → no throw. |
-| Exit | On close the Root stays with `data-ending` and `inert`; dropped in the same effect in jsdom (no animations); the region's `hidePopover` shim is called when the last item is dropped; `ending` items keep their position. |
+| Exit | On close the Root stays with `data-ending` and `inert`; dropped in the same effect in jsdom (no animations); the region's `hidePopover` shim is called when the last item is dropped; `ending` items keep their position; an animation running before the close (a progress bar, `getAnimations` stubbed on the Root) is not waited for (review M1). |
 | Function props and `render` | `className` / `style` / `children` / `render` on Viewport, Root, Action, Close receive the documented state; `render={<article />}` keeps the handlers and forwards `ref`. |
-| Manager | `createToastManager()` isolation (two Viewports, two managers, no cross-talk); a second Viewport on the default manager warns and renders nothing; `toast()` before any Viewport is buffered and rendered on mount, once under StrictMode; with `document` undefined (a `// @vitest-environment node` row or a deleted global) every method is a no-op that warns once and leaves the buffer empty. |
-| Modal registry | With the Dialog shim: a modal `Dialog` open → the region is a descendant of the `<dialog>` and `showPopover` was called again; on close → back inline and shown again; a Viewport rendered inside a Dialog warns. |
+| Manager | `createToastManager()` isolation (two Viewports, two managers, no cross-talk); a second Viewport on the default manager warns and renders nothing; `toast()` before any Viewport is buffered and rendered on mount, once under StrictMode; with `document` undefined (a `// @vitest-environment node` row or a deleted global) every method is a no-op that warns once and leaves the buffer empty; a second Viewport added while another holds the manager never renders its region, from its first render on (review L8); a Viewport remount does not announce a restored toast again (review L1). |
+| Modal registry and portal host | With the Dialog shim: a modal `Dialog` open → the region is a descendant of the `<dialog>` and `showPopover` was called again; on close → back inline and shown again; the toasts' React state survives the move (an Undo in flight stays `data-pending`, its timer paused, review M2); a move that hid the popover shows it again in the same commit (jsdom's shim keeps a popover open across a synchronous `append`, so that row stubs `append` to hide like a browser); `hydrateRoot` on the server's inline region hydrates without a mismatch, then portals and renders toasts; a Viewport rendered inside a Dialog warns. |
 | Directive | Every part file starts with `"use client"`; `toast.ts` and `internal/modal-registry.ts` do not. |
 
 jsdom facts to rely on (verified in earlier designs): no Popover API (`showPopover` shim from
@@ -1033,7 +1142,7 @@ visibility row.
 | Top layer | The region is `:popover-open` after the first toast and not after the last leaves; adding a toast does not close an open `Menu`; a click on a toast light-dismisses an open `auto` Popover (expected). | none |
 | Re-raise | Open a toast, open a `Popover` over it, add a toast: the new toast is hit-testable (`elementFromPoint` at its centre is inside it) and the Popover is still open; the existing toast's `getAnimations()` is empty right after the re-raise (no enter replay). | the fallback in 4.2 if an engine replays |
 | Modal | Open a toast, open a modal `Dialog`: the toast's Undo is focusable and a real click reaches it (the region moved into the dialog); close the dialog: the region is back inline, visible, and the toast still interactive. | none expected (research verified Chromium and Firefox; WebKit on CI) |
-| Enter and exit | With the starter CSS: a new Root has a running transition; after Close the Root stays with `data-ending` until `getAnimations()` settle, then is gone and the region hidden; `prefers-reduced-motion` emulation drops it immediately. | Firefox: no `display` transition on the region, irrelevant (it hides when empty) |
+| Enter and exit | With the starter CSS and a long (5 s) exit, so the assertions cannot race the wall clock (the wall-clock version was the flake in #62): a new Root has a running transition; after Close the Root stays with `data-ending`; `finish()` on the captured animations drops it and hides the region; `prefers-reduced-motion` emulation drops it immediately. A 5 s progress bar paused under `data-paused` does not hold the exit (review M1). | Firefox: no `display` transition on the region, irrelevant (it hides when empty) |
 | Announcement | `document.ariaNotify` exists in all three engines (no throw, called once per add). | AT behaviour is the manual pass |
 | No view transition | `document.startViewTransition` spied: zero calls for add, update, Close, Escape, Undo settle (there is no `transition` prop; this row guards against a stray boundary). | none |
 | Focus | F8 focuses the newest toast in each engine; Escape returns focus to the button that had it. | none |
@@ -1075,12 +1184,22 @@ packages/ui/src/internal/
   `"fsui-toast-" + n` per manager. `promise` wraps: `const id = add(pending)`, then
   `promise.then(v => update(id, resolve(success, v)) or dismiss(id), e => update(id,
   resolve(error, e)) or dismiss(id))`, and returns a promise built from the same `then` that
-  resolves `undefined` after an error update and rethrows when `error` is absent. The manager
-  never touches React or the DOM; `queueMicrotask` is the only platform call.
-- **Queue reducer** in the Viewport: `useState<{ items: Item[]; }>` with functional updates
-  per command. `add` with an existing id → `update`. `dismiss` on an item → `ending: true` and
-  `closeAction` scheduled (below); `drop(id)` removes it. Visible items are the first `limit`
-  non-ending items plus every ending item; `queued` is the remainder's length.
+  resolves `undefined` after an error update and rethrows when `error` is absent; the resolution
+  runs inside a `settle` helper whose `catch` dismisses the toast and rethrows (review M4). The
+  unsubscribe asks the listener to `retain()` its non-ending entries (options, `pending`, the
+  last announced text) for the next subscriber's `restore` (review L1); `isTaken(listener)` is
+  readable during render for the second-Viewport case (review L8). The manager never touches
+  React or the DOM; `queueMicrotask` is the only platform call.
+- **Queue reducer** in the Viewport: `useState` plus an authoritative `entriesRef` written
+  together, so a burst of commands composes and side effects stay out of updaters. The commands
+  of one batch apply **in order inside the loop, dismissals included** (`dismiss` marks the
+  entries open at that point `ending: true`); the side effects run after the loop: `moveFocusOut`
+  and the exit-baseline snapshot for the ids that actually leave (not one replaced by a later
+  add in the same batch), `closeAction` for every dismissed entry (review H1). `add` with an
+  existing non-ending id → `update`; with an ending id → the entry is replaced and its timer,
+  last-announced text and exit baseline are cleared (review L7). `drop(id)` removes an ending
+  entry. Visible items are the first `limit` non-ending items plus every ending item; `queued`
+  is the remainder's length.
 - **`closeAction` dispatch.** The Viewport keeps one `useTransition`; on a close it runs
   `startTransition(async () => { await closeAction?.(createActionDetails(event, { id, reason })); })`
   from the handler or timer that caused it (never from render). Rejections take React's path to
@@ -1094,34 +1213,50 @@ packages/ui/src/internal/
   it has items and is not open (also after a container change: the element is new), `hidePopover()`
   when it has none and is open; re-raise on an add while open (a `addedSinceLastEffect` ref set
   by the reducer path). Guard every call with `isConnected` and `matches(":popover-open")`.
-- **Portal.** `const container = useSyncExternalStore(modalRegistry.subscribe,
-  modalRegistry.getTopmost, () => null)`; `container === null ? region :
-  createPortal(region, container)`. The Dialog change: `dialog-popup.tsx` calls
-  `modalRegistry.push(element)` after `showModal()` and `modalRegistry.remove(element)` in its
-  `close` listener and unmount cleanup (two lines each; no behaviour change for Dialog).
+- **Portal host.** `const container = useSyncExternalStore(modalRegistry.subscribe,
+  modalRegistry.getTopmost, () => null)`; `const [host] = useState(createHost)` (a
+  `display: contents` `div`, `null` on the server); `portalled =
+  useSyncExternalStore(subscribeNothing, () => true, () => false)` tells the hydration render
+  from a client render. Render: inline while `!portalled`, else `<><div ref={anchorRef}
+  style="display: contents" />{createPortal(content, host)}</>`. A per-commit layout effect,
+  declared **before** the region effect, does `(container ?? anchor).append(host)` when the host
+  is not already there; the region effect then re-shows the popover the move hid (review M2).
+  The host is removed on unmount. The Dialog change: `Dialog.Popup` calls
+  `useModalRegistration(dialog)` (one hook, one import), which reads `:modal` after
+  `beforetoggle` (a microtask later) and on `toggle` / `close`, so every way of opening counts.
 - **Announcements.** The Root's effect after commit (and after the guard reports un-suspended)
   calls `viewport.announce(id, text, priority)`; the Viewport collects into a per-microtask
   batch and calls `document.ariaNotify?.(texts.join(" "), { priority })`. Last-announced text per
-  id in a ref for the "unchanged" rule.
+  id in a ref for the "unchanged" rule, seeded from `RetainedToast.announced` on `restore`
+  (review L1). The Root's announcement is a **layout** effect (visible toasts announce before
+  the Viewport's effect announces the queued ones: dispatch order). `Toast.Title` and
+  `Toast.Description` call `root.contentCommitted()` from a `[]` layout effect; after the Root's
+  first announcement effect has run, that queues one microtask which re-runs the announcement
+  (coalesced, so a Title and a Description revealed together produce one text), which is how a
+  reveal inside a consumer `<Suspense>` is announced (review M3).
 - **Root.** `<div role tabIndex={0} aria-labelledby aria-describedby data-* inert={ending}>`
   wrapped in nothing (no boundary); children inside `<Suspense fallback={<Guard />}>`. `Guard` is
   a component rendering `null` whose layout effect sets `suspended` in the Root's state on mount
-  and clears it on unmount. Exit: on `ending` becoming true, `holdUntil(exitAnimations(el))` and,
-  when `held` goes false, `viewport.drop(id)`. Keyboard: `onKeyDown` for Escape and arrows
+  and clears it on unmount. Exit: on `ending` becoming true, `exitAnimations(el)` filtered by
+  `viewport.exitBaseline(id)` (section 10.2), `Promise.allSettled`, then `viewport.drop(id)`
+  (guarded against a cancelled effect; idempotent; the baseline is kept until the drop so a
+  StrictMode effect re-run sees it too). Keyboard: `onKeyDown` for Escape and arrows
   (`preventDefault()`; the arrows read the Viewport's registered Root elements sorted by
   `compareDocumentPosition`).
 - **Action.** `useActionTrigger()`; `run(() => action(details), () => closeOnSettle &&
   viewport.dismiss(id, "activate", event))`; `pending` is reported to the Root through context
   (`setActionPending`), which merges it into `toast.pending` for its state and the Viewport.
 - **Hotkey.** A document `keydown` listener in an effect keyed on the serialised `hotkey`;
-  match: `hotkey.every(k => k in event ? event[k] === true : event.code === k)`.
+  match: every modifier flag on the event equals "listed in `hotkey`" (so an unlisted modifier
+  held rejects, review L4), and every non-modifier entry equals `event.code`.
 - **Focus return.** `focusin` on the region with `relatedTarget` outside (or null) stores it;
   `focusout` to outside clears it. Before a close of the toast containing focus, compute the
   target (next, previous, stored, body) and `.focus()` it synchronously, then mark ending.
 - **Dev warnings** (`useDevWarning`): second Viewport on one manager; Viewport inside a Dialog
   (`element.closest("dialog")`); `toast.update` on an unknown id; `Toast.Close` with no accessible
   name (text or `aria-label`); `toast()` on the server.
-- **Shared code reused**: `useActionTrigger`, `useExitAnimation` / `exitAnimations`,
+- **Shared code reused**: `useActionTrigger`, `exitAnimations` (not the `useExitAnimation`
+  hook, section 10.2),
   `createActionDetails`, `dataAttr`, `useRender`, `useDevWarning`, `useLatest`,
   `platform-attributes` (nothing new needed: `popover`, `inert` are typed).
 
@@ -1202,3 +1337,130 @@ proceeds as recommended unless overridden.
    `visibleToasts` hides, Radix shows all). Queueing never loses an Undo. Recommended.
 
 **Accepted by the product owner (2026-10-18):** all nine recommendations as written. One amendment: a `toast()` call on the server (`typeof document === "undefined"`) must be a no-op with a dev warning. It must **not** be buffered: the default manager is module-level, so on a server it would build up a queue shared between requests (leaking memory and data between users). The pre-mount buffer is for the client only.
+
+---
+
+## 20. Review corrections (#54, 2026-10-18)
+
+From `memo/reviewer/toast.md` (review of 3266e4e..fa6e481, merged at 03404ef; commit 2805959) and
+the developer's reasoning in `memo/developer/toast.md` "Review fixes"; code and tests in eeacdbf,
+the docs page in 906702d. Each item is folded into the sections named; this table is the audit
+trail. The architect agrees with every choice the developer made; none is corrected here. The
+leftovers are GitHub issue #63.
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| H1 | Dismissals apply **in batch order**: the Viewport's `apply` marks entries ending inside the command loop, so `toast.dismiss()` (all) and `toast.dismiss(id)` close what is open at that point of the batch and never a toast added later in the same tick. Side effects run after the loop: focus move and exit-baseline snapshot only for ids that actually leave (a `dismiss(id); toast({ id })` pair keeps its keyed Root), `closeAction` for every dismissed entry (the replaced one included, `"dismiss"`). Before: dismissals were applied after every add, so `toast.dismiss(); toast({ title: "Saved", closeAction })` never showed "Saved" and ran its `closeAction` at once (`deleteForReal` in the 9.3 pattern). | Decisions 3, 3.4, 8, 14.14, 16.1, 17 |
+| M1 | The exit hold **excludes animations already running before `data-ending`**, compared by animation object: the Viewport snapshots `root.getAnimations({ subtree: true })` in the closing handler, before the ending write, and the Root's exit effect filters `exitAnimations(element)` by that baseline. Identity rather than `startTime` / `pending` because a progress bar paused under `[data-paused]` is indistinguishable from a just-created animation on the timeline. A retargeted transition is a new object, so it is waited for. Before: Close over a paused 5 s progress bar held the inert, invisible toast (and the region, and `data-empty`) until the pointer left and the bar ended. Also records why the hold is a layout effect and not `useExitAnimation`. | Decisions 12, 3.4, 10.2, 12, 16.1, 16.2, 17 |
+| M2 | The region **always portals into a library-owned `display: contents` host `div`** that the library moves with a DOM `append` between an inline anchor (`<div style="display: contents">` where the Viewport renders) and the topmost modal dialog. React never sees the move, so the Roots, Actions and `useActionTrigger` keep their state (an Undo in flight stays `data-pending`, its timer paused). The hydration render stays inline to match the server HTML (`useSyncExternalStore` with a `false` server snapshot); the first client render switches to the portal with an empty queue. The host-move effect runs before the region effect, which re-shows the popover the move hid. Before: `container === null ? region : createPortal(region, container)` remounted the subtree on each move (and `createPortal` remounts on a container change anyway), clearing the Action's pending flag so a timed Undo toast could expire during the undo. | Decisions 7, 1, 4.3, 12, 13, 14.10, 14.17, 16.1, 17 |
+| M3 (announcement) | `Toast.Title` and `Toast.Description` **report their commit** (`root.contentCommitted()` from a `[]` layout effect: mount, and re-show after a boundary inside the Root hid them). After the Root's first announcement effect has run, a report queues one microtask that re-runs the announcement, so a reveal inside a consumer `<Suspense>` is announced, and a Title and Description revealed together are one text. Before: the Root's effect ran once at the skeleton commit, recorded `""` as announced, and the boundary's retry never re-ran it: `ariaNotify` was never called. | 3.5, 5, 14.16, 16.1, 17 |
+| M3 (timer) | **Not fixed.** The timer starts at mount while a consumer boundary inside the Root shows its skeleton: nothing committed distinguishes "Title not yet committed" from "no Title", and a render-phase flag can be left set by a discarded render. Documented next to the skeleton recipe; section 21 is the proposal (`fallback` on `Toast.Root`), tracked in #63. | 3.5, 6, 21 |
+| M4 | A **throwing `success` / `error` function in `toast.promise` dismisses the toast and the returned promise rejects** with what was thrown (a `settle` helper wraps `resolveOptions`). Not the `error` toast: the operation's outcome is known, only its message is not, and an error message would misreport a fulfilment; the consumer's bug reaches the awaiting action's boundary. Before: the throw escaped `then` before any dispatch and the toast stayed `data-pending` with no timer, forever. | 3.1, 9.1, 11, 14.15, 16.1, 17 |
+| L1 | `RetainedToast.announced` carries the last announced text (`null` for silenced) across a Viewport unmount; `restore` seeds the next Viewport's map, so a route-level Viewport does not repeat "Archived, Undo" on every navigation. | 5, 14.11, 16.1, 17 |
+| L4 | The **hotkey rejects unlisted modifiers**: every modifier flag must equal "listed in `hotkey`", so Ctrl+F8, Alt+F8 and Shift+F8 are not F8 (Radix accepts them; the design chooses the stricter match so a chord that shares the key is left to the browser or OS). Docs prop row updated. | Decisions 10, 7, 11, 16.1, 17 |
+| L7 | A `toast({ id })` on an ending id clears that id's timer, last-announced text and exit baseline in the "ending entry replaced" branch, so the same text is announced again and the timer is fresh. | 5, 8, 17 |
+| L8 (partial) | `rejected` is initialised from `isTaken(listener)` during render, so a Viewport added while another holds the manager renders nothing from its first render and installs no document listeners. Two Viewports mounted in the same commit still render the second region once, and the server always renders it (cosmetic; #63). | 13, 16.1 |
+| Flake | The browser exit row uses a 5 s exit, asserts the held state, `finish()`es the captured animations and asserts the drop, so it no longer races a wall clock under suite load (#62). A new browser row covers M1 with a paused 5 s progress bar. | 16.2 |
+| L2, L3, L5, L6 | Not fixed: `manager` prop change mixes queues; hover pause can stick when the region leaves under the pointer (the move no longer remounts, but a DOM move delivers no `pointerleave`); a queued toast that is dismissed renders once as an ending Root; the `blurred` pause is not initialised at mount (`document.hasFocus()` is `false` in unfocused iframes and in jsdom, so seeding it would pause every timer there until a click). Tracked in #63. | – |
+
+---
+
+## 21. Proposal: `fallback` on `Toast.Root` (review M3, the timer; issue #63)
+
+Status: **proposed, needs product-owner acceptance.** Not implemented; nothing above depends on
+it, and the design stands without it. It works out the developer's suggestion from
+`memo/developer/toast.md` so the decision can be taken on an API rather than on a sentence. It
+also amends conventions 6 ("the library … has no `fallback` props in v0"), so accepting it is a
+conventions decision too (section 18 would gain an item 10); the conventions are not edited
+until then.
+
+### 21.1 The gap
+
+The library's Suspense guard (section 3.5) gates the timer and the announcement on the toast's
+content committing. The documented way to show a skeleton is a consumer `<Suspense>` inside the
+Root, which catches first and is invisible to the guard: after M3 the reveal is still announced,
+but the timer starts while the skeleton shows. A 5 s toast whose avatar takes 3 s to load is on
+screen, readable, for 2 s. The library cannot detect the consumer's boundary without render-phase
+bookkeeping that a discarded render can corrupt (review M3, section 3.5).
+
+### 21.2 API
+
+```ts
+export interface ToastRootProps … {
+  /**
+   * Rendered by the Root's own Suspense guard while `children` suspend, in place of the
+   * invisible default. The toast's timer and announcement wait for the reveal either way.
+   */
+  readonly fallback?: ReactNode;
+}
+```
+
+```tsx
+<Toast.Root key={t.id} toast={t} className="toast" fallback={<ToastSkeleton />}>
+  <Toast.Title />          {/* t.title may be <Avatar userId={…} />, which suspends */}
+  <Toast.Description />
+  <Toast.Action />
+  <Toast.Close aria-label="Close">×</Toast.Close>
+</Toast.Root>
+```
+
+Implementation: `<Suspense fallback={<SuspenseGuard>{fallback}</SuspenseGuard>}>`; the guard
+component keeps reporting its mount and unmount to the Root as today and renders `fallback`
+(default `null`). About five lines in `toast-root.tsx`.
+
+### 21.3 Semantics
+
+- **While `children` suspend**: `fallback` is visible inside the Root's `div[role=dialog]`; the
+  Root is not `data-pending` (the attribute keeps its one meaning, section 12); the timer has
+  not started; nothing is announced. Exactly the invisible guard's behaviour, made visible.
+- **On reveal**: the guard unmounts, the Root announces the Title and Description text that now
+  exists, the timer starts (section 6). The reveal is a retry-lane commit, so it lands while
+  unrelated actions are pending (the probe in section 3.5).
+- **Mount**: the toast mounts urgently, and a newly mounted boundary shows its fallback at once
+  (conventions 6), so the skeleton is on screen in the same frame as the `toast()` call. That is
+  what a skeleton wants; it is the opposite of the transition-keyed content regions elsewhere,
+  and it is why the boundary belongs to the Root and not to the Viewport.
+- **An `update` (or a promise settle) whose new content suspends**: the mounted boundary is
+  updated urgently, so React shows `fallback` again in place of the committed content, the guard
+  mounts, the timer stops and the announcement waits for the new reveal (section 14 item 13,
+  unchanged in substance, visible now).
+- **Parts inside the fallback** are allowed (a visually hidden `<Toast.Title>Loading…
+  </Toast.Title>` gives the Root an accessible name while the skeleton shows; without one the
+  `aria-labelledby` IDREF dangles and a user who presses F8 into the toast hears a nameless
+  dialog, as today) but gate nothing: a `contentCommitted` report while the guard is mounted is
+  ignored, and nothing is announced for the fallback. A consumer who wants "Loading…" announced
+  has `toast.promise`'s `pending` phase for that.
+- **A consumer `<Suspense>` inside `children`** still catches first and still has the timer gap;
+  the docs steer to `fallback` and keep the caveat for the nested shape.
+- **Type**: a `ReactNode`, as React's own `fallback`, not a `StateValue` function: nothing in
+  `ToastRootState` changes while the fallback shows that the skeleton could depend on, and the
+  consumer has `t` (its `type`, `data`) in the closure. A function form can be added later
+  without a break.
+- **SSR**: not applicable (the server renders an empty region).
+
+### 21.4 Trade-offs
+
+- **The convention.** Conventions 6 says "no `fallback` props in v0": boundary placement is the
+  consumer's layout decision. Toast is already the one component that owns a boundary (the
+  guard, accepted in section 18 item 6, for the reason that an urgent mount from outside the
+  consumer's tree would otherwise reveal the app shell's fallback). The prop does not move the
+  boundary; it lets the consumer style the one the library already has. The rule to write is
+  narrow: *`fallback` exists only where the library owns the boundary, which is Toast alone.*
+  Risk: precedent, with Dialog or Popover asking for one next; the answer there is unchanged
+  (transition-mounted content keeps old UI and shows `data-pending`; the consumer places the
+  boundary), and the rule names the reason so it cannot be generalised by analogy.
+- **Alternatives considered.** (a) Detect the consumer boundary with a render-phase "Title
+  rendered but not committed" flag: unsafe, a discarded render leaves it set and the toast never
+  times out. (b) Gate the timer on `contentCommitted` instead of on the guard: a toast without a
+  Title or Description (custom content from `t.data`) would never start its timer, and the
+  library cannot tell "no Title" from "Title not yet committed", which is the same wall as (a).
+  (c) A `Toast.Content` part that owns the boundary: the Root already is that part; a second
+  wrapper adds anatomy for nothing. (d) Status quo, documented: the cheapest; the cost is a
+  recipe whose skeleton silently eats the toast's duration, in the one component where the
+  library chose to own the boundary precisely so that the timer and announcement would be right.
+- **Built-in strings.** Unchanged: the fallback is the consumer's node; the library ships no
+  skeleton and no text (conventions 11).
+- **Tests to add** (16.1 "Suspending content"): `fallback` rendered while the title suspends,
+  no `data-pending`, nothing announced, timer not started; on reveal, announced and timer
+  started; an `update` whose content suspends shows `fallback` again and pauses the timer. Docs
+  page: the prop row and the Suspense paragraph (which today says the timer starts at once).
