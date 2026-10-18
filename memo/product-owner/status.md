@@ -143,3 +143,18 @@
 ## 2026-10-18 — usage limit hit mid-wave 6, resumed
 
 impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and design-numberfield were interrupted by the session limit; all four resumed via SendMessage after the reset.
+
+## 2026-10-18 — wave 6 done, 0.1.0-alpha.4 released
+
+- Shipped: ToggleGroup/Toolbar (#66), NumberField (#67) and Progress/Meter (#68). Each went through design, implement, review, fixes and design fold.
+- Fixed flakes: the Dialog.Form settle test (b2fc473) and the NumberField Firefox wheel test (509c87f).
+- Release: 0.1.0-alpha.4 (00cc075). publish.yml and deploy-docs.yml are both green.
+- Open follow-ups:
+  - #71: browser timing flakes
+  - #72: docs build should fail on RSC errors
+  - #73: human checks (Next.js, screen readers)
+  - #74: Toolbar native radios; direction accepted; probe native Tab from a radio first; next wave
+  - #75: Tooltip role=group check
+  - #77: NumberField browser rows and announce.ts migration
+- Open question: should NumberField validity follow the draft? The Firefox bubble and :user-invalid persist while the user types a fix. The architect says leave it; it was raised with the user.
+- Wave 7 candidates: #74, #72 and #77; new components are still to be chosen.
