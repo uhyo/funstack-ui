@@ -1464,3 +1464,5 @@ component keeps reporting its mount and unmount to the Root as today and renders
   no `data-pending`, nothing announced, timer not started; on reveal, announced and timer
   started; an `update` whose content suspends shows `fallback` again and pauses the timer. Docs
   page: the prop row and the Suspense paragraph (which today says the timer starts at once).
+
+**Accepted by the product owner** (2026-10-18). Section 21 is accepted as proposed: `fallback?: ReactNode` on `Toast.Root`, with the narrow conventions 6 rule "`fallback` exists only where the library owns the boundary (Toast alone)". The architect amends conventions 6 (and the 4.1 `ending` wording); a developer implements it with the tests listed above. Closes the M3 timer item of #63.
