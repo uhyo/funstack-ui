@@ -1133,6 +1133,7 @@ exit-animated error through `useExitAnimation` is a possible v2 if a demo wants 
     item 9) tracks whether `Dialog.Form` should gain `errors` / `autoReset` and close only on an
     error-free settle, so this becomes one part. The docs' Field page has this composition; the
     Dialog page points to it.
+    Proposed answer: dialog.md "Dialog.Form and Form.Root (#59)": no new props; the composition stays and `closeOnSettle` closes only on a settle with no errors when the form is a `Form.Root`.
 12. **A Combobox pick, then Enter** (review H1). A country Field with `validate={(v) => v === ""
     ? "Pick a country" : null}`: the user types "Jap", ArrowDown, Enter. The Combobox dispatches
     the selection; React writes the hidden input; no event. Its `useFieldValueChange` fires in

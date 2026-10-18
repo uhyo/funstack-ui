@@ -2305,3 +2305,217 @@ part-cancelled-event note for the `preventDefault()` warning (2.3). Kept for the
    prop lie after a dismiss).
 9. **jsdom dialog shim** (13.1) is a second test shim next to the popover one; the alternative is
    to move most Dialog rows to browser mode, which is slower on three engines.
+
+---
+
+## Dialog.Form and Form.Root (#59)
+
+Status: **proposed** (2026-10-18). Follow-up from the Field and Form design (#54, product-owner
+item 9): now that `Form.Root` exists, should `Dialog.Form` gain `errors` / `autoReset` of its own
+and close only on a settle with no errors? Inputs: field-form.md 3.1 to 3.4 and walkthrough 11,
+this document's 3.5 and 8.1, `packages/ui/src/dialog/dialog-form.tsx`,
+`packages/ui/src/form/form-root.tsx`, `internal/merge-props.ts` (the owned-key rule), and the
+`form.test.tsx` rows "Dialog.Form render={<Form.Root errors />}". Notes in
+`memo/architect/dialog-form-59.md`.
+
+### Recommendation
+
+**No new props on `Dialog.Form`.** The composition through `render` stays the one shape, and
+`Dialog.Form`'s settle close becomes **error-aware**: when the form is rendered as a `Form.Root`,
+`closeOnSettle` closes on a settle **with no errors** (the predicate `autoReset` already uses),
+and a settle that reports errors keeps the dialog open while the Form focuses the first errored
+field. The consumer no longer writes `closeOnSettle={false}` and a close of their own:
+
+```tsx
+// Before (#54, walkthrough 11): three things to remember, and "close it yourself on success".
+<Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />} closeOnSettle={false}>
+
+// After: the composition is the whole recipe. Errors keep the dialog open; a clean settle closes it.
+const [state, dispatch] = useActionState(saveProfile, {});
+
+<Dialog.Popup>
+  <Dialog.Title>Edit profile</Dialog.Title>
+  <Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />}>
+    <Field.Root name="email">
+      <Field.Label>Email</Field.Label>
+      <Field.Control type="email" required />
+      <Field.Error />
+    </Field.Root>
+    <Dialog.Close value="cancel">Cancel</Dialog.Close>
+    <Form.Submit value="save">Save</Form.Submit>
+  </Dialog.Form>
+</Dialog.Popup>
+```
+
+Three outcomes of a submission, one rule each:
+
+| The action | What the user sees | Who decides |
+| --- | --- | --- |
+| throws | the dialog stays open; the nearest Error Boundary shows the error (8.1, unchanged) | React |
+| returns errors (`state.errors` has a non-empty entry) | the dialog stays open, the typed values stay, the first errored field is focused, nothing is reset | `Form.Root` (3.2 of field-form.md); `Dialog.Form` skips the close |
+| returns no error (a clean settle) | `Form.Root` resets the form (`autoReset`), `Dialog.Form` requests the close through the Root (`openChangeAction(false)` awaited, `reason: "activate"`, `returnValue` = the submitter's `value`, view transition if set) | both, in that order |
+
+### Why not `errors` / `autoReset` on `Dialog.Form`
+
+1. **It would make `Dialog.Form` a second `Form.Root`.** The errors channel is not one prop: it
+   is the `FormContext` the Fields register with, the intercepted submit (`Form.Root` runs the
+   action itself so React's automatic reset does not wipe a rejected form), the settle effect
+   (focus the first errored field, `ariaNotify` when focus is already there, the stale-value
+   suppression against the submitted `FormData`) and `autoReset`. Either `Dialog.Form`
+   duplicates that, or it renders a `Form.Root` internally and re-declares every `Form.Root`
+   prop, today `errors` and `autoReset`, tomorrow whatever #54's "not in v1" list adds. Two
+   prop surfaces for one policy is the maintenance cost conventions 1.2 introduced `render` to
+   avoid: "this part is also that element" is what `render={<Form.Root />}` says.
+2. **The call-site saving is one attribute.** `errors={state.errors}` versus
+   `render={<Form.Root errors={state.errors} />}`. What walkthrough 11 actually complained
+   about was the rest of the line, `closeOnSettle={false}` plus a hand-written close on success,
+   and that is removed by making the settle close error-aware, not by moving `errors`.
+3. **Two policies on one form would need a precedence rule.** With both a built-in `errors` and
+   a `render={<Form.Root errors />}` the form would have two errors channels; the only honest
+   answer is "do not do that", which is a dev warning for a problem the composition does not
+   have.
+4. **The plain `Dialog.Form` keeps its place.** Without a `Form.Root` it is React's own form
+   (React runs the action, React resets, 8.1): the right thing for the confirm dialog, the
+   Server Component dialog, and a form with no fields to validate. The `dialog` subpath stays
+   free of the Field machinery, and 8.1 does not change.
+5. **Prior art composes.** None of Radix, Base UI, React Aria or Ark gives a dialog a form part
+   with error routing; the form is composed in. The library's `Form` part exists for the close
+   (conventions 1.1), not for validation.
+
+Alternatives considered and rejected:
+
+- **A third `closeOnSettle` value** (`"clean"`, or a rename to `closeOnSuccess`). Toast uses
+  `closeOnSettle` for the same "the action resolved" idea, and a third value would exist only
+  to describe a composition the part can detect exactly (below). Without a `Form.Root` there is
+  no errors channel, so every settle that does not throw *is* clean: the error-aware rule is
+  the same rule, not a mode switch.
+- **`Form.Root` closing the dialog itself** (a `Form.Root` inside a Popup asking the Dialog
+  context to close). It would couple the `form` subpath to Dialog and give the plain
+  `<Form.Root>` inside a Popup (not rendered through `Dialog.Form`) a close it never advertised.
+
+### The rule, precisely
+
+`Dialog.Form` detects the composition through the **`FormContext`**: `Form.Root` provides it,
+and the `render` composition renders `Dialog.Form`'s children (its status watcher included)
+inside the cloned `Form.Root`, so a child of `Dialog.Form` reads the context exactly when the
+form is a `Form.Root`. No import of `Form.Root` into the `dialog` subpath, no element-type
+check, and the reverse orientation (`<Form.Root render={<Dialog.Form />}>`) is detected the same
+way (its children are inside the context too); the documented shape stays
+`Dialog.Form render={<Form.Root />}`.
+
+```
+settle (useFormStatus true → false, the watcher's edge)
+  closeOnSettle === false            → nothing (unchanged)
+  closedSinceSubmit                  → nothing (8.1, unchanged)
+  form context present
+    && hasAnyError(context.errors)   → nothing: Form.Root focuses the first errored field
+  otherwise                          → requestClose(submitEvent, "activate", submitter.value)   (library mode)
+                                       recordCloseIntent + dialog.close(value)                 (JS-free mode)
+```
+
+`hasAnyError` is `Form.Root`'s own predicate (`internal/validity.ts`): any non-empty entry in
+`errors` at the settle commit, **hidden stale ones included**. That is deliberate: a result that
+flags only a value the user replaced during the flight (field-form.md walkthrough 5) resets
+nothing and focuses nothing, and it must not close the dialog either; the user resubmits the new
+value. One predicate for "reset" and "close" means the two never disagree.
+
+Both watchers see the same edge in the same commit (verified for #54, walkthrough 11) and read
+the same `errors` (the context value of the settle render; `Form.Root` reads it through `latest`
+in its own effect). Effect order in that flush: `Dialog.Form`'s watcher runs **before**
+`Form.Root`'s (it is among the children `Form.Root` renders ahead of its own watcher), so the
+close is requested before the reset. Nothing depends on that order; it is recorded so nobody
+starts to.
+
+**Reset before exit.** On a clean settle `Form.Root` calls `form.reset()` in that same effect
+flush, and the close commit lands later (after `openChangeAction(false)`), so the exit
+animation (CSS or view transition) shows the fields at their defaults, exactly as React's own
+path already does for a plain `Dialog.Form` (8.1, "React's automatic form reset after a
+successful action runs before the close"). With the default content mounting the next open
+mounts fresh fields anyway, so a consumer whose exit is visible passes `autoReset={false}` on
+the `Form.Root` element; with `keepMounted` the reset is what makes the next open clean, keep
+the default. Not automated: `Dialog.Form` would have to inject a `Form.Root` prop into the
+`render` element, Form-specific knowledge in a part that otherwise only reads a context.
+
+**Composition without a function `action`** is a mistake the library now names.
+`<Dialog.Form render={<Form.Root />}>` with no `action` loses `method="dialog"`: `Dialog.Form`
+passes it to the cloned element, but `Form.Root` owns `method` (except with a string `action`)
+and its owned `undefined` removes it (`merge-props.ts`), leaving a GET-navigating form that
+reloads the page on submit. A development warning from the same context-reading child:
+"`Dialog.Form` rendered as a `Form.Root` needs a function `action`; without one the form
+navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a `method="dialog"`
+form." A string `action` is a navigating form in both parts and needs no warning.
+
+What does **not** change: 8.1 for a plain `Dialog.Form` (React's path, every settle closes,
+throw to keep open), `closeOnSettle={false}`, `closedSinceSubmit`, the `returnValue` from the
+capture `submit` listener (the native event reaches it before `Form.Root`'s `onSubmit`
+cancels React's path), the Popup's root-node `submit` listener (the form's method is React's,
+not `"dialog"`, so it returns), and the JS-free mode (`Form.Root` intercepts only after
+hydration; before it the Server Function posts with progressive enhancement, as today).
+
+### Prop doc, after
+
+```ts
+  /**
+   * With a function `action`: close the dialog once the action's transition settles without
+   * throwing and, when this form is rendered as a `Form.Root`
+   * (`render={<Form.Root errors={state.errors} />}`), with no field error: a settle whose
+   * `errors` has a non-empty entry (hidden stale ones included, the `autoReset` rule) keeps
+   * the dialog open and the Form focuses the first errored field. Default `true`.
+   *
+   * Without a `Form.Root` the library never sees a result, so any settle that does not throw
+   * counts, including a `useActionState` result that reports errors: render the form as a
+   * `Form.Root` to route them, throw to keep the dialog open, or set `closeOnSettle={false}`
+   * and close it yourself (a `Dialog.Close`, a submit button in a separate `method="dialog"`
+   * form, or a controlled `open`). A `formMethod="dialog"` submitter inside this form cannot
+   * close it: React prevents every submit of a form with a function `action` and runs the
+   * action again.
+   *
+   * The dialog is not closed either when it was closed (Escape, a Close part) while the action
+   * ran, also if the user re-opened it meanwhile.
+   */
+  closeOnSettle?: boolean;
+```
+
+### Implementation notes for the developer
+
+- `dialog-form.tsx`: render the `FormStatusWatcher` through a small child that reads
+  `use(FormContext)` (`internal/field-context.ts`) and calls `onSettled` with
+  `clean = form === null || !hasAnyError(form.errors)` (`internal/validity.ts`); `onSettled`
+  returns early when `!clean`. The same child issues the dev warning when `form !== null &&
+  action === undefined` (once per mount). Nothing else in `Dialog.Form` changes;
+  `FormStatusWatcher` and `Form.Root` are untouched.
+- Tests (`form.test.tsx`, the "Dialog.Form render={<Form.Root errors />}" describe): the row
+  "the default closeOnSettle closes the dialog even when the result has errors" flips to "keeps
+  the dialog open and focuses the field"; add: a clean settle closes with `reason: "activate"`
+  and `returnValue` = the `Form.Submit`'s `value` and the `openChangeAction` sees it; a hidden
+  stale error (value edited during the flight) neither closes, resets nor focuses; `closeOnSettle={false}`
+  still never closes; the dev warning for the composition without `action`; a plain
+  `Dialog.Form` still closes on a settle with errors (8.1 unchanged). jsdom is enough: nothing
+  here depends on the browser.
+- Docs: Field page "In a Dialog" and the Dialog page's `Dialog.Form` paragraph and props row
+  drop the `closeOnSettle={false}` advice and show the recipe above; the `autoReset={false}`
+  note for a visible exit; the Dialog page's `closeOnSettle` row takes the new doc comment.
+- On acceptance, fold into 3.5 and 8.1, the decisions table row 9, and field-form.md
+  walkthrough 11 and PO item 9 (the cross-reference line is already there).
+
+### For the product owner
+
+1. **No `errors` / `autoReset` on `Dialog.Form`; the `render={<Form.Root />}` composition stays
+   the one shape.** Alternative: a built-in errors channel (`Dialog.Form` wraps `Form.Root`)
+   for one attribute less at the call site. **Recommendation: no new props**, for the five
+   reasons above.
+2. **`closeOnSettle` becomes error-aware when the form is a `Form.Root`**: close on a settle
+   with no errors (`hasAnyError`, hidden stale entries included, the `autoReset` predicate),
+   stay open otherwise. A behaviour change for the one documented composition (the dialog no
+   longer closes over unseen errors), none for a plain `Dialog.Form`. Alternative: a third
+   `closeOnSettle` value or a `closeOnSuccess` rename. **Recommendation: same prop, same name,
+   error-aware by detection.**
+3. **Detection through `FormContext`**, not an element-type check: no `dialog` → `form`
+   subpath dependency beyond two internal helpers, and the reverse orientation works for free.
+   **Recommendation: accept.**
+4. **Reset before exit is accepted as a documented cosmetic** with the `autoReset={false}`
+   recipe for the default (unmounting) content; not automated. Alternative: `Dialog.Form`
+   suppresses `Form.Root`'s reset on a closing settle through the context. **Recommendation:
+   document, do not automate**; revisit if the exit-animation docs attract the question.
+5. **Development warning** for `Dialog.Form render={<Form.Root />}` without a function
+   `action` (the composition silently loses `method="dialog"`). **Recommendation: accept.**
