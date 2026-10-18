@@ -102,7 +102,12 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            instances: selectBrowsers().map((browser) => ({ browser })),
+            // Firefox runs its files one at a time: headless Firefox shares one mouse and one
+            // pointer-capture state between the pages of the browser, so another file's
+            // Playwright pointer input lands in a running drag or click (#62).
+            instances: selectBrowsers().map((browser) =>
+              browser === "firefox" ? { browser, fileParallelism: false } : { browser },
+            ),
           },
         },
       },

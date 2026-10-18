@@ -122,3 +122,11 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   as it already did for vertical (Firefox decreases a vertical range on ArrowRight). WebKit's
   `isVertical` is only `appearance: slider-vertical`, so for our writing-mode vertical input it
   does Up +, Down −; the JS normalisation covers Left / Right.
+- #62 (Firefox flakes in Combobox, CheckboxGroup, Checkbox, Tooltip, RadioGroup, Popover,
+  Dialog, Slider drag): cause found by the reviewer. Headless Firefox shares one mouse /
+  pointer-capture state between the browser's pages, so another file's Playwright pointer input
+  is delivered into the running file's document (a foreign `pointerup` ends our drag). Fix:
+  `fileParallelism: false` on the Firefox instance in `vitest.config.ts`. The Slider drag row is
+  strict again (75, no "warn and accept"). Local, Firefox only: before 35 s / 50 s wall with
+  3 failing files each run; after 60 s / 58 s / 69 s (wall 63 / 60 / 70 s), 16/16 files green
+  in all three runs.

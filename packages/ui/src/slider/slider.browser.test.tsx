@@ -238,41 +238,19 @@ describe("Slider (browser)", () => {
         <Fixture defaultValue={20} valueChangeAction={onChange} valueCommitAction={onCommit} />,
       );
       const track = screen.getByTestId("track");
-      // The pointer positions the engine actually delivered: the contract is "the value follows
-      // the pointer". (Firefox under the full three-project load once delivered the final move
-      // at the track's far end; recorded here so such a run is diagnosable.)
-      const moves: number[] = [];
-      const record = (e: PointerEvent) => moves.push(e.clientX);
-      document.addEventListener("pointermove", record, true);
-      document.addEventListener("pointerup", record, true);
-      try {
-        await user.dragAndDrop(thumb(), track, {
-          sourcePosition: { x: 10, y: 10 },
-          targetPosition: { x: 150, y: 10 },
-        });
-      } finally {
-        document.removeEventListener("pointermove", record, true);
-        document.removeEventListener("pointerup", record, true);
-      }
+      await user.dragAndDrop(thumb(), track, {
+        sourcePosition: { x: 10, y: 10 },
+        targetPosition: { x: 150, y: 10 },
+      });
       await flush();
       const rect = track.getBoundingClientRect();
-      const lastX = moves.at(-1) ?? 0;
-      const expected = Math.min(
-        100,
-        Math.max(0, Math.round(((lastX - rect.left) / rect.width) * 100)),
-      );
-      if (Math.abs(lastX - (rect.left + 150)) > 1) {
-        console.warn(`[${browserName}] drag ended at clientX ${lastX}, not the target`, moves);
-      } else {
-        expect(expected).toBe(75);
-      }
-      expect(input().value).toBe(String(expected));
+      expect(input().value).toBe("75");
       const { x } = centre(thumb());
-      expect(Math.abs(x - (rect.left + (expected / 100) * rect.width))).toBeLessThanOrEqual(2);
+      expect(Math.abs(x - (rect.left + 150))).toBeLessThanOrEqual(2);
       expect(onCommit).toHaveBeenCalledTimes(1);
-      expect(onCommit.mock.calls[0]![0]).toBe(expected);
+      expect(onCommit.mock.calls[0]![0]).toBe(75);
       expect(onChange.mock.calls.length).toBeGreaterThanOrEqual(1);
-      expect(onChange.mock.calls.at(-1)![0]).toBe(expected);
+      expect(onChange.mock.calls.at(-1)![0]).toBe(75);
       expect(screen.getByTestId("root")).not.toHaveAttribute("data-dragging");
       expect(document.activeElement).toBe(input());
       expect(window.getSelection()?.toString() ?? "").toBe("");
