@@ -173,3 +173,30 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   navigation does not wrap (ArrowRight on the last radio of a group stays there); Chromium and
   Firefox wrap. Not the toolbar's doing (it leaves radio arrows alone on every path); the browser
   row branches on `browserName === "webkit"` for that one step.
+
+## Load-sensitive browser rows (2026-10-18, #71)
+
+- transition-boundary "not delayed" rows (Firefox): reproduced at once, 5 of 10 runs of the file
+  failed with 20 CPU burners (51-116 ms against the 50 ms bound) while `calls` was 0, i.e. no
+  view transition existed at all: the delay was plain main-thread starvation, and `bestOf(3)`
+  did not help because the load is not bursty. Restated from the mechanism: react-dom 19.3 holds
+  a transition commit exactly when `document.__reactViewTransition` is set at commit readiness
+  (`waitingForViewTransition` in react-dom-client, waits for `.finished`). The rows sample it
+  (and `document.activeViewTransition` where present) at the second click and at the second
+  commit and expect both false plus `calls === 0`; the `transition="none"` Tabs rows assert the
+  probe is true at the second click (positive control). Delays are still logged. After: 12/12
+  runs (Chromium + Firefox) with 20 burners.
+- Exit-animation rows (Menu x2 in Chromium, Popover x2, Dialog x2): the rows checked "content
+  still mounted" after a 300 ms CSS exit with several Playwright round trips (`user.keyboard`,
+  `flush()`) in between; under load those exceed 300 ms, the exit finishes, the library releases
+  correctly and the check fails. Also `seen.count` was set in a `toggle` / `close` task the row
+  only hoped one `flush()` had run. Fix: `heldExitStyle()` - instant enter, 60 s exit; the row
+  awaits the exit animations from the `toggle` / `close` event (a promise, inside `act`), checks
+  the content is held, calls `finish()` on them and expects the release. The `sleep(350)` enter
+  waits are gone. Chromium additionally asserts it found exit animations, so the held branch
+  cannot pass vacuously. The #64 baseline rows keep the 300 ms fade (they poll for the release).
+  Not reproduced locally by load alone (4 full Chromium runs, 24 burners); confirmed by injecting
+  a 400 ms main-thread block after the Escape in the dismissal row: the old row fails with
+  "expected null not to be null" (the reported failure), the new row passes.
+- Master CI failures in the last 40 runs: four, all known (the Dialog.Form jsdom row b2fc473,
+  the NumberField wheel row 509c87f, twice each).

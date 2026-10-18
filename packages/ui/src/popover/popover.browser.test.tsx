@@ -457,27 +457,54 @@ describe("exit animation and the deferred unmount (browser)", () => {
     );
   }
 
-  /** Records the exit animations the engine runs when the popup is hidden. */
-  function watchExit() {
-    const seen = { count: -1, finished: Promise.resolve() as Promise<unknown> };
-    popup().addEventListener("toggle", (event) => {
-      if ((event as ToggleEvent).newState !== "closed") return;
-      void getComputedStyle(popup()).opacity;
-      const animations = popup().getAnimations({ subtree: true });
-      seen.count = animations.length;
-      seen.finished = Promise.allSettled(animations.map((animation) => animation.finished));
-    });
-    return seen;
+  /**
+   * A fade whose exit outlasts any test (#71): the enter is instant and the exit takes 60 s, so
+   * the "content still there" check cannot race a 300 ms fade against Playwright round trips
+   * under load. The row ends the exit itself with `finish()` and then expects the release.
+   */
+  function heldExitStyle() {
+    cleanups.push(
+      addStyle(`
+        .held-exit {
+          opacity: 0;
+          transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
+        }
+        .held-exit:popover-open { opacity: 1; transition-duration: 0s; }
+      `),
+    );
   }
 
-  async function expectHeldThenReleased(seen: { count: number; finished: Promise<unknown> }) {
-    expect(seen.count).toBeGreaterThanOrEqual(0);
-    if (seen.count > 0) {
+  /**
+   * Resolves with the exit animations the engine runs when the popup is hidden, read in its
+   * `toggle` (a queued task, so the row awaits it rather than assuming one flush ran it).
+   */
+  function watchExit(): Promise<Animation[]> {
+    return new Promise((resolve) => {
+      const element = popup();
+      element.addEventListener("toggle", function listener(event) {
+        if ((event as ToggleEvent).newState !== "closed") return;
+        element.removeEventListener("toggle", listener);
+        void getComputedStyle(element).opacity;
+        resolve(element.getAnimations({ subtree: true }));
+      });
+    });
+  }
+
+  async function expectHeldThenReleased(exit: Promise<Animation[]>) {
+    let animations: Animation[] = [];
+    await act(async () => {
+      animations = await exit;
+    });
+    // Chromium animates the exit: the held branch below must not pass vacuously there.
+    if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
+    if (animations.length > 0) {
       // Chromium / WebKit: the popup is still fading out; the content stays.
       expect(screen.queryByTestId("content")).not.toBeNull();
-      // The unmount is a transition the Popup starts when the animations finish: inside `act`.
+      // End the exit; the unmount is an update the Popup makes when the animations finish:
+      // inside `act`.
       await act(async () => {
-        await seen.finished;
+        for (const animation of animations) animation.finish();
+        await Promise.allSettled(animations.map((animation) => animation.finished));
         await sleep(20);
       });
       expect(screen.queryByTestId("content")).toBeNull();
@@ -488,38 +515,36 @@ describe("exit animation and the deferred unmount (browser)", () => {
   }
 
   it("a part-initiated close keeps the content while the CSS exit runs; none in Firefox", async () => {
-    fadeStyle();
+    heldExitStyle();
     render(
-      <Library popup={{ className: "fade" }}>
+      <Library popup={{ className: "held-exit" }}>
         <span data-testid="content">content</span>
       </Library>,
     );
     await user.click(trigger());
     await flush();
-    await sleep(350); // let the enter transition finish
-    const seen = watchExit();
+    const exit = watchExit();
     await user.click(trigger());
     await flush();
     expect(isOpen()).toBe(false);
-    await expectHeldThenReleased(seen);
+    await expectHeldThenReleased(exit);
   });
 
   it("a dismissal keeps the content while the CSS exit runs; none in Firefox", async () => {
-    fadeStyle();
+    heldExitStyle();
     render(
-      <Library popup={{ className: "fade" }}>
+      <Library popup={{ className: "held-exit" }}>
         <span data-testid="content">content</span>
         <button type="button">Inside</button>
       </Library>,
     );
     await user.click(trigger());
     await flush();
-    await sleep(350);
-    const seen = watchExit();
+    const exit = watchExit();
     await user.keyboard("{Escape}");
     await flush();
     expect(isOpen()).toBe(false);
-    await expectHeldThenReleased(seen);
+    await expectHeldThenReleased(exit);
   });
 
   // A finite animation already running inside (a progress bar) is not the exit: the release

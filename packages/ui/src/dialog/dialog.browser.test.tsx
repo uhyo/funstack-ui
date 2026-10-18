@@ -561,44 +561,67 @@ describe("review rows (browser)", () => {
 });
 
 describe("exit animation and the deferred unmount (browser)", () => {
-  it("keeps the content mounted while the exit animation runs; none in Firefox", async () => {
+  /**
+   * A fade whose exit outlasts any test (#71): the enter is instant and the exit takes 60 s, so
+   * the "content still there" check cannot race a 300 ms fade against Playwright round trips
+   * under load. The row ends the exit itself with `finish()` and then expects the release.
+   */
+  function heldExitStyle() {
     cleanups.push(
       addStyle(`
-        .fade, .fade::backdrop {
+        .held-exit, .held-exit::backdrop {
           opacity: 0;
-          transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
+          transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
         }
-        .fade:open, .fade:open::backdrop { opacity: 1; }
-        @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
+        .held-exit:open, .held-exit:open::backdrop { opacity: 1; transition-duration: 0s; }
       `),
     );
+  }
+
+  /** Resolves with the exit animations running when the dialog's `close` (a queued task) fires. */
+  function watchExit(): Promise<Animation[]> {
+    return new Promise((resolve) => {
+      const element = popup();
+      element.addEventListener(
+        "close",
+        () => {
+          void getComputedStyle(element).opacity;
+          resolve(element.getAnimations({ subtree: true }));
+        },
+        { once: true },
+      );
+    });
+  }
+
+  /** Ends the exit and lets the Popup's release (a normal update) run, inside `act`. */
+  const finishExit = (animations: Animation[]) =>
+    act(async () => {
+      for (const animation of animations) animation.finish();
+      await Promise.allSettled(animations.map((animation) => animation.finished));
+      await sleep(20);
+    });
+
+  it("keeps the content mounted while the exit animation runs; none in Firefox", async () => {
+    heldExitStyle();
     render(
-      <Library popup={{ className: "fade" }}>
+      <Library popup={{ className: "held-exit" }}>
         <span data-testid="content">content</span>
       </Library>,
     );
     await openWithTrigger();
-    await sleep(350); // let the enter transition finish
     expect(popup().open).toBe(true);
-    let exitAnimations = -1;
-    let finished: Promise<unknown> = Promise.resolve();
-    popup().addEventListener("close", () => {
-      void getComputedStyle(popup()).opacity;
-      const animations = popup().getAnimations({ subtree: true });
-      exitAnimations = animations.length;
-      finished = Promise.allSettled(animations.map((animation) => animation.finished));
-    });
+    const exit = watchExit();
     await user.keyboard("{Escape}");
-    // The `close` listener ran (it is a queued task).
-    await settle(() => expect(exitAnimations).toBeGreaterThanOrEqual(0));
-    if (exitAnimations > 0) {
+    let animations: Animation[] = [];
+    await act(async () => {
+      animations = await exit;
+    });
+    // Chromium animates the exit: the held branch below must not pass vacuously there.
+    if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
+    if (animations.length > 0) {
       // Chromium / WebKit: the dialog is still fading out; the content stays.
       expect(screen.queryByTestId("content")).not.toBeNull();
-      // The unmount is a normal update the Popup makes when the animations finish: inside `act`.
-      await act(async () => {
-        await finished;
-        await sleep(20);
-      });
+      await finishExit(animations);
       expect(screen.queryByTestId("content")).toBeNull();
     } else {
       // Firefox: `display` flips at once (bug 1834877); nothing to wait for.
@@ -648,16 +671,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
   );
 
   it("a controlled close without transition keeps the content through the fade, mounted once (#46)", async () => {
-    cleanups.push(
-      addStyle(`
-        .fade, .fade::backdrop {
-          opacity: 0;
-          transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
-        }
-        .fade:open, .fade:open::backdrop { opacity: 1; }
-        @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
-      `),
-    );
+    heldExitStyle();
     let mounts = 0;
     function Content() {
       useEffect(() => {
@@ -671,7 +685,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
         <>
           <Dialog.Root open={open} openChangeAction={(next) => setOpen(next)}>
             <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
-            <Dialog.Popup data-testid="popup" aria-label="Edit" className="fade">
+            <Dialog.Popup data-testid="popup" aria-label="Edit" className="held-exit">
               <Content />
             </Dialog.Popup>
           </Dialog.Root>
@@ -687,27 +701,21 @@ describe("exit animation and the deferred unmount (browser)", () => {
     }
     render(<Controlled />);
     await openWithTrigger();
-    await sleep(350); // the enter fade
     expect(mounts).toBe(1);
-    let exitAnimations = -1;
-    let finished: Promise<unknown> = Promise.resolve();
-    popup().addEventListener("close", () => {
-      void getComputedStyle(popup()).opacity;
-      const animations = popup().getAnimations({ subtree: true });
-      exitAnimations = animations.length;
-      finished = Promise.allSettled(animations.map((animation) => animation.finished));
-    });
+    const exit = watchExit();
     // A programmatic close (the dialog's page is inert, so not a click on the page).
     await act(async () => screen.getByTestId("close-from-outside").click());
     expect(popup().open).toBe(false);
-    await settle(() => expect(exitAnimations).toBeGreaterThanOrEqual(0));
-    if (exitAnimations > 0) {
+    let animations: Animation[] = [];
+    await act(async () => {
+      animations = await exit;
+    });
+    // Chromium animates the exit: the held branch below must not pass vacuously there.
+    if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
+    if (animations.length > 0) {
       // Chromium / WebKit: the close commit held the content and it is still there mid-fade.
       expect(screen.queryByTestId("content")).not.toBeNull();
-      await act(async () => {
-        await finished;
-        await sleep(20);
-      });
+      await finishExit(animations);
     }
     await settle(() => expect(screen.queryByTestId("content")).toBeNull());
     // Never emptied and re-mounted into the fading dialog (the pre-#46 behaviour).
