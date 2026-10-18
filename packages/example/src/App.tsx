@@ -11,6 +11,7 @@ import { CheckboxGroupDemo } from "./checkbox-group-demo";
 import { SelectDemo } from "./select-demo";
 import { ComboboxDemo } from "./combobox-demo";
 import { Notifications, ToastDemo } from "./toast-demo";
+import { FieldFormDemo } from "./field-form-demo";
 
 export function App() {
   return (
@@ -33,6 +34,7 @@ export function App() {
       <SelectDemo />
       <ComboboxDemo />
       <ToastDemo />
+      <FieldFormDemo />
       <Notifications />
     </main>
   );
