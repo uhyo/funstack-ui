@@ -5,6 +5,9 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  # Lets an agent check a pushed work branch (e.g. WebKit, which cannot run locally)
+  # without pushing to master: gh workflow run ci.yml --ref <branch>
+  workflow_dispatch:
 
 jobs:
   ci:
