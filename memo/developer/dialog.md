@@ -192,3 +192,16 @@ Commits 56e1ea8 (code + jsdom rows) and 5dcce5f (recipe, docs, browser rows).
   `getAnimations()` are not reliable there, so the WebKit rows assert `display` only. Worth a
   look by someone with WebKit (is it a mislabel or a stale open animation?). The older row "the
   open and %s each run one view transition" passes in WebKit only through `old(root)`.
+
+## #59: error-aware closeOnSettle (2026-10-18)
+
+- `DialogFormSettle` (in dialog-form.tsx) is always rendered among the form's children: it reads
+  `use(FormContext)`, issues the dev warning for `render={<Form.Root />}` without `action`, and
+  renders the `FormStatusWatcher` only with a function action, calling `onSettled(clean)` with
+  `clean = form === null || !hasAnyError(form.errors)` from the settle render.
+- Reverse orientation (`<Form.Root action errors render={<Dialog.Form />}>`) works: useRender's
+  clone hands the Form's `action` to Dialog.Form, and Dialog.Form's children sit inside the
+  FormContext provider. Pinned by a test in form.test.tsx.
+- Tests in form.test.tsx "Form: Dialog.Form render={<Form.Root errors />}"; all verified to fail
+  against the pre-#59 implementation except the unchanged-behaviour rows.
+- The "Not implemented: requestSubmit()" jsdom lines come from dialog.test.tsx and predate #59.

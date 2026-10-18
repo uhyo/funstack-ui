@@ -26,6 +26,7 @@ import {
 import { Checkbox } from "../checkbox/index.js";
 import { Dialog } from "../dialog/index.js";
 import type { CheckboxCheckedChangeDetails } from "../checkbox/index.js";
+import type { DialogOpenChangeDetails } from "../dialog/index.js";
 import { Field } from "../field/index.js";
 import { Form } from "./index.js";
 import type { FormErrors, FormRootState, FormSubmitState } from "./index.js";
@@ -792,20 +793,23 @@ describe("Form: platform path", () => {
 });
 
 // Walkthrough 11 and review M3: `Dialog.Form` rendered as `Form.Root` takes the Form's policy.
+// #59 (design/components/dialog.md "Dialog.Form and Form.Root"): the settle close is error-aware.
 describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
   function DialogWithForm({
     run,
     closeOnSettle,
+    openChangeAction,
   }: {
     run: (formData: FormData) => Promise<ActionResult>;
     closeOnSettle?: boolean;
+    openChangeAction?: (open: boolean, details: DialogOpenChangeDetails) => unknown;
   }) {
     const [state, dispatch] = useActionState(
       (_prev: ActionResult, formData: FormData) => run(formData),
       {},
     );
     return (
-      <Dialog.Root defaultOpen>
+      <Dialog.Root defaultOpen openChangeAction={openChangeAction}>
         <Dialog.Popup aria-label="Profile" data-testid="popup">
           <Dialog.Form
             data-testid="form"
@@ -814,20 +818,21 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
             closeOnSettle={closeOnSettle}
           >
             <EmailField />
-            <Form.Submit>Save</Form.Submit>
+            <Form.Submit value="save">Save</Form.Submit>
           </Dialog.Form>
         </Dialog.Popup>
       </Dialog.Root>
     );
   }
 
+  const popup = () => screen.getByTestId("popup") as HTMLDialogElement;
+
   it("errors: shown and focused, not reset, the dialog stays open; success resets", async () => {
     const run = vi.fn(async (formData: FormData): Promise<ActionResult> =>
       formData.get("email") === "bad" ? { errors: { email: "Taken" } } : {},
     );
     render(<DialogWithForm run={run} closeOnSettle={false} />);
-    const popup = screen.getByTestId("popup") as HTMLDialogElement;
-    expect(popup.open).toBe(true);
+    expect(popup().open).toBe(true);
     const user = setupUser();
     await user.type(control(), "bad");
     await user.click(submit());
@@ -837,7 +842,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     // React's own path would have reset the form after this successful action.
     expect(control().value).toBe("bad");
     expect(document.activeElement).toBe(control());
-    expect(popup.open).toBe(true);
+    expect(popup().open).toBe(true);
 
     await user.clear(control());
     await user.type(control(), "good");
@@ -847,17 +852,192 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     expect(run).toHaveBeenCalledTimes(2);
     // autoReset: no error in the result.
     expect(control().value).toBe("");
+    // closeOnSettle={false}: a clean settle does not close either.
+    expect(popup().open).toBe(true);
   });
 
-  it("the default closeOnSettle closes the dialog even when the result has errors", async () => {
+  it("the default closeOnSettle keeps the dialog open over errors and focuses the field", async () => {
     const run = vi.fn(async (): Promise<ActionResult> => ({ errors: { email: "Taken" } }));
-    render(<DialogWithForm run={run} />);
-    const popup = screen.getByTestId("popup") as HTMLDialogElement;
+    const openChangeAction = vi.fn();
+    render(<DialogWithForm run={run} openChangeAction={openChangeAction} />);
     const user = setupUser();
     await user.type(control(), "x");
     await user.click(submit());
     await flush();
     expect(run).toHaveBeenCalledTimes(1);
-    expect(popup.open).toBe(false);
+    expect(popup().open).toBe(true);
+    expect(openChangeAction).not.toHaveBeenCalled();
+    expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
+    expect(document.activeElement).toBe(control());
+    expect(control().value).toBe("x");
+  });
+
+  it("a clean settle resets and closes: reason 'activate', returnValue = the submitter's value", async () => {
+    const d = deferred<ActionResult>();
+    const run = vi.fn(() => d.promise);
+    const close = deferred();
+    const openChangeAction = vi.fn(
+      (_open: boolean, _details: DialogOpenChangeDetails) => close.promise,
+    );
+    render(<DialogWithForm run={run} openChangeAction={openChangeAction} />);
+    const user = setupUser();
+    await user.type(control(), "a@b.c");
+    await user.click(submit());
+    expectPending(screen.getByTestId("form"));
+    await act(async () => d.resolve({}));
+    await flush();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(control().value).toBe("");
+    expect(openChangeAction).toHaveBeenCalledTimes(1);
+    const [next, details] = openChangeAction.mock.calls[0]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.returnValue).toBe("save");
+    // openChangeAction is awaited before the close commit.
+    expect(popup().open).toBe(true);
+    await act(async () => close.resolve());
+    await flush();
+    expect(popup().open).toBe(false);
+    expect(popup().returnValue).toBe("save");
+  });
+
+  it("closeOnSettle={false} never closes, also on a clean settle", async () => {
+    const run = vi.fn(async (): Promise<ActionResult> => ({}));
+    const openChangeAction = vi.fn();
+    render(<DialogWithForm run={run} closeOnSettle={false} openChangeAction={openChangeAction} />);
+    const user = setupUser();
+    await user.type(control(), "a@b.c");
+    await user.click(submit());
+    await flush();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(control().value).toBe("");
+    expect(openChangeAction).not.toHaveBeenCalled();
+    expect(popup().open).toBe(true);
+  });
+
+  it("a hidden stale error (value edited during the flight) neither closes, resets nor focuses", async () => {
+    const d = deferred<ActionResult>();
+    const openChangeAction = vi.fn();
+    render(<DialogWithForm run={() => d.promise} openChangeAction={openChangeAction} />);
+    const user = setupUser();
+    await user.type(control(), "a@b.c");
+    await user.click(submit());
+    expectPending(screen.getByTestId("form"));
+    await act(async () => {
+      fireEvent.input(control(), { target: { value: "x@y.z" } });
+    });
+    await act(async () => d.resolve({ errors: { email: "a@b.c is taken" } }));
+    await flush();
+    expect(screen.queryByTestId("email-error")).toBeNull();
+    expect(control().value).toBe("x@y.z");
+    expect(document.activeElement).toBe(submit());
+    expect(openChangeAction).not.toHaveBeenCalled();
+    expect(popup().open).toBe(true);
+  });
+
+  it("the reverse orientation (Form.Root render={<Dialog.Form />}) is detected the same way", async () => {
+    function Reverse({ run }: { run: (formData: FormData) => Promise<ActionResult> }) {
+      const [state, dispatch] = useActionState(
+        (_prev: ActionResult, formData: FormData) => run(formData),
+        {},
+      );
+      return (
+        <Dialog.Root defaultOpen>
+          <Dialog.Popup aria-label="Profile" data-testid="popup">
+            <Form.Root action={dispatch} errors={state.errors} render={<Dialog.Form />}>
+              <EmailField />
+              <Form.Submit value="save">Save</Form.Submit>
+            </Form.Root>
+          </Dialog.Popup>
+        </Dialog.Root>
+      );
+    }
+    const run = vi.fn(async (formData: FormData): Promise<ActionResult> =>
+      formData.get("email") === "bad" ? { errors: { email: "Taken" } } : {},
+    );
+    const error = vi.spyOn(console, "error");
+    render(<Reverse run={run} />);
+    const user = setupUser();
+    await user.type(control(), "bad");
+    await user.click(submit());
+    await flush();
+    expect(popup().open).toBe(true);
+    expect(document.activeElement).toBe(control());
+    await user.clear(control());
+    await user.type(control(), "good");
+    await user.click(submit());
+    await flush();
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(popup().open).toBe(false);
+    expect(popup().returnValue).toBe("save");
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("dev warning: the composition without a function action (it would lose method=dialog)", async () => {
+    const error = silenceErrors();
+    const { unmount } = render(
+      <Dialog.Root defaultOpen>
+        <Dialog.Popup aria-label="Profile">
+          <Dialog.Form render={<Form.Root />}>
+            <EmailField />
+          </Dialog.Form>
+        </Dialog.Popup>
+      </Dialog.Root>,
+    );
+    await flush();
+    const warnings = error.mock.calls.filter((args) =>
+      String(args[0]).includes("`Dialog.Form` rendered as a `Form.Root` needs a function `action`"),
+    );
+    expect(warnings).toHaveLength(1);
+    unmount();
+    error.mockClear();
+
+    // No warning: a plain Dialog.Form without action, the composition with a function action,
+    // and the composition with a string action (a navigating form in both parts).
+    render(
+      <Dialog.Root defaultOpen>
+        <Dialog.Popup aria-label="Profile">
+          <Dialog.Form>
+            <button type="submit">Plain</button>
+          </Dialog.Form>
+          <Dialog.Form render={<Form.Root />} action={async () => {}}>
+            <EmailField />
+          </Dialog.Form>
+          <Dialog.Form render={<Form.Root />} action="/save" method="post">
+            <EmailField name="name" />
+          </Dialog.Form>
+        </Dialog.Popup>
+      </Dialog.Root>,
+    );
+    await flush();
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("a plain Dialog.Form still closes on a settle whose result has errors (8.1 unchanged)", async () => {
+    function Plain() {
+      const [state, dispatch] = useActionState(
+        async (): Promise<ActionResult> => ({ errors: { email: "Taken" } }),
+        {},
+      );
+      return (
+        <Dialog.Root defaultOpen>
+          <Dialog.Popup aria-label="Profile" data-testid="popup">
+            <Dialog.Form action={dispatch}>
+              <span data-testid="state">{state.errors?.email ?? ""}</span>
+              <button type="submit" value="save">
+                Save
+              </button>
+            </Dialog.Form>
+          </Dialog.Popup>
+        </Dialog.Root>
+      );
+    }
+    render(<Plain />);
+    const user = setupUser();
+    await user.click(submit());
+    await flush();
+    expect(screen.getByTestId("state")).toHaveTextContent("Taken");
+    expect(popup().open).toBe(false);
+    expect(popup().returnValue).toBe("save");
   });
 });

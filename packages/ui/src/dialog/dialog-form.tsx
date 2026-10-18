@@ -1,9 +1,12 @@
 "use client";
-import { useCallback, useRef, useState } from "react";
+import { use, useCallback, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import { FormContext } from "../internal/field-context.js";
 import { FormStatusWatcher } from "../internal/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { hasAnyError } from "../internal/validity.js";
 import { useDialogContext } from "./dialog-context.js";
 
 export interface DialogFormState {
@@ -29,14 +32,18 @@ export interface DialogFormProps extends Omit<
   action?: string | ((formData: FormData) => unknown);
   /**
    * With a function `action`: close the dialog once the action's transition settles without
-   * throwing. Default `true`.
+   * throwing and, when this form is rendered as a `Form.Root`
+   * (`render={<Form.Root errors={state.errors} />}`), with no field error: a settle whose
+   * `errors` has a non-empty entry (hidden stale ones included, the `autoReset` rule) keeps
+   * the dialog open and the Form focuses the first errored field. Default `true`.
    *
-   * Any result that does not throw counts as success, including a `useActionState`-style result
-   * that reports validation errors: with the default the dialog closes and those errors are never
-   * seen. Throw to keep the dialog open, or set `closeOnSettle={false}` and close it yourself:
-   * a `Dialog.Close`, a submit button in a separate `method="dialog"` form, or a controlled
-   * `open`. (A `formMethod="dialog"` submitter inside this form cannot close it: React prevents
-   * every submit of a form with a function `action` and runs the action again.)
+   * Without a `Form.Root` the library never sees a result, so any settle that does not throw
+   * counts, including a `useActionState` result that reports errors: render the form as a
+   * `Form.Root` to route them, throw to keep the dialog open, or set `closeOnSettle={false}`
+   * and close it yourself (a `Dialog.Close`, a submit button in a separate `method="dialog"`
+   * form, or a controlled `open`). A `formMethod="dialog"` submitter inside this form cannot
+   * close it: React prevents every submit of a form with a function `action` and runs the
+   * action again.
    *
    * The dialog is not closed either when it was closed (Escape, a Close part) while the action
    * ran, also if the user re-opened it meanwhile.
@@ -59,7 +66,9 @@ export interface DialogFormProps extends Omit<
  * in library mode the Popup cancels the submission and closes through the Root). With a
  * function `action`: `<form action={action}>` (React overrides the method) and a status watcher
  * that closes the dialog once the action has settled, with the submitter's `value`, unless
- * `closeOnSettle` is `false` or the dialog was closed while the action ran.
+ * `closeOnSettle` is `false`, the dialog was closed while the action ran, or the form is rendered
+ * as a `Form.Root` and the result has a field error (`render={<Form.Root errors={...} />}`, the
+ * recommended composition for validation).
  *
  * `DialogFormState.pending` is this form's own status; it is not emitted as `data-pending` and
  * is not folded into any control's `pending` (conventions 2.7). Submit buttons read
@@ -111,22 +120,29 @@ export function DialogForm({
     };
   }, []);
 
-  const onSettled = useCallback(() => {
-    const dialog = dialogRef.current;
-    const submitted = submission.current;
-    submission.current = null;
-    if (!closeOnSettle || closedSinceSubmit.current) return;
-    if (dialog === null || !dialog.open) return;
-    const returnValue = submitted?.returnValue ?? "";
-    if (isLibrary) {
-      // A library-owned close (design 2.3): `openChangeAction(false)` awaited, then
-      // `close(returnValue)` in the commit, inside the view transition if set.
-      requestClose(submitted?.event, "activate", returnValue);
-      return;
-    }
-    recordCloseIntent({ reason: "activate", event: submitted?.event });
-    dialog.close(returnValue);
-  }, [closeOnSettle, dialogRef, isLibrary, recordCloseIntent, requestClose]);
+  // `clean`: no field error in the settle's result (always `true` without a `Form.Root`).
+  const onSettled = useCallback(
+    (clean: boolean) => {
+      const dialog = dialogRef.current;
+      const submitted = submission.current;
+      submission.current = null;
+      if (!closeOnSettle || closedSinceSubmit.current) return;
+      // A result with field errors keeps the dialog open; the Form.Root focuses the first errored
+      // field (design/components/dialog.md, "Dialog.Form and Form.Root").
+      if (!clean) return;
+      if (dialog === null || !dialog.open) return;
+      const returnValue = submitted?.returnValue ?? "";
+      if (isLibrary) {
+        // A library-owned close (design 2.3): `openChangeAction(false)` awaited, then
+        // `close(returnValue)` in the commit, inside the view transition if set.
+        requestClose(submitted?.event, "activate", returnValue);
+        return;
+      }
+      recordCloseIntent({ reason: "activate", event: submitted?.event });
+      dialog.close(returnValue);
+    },
+    [closeOnSettle, dialogRef, isLibrary, recordCloseIntent, requestClose],
+  );
 
   const state: DialogFormState = { pending };
 
@@ -139,7 +155,12 @@ export function DialogForm({
     children: (s) => (
       <>
         {resolveStateValue(children, s)}
-        {watches && <FormStatusWatcher onPendingChange={setPending} onSettled={onSettled} />}
+        <DialogFormSettle
+          watches={watches}
+          missingAction={action === undefined}
+          onPendingChange={setPending}
+          onSettled={onSettled}
+        />
       </>
     ),
     props: rest,
@@ -154,3 +175,37 @@ export function DialogForm({
 }
 
 DialogForm.displayName = "DialogForm";
+
+/**
+ * Rendered among the form's children, so it reads the `FormContext` exactly when the form is a
+ * `Form.Root` (either orientation of the `render` composition): the settle close then waits for
+ * a result with no field error (`hasAnyError`, the `autoReset` predicate, hidden stale entries
+ * included).
+ */
+function DialogFormSettle({
+  watches,
+  missingAction,
+  onPendingChange,
+  onSettled,
+}: {
+  readonly watches: boolean;
+  readonly missingAction: boolean;
+  readonly onPendingChange: (pending: boolean) => void;
+  readonly onSettled: (clean: boolean) => void;
+}) {
+  const form = use(FormContext);
+  useDevWarning(
+    form !== null && missingAction,
+    "`Dialog.Form` rendered as a `Form.Root` needs a function `action`; without one the form " +
+      "navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a " +
+      '`method="dialog"` form.',
+  );
+  const isForm = form !== null;
+  const errors = form?.errors;
+  const settled = useCallback(
+    () => onSettled(!isForm || !hasAnyError(errors)),
+    [isForm, errors, onSettled],
+  );
+  if (!watches) return null;
+  return <FormStatusWatcher onPendingChange={onPendingChange} onSettled={settled} />;
+}
