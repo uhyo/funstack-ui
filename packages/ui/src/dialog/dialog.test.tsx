@@ -2360,7 +2360,11 @@ describe("Dialog", () => {
             effect: { getComputedTiming: () => ({ endTime: 150 }) },
             finished: fade.promise,
           } as unknown as Animation;
-          vi.spyOn(popup(), "getAnimations").mockReturnValue([animation]);
+          // The exit starts with the close: an animation already running at `beforetoggle` is
+          // the baseline, not the exit (#64).
+          vi.spyOn(popup(), "getAnimations").mockImplementation(() =>
+            popup().open ? [] : [animation],
+          );
           calls.mockClear();
           await act(async () => popup().requestClose());
           await flush();
@@ -2374,6 +2378,22 @@ describe("Dialog", () => {
         } finally {
           Reflect.deleteProperty(document, "startViewTransition");
         }
+      });
+
+      it("an animation already running before the close does not hold the content (#64)", async () => {
+        const user = setupUser();
+        render(<Harness mode="uncontrolled" />);
+        await openThroughTrigger(user);
+        const running = {
+          effect: { getComputedTiming: () => ({ endTime: 10_000 }) },
+          finished: new Promise<never>(() => {}),
+        } as unknown as Animation;
+        // The same object before and after the close: a progress bar, not the exit.
+        vi.spyOn(popup(), "getAnimations").mockReturnValue([running]);
+        await act(async () => popup().requestClose());
+        await flush();
+        expect(popup().open).toBe(false);
+        expect(content()).toBeNull();
       });
     });
 

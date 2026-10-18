@@ -692,7 +692,8 @@ Two exits exist, and the Popup must not keep children for the wrong one:
 - **A dismissal** (browser close) runs the consumer's CSS exit (Chromium and Safari; Firefox hides
   instantly). Dialog's mechanism applies unchanged: the `toggle(closed)` listener calls
   `getAnimations({ subtree: true })` (after flushing style), filters out animations that never
-  end, and if any remain sets `held` (an urgent, library-internal write) **before** dispatching
+  end and those already running at the synchronous `beforetoggle(closed)` (a baseline, as Toast
+  10.2: a progress bar inside is not the exit; #64), and if any remain sets `held` (an urgent, library-internal write) **before** dispatching
   the notification, so the commit that sets committed `false` keeps the children; when the
   animations settle, `setHeld(false)` unmounts them as a **normal update, never in a
   transition**: the popup is already `display: none`, nothing visible changes, and only

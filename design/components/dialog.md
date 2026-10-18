@@ -977,7 +977,9 @@ keep them for the wrong reason:
   flips `display` at once). The `close` listener reads the running animations after flushing
   style (`exitAnimations(dialog)`: `getAnimations({ subtree: true })`, which lists the
   `::backdrop` transition in Chromium, verified by the reviewer, filtered to animations that end,
-  so a decorative loop cannot hold the content forever) and, if any remain, sets `held` (an
+  so a decorative loop cannot hold the content forever, and excluding those already running at
+  the synchronous `beforetoggle(closed)`, so a progress bar inside is not the exit; #64) and, if
+  any remain, sets `held` (an
   urgent, library-internal write) **before** dispatching the notification, so the commit that
   sets committed `false` keeps the children; when the animations settle, `held` is cleared as a
   **normal update, never in a transition**: the dialog is already `display: none`, nothing

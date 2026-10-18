@@ -218,10 +218,7 @@ export function ToastRoot({
     if (!item.ending) return;
     const element = elementRef.current;
     const baseline = viewport.exitBaseline(item.id);
-    const animations =
-      element === null
-        ? []
-        : exitAnimations(element).filter((animation) => !baseline?.has(animation));
+    const animations = element === null ? [] : exitAnimations(element, baseline);
     if (animations.length === 0) {
       viewport.drop(item.id);
       return;

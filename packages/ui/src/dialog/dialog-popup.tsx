@@ -20,7 +20,7 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { exitAnimations, useExitAnimation } from "../internal/use-exit-animation.js";
+import { useExitAnimation } from "../internal/use-exit-animation.js";
 import { useModalRegistration } from "../internal/use-modal-registration.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -469,7 +469,7 @@ export function DialogPopup({
     // The library's own `close()` needs no notification, and with `transition` no hold either:
     // the close commit's view transition carried the content out (4.4).
     if (!echo || transition === undefined) {
-      const animations = exitAnimations(element);
+      const animations = exit.exitAnimations(element);
       if (animations.length > 0) {
         // Before the notification, so its commit keeps the children (urgent, internal).
         exit.holdUntil(animations);
@@ -497,9 +497,12 @@ export function DialogPopup({
   });
 
   const onBeforeToggle = useEffectEvent((event: Event) => {
-    if (event.target !== dialogRef.current) return;
+    const element = dialogRef.current;
+    if (element === null || event.target !== element) return;
     const newState = (event as ToggleEvent).newState;
     awaitingClose.current = newState === "closed";
+    // What already runs inside is not the exit (#64).
+    if (newState === "closed") exit.recordBaseline(element);
     // Every native open counts as a new opening (design 3.4, as Popover 14.1): foreign,
     // pre-hydration and JS-free opens too, so a Close action from an earlier opening skips its
     // close. Counted here, synchronously inside `showModal()` / `show()`, not at the queued

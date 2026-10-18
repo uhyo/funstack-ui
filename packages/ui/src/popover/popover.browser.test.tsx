@@ -521,6 +521,46 @@ describe("exit animation and the deferred unmount (browser)", () => {
     expect(isOpen()).toBe(false);
     await expectHeldThenReleased(seen);
   });
+
+  // A finite animation already running inside (a progress bar) is not the exit: the release
+  // waits for the CSS exit only, not for the bar (#64). A Web Animations API animation keeps
+  // running on a hidden element in every engine, so without the baseline all three would hold
+  // the content for the bar's 10 s.
+  it.each(["part-initiated close", "dismissal"] as const)(
+    "a %s ignores a finite animation that was already running inside (#64)",
+    async (kind) => {
+      fadeStyle();
+      let bar: Animation | undefined;
+      render(
+        <Library popup={{ className: "fade" }}>
+          <span data-testid="content">content</span>
+          <div
+            ref={(element) => {
+              bar ??= element?.animate([{ width: "0px" }, { width: "100px" }], 10_000);
+            }}
+            style={{ height: 4, background: "currentColor" }}
+          />
+        </Library>,
+      );
+      await user.click(trigger());
+      await flush();
+      await sleep(350);
+      expect(bar?.playState).toBe("running");
+      if (kind === "dismissal") await user.keyboard("{Escape}");
+      else await user.click(trigger());
+      await flush();
+      expect(isOpen()).toBe(false);
+      const start = performance.now();
+      while (screen.queryByTestId("content") !== null && performance.now() - start < 3000) {
+        await act(async () => {
+          await sleep(50);
+        });
+      }
+      expect(screen.queryByTestId("content")).toBeNull();
+      expect(bar?.playState).toBe("running");
+      bar?.cancel();
+    },
+  );
 });
 
 describe("ViewTransition (browser)", () => {

@@ -606,6 +606,47 @@ describe("exit animation and the deferred unmount (browser)", () => {
     }
   });
 
+  // A finite animation already running inside (a progress bar) is not the exit: the release
+  // waits for the CSS exit only (#64). The bar is a Web Animations API animation, which keeps
+  // running on a hidden element in every engine.
+  it.each(["Escape", "Close part"] as const)(
+    "%s: the close ignores a finite animation that was already running inside (#64)",
+    async (kind) => {
+      cleanups.push(
+        addStyle(`
+          .fade, .fade::backdrop {
+            opacity: 0;
+            transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
+          }
+          .fade:open, .fade:open::backdrop { opacity: 1; }
+          @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
+        `),
+      );
+      let bar: Animation | undefined;
+      render(
+        <Library popup={{ className: "fade" }}>
+          <span data-testid="content">content</span>
+          <div
+            ref={(element) => {
+              bar ??= element?.animate([{ width: "0px" }, { width: "100px" }], 10_000);
+            }}
+            style={{ height: 4, background: "currentColor" }}
+          />
+          <Dialog.Close data-testid="close">Close</Dialog.Close>
+        </Library>,
+      );
+      await openWithTrigger();
+      await sleep(350);
+      expect(bar?.playState).toBe("running");
+      if (kind === "Escape") await user.keyboard("{Escape}");
+      else await user.click(screen.getByTestId("close"));
+      await settle(() => expect(popup().open).toBe(false));
+      await settle(() => expect(screen.queryByTestId("content")).toBeNull(), 3000);
+      expect(bar?.playState).toBe("running");
+      bar?.cancel();
+    },
+  );
+
   it("a controlled close without transition keeps the content through the fade, mounted once (#46)", async () => {
     cleanups.push(
       addStyle(`

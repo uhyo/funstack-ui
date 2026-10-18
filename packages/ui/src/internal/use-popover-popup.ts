@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
-import { exitAnimations, useExitAnimation } from "./use-exit-animation.js";
+import { useExitAnimation } from "./use-exit-animation.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
 export interface UsePopoverPopupOptions {
@@ -305,6 +305,7 @@ export function usePopoverPopup(
       contentProbe.forget();
     } else {
       awaitingClose.current = true;
+      exit.recordBaseline(element);
       const active = element.ownerDocument.activeElement;
       focusWasInside.current =
         (active !== null && element.contains(active)) || contentProbe.hadFocus();
@@ -332,7 +333,7 @@ export function usePopoverPopup(
         // part-initiated close). With `transition` such a close needs no hold (4.4).
         const echo = !ctx.intended();
         if (!echo || transition === undefined) {
-          const animations = exitAnimations(element);
+          const animations = exit.exitAnimations(element);
           if (animations.length > 0) {
             // Before the notification, so its commit keeps the children (urgent, internal).
             exit.holdUntil(animations);

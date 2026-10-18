@@ -134,3 +134,12 @@ is now a normal update; 6.1 fallback paragraph is obsolete (WebKit verified); 6.
 `nextOpenGeneration`; 3.4 Close: stale close after dismiss + re-open is dropped; 2.5 / 3.1
 `defaultOpen` wording (content and Trigger state are in the server HTML); 13.1 shim now runs
 focusing steps.
+
+## #64 exit baseline (wave 6)
+
+- `useExitAnimation` gained `recordBaseline(element)` / `exitAnimations(element)`; Popover and
+  Dialog record at the synchronous `beforetoggle(closed)` and the `toggle` / `close` read excludes
+  that set. Toast uses the shared `animationBaseline` + `exitAnimations(el, baseline)`.
+- Browser rows use a WAAPI `element.animate()` bar: it keeps running on a hidden element in every
+  engine (CSS animations are cancelled by `display: none`, so Firefox would not reproduce with
+  CSS). Verified the rows fail in Chromium and Firefox with the record disabled.

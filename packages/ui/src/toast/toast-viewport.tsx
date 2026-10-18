@@ -22,6 +22,7 @@ import {
 } from "../internal/modal-registry.js";
 import type { ChangeReason, RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { animationBaseline } from "../internal/use-exit-animation.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -404,9 +405,8 @@ export function ToastViewport({
   const snapshotExitBaselines = (ids: Iterable<string>): void => {
     for (const id of ids) {
       const element = roots.current.get(id);
-      if (element === undefined || !element.isConnected) continue;
-      if (typeof element.getAnimations !== "function") continue;
-      exitBaselines.current.set(id, new Set(element.getAnimations({ subtree: true })));
+      if (element === undefined) continue;
+      exitBaselines.current.set(id, animationBaseline(element));
     }
   };
 

@@ -8,14 +8,28 @@ function ends(animation: Animation): boolean {
 }
 
 /**
- * The running exit animations of a top-layer element that has just been hidden, read after a
- * style flush so that `transition-behavior: allow-discrete` exits exist. Empty where the engine
- * does not animate the exit (Firefox) or there is no CSS exit.
+ * The animations running in an element's subtree right before it closes (the synchronous
+ * `beforetoggle` of the hide, Toast's `data-ending` write): the baseline that `exitAnimations`
+ * excludes, so a finite animation already running inside (a progress bar) does not hold the exit
+ * (Toast 10.2, #64). Empty where `getAnimations` is absent (jsdom).
  */
-export function exitAnimations(element: Element): Animation[] {
+export function animationBaseline(element: Element): ReadonlySet<Animation> {
+  if (!element.isConnected || typeof element.getAnimations !== "function") return new Set();
+  return new Set(element.getAnimations({ subtree: true }));
+}
+
+/**
+ * The running exit animations of a top-layer element that has just been hidden, read after a
+ * style flush so that `transition-behavior: allow-discrete` exits exist, minus the `baseline`
+ * of animations that were already running before the close. Empty where the engine does not
+ * animate the exit (Firefox) or there is no CSS exit.
+ */
+export function exitAnimations(element: Element, baseline?: ReadonlySet<Animation>): Animation[] {
   if (!element.isConnected || typeof element.getAnimations !== "function") return [];
   void getComputedStyle(element).opacity;
-  return element.getAnimations({ subtree: true }).filter(ends);
+  return element
+    .getAnimations({ subtree: true })
+    .filter((animation) => ends(animation) && !(baseline?.has(animation) ?? false));
 }
 
 export interface ExitAnimation {
@@ -29,6 +43,13 @@ export interface ExitAnimation {
   readonly holdDuringRender: () => void;
   /** Whether a `holdUntil` wait is still running. Handlers and effects only. */
   readonly waiting: () => boolean;
+  /**
+   * Record the animations already running in `element`'s subtree. Call from the synchronous
+   * `beforetoggle` of a close, before the hide starts the exit (#64).
+   */
+  readonly recordBaseline: (element: Element) => void;
+  /** `exitAnimations(element)` minus the recorded baseline, which it consumes. */
+  readonly exitAnimations: (element: Element) => Animation[];
 }
 
 /**
@@ -42,6 +63,8 @@ export function useExitAnimation(): ExitAnimation {
   // The generation of the wait in progress, or null; a newer wait supersedes an older one.
   const wait = useRef<number | null>(null);
   const generation = useRef(0);
+  // The animations running right before the latest close (#64), consumed by `exitAnimations`.
+  const baseline = useRef<ReadonlySet<Animation> | null>(null);
 
   const holdUntil = (animations: readonly Animation[]): void => {
     const current = ++generation.current;
@@ -66,5 +89,13 @@ export function useExitAnimation(): ExitAnimation {
     release,
     holdDuringRender: () => setHeld(true),
     waiting: () => wait.current !== null,
+    recordBaseline: (element) => {
+      baseline.current = animationBaseline(element);
+    },
+    exitAnimations: (element) => {
+      const recorded = baseline.current ?? undefined;
+      baseline.current = null;
+      return exitAnimations(element, recorded);
+    },
   };
 }
