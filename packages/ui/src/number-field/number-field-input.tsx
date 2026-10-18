@@ -34,8 +34,6 @@ export interface NumberFieldInputProps extends Omit<
   | "onChange"
   | "onKeyDown"
   | "onBlur"
-  | "onCompositionStart"
-  | "onCompositionEnd"
   | "disabled"
   | "readOnly"
   | "required"
@@ -251,6 +249,7 @@ export function NumberFieldInput({
         disabled={field.disabled}
         readOnly={state.readOnly}
         defaultValue={ctx.resetTargetText}
+        autoComplete="off"
         aria-hidden="true"
         tabIndex={-1}
         style={HIDDEN_STYLE}

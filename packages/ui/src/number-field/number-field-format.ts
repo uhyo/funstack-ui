@@ -70,6 +70,8 @@ interface Symbols {
   readonly affixes: readonly string[];
   /** Literal strings the formatter puts around the number (never parentheses). */
   readonly literals: readonly string[];
+  /** Affixes and literals, longest first: what may be stripped from the edges. */
+  readonly edges: readonly string[];
   /** The numbering system's ten digits, normalised. */
   readonly digits: readonly string[];
   readonly primaryGroup: number;
@@ -153,6 +155,8 @@ function deriveSymbols(
   collect(loc, options, "literal", literals);
   for (const ch of ["(", ")"]) literals.delete(ch);
 
+  const literalList = [...literals].filter((l) => l !== "").sort((a, b) => b.length - a.length);
+
   const digitFormat = new Intl.NumberFormat(loc, { useGrouping: false, numberingSystem });
   const digits = Array.from({ length: 10 }, (_, d) => normalize(digitFormat.format(d)));
 
@@ -162,7 +166,8 @@ function deriveSymbols(
     minus: [...minus],
     plus: [...plus],
     affixes: [...affixes].sort((a, b) => b.length - a.length),
-    literals: [...literals].filter((l) => l !== "").sort((a, b) => b.length - a.length),
+    literals: literalList,
+    edges: [...affixes, ...literalList].sort((a, b) => b.length - a.length),
     digits,
     primaryGroup,
     secondaryGroup,
@@ -237,16 +242,17 @@ function parseWith(
   let s = normalize(text).trim();
   if (s === "") return null;
 
-  // 2. Currency, unit and percent strings, anywhere.
-  for (const affix of symbols.affixes) s = s.split(affix).join(" ");
-  s = stripEdges(s, symbols.literals);
+  // 2. Currency, unit and percent strings and literals, at the edges only (and again inside the
+  // sign below): in the middle of the number they are garbage, never a group separator.
+  const edges = symbols.edges;
+  s = stripEdges(s, edges);
   if (s === "") return undefined;
 
   // 3. One sign: parentheses (accounting), a leading or trailing minus or plus.
   let negative = false;
   if (s.startsWith("(") && s.endsWith(")")) {
     negative = true;
-    s = stripEdges(s.slice(1, -1), symbols.literals);
+    s = stripEdges(s.slice(1, -1), edges);
   } else {
     const leadMinus = startsWithAny(s, symbols.minus);
     const leadPlus = leadMinus === null ? startsWithAny(s, symbols.plus) : null;
@@ -261,7 +267,7 @@ function parseWith(
         s = s.slice(0, s.length - (trailMinus ?? trailPlus)!.length);
       }
     }
-    s = stripEdges(s, symbols.literals);
+    s = stripEdges(s, edges);
   }
   if (s === "") return undefined;
 

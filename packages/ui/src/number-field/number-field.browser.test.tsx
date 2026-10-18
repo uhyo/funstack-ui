@@ -319,8 +319,11 @@ describe("NumberField (browser)", () => {
       render(<Fixture defaultValue={1000} />);
       await focusInput();
       await user.keyboard("{ArrowUp}");
-      expect(document.querySelector('[role="status"][data-fsui-announcer]')).toHaveTextContent(
-        "1,001",
+      // The fallback region writes a tick after it is cleared.
+      await vi.waitFor(() =>
+        expect(document.querySelector('[role="status"][data-fsui-announcer]')).toHaveTextContent(
+          "1,001",
+        ),
       );
     }
   });

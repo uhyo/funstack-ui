@@ -398,6 +398,30 @@ eachMode("typing", (mode) => {
     expect(onCommit.mock.calls[0]![1].event?.type).toBe("keydown");
   });
 
+  it("an Enter with keyCode 229 (WebKit's composition-confirming keydown) does nothing", async () => {
+    const onCommit = vi.fn<Fn>();
+    render(<Fixture mode={mode} onCommit={onCommit} />);
+    typeText("１２");
+    key("Enter", { keyCode: 229 });
+    await flush();
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(input().value).toBe("１２");
+  });
+
+  it("composition handlers pass through to the visible input", () => {
+    const start = vi.fn();
+    const end = vi.fn();
+    render(
+      <NumberField.Root locale="en-US">
+        <NumberField.Input data-testid="input" onCompositionStart={start} onCompositionEnd={end} />
+      </NumberField.Root>,
+    );
+    fireEvent.compositionStart(input());
+    fireEvent.compositionEnd(input());
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(end).toHaveBeenCalledTimes(1);
+  });
+
   it("Enter during an IME composition does nothing", async () => {
     const onCommit = vi.fn<Fn>();
     render(<Fixture mode={mode} onCommit={onCommit} />);
@@ -517,6 +541,16 @@ eachMode("keyboard", (mode) => {
       expect(details.reason).toBe("activate");
       expect(details.event?.type).toBe("keydown");
     }
+  });
+
+  it("Shift+Home / Shift+End keep their native text selection", async () => {
+    const onCommit = vi.fn<Fn>();
+    render(<Fixture mode={mode} initial={5} onCommit={onCommit} rootProps={{ min: 0, max: 10 }} />);
+    expect(key("Home", { shiftKey: true })).toBe(true);
+    expect(key("End", { shiftKey: true })).toBe(true);
+    await flush();
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(input().value).toBe("5");
   });
 
   it("Home / End without bounds are not handled", async () => {
@@ -683,6 +717,25 @@ describe("hold", () => {
     expect(onCommit).toHaveBeenCalledTimes(2);
   });
 
+  it("while a draft is open the bound state follows the draft", async () => {
+    const onCommit = vi.fn<Fn>();
+    render(
+      <Fixture mode="uncontrolled" initial={99} onCommit={onCommit} rootProps={{ max: 99 }} />,
+    );
+    expect(inc()).toBeDisabled();
+    typeText("50");
+    expect(inc()).toBeEnabled();
+    press(inc());
+    await flush();
+    expect(input().value).toBe("51");
+    expect(onCommit.mock.calls[0]![0]).toBe(51);
+    // An unparsable draft: the shown value decides.
+    typeText("abc");
+    expect(inc()).toBeEnabled();
+    typeText("99");
+    expect(inc()).toBeDisabled();
+  });
+
   it("disabled, readOnly and at-bound buttons do nothing", async () => {
     const onCommit = vi.fn<Fn>();
     const { rerender } = render(
@@ -815,6 +868,39 @@ describe("hidden input and the mirror", () => {
     fireEvent.click(screen.getByText("change"));
     expect(hidden().getAttribute("value")).toBe("9");
     expect(hidden().value).toBe("1");
+  });
+
+  it("the hidden input is autocomplete=off (no form-state restoration the text does not show)", () => {
+    render(<Fixture mode="uncontrolled" />);
+    expect(hidden()).toHaveAttribute("autocomplete", "off");
+  });
+
+  it("a step finer than the format is rounded like a typed value: text and FormData agree", async () => {
+    const onCommit = vi.fn<Fn>();
+    render(
+      <form data-testid="form">
+        <Fixture
+          mode="uncontrolled"
+          onCommit={onCommit}
+          rootProps={{
+            name: "price",
+            step: 0.001,
+            format: { style: "currency", currency: "EUR" },
+          }}
+        />
+      </form>,
+    );
+    // 1 + 0.001 = 1.001, which the euro format shows as €1.00: rounded to 1, no change.
+    key("ArrowUp");
+    await flush();
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(hidden().value).toBe("1");
+    key("PageUp");
+    await flush();
+    // + 0.01 (10 steps): €1.01, and the form posts 1.01.
+    expect(input().value).toBe("€1.01");
+    expect(onCommit.mock.calls[0]![0]).toBe(1.01);
+    expect(new FormData(screen.getByTestId("form") as HTMLFormElement).get("price")).toBe("1.01");
   });
 
   it("invalid on the hidden input is always cancelled; on the visible not (bare)", () => {
@@ -1223,6 +1309,23 @@ eachMode("mount reconciliation", (mode) => {
       },
     );
     expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("focused, unparsable text at hydration stays as the draft (never overwritten under the caret)", async () => {
+    const onCommit = vi.fn<Fn>();
+    await hydrate(<Fixture mode={mode} onCommit={onCommit} />, (c) => {
+      visibleIn(c).value = "12,";
+      visibleIn(c).focus();
+    });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(input().value).toBe("12,");
+    expect(document.activeElement).toBe(input());
+    expect(hidden().value).toBe("1");
+    // The blur resolves it by the ordinary rule: `12,` is not a number under en-US, so it reverts.
+    blur();
+    await flush();
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(input().value).toBe("1");
   });
 
   it("a focused input adopts the text as the draft; the blur commits", async () => {
@@ -1722,12 +1825,34 @@ describe("announcements", () => {
     expect(region.parentElement).toBe(document.body);
     expect(region).toHaveAttribute("aria-live", "polite");
     expect(region).toHaveAttribute("aria-atomic", "true");
+    // Inserted empty; the message is written a tick later (a region inserted together with its
+    // first message is skipped by some screen readers).
+    expect(region).toHaveTextContent("");
+    act(() => vi.advanceTimersByTime(100));
     expect(region).toHaveTextContent("2");
     act(() => vi.advanceTimersByTime(1000));
     expect(region).toHaveTextContent("");
     key("ArrowDown", {}, screen.getByTestId("second"));
+    act(() => vi.advanceTimersByTime(100));
     expect(document.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(region).toHaveTextContent("9");
+  });
+
+  it("a repeat of the same text within the clear window is a fresh change", () => {
+    vi.useFakeTimers();
+    render(<Fixture mode="uncontrolled" initial={1} />);
+    key("ArrowUp");
+    act(() => vi.advanceTimersByTime(100));
+    const region = document.querySelector('[role="status"]')!;
+    expect(region).toHaveTextContent("2");
+    // Down then up again: "1" is replaced by a second "2" before it is written. The region is
+    // cleared at once and written a tick later, so the repeated "2" is a DOM change a screen
+    // reader hears again.
+    key("ArrowDown");
+    key("ArrowUp");
+    expect(region).toHaveTextContent("");
+    act(() => vi.advanceTimersByTime(100));
+    expect(region).toHaveTextContent("2");
   });
 });
 

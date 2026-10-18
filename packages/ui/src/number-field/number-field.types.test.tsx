@@ -41,6 +41,10 @@ describe("NumberField types", () => {
     >();
   });
 
+  it("composition handlers pass through on Input", () => {
+    void (<NumberField.Input onCompositionStart={() => {}} onCompositionEnd={() => {}} />);
+  });
+
   it("hiddenInputRef is a Ref<HTMLInputElement>", () => {
     expectTypeOf<NumberFieldInputProps["hiddenInputRef"]>().toEqualTypeOf<
       Ref<HTMLInputElement> | undefined

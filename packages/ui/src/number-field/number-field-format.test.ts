@@ -149,6 +149,19 @@ describe("styles", () => {
     expect(long.parse("12 km")).toBe(12);
   });
 
+  it("affixes are stripped at the edges only, never inside the number", () => {
+    const fr = createNumberFormatter("fr-FR", { style: "currency", currency: "EUR" });
+    expect(fr.parse("1€234")).toBeUndefined();
+    expect(fr.parse("1 234,50 €")).toBe(1234.5);
+    expect(fr.parse("€ 1 234,50")).toBe(1234.5);
+    const en = createNumberFormatter("en-US", { style: "currency", currency: "EUR" });
+    expect(en.parse("-€1.50")).toBe(-1.5);
+    expect(en.parse("€-1.50")).toBe(-1.5);
+    expect(en.parse("1EUR5")).toBeUndefined();
+    const percent = createNumberFormatter("en-US", { style: "percent" });
+    expect(percent.parse("5%0")).toBeUndefined();
+  });
+
   it("a percent sign outside percent style is garbage", () => {
     expect(createNumberFormatter("en-US").parse("50%")).toBeUndefined();
   });

@@ -14,6 +14,8 @@ export interface NumberFieldContextValue {
   /** The state every part's function props receive. */
   readonly state: NumberFieldState;
   readonly bounds: StepBounds;
+  /** What a button steps from: the parsed draft while one is open, else the shown value. */
+  readonly stepBase: number | null;
   /** The Root is pending and the latest step or commit came from this source. */
   readonly pendingSource: NumberFieldSource;
   /** Ids: the visible input (the Root's, or a Field's control id) and the Label. */

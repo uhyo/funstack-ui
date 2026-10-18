@@ -48,7 +48,8 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
   /**
    * `"activate"`: the user typed, pressed a key, a button or turned the wheel (`details.event` is
    * the `focusout` / Enter `keydown` of a typed value, the `keydown` of a key, the `pointerdown` /
-   * tick / `pointerup` of a button, the `wheel` event). `"platform"`: a form reset (the `reset`
+   * `pointerup` of a button (`undefined` for the repeats of a held button and for a hold that
+   * ended at its bound), the `wheel` event). `"platform"`: a form reset (the `reset`
    * event) or text typed before hydration (`undefined`). `"dismiss"`: the commit action rejected
    * and the field reverted to the committed value (uncontrolled; `valueChangeAction` only).
    */
@@ -315,6 +316,9 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   const shown = held && live !== null ? live.value : optimistic;
   const pending = stepPending || commitState.pending;
   const text = draft ?? formatter.format(shown);
+  // The value a button press steps from (4.3 step 3): the parsed draft while one is open.
+  const parsedDraft = draft === null ? undefined : formatter.parse(draft);
+  const stepBase = parsedDraft === undefined ? shown : parsedDraft;
   useInsertionEffect(() => {
     shownRef.current = shown;
   });
@@ -353,6 +357,10 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       reason: ChangeReason,
       event: Event | undefined,
     ): boolean => {
+      // What the text can show is what the form posts (5.4): a step finer than the format's
+      // digits is rounded like a typed value.
+      const { formatter: f } = latest.current;
+      if (next !== null) next = f.round(next);
       // No-op against what the user sees (conventions 2.3 item 8).
       if (Object.is(next, shownRef.current)) return false;
       liveRef.current = next;
@@ -468,7 +476,9 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   const keyDown = useCallback(
     (event: KeyboardEvent) => {
       const { disabled: off, readOnly: ro, bounds: b, largeStep: large } = latest.current;
-      if (off || ro || event.isComposing) return;
+      // WebKit fires `compositionend` before the confirming keydown, which then has
+      // `isComposing === false` and `keyCode === 229` (Combobox's guard).
+      if (off || ro || event.isComposing || event.keyCode === 229) return;
       if (event.key === "Enter") {
         commitDraft(event);
         return;
@@ -489,11 +499,14 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
           compute = (v) => stepBy(v, -large, b);
           break;
         case "Home": {
+          // Shift+Home / Shift+End are text selection.
+          if (event.shiftKey) break;
           const target = boundValue("min", b);
           if (target !== undefined) compute = () => target;
           break;
         }
         case "End": {
+          if (event.shiftKey) break;
           const target = boundValue("max", b);
           if (target !== undefined) compute = () => target;
           break;
@@ -602,17 +615,18 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       if (visible === null) return current;
       const domText = visible.value;
       if (domText === formatter.format(current)) return current;
+      if (visible.ownerDocument.activeElement === visible) {
+        // Still typing (even a partial `12,` or `-`): adopted as the draft, never overwritten
+        // under the caret. The blur commits it, or reverts it by the ordinary rule.
+        draftRef.current = domText;
+        setDraft(domText);
+        return current;
+      }
       const parsed = formatter.parse(domText);
       if (parsed === undefined || Object.is(parsed, current)) {
         // Another locale's formatting of the same value, or text that is no number: show the
         // client's text (react-dom kept the hydrated DOM value).
         visible.value = formatter.format(current);
-        return current;
-      }
-      if (visible.ownerDocument.activeElement === visible) {
-        // Still typing: adopted as the draft, committed at the blur.
-        draftRef.current = domText;
-        setDraft(domText);
         return current;
       }
       return parsed;
@@ -681,6 +695,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     () => ({
       state,
       bounds,
+      stepBase,
       pendingSource: pending ? pendingSource : null,
       inputId,
       labelId,
@@ -707,6 +722,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     [
       state,
       bounds,
+      stepBase,
       pending,
       pendingSource,
       inputId,

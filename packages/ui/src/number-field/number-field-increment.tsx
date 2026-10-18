@@ -50,7 +50,7 @@ export function useStepButtonElement(
   const { disabled: disabledProp = false, className, style, children, render, ...rest } = props;
   const ctx = useNumberFieldContext(part);
   const { state } = ctx;
-  const atBound = isAtBound(state.value, direction === "increment" ? 1 : -1, ctx.bounds);
+  const atBound = isAtBound(ctx.stepBase, direction === "increment" ? 1 : -1, ctx.bounds);
   const disabled = disabledProp || state.disabled || state.readOnly || atBound;
   const pending = ctx.pendingSource === direction;
   const buttonState: NumberFieldButtonState = { pending, disabled };
