@@ -64,8 +64,10 @@ export interface FieldRootProps extends Omit<
    * field's submitted value (`formData.get(name)` as a string, `""` when absent) and the whole
    * form's `FormData`, so a cross-field rule can read the other field. Runs at mount, on every
    * `input` / `change` in the form (and a FUNSTACK control's value change), on blur, after a
-   * reset and on a submission attempt; a new function takes effect at the next of these, so
-   * derive the rule from its arguments rather than from outside state. Return a string
+   * reset, on a submission attempt, and in every commit in which this prop changed identity, so
+   * a rule that reads outside state (a list that loads, a sibling value in React state) updates
+   * on render. An inline function therefore re-runs on every render of the Field; wrap it in
+   * `useCallback` to re-run only when its inputs change. Return a string
    * or strings for an error, `null` / `undefined` / `""` for none. Shown when the platform's
    * `:user-invalid` heuristic says so, like a native constraint. Not serialisable: a Field with
    * `validate` is rendered from a client component.
@@ -294,13 +296,13 @@ export function FieldRoot({
     [latest],
   );
 
-  // The slot follows the server error (and is written once the control is known). `validate` is
-  // read through `latest`, not a dependency: an inline function would otherwise re-run it (and
-  // build a `FormData`) on every render of the Field. A new function takes effect at the next
-  // read (an edit anywhere in the form, a blur, a reset, a submission attempt).
+  // The slot follows the server error and `validate` (and is written once the control is known).
+  // Keyed on `validate`'s identity (design 2.1): a rule reading outside state updates in the
+  // commit that changed it. An inline function re-runs on every render (documented: `useCallback`
+  // avoids it); the form's own values are covered by the listeners below.
   useLayoutEffect(() => {
     refresh();
-  }, [refresh, control, serverShown, serverKey]);
+  }, [refresh, control, serverShown, serverKey, validate]);
 
   // Clear the slot when the control goes away (it may be reused outside the Field).
   useLayoutEffect(

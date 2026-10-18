@@ -141,9 +141,10 @@ import { Form } from "@funstack/ui/form";
         submission, matches <code>:invalid</code> / <code>:user-invalid</code> and is shown like a
         native constraint. It runs at mount, on every <code>input</code> / <code>change</code>{" "}
         anywhere in the form and on a FUNSTACK control's value change (cross-field rules stay
-        current), on blur, after a reset and on a submission attempt. A new function (an inline one
-        on every render) is not run by the render itself; it is used from the next of these events,
-        so derive the rule from its two arguments rather than from outside state. A field with{" "}
+        current), on blur, after a reset, on a submission attempt, and whenever the prop changes, so
+        a rule that reads outside state (a list that loads, a value in React state) updates on
+        render. An inline function is a new prop on every render and so re-runs each time; wrap it
+        in <code>useCallback</code> to re-run it only when its inputs change. A field with{" "}
         <code>validate</code> is rendered from a client component (a function is not serialisable).
       </p>
 

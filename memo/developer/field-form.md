@@ -116,9 +116,9 @@ focus-first-invalid,form-status-watcher}`. Docs page `/components/field`, playgr
   a Field); the fieldset keeps `data-invalid` / `aria-describedby`. Items need it explicitly
   anyway: the slot's `customError` on the first item would otherwise be exposed as invalid by
   Chromium too early (design 2.3). RadioGroup keeps it on `radiogroup` (supported).
-- **L4.** `validate` read through `latest`; the slot effect is keyed on control / server state
-  only. Behaviour change: a new `validate` function takes effect at the next read (edit anywhere
-  in the form, blur, reset, attempt), not at the render. Design 2.1 / the prop doc said "when the
-  prop changes"; docs and JSDoc updated, field.test row adjusted. Architect should confirm.
+- **L4: reverted (PO decision).** `validate` stays a dependency of the slot effect, as design
+  2.1 says: a rule reading outside state updates in the commit that changed it. An inline function
+  re-runs on every render; JSDoc and the docs page recommend `useCallback`. (Briefly shipped as a
+  latest-ref read in ae4640d.)
 - L3: `defaultPrevented` → `submission.current = null` and return (React's own action plugin
   also skips a prevented submit).

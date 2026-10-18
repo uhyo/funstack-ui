@@ -410,7 +410,7 @@ describe("Field: validate", () => {
     expect(confirm.validity.customError).toBe(true);
   });
 
-  it("re-runs after a reset and, after the prop changes, at the next read (blur); null clears it", async () => {
+  it("re-runs after a reset and when the prop changes; null clears it", async () => {
     function Harness() {
       const [banned, setBanned] = useState("x");
       return (
@@ -431,10 +431,7 @@ describe("Field: validate", () => {
     expect(c.validationMessage).toBe("Banned.");
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Change" }));
-    // Read through a latest ref (review L4): a new function is not re-run by the render alone.
-    expect(c.validity.customError).toBe(true);
-    await user.click(c);
-    await user.tab();
+    // The new function runs in the commit that passed it, with no edit (design 2.1).
     expect(c.validity.customError).toBe(false);
     await user.clear(c);
     await user.type(c, "y");
@@ -464,14 +461,13 @@ describe("Field: validate", () => {
   });
 
   it("re-runs when a FUNSTACK control's value changes with no DOM event (controlled from outside)", async () => {
+    // A stable function, so the Harness's re-render does not re-run it by identity.
+    const acceptTerms = (value: string) => (value === "" ? "Accept the terms." : null);
     function Harness() {
       const [accepted, setAccepted] = useState(false);
       return (
         <TestForm>
-          <Field.Root
-            name="terms"
-            validate={(value) => (value === "" ? "Accept the terms." : null)}
-          >
+          <Field.Root name="terms" validate={acceptTerms}>
             <Field.Label>Terms</Field.Label>
             <Checkbox checked={accepted} data-testid="c" />
           </Field.Root>
