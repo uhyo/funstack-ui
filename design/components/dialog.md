@@ -2519,3 +2519,5 @@ hydration; before it the Server Function posts with progressive enhancement, as 
    document, do not automate**; revisit if the exit-animation docs attract the question.
 5. **Development warning** for `Dialog.Form render={<Form.Root />}` without a function
    `action` (the composition silently loses `method="dialog"`). **Recommendation: accept.**
+
+**Accepted by the product owner (2026-10-18):** recommendations 1-5 of "Dialog.Form and Form.Root (#59)" are accepted as written.
