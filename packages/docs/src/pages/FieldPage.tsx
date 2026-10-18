@@ -76,8 +76,9 @@ import { Form } from "@funstack/ui/form";
         </li>
         <li>
           <strong>Any FUNSTACK form control is a Field's control</strong> without a wrapper:
-          Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox and Slider (see{" "}
-          <a href="/components/slider#inside-a-field">Slider inside a Field</a>). A group
+          Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, Slider and NumberField (see{" "}
+          <a href="/components/slider#inside-a-field">Slider inside a Field</a> and{" "}
+          <a href="/components/number-field#inside-a-field">NumberField inside a Field</a>). A group
           (RadioGroup, CheckboxGroup, a Slider with several thumbs) is named by{" "}
           <code>Field.Label</code> through <code>aria-labelledby</code> instead of <code>for</code>.
           A RadioGroup carries <code>aria-invalid</code> on its <code>radiogroup</code>; a
@@ -281,6 +282,19 @@ import { Form } from "@funstack/ui/form";
           <code>Combobox.Label</code> is rendered. <code>validate</code> reads the selection (the
           hidden input), and picking an option counts as an edit: it re-runs <code>validate</code>{" "}
           and dismisses a server error, like typing.
+        </li>
+        <li>
+          NumberField: the visible text input is the control (labelled, described, focused), while
+          its validity is the hidden <code>&lt;input type="number"&gt;</code>'s, so{" "}
+          <code>Field.Error</code>'s function <code>children</code> can branch on{" "}
+          <code>validity.stepMismatch</code>, <code>rangeUnderflow</code> or{" "}
+          <code>rangeOverflow</code>:{" "}
+          <code>
+            {
+              '{({ validity, messages }) => validity.stepMismatch ? "Enter a multiple of six." : messages.join(" ")}'
+            }
+          </code>
+          . <code>validate</code> reads the committed number, never a half-typed draft.
         </li>
         <li>
           "Submit on change":{" "}

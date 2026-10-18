@@ -1,0 +1,84 @@
+/* NumberField: the Root is the group (a grid of the two buttons around the input). The visible
+   input is a plain text field; the hidden number input after it is positioned by the library. */
+.demo-number-field {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+}
+
+.demo-number-label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.demo-number-group {
+  display: inline-grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.demo-number-group:has(.demo-number-input:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.demo-number-input {
+  inline-size: 9ch;
+  min-inline-size: 6ch;
+  border: 0;
+  padding: 0.4rem 0.6rem;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.demo-number-input:focus {
+  outline: none;
+}
+
+.demo-number-input:user-invalid {
+  color: #dc2626;
+}
+
+.demo-number-input[data-pending] {
+  color: var(--color-text-secondary);
+}
+
+.demo-number-step {
+  inline-size: 2.25rem;
+  border: 0;
+  background: var(--color-bg-secondary, transparent);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.demo-number-step:active {
+  background: var(--color-border);
+}
+
+.demo-number-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.demo-number-step[data-pending] {
+  cursor: progress;
+}
+
+.demo-number-field[data-invalid] .demo-number-group,
+.demo-number-group:has(:user-invalid) {
+  border-color: #dc2626;
+}
+
+.demo-number-status {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}

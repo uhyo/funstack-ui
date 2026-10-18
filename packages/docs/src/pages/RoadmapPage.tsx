@@ -122,6 +122,13 @@ export function RoadmapPage() {
           its items in the DOM, so menu buttons, toggles, links and inputs join one Tab stop without
           wrapper parts (<a href={issue(66)}>#66</a>).
         </li>
+        <li>
+          <a href="/components/number-field">NumberField</a>: a text field that holds a number,
+          formatted and parsed in the field's locale with <code>Intl.NumberFormat</code> (strict
+          grouping), a visually hidden native number input for the form value and the browser's
+          constraint messages, press-and-hold buttons, and Slider's step / commit pair with rollback
+          (<a href={issue(67)}>#67</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>

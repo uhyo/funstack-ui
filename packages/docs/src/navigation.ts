@@ -42,6 +42,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/combobox", label: "Combobox" },
   { path: "/components/toast", label: "Toast" },
   { path: "/components/slider", label: "Slider" },
+  { path: "/components/number-field", label: "NumberField" },
   { path: "/components/field", label: "Field & Form" },
   { path: "/components/progress", label: "Progress" },
   { path: "/components/meter", label: "Meter" },

@@ -51,6 +51,7 @@ const SelectPage = lazyPage(() => import("./pages/SelectPage.js"), "SelectPage")
 const ComboboxPage = lazyPage(() => import("./pages/ComboboxPage.js"), "ComboboxPage");
 const ToastPage = lazyPage(() => import("./pages/ToastPage.js"), "ToastPage");
 const SliderPage = lazyPage(() => import("./pages/SliderPage.js"), "SliderPage");
+const NumberFieldPage = lazyPage(() => import("./pages/NumberFieldPage.js"), "NumberFieldPage");
 const FieldPage = lazyPage(() => import("./pages/FieldPage.js"), "FieldPage");
 const ProgressPage = lazyPage(() => import("./pages/ProgressPage.js"), "ProgressPage");
 const MeterPage = lazyPage(() => import("./pages/MeterPage.js"), "MeterPage");
@@ -158,6 +159,12 @@ export const routes = [
                   page("/combobox", "/components/combobox", ComboboxPage, "ComboboxPage"),
                   page("/toast", "/components/toast", ToastPage, "ToastPage"),
                   page("/slider", "/components/slider", SliderPage, "SliderPage"),
+                  page(
+                    "/number-field",
+                    "/components/number-field",
+                    NumberFieldPage,
+                    "NumberFieldPage",
+                  ),
                   page("/field", "/components/field", FieldPage, "FieldPage"),
                   page("/progress", "/components/progress", ProgressPage, "ProgressPage"),
                   page("/meter", "/components/meter", MeterPage, "MeterPage"),
