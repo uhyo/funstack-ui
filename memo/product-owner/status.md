@@ -128,3 +128,9 @@
   - Batch doc/memo commits; tell agents to make a single commit per task.
 - Docs deploy now matches FUNSTACK repos (2f91ea1): wrangler.toml prod via deploy-docs.yml on release; wrangler-dev.toml for Workers Builds. User must add CLOUDFLARE_API_TOKEN/ACCOUNT_ID secrets and repoint Workers Builds to the dev worker.
 - Wave 5 state: Toast (fixes + fallback ada1cba, design folded), Slider (merged, fixes 3b96bcb/8fffbca/330ba8c, WebKit rollback row red -> fix on branch), Field/Form merged e172925 (review running). Issues: #59 Dialog.Form errors, #60 Slider-Field, #62 flakes (Firefox serial fix), #63 Toast leftovers, #64 useExitAnimation baseline.
+
+## 2026-10-18 — alpha.3 released; wave 6 started
+- 0.1.0-alpha.3 released: publish run and Deploy Docs succeeded; npm alpha=0.1.0-alpha.3. #54 closed.
+- User: "Let's proceed with Wave 6." Tracker #69. Components: ToggleGroup/Toolbar (#66), NumberField (#67), Progress/Meter (#68); research #65.
+- Polish in parallel: #57 + #64 (one developer), #63 (one developer). #59 goes to the architect once Field/Form design questions are in hand.
+- Every code change goes to a work branch with branch CI green before master (see the CI policy above).
