@@ -14,7 +14,7 @@ metadata:
 Creating a GitHub release is the whole release: the `release: created` event triggers the npm publish workflow.
 
 - `.github/workflows/publish.yml` builds `@funstack/ui` and publishes it to npm (trusted publishing). A prerelease version such as `0.1.0-alpha.0` is published under the matching dist-tag (`alpha`); other versions go to `latest`.
-- The docs site (https://ui.funstack.work) is deployed by Cloudflare's Git integration, not by a GitHub workflow.
+- `.github/workflows/deploy-docs.yml` deploys the docs site (https://ui.funstack.work, worker `funstack-ui`) to Cloudflare Workers on the same event. The dev worker `funstack-ui-dev` is deployed on push by Cloudflare's Git integration.
 
 Do not run `npm publish` or `wrangler deploy` locally.
 
@@ -40,7 +40,7 @@ To release a new version of the `@funstack/ui` package, follow these steps:
 - The tag name should be `x.y.z` where `x.y.z` is the new version (no `v` prefix).
 - Mark prerelease versions (those containing `-`) with `--prerelease`.
 
-5. Inform the user that the release has been created successfully, providing the URL to the release page on GitHub, and that the npm publish workflow is now running (`gh run list --limit 5` shows it). The docs site is deployed by Cloudflare on its own.
+5. Inform the user that the release has been created successfully, providing the URL to the release page on GitHub, and that the npm publish and docs deploy workflows are now running (`gh run list --limit 5` shows them).
 
 ## Writing Release Notes
 
