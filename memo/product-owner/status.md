@@ -120,3 +120,11 @@
   - the Toast reviewer.
   Check their outputs and branches on resume.
 - Toast browser row "animates the enter; holds ... data-ending" flaked once under load. The reviewer was asked to assess it.
+
+## 2026-10-18 (after the reset)
+- User complaint: CI failures flood GitHub notifications. Policy from now on:
+  - Merges must pass the gate in a clean temp worktree before pushing (done for Slider, Field).
+  - WebKit-sensitive fixes go to a work branch first: push the branch, `gh workflow run ci.yml --ref <branch>` (workflow_dispatch added in 441eb87), and fast-forward master only when all four jobs are green.
+  - Batch doc/memo commits; tell agents to make a single commit per task.
+- Docs deploy now matches FUNSTACK repos (2f91ea1): wrangler.toml prod via deploy-docs.yml on release; wrangler-dev.toml for Workers Builds. User must add CLOUDFLARE_API_TOKEN/ACCOUNT_ID secrets and repoint Workers Builds to the dev worker.
+- Wave 5 state: Toast (fixes + fallback ada1cba, design folded), Slider (merged, fixes 3b96bcb/8fffbca/330ba8c, WebKit rollback row red -> fix on branch), Field/Form merged e172925 (review running). Issues: #59 Dialog.Form errors, #60 Slider-Field, #62 flakes (Firefox serial fix), #63 Toast leftovers, #64 useExitAnimation baseline.
