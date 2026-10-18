@@ -1,0 +1,81 @@
+chromium {
+ "version": "156.0.8078.4",
+ "disabled": [
+  [
+   "sync",
+   "b",
+   ":focus",
+   true
+  ],
+  [
+   "2rAF",
+   "BODY",
+   ":focus",
+   false,
+   "blur",
+   true
+  ]
+ ],
+ "disabledThenTab": "after",
+ "keyAfterDisable": 0,
+ "ariaDisabled": "b",
+ "implicit": {
+  "enabled": 1,
+  "disabled": 0,
+  "type=button": 1
+ },
+ "ax": [
+  [
+   "before",
+   "invalid=\"false\" focusable=true"
+  ],
+  [
+   "Save",
+   "disabled=true invalid=\"false\" focusable=true"
+  ],
+  [
+   "after",
+   "invalid=\"false\" focusable=true"
+  ],
+  [
+   "Busy",
+   "invalid=\"false\" focusable=true busy=1"
+  ],
+  [
+   "AriaDisabled",
+   "disabled=true invalid=\"false\" focusable=true"
+  ],
+  [
+   "Submit",
+   "invalid=\"false\" focusable=true"
+  ]
+ ]
+}
+firefox {
+ "version": "157.0",
+ "disabled": [
+  [
+   "sync",
+   "b",
+   ":focus",
+   true
+  ],
+  [
+   "2rAF",
+   "BODY",
+   ":focus",
+   false,
+   "blur",
+   true
+  ]
+ ],
+ "disabledThenTab": "after",
+ "keyAfterDisable": 0,
+ "ariaDisabled": "b",
+ "implicit": {
+  "enabled": 1,
+  "disabled": 0,
+  "type=button": 1
+ }
+}
+webkit cannot launch: browserType.launch: 

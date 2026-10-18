@@ -1,0 +1,5 @@
+1 after click A: a:PM b:P- plain:P-
+2 after second click A (first unresolved): ["A start","A start"]
+  after resolve: a:-- b:-- plain:-- ["A start","A start","A end","A end"]
+3 click A with preventDefault in onClick: []
+4 console.error: ["A button can only specify a formAction along with type=\"submit\" or no type."]
