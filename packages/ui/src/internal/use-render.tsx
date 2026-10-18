@@ -1,67 +1,33 @@
 "use client";
-import { cloneElement, createElement, isValidElement, useMemo } from "react";
-import type { CSSProperties, ReactNode, Ref } from "react";
-import { mergeProps, mergeRefs } from "./merge-props.js";
-import type { RenderProp, StateValue } from "./types.js";
+import { isValidElement, useMemo } from "react";
+import type { ReactNode, Ref } from "react";
+import { mergeRefs } from "./merge-props.js";
+import { renderElement } from "./render-element.js";
+import type { ElementLikeProps, RenderElementOptions } from "./render-element.js";
 
-interface ElementLikeProps {
-  className?: string | undefined;
-  style?: CSSProperties | undefined;
-  children?: ReactNode;
-  ref?: Ref<unknown> | undefined;
-}
+export { rendersButton, resolveStateValue } from "./render-element.js";
+export type { DataAttributes } from "./render-element.js";
 
-/** `data-*` attributes are valid JSX but absent from the element prop types. */
-export type DataAttributes = { [key: `data-${string}`]: string | undefined };
-
-export interface UseRenderOptions<Props extends ElementLikeProps, State> {
-  /** Intrinsic element rendered when `render` is not given. */
-  defaultElement: string;
-  render: RenderProp<Props, State> | undefined;
-  state: State;
-  className: StateValue<string | undefined, State> | undefined;
-  style: StateValue<CSSProperties | undefined, State> | undefined;
-  children: StateValue<ReactNode, State> | undefined;
-  /** The part's pass-through props for the element. A `render` element's own props win over these. */
-  props: Omit<Props, "className" | "style" | "children"> & DataAttributes;
-  /**
-   * Library-controlled attributes the part computes (`role`, `aria-*` state, id wiring, `data-*`
-   * state, the library's own event handlers). These win over a `render` element's props
-   * (conventions 1.2).
-   */
-  libraryProps?: Partial<Omit<Props, "className" | "style" | "children">> & DataAttributes;
+export interface UseRenderOptions<Props extends ElementLikeProps, State> extends Omit<
+  RenderElementOptions<Props, State>,
+  "ref"
+> {
   /** The library's own ref, if the part needs the DOM node. */
   ref?: Ref<unknown> | undefined;
 }
 
-export function resolveStateValue<T, State>(value: StateValue<T, State>, state: State): T {
-  return typeof value === "function" ? (value as (state: State) => T)(state) : value;
-}
-
-/**
- * Whether a part whose default element is a `<button>` should add `type="button"`: no `render`,
- * a `render` element whose type is the intrinsic `"button"`, or the function form (it receives
- * button props and decides itself what to spread). An element of any other type (an `<a>`, a
- * router `Link`) does not get it: `type` means something else, or nothing, there.
- */
-export function rendersButton<Props, State>(render: RenderProp<Props, State> | undefined): boolean {
-  if (render === undefined || typeof render === "function") return true;
-  return isValidElement(render) && render.type === "button";
-}
-
 /**
  * Resolves `render` and the function-form `className` / `style` / `children` of a part against
- * its state and produces the element (conventions 1.2, 1.3, 1.4).
+ * its state and produces the element (conventions 1.2, 1.3, 1.4). The pure work is
+ * `renderElement` (`render-element.ts`); this hook adds the memoised ref merge.
  */
 export function useRender<Props extends ElementLikeProps, State>(
   options: UseRenderOptions<Props, State>,
 ): ReactNode {
-  const { defaultElement, render, state, className, style, children, props, libraryProps, ref } =
-    options;
+  const { render, props, ref } = options;
 
   const consumerRef = (props as ElementLikeProps).ref;
-  const renderElement = isValidElement<ElementLikeProps>(render) ? render : undefined;
-  const elementRef = renderElement?.props.ref;
+  const elementRef = isValidElement<ElementLikeProps>(render) ? render.props.ref : undefined;
   // Memoised so that the callback ref keeps its identity across renders and React does not
   // detach and re-attach the node every time.
   const mergedRef = useMemo(
@@ -69,26 +35,5 @@ export function useRender<Props extends ElementLikeProps, State>(
     [ref, consumerRef, elementRef],
   );
 
-  const partProps = {
-    ...props,
-    ref: mergedRef,
-    className: resolveStateValue(className, state),
-    style: resolveStateValue(style, state),
-    children: resolveStateValue(children, state),
-  } as Record<string, unknown>;
-  const controlled = (libraryProps ?? {}) as Record<string, unknown>;
-
-  if (renderElement !== undefined) {
-    // The element's ref is already part of `mergedRef`.
-    const { ref: _ignored, ...elementProps } = renderElement.props as Record<string, unknown>;
-    return cloneElement(
-      renderElement,
-      mergeProps(partProps, elementProps, controlled) as Partial<Props>,
-    );
-  }
-  const resolved = mergeProps(partProps, {}, controlled) as unknown as Props;
-  if (typeof render === "function") {
-    return render(resolved, state);
-  }
-  return createElement(defaultElement, resolved);
+  return renderElement<Props, State>({ ...options, ref: mergedRef });
 }

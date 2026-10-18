@@ -1,0 +1,61 @@
+/* Meter: the Root publishes --meter-value, --meter-low, --meter-high and --meter-optimum (the
+   clamped boundaries as percentages, inherited); every part carries data-region. */
+.demo-meter {
+  display: grid;
+  gap: 0.35rem;
+  inline-size: min(24rem, 100%);
+}
+
+.demo-meter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+.demo-meter-head [aria-hidden] {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The zones, drawn from the boundaries. */
+.demo-meter-track {
+  position: relative;
+  block-size: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: linear-gradient(
+    to right,
+    #d3f9d8 var(--meter-low),
+    #fff3bf var(--meter-low) var(--meter-high),
+    #ffe3e3 var(--meter-high)
+  );
+}
+.demo-meter-plain {
+  background: var(--color-border);
+}
+
+/* The fill, coloured by region. */
+.demo-meter-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--meter-value);
+  border-radius: inherit;
+  transition: inline-size 150ms ease-out;
+}
+.demo-meter-fill[data-region="optimum"] {
+  background: #2f9e44;
+}
+.demo-meter-fill[data-region="suboptimum"] {
+  background: #f08c00;
+}
+.demo-meter-fill[data-region="even-less-good"] {
+  background: #e03131;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-meter-fill {
+    transition: none;
+  }
+}

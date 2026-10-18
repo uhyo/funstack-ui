@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { playwright } from "@vitest/browser-playwright";
 import { chromium, firefox, webkit } from "playwright";
 import { configDefaults, defineConfig } from "vitest/config";
+import type { BrowserCommand } from "vitest/node";
 
 const browserTypes = { chromium, firefox, webkit } as const;
 type BrowserName = keyof typeof browserTypes;
@@ -39,6 +40,14 @@ function isInstalled(name: BrowserName): boolean {
  * - In CI (`CI` set) all three run.
  * - Locally, every engine whose Playwright build is installed runs; Chromium always does.
  */
+/**
+ * Emulates `prefers-reduced-motion` for the test page (and its frames). Declared for the tests in
+ * src/__tests__/browser-commands.ts; a test that turns it on turns it off in `finally`.
+ */
+const emulateReducedMotion: BrowserCommand<[reduce: boolean]> = async (context, reduce) => {
+  await context.page.emulateMedia({ reducedMotion: reduce ? "reduce" : "no-preference" });
+};
+
 function selectBrowsers(): BrowserName[] {
   const requested = process.env["FUNSTACK_BROWSERS"];
   if (requested) {
@@ -102,6 +111,7 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
+            commands: { emulateReducedMotion },
             // Firefox runs its files one at a time: headless Firefox shares one mouse and one
             // pointer-capture state between the pages of the browser, so another file's
             // Playwright pointer input lands in a running drag or click (#62).

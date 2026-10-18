@@ -1,0 +1,100 @@
+/* Progress: the library publishes the percentage as --progress-value on the Root (inherited,
+   absent while indeterminate) and sizes nothing; this CSS does. Registering the property lets
+   the variable itself transition, in every engine. */
+@property --progress-value {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+.demo-progress {
+  display: grid;
+  gap: 0.35rem;
+  inline-size: min(24rem, 100%);
+  transition: --progress-value 200ms ease-out;
+}
+
+.demo-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+.demo-progress-head [aria-hidden] {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Linear */
+.demo-progress-track {
+  position: relative;
+  block-size: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-border);
+}
+.demo-progress-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--progress-value, 0%);
+  border-radius: inherit;
+  background: var(--color-primary);
+}
+
+/* Complete */
+.demo-progress-fill[data-complete] {
+  background: #2f9e44;
+}
+
+/* Indeterminate: a sliding segment. */
+.demo-progress-fill[data-indeterminate] {
+  inset-inline-start: auto;
+  inline-size: 30%;
+  animation: demo-progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes demo-progress-slide {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 400% 0;
+  }
+}
+
+/* Circular: the same variable, no SVG. Indeterminate, it spins a quarter arc. */
+.demo-progress-ring {
+  inline-size: 32px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--color-primary) var(--progress-value, 25%),
+    var(--color-border) 0
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), black calc(100% - 5px));
+}
+.demo-progress-ring[data-indeterminate] {
+  animation: demo-progress-spin 1s linear infinite;
+}
+@keyframes demo-progress-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-progress {
+    transition: none;
+  }
+  .demo-progress-fill[data-indeterminate] {
+    animation: none;
+    inset-inline-start: 0;
+    inline-size: 100%;
+    opacity: 0.5;
+  }
+  .demo-progress-ring[data-indeterminate] {
+    animation: none;
+    opacity: 0.5;
+  }
+}

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -152,6 +152,18 @@ const clientFiles = [
   "internal/use-field-control.mjs",
   "internal/use-form-owner-event.mjs",
   "internal/form-status-watcher.mjs",
+  // Progress and Meter: the contexts and the four parts that read them are client modules; the
+  // Roots are not (design/components/progress.md 8.1 and 12.1 "Directive").
+  "progress/progress-context.mjs",
+  "progress/progress-track.mjs",
+  "progress/progress-indicator.mjs",
+  "progress/progress-label.mjs",
+  "progress/progress-value.mjs",
+  "meter/meter-context.mjs",
+  "meter/meter-track.mjs",
+  "meter/meter-indicator.mjs",
+  "meter/meter-label.mjs",
+  "meter/meter-value.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -183,6 +195,16 @@ const directiveFreeFiles = [
   "form/index.mjs",
   "internal/validity.mjs",
   "internal/focus-first-invalid.mjs",
+  // Directive-free Roots that render their client context's provider, and the pure modules they
+  // use (design/components/progress.md 8.1).
+  "progress/index.mjs",
+  "progress/progress-root.mjs",
+  "meter/index.mjs",
+  "meter/meter-root.mjs",
+  "meter/meter-region.mjs",
+  "internal/range-value.mjs",
+  "internal/render-element.mjs",
+  "internal/dev-warn.mjs",
 ];
 
 function startsWithUseClient(file: string): boolean {
@@ -201,4 +223,57 @@ describe("built files", () => {
   it.each(directiveFreeFiles)('%s does not start with "use client"', (file) => {
     expect(startsWithUseClient(file)).toBe(false);
   });
+});
+
+/**
+ * A directive-free Root may render a provider of a context created in a client module
+ * (conventions 7.1's second exception) and must import nothing else from a client module, so a
+ * refactor cannot quietly pull `useRender` into it (design/components/progress.md 12.1).
+ */
+const src = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const directiveFreeRoots = [
+  { root: "progress/progress-root.tsx", context: "progress/progress-context.ts" },
+  { root: "meter/meter-root.tsx", context: "meter/meter-context.ts" },
+];
+
+function resolveSource(from: string, specifier: string): string {
+  const base = resolve(dirname(from), specifier.replace(/\.js$/, ""));
+  for (const candidate of [`${base}.ts`, `${base}.tsx`]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`cannot resolve ${specifier} from ${from}`);
+}
+
+/** Every relative module `file` reaches through runtime (non-`import type`) imports. */
+function runtimeImportGraph(file: string, stopAt: string): Set<string> {
+  const seen = new Set<string>();
+  const visit = (current: string) => {
+    if (seen.has(current)) return;
+    seen.add(current);
+    if (current === stopAt) return;
+    const code = readFileSync(current, "utf8");
+    for (const match of code.matchAll(
+      /^(?:import|export)\s+(?!type\b)[^;]*?from\s+"(\.[^"]+)";/gms,
+    )) {
+      visit(resolveSource(current, match[1]!));
+    }
+    for (const match of code.matchAll(/^import\s+"(\.[^"]+)";/gm)) {
+      visit(resolveSource(current, match[1]!));
+    }
+  };
+  visit(file);
+  return seen;
+}
+
+describe("directive-free Roots", () => {
+  it.each(directiveFreeRoots)(
+    "$root reaches no client module but its context",
+    ({ root, context }) => {
+      const graph = runtimeImportGraph(resolve(src, root), resolve(src, context));
+      const clients = [...graph]
+        .filter((file) => /^"use client";/.test(readFileSync(file, "utf8").trimStart()))
+        .map((file) => relative(src, file));
+      expect(clients).toEqual([context]);
+    },
+  );
 });

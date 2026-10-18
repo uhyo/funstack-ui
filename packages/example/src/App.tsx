@@ -13,6 +13,7 @@ import { ComboboxDemo } from "./combobox-demo";
 import { Notifications, ToastDemo } from "./toast-demo";
 import { SliderDemo } from "./slider-demo";
 import { FieldFormDemo } from "./field-form-demo";
+import { ProgressMeterDemo } from "./progress-meter-demo";
 
 export function App() {
   return (
@@ -38,6 +39,7 @@ export function App() {
       <FieldFormDemo />
       <Notifications />
       <SliderDemo />
+      <ProgressMeterDemo />
     </main>
   );
 }

@@ -45,10 +45,15 @@ export function Settings() {
   );
 }`}</CodeBlock>
       <p>
-        Every part is a client module today, including the Accordion and Dialog parts: compound
-        parts find their Root through context, and a Server Component cannot read context. "JS-free"
-        on this site is a statement about behaviour (no JavaScript runs for the interaction, and it
-        works before hydration), not about module boundaries. Directive-free variants are tracked in{" "}
+        Compound parts find their Root through context, and a Server Component cannot read context,
+        so parts are client modules, including the Accordion and Dialog parts. The exceptions are{" "}
+        <a href="/components/progress">Progress</a> and <a href="/components/meter">Meter</a>: their
+        Roots have no <code>"use client"</code> (they only compute, then render a context provider
+        created in a client module), so a Server Component renders the Root on the server, may pass
+        it function props, and only the small context module and the parts reach the browser.
+        "JS-free" on this site is a statement about behaviour (no JavaScript runs for the
+        interaction, and it works before hydration), not about module boundaries. Directive-free
+        variants are tracked in{" "}
         <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a>; action-less Switch,
         Checkbox and RadioGroup are strong candidates, since a native input already works without
         JavaScript.
@@ -103,6 +108,10 @@ import { saveOpenSections } from "./actions"; // "use server"
           [
             "Select",
             'A native select: picking, the keyboard, typeahead, `required` and form submission all work, and with `appearance: base-select` the browser copies the selected option into `Select.Value` before hydration. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).',
+          ],
+          [
+            "Progress, Meter",
+            "Everything: there is no behaviour. The HTML carries the role, the values, `aria-valuetext`, the data attributes and the custom property, and your CSS draws the bar from the first paint. The Root is itself a Server Component.",
           ],
           [
             "Combobox",

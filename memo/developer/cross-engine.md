@@ -139,3 +139,21 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   dragged value, and the rollback runs from it. The row now holds the save on a promise (held
   value painted, asserted `80` + `data-pending`), drags with `steps: 5`, asserts no start while
   `[data-dragging]`, then counts only the starts after the save settles: exactly one.
+
+## Progress / Meter (2026-10-18, #68)
+
+- Native `<meter>` region at the boundaries differs: Chromium (`GetGaugeRegion`) puts a value
+  exactly at `low` (optimum < low) or exactly at `high` (optimum > high) in `optimum`; Firefox
+  (`:-moz-meter-*` pseudo-classes, read with `matches()`) puts it in `suboptimum`. The library
+  follows Chromium as designed; `meter.browser.test.tsx` asserts Gecko's operators for Firefox
+  (`geckoRegion`). Chromium oracle: `getComputedStyle(meter, "::-webkit-meter-*-value")` reports
+  the same width for all three pseudo-elements (useless), so the row screenshots a meter whose
+  three value pseudo-elements have distinct colours (`appearance: none`) and reads a pixel.
+  WebKit: attributes only (not runnable locally; WebKit has the same pseudo-elements, so the
+  screenshot oracle could be tried there later).
+- CDP `Accessibility.getFullAXTree` reports `valuetext: ""` for `aria-valuetext` on every
+  role (progressbar, meter, slider, native progress); only `input type=range` reports its own
+  value. Assert `aria-valuetext` on the attribute, not on the CDP node.
+- `prefers-reduced-motion` is emulated through a custom browser command
+  (`emulateReducedMotion`, Playwright `page.emulateMedia`) registered in `vitest.config.ts`;
+  `withReducedMotion()` in `src/__tests__/browser-commands.ts` restores it in `finally`.

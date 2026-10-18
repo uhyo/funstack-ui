@@ -264,6 +264,27 @@ export type {
   FormSubmitState,
 } from "./form/index.js";
 
+export { Progress } from "./progress/index.js";
+export type {
+  ProgressRootProps,
+  ProgressState,
+  ProgressTrackProps,
+  ProgressIndicatorProps,
+  ProgressLabelProps,
+  ProgressValueProps,
+} from "./progress/index.js";
+
+export { Meter } from "./meter/index.js";
+export type {
+  MeterRootProps,
+  MeterState,
+  MeterRegion,
+  MeterTrackProps,
+  MeterIndicatorProps,
+  MeterLabelProps,
+  MeterValueProps,
+} from "./meter/index.js";
+
 export type {
   Action,
   ActionDetails,

@@ -50,6 +50,8 @@ const ComboboxPage = lazyPage(() => import("./pages/ComboboxPage.js"), "Combobox
 const ToastPage = lazyPage(() => import("./pages/ToastPage.js"), "ToastPage");
 const SliderPage = lazyPage(() => import("./pages/SliderPage.js"), "SliderPage");
 const FieldPage = lazyPage(() => import("./pages/FieldPage.js"), "FieldPage");
+const ProgressPage = lazyPage(() => import("./pages/ProgressPage.js"), "ProgressPage");
+const MeterPage = lazyPage(() => import("./pages/MeterPage.js"), "MeterPage");
 const CheckboxGroupPage = lazyPage(
   () => import("./pages/CheckboxGroupPage.js"),
   "CheckboxGroupPage",
@@ -148,6 +150,8 @@ export const routes = [
                   page("/toast", "/components/toast", ToastPage, "ToastPage"),
                   page("/slider", "/components/slider", SliderPage, "SliderPage"),
                   page("/field", "/components/field", FieldPage, "FieldPage"),
+                  page("/progress", "/components/progress", ProgressPage, "ProgressPage"),
+                  page("/meter", "/components/meter", MeterPage, "MeterPage"),
                 ],
               }),
               page("/roadmap", "/roadmap", RoadmapPage, "RoadmapPage"),

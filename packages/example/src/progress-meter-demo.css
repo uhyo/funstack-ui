@@ -1,0 +1,116 @@
+/* Progress and Meter demo: the recipes of design/components/progress.md 7.3. The library
+   publishes percentages as custom properties on the Root; this CSS sizes the fills. */
+
+@property --progress-value {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+.pm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pm-progress,
+.pm-meter {
+  display: grid;
+  gap: 0.35rem;
+  max-inline-size: 22rem;
+  margin-block: 0.75rem;
+}
+.pm-inline {
+  inline-size: 12rem;
+}
+
+.pm-progress {
+  transition: --progress-value 200ms ease-out;
+}
+
+.pm-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.pm-track,
+.pm-meter-track {
+  position: relative;
+  block-size: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #e2e2ea;
+}
+
+.pm-fill,
+.pm-meter-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: inherit;
+}
+
+.pm-fill {
+  inline-size: var(--progress-value, 0%);
+  background: #5b5bd6;
+}
+.pm-fill[data-complete] {
+  background: #2f9e44;
+}
+.pm-fill[data-indeterminate] {
+  inset-inline-start: auto;
+  inline-size: 30%;
+  animation: pm-slide 1.2s ease-in-out infinite;
+}
+@keyframes pm-slide {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 400% 0;
+  }
+}
+
+.pm-ring {
+  inline-size: 48px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(#5b5bd6 var(--progress-value, 0%), #e2e2ea 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), black calc(100% - 6px));
+}
+
+.pm-meter-track {
+  background: linear-gradient(
+    to right,
+    #d3f9d8 var(--meter-low),
+    #fff3bf var(--meter-low) var(--meter-high),
+    #ffe3e3 var(--meter-high)
+  );
+}
+.pm-meter-fill {
+  inline-size: var(--meter-value);
+}
+.pm-meter-fill[data-region="optimum"] {
+  background: #2f9e44;
+}
+.pm-meter-fill[data-region="suboptimum"] {
+  background: #f08c00;
+}
+.pm-meter-fill[data-region="even-less-good"] {
+  background: #e03131;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-progress {
+    transition: none;
+  }
+  .pm-fill[data-indeterminate] {
+    animation: none;
+    inset-inline-start: 0;
+    inline-size: 100%;
+    opacity: 0.5;
+  }
+}

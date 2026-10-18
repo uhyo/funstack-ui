@@ -106,6 +106,15 @@ export function RoadmapPage() {
           bubble with first-invalid focus, and a Form that runs its action in a transition, routes
           server errors to fields and resets only on success (<a href={issue(54)}>#54</a>).
         </li>
+        <li>
+          <a href="/components/progress">Progress</a> and <a href="/components/meter">Meter</a>: the
+          first output-only components and the first whose Root is itself a Server Component (no{" "}
+          <code>"use client"</code>). ARIA divs with a fill sized by your CSS from a registered
+          custom property, localised <code>aria-valuetext</code>, an indeterminate state, the
+          platform's meter regions, and the one place the transition advice inverts: a value that
+          reports on a pending action is written with a plain <code>setState</code> (
+          <a href={issue(68)}>#68</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>

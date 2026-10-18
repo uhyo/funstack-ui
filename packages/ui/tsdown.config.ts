@@ -20,6 +20,8 @@ export default defineConfig({
     "src/slider/index.ts",
     "src/field/index.ts",
     "src/form/index.ts",
+    "src/progress/index.ts",
+    "src/meter/index.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives
