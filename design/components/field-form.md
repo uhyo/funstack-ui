@@ -1,10 +1,10 @@
 # Field and Form
 
-Status: **proposed** (2026-10-18, wave 5, GitHub issue #54; research issue #55). Follows
-`design/conventions.md` (accepted); where this document and the conventions disagree, the
-conventions win. The conventions changes this design needs are listed under "Conventions
-feedback (proposed)" and are **not yet applied** (another design holds `conventions.md`
-concurrently).
+Status: **accepted** (2026-10-18, wave 5, GitHub issue #54; research issue #55; all eleven
+product-owner items accepted as recommended, see "Accepted by the product owner" at the end).
+Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
+the conventions win. The conventions changes listed under "Conventions feedback (proposed)"
+were **applied** to `design/conventions.md` on 2026-10-18 (resolved question 30).
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/field-form.md` (binding: native
 constraint validation as the source of validity, `:user-invalid` as the show-timing signal,
@@ -1237,8 +1237,8 @@ src/internal/
 
 ## Conventions feedback (proposed)
 
-To be applied to `design/conventions.md` at acceptance by whoever holds it (another design holds
-it now):
+Applied to `design/conventions.md` on 2026-10-18 (resolved question 30); kept here as the record of
+what changed:
 
 1. **1.1 part vocabulary.** Add `Control` ("the native form control a Field labels and
    describes: `input`, or `textarea` / `select` through `render`"), `Description` ("describes

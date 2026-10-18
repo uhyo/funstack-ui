@@ -17,7 +17,13 @@ the strings in 11, the Lanes row in 10.1; amended 2026-10-18 with the Slider des
 question 29: the commit action in 2.1, the hidden-control exception in 1.1, the continuous-control
 corollary in 2.3, the gesture value in 3.2 and 3.3, the controlled value input's reset in 3.5 and 3.8,
 `dragging` in 4.1, the no-`transition` note in 5.1, the types in 5.3, generic props in 9.4, the
-continuous-control row in 10.1). Binding for every component design in
+continuous-control row in 10.1; amended 2026-10-18 with the Field and Form design, #54, see resolved
+question 30: `Control` / `Description` / `Error` / `Submit` in 1.1 and the element rules in 1.2, the
+validity mirror in 2.6, the form-channel amendments in 2.7, the reset and settle notes in 3.5, the
+owned custom-validity slot in 3.6, `useFieldControl` and `useFormOwnerEvent` in 3.8, `invalid` /
+`required` in 4.1 and 4.2, the no-`transition` note and the CSS-exit rule (#46) in 5.1, the types in
+5.3, the shared context location in 7.1, the shared state type in 9.4, the three rows in 10.1, the
+platform-string note in 11). Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -40,7 +46,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
-| 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6). Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
+| 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 
 ---
 
@@ -81,14 +87,14 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 
 | Part | Meaning | Default element |
 | --- | --- | --- |
-| `Root` | Owns state, context and the transition. May render no DOM (overlays) or a wrapper; a Root that owns a form value but no visible element may render exactly one `<input type="hidden">` when `name` is given (Combobox). | `div` or none |
+| `Root` | Owns state, context and the transition. May render no DOM (overlays) or a wrapper; a Root that owns a form value but no visible element may render exactly one `<input type="hidden">` when `name` is given (Combobox); a Form's Root is the `<form>` itself. | `div` / `form` or none |
 | `List` | Groups triggers; owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (the Popup is the container, because a listbox may contain only options and groups). | `div` |
 | `Item` | One entry in a multi-item component (Accordion, Menu). Menu's is a `button[role=menuitem]` with an `action`. | `div` / `details` / `button` |
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
 | `Indicator` | Purely visual element that tracks state (active tab marker; the fill of a Slider, placed by the consumer's CSS from the Root's `--slider-start` / `--slider-end`). | `span` |
-| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child; for a component whose owner surface is an `Input` part (Combobox) it renders `<label for>`; for Slider it renders `label[for]` naming the only Thumb's input, or `label[id]` naming a multi-thumb Root (`role="group"`). | `label` / `legend` |
+| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child; for a component whose owner surface is an `Input` part (Combobox) it renders `<label for>`; for Slider it renders `label[for]` naming the only Thumb's input, or `label[id]` naming a multi-thumb Root (`role="group"`); for Field it renders `label[for]` naming the field's control, or `label[id]` that a group control (a `<fieldset>` Root) is `aria-labelledby` (the `for` is dropped once such a control registers). | `label` / `legend` |
 | `Input` | The text field of a combobox-like component: `input[role=combobox]`, the owner's surface for `data-pending`, with the urgent `inputValue` state (section 2.6). | `input` |
 | `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its checked/mixed state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
 | `Option` | One choice in a native `<select>` (Select; renders optimistic `data-selected`, equal to the platform's `:checked`) or in a listbox (Combobox: `div[role=option]`, never focused, `data-active` for virtual focus). | `option` / `div` |
@@ -99,6 +105,10 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Track` | The rail a slider's thumbs move along; owns pointer interaction (a press moves the nearest thumb) and is the geometry reference for pointer math. | `div` |
 | `Thumb` | A draggable value handle (Slider, one per value, explicit `index`): a styled element **containing** a visually hidden native `<input type="range">`, which is the focusable, labelled, form-participating `slider`. | `span` + `input[type=range]` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
+| `Control` | The native form control a Field labels and describes: an `input`, or a `textarea` / `select` through `render`; must stay a native control. Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (section 3.8). | `input` |
+| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the control (Field) or the `<dialog>` (Dialog) always references, mounted or not (a dangling reference is skipped). | `p` |
+| `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown, referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
+| `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
 | `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role). | as named |
 
@@ -148,6 +158,10 @@ Rules for the element passed to `render` (same as Base UI):
   has no children; visual indicators are **sibling parts** (`Indicator`) that receive the same
   state attributes. Replacing the element would lose form participation, validation, reset, label
   activation, native radio keyboard handling and RTL mirroring (`docs/research/form-controls.md`).
+- Field and Form (#54): `Field.Control` must stay a native form control (`input`, `textarea`,
+  `select`), `Field.Label` a `<label>`, `Form.Root` a `<form>`, `Form.Submit` a submitter (a
+  `<button>` or `<input type="submit">`). Inside a `Field.Root`, a control's `id` is **owned by
+  the Field** (the Label's `for` must point at it; a consumer `id` on the control warns).
 - `className`: the library's and the element's are concatenated. `style`: merged, element wins.
 - Event handlers the library installs (for example `onClick` on a `Tab`): both run, the element's
   first, then the library's. v0 provides no way to cancel the library's handler from there.
@@ -573,6 +587,15 @@ sync prefix) escapes the scope while order is preserved; the Viewport applies th
 transition as usual. Such a state has no `UrgentChangeAction` prop and no `x` / `defaultX`
 triple, and its commits never run a view transition (5.1).
 
+**A mirror of a browser-owned validity fact** (fourth urgent state, Field #54). `Field.Root`
+reads `:user-invalid`, `validity` and `validationMessage` from its control on `input`, `change`,
+`focusout`, `invalid` and after `reset`, and writes them with `useState` from the DOM event,
+never inside `startTransition`: the DOM already holds the fact, nothing is awaited or optimistic,
+and the error element and its `aria-describedby` token must be in the DOM when the library
+focuses the first invalid control a microtask later (a transition commit would land after the
+focus move, and later still while any async action is pending). No consumer-facing urgent
+action, no `x` / `defaultX` triple, no `transition` prop (`design/components/field-form.md` 2.4).
+
 ### 2.7 Form-level actions are a separate channel
 
 `<form action>`, `useFormStatus` and React's automatic form reset are React's form channel. A
@@ -583,11 +606,23 @@ are independent and the library does not couple them:
   input that posts `name=value` with the form; `useFormStatus().pending` covers the submit.
 - A control **must not** fold `useFormStatus` into its own `pending`: that would mark every
   control in the form pending during a submit. A consumer who wants that reads `useFormStatus`
-  in their own `className` function or styles `form:has(...)`.
+  in their own `className` function or styles `form:has(...)`. A part that **has no action of
+  its own** may expose the form channel's pending as its `pending`: `Field.Root`, `Form.Root`
+  and `Form.Submit` (#54) do, and a control inside a Field keeps its own `data-pending` for its
+  own action, so the two meanings never share an element.
 - A part may **observe** the form channel to perform a platform side effect after a successful
   action (`Dialog.Form` closes the dialog once the action's transition settles); it never wraps
   the action (so a Server Function keeps progressive enhancement) and never reports form pending
-  as its own `pending`.
+  as its own `pending`. `Form.Root` (#54) goes one step further while keeping both properties:
+  it renders a function `action` **unwrapped** on the element and, after hydration, runs it
+  itself from `onSubmit` (`preventDefault()` + its own `useTransition`); react-dom then skips its
+  own action run and its automatic reset but still starts the form's pending status, so
+  `useFormStatus` readers are unaffected, and the reset becomes `autoReset` (a settle with no
+  errors). A submitter with its own `formaction` and a string `action` stay on React's / the
+  browser's path.
+- Field errors an action returns reach fields through `Form.Root errors`, keyed by field `name`
+  (`useActionState`'s result in the common case). The library never interprets an action's
+  return value, so a result is visible to Fields only through that prop.
 - "Autosave on change" is `checkedChangeAction={saveSetting}` (a Server Function may be passed
   directly, section 2.2); "submit on change" is
   `checkedChangeAction={() => formRef.current?.requestSubmit()}`.
@@ -824,7 +859,7 @@ can delay or roll it back. The boundary:
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
 | Server Components | Only through Server Functions as actions | Uncontrolled form needs no behaviour JS; the part may still be a client module (section 7.3) |
-| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event; **late-mounting options** in a `<select>` (Select) are never selected by React (`updateOptions` runs only in the select's own commit), so the Root re-applies the intended option when an Option reports its mount: an option that **hydrated** is reconciled first (a user may have picked it before hydration) and one React **created** is only re-applied (the browser's automatic first-option selection on insertion is not an intent), told apart by `useSyncExternalStore`'s server snapshot; and a platform dispatch on a `<select>` requires the **intended option to exist in the DOM**, so a value whose option is still loading is never "reconciled" to the fallback; **text typed into a controlled text input before hydration** (Combobox) is adopted at mount through the urgent action with `reason: "platform"` (react-dom keeps a hydrated text input's DOM value and fires no `onChange`), and **a value stepped into a native range before hydration** (Slider) the same way through its step + commit dispatch; **a controlled value input** (`type=text`, `type=range`, …) has no reset target of its own, because react-dom keeps its `value` attribute equal to the current value after every update, so the component writes the reset target into `defaultValue` synchronously in the `reset` event (`useFormReset`'s `onResetEvent`) and dispatches the JS-computed target (uncontrolled: the latest `defaultX`; controlled: the mount-time value) from the microtask (Combobox's text, Slider's thumbs); and a component that owns a form value with no visible form element of its own **mirrors the optimistic value into a hidden input** and listens to `reset` on it; a hidden input has **no reset behaviour** (its `.value` is the `value` attribute, which React keeps equal to the optimistic value), so the reset target is computed in JS (uncontrolled: the latest `defaultX`; controlled: the mount-time value) and dispatched from the `reset` microtask, while the visible text input's `defaultValue` mirror is written synchronously in the `reset` event itself, because react-dom syncs a text input's `defaultValue` attribute to its value after every keystroke (Combobox, `useFormReset`'s `onResetEvent`) | n/a |
+| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event; **late-mounting options** in a `<select>` (Select) are never selected by React (`updateOptions` runs only in the select's own commit), so the Root re-applies the intended option when an Option reports its mount: an option that **hydrated** is reconciled first (a user may have picked it before hydration) and one React **created** is only re-applied (the browser's automatic first-option selection on insertion is not an intent), told apart by `useSyncExternalStore`'s server snapshot; and a platform dispatch on a `<select>` requires the **intended option to exist in the DOM**, so a value whose option is still loading is never "reconciled" to the fallback; **text typed into a controlled text input before hydration** (Combobox) is adopted at mount through the urgent action with `reason: "platform"` (react-dom keeps a hydrated text input's DOM value and fires no `onChange`), and **a value stepped into a native range before hydration** (Slider) the same way through its step + commit dispatch; **a controlled value input** (`type=text`, `type=range`, …) has no reset target of its own, because react-dom keeps its `value` attribute equal to the current value after every update, so the component writes the reset target into `defaultValue` synchronously in the `reset` event (`useFormReset`'s `onResetEvent`) and dispatches the JS-computed target (uncontrolled: the latest `defaultX`; controlled: the mount-time value) from the microtask (Combobox's text, Slider's thumbs); and a component that owns a form value with no visible form element of its own **mirrors the optimistic value into a hidden input** and listens to `reset` on it; a hidden input has **no reset behaviour** (its `.value` is the `value` attribute, which React keeps equal to the optimistic value), so the reset target is computed in JS (uncontrolled: the latest `defaultX`; controlled: the mount-time value) and dispatched from the `reset` microtask, while the visible text input's `defaultValue` mirror is written synchronously in the `reset` event itself, because react-dom syncs a text input's `defaultValue` attribute to its value after every keystroke (Combobox, `useFormReset`'s `onResetEvent`); a form `reset` also **clears the user-validity flag (`:user-invalid`) but not custom validity**, so `Field.Root` re-reads its validity mirror and recomputes its custom-validity slot in the reset microtask (Field #54); and **the settle of a form submission** (the `useFormStatus` `true → false` edge) is a form-channel event the library observes without owning: `Dialog.Form` closes on it, `Form.Root` advances its settle generation, focuses the first errored field and applies `autoReset` on it | n/a |
 
 Rules:
 
@@ -899,8 +934,11 @@ renders `required` on every Item only while the group's **optimistic** set is em
 one"), so validation, `:user-invalid` and the localised browser message stay native. Such an
 attribute is owned by the part, follows optimistic state (it appears during a pending uncheck of
 the last box and leaves on rollback), and is static before hydration (the server-rendered value),
-which the component doc records as its pre-hydration behaviour. It is never written through the
-DOM (`setCustomValidity`) in v0.
+which the component doc records as its pre-hydration behaviour. The **custom-validity slot**
+(`setCustomValidity`) of a control inside a `Field.Root` is **owned by the Field** (#54): it
+holds the Field's `validate` result or the server error for the field, recomputed on the
+control's next `input`; a control never calls `setCustomValidity` itself, and attribute-based
+constraints such as CheckboxGroup's `required` are unaffected.
 
 ### 3.7 `keepMounted` on content regions
 
@@ -926,7 +964,9 @@ only, because `"until-found"` cannot apply inside a closed `display: none` dialo
 ### 3.8 Native checkable inputs: the shared machinery
 
 Switch, Checkbox and RadioGroup render controlled native inputs. Beyond `useControllableAction`
-they share three internal hooks, so that one dispatch model covers single controls and groups.
+they share three internal hooks, so that one dispatch model covers single controls and groups;
+every form control's owner part additionally calls `useFieldControl` (last rows), which is how
+a control becomes a Field's control (#54).
 This is the one contract both designs implement (reconciled 2026-10-16 from
 `design/components/switch.md` §7 and `design/components/radio-group.md` Cross-component item 2).
 
@@ -936,6 +976,8 @@ This is the one contract both designs implement (reconciled 2026-10-16 from
 | `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies, in this order, `defaultChecked` (if given), then `checked` (optimistic), then `indeterminate` (if given). The order matters in exactly one case: react-dom's `updateInput` writes `el.checked` on every update of the input (setting the dirty-checkedness flag), and React's automatic form reset runs in the form's mutation effects, after the inputs' updates and before layout effects; after that reset the dirty flag is clear, so writing `defaultChecked` (the `checked` content attribute) would move `checked` too, and writing `checked` afterwards settles it. `indeterminate` is independent of both; and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
 | `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns a stable `{ onItemMounted }`, which the Root passes down through context and `group: true` items call from their mount layout effect (`useNativeChecked` takes `onItemMounted` and `component` options). The adapter **ignores calls made before its own mount reconciliation has run** (members rendered in the Root's commit run their effects first, so they are covered by that reconciliation; the flag is reset in the effect cleanup so StrictMode's re-run behaves the same); any later call queues **one microtask per commit** that compares `readCurrent()` with `base()` and dispatches `"platform"` with `event: undefined`. Comparison is `equals` (option, default `Object.is`); a group with a set value (`CheckboxGroup.Root`) passes set equality, because two sets are never `Object.is`-equal. `element` accepts any `FormAssociatedElement`: Slider subscribes through its first Thumb's input (a Root `div` has no `.form`), with `readCurrent` reading every registered input and `readDefault` returning the JS-computed reset target; the optional `onResetEvent` option is passed through to `useFormReset` for the `defaultValue` mirror of a controlled value input (rule 6). |
 | `useNativeSelectValue(options)` (`internal/use-native-select-value.ts`) | `Select.Root` with its `<select>` ref | The select analogue of `useNativeChecked`, built on `useNativeGroupReconciliation`. After every commit, and for each late Option's mount report, it mirrors the reset target into `option.defaultSelected` (uncontrolled: the latest `defaultValue`, nothing when absent; controlled: the Root's mount-time value; react-dom writes `defaultSelected` only for an uncontrolled `defaultValue`) **and then** re-applies the intended option's `selected`, in that order in one synchronous step, because `defaultSelected = true` on an option the user or script never selected moves the selection. Mount reconciliation reads `select.value`; the reset path reads the spec's reset result (the last `defaultSelected` option, else the first enabled option, else `""`); both dispatch once per Select and only when the intended option exists. With neither `value` nor `defaultValue` the uncontrolled value is **adopted** from the browser's choice without a dispatch (`adopt(next)` on `useControllableAction`, uncontrolled only). |
+| `useFormOwnerEvent(ref, type, handler, options?)` (`internal/use-form-owner-event.ts`) | `useFormReset` (now a thin wrapper), `Field.Root` (`input` / `change` on the form owner for cross-field `validate`) | The stable form-owner subscription of rule 4 generalised to any event type: re-reads `ref.current.form` after every commit, re-subscribes only when the owner changed, handler body through `useEffectEvent`. |
+| `useFieldControl({ ref, labelable, name?, disabled?, required?, component })` (`internal/use-field-control.ts`) | `Field.Control` and the owner part of every FUNSTACK form control: `Checkbox`, `Switch`, `RadioGroup.Root` and `CheckboxGroup.Root` (their `<fieldset>`, `labelable: false`), `Select.Root`, `Combobox.Input`, `Slider` (one thumb: the thumb's input; several: the group element, `labelable: false`) | Outside a `Field.Root`: returns nothing to merge. Inside: registers `{ element, labelable, required, focus() }` with the Field from a layout effect, attaches the Field's native listeners (`input`, `change`, `focusout`, `invalid`, capture) to the element, resolves the **validity element** (the element itself when it is a form control, else the first `willValidate` member of a `<fieldset>`'s `elements`, else the first control inside) where `validity` / `validationMessage` / `:user-invalid` are read and `setCustomValidity` is written, and returns the owned attributes the part spreads into its library layer: `id` (labelable only), `name` / `disabled` / `required` (own, else the Field's), `aria-labelledby` (groups: the Label id), `aria-describedby` (token-merged by the part), `aria-invalid` (`"true"` / `"false"`), `data-invalid`, `data-pending` (the form channel; the part merges it with its own). Two registrations in one Field warn (`design/components/field-form.md` 7). |
 
 Rules the three hooks implement, which component docs may cite instead of restating:
 
@@ -1031,7 +1073,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 
 | Name | Kind | Where | Meaning |
 | --- | --- | --- | --- |
-| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
+| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner. |
 | `pressed` | boolean | Toggle | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`), `Combobox.Option` (optimistic `aria-selected`; distinct from `active`), `Combobox.Input` (a non-null optimistic value) | Optimistic selection on triggers; committed on panels. |
@@ -1042,6 +1084,8 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab; every Slider part | Enum attribute with value. |
+| `invalid` | boolean | every Field part | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). The control also carries an explicit `aria-invalid="true" \| "false"`. |
+| `required` | boolean | every Field part | `Field.Root required` or the control's own `required` (reported through its registration). |
 | `dragging` | boolean | Slider `Root` and the captured `Thumb` | A pointer is captured on a thumb (urgent state; keyboard never sets it). Style motion off under it (`[data-dragging] { transition: none }`). |
 | `ending` | boolean | Toast `Root` | Closed, kept mounted (and `inert`) until its exit animations finish (`useExitAnimation`); CSS animates on it. |
 | `paused` | boolean | Toast `Viewport` | A viewport-wide timer pause holds (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
@@ -1082,7 +1126,7 @@ For native inputs the equivalence is exact, because the DOM holds the optimistic
 | `:checked` | `data-checked` | Identical except under the unsupported `preventDefault()` misuse (2.3) and in one engine quirk: Chromium 156 does **not** match `:checked` on a checkbox that is both checked and indeterminate (Firefox does). Where `indeterminate` is in play, select on `[data-checked]`. |
 | `:indeterminate` | `data-indeterminate` | Only the attribute works before hydration; `:indeterminate` also matches every radio in a group with no selection. |
 | `:disabled` | `data-disabled` | Only the pseudo-class sees `<fieldset disabled>` inheritance. |
-| `:user-invalid`, `:required` | none | Platform only; no attribute. |
+| `:user-invalid`, `:required` | none on the input; `data-invalid` / `data-required` on Field parts | On a bare control: platform only. Inside a `Field.Root` the Field parts emit `data-invalid` (which also covers server errors, where no pseudo-class exists) and `data-required`; `:user-invalid` / `:user-valid` on the control and `:has(:user-invalid)` on the Root remain the zero-JS, pre-hydration styling hooks for the native half. |
 
 The data attributes are still emitted, because sibling or wrapper parts (an `Indicator`, a label
 Root) cannot use `:checked` on themselves; `:has(:checked)` on a wrapper is the zero-JS
@@ -1161,7 +1205,10 @@ prop: parts whose **every commit is on the urgent lane by design** (Toast, secti
 never starts a view transition for an urgent commit, so a boundary could animate nothing and
 would still pay the page cross-fade whenever the part happened to mount inside another
 component's transition commit; such parts animate enter and exit in CSS (`@starting-style`,
-`data-ending`).
+`data-ending`). Field and Form (#54) are in this category too: a Field's state is an urgent
+mirror of browser-owned validity (2.6) and a Form's own commits change nothing the form element
+displays, so no Field or Form part has `transition`; `Field.Error` enters with
+`@starting-style`.
 
 **Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
 (decision for Popover, #38, from the `vt-popover` probe in `docs/research/popover-menu.md`). A
@@ -1171,7 +1218,12 @@ popup's own box on a library-driven open (`::view-transition-new`) and on a libr
 (`::view-transition-old`), in all three engines. `Dialog.Popup` already wraps the `<dialog>`;
 `Popover.Popup` and `Menu.Popup` wrap the `[popover]` element. The rule only matters for opens
 and closes the library performs in a layout effect of a transition commit; browser-initiated
-ones (Escape, light dismiss) happen outside React and animate with CSS, as above.
+ones (Escape, light dismiss) happen outside React and animate with CSS, as above. A CSS exit
+kept next to `transition` must be **cut while a view transition runs**
+(`html:active-view-transition .dialog { transition: none; }`), otherwise Chromium keeps the
+fading element rendered and the close's view transition captures it as a live
+`::view-transition-new` next to the old image (a double image); the rule is untyped on purpose,
+because a controlled close carries no types (#46; Dialog 10.3, Popover 10.2).
 
 ```tsx
 // inside Tabs.Panel (mount strategy per `keepMounted`, section 3.7: not rendered, <Activity>,
@@ -1253,6 +1305,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Select | `fsui-select` (no direction variants) |
 | Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch) |
 | Toast | none (no `transition` prop; every commit is urgent, section 5.1) |
+| Field, Form | none (no `transition` prop: an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
 | Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
@@ -1329,7 +1382,10 @@ else. Files without the directive must not import from files with it, with two e
 `index.ts` files, which only re-export, and the React 19.3 pattern of a directive-free file
 *rendering* a context provider imported from a client module (`<TabsContext value={...}>`), which
 is allowed because Server Components may render client-created contexts. No initial component
-needs the second exception; a component that does says so in its design doc.
+needs the second exception; a component that does says so in its design doc. A context shared
+by **several component folders** lives in `internal/` (`internal/field-context.ts`, read by the
+Field parts, `Form.Root` and `useFieldControl` from every form control's folder); the one-way
+rule above is unchanged, and `internal/` stays unexported.
 
 ```
 src/tabs/
@@ -1599,7 +1655,8 @@ re-exports them.
   `ChangeReason`, `RenderProp<Props, State>`, `StateValue<T, State> = T | ((state: State) => T)`,
   `ViewTransitionClass` (the `transition` prop's type, section 5.2).
 - Props interfaces are `interface`s extending the element props (section 1.5); state objects are
-  `interface`s with readonly members.
+  `interface`s with readonly members. A component whose parts **all share one state object**
+  may export a single `<Component>State` (`FieldState`) instead of one alias per part (#54).
 - A component whose value has two shapes may be **generic** with a default
   (`SliderRootProps<T extends SliderValue = number>`, inferred from `value` / `defaultValue`);
   the shape is fixed at mount (a switch warns in development, like a mode switch).
@@ -1634,6 +1691,9 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Platform path (both) | Required for every component with a residual browser path (section 3.5): mount reconciliation (`renderToString`, change the DOM before `hydrateRoot`, exactly one dispatch with `reason: "platform"` and `event === undefined`, StrictMode still one) and, for native form controls, form reset through `<button type="reset">`, `form.reset()` and React's automatic reset after a successful `<form action>` (one dispatch per state owner with the `reset` event; a cancelled `reset` dispatches nothing; a controlled parent that refuses gets the DOM re-synced after settle). |
 | Lanes | Required for a state that is urgent by design (section 2.6, Toast): with an unrelated `useTransition` action pending (a deferred), the command called inside that action's sync prefix, inside a consumer `startTransition`, and plainly, all commit before the action settles; several commands in one tick keep their order. The component also lists the rows it declares N/A for lacking an `x` / `defaultX` triple (controlled parity, post-await, optimistic, platform path, urgent action) in its top-of-file comment. |
 | Continuous control (both) | Required for a component with a step / commit pair (section 2.1, Slider): between two steps the shown value never reverts to the committed value (with a synchronous step action that has settled); a rejected commit reverts the whole gesture to its start value; a gesture that returns to its start value dispatches steps and no commit; a trailing platform `change` with an unchanged value dispatches nothing. |
+| Form channel | Required for every part that exposes `useFormStatus` as its `pending` (`Field.Root`, `Form.Root`, `Form.Submit`): `data-pending` appears while a deferred form action is unresolved and disappears after it settles (also through a portal); a control inside keeps its own `data-pending` for its own action. |
+| Inside a Field | Required for every form control (Switch, Checkbox, RadioGroup, CheckboxGroup, Select, Combobox, Slider): rendered inside a `Field.Root`, the part's element (or group element) receives the Field's `id` (or `aria-labelledby`), `name`, `aria-describedby`, `aria-invalid`, and `disabled` / `required` from the Field; its own `data-pending` is unaffected by the form's. |
+| Validity display | Required for Field: a submission attempt with an invalid control shows the message, cancels the native bubble (the `invalid` event is `defaultPrevented`) and focuses the first invalid control in document order; a `form.reset()` clears it. The `:user-invalid` half (changed-then-blurred, live updates, `checkValidity()` showing nothing) runs in browser mode. |
 | Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
@@ -1689,6 +1749,9 @@ question 27):
   (following `hotkey`). The name is **static**, so its override is the ordinary `aria-label`
   pass-through rather than a function prop: the function form exists for strings that depend on
   state, and a label with no state would only add a prop.
+- Field (#54) adds **no** string: `Field.Error`'s default text is the browser's own localised
+  `validationMessage` (a platform string, not a library one), and the override is the function
+  form of `children` (`({ validity, messages }) => …`), per `ValidityState` key.
 
 ---
 
@@ -1849,6 +1912,24 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     in 3.2 and 3.3, the controlled value input's reset and pre-hydration path in 3.5 and 3.8,
     `dragging` and the `pending` / `orientation` rows in 4.1, the no-`transition` note in 5.1,
     the types in 5.3, generic props in 9.4, the continuous-control row in 10.1) are applied.
+30. **Field and Form (#54)** accepted 2026-10-18 (`design/components/field-form.md`), all
+    eleven product-owner items as recommended: `Form.Root` runs a function `action` itself on
+    the client (`onSubmit` `preventDefault()` + its own transition, the element's `action`
+    unwrapped for progressive enhancement) with `autoReset` defaulting to `true` (reset on a
+    settle with no errors); `Field.Root` exposes the form's pending; no `aria-errormessage` in
+    v1; server errors written into `setCustomValidity` with the stale-value suppression;
+    repeat submissions not dropped; the validity display urgent with no `transition`;
+    `Dialog.Form` `errors` / `autoReset` as a follow-up; `Field.Label` for group controls by
+    registration (`for` dropped, `aria-labelledby` on the group); sync `validate(value,
+    formData)`. Items 1 and 4 are reported to the user as the most visible. The conventions
+    changes it asked for (`Control` / `Description` / `Error` / `Submit` and the widened `Label`
+    / `Root` in 1.1, the element rules and the Field-owned `id` in 1.2, the validity mirror in
+    2.6 and decision 11, the three form-channel amendments in 2.7, the reset and settle notes in
+    3.5, the owned custom-validity slot in 3.6, `useFieldControl` / `useFormOwnerEvent` in 3.8,
+    `invalid` / `required` and the `pending` row in 4.1 and the `:user-invalid` row in 4.2, the
+    no-`transition` note in 5.1 and the types in 5.3, the shared context in 7.1, the shared
+    state type in 9.4, the three rows in 10.1, the platform-string note in 11) are applied,
+    together with the #46 fold's CSS-exit rule in 5.1.
 
 ## Open questions
 
