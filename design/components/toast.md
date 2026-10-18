@@ -1428,10 +1428,14 @@ component keeps reporting its mount and unmount to the Root as today and renders
   mounts, the timer stops and the announcement waits for the new reveal (section 14 item 13,
   unchanged in substance, visible now).
 - **Parts inside the fallback** are allowed (a visually hidden `<Toast.Title>Loading…
-  </Toast.Title>` gives the Root an accessible name while the skeleton shows; without one the
-  `aria-labelledby` IDREF dangles and a user who presses F8 into the toast hears a nameless
-  dialog, as today) but gate nothing: a `contentCommitted` report while the guard is mounted is
-  ignored, and nothing is announced for the fallback. A consumer who wants "Loading…" announced
+  </Toast.Title>` gives the Root an accessible name while the skeleton shows **on mount**;
+  without one the `aria-labelledby` IDREF dangles and a user who presses F8 into the toast
+  hears a nameless dialog, as today) but gate nothing: a `contentCommitted` report while the
+  guard is mounted is ignored, and nothing is announced for the fallback. On an **update** that
+  re-suspends, the fallback Title does not rename the toast: React hides the committed content
+  with `display: none` but keeps it in the DOM, so the previous Title keeps the same `id` and
+  comes first in the document; the toast keeps its old name ("Uploading", not "Loading…") until
+  the reveal (issue #63; the jsdom row pins this). A consumer who wants "Loading…" announced
   has `toast.promise`'s `pending` phase for that.
 - **A consumer `<Suspense>` inside `children`** still catches first and still has the timer gap;
   the docs steer to `fallback` and keep the caveat for the nested shape.

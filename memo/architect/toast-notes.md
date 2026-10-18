@@ -124,3 +124,12 @@ conventions 6 change ("no `fallback` props in v0").
    ever needs it; not needed now.
 4. Conventions 6: only if section 21 is accepted ("`fallback` exists only where the library
    owns the boundary, which is Toast alone").
+
+## 21.3 wording fix (2026-10-18)
+
+The developer's `fallback` implementation (memo/developer/toast.md, end) found that a Title
+inside the fallback names the toast only on mount: on an update that re-suspends, React hides
+the committed content with `display: none` but keeps it in the DOM, so the hidden previous Title
+keeps `ids.title` and comes first; the toast keeps its old name until the reveal. 21.3 now says
+so (issue #63). Not worth a code change: renaming to "Loading…" mid-update would be the odd
+behaviour, and the old name is still true of the toast.

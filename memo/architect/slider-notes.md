@@ -125,3 +125,50 @@ Checks against the React facts in `react-async-apis.md`:
 Design written as proposed (`design/components/slider.md`), with the conventions changes under
 "Conventions feedback (proposed)" (another architect holds `conventions.md` for Toast) and the
 product decisions under "For the product owner".
+
+## Review fold-in (2026-10-18)
+
+Folded `memo/reviewer/slider.md` and the fixes 3b96bcb (H1), 8fffbca (M3), 330ba8c (M1, M2,
+L1 to L4) into the design; audit table "Review corrections (#54)" at the end of
+`design/components/slider.md`. Developer deviations 1 to 5 accepted and recorded; 6 is L4.
+
+What I learned, in order of how much it changes the design:
+
+- **M2 changed the lane rule, not just a flicker.** "A step is a transition" now reads "a step
+  is a transition when there is a `valueChangeAction`". With no step action there is nothing
+  to run and nothing to keep interruptible, so the transition existed only to make `held` true.
+  That hidden job is now an explicit urgent flag, `stepHeld` (set by every step except the
+  `"dismiss"` revert, cleared by the commit). The reason it must exist is react-dom's
+  end-of-event restore of a controlled input: between a key's `input` and its `change` the
+  prop must already be the new value, or the restore writes the old one back and Firefox
+  fires no `change` at all. Worth remembering for any future controlled native input whose
+  "shown" value is derived rather than stored.
+- **H1 moved an RTL promise from the platform to the library.** The research table said
+  "RTL mirrored by the browser"; WebKit's `RangeInputType::handleKeydownEvent` has no
+  direction check. The fix reads the computed `direction` at each keydown (not at mount, not
+  from `document.dir`), through the vertical path. Horizontal LTR is still fully native, which
+  is the thing worth protecting.
+- **Walkthrough 2 was wrong about what the user sees.** A rejection in uncontrolled mode goes
+  to the boundary above the Root, which unmounts the slider; the "slide-back" I described is
+  only observable with the slider mounted (a parent that catches the failure in its action, or
+  a non-adopting parent at release). The optimistic revert still happens, it is just not
+  rendered by anything. Docs must not promise a slide-back for uncontrolled mode.
+- **L2 is a generic-parts lesson.** A part cannot see its Root's `T`, so defaulting the part's
+  `T` to the narrow case (`number`) is a lie that type-checks. Default to the union and let the
+  consumer narrow. Same applies to any future generic Root with child parts.
+- **M4 is the real design debt**: Field relies on native `input` / `change` and pointer
+  gestures fire none (product-owner item 8). Recorded as 9.4 pointing at #60; the decision
+  (`BubbleInput` vs a direct Field hook) must precede #60.
+
+Open after the fold-in: WebKit CI on 330ba8c fails the rollback-animation browser row (no
+`transitionstart` at release). My unverified hypothesis is in the audit table: the release now
+clears `data-dragging` (transition `none` → on) and lands the return value in the same style
+change, which WebKit may not transition. The developer owns it; the row, not the recipe, is the
+likely fix.
+
+Conventions: nothing changed. Suggested wording (not applied): 3.2's urgent row describes
+`held` as "while a pointer is captured or a step or commit is in flight"; it is now also "or a
+step is waiting for its gesture's commit (`stepHeld`)", and 2.3 item 5 / 3.3 could say "a step
+starts a transition only when there is a step action". 3.8 `useFieldControl` row: Slider's
+two-part control (labelable input in the Thumb, group element in the Root) does not fit "spread
+into the owner part's libraryProps"; decide with #60.
