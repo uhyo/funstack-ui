@@ -425,6 +425,13 @@ Owned keys: `role`, `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocu
 
 ### 3.4 `Toolbar.Button`
 
+> **Superseded (2026-10-22, Button #79).** `Toolbar.Button` is removed; a toolbar's command button
+> is `Button` from `@funstack/ui/button`, which reads `ToolbarContext` and renders `disabled` as
+> `aria-disabled` inside a toolbar exactly as this part did, and additionally ignores activation
+> while its own action is pending. See `design/components/button.md` 7.3 (what goes, migration)
+> and 15.4 (the `toolbar/index.ts` and test changes). The text below is kept as the historical
+> record of the accepted #66 design.
+
 ```ts
 // packages/ui/src/toolbar/toolbar-button.tsx
 export interface ToolbarButtonActionDetails extends ActionDetails {}
@@ -924,6 +931,11 @@ both resolve → committed [] (latest wins)
 ```
 
 ### 11.5 `Toolbar.Button` with a slow action, clicked twice
+
+> **Superseded (2026-10-22, Button #79).** With `Button` in place of `Toolbar.Button` the second
+> click is **ignored** while the first run is pending (`aria-disabled="true"` meanwhile), so the
+> walkthrough below no longer describes a toolbar button; see `design/components/button.md` 5.2
+> and 10 (walkthrough 2). Kept as the historical record of the #66 design.
 
 `useActionTrigger`: both runs execute; `data-pending` stays until both settle; the second run's
 rejection is React's route, the first's is surfaced from render if it rejects. No optimistic state
