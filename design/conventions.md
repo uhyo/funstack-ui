@@ -36,7 +36,11 @@ note in 11; amended 2026-10-18 with the NumberField design, #67, see resolved qu
 and the held value in 2.6 and 3.2, the uncontrolled hidden input in 3.5 and 3.8 rule 6, the surface /
 validity-element mirror in 3.6, `validityElement` in 3.8, the `pending` / `disabled` rows in 4.1, the
 no-`transition` note in 5.1 and the types in 5.3, the directive-free modules in 7.1, the `announce` helper
-in 8, the three rows in 10.1, the two static strings in 11). Binding for every component design in
+in 8, the three rows in 10.1, the two static strings in 11; amended 2026-10-18 with the Button design,
+#79, **accepted 2026-10-22**, see resolved question 34: the `Button` row in 1.1, the cancelled-click note and item 9 in 2.3, the
+re-entry rule in 2.5, the own-`formAction` reading in 2.7, the hook option in 3.4, `aria-disabled` while
+pending in 3.6, the `pending` row in 4.1, the row in 5.3, the folder in 9.1, the Re-entry row in 10.1).
+Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
@@ -50,7 +54,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
-| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. No `on*` handlers in the library API. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), never a handler. |
+| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. A pure trigger ignores activation while its own action is pending and renders `aria-disabled="true"` meanwhile (#79). No `on*` handlers in the library API. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), never a handler. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
@@ -124,7 +128,7 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown, referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
-| `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending` (`useActionTrigger`) inside a composite that needs one: `Toolbar.Button`, focusable when disabled (`aria-disabled`) as the APG Toolbar example wants (#66). Not a general button component. | `button` |
+| `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending` (`useActionTrigger`). The general one is the single-element `Button` (`@funstack/ui/button`, #79): `type="button"` by default (`"submit"` with `formAction`), ignores activation while its own action is pending (`aria-disabled="true"` meanwhile), and reads `ToolbarContext` so that inside a Toolbar `disabled` renders `aria-disabled` and keeps the button focusable, as the APG Toolbar example wants (#66). It **replaces `Toolbar.Button`** (removed with #79, user decision): a Toolbar's command button is a `Button`. | `button` |
 | `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role); inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's (`Toolbar.Separator`, #66). | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
@@ -438,7 +442,11 @@ What a consumer can rely on:
    when the library's handler runs is not a change and does not dispatch, because the browser
    reverts the DOM after dispatch and React restores unchanged props. A part that itself cancels
    the event as part of its mechanism (Dialog's Trigger `preventDefault()`s the click to cancel the
-   `command`) keys the warning on its own flag, not on `defaultPrevented`. Vetoing is done with
+   `command`) keys the warning on its own flag, not on `defaultPrevented`. A **pure trigger**
+   (`Button`, #79) does not read `defaultPrevented` at all: an outer part that renders it
+   (`Dialog.Trigger render={<Button />}`) cancels the click as part of its own mechanism before the
+   trigger's handler runs, there is no DOM state a cancelled click reverts, and the action must
+   still run. Vetoing is done with
    controlled mode: the parent simply does not adopt the change (section 2.4).
 4. **`setState` after the consumer's own `await` is not a Transition** (React limitation). Wrap it:
    ```tsx
@@ -482,7 +490,8 @@ What a consumer can rely on:
    against the **optimistic** value, not the committed one: clicking the Tab that is already
    optimistically selected calls nothing, but clicking back to the committed tab while another is
    pending is a real dispatch that replaces the in-flight intent (section 2.5).
-9. **Parts are never disabled while pending.** See section 3.6.
+9. **Parts are never natively disabled while pending.** A pure trigger ignores re-entry while its
+   own action is pending and says so with `aria-disabled="true"` (sections 2.5 and 3.6, #79).
 
 ### 2.4 Errors
 
@@ -553,6 +562,24 @@ React neither cancels nor orders overlapping actions. The library's stance:
   uncontrolled mode. Component docs show the pattern next to every "update on success" example.
 - **No queueing in the library.** Components that need ordered, result-threaded actions (forms,
   counters) use `useActionState` internally and document that. None of the initial four do.
+- **Pure triggers ignore re-entry** (product-owner decision with Button, #79). A part with a bare
+  `action` and no value has nothing for "latest intent wins" to protect: a second activation
+  while its action is pending would run the side effect twice (every component library with a
+  pending button blocks it; only React's primitives run concurrently, and React points to
+  `useActionState` for ordering). So a click, Enter or Space on a pure trigger whose own action
+  is in flight starts nothing and is `preventDefault()`ed (a `render`ed link does not navigate
+  again, a `formAction` does not submit again, a `command` does not run again); other listeners
+  (focus, hover, the consumer's pass-through handlers) are untouched. The guard reads a
+  synchronous in-flight counter in `useActionTrigger` (two activations in one task) **and** the
+  last render's `pending` (the settled-but-held commit under entanglement), and the trigger
+  renders `aria-disabled="true"` meanwhile (section 3.6). A consumer who wants every activation
+  to count does not await the work (`action={() => { void inc(); }}`, item 5 of 2.3), which ends
+  `pending` at once; an ordered sequence is `useActionState`. No opt-out prop. **Rollout**: the
+  guard is `useActionTrigger`'s `ignoreWhilePending` option (3.4), on for `Button` in #79;
+  `Dialog.Close`, `Popover.Close` and `Menu.Item` keep re-running until the follow-up issue #81
+  (`design/components/button.md` 5.5) switches them (their designs and tests document
+  re-run, and `Menu.Item`'s arrow navigation keys on `aria-disabled`). `Form.Submit` is not a
+  pure trigger (its pending is the form's, 2.7) and is never guarded.
 - Consumers who need abort semantics implement them in the action (`AbortController` captured in
   a ref); the library passes no signal in v0.
 - **Overlap never includes user input.** An action that awaits a promise another user action is
@@ -641,7 +668,11 @@ are independent and the library does not couple them:
   in their own `className` function or styles `form:has(...)`. A part that **has no action of
   its own** may expose the form channel's pending as its `pending`: `Field.Root`, `Form.Root`
   and `Form.Submit` (#54) do, and a control inside a Field keeps its own `data-pending` for its
-  own action, so the two meanings never share an element.
+  own action, so the two meanings never share an element. A part with its **own** function
+  `formAction` (`Button`, #79) may expose the channel's pending **for its own submissions only**:
+  `useFormStatus().action` is the submitter's function, so `status.pending && status.action ===
+  formAction` is this submitter's pending and no other's (the third and last allowed reading of
+  the channel; a plain `type="submit"` button with no `formAction` reads nothing).
 - A part may **observe** the form channel to perform a platform side effect after a successful
   action (`Dialog.Form` closes the dialog once the action's transition settles); it never wraps
   the action (so a Server Function keeps progressive enhancement) and never reports form pending
@@ -859,11 +890,16 @@ transition but no state (`Dialog.Close`, `Popover.Close`, `Menu.Item`) runs the 
 this hook instead of calling `useTransition` itself:
 
 ```ts
-const { pending, run } = useActionTrigger(openGeneration); // openGeneration?: () => number
-run(() => action?.(details), () => close());               // `then` runs inside the same transition once `work` resolved
+const { pending, run } = useActionTrigger({ openGeneration, ignoreWhilePending }); // both optional
+const started = run(() => action?.(details), () => close()); // `then` runs inside the same transition once `work` resolved
+if (!started) event.preventDefault();                        // ignored while pending (2.5)
 ```
 
 - `pending` is the part's own transition (`data-pending` on the button or item).
+- `ignoreWhilePending` (#79): `run` returns `false` and starts nothing while a run is in flight,
+  judged by the hook's synchronous in-flight counter **or** the last render's `pending` (section
+  2.5). On for `Button`; off by default until the follow-up #81 (`design/components/button.md`
+  5.5) makes it the only behaviour.
 - A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
   the part; an older run's rejection (the part was clicked again before the first settled) is
   caught, kept and thrown from the part's render before `useTransition` (the superseded-rejection
@@ -962,18 +998,27 @@ Rules:
 ### 3.6 `disabled`
 
 `disabled` is a boolean prop on the owner and on individual triggers. Native `disabled` is used
-where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs; `Toolbar.Button`, whose APG example
+where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs; a `Button` inside a Toolbar, formerly `Toolbar.Button`, whose APG example
 keeps disabled commands focusable so screen-reader users still find them, #66), the
 part sets `aria-disabled` instead. In both cases the part emits `data-disabled` and never
 dispatches for user interaction (platform dispatches from the form owner are the exception,
 section 2.3 item 7).
 
-**A part is never disabled while pending** (product-owner decision, library-wide). The library
-does not set `disabled`, `aria-disabled` or `inert` on a trigger because its action is in flight:
-native `disabled` drops keyboard focus, and the latest-intent rule (section 2.5) already makes
-repeated activation safe. Consumers who want to block re-activation do it with CSS
-(`[data-pending] { pointer-events: none }`) or announce it with `aria-busy` through pass-through;
-the library emits `data-pending` and nothing else.
+**A part is never natively disabled while pending** (product-owner decision, library-wide;
+amended with Button, #79). The library does not set `disabled` or `inert` on a trigger because its
+action is in flight: native `disabled` drops keyboard focus to `<body>` in Chromium and Firefox
+and leaves it on a dead element in WebKit (`docs/research/button.md` 1.2), so the user's place is
+lost either way. A **pure trigger** that ignores re-entry (section 2.5) renders
+`aria-disabled="true"` while its own action is pending, the honest state of a control that will
+not act (React Aria does the same): focus stays, every listener keeps working (a Tooltip still
+opens), and a user who presses again or returns hears "unavailable" rather than nothing.
+`data-disabled` and `state.disabled` stay the consumer's `disabled` only, so `[data-pending]` and
+`[data-disabled]` never need to look alike. A state owner (Toggle, Tabs, …) sets nothing: the
+latest-intent rule covers it. No `aria-busy` (its meaning is "my content is being modified",
+NVDA and VoiceOver ignore it and JAWS may hide the element's content; pass-through for consumers
+who want it) and no built-in announcement of pending (the outcome is the consumer's).
+`focusableWhenDisabled` (`Button`) joins Tabs and the Toolbar as a source of `aria-disabled` for a
+consumer-disabled control.
 
 **Computed native validity attributes.** A part may render a native constraint attribute from
 library state when the platform has no constraint for the component's semantic: CheckboxGroup
@@ -1129,7 +1174,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 
 | Name | Kind | Where | Meaning |
 | --- | --- | --- | --- |
-| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `ToggleGroup.Root` and each `ToggleGroup.Item` whose optimistic pressed state differs from its committed one; `Toolbar.Button` (its own action, #66); `NumberField.Root`, `NumberField.Input` and the `Increment` / `Decrement` button the latest step or commit came from (#67); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
+| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `ToggleGroup.Root` and each `ToggleGroup.Item` whose optimistic pressed state differs from its committed one; `Button` (its own `action`, or a submission it started through its own function `formAction`, #79; it replaced `Toolbar.Button`, #66); `NumberField.Root`, `NumberField.Input` and the `Increment` / `Decrement` button the latest step or commit came from (#67); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner; also a NumberField `Increment` / `Decrement` button whose next step would change nothing (at its bound, `readOnly`, #67). |
 | `pressed` | boolean | Toggle, `ToggleGroup.Item` | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`), `Combobox.Option` (optimistic `aria-selected`; distinct from `active`), `Combobox.Input` (a non-null optimistic value) | Optimistic selection on triggers; committed on panels. |
@@ -1369,7 +1414,8 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Field, Form | none (no `transition` prop: an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
 | Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
 | ToggleGroup | `fsui-toggle-group`, `fsui-toggle-group-press` (when `details.added` is non-empty), `fsui-toggle-group-release` (when `details.removed` is non-empty; an exclusive switch carries both) |
-| Toolbar | none (`Toolbar.Button` runs through `useActionTrigger`, which attaches no types) |
+| Toolbar | none |
+| Button | none (`useActionTrigger`; `transition` animates the commit that ends the action, #79; `Toolbar.Button` was the same) |
 | Progress, Meter | none (no `transition` prop: a consumer-owned value in the consumer's lane, section 5.1) |
 | NumberField | `fsui-number-field`, `fsui-number-field-change` (each step), `fsui-number-field-commit` (each gesture's commit); no `transition` prop on any part |
 
@@ -1691,6 +1737,11 @@ packages/ui/src/
     index.ts
     toggle.tsx
     toggle.test.tsx
+  button/                   # #79; replaced toolbar/toolbar-button.tsx
+    index.ts
+    button.tsx
+    button.test.tsx
+    button.browser.test.tsx
   tabs/
     index.ts
     tabs-context.ts
@@ -1778,7 +1829,8 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Async action (both) | While the promise is unresolved: `data-pending` on owner and trigger, optimistic state on the trigger, committed state unchanged on content. After resolve: `data-pending` gone, content updated. |
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
 | Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled). |
-| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. |
+| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. |
+| Re-entry (pure trigger) | Required for every pure trigger with the guard on (section 2.5; `Button`, #79): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) is ignored (the rendered `pending`); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. |
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |
@@ -2076,6 +2128,17 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     modules in 7.1, `internal/announce.ts` in 8, the three rows in 10.1, the two static strings
     in 11. `validityElement` also amends the accepted Field design
     (`design/components/field-form.md` 7.1 and its "Amendment: `validityElement`" section).
+34. **Button (#79)** accepted 2026-10-22 (`design/components/button.md`), every recommendation
+    as recommended: the single-element `Button` with a bare `action`; the re-entry guard (ignore
+    while pending, `aria-disabled="true"` meanwhile, never native `disabled`, no `aria-busy`, no
+    announcement, no opt-out prop), library-wide as a rule and landed for Button only, with the
+    follow-up for `Dialog.Close`, `Popover.Close` and `Menu.Item` filed as #81; `type="button"`
+    by default and `"submit"` with `formAction`; `formAction` with per-submitter pending from
+    `useFormStatus().action`; `Form.Submit` unchanged and unguarded; a cancelled click is not a
+    veto for a pure trigger; `Button` reads `ToolbarContext`; `focusableWhenDisabled` in v1;
+    `"use client"`. User decisions: **`Toolbar.Button` is removed** (a breaking change; `Button`
+    replaces it inside a Toolbar) and `focusableWhenDisabled` ships. The conventions changes
+    (decisions row 2, 1.1, 2.3, 2.5, 2.7, 3.4, 3.6, 4.1, 5.3, 9.1, 10.1) are applied.
 
 ## Open questions
 
