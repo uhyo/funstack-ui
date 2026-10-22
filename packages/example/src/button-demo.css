@@ -1,0 +1,37 @@
+/* Button demo: [data-pending] is the in-flight state, [data-disabled] the consumer's disabled. */
+
+.btn {
+  padding: 0.4em 0.9em;
+  border: 1px solid #888;
+  border-radius: 6px;
+  background: white;
+  color: #222;
+  font: inherit;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #f3f3f3;
+}
+
+.btn[data-pending] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.btn[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-tip {
+  margin: 0;
+  padding: 0.25em 0.5em;
+  border: 0;
+  border-radius: 4px;
+  background: #222;
+  color: white;
+  font-size: 0.85em;
+  position-area: top;
+  margin-block-end: 6px;
+}
