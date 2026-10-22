@@ -208,3 +208,14 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - PO decision: a disabled link ToggleGroup.Item stays arrow-reachable (APG toolbar); the user was told the one-line alternative.
 - Release 0.1.0-alpha.7 (f714102); #81 flagged as breaking.
 - Candidates next: #45 context menu, #20/#21 Tooltip arrow and skip-delay, #53 RTL, #19 zero-JS variants.
+
+## 2026-10-22 — wave 10 done, 0.1.0-alpha.8 released
+- Context menu (#45) as Menu.ContextTrigger.
+  - Research 7455084; design 14a8aba and e8377ba; implementation 27c6c11..1cbabf4.
+  - Review a8d09c7: H1 the long-press click swallow; M1 the nested menu's long-press. Fixes c6cb71f and 83a97fa; fold b5febfa.
+- User decision: positioning-only shipped CSS is allowed (conventions 12).
+- PO decisions: editable targets get the native menu by default; press-drag-release is deferred; one Root with two triggers for shared items.
+- #87: the CI Playwright install hung on the apt mirror. Fixed with split steps, timeouts and a cache (4ca589a). apt-get update can still stall; it now fails at 15 min.
+- Release 0.1.0-alpha.8 (4c5bdcd). Publish green; the deploy-docs runner was queued for a long time.
+- Deferred context-menu follow-ups (design): press-drag-release, touch offset, close-on-scroll, RTL placement, a CSP nonce for the style.
+- Candidates next: #20/#21 Tooltip, #53 RTL, #19 zero-JS, context-menu follow-ups.
