@@ -1,0 +1,160 @@
+{
+  "engine": "chromium",
+  "version": "156.0.8078.4",
+  "supportsInterestFor": true,
+  "supportsHint": true,
+  "p1": {
+    "aCold": {
+      "run": 2,
+      "anims": 2,
+      "instant": false
+    },
+    "bSync": {
+      "instant": true,
+      "anims": 0,
+      "run": 0
+    },
+    "bLater": {
+      "anims": 0,
+      "run": 0,
+      "cancel": 0,
+      "instant": true,
+      "open": true,
+      "aOpen": false
+    },
+    "bExit": {
+      "runDelta": 4,
+      "instant": false
+    },
+    "bCold": {
+      "instant": false,
+      "anims": 0
+    },
+    "log": [
+      "a beforetoggle open, other open: false, self popover-open: false",
+      "b beforetoggle open, other open: true, self popover-open: false",
+      "a beforetoggle closed (had data-instant: false)",
+      "b beforetoggle closed (had data-instant: true)",
+      "b beforetoggle open, other open: false, self popover-open: false",
+      "b beforetoggle closed (had data-instant: false)"
+    ]
+  },
+  "p2": {
+    "sync": {
+      "anims": 2
+    },
+    "after": {
+      "run": 2,
+      "cancel": 2,
+      "anims": 0
+    }
+  },
+  "p3": {
+    "warm": {
+      "animstart": 0,
+      "anims": 0,
+      "instant": true
+    },
+    "cold": {
+      "animstart": 1,
+      "anims": 2,
+      "instant": false
+    },
+    "log": [
+      "a beforetoggle open, other open: false, self popover-open: false",
+      "c beforetoggle open, other open: true, self popover-open: false",
+      "a beforetoggle closed (had data-instant: false)",
+      "c beforetoggle closed (had data-instant: true)",
+      "c beforetoggle open, other open: false, self popover-open: false",
+      "c beforetoggle closed (had data-instant: false)"
+    ]
+  },
+  "p6": "no throw",
+  "p4": {
+    "instant": true,
+    "bRun": 0,
+    "bCancel": 4,
+    "bAnims": 0,
+    "aOpen": false,
+    "log": [
+      "a beforetoggle open, other open: false, self popover-open: false",
+      "b beforetoggle open, other open: true, self popover-open: false",
+      "a beforetoggle closed (had data-instant: false)"
+    ],
+    "aColdRun": 2,
+    "msToOpenB": 18
+  }
+}
+{
+  "engine": "firefox",
+  "version": "157.0",
+  "supportsInterestFor": false,
+  "supportsHint": true,
+  "p1": {
+    "aCold": {
+      "run": 2,
+      "anims": 2,
+      "instant": false
+    },
+    "bSync": {
+      "instant": true,
+      "anims": 0,
+      "run": 0
+    },
+    "bLater": {
+      "anims": 0,
+      "run": 0,
+      "cancel": 0,
+      "instant": true,
+      "open": true,
+      "aOpen": false
+    },
+    "bExit": {
+      "runDelta": 0,
+      "instant": false
+    },
+    "bCold": {
+      "instant": false,
+      "anims": 2
+    },
+    "log": [
+      "a beforetoggle open, other open: false, self popover-open: false",
+      "b beforetoggle open, other open: true, self popover-open: false",
+      "a beforetoggle closed (had data-instant: false)",
+      "b beforetoggle closed (had data-instant: true)",
+      "b beforetoggle open, other open: false, self popover-open: false",
+      "b beforetoggle closed (had data-instant: false)"
+    ]
+  },
+  "p2": {
+    "sync": {
+      "anims": 2
+    },
+    "after": {
+      "run": 2,
+      "cancel": 2,
+      "anims": 0
+    }
+  },
+  "p3": {
+    "warm": {
+      "animstart": 0,
+      "anims": 0,
+      "instant": true
+    },
+    "cold": {
+      "animstart": 1,
+      "anims": 3,
+      "instant": false
+    },
+    "log": [
+      "a beforetoggle open, other open: false, self popover-open: false",
+      "c beforetoggle open, other open: true, self popover-open: false",
+      "a beforetoggle closed (had data-instant: false)",
+      "c beforetoggle closed (had data-instant: true)",
+      "c beforetoggle open, other open: false, self popover-open: false",
+      "c beforetoggle closed (had data-instant: false)"
+    ]
+  },
+  "p6": "no throw"
+}

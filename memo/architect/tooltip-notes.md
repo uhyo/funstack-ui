@@ -75,3 +75,26 @@ Working notes behind `design/components/tooltip.md`. Not a spec; the design doc 
   pseudo-class proposal before writing any JS for it.
 - Graduation checklist: drop `experimental_hint` when Safari stable has `hint`; drop
   `experimental_interestFor` when Gecko and WebKit ship `interestfor`.
+
+## Wave 12: `data-instant` (#93, 2026-10-23)
+
+- Probe: `probes/tooltip-instant-beforetoggle.mjs` (+ `.output.txt`), Chromium 156 / Firefox 157
+  via Playwright; WebKit does not launch on this machine (host libs; `playwright install
+  --with-deps webkit` would fix it). Run `ENGINES=chromium node …` to restrict.
+- The first run of P4 (native path) was a false negative: without the warm rule in the page B
+  waited its 300 ms and A had already closed after its 150 ms end delay, so B was cold. With the
+  shipped rule in place, B's `beforetoggle` fires with A still `:popover-open` and `hint`
+  stacking closes A afterwards. Keep that in mind for the browser row: the warm case needs the
+  pointer to reach B inside A's `closeDelay`, which a straight Playwright move does.
+- `getAnimations()` is not an oracle for "before first frame": a write from `toggle` starts and
+  cancels the transitions and the list is empty afterwards. Count `transitionrun` /
+  `animationstart`. Also: reopening a popup whose exit transition still runs cancels it
+  (`transitioncancel` noise); rows start from a settled state.
+- Rejected: `state.instant` via `flushSync` in `beforetoggle` (a sync render inside the show
+  algorithm per warm open, on the native path too, for a value no render can use because there
+  is no `state.open`); keeping the attribute until the next cold open (inconsistent exits during
+  browsing; see the amendment); the `:root` inherited-property cooldown as a CSS-only route
+  (conventions 12, `html { transition }` conflict, document restyle, different semantics).
+- Possible follow-up: a closing-side marker ("closing because another tooltip opens") so a
+  consumer can make replaced tooltips vanish instead of fading; at A's close `beforetoggle`, B
+  already carries `data-instant` and is not yet `:popover-open`, which is detectable.

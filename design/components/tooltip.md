@@ -25,6 +25,7 @@ thin, feature-detected shim for the trigger that steps aside wherever the browse
 | 6   | Delays                | `delay` (250 ms) and `closeDelay` (150 ms) on `Root`, matching Chromium's `interest-delay` defaults. Native path: inline `interest-delay-start/end` on the trigger. JS path: timers. Same delay for hover and keyboard focus. **Skip-delay (wave 11, #21): while any `[role="tooltip"]:popover-open` exists in the document, a tooltip opens with no delay and the other one is hidden at once; global, no provider, no prop.** Native path: a shipped `@property` + `:root:has()` rule feeding `interest-delay-start: calc(<delay> * (1 - var(--fsui-tooltip-warm, 0)))`; JS path: a `querySelector` at hover / focus start. |
 | 7   | Positioning           | `side` (`top`) and `align` (`center`) on `Popup` set inline `position-area` and `position-try-fallbacks` through the shared matrix of conventions 13.1: physical sides plus `inline-start` / `inline-end`, inline-relative `align` on a horizontal side (wave 11, #53). `side={null}` emits nothing so a stylesheet can take over.                                                                                                                                                                       |
 | 11  | Resolved side         | `data-side` / `data-align` on Popup and Arrow (and `state.side` / `state.align`) are the **resolved** placement while the tooltip is shown, read from the computed `position-area` by the shared observer (conventions 13.2), and the requested values otherwise. The Arrow therefore points at the trigger after a fallback flip (wave 11, #20). |
+| 12  | Warm opens            | `data-instant` on `Popup` (presence) while the tooltip is shown by an open that began while another `[role="tooltip"]:popover-open` existed (the skip-delay condition, read at the open's `beforetoggle`), so `.tip[data-instant] { transition: none }` skips the entry animation on a warm open and keeps it on a cold one (wave 12, #93). A DOM write from the popup's synchronous `beforetoggle` on **both** paths, before the first style recalc of the open; cleared at the close's `beforetoggle`; never React state, no `state.instant`, no prop. The native path's one listener. |
 | 8   | Animation             | CSS only (`@starting-style`, `transition-behavior: allow-discrete`, `overlay` required for Chromium's exit). Exit fade is progressive enhancement (none in Firefox); the library never waits on it. No `<ViewTransition>` and no `transition` prop on any Tooltip part (conventions 3.5).                                                                                                                                                                                 |
 | 9   | Directives            | Every file is `"use client"`. No directive-free part is possible because the trigger/popup id link needs context and only Client Components read context. "Zero-JS" here means no runtime behaviour JS on the native path, not no hydration.                                                                                               |
 | 10  | Touch                 | JS path ignores `pointerType === "touch"`; no long-press in v0. Chromium's native long-press works on the native path. Tooltip content must never be the only place information lives.                                                                                                                                                     |
@@ -153,7 +154,9 @@ Chromium 153 by the reviewer:
 
 The library's interaction effect checks whether the trigger element has the
 `interestfor` attribute **and** `"interestForElement" in triggerElement`. If both hold it attaches
-no listeners at all (beyond the `disabled` cleanup above). The two flags are designed to be set together; `experimental_interestFor`
+no interaction listeners at all (beyond the `disabled` cleanup above); since wave 12 one passive
+`beforetoggle` listener on the popup writes `data-instant` on both paths (the amendment for
+#93), which handles nothing and cancels nothing. The two flags are designed to be set together; `experimental_interestFor`
 without `experimental_hint` leaves a `manual` popup driven by interest, which still works in
 Chromium (interest loss and Escape hide it) but has no outside-click dismissal.
 
@@ -164,12 +167,13 @@ omitted from the trigger's prop type and consumer `onPointerEnter` et al. pass t
 
 | Target                         | Event                                             | Behaviour                                                                                       |
 | ------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| trigger                        | `pointerenter` (not `touch`)                      | start open timer (`delay`); **warm** (another `[role="tooltip"]:popover-open` in the document, section 6): hide it now and open now |
+| trigger                        | `pointerenter` (not `touch`)                      | start open timer (`delay`); **warm** (another `[role="tooltip"]:popover-open` in the document, section 6): open now, then hide it (that order, so the popup's `beforetoggle` sees it; wave 12) |
 | trigger                        | `pointerleave`                                    | start close timer (`closeDelay`)                                                                |
 | trigger                        | `focus` where `trigger.matches(":focus-visible")` | start open timer; warm: as above                                                                 |
 | trigger                        | `blur`                                            | start close timer                                                                               |
 | popup                          | `pointerenter`                                    | cancel close timer                                                                              |
 | popup                          | `pointerleave`                                    | start close timer                                                                               |
+| popup                          | `beforetoggle` (both paths)                       | open: write `data-instant` by presence from "another `[role=\"tooltip\"]:popover-open` exists" (`syncPresence`); close: remove it (wave 12, #93). Synchronous, before the top-layer insertion, so the first style recalc of the open sees it |
 | popup                          | `toggle`                                          | reconcile open state (`event.newState === "open"`) for opens and closes the library did not perform; install or remove the document listeners below |
 | document (while open)          | `keydown` Escape                                  | hide now and `preventDefault()` (keeps an enclosing modal `<dialog>` or `auto` menu open; a second Escape closes them) |
 | document (while open, capture) | `pointerdown`                                     | hide now (covers outside click, click on the trigger, and click on the popup)                   |
@@ -383,6 +387,7 @@ computed `position-area` is that signal, read without geometry.)
 | open        | **browser** (popover visibility state, top layer) | `:popover-open` on the popup; `.trigger:has(+ .popup:popover-open)` on the trigger; Chromium native path also `:interest-source` / `:interest-target` |
 | disabled    | library (prop, not changeable by the user)        | `data-disabled` on Trigger and Popup; `state.disabled`                                                                                                |
 | side, align | props while closed; **browser** (the applied `position-try-fallbacks` option, observed, written urgently; conventions 3.5 and 13.2) while shown | `data-side`, `data-align` on Popup and Arrow; `state.side`, `state.align`: the resolved placement while shown, the requested one otherwise (wave 11, #20) |
+| instant     | **browser** (the top-layer state of the other tooltips at the moment this open begins) | `data-instant` on Popup, written by presence from the popup's `beforetoggle` on both paths and removed at the close's; **no `state.instant`** (wave 12, #93, amendment) |
 | pending     | n/a                                               | never emitted: no action, no transition                                                                                                               |
 
 ### 4.1 No `open`, no `openChangeAction`, no `data-open`
@@ -402,6 +407,11 @@ escape hatch, conventions 2.6).
 and conventions 7.4 says not to duplicate a pseudo-class for browser-owned state. Emitting it on
 the trigger would require a React state write from the `toggle` event (a render per hover) solely
 to mirror what `:has(+ :popover-open)` selects today.
+
+`data-instant` (wave 12) is the one attribute Tooltip writes for browser-owned state, because
+no pseudo-class carries it: it is a DOM write from the popup's `beforetoggle`, never a React
+state write, so it has no `state.instant` counterpart for the same reason there is no
+`state.open` (conventions 7.4; the amendment for #93).
 
 Controlled `open` (pinned or programmatic tooltips) is out of scope for v0. A pinned tooltip is
 click-driven, which makes it a Popover with `commandfor` + `interestfor` ("hover to preview,
@@ -564,7 +574,8 @@ reads them in `Root`'s effect.
     transition too, while on a skip the previous tooltip is already hidden when the next one's
     style changes, so "another tooltip is open" is never observable from CSS at that moment.
     No replacement recipe is possible. Instant browsing that keeps cold entry animations
-    needs library state (`data-instant` / `state.warm`): follow-up **#93**.
+    needs library state: **`data-instant` on the Popup, wave 12 (#93, the amendment at the end
+    of this document)**, written from the popup's `beforetoggle` on both paths.
   - **Accessibility:** WCAG 1.4.13's dismissible and persistent requirements are unchanged;
     **hoverable has one new trade-off** (review L5): the pointer crossing a neighbouring
     trigger B on its way from trigger A to A's tooltip now opens B at once and hides A, where
@@ -727,12 +738,20 @@ The animation is CSS, shown in the docs with the reduced-motion block:
     translate: 0 4px;
   }
 }
+.tip[data-instant] {
+  transition: none; /* a warm open (another tooltip was showing): no entry animation, wave 12 */
+}
 @media (prefers-reduced-motion: reduce) {
   .tip {
     transition: none;
   }
 }
 ```
+
+The `[data-instant]` rule skips the entry animation of a warm open (skip-delay, section 6) and
+leaves a cold open's alone; the attribute is written before the open's first style recalc, so
+no transition is created rather than cancelled (the amendment for #93, with the probe). Because
+it is removed at the close's `beforetoggle`, the exit transition is never affected.
 
 The **entry** fade works in all three engines. The **exit** fade is progressive enhancement
 (`docs/research/popover-anchor-tooltip.md`, correction of 2026-10-16, screenshot-probed on
@@ -1167,6 +1186,33 @@ pointerdown in the same task would otherwise leave the popup open).
 `popup.showPopover` is called with the `source` option in all three engines (Chrome 137, Firefox
 144, Safari 26.0). No feature check.
 
+Wave 12 (#93) adds, before the native-path check (so it is the one listener on that path), a
+`beforetoggle` listener on the popup; the shipped implementation's `showSoon` reads as:
+
+```ts
+// Both paths: the popup's own `beforetoggle` is synchronous and runs before the top-layer
+// insertion, so the attribute is in place for the first style recalc of the open. Open: present
+// iff another tooltip is showing right now (the skip-delay condition); close: absent.
+const onBeforeToggle = (event: Event) => {
+  const opening = (event as ToggleEvent).newState === "open";
+  syncPresence(popup, "data-instant", opening && otherOpenTooltip(doc, popup) !== null);
+};
+popup.addEventListener("beforetoggle", onBeforeToggle);
+// ...
+// Warm: show first, then hide the other, so `beforetoggle` sees the same DOM as on the native
+// path (where `hint` stacking hides the other inside `showPopover`, after `beforetoggle`).
+const showSoon = () => {
+  const other = isOpen(popup) ? null : otherOpenTooltip(doc, popup);
+  if (other === null) {
+    showLater();
+    return;
+  }
+  clear();
+  show();
+  if (isOpen(other)) other.hidePopover(); // already hidden by `hint` stacking on that type
+};
+```
+
 ### 12.4 Rendering details
 
 - `Trigger`: `type="button"` default; `interestfor={popupId}`, the two `interestDelay*` style
@@ -1181,7 +1227,9 @@ pointerdown in the same task would otherwise leave the popup open).
   so a `render` element or stylesheet-driven `data-side` passes through), `data-disabled`.
   The values come from `useResolvedPlacement({ side, align })` (7.4), whose `ref` is merged
   with `ctx.setPopupElement` and the consumer's ref; `state` carries the same values. Provides
-  `TooltipPopupContext` with them.
+  `TooltipPopupContext` with them. `data-instant` is **not rendered** by the part: the Root's
+  effect writes it on the element from `beforetoggle` (12.3), so it is never in server markup
+  and a consumer `data-instant` prop is overwritten (unsupported).
 - `Arrow`: `aria-hidden="true"`, `data-side` / `data-align` from `TooltipPopupContext` (the
   resolved values).
 - All three resolve `className` / `style` / `children` / `render` through the shared
@@ -1232,6 +1280,7 @@ Coverage against conventions 10.1. "both" rows have no controlled mode here.
 | Keyboard                                          | Tab to trigger then advance `delay`: `showPopover` called once with `{ source: trigger }`; Escape: `hidePopover` called; Tab away then advance `closeDelay`: `hidePopover` called; Escape when closed: no call. `:focus-visible` in jsdom: verify nwsapi support in setup; if absent, stub `matches` for that selector in the shim.                                                                                                                                                                                                                            |
 | Hover (pattern-specific)                          | `pointerenter` then advance `delay`: shown; leave before `delay`: never shown; leave after open then advance `closeDelay`: hidden; enter popup inside `closeDelay`: not hidden; `pointerType: "touch"`: never shown; `pointerdown` on `document.body` while open: hidden immediately; `delay={0}`: shown on the next tick.                                                                                                                                                                                                                                     |
 | Skip-delay (wave 11)                              | Two Roots A and B. A open (shim `:popover-open` via the `WeakSet`, `matches` stubbed for `[role="tooltip"]:popover-open`): `pointerenter` on B's trigger calls `showPopover` on B **synchronously** (no timer advance) and `hidePopover` on A; the same for `:focus-visible` focus; A's pending close timer firing afterwards calls nothing more. Nothing open: B waits `delay`. A non-FUNSTACK `<div role="tooltip" popover>` open in the document counts. Re-entering A's own trigger while A is open: no call. Native markup: with `experimental_interestFor` the Trigger renders `interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))`, `data-fsui-tooltip-trigger`, and exactly one `<style>` in `document.head` whose text contains `@property --fsui-tooltip-warm` (two flagged Roots: still one); without the flag none of the three; `disabled`: none; `nonce` from a `<CSPProvider nonce="n">` lands on the `<style>`. |
+| Warm open attribute (wave 12, #93)                | Two Roots A and B, the shim's synchronous `beforetoggle`. A open: `pointerenter` on B's trigger leaves B with `data-instant=""` **synchronously** and A closed by the end of the call; at B's `beforetoggle` (a test listener registered first) A still matches `:popover-open` (pins the show-then-hide order); the same for `:focus-visible` focus. Nothing open: after `delay`, B opens without the attribute. Close (Escape, `pointerdown`, the `closeDelay` timer, `disabled` flipped while open on the JS path and under the `interestForElement` stub): the attribute is gone at the close's `beforetoggle`, before `toggle`. An open the library did not perform (`popupB.showPopover()` from the test while A is open; stands in for the native path) carries it, and under the `interestForElement` stub the listener is still attached (the only one); without another tooltip the same call carries nothing. A foreign `<div role="tooltip" popover>` that is open counts. `render={<section />}` on Popup: the attribute lands on the section. `renderToString` of a flagged pair contains no `data-instant`; a consumer `data-instant=""` prop is removed by a cold open. Unmount while warm-open: no write afterwards (`setAttribute` spied). The shim fidelity row asserts `beforetoggle` precedes `toggle` and is synchronous. |
 | Sync action                                       | **N/A**: Tooltip has no action props. The test file states this in a leading comment and includes a type-level test (`// @ts-expect-error`) that `openChangeAction` and `open` are not accepted.                                                                                                                                                                                                                                                                                                                                                               |
 | Async action, Rejection, Overlap, Post-await rule | **N/A**, same reason.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Suspending content                                | Popup child suspends at mount with a `<Suspense>` inside Popup: fallback renders inside the popup, no `data-pending` anywhere, trigger still mounted; after resolve, content present.                                                                                                                                                                                                                                                                                                                                                                          |
@@ -1262,7 +1311,9 @@ first real WebKit check of the computed-style claim, which the research took fro
 | Inline side and RTL | `side="inline-end"`: the popup's left edge meets the trigger's right edge in LTR with `data-side="right"`; under `document.documentElement.dir = "rtl"` the popup's right edge meets the trigger's left edge with `data-side="left"`. `align="start"` on `side="bottom"` under page RTL: the right edges meet (`data-align="start"`). | none |
 | Container RTL | The same two assertions with `dir="rtl"` on a wrapper `div` around the Trigger and Popup and an LTR document. | `anchorPositionHonoursParentDirection` true (Chromium, WebKit): mirrored as above. False (Firefox, Mozilla 2019601): the popup's inline edges meet neither trigger edge (the mirrored offset); assert that and the comment names the bug. Never skipped. |
 | Skip-delay degradation (wave 11, review M1) | On the flagged markup: with the warm `<style>` removed by hand (re-inserted in `finally`; React never re-inserts it), `getComputedStyle(trigger).interestDelayStart` is the Root's `delay` (`0.4s`), not `normal`; the same inside an `iframe` whose `srcdoc` carries `<meta http-equiv="Content-Security-Policy" content="style-src 'none'">` (the blocked `<style>` has `sheet === null`). | Computed values asserted only where `CSS.supports("interest-delay-start", "0s")` (Chromium): Firefox drops the unknown property from the inline style entirely; there the rows assert the markup and the blocked sheet only. |
-| Skip-delay (wave 11) | Two adjacent triggers, `delay={400}`: hover A with the real pointer, wait for it; move straight to B: B is `:popover-open` within 100 ms and A is closed; 800 ms after leaving both, hover B: it waits about 400 ms. On the flagged (native) markup in Chromium, `getComputedStyle(triggerB).interestDelayStart` is `0s` while A is open and `0.4s` otherwise. | `supportsInterestFor` with the flags on: the native path (no library listener runs); elsewhere the JS path under the same markup; both branches assert the same timings. `supportsPopoverHint` false (Safari 27.0): `manual`, the JS path hides A. |
+| Skip-delay (wave 11) | Two adjacent triggers, `delay={400}`: hover A with the real pointer, wait for it; move straight to B: B is `:popover-open` within 100 ms and A is closed; 800 ms after leaving both, hover B: it waits about 400 ms. On the flagged (native) markup in Chromium, `getComputedStyle(triggerB).interestDelayStart` is `0s` while A is open and `0.4s` otherwise. | `supportsInterestFor` with the flags on: the native path (no library interaction listener runs); elsewhere the JS path under the same markup; both branches assert the same timings. `supportsPopoverHint` false (Safari 27.0): `manual`, the JS path hides A. |
+| Warm open skips the entry animation (wave 12, #93) | The same pair with the section 8 stylesheet injected (`transition: opacity 1s, translate 1s, …` with `@starting-style`, and `.tip[data-instant] { transition: none }`), `transitionrun` and `animationstart` counters on both popups registered **before** any gesture. Hover A, wait until it is `:popover-open`: no `data-instant`, `transitionrun > 0` (the cold entry; the count is per transitioned property). Move straight to B, wait until it is `:popover-open`: `data-instant=""`, **zero** `transitionrun` and `getAnimations().length === 0`; A closed. A second variant keys a CSS `animation` on `:popover-open` with `[data-instant] { animation: none }` and asserts zero `animationstart`. The oracle is the event count, not `getAnimations()`: an attribute written one task late (probe: from `toggle`) starts the transitions and cancels them, after which `getAnimations()` is empty too. Each row starts from a settled closed state (the first open of each popup): a reopen during a still-running exit transition cancels it (`transitioncancel`) and skews the counts. Conditions only, no wall-clock waits. | None for the assertions: the row runs on the baseline and the flagged markup; with `supportsInterestFor` the browser performs the warm open (`hint` stacking closes A after B's `beforetoggle`) and the library's `beforetoggle` listener is the only JS; elsewhere the JS path under the same markup. Entry transitions run in all three engines (section 8). |
+| Warm attribute cleared at the close (wave 12) | After the warm open of B, move to "Elsewhere" and wait until B is not `:popover-open`: no `data-instant` (removed at its `beforetoggle`). Asserted on the attribute only; the exit transition is not observed (section 8: Firefox has none, and nothing may wait on it). | none |
 
 ---
 
@@ -1491,3 +1542,186 @@ Design-side items, folded in place (section 6, decision 6, the 2.1 markup, 13; c
 | M3 | The "skip the entry animation" CSS recipe is removed: it matches the opening tooltip itself and kills every cold entry transition. Instant browsing with cold animations kept needs library state; a follow-up if asked. |
 | L5 | WCAG 1.4.13 "hoverable" is a recorded trade-off (crossing a neighbouring trigger on the way to a tooltip hides it), not "unchanged"; docs note added. |
 | L1, L2 | Conventions 12 records Fizz's four nonce cases (the object form with no provider drops the rules) and the one-SSR-stylesheet-per-precedence constraint. |
+
+## Amendment: warm opens exposed as `data-instant` (wave 12, 2026-10-23, issue #93)
+
+Status: **proposed** (questions 9 to 12 at the end). Inputs: the Part B review (M3),
+`docs/research/interaction-wave11.md` 1.2 (Base UI's `data-instant`, React Aria's
+`shouldSkipAnimation`), and the probe `memo/architect/probes/tooltip-instant-beforetoggle.mjs`
+(Chromium 156.0.8078.4 and Firefox 157.0 through Playwright; WebKit could not be launched on the
+design machine, missing host libraries, so its browser row in CI is the first WebKit check).
+Edited in place: decision 12, the 2.1 "attaches no listeners" sentence, the 2.2 table, the 4
+state table and 4.1, 6's "Not in v1", 8's stylesheet, 12.3, 12.4, the 13 rows.
+
+| | Wave 11 | Wave 12 |
+| --- | --- | --- |
+| A warm open (skip-delay, section 6) | opens at once; its CSS entry animation plays | opens at once; the Popup carries **`data-instant`** from before the open's first style recalc, so `.tip[data-instant] { transition: none }` skips the animation |
+| A cold open | animation plays | unchanged (no attribute) |
+| API | none | `data-instant` on `Tooltip.Popup`, boolean by presence (conventions 4.1). **No prop, no `state.instant`**, nothing on Trigger or Arrow |
+| Mechanism | | one `beforetoggle` listener on the popup, attached by the Root's interaction effect on **both** paths, writing the attribute with `syncPresence` |
+| Cleared | | at the close's `beforetoggle` (so present implies `:popover-open`) |
+| Files | | `use-tooltip-interaction.ts` (the listener; `showSoon` shows before it hides), `internal/sync-presence.ts` (existing) |
+
+### What the attribute means
+
+> `data-instant` is present while the tooltip is shown by an open that **began while another
+> `[role="tooltip"]:popover-open` existed in the document**: the skip-delay condition of
+> section 6, read at the popup's own `beforetoggle`.
+
+```css
+.tip[data-instant] {
+  transition: none; /* or `animation: none` for a keyframe entry */
+}
+```
+
+The definition is a DOM fact at the moment the open begins, not "the library skipped a timer".
+That is what makes it the same on both paths (the native path has no timer the library can see),
+and it has three consequences worth stating: a foreign tooltip (`role="tooltip"` on any popover)
+counts, as it does for skip-delay; an open the library did not perform (the browser's `interestfor`,
+or a consumer's `showPopover()` through the ref) is classified like any other; and a cold-timer
+open that lands while another tooltip is showing (mixed input: the pointer rests on A while the
+keyboard focuses B, both timers run, A opens first) carries the attribute although it waited,
+which is also what the user sees (a tooltip joining one already on screen). The JS path does not
+hide A in that case (only the warm branch of `showSoon` hides), unchanged from wave 11.
+
+### Why an attribute, and why no `state.instant`
+
+- The only consumer is CSS. The animation being skipped is the CSS entry of section 8, and a
+  React animation library cannot animate the open at all: open state is browser-owned and has no
+  render-time value (4.1: no `open`, no `data-open`). A `state.instant` would describe an open
+  the render cannot see. Conventions 4.1's "three forms" rule is for library-owned state;
+  7.4's "pseudo-class the platform already provides" row is the precedent for browser-owned state
+  styled from the DOM alone, and `data-instant` exists only because no pseudo-class carries it.
+- Timing rules out React state anyway. A React write from the popover's events can be a frame
+  late harmlessly for geometry (`useResolvedPlacement` writes `data-side` with `flushSync` from
+  `toggle` and a `ResizeObserver`, both after the first style recalc), but here one late frame
+  is the whole bug: the transition is created at the open's first style recalc, and an
+  attribute that arrives afterwards cancels it mid-flight (probe P2 below). Only a synchronous
+  write inside the platform's show algorithm is early enough, and a `flushSync` render in that
+  position, per warm open, on the native path too, buys nothing over one `setAttribute`.
+- So `data-instant` follows conventions 7.4's existing row for browser-owned state kept current
+  by **a DOM write from the platform event through the ref, never React state** (the
+  `aria-expanded` of a JS-free Popover Trigger), with `beforetoggle` in place of `toggle`
+  because the value must precede the first style recalc. It uses `internal/sync-presence.ts`
+  (`syncPresence(popup, "data-instant", present)`), already shared by the group inputs. The
+  Popup never renders it, so server markup never contains it and hydration is untouched.
+
+### Why `beforetoggle`, and the proof
+
+HTML's "show popover" steps, in order: fire `beforetoggle` (synchronous, cancelable) at the
+element; run the `auto` / `hint` stacking that hides other popovers; add the element to the top
+layer and set its visibility state (`:popover-open` starts matching); queue the `toggle` task.
+Everything in the first step happens before any style recalc that can see `:popover-open`, and
+before the other tooltip is hidden by `hint` stacking. So a listener on the popup's own
+`beforetoggle` can both **classify** the open (`otherOpenTooltip(doc, popup)` still finds the
+tooltip being replaced) and **write** the attribute in time, with no listener on anything else.
+Measured (probe; each row is a `[role="tooltip"]` popover with section 8's transition stylesheet
+plus `.tip[data-instant] { transition: none }`, counters on `transitionrun` /
+`transitioncancel` / `animationstart` registered before any open):
+
+| Probe | Chromium 156 | Firefox 157 |
+| --- | --- | --- |
+| P1 JS order: `B.showPopover()` then `A.hidePopover()`, attribute written in B's `beforetoggle`. Cold A: `transitionrun` 2, `getAnimations()` 2. Warm B: attribute present synchronously after `showPopover()`, `transitionrun` **0**, `getAnimations()` **0**, still 0 two frames later; at B's `beforetoggle` A still matched `:popover-open`. | as described | as described |
+| P1 close: attribute removed at B's close `beforetoggle` | exit transitions run (4: opacity, translate, display, overlay) | none (Gecko, section 8) |
+| P1 next cold open of B | no attribute | no attribute, `transitionrun` 2 |
+| P2 late write from `toggle` (a task later) | `transitionrun` 2, then `transitioncancel` 2, `getAnimations()` 0 afterwards | same |
+| P3 keyframe `animation` on `:popover-open` with `[data-instant] { animation: none }` | warm: `animationstart` 0; cold: 1 | same |
+| P4 **native path**: `interestfor` + `popover="hint"` with the shipped warm rule, real pointer A then B | B opened 17 ms after the pointer arrived; log order **B `beforetoggle` open (A `:popover-open`: true)** → A `beforetoggle` closed; B: attribute present, `transitionrun` 0, `getAnimations()` 0; A closed | n/a (no `interestfor`) |
+| P6 `hidePopover()` on a hidden popover | no throw | no throw |
+
+P2 is the reason the browser rows count `transitionrun` rather than reading `getAnimations()`:
+a late attribute produces the same empty animation list after a visible first frame. P6 is why
+the JS path may show before it hides (`hint` stacking has already hidden the other; the guarded
+`hidePopover()` is a no-op).
+
+### No CSS-only route
+
+Recorded so it is not re-derived (review M3 and research 1.5 question 2 both hoped for one):
+
+- `:root:has([role="tooltip"]:popover-open) .tip` matches the opening tooltip itself (M3).
+- The trigger's `--fsui-tooltip-warm` is `1` only while the other tooltip is `:popover-open`; at
+  the opening tooltip's first style recalc that tooltip is already hidden, so it is `0` again,
+  and a popup cannot read its sibling trigger's property in any case. A shipped
+  `--fsui-tooltip-instant` for the Popup would need the same impossible selector.
+- The one CSS "memory" is research 1.1's cooldown variant: an **inherited** registered property
+  on `:root` with `transition: --warm 0s step-end 300ms`, which holds `1` for 300 ms after the
+  last tooltip closed, inherited by every popup, so
+  `transition-duration: calc(120ms * (1 - var(--warm)))` would work on both paths with no JS.
+  Rejected: the rule cascades onto `:root`, outside conventions 12's exception (selectors may
+  match only library-marked elements); its `transition` on `:root` collides with an app's own
+  `html { transition }`; an inherited root property restyles the document on every tooltip open
+  and close; and its meaning is a cooldown window, not "another tooltip was showing": a cold open
+  inside the window would lose its animation, and the window would not match skip-delay's own
+  (section 6, no cooldown; decision 8 of Part B).
+
+### Cleared at the close
+
+The attribute is removed at the close's `beforetoggle`, before the close's style recalc, so the
+exit transition (where the engine runs one, section 8) is the same for a warm and a cold open.
+Invariant: `[data-instant]` implies `:popover-open`. The alternative, keeping it until the next
+cold open, would let `.tip[data-instant] { transition: none }` also cut the exit of a
+warm-opened tooltip, but browsing A → B → C would then give A (cold) a fade-out under B and B
+(warm) an instant cut under C, which is inconsistent, and the consistent "a replaced tooltip
+vanishes" needs a marker on the **closing** side (its close `beforetoggle` would have to know
+that another tooltip is about to open; feasible from the opener's attribute being present while
+it is not yet `:popover-open`, but not in v1). In v1 every exit animates; a follow-up if asked.
+
+### Edge cases
+
+- **Server, closed, hydration.** Never in server markup (not rendered by React); absent while
+  closed; no hydration concern. Before hydration on the native path a warm open gets no
+  attribute and the animation plays: the same degradation as every other pre-hydration gap, and
+  skip-delay itself still works (CSS).
+- **`disabled` flipped while open.** The effect's hide fires the close `beforetoggle` through the
+  listener, which is attached **before** the `disabled` and native-path branches of the effect
+  and removed last in its cleanup, so the attribute is cleared on both paths.
+- **Unmount while warm-open.** The listener goes with the effect; the attribute goes with the
+  element.
+- **A `render` element on Popup.** The write targets whatever element registered as the popup.
+- **A consumer `data-instant` prop.** Overwritten by the next open or close; unsupported (12.4).
+- **A cancelled `beforetoggle`** (a consumer `preventDefault()` through the ref, unsupported):
+  the attribute may be set on a popup that then does not open; the next open or close corrects
+  it. Not guarded.
+- **`Tooltip.Arrow`.** Nothing: `.tip[data-instant] .arrow { … }` is a descendant selector, and
+  the Arrow's own attributes come from React context, which could not be in time anyway.
+- **The JS path's order.** `showSoon`'s warm branch is now `show()` then
+  `if (isOpen(other)) other.hidePopover()`: the opening popup's `beforetoggle` sees the same DOM
+  as on the native path, so one classifier serves both. With `manual` both popovers are in the
+  top layer for the remainder of the task (no frame in between); with `hint` the show already
+  hid the other and the guard skips the call.
+
+### Native path: the one listener
+
+2.1's "attaches no listeners at all" becomes "no interaction listeners": the `beforetoggle`
+listener handles nothing, cancels nothing and reads only the DOM. It is the only way to give the
+native path the attribute (no CSS route exists), and leaving the native path without it would
+make the flags change what the user sees (against decision 6 of this document). Question 9.
+
+### Naming
+
+`instant` (Base UI's word, and the consumer's view: this open was instant, make its animation
+instant too) rather than `warm`, the library's internal term for the trigger's property, which
+reads as a temperature on a styling hook. Boolean by presence; a reason value (`"focus"`, as Base
+UI has) can be added later without breaking `[data-instant]`.
+
+### Docs
+
+Tooltip page: a `data-instant` row in the data-attributes table; the skip-delay section's last
+bullet ("A tooltip that opens at once still runs its entry animation…") becomes the recipe plus
+the before-hydration caveat; the animation section's CSS gains the `[data-instant]` rule. Props
+tables unchanged (no prop).
+
+### Migration
+
+None: additive. Wave 11 consumers see no change until they style `[data-instant]`.
+
+### Questions for the product owner (continuing the Part B list)
+
+9. **One passive `beforetoggle` listener on the native path.** Recommendation: accept (the
+   alternative is no attribute there, so the flags would change the UX; no CSS route exists).
+10. **Attribute only, no `state.instant`.** Recommendation: accept (no `state.open` exists for
+    it to accompany; a React write cannot be early enough without `flushSync` inside the show
+    algorithm).
+11. **Cleared at the close; exits always animate in v1.** Recommendation: accept; a
+    closing-side marker is a follow-up if browsing exits should be instant too.
+12. **The name `data-instant`.** Recommendation: accept.
