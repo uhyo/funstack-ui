@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@funstack/router": "^1.5.0",
+    "@funstack/router": "^1.6.0",
     "@funstack/static": "^1.3.3",
     "@funstack/ui": "workspace:*",
     "react": "^19.3.1",
