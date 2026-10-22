@@ -1151,7 +1151,13 @@ packages/ui/vitest.config.ts                   # registers the command
   `point.offset` for the vertical inset, the gap and the fallback list (3.3, 4.7); `openAt`
   fills `direction` from `isRtl(popover.popupRef.current)` (`"ltr"` when the popup is not
   mounted, in which case nothing opens anyway) and `offset` from the opening event's
-  `pointerType` (`touch` / `pen`).
+  `pointerType` (`touch` / `pen`). The fallback list is
+  `MENU_POINT_FALLBACKS[direction][offset ? "touch" : "mouse"][generation % 2]`.
+  `capturePointer` returns whether the capture was taken, and the gesture starts only then
+  (B3). The gesture reaches a `SubmenuTrigger`'s hover intent through a `WeakMap` registry
+  (`registerSubmenuHover` / `submenuHover` in `menu-context.ts`), since no `pointerenter`
+  fires under capture; `listenOutside` reads the placement at event time through
+  `useLatest(menu.placement)`, so close-on-scroll applies to point placements only.
 - **The drag gesture** (2.6) lives in `menu-context-trigger.tsx` next to the long-press
   (`startDrag(popup, { pointerId, x, y, timeStamp, slop, touch })`): native listeners on the
   popup element for `pointermove` / `pointerup` / `pointercancel` / `lostpointercapture`
