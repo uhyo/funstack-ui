@@ -71,3 +71,23 @@ meets) in Firefox, with #89 cited.
 
 act(): every poll after a placement change goes through `actPoll` (an async `act` scope), and
 rows that end shown close inside `act`, so the observer's `flushSync` writes log nothing.
+
+## Review fixes (memo/reviewer/wave11-positioning.md, 2026-10-23)
+
+- M1: logical sides cost one render on show and one on hide; jsdom rows in
+  `internal/use-resolved-placement.test.tsx` (render counter) pin it, docs pages say so.
+- M2: same file, deterministic scroll/resize describe (manual rAF queue, listener spies). Note:
+  a scroll **before** the first frame of a pending pair also sets `again`, so it costs one extra
+  pair at the end (kept; the row pins "at most one more pair").
+- L1 guard on `written.current`; L2 `if (!listening) return`; L3 sync read kept for WebKit.
+- L4: menu recipes keep the symmetric keyed form and add the closed `inline-start` /
+  `inline-end` keys (menu.md 9); PopoverPage shows the static requested-edge form first
+  (popover.md 10) plus the any-side keyed form.
+- L5: `topLayerAnchorReChoosesOnScroll()` (async, engine.ts, #92 reduction). In vitest browser
+  mode: Chromium false and Firefox true at every show-to-scroll delay 0..300 ms (60 runs each),
+  and stable under 16 CPU burners (4 runs). Pinned in the environment row (WebKit logged only)
+  and in the Tooltip scroll row. **Not** in the Popover scroll row: there Chromium re-chooses
+  in every run (local and CI) although the probe says it does not, so the probe does not predict
+  it. Unexplained difference (that row pre-scrolls the container, opens through the library,
+  popup 160x120, overflow at the bottom; a probe variant with bottom overflow still kept the
+  option in Chromium, so the direction is not it).
