@@ -629,10 +629,14 @@ research `arrow-flip.mjs`, `resolved-side-timing.mjs`) and renders **that** as `
 requested values are rendered. The mechanism is the shared hook of conventions 13.2
 (`internal/use-resolved-placement.ts`): a `ResizeObserver` on the popup from mount (hidden to
 shown is a resize delivered after layout and before paint, so the first frame is right), the
-`toggle` event, and `scroll` (document, capture, passive) plus `resize` (window) while shown;
-a plain `useState` written only when the pair changed. A tooltip that opens where it was asked
+`toggle` event, and `scroll` (document, capture, passive) plus `resize` (window) while shown,
+each read at once and again in the next two animation frames (Firefox applies a re-chosen
+option one frame after the event; Chromium re-chooses only within about a frame of the show
+and otherwise keeps the option it chose, scroll-compensating the popup; conventions 13.2); a
+plain `useState` written only when the pair changed. A tooltip that opens where it was asked
 to costs **no render** (4.1's "no React work per hover" holds); a flipped one costs one render
-on open and one on close.
+on open and one on close. The starter stylesheet's gap is symmetric (`margin: 6px`) on purpose:
+a flip swaps the popup's own margins (conventions 13.2).
 
 ```html
 <!-- requested side="top", no room above: -->
@@ -1226,7 +1230,7 @@ first real WebKit check of the computed-style claim, which the research took fro
 | Row | Assertion | Engine branches |
 | --- | --- | --- |
 | Resolved side on open | A trigger at the top of the viewport with `side="top"`: once shown, `data-side="bottom"` on Popup and Arrow, `state.side === "bottom"` in a `className` function; the Arrow's rect touches the popup's top edge (the docs CSS). A trigger in the middle: `data-side="top"`, and a render counter shows one render for the open (the `toggle`-driven interaction effect writes no state; the hook wrote none). | none |
-| Resolved side after scroll | The trigger inside a scrollable container, tooltip open above it; scroll the container so the trigger reaches the container's top: `data-side` becomes `bottom` without closing (read in the `scroll` handler); scroll back: stays `bottom` (the last successful option is kept while it still fits, spec; the row documents this rather than expecting `top`). On close, `data-side` is `top` again. | none |
+| Resolved side after scroll | The trigger inside a scrollable container, tooltip open above it; scroll the container so the trigger reaches the container's top, wait two frames: `data-side` equals the side the popup box is on relative to the trigger (`placedSide` helper): `bottom` where the engine re-chose (Firefox, WebKit), `top` where it kept the option chosen at show (Chromium 156; the popup is scroll-compensated); the tooltip stays open. On close, `data-side` is `top` again. | none: the invariant holds everywhere; the row logs which branch the engine took. |
 | Native path | With `experimental_interestFor` and `experimental_hint`, the row above on open: the observer runs on the native path too (product-owner question 1 of the amendment). | `supportsInterestFor`: native open by real hover; elsewhere the JS path opens, same assertion. |
 | Inline side and RTL | `side="inline-end"`: the popup's left edge meets the trigger's right edge in LTR with `data-side="right"`; under `document.documentElement.dir = "rtl"` the popup's right edge meets the trigger's left edge with `data-side="left"`. `align="start"` on `side="bottom"` under page RTL: the right edges meet (`data-align="start"`). | none |
 | Container RTL | The same two assertions with `dir="rtl"` on a wrapper `div` around the Trigger and Popup and an LTR document. | `anchorPositionHonoursParentDirection` true (Chromium, WebKit): mirrored as above. False (Firefox, Mozilla 2019601): the popup's inline edges meet neither trigger edge (the mirrored offset); assert that and the comment names the bug. Never skipped. |
@@ -1413,3 +1417,21 @@ Questions for the product owner (continuing the Part A list):
 6 confirmed (global, no opt-out, no provider, no prop). 7 **user decision, "allow it"**: the
 selector rule ships; conventions 12 now reads "placement and interaction timing, never
 visuals". 8 confirmed (no cooldown).
+
+### Implementation deviations folded (Part A, d3d0359, 2026-10-23)
+
+From `memo/developer/positioning-wave11.md`; the sections above (7.4, the scroll row) and
+conventions 13.2 / 10.1 are edited in place. The review (`memo/reviewer/wave11-positioning.md`)
+may add to this list.
+
+| Finding | What changed in the design |
+| --- | --- |
+| A scroll does not reliably re-choose the applied option: Chromium 156 keeps the option chosen at show unless the scroll comes within about a frame of it (the popup is scroll-compensated); Firefox re-chooses, readable one frame after the event | 13.2 no longer claims "no `requestAnimationFrame`": the observer re-reads at once and in the next two frames after `scroll` / `resize`. The scroll rows assert the geometry invariant (`data-side` equals the side the popup box is on), not "flips to X". The research's timing probe scrolled one frame after the show, which is the one case Chromium re-chooses. |
+| `flip-block` / `flip-inline` swap the popup's own margins, so a one-sided gap keyed on the resolved `data-side` lands on the far edge | Gap recipes are symmetric along the side's axis (`margin-block` / `margin-inline`); popover.md 10 and menu.md 7 / 9 corrected; the Arrow is unaffected. |
+| Firefox container-RTL submenu: the misplaced submenu overflows and `flip-inline` applies, so its resolved side is `right` | menu.md 13.2's degraded branch asserts the applied option and the misplacement, not `left`. |
+| Smaller | `parsePositionArea` takes a fourth `writingMode` argument and `rootDirection` may be a function; the observer stores `null` when the result equals the request and writes with `flushSync` from its event paths; a hidden-but-rendered popup keeps its resolved value until the box goes. |
+
+Part B (skip-delay here; press-drag-release, touch offset, close-on-scroll and CSP in
+context-menu.md) relies on none of the corrected claims: the touch gap is an inset inside
+each `@position-try` option, not a margin, and nothing in Part B reads the computed
+`position-area`.

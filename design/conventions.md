@@ -1901,7 +1901,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 | Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
 | Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
-| Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter). Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open and after a scroll that forces a flip, back on close; `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
+| Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter). Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open, back on close; after a scroll that moves the trigger to an edge, `data-side` equals the side the popup box actually sits on (the geometry invariant: Chromium keeps the option chosen at show, Firefox and WebKit re-choose, section 13.2), never "flips to X"; `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). jsdom tests assert that components render with and without `transition`
@@ -2132,9 +2132,10 @@ the server, while closed, and when the computed value cannot be mapped). No seco
 and nobody needs "the side I asked for" as an attribute, since they asked for it. Floating
 UI-based libraries (Radix, Base UI) expose the resolved side under the same name.
 
-The parser (`parsePositionArea(value, selfDirection, rootDirection)` in
-`internal/anchor-position.ts`, pure, total: it returns `null` rather than throwing) maps the
-full keyword grammar in `horizontal-tb`:
+The parser (`parsePositionArea(value, selfDirection, rootDirection, writingMode)` in
+`internal/anchor-position.ts`, pure, total: it returns `null` rather than throwing;
+`rootDirection` may be a function, read lazily; `writingMode` other than `horizontal-tb` gives
+`null`) maps the full keyword grammar in `horizontal-tb`:
 
 - The side token is the one that is neither `center`, `span-all` nor `span-*`. Physical tokens
   map directly; `self-x-*` / `self-inline-*` through the popup's computed `direction`;
@@ -2164,14 +2165,33 @@ merges `ref` into its popup element's ref and renders the returned values.
   change the fit, so it reads again; hidden again is a reset. `toggle` on the popup (open:
   read, and install the two listeners below; closed: remove them and reset); it is also what
   drives the jsdom row, which has no `ResizeObserver`. While shown: `scroll` on the document
-  (capture, passive: nested scrollers included) and `resize` on the window. Reading inside the
-  `scroll` handler already returns the new option; no `requestAnimationFrame`.
-- **Write.** A plain `useState` in the part, written only when `side` or `align` changed
-  (section 3.5); `null` while not shown. Returned value: the resolved pair, else the requested
-  one. A popup that opens without flipping costs **no render**, which keeps Tooltip's "no React
-  work per hover" (tooltip.md 4.1); a flip costs one render on open and one on close. The
-  "only when changed" rule also terminates the `ResizeObserver` loop a consumer's
-  `[data-side]` padding rule could otherwise start.
+  (capture, passive: nested scrollers included) and `resize` on the window. **Each `scroll` /
+  `resize` reads at once and again in the next two animation frames** (coalesced; a scroll
+  during a pending pair re-runs it at the end): Firefox 157 re-chooses the option on scroll
+  but the computed value is current only at the second frame after the event, and Chromium
+  156 re-chooses only when the scroll comes within about a frame of the show, otherwise it
+  keeps the option chosen at show and scroll-compensates the popup (implementation finding,
+  `memo/developer/positioning-wave11.md`; the research probe scrolled one frame after the
+  show, which is why it saw "current inside the handler"). Either way `data-side` reports
+  what is applied; the library does not try to force a re-choice.
+- **Write.** A plain `useState` in the part (`flushSync` from the observer and event paths so
+  the attribute lands before paint; a plain `setState` from the layout effect that re-reads
+  when the request changes), written only when `side` or `align` changed (section 3.5);
+  `null` while not shown **and when the parsed pair equals the request**, so the comparison is
+  against what was last written. Returned value: the resolved pair, else the requested one. A
+  popup that opens without flipping costs **no render**, which keeps Tooltip's "no React work
+  per hover" (tooltip.md 4.1); a flip costs one render on open and one on close. The "only
+  when changed" rule also terminates the `ResizeObserver` loop a consumer's `[data-side]`
+  padding rule could otherwise start. A popup hidden but still rendered (exit animation) keeps
+  the resolved value until its box goes.
+- **Gap recipes must be symmetric.** `flip-block` / `flip-inline` swap the popup's **own
+  margins** along the flipped axis, so a one-sided gap keyed on the resolved side
+  (`[data-side="top"] { margin-block-end: 6px }`) is applied as `margin-block-start` once the
+  flipped option is in force: gap 0 against the trigger (measured in both engines; with v0's
+  requested-value `data-side` the swap was what put the gap right). The documented recipe is
+  a symmetric margin along the side's axis: `margin-block: 6px` for a top / bottom side,
+  `margin-inline: 2px` for a left / right / inline one. An **Arrow** is unaffected: the insets
+  of a child are not part of the option.
 - **Idle** with `side={null}` (the stylesheet owns placement; the parser cannot interpret
   consumer `@position-try` rules that set insets) and for a point-placed menu (no anchor): no
   reads, nothing emitted, as today.

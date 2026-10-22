@@ -709,7 +709,8 @@ No `returnFocus` prop.
   submenu's own inherited `direction`, so an RTL container is followed too (Chromium, WebKit;
   Firefox is misplaced there by Mozilla 2019601, conventions 13.3). While shown, `data-side` is
   the resolved physical side (`right` or `left`), so a gap rule addresses both (section 9). A
-  horizontal gap is the stylesheet's (`margin-inline-start`). **WebKit 302008**
+  horizontal gap is the stylesheet's, symmetric (`margin-inline`: a flip swaps the popup's own
+  margins, conventions 13.2). **WebKit 302008**
   (`position-try-fallbacks` on a nested popover hangs or spins): the default keeps the fallback,
   because the bug is NEW against a platform feature the vision adopts and the reporter says the
   hang itself was fixed in 26.4; a dedicated WebKit browser row opens and closes a submenu with
@@ -1025,7 +1026,7 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | Light dismiss and layering | Click outside closes with `"dismiss"`; a Tooltip (`manual` / `hint`) on an item does not close the menu; a modal Dialog opened from an item keeps the menu open while it is a DOM descendant (and closes it when opened outside). | `supportsPopoverHint` for the hint variant. |
 | Pointer focus | Moving the real pointer over items focuses them; `:focus-visible` is false after a pointer open (the quiet focus path, 6.1); a click on a Separator leaves focus on the current item and ArrowDown still moves (M1). | none: all three engines implement `focus({ focusVisible })` (WebKit verified on CI run 39021387650, H1). |
 | Resolved side (wave 11) | A Trigger at the bottom of the viewport: the open menu reports `data-side="top"` and `state.side === "top"`; the existing inline-flip submenu row (near the right edge) additionally asserts the submenu's `data-side="left"` while shown and `"inline-end"` once closed. | none |
-| Submenu direction (wave 11) | Under `document.documentElement.dir = "rtl"`: ArrowLeft on the SubmenuTrigger opens the submenu with its right edge at the item's left edge (`getBoundingClientRect`) and `data-side="left"`; near the left viewport edge it flips to the right (`flip-inline`); the top-level `align="start"` menu's right edge meets the Trigger's right edge. The same inside a `dir="rtl"` wrapper in an LTR document, Trigger and Popups inside it. | Container case: `anchorPositionHonoursParentDirection` true: as above; false (Firefox, Mozilla 2019601): the submenu's inline edges meet neither item edge (probe: 0 instead of 180 for a 300..500 anchor), asserted with the bug named. Page case: none. |
+| Submenu direction (wave 11) | Under `document.documentElement.dir = "rtl"`: ArrowLeft on the SubmenuTrigger opens the submenu with its right edge at the item's left edge (`getBoundingClientRect`) and `data-side="left"`; near the left viewport edge it flips to the right (`flip-inline`); the top-level `align="start"` menu's right edge meets the Trigger's right edge. The same inside a `dir="rtl"` wrapper in an LTR document, Trigger and Popups inside it. | Container case: `anchorPositionHonoursParentDirection` true: as above; false (Firefox, Mozilla 2019601, #89): the submenu's inline edges meet neither item edge, and because the misplaced submenu overflows, `flip-inline` applies (`self-x-start span-bottom`) and the resolved `data-side` is **`right`**; the branch asserts the misplacement and that `data-side` matches whatever option applied (the geometry invariant), not `left`. Page case: none. |
 
 ---
 
@@ -1277,3 +1278,8 @@ small behaviour change for Menu, as the outside right-click close was; specified
 `design/components/context-menu.md` 4.8 and its Part B amendment (product-owner question 3
 there, **confirmed 2026-10-23**). Close-on-scroll applies to point-placed menus only; a Trigger-opened menu keeps
 following its Trigger.
+
+Implementation deviations of Part A (d3d0359) folded on 2026-10-23: the submenu gap is
+symmetric (`margin-inline`), and the Firefox container-RTL branch asserts the applied option
+(`right`, since the misplaced submenu overflows and `flip-inline` applies) rather than `left`;
+the list is in Tooltip's amendment ("Implementation deviations folded") and conventions 13.2.
