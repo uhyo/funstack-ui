@@ -1,5 +1,6 @@
 import { Component, startTransition, useState } from "react";
 import type { ReactNode } from "react";
+import { Button } from "@funstack/ui/button";
 import { Menu } from "@funstack/ui/menu";
 import { ToggleGroup } from "@funstack/ui/toggle-group";
 import { Toolbar } from "@funstack/ui/toolbar";
@@ -148,7 +149,7 @@ function EditorToolbar({ focusgroup, fail }: { focusgroup: boolean; fail: boolea
             <Menu.Item action={() => note("Inserted a table")}>Table</Menu.Item>
           </Menu.Popup>
         </Menu.Root>
-        <Toolbar.Button
+        <Button
           className="tb-item"
           action={async () => {
             await save("cut", null, fail);
@@ -156,13 +157,13 @@ function EditorToolbar({ focusgroup, fail }: { focusgroup: boolean; fail: boolea
           }}
         >
           {({ pending }) => (pending ? "Cutting…" : "Cut")}
-        </Toolbar.Button>
-        <Toolbar.Button className="tb-item" disabled>
+        </Button>
+        <Button className="tb-item" disabled>
           Copy
-        </Toolbar.Button>
-        <Toolbar.Button className="tb-item" action={() => note("Pasted")}>
+        </Button>
+        <Button className="tb-item" action={() => note("Pasted")}>
           Paste
-        </Toolbar.Button>
+        </Button>
         <input type="text" aria-label="Font size" inputMode="numeric" defaultValue="16" size={3} />
       </Toolbar.Root>
       <p>

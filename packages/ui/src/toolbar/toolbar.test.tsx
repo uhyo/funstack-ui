@@ -1,18 +1,14 @@
 // Toolbar tests (jsdom), design/components/toggle-group.md section 14 rows 1, 8, 12-17 and 19,
-// plus Toolbar.Button's action rows (as Menu.Item's). jsdom has no Popover API; the shim in
-// vitest.setup.ts provides it for the Menu rows.
+// with `Button` as the command item (Toolbar.Button was removed, design/components/button.md 7.3;
+// its action rows live in button.test.tsx). jsdom has no Popover API; the shim in vitest.setup.ts
+// provides it for the Menu rows.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  deferred,
-  ErrorCatcher,
-  expectNotPending,
-  expectPending,
-  setupUser,
-} from "../__tests__/helpers.js";
+import { setupUser } from "../__tests__/helpers.js";
+import { Button } from "../button/index.js";
 import { Dialog } from "../dialog/index.js";
 import { Menu } from "../menu/index.js";
 import { Popover } from "../popover/index.js";
@@ -20,7 +16,7 @@ import { RadioGroup } from "../radio-group/index.js";
 import { Toggle } from "../toggle/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
 import { Toolbar } from "./index.js";
-import type { ToolbarButtonActionDetails, ToolbarButtonState, ToolbarRootState } from "./index.js";
+import type { ToolbarRootState } from "./index.js";
 
 const button = (name: string) => screen.getByRole("button", { name });
 const toolbar = () => screen.getByRole("toolbar");
@@ -66,14 +62,14 @@ function Mixed({
         loop={loop}
         style={rtl ? { direction: "rtl" } : undefined}
       >
-        <Toolbar.Button>One</Toolbar.Button>
+        <Button>One</Button>
         <Toggle>Two</Toggle>
         <button type="button" disabled>
           Off
         </button>
         <button type="button">Three</button>
         <a href="#x">Four</a>
-        <Toolbar.Button disabled>Five</Toolbar.Button>
+        <Button disabled>Five</Button>
         {children}
       </Toolbar.Root>
       <button type="button">after</button>
@@ -86,9 +82,9 @@ describe("Toolbar", () => {
     it("Root is div[role=toolbar] with aria-orientation; Separator is perpendicular", () => {
       const { unmount } = render(
         <Toolbar.Root aria-label="T">
-          <Toolbar.Button>A</Toolbar.Button>
+          <Button>A</Button>
           <Toolbar.Separator data-testid="sep" />
-          <Toolbar.Button disabled>B</Toolbar.Button>
+          <Button disabled>B</Button>
         </Toolbar.Root>,
       );
       const root = screen.getByRole("toolbar", { name: "T" });
@@ -118,128 +114,18 @@ describe("Toolbar", () => {
     });
   });
 
-  describe("Toolbar.Button action", () => {
-    it("sync action gets details with the click event", async () => {
-      const action = vi.fn<(d: ToolbarButtonActionDetails) => void>();
-      render(
-        <Toolbar.Root aria-label="T">
-          <Toolbar.Button action={action}>Cut</Toolbar.Button>
-        </Toolbar.Root>,
-      );
-      await setupUser().click(button("Cut"));
-      expect(action).toHaveBeenCalledTimes(1);
-      const details = action.mock.calls[0]![0];
-      expect(details.event?.type).toBe("click");
-      // Row 19: `event` is virtual.
-      expect(Object.keys(details)).toEqual([]);
-      expect(JSON.stringify(details)).toBe("{}");
-    });
-
-    it("async action shows data-pending until it resolves; disabled never dispatches", async () => {
-      const d = deferred();
-      const action = vi.fn(() => d.promise);
-      render(
-        <Toolbar.Root aria-label="T">
-          <Toolbar.Button action={action}>
-            {(s: ToolbarButtonState) => (s.pending ? "Saving" : "Save")}
-          </Toolbar.Button>
-          <Toolbar.Button action={action} disabled>
-            Copy
-          </Toolbar.Button>
-        </Toolbar.Root>,
-      );
-      const user = setupUser();
-      await user.click(button("Save"));
-      expectPending(button("Saving"));
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(button("Save"));
-
-      await user.click(button("Copy"));
-      act(() => button("Copy").focus());
-      await user.keyboard("{Enter}[Space]");
-      expect(action).toHaveBeenCalledTimes(1);
-    });
-
-    it("pending stays until both overlapping runs settle", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      render(
-        <Toolbar.Root aria-label="T">
-          <Toolbar.Button action={() => deferreds[calls++]!.promise}>Go</Toolbar.Button>
-        </Toolbar.Root>,
-      );
-      const user = setupUser();
-      await user.click(button("Go"));
-      await user.click(button("Go"));
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expectPending(button("Go"));
-      await act(async () => {
-        deferreds[0]!.resolve();
-      });
-      expectNotPending(button("Go"));
-    });
-
-    it("rejection reaches the boundary above the button", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
-      const d = deferred();
-      const onError = vi.fn();
-      render(
-        <Toolbar.Root aria-label="T">
-          <ErrorCatcher onError={onError}>
-            <Toolbar.Button action={() => d.promise}>Go</Toolbar.Button>
-          </ErrorCatcher>
-          <Toolbar.Button>Other</Toolbar.Button>
-        </Toolbar.Root>,
-      );
-      await setupUser().click(button("Go"));
-      const err = new Error("failed");
-      await act(async () => {
-        d.reject(err);
-      });
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(button("Other")).toBeInTheDocument();
-    });
-
-    it("a superseded rejection reaches the boundary too", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const onError = vi.fn();
-      render(
-        <ErrorCatcher onError={onError}>
-          <Toolbar.Button action={() => deferreds[calls++]!.promise}>Go</Toolbar.Button>
-        </ErrorCatcher>,
-      );
-      const user = setupUser();
-      await user.click(button("Go"));
-      await user.click(button("Go"));
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      const err = new Error("older");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledWith(err);
-    });
-  });
-
   describe("function props and render (row 8)", () => {
     it("Root state and Button render as a link get no type; a disabled link does not navigate", async () => {
       const className = vi.fn((s: ToolbarRootState) => `tb-${s.orientation}`);
       const action = vi.fn();
       render(
         <Toolbar.Root aria-label="T" orientation="vertical" className={className}>
-          <Toolbar.Button render={<a href="#go" />} action={action}>
+          <Button render={<a href="#go" />} action={action}>
             Link
-          </Toolbar.Button>
-          <Toolbar.Button render={<a href="#no" />} disabled action={action}>
+          </Button>
+          <Button render={<a href="#no" />} disabled action={action}>
             Dead
-          </Toolbar.Button>
+          </Button>
         </Toolbar.Root>,
       );
       expect(toolbar()).toHaveClass("tb-vertical");
@@ -353,8 +239,8 @@ describe("Toolbar", () => {
     it("first entry lands on an aria-disabled first item, as native focusgroup does", () => {
       render(
         <Toolbar.Root aria-label="T">
-          <Toolbar.Button disabled>Dead</Toolbar.Button>
-          <Toolbar.Button>Live</Toolbar.Button>
+          <Button disabled>Dead</Button>
+          <Button>Live</Button>
         </Toolbar.Root>,
       );
       expect(tabStops()).toEqual([button("Dead")]);
@@ -371,8 +257,8 @@ describe("Toolbar", () => {
         const [shown, setShown] = useState(true);
         return (
           <Toolbar.Root aria-label="T">
-            <Toolbar.Button>First</Toolbar.Button>
-            {shown && <Toolbar.Button action={() => setShown(false)}>Gone</Toolbar.Button>}
+            <Button>First</Button>
+            {shown && <Button action={() => setShown(false)}>Gone</Button>}
           </Toolbar.Root>
         );
       }
@@ -386,7 +272,7 @@ describe("Toolbar", () => {
     it("server HTML carries no tabindex", () => {
       const html = renderToString(
         <Toolbar.Root aria-label="T">
-          <Toolbar.Button>A</Toolbar.Button>
+          <Button>A</Button>
           <button type="button">B</button>
         </Toolbar.Root>,
       );
@@ -400,7 +286,7 @@ describe("Toolbar", () => {
       return (
         <>
           <Toolbar.Root aria-label="T">
-            <Toolbar.Button>A</Toolbar.Button>
+            <Button>A</Button>
             <input type="text" aria-label="text" />
             <textarea aria-label="area" />
             <div
@@ -413,7 +299,7 @@ describe("Toolbar", () => {
               rich
             </div>
             <div role="spinbutton" aria-label="spin" tabIndex={0} />
-            {!last && <Toolbar.Button>Z</Toolbar.Button>}
+            {!last && <Button>Z</Button>}
             {last && <input type="text" aria-label="last" />}
           </Toolbar.Root>
           <button type="button">after</button>
@@ -459,7 +345,7 @@ describe("Toolbar", () => {
       const action = vi.fn<(next: string[]) => void>();
       render(
         <Toolbar.Root aria-label="T" orientation="vertical">
-          <Toolbar.Button>Before</Toolbar.Button>
+          <Button>Before</Button>
           <ToggleGroup.Root aria-label="Style" defaultValue={["i"]} valueChangeAction={action}>
             <ToggleGroup.Item value="b">B</ToggleGroup.Item>
             <ToggleGroup.Item value="x" disabled>
@@ -467,7 +353,7 @@ describe("Toolbar", () => {
             </ToggleGroup.Item>
             <ToggleGroup.Item value="i">I</ToggleGroup.Item>
           </ToggleGroup.Root>
-          <Toolbar.Button>After</Toolbar.Button>
+          <Button>After</Button>
         </Toolbar.Root>,
       );
       expect(tabStops()).toEqual([button("Before")]);
@@ -548,7 +434,7 @@ describe("Toolbar", () => {
           orientation={orientation}
           style={rtl ? { direction: "rtl" } : undefined}
         >
-          <Toolbar.Button>Before</Toolbar.Button>
+          <Button>Before</Button>
           <Menu.Root>
             <Menu.Trigger>Insert</Menu.Trigger>
             <Menu.Popup data-testid="popup">
@@ -556,7 +442,7 @@ describe("Toolbar", () => {
               <Menu.Item>Table</Menu.Item>
             </Menu.Popup>
           </Menu.Root>
-          <Toolbar.Button>After</Toolbar.Button>
+          <Button>After</Button>
         </Toolbar.Root>
       );
     }
@@ -643,8 +529,8 @@ describe("Toolbar", () => {
     it("renders toolbar inline wrap; vertical + loop={false} gives block nowrap", () => {
       const { unmount } = render(
         <Toolbar.Root aria-label="T" experimental_focusgroup>
-          <Toolbar.Button>A</Toolbar.Button>
-          <Toolbar.Button>B</Toolbar.Button>
+          <Button>A</Button>
+          <Button>B</Button>
         </Toolbar.Root>,
       );
       expect(toolbar()).toHaveAttribute("focusgroup", "toolbar inline wrap");
@@ -685,7 +571,7 @@ describe("Toolbar", () => {
     it("Popover.Popup: a ToggleGroup runs its own engine, a Separator and a Menu.Trigger see no Toolbar", async () => {
       render(
         <Toolbar.Root aria-label="T" orientation="vertical">
-          <Toolbar.Button>Before</Toolbar.Button>
+          <Button>Before</Button>
           <Popover.Root defaultOpen>
             <Popover.Trigger>More</Popover.Trigger>
             <Popover.Popup data-testid="popover">
@@ -762,15 +648,15 @@ describe("Toolbar", () => {
         <>
           <button type="button">before</button>
           <Toolbar.Root aria-label="T" loop={loop}>
-            <Toolbar.Button>b1</Toolbar.Button>
+            <Button>b1</Button>
             <input type="radio" name="align" aria-label="left" />
             <input type="radio" name="align" aria-label="center" defaultChecked />
             <input type="radio" name="align" aria-label="right" />
-            <Toolbar.Button>b2</Toolbar.Button>
+            <Button>b2</Button>
             <input type="radio" name="size" aria-label="s" />
             <input type="radio" name="size" aria-label="m" />
             <input type="radio" name="size" aria-label="l" />
-            <Toolbar.Button>b3</Toolbar.Button>
+            <Button>b3</Button>
           </Toolbar.Root>
           <button type="button">after</button>
         </>
@@ -810,7 +696,7 @@ describe("Toolbar", () => {
           <Toolbar.Root aria-label="T">
             <input type="radio" name="a" aria-label="a1" />
             <input type="radio" name="a" aria-label="a2" defaultChecked />
-            <Toolbar.Button>mid</Toolbar.Button>
+            <Button>mid</Button>
             <input type="radio" name="z" aria-label="z1" />
             <input type="radio" name="z" aria-label="z2" />
           </Toolbar.Root>,
@@ -843,7 +729,7 @@ describe("Toolbar", () => {
       it("a button[role=radio] is an ordinary item: the arrows walk through it", () => {
         render(
           <Toolbar.Root aria-label="T">
-            <Toolbar.Button>b1</Toolbar.Button>
+            <Button>b1</Button>
             <button type="button" role="radio" aria-checked="true">
               r1
             </button>
@@ -903,7 +789,7 @@ describe("Toolbar", () => {
       it("Tab from the last unit is not handled", () => {
         render(
           <Toolbar.Root aria-label="T">
-            <Toolbar.Button>b1</Toolbar.Button>
+            <Button>b1</Button>
             <input type="radio" name="z" aria-label="z1" defaultChecked />
             <input type="radio" name="z" aria-label="z2" />
           </Toolbar.Root>,
@@ -932,12 +818,12 @@ describe("Toolbar", () => {
       it("a RadioGroup.Root inside the toolbar is one unit; disabled removes it", () => {
         const { rerender } = render(
           <Toolbar.Root aria-label="T">
-            <Toolbar.Button>b1</Toolbar.Button>
+            <Button>b1</Button>
             <RadioGroup.Root aria-label="Size" defaultValue="m">
               <RadioGroup.Item value="s" aria-label="s" />
               <RadioGroup.Item value="m" aria-label="m" />
             </RadioGroup.Root>
-            <Toolbar.Button>b2</Toolbar.Button>
+            <Button>b2</Button>
           </Toolbar.Root>,
         );
         from(button("b1"), "ArrowRight");
@@ -946,12 +832,12 @@ describe("Toolbar", () => {
         expect(radio("m")).toHaveFocus();
         rerender(
           <Toolbar.Root aria-label="T">
-            <Toolbar.Button>b1</Toolbar.Button>
+            <Button>b1</Button>
             <RadioGroup.Root aria-label="Size" defaultValue="m" disabled>
               <RadioGroup.Item value="s" aria-label="s" />
               <RadioGroup.Item value="m" aria-label="m" />
             </RadioGroup.Root>
-            <Toolbar.Button>b2</Toolbar.Button>
+            <Button>b2</Button>
           </Toolbar.Root>,
         );
         from(button("b1"), "ArrowRight");

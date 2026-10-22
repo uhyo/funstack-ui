@@ -1,5 +1,6 @@
 "use client";
 import { startTransition, useState } from "react";
+import { Button } from "@funstack/ui/button";
 import { Menu } from "@funstack/ui/menu";
 import { ToggleGroup } from "@funstack/ui/toggle-group";
 import { Toolbar } from "@funstack/ui/toolbar";
@@ -7,7 +8,7 @@ import { DemoErrorBoundary } from "./DemoErrorBoundary.js";
 import { fakeSave } from "./fake-api.js";
 
 // An editor toolbar: one Tab stop over two ToggleGroups, separators, a menu button, three
-// Toolbar.Buttons (Copy is disabled but stays focusable) and a text input placed last. Left /
+// Buttons (Copy is disabled but stays focusable) and a text input placed last. Left /
 // Right walk every control; ArrowDown on Insert opens the menu.
 export function ToolbarEditor() {
   const [styles, setStyles] = useState<string[]>(["bold"]);
@@ -67,7 +68,7 @@ export function ToolbarEditor() {
               <Menu.Item action={() => note("Inserted a table.")}>Table</Menu.Item>
             </Menu.Popup>
           </Menu.Root>
-          <Toolbar.Button
+          <Button
             className="demo-toolbar-button"
             action={async () => {
               await fakeSave("cut");
@@ -80,13 +81,13 @@ export function ToolbarEditor() {
                 Cut
               </>
             )}
-          </Toolbar.Button>
-          <Toolbar.Button className="demo-toolbar-button" disabled>
+          </Button>
+          <Button className="demo-toolbar-button" disabled>
             Copy
-          </Toolbar.Button>
-          <Toolbar.Button className="demo-toolbar-button" action={() => note("Pasted.")}>
+          </Button>
+          <Button className="demo-toolbar-button" action={() => note("Pasted.")}>
             Paste
-          </Toolbar.Button>
+          </Button>
           {/* A text-entry control owns its arrow keys: at most one, and last (APG). */}
           <input
             type="text"

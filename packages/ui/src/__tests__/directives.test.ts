@@ -170,7 +170,6 @@ const clientFiles = [
   "toggle-group/toggle-group-root.mjs",
   "toggle-group/toggle-group-item.mjs",
   "toolbar/toolbar-root.mjs",
-  "toolbar/toolbar-button.mjs",
   "toolbar/toolbar-separator.mjs",
   "internal/toolbar-context.mjs",
   "internal/use-roving-focus.mjs",
@@ -184,6 +183,8 @@ const clientFiles = [
   "number-field/number-field-decrement.mjs",
   "number-field/use-step-button.mjs",
   "internal/announce.mjs",
+  // Button (design/components/button.md 11, row 20).
+  "button/button.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -232,7 +233,11 @@ const directiveFreeFiles = [
   "number-field/number-field-format.mjs",
   "number-field/number-field-arithmetic.mjs",
   "internal/decimal.mjs",
+  "button/index.mjs",
 ];
+
+/** Files a release removed; a stale build must not keep shipping them (button.md row 20). */
+const removedFiles = ["toolbar/toolbar-button.mjs", "toolbar/toolbar-button.d.mts"];
 
 function startsWithUseClient(file: string): boolean {
   const path = resolve(dist, file);
@@ -249,6 +254,10 @@ describe("built files", () => {
 
   it.each(directiveFreeFiles)('%s does not start with "use client"', (file) => {
     expect(startsWithUseClient(file)).toBe(false);
+  });
+
+  it.each(removedFiles)("%s no longer exists", (file) => {
+    expect(existsSync(resolve(dist, file))).toBe(false);
   });
 });
 

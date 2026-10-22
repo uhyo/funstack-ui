@@ -31,7 +31,8 @@
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
 }
 
-.demo-toolbar-button[aria-disabled="true"] {
+/* [data-disabled], not [aria-disabled]: a pending Button is aria-disabled too. */
+.demo-toolbar-button[data-disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }

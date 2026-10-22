@@ -30,6 +30,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./accordion": "./dist/accordion/index.mjs",
+    "./button": "./dist/button/index.mjs",
     "./checkbox": "./dist/checkbox/index.mjs",
     "./checkbox-group": "./dist/checkbox-group/index.mjs",
     "./combobox": "./dist/combobox/index.mjs",

@@ -200,3 +200,12 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   "expected null not to be null" (the reported failure), the new row passes.
 - Master CI failures in the last 40 runs: four, all known (the Dialog.Form jsdom row b2fc473,
   the NumberField wheel row 509c87f, twice each).
+
+## Button (#79, wave 8)
+
+- Chromium AX tree (CDP): a Button with `aria-disabled="true"` while pending reports the
+  `disabled` property `true`; name unchanged; the property is gone after settle (row 26).
+- Playwright's `click()` refuses an `aria-disabled="true"` element ("element is not enabled") in
+  every engine; the re-entry row passes `{ force: true }` for the click while pending.
+- Focus stays on a pending (aria-disabled, not natively disabled) Button after two animation
+  frames in Chromium and Firefox (row 21); WebKit via CI.

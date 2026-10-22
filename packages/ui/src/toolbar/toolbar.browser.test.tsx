@@ -7,6 +7,7 @@ import type { ViewTransitionClass } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsFocusgroup } from "../__tests__/engine.js";
+import { Button } from "../button/index.js";
 import { Menu } from "../menu/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
 import { Toolbar } from "./index.js";
@@ -23,7 +24,7 @@ function Editor({ flag, rtl = false }: { flag: boolean; rtl?: boolean }) {
     <div style={rtl ? { direction: "rtl" } : undefined}>
       <button type="button">before</button>
       <Toolbar.Root aria-label="Formatting" experimental_focusgroup={flag}>
-        <Toolbar.Button>Cut</Toolbar.Button>
+        <Button>Cut</Button>
         <ToggleGroup.Root aria-label="Style" defaultValue={["i"]}>
           <ToggleGroup.Item value="b">Bold</ToggleGroup.Item>
           <ToggleGroup.Item value="i">Italic</ToggleGroup.Item>
@@ -31,9 +32,9 @@ function Editor({ flag, rtl = false }: { flag: boolean; rtl?: boolean }) {
         <button type="button" disabled>
           Off
         </button>
-        <Toolbar.Button disabled>Copy</Toolbar.Button>
+        <Button disabled>Copy</Button>
         <input type="text" aria-label="Size" defaultValue="12" />
-        <Toolbar.Button>Paste</Toolbar.Button>
+        <Button>Paste</Button>
       </Toolbar.Root>
       <button type="button">after</button>
     </div>
@@ -110,8 +111,8 @@ describe.each([
       <>
         <button type="button">before</button>
         <Toolbar.Root aria-label="T" experimental_focusgroup={flag}>
-          <Toolbar.Button disabled>Dead</Toolbar.Button>
-          <Toolbar.Button>Live</Toolbar.Button>
+          <Button disabled>Dead</Button>
+          <Button>Live</Button>
         </Toolbar.Root>
       </>,
     );
@@ -133,9 +134,9 @@ describe.each([
           loop={false}
           experimental_focusgroup={flag}
         >
-          <Toolbar.Button>Select</Toolbar.Button>
-          <Toolbar.Button>Draw</Toolbar.Button>
-          <Toolbar.Button>Erase</Toolbar.Button>
+          <Button>Select</Button>
+          <Button>Draw</Button>
+          <Button>Erase</Button>
         </Toolbar.Root>
       </>,
     );
@@ -165,7 +166,7 @@ describe.each([
     async (orientation) => {
       render(
         <Toolbar.Root aria-label="T" orientation={orientation} experimental_focusgroup={flag}>
-          <Toolbar.Button>Before</Toolbar.Button>
+          <Button>Before</Button>
           <Menu.Root>
             <Menu.Trigger>Insert</Menu.Trigger>
             <Menu.Popup data-testid="popup" side={orientation === "vertical" ? "right" : "bottom"}>
@@ -173,7 +174,7 @@ describe.each([
               <Menu.Item>Table</Menu.Item>
             </Menu.Popup>
           </Menu.Root>
-          <Toolbar.Button>After</Toolbar.Button>
+          <Button>After</Button>
         </Toolbar.Root>,
       );
       const [next, open] =
@@ -210,15 +211,15 @@ describe.each([
       <>
         <button type="button">before</button>
         <Toolbar.Root aria-label="T" experimental_focusgroup={flag}>
-          <Toolbar.Button>b1</Toolbar.Button>
+          <Button>b1</Button>
           <input type="radio" name="align" aria-label="left" />
           <input type="radio" name="align" aria-label="center" defaultChecked />
           <input type="radio" name="align" aria-label="right" />
-          <Toolbar.Button>b2</Toolbar.Button>
+          <Button>b2</Button>
           <input type="radio" name="size" aria-label="s" />
           <input type="radio" name="size" aria-label="m" />
           <input type="radio" name="size" aria-label="l" />
-          <Toolbar.Button>b3</Toolbar.Button>
+          <Button>b3</Button>
         </Toolbar.Root>
         <button type="button">after</button>
       </>
@@ -316,7 +317,7 @@ describe("Toolbar: a click makes the item the Tab stop (row 22)", () => {
   });
 });
 
-describe("Toolbar.Button view transitions (row 23)", () => {
+describe("Button view transitions in a Toolbar (row 23)", () => {
   async function mountButton(transition: ViewTransitionClass | undefined): Promise<number> {
     let calls = 0;
     const original = document.startViewTransition.bind(document);
@@ -334,10 +335,8 @@ describe("Toolbar.Button view transitions (row 23)", () => {
             show
           </button>
           <Toolbar.Root aria-label="T">
-            <Toolbar.Button>A</Toolbar.Button>
-            {shown && (
-              <Toolbar.Button {...(transition !== undefined && { transition })}>B</Toolbar.Button>
-            )}
+            <Button>A</Button>
+            {shown && <Button {...(transition !== undefined && { transition })}>B</Button>}
           </Toolbar.Root>
         </>
       );

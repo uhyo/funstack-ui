@@ -8,6 +8,9 @@
 // (conventions 7.4). Type-only: nothing is imported at runtime.
 import "./internal/platform-attributes.js";
 
+export { Button } from "./button/index.js";
+export type { ButtonProps, ButtonState, ButtonActionDetails } from "./button/index.js";
+
 export { Toggle } from "./toggle/index.js";
 export type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./toggle/index.js";
 
@@ -28,9 +31,6 @@ export type {
   ToolbarRootProps,
   ToolbarRootState,
   ToolbarOrientation,
-  ToolbarButtonProps,
-  ToolbarButtonState,
-  ToolbarButtonActionDetails,
   ToolbarSeparatorProps,
   ToolbarSeparatorState,
 } from "./toolbar/index.js";

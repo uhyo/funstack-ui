@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Button } from "@funstack/ui/button";
 import { Menu } from "@funstack/ui/menu";
 import { Toolbar } from "@funstack/ui/toolbar";
 
@@ -11,12 +12,12 @@ export function ToolbarVertical() {
   return (
     <div className="demo-row">
       <Toolbar.Root orientation="vertical" aria-label="Tools" className="demo-toolbar">
-        <Toolbar.Button className="demo-toolbar-button" action={() => setTool("select")}>
+        <Button className="demo-toolbar-button" action={() => setTool("select")}>
           Select
-        </Toolbar.Button>
-        <Toolbar.Button className="demo-toolbar-button" action={() => setTool("draw")}>
+        </Button>
+        <Button className="demo-toolbar-button" action={() => setTool("draw")}>
           Draw
-        </Toolbar.Button>
+        </Button>
         <Toolbar.Separator className="demo-toolbar-separator" />
         <Menu.Root>
           <Menu.Trigger className="demo-toolbar-button">Shapes</Menu.Trigger>
