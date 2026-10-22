@@ -1,0 +1,47 @@
+{
+ "version": "156.0.8078.4",
+ "E_mouse": [
+  "contextmenu region button=2 pointerId=1 pt=\"mouse\" xy=250,250 ctrl=false",
+  "toggle open"
+ ],
+ "E_key": [
+  "contextmenu btn button=-1 pointerId=1 pt=\"mouse\" xy=170,150 ctrl=false"
+ ],
+ "G_upLeft": {
+  "log": [
+   "contextmenu region button=2 pointerId=1 pt=\"mouse\" xy=300,250 ctrl=false",
+   "toggle open"
+  ],
+  "open": true
+ },
+ "H_leftClickOutside_open": false,
+ "H_rightClickOutside_open": true,
+ "H_middleClickOutside_open": true,
+ "F_longPress": {
+  "log": [
+   "pointerdown pt=touch",
+   "touchstart pt=-",
+   "pointerup pt=touch",
+   "touchend pt=-"
+  ],
+  "open": false
+ }
+}
+{
+ "version": "157.0",
+ "E_mouse": [
+  "contextmenu region button=2 pointerId=0 pt=\"mouse\" xy=250,250 ctrl=false",
+  "toggle open"
+ ],
+ "E_key": [],
+ "G_upLeft": {
+  "log": [
+   "contextmenu region button=2 pointerId=0 pt=\"mouse\" xy=300,250 ctrl=false",
+   "toggle open"
+  ],
+  "open": true
+ },
+ "H_leftClickOutside_open": false,
+ "H_rightClickOutside_open": false,
+ "H_middleClickOutside_open": false
+}

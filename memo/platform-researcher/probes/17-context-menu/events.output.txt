@@ -1,0 +1,243 @@
+{
+ "version": "156.0.8078.4",
+ "A_rightClickRegion": [
+  "pointerdown region btn=2 buttons=2 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+  "mousedown region btn=2 buttons=2 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+  "contextmenu region btn=2 buttons=2 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+  "pointerup region btn=2 buttons=0 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+  "mouseup region btn=2 buttons=0 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+  "auxclick region btn=2 buttons=0 pt=mouse xy=250,250 detail=1 ctor=PointerEvent trusted=true"
+ ],
+ "B_contextMenuKey_onButton": [
+  "keydown ContextMenu false btn",
+  "contextmenu btn btn=-1 buttons=0 pt=mouse xy=170,150 detail=0 ctor=PointerEvent trusted=true",
+  "keyup ContextMenu false btn"
+ ],
+ "B_shiftF10_onButton": [
+  "keydown Shift true btn",
+  "keydown F10 true btn",
+  "contextmenu btn btn=-1 buttons=0 pt=mouse xy=170,150 detail=0 ctor=PointerEvent trusted=true",
+  "keyup F10 true btn",
+  "keyup Shift false btn"
+ ],
+ "B_contextMenuKey_noFocus": [
+  "keydown ContextMenu false BODY",
+  "contextmenu HTML btn=-1 buttons=0 pt=mouse xy=1,1 detail=0 ctor=PointerEvent trusted=true",
+  "keyup ContextMenu false BODY"
+ ],
+ "B_contextMenuKey_withSelection": [
+  "keydown ContextMenu false BODY",
+  "contextmenu txt btn=-1 buttons=0 pt=mouse xy=120,228 detail=0 ctor=PointerEvent trusted=true",
+  "keyup ContextMenu false BODY"
+ ],
+ "D1_openedFromRightClick": {
+  "log": [
+   "pointerdown region btn=2 buttons=2 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown region btn=2 buttons=2 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu region btn=2 buttons=2 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+   "shown at 250,250",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick BODY btn=2 buttons=0 pt=mouse xy=250,250 detail=1 ctor=PointerEvent trusted=true",
+   "toggle open"
+  ],
+  "open": true
+ },
+ "D2_split": {
+  "log": [
+   "pointerdown region btn=2 buttons=2 pt=mouse xy=260,260 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown region btn=2 buttons=2 pt=- xy=260,260 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu region btn=2 buttons=2 pt=mouse xy=260,260 detail=0 ctor=PointerEvent trusted=true",
+   "shown at 260,260",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=260,260 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=260,260 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick BODY btn=2 buttons=0 pt=mouse xy=260,260 detail=1 ctor=PointerEvent trusted=true",
+   "toggle open"
+  ],
+  "openAfterDown": true,
+  "openAfterUp": true
+ },
+ "D3_rightClickInsideMenu": {
+  "log": [
+   "pointerdown menu btn=2 buttons=2 pt=mouse xy=320,330 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown menu btn=2 buttons=2 pt=- xy=320,330 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu menu btn=2 buttons=2 pt=mouse xy=320,330 detail=0 ctor=PointerEvent trusted=true",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=320,330 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=320,330 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick menu btn=2 buttons=0 pt=mouse xy=320,330 detail=1 ctor=PointerEvent trusted=true"
+  ],
+  "open": true
+ },
+ "D4_rightClickElsewhereInRegion": {
+  "log": [
+   "pointerdown region btn=2 buttons=2 pt=mouse xy=150,280 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown region btn=2 buttons=2 pt=- xy=150,280 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu region btn=2 buttons=2 pt=mouse xy=150,280 detail=0 ctor=PointerEvent trusted=true",
+   "shown at 150,280",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=150,280 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=150,280 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick BODY btn=2 buttons=0 pt=mouse xy=150,280 detail=1 ctor=PointerEvent trusted=true",
+   "toggle open"
+  ],
+  "open": true,
+  "rect": [
+   150,
+   280
+  ]
+ },
+ "D5_rightClickOutsideRegion": {
+  "log": [
+   "pointerdown other btn=2 buttons=2 pt=mouse xy=600,200 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown other btn=2 buttons=2 pt=- xy=600,200 detail=1 ctor=MouseEvent trusted=true",
+   "focusin other",
+   "contextmenu other btn=2 buttons=2 pt=mouse xy=600,200 detail=0 ctor=PointerEvent trusted=true",
+   "pointerup other btn=2 buttons=0 pt=mouse xy=600,200 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup other btn=2 buttons=0 pt=- xy=600,200 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick other btn=2 buttons=0 pt=mouse xy=600,200 detail=1 ctor=PointerEvent trusted=true"
+  ],
+  "open": true
+ },
+ "D6_kbdOpen": {
+  "log": [
+   "focusin btn",
+   "keydown Shift true btn",
+   "keydown F10 true btn",
+   "contextmenu btn btn=-1 buttons=0 pt=mouse xy=170,150 detail=0 ctor=PointerEvent trusted=true",
+   "shown at 170,150",
+   "keyup F10 true btn",
+   "keyup Shift false btn",
+   "toggle open"
+  ],
+  "open": true,
+  "active": "btn"
+ },
+ "D6_afterEscape": {
+  "open": false,
+  "active": "btn"
+ },
+ "D7_focusAfterRightClickRegion": "BODY",
+ "D7_focusAfterEscape": "item",
+ "C_touchLongPress": [
+  "pointerdown region btn=0 buttons=1 pt=touch xy=249.99998474121094,249.99998474121094 detail=0 ctor=PointerEvent trusted=true",
+  "touchstart region btn=undefined buttons=undefined pt=- xy=undefined,undefined detail=0 ctor=TouchEvent trusted=true",
+  "pointerup region btn=0 buttons=0 pt=touch xy=249.99998474121094,249.99998474121094 detail=0 ctor=PointerEvent trusted=true",
+  "touchend region btn=undefined buttons=undefined pt=- xy=undefined,undefined detail=0 ctor=TouchEvent trusted=true",
+  "mousedown region btn=0 buttons=1 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+  "mouseup region btn=0 buttons=0 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+  "click region btn=0 buttons=0 pt=touch xy=250,250 detail=1 ctor=PointerEvent trusted=true"
+ ]
+}
+{
+ "version": "157.0",
+ "A_rightClickRegion": [
+  "pointerdown region btn=2 buttons=2 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+  "mousedown region btn=2 buttons=2 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+  "contextmenu region btn=2 buttons=2 pt=mouse xy=250,250 detail=1 ctor=PointerEvent trusted=true",
+  "pointerup region btn=2 buttons=0 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+  "mouseup region btn=2 buttons=0 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+  "auxclick region btn=2 buttons=0 pt=mouse xy=250,250 detail=1 ctor=PointerEvent trusted=true"
+ ],
+ "B_contextMenuKey_onButton": [
+  "keydown ContextMenu false btn",
+  "keyup ContextMenu false btn"
+ ],
+ "B_shiftF10_onButton": [
+  "keydown Shift true btn",
+  "keydown F10 true btn",
+  "keyup F10 true btn",
+  "keyup Shift false btn"
+ ],
+ "B_contextMenuKey_noFocus": [
+  "keydown ContextMenu false BODY",
+  "keyup ContextMenu false BODY"
+ ],
+ "B_contextMenuKey_withSelection": [
+  "keydown ContextMenu false BODY",
+  "keyup ContextMenu false BODY"
+ ],
+ "D1_openedFromRightClick": {
+  "log": [
+   "pointerdown region btn=2 buttons=2 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown region btn=2 buttons=2 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu region btn=2 buttons=2 pt=mouse xy=250,250 detail=1 ctor=PointerEvent trusted=true",
+   "shown at 250,250",
+   "toggle open",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=250,250 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=250,250 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick BODY btn=2 buttons=0 pt=mouse xy=250,250 detail=1 ctor=PointerEvent trusted=true"
+  ],
+  "open": true
+ },
+ "D2_split": {
+  "log": [
+   "pointerdown region btn=2 buttons=2 pt=mouse xy=260,260 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown region btn=2 buttons=2 pt=- xy=260,260 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu region btn=2 buttons=2 pt=mouse xy=260,260 detail=1 ctor=PointerEvent trusted=true",
+   "shown at 260,260",
+   "toggle open",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=260,260 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=260,260 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick BODY btn=2 buttons=0 pt=mouse xy=260,260 detail=1 ctor=PointerEvent trusted=true"
+  ],
+  "openAfterDown": true,
+  "openAfterUp": true
+ },
+ "D3_rightClickInsideMenu": {
+  "log": [
+   "pointerdown menu btn=2 buttons=2 pt=mouse xy=320,330 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown menu btn=2 buttons=2 pt=- xy=320,330 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu menu btn=2 buttons=2 pt=mouse xy=320,330 detail=1 ctor=PointerEvent trusted=true",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=320,330 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=320,330 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick menu btn=2 buttons=0 pt=mouse xy=320,330 detail=1 ctor=PointerEvent trusted=true"
+  ],
+  "open": true
+ },
+ "D4_rightClickElsewhereInRegion": {
+  "log": [
+   "pointerdown region btn=2 buttons=2 pt=mouse xy=150,280 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown region btn=2 buttons=2 pt=- xy=150,280 detail=1 ctor=MouseEvent trusted=true",
+   "contextmenu region btn=2 buttons=2 pt=mouse xy=150,280 detail=1 ctor=PointerEvent trusted=true",
+   "shown at 150,280",
+   "toggle open",
+   "pointerup menu btn=2 buttons=0 pt=mouse xy=150,280 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup menu btn=2 buttons=0 pt=- xy=150,280 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick BODY btn=2 buttons=0 pt=mouse xy=150,280 detail=1 ctor=PointerEvent trusted=true"
+  ],
+  "open": true,
+  "rect": [
+   150,
+   280
+  ]
+ },
+ "D5_rightClickOutsideRegion": {
+  "log": [
+   "pointerdown other btn=2 buttons=2 pt=mouse xy=600,200 detail=0 ctor=PointerEvent trusted=true",
+   "mousedown other btn=2 buttons=2 pt=- xy=600,200 detail=1 ctor=MouseEvent trusted=true",
+   "focusin other",
+   "contextmenu other btn=2 buttons=2 pt=mouse xy=600,200 detail=1 ctor=PointerEvent trusted=true",
+   "pointerup other btn=2 buttons=0 pt=mouse xy=600,200 detail=0 ctor=PointerEvent trusted=true",
+   "mouseup other btn=2 buttons=0 pt=- xy=600,200 detail=1 ctor=MouseEvent trusted=true",
+   "auxclick other btn=2 buttons=0 pt=mouse xy=600,200 detail=1 ctor=PointerEvent trusted=true",
+   "toggle closed"
+  ],
+  "open": false
+ },
+ "D6_kbdOpen": {
+  "log": [
+   "focusin btn",
+   "keydown Shift true btn",
+   "keydown F10 true btn",
+   "keyup F10 true btn",
+   "keyup Shift false btn"
+  ],
+  "open": false,
+  "active": "btn"
+ },
+ "D6_afterEscape": {
+  "open": false,
+  "active": "btn"
+ },
+ "D7_focusAfterRightClickRegion": "BODY",
+ "D7_focusAfterEscape": "BODY"
+}

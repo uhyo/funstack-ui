@@ -1,0 +1,2 @@
+firefox {"B_sameTask_sync":[780,580],"B_sameTask_after2raf":[780,580],"B_back_sync":[300,250],"B_back_after2raf":[300,250],"A_sameTask_sync":[660,500],"A_sameTask_after2raf":[660,500],"A_back_sync":[180,170],"A_back_after2raf":[180,170]} expected 780,580 -> [660,500]; 300,250 -> [300,250]
+chromium {"B_sameTask_sync":[660,500],"B_sameTask_after2raf":[660,500],"B_back_sync":[180,170],"B_back_after2raf":[180,170],"A_sameTask_sync":[660,500],"A_sameTask_after2raf":[660,500],"A_back_sync":[180,170],"A_back_after2raf":[180,170]} expected 780,580 -> [660,500]; 300,250 -> [300,250]

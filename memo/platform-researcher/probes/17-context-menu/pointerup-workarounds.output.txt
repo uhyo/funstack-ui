@@ -1,0 +1,150 @@
+{
+ "version": "156.0.8078.4",
+ "none": {
+  "rightClick": [
+   "contextmenu buttons=2 | pointerup region | toggle open",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "capture-after-show": {
+  "rightClick": [
+   "contextmenu buttons=2 | gotpointercapture menu | pointerup menu | lostpointercapture menu | toggle open",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "capture-before-show": {
+  "rightClick": [
+   "contextmenu buttons=2 | gotpointercapture menu | pointerup menu | lostpointercapture menu | toggle open",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "defer": {
+  "rightClick": [
+   "contextmenu buttons=2 | shown after up | pointerup region | toggle open",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "defer-microtask": {
+  "rightClick": [
+   "contextmenu buttons=2 | pointerup region | toggle open",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "defer-task": {
+  "rightClick": [
+   "contextmenu buttons=2 | pointerup region | toggle open",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ }
+}
+{
+ "version": "157.0",
+ "none": {
+  "rightClick": [
+   "contextmenu buttons=2 | toggle open | pointerup region | toggle closed",
+   false
+  ]
+ },
+ "capture-after-show": {
+  "rightClick": [
+   "contextmenu buttons=2 | toggle open | gotpointercapture menu | pointerup menu | lostpointercapture menu",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "capture-before-show": {
+  "rightClick": [
+   "contextmenu buttons=2 | toggle open | gotpointercapture menu | pointerup menu | lostpointercapture menu",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "defer": {
+  "rightClick": [
+   "contextmenu buttons=2 | shown after up | pointerup region | toggle open",
+   true
+  ],
+  "clickItem": [
+   "pointerup item | item click",
+   true
+  ],
+  "leftClickOutside": [
+   "pointerup HTML | toggle closed",
+   false
+  ]
+ },
+ "defer-microtask": {
+  "rightClick": [
+   "contextmenu buttons=2 | toggle open | pointerup region | toggle closed",
+   false
+  ]
+ },
+ "defer-task": {
+  "rightClick": [
+   "contextmenu buttons=2 | toggle open | pointerup region | toggle closed",
+   false
+  ]
+ }
+}
