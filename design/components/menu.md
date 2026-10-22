@@ -4,7 +4,10 @@ Status: **accepted** (2026-10-17, GitHub issue #39; the product owner accepted a
 questions as recommended, see the end of this document). **Implemented** in #41 (a456681; the
 shared `useActionTrigger` in ac7064e) and reviewed the same day: the review corrections and the
 six accepted deviations are folded into the sections below and listed at the end of this
-document. Follows `design/conventions.md` (accepted);
+document. **Amended 2026-10-22 with the context menu** (#45, `design/components/context-menu.md`,
+proposed): `Menu.ContextTrigger` in 1 and 3.9, the outside right- / middle-click close for every
+menu in 2.2, `data-context`, the point placement and the owned `onContextMenu` in 3.3, the
+placement in 14. Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` first** (accepted): Menu is built on its internal hooks
 (`usePopoverRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
@@ -51,7 +54,8 @@ with a view transition in every engine.
 | 12 | Pending UI | Trigger: `data-open`, `data-pending` (Root pending: open or close in flight). Item: `data-pending` while its action runs. CheckboxItem / RadioItem: `data-checked` (optimistic), `data-pending`; `RadioGroup`: `data-pending` (owner). Popup: nothing (`:popover-open`). |
 | 13 | Content mounting | Conventions 3.7 unchanged: Popup children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">`. Items are read from the DOM at keydown time (no registration), so mounting strategy does not affect keyboard code. |
 | 14 | Animation | As Popover: CSS for opens and dismissals; `transition` on Popup wraps the `<div popover>` and animates library-driven opens and closes (item activation, Close, ArrowLeft, hover close, controlled) in every engine. Types `fsui-menu`, `fsui-menu-open`, `fsui-menu-close`; item state types `fsui-menu-check` / `fsui-menu-uncheck` / `fsui-menu-select`. |
-| 15 | Out of scope | Context menus (#45), menubars (`ArrowLeft` / `ArrowRight` between top-level menus), `interestfor`, the Open UI `<menulist>` elements (a future `experimental_` rendering), `Menu.Form`. |
+| 15 | Out of scope | Menubars (`ArrowLeft` / `ArrowRight` between top-level menus), `interestfor`, the Open UI `<menulist>` elements (a future `experimental_` rendering), `Menu.Form`. |
+| 16 | Context menus (#45) | `Menu.ContextTrigger`: a plain region (no ARIA) whose `contextmenu` or long-press opens the same `Menu.Popup` at the pointer, with no anchor (`--menu-point-x` / `-y` and three shipped `@position-try` options), `source: region` for nesting, pointer capture on the hidden popup against the Firefox / WebKit `pointerup` light dismiss, and a move (no dispatch) on a second right-click. A Root may hold a `Trigger` and a `ContextTrigger`. Also for **every** menu: a right- or middle-click outside closes the stack at once (`"dismiss"`). Design: `design/components/context-menu.md`. |
 
 ---
 
@@ -132,6 +136,7 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 | `GroupLabel` | `div` | | none | `id` wiring. |
 | `Separator` | `hr` | `separator` (implicit) | none | `render={<div role="separator" />}` if an `<hr>` cannot be styled as wanted. |
 | `SubmenuTrigger` | `button` | `menuitem` | `aria-expanded`, `data-open` (optimistic), `data-pending`, `data-disabled` | Both an item of the parent menu and the Trigger of the submenu: `commandfor` + `toggle-popover`, `aria-haspopup="menu"`, roving `tabindex`, typeahead participation, ArrowRight / Enter / Space / click / hover open. |
+| `ContextTrigger` | `div` | none | `data-open` (optimistic), `data-pending`, `data-disabled`; inline `-webkit-touch-callout: none` | #45: the region whose `contextmenu` (and touch / pen long-press) opens the Popup at the pointer. No ARIA. Top-level Roots only. `design/components/context-menu.md`. |
 
 Why these parts:
 
@@ -210,6 +215,7 @@ menu whose pre-hydration experience matters is rare; it is recorded as question 
 | Escape | browser | innermost menu only (the platform's close-watcher stack); focus returns to its trigger (platform for the root menu, library for a submenu); notification | `"dismiss"` |
 | Light dismiss, another `auto` popover or modal dialog opening outside | browser | the whole stack; notifications | `"dismiss"` |
 | Controlled parent sets `open={false}` | library | apply effect; echo | (none) |
+| Right-click (`contextmenu`) or middle-button `pointerdown` outside the menu tree (#45) | library-initiated, browser-shaped | a document listener the root Popup installs while open calls `rootPopup.hidePopover()` at once, as the Tab path does (Chromium's click-based light dismiss ignores those buttons; native menus close on any click); a `contextmenu` inside the popup is only `preventDefault()`ed; one inside this Root's `ContextTrigger` is a move, not a close | `"dismiss"` |
 
 Why item activation closes **through the root Root** rather than the item's own menu: the APG
 and Open UI both close the whole menu on activation, and closing the root popover is one call
@@ -335,7 +341,7 @@ export interface MenuPopupState {
 }
 
 export interface MenuPopupProps
-  extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "role" | "aria-labelledby" | "onKeyDown" | "onFocus" | "onBlur" | "onMouseDown" | "onPointerEnter" | "onPointerLeave" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "role" | "aria-labelledby" | "onKeyDown" | "onFocus" | "onBlur" | "onMouseDown" | "onContextMenu" | "onPointerEnter" | "onPointerLeave" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"> {
   /** Default `"bottom"` for a top-level menu, `"right"` for a submenu. `null`: stylesheet-owned placement. */
   side?: MenuSide | null;
   /** Default `"start"` (both levels). */
@@ -362,7 +368,12 @@ Owned keys: `id`, `popover` (`"auto"`), `role` (`"menu"`; owned here, unlike Pop
 keyboard model assumes it), `aria-labelledby` (the Trigger's id, token-merged with the
 consumer's), `focusgroup` (with the flag), `tabIndex` (`-1`, so the popup itself can take focus
 as a last resort when a menu has no items; when it has focus the arrow keys enter the items,
-section 5), `data-side` / `data-align`, and the handlers: `onKeyDown` (section 5), `onBlur`
+section 5), `data-side` / `data-align` (anchored opens) or `data-context` (a context open,
+#45: then the inline style is the point placement, `--menu-point-x` / `--menu-point-y`, `inset:
+auto`, `left` / `top`, `position-area: none` and the library's `@position-try` fallbacks, and
+`state.side` is `null`; `side={null}` opts out of inline placement on both paths and leaves the
+two custom properties), `onContextMenu` (`preventDefault()`: no native menu over the custom
+one), and the handlers: `onKeyDown` (section 5), `onBlur`
 (React's `focusout`, 2.2), `onMouseDown` (keeps focus on the current item when non-item space
 is pressed, 6.2) and, on a submenu Popup, `onPointerEnter` / `onPointerLeave` (hover intent,
 section 7). `usePopoverPopup` has no handler or `role` options; Menu attaches these as owned
@@ -493,6 +504,7 @@ export const Menu = {
   Item: MenuItem, CheckboxItem: MenuCheckboxItem, RadioGroup: MenuRadioGroup, RadioItem: MenuRadioItem,
   Group: MenuGroup, GroupLabel: MenuGroupLabel, Separator: MenuSeparator,
   SubmenuTrigger: MenuSubmenuTrigger,
+  ContextTrigger: MenuContextTrigger, // #45
 } as const;
 ```
 
@@ -743,6 +755,7 @@ No `returnFocus` prop.
 | Group / GroupLabel | `role="group"` + `aria-labelledby`; the label has the `id` |
 | Separator | `<hr>` (implicit `separator`) |
 | SubmenuTrigger | `role="menuitem"`, `aria-haspopup="menu"`, `aria-expanded`, `id`, `commandfor`, `command`, `tabindex="-1"` |
+| ContextTrigger | none (#45): no role, no `aria-haspopup`, no `aria-expanded`; `aria-label` on the Popup names a context-only menu |
 
 Chromium's implicit `aria-expanded` and `aria-details` for `commandfor` invokers are overridden
 by the explicit attributes; placing the Popup right after the Trigger (the natural DOM order
@@ -1017,6 +1030,7 @@ packages/ui/src/menu/                    (as implemented in #41)
   menu-radio-item.tsx       # "use client"
   menu-group.tsx            # "use client": Group, GroupLabel and Separator (three stateless parts sharing one context; one file, deviation 4)
   menu-submenu-trigger.tsx  # "use client": item + trigger; hover intent
+  menu-context-trigger.tsx  # "use client" (#45): the region: contextmenu, long-press, modality, pointer capture (context-menu.md 14)
   menu-hover.ts             # "use client": scheduleHoverClose (the :hover / focus-inside checks before a hover close)
   menu-dom.ts               # items from the DOM, typeahead text
   menu.test.tsx, menu.browser.test.tsx

@@ -43,7 +43,10 @@ pending in 3.6, the `pending` row in 4.1, the row in 5.3, the folder in 9.1, the
 review fold 2026-10-22: the component-`render` `type` rule and the non-host-button `disabled` rule
 in 1.2, the counter-only guard in 2.5, 3.4 and 10.1; wave 9 amendments #81 and #83, 2026-10-22,
 `design/components/button.md` 16 and 17: the guard as the hook's default in 2.5 and 3.4, the
-library-wide `disabled` sweep in 1.2).
+library-wide `disabled` sweep in 1.2; amended 2026-10-22 with the Context menu design, #45,
+`design/components/context-menu.md`, **proposed**: the `ContextTrigger` row in 1.1, the
+outside right-click example in 2.2, the move note in 3.5, the `context` row in 4.1, and
+section 12, shipped functional CSS, which is pending the user's decision).
 Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
@@ -112,6 +115,7 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `List` | Groups triggers; owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (the Popup is the container, because a listbox may contain only options and groups). | `div` |
 | `Item` | One entry in a multi-item component (Accordion, Menu). Menu's is a `button[role=menuitem]` with an `action`; ToggleGroup's is a `button[aria-pressed]`, the Toggle element, whose pressed state is the Root's (#66). | `div` / `details` / `button` |
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
+| `ContextTrigger` | A region whose `contextmenu` (right-click, Ctrl+click, Shift+F10 / the ContextMenu key at a focused descendant, a library long-press for touch) opens the owner's `Popup` at the pointer (Menu, #45). A plain element with **no role and no ARIA** (`aria-haspopup` is not allowed on generic roles and ARIA has no attribute for "has a context menu"); `data-open` / `data-pending` / `data-disabled`. May share a Root with a `Trigger` (a "More" button and a right-click region opening one popup). | `div` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
 | `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
 | `Indicator` | Purely visual element that tracks state (active tab marker; the fill of a Slider, placed by the consumer's CSS from the Root's `--slider-start` / `--slider-end`; the fill of a Progress / Meter, sized by the consumer's CSS from the Root's `--progress-value` / `--meter-value`, #68). | `span` |
@@ -358,7 +362,7 @@ exposes `reason` uses exactly these values and no synonyms:
 | --- | --- | --- |
 | `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). For native checkbox and radio inputs it is always the `click` `PointerEvent`, including Space and radio arrow keys, because React's `onChange` for them is click-driven. |
 | `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), form reset, or interaction before hydration reconciled at mount. Never a user gesture. | The platform event, or `undefined` for mount reconciliation. |
-| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover, focus leaving the component (Tab out of a menu), the pointer leaving a hover-opened submenu, or a parent overlay closing (a submenu when its menu closes). A close through a part **that carries a decision** (`Dialog.Close`, a Form submit) is `"activate"`; `Toast.Close`, which only ever means "go away" (the same as Escape), is `"dismiss"`, so a toast's `closeAction` can tell "acted on the content" (its Action part, `"activate"`) from everything else. | The platform's `close` or `toggle` event; the click or keydown for Toast. |
+| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover, focus leaving the component (Tab out of a menu), a right- or middle-click outside a menu (the library's own immediate close, since click-based light dismiss ignores those buttons; Menu #45), the pointer leaving a hover-opened submenu, or a parent overlay closing (a submenu when its menu closes). A close through a part **that carries a decision** (`Dialog.Close`, a Form submit) is `"activate"`; `Toast.Close`, which only ever means "go away" (the same as Escape), is `"dismiss"`, so a toast's `closeAction` can tell "acted on the content" (its Action part, `"activate"`) from everything else. | The platform's `close` or `toggle` event; the click or keydown for Toast. |
 | `"timeout"` | The library's own timer closed the component: no user gesture and no platform event. Toast's auto-dismiss is the only user; the Undo-window pattern (`design/components/toast.md` 9.3) relies on it being distinct from `"dismiss"`. | `undefined` |
 
 Components whose close carries a platform result add it as a serialisable field next to
@@ -987,6 +991,10 @@ Rules:
   for its Close part, Form and controlled close (`design/components/dialog.md` 2.3, 10.3,
   amended for issue #46).
 - Per-component designs list every state and label it library-owned or browser-owned.
+- A library-driven **move** of a shown top-layer element (Menu's context menu re-opened at a
+  new point, #45) is not a state change: no dispatch, the part re-shows the popover under its
+  own "opening" flag so the coalesced `toggle` (`open` → `open`) notifies nothing, and the
+  component doc says what else the move does (focus, pointer capture).
 - Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
   dispatches use `"activate"`.
 - A **module-level registry** is an allowed shape for a cross-component fact the DOM does not
@@ -1214,7 +1222,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `active` | boolean | `Combobox.Option` | Virtual focus: `aria-activedescendant` points here. Urgent (section 3.2), never a transition. |
 | `stale` | boolean | `Combobox.Popup`, `Combobox.List` (with `aria-busy="true"` on the listbox while stale **or loading**: a `Status` mounted inside the List; loading itself is not a data attribute in v1) | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile. |
 | `empty` | boolean | `Combobox.List` | No mounted options, not stale and not loading; the same condition under which `Empty` renders. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`); Combobox `Input` and `Trigger` likewise, its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits none because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` and `aria-expanded` in library mode; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open` and `aria-expanded`), Menu `ContextTrigger` (optimistic `data-open`, no ARIA, #45); Combobox `Input` and `Trigger` likewise, its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch); Progress, every part (`value` is `null`: derived, not a DOM property, never suspended, #68) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab; every Slider part; `ToggleGroup.Root` and `Item` (the enclosing Toolbar's when inside one); `Toolbar.Root` and `Toolbar.Separator` (the separator's own, perpendicular to the toolbar's) | Enum attribute with value. |
@@ -1225,6 +1233,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `paused` | boolean | Toast `Viewport` | A viewport-wide timer pause holds (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
 | `type` | string | Toast `Root` | The toast's consumer-defined `type` (`"error"`, `"success"`, …), an enum whose vocabulary is the consumer's. |
 | `complete` | boolean | Progress, every part | The clamped value reached `max` (#68). |
+| `context` | boolean | `Menu.Popup` | The current open came from a `Menu.ContextTrigger` and the popup is placed at a point: `--menu-point-x` / `--menu-point-y` are set inline and `data-side` / `data-align` are absent (#45). Committed, like the Popup's `open`. |
 | `region` | `"optimum" \| "suboptimum" \| "even-less-good"` | Meter, every part | HTML's meter region for the value against `low` / `high` / `optimum`, the platform's words (#68). |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
@@ -1944,6 +1953,38 @@ question 27):
   pass-through (Toast's region-name rule); the announced stepped value is the formatted text,
   not a library string, overridable through `announce(value, state)`; no `aria-roledescription`
   and no string for it.
+
+---
+
+## 12. Shipped functional CSS
+
+Status: **proposed** with the Context menu design (#45); it becomes binding only if the user
+accepts the design's open question 1. Until then no component ships CSS.
+
+The library ships no visual CSS: no reset, no theme, no colours, sizes or motion (section 11's
+"ships no CSS" stands for everything a stylesheet could do to the look of a part). A component
+may ship **functional at-rules** it needs and cannot express inline, under these rules:
+
+- **Only at-rules with no selectors** (`@position-try` options for placement are the first
+  case, `Menu.Popup`'s point placement, `design/components/context-menu.md` 4.2). Nothing
+  cascades onto any element; the inline `style` the part renders is what references the rules.
+- **Rendered by the part that needs them**, as a React 19 hoisted style, never as a stylesheet
+  file the consumer imports: `<style href="@funstack/ui/<name>" precedence="fsui">`. React moves
+  it into `<head>` in the commit (before layout effects), deduplicates it by `href` across
+  roots, and nothing lands in place, so the part still renders one DOM element and a
+  `<ViewTransition>` boundary around that element is unaffected. Rendered only while the part
+  uses the rules (a point-placed menu), so a page that never does never gets them.
+- **Names are prefixed** `--fsui-<component>-…` so they cannot clash with a consumer's.
+- **Opt-out through the part's existing switch** for stylesheet-owned placement (`side={null}`
+  on a Popup): then the part renders neither the inline reference nor the style, and hands the
+  consumer the data (custom properties) their own rules need.
+- **CSP**: an inline `<style>` is governed by the same `style-src` directive as the inline
+  `style` attributes the library already depends on, so no new requirement; the component page
+  says so in one sentence.
+- The CSS text lives in a directive-free module next to the placement helpers
+  (`internal/anchor-position.ts`), as a string constant, and is covered by a jsdom row (one
+  `<style>` in `document.head` after use, none without) and a browser row (the computed
+  property names the option).
 
 ---
 
