@@ -63,7 +63,7 @@
   padding: 4px;
   border: 1px solid GrayText;
   border-radius: 6px;
-  position-area: block-end span-inline-end;
+  position-area: self-block-end span-self-inline-end;
 }
 .ff-popup [role="option"][data-active] {
   background: Highlight;

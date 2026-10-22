@@ -14,12 +14,15 @@
   color: #111827;
   background: #fff;
 }
-.menu[data-side="bottom"] {
-  margin-block-start: 4px;
+/* Gaps on the resolved side (`data-side` is where the browser placed the menu; a submenu is
+   right in LTR, left in RTL). A flip swaps the popup's margins: both sides of the axis. */
+.menu[data-side="bottom"],
+.menu[data-side="top"] {
+  margin-block: 4px;
 }
-/* Submenu gap. */
-.menu[data-side="right"] {
-  margin-inline-start: 2px;
+.menu[data-side="right"],
+.menu[data-side="left"] {
+  margin-inline: 2px;
 }
 .menu [role^="menuitem"] {
   display: flex;

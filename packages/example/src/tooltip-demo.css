@@ -35,9 +35,41 @@
   }
 }
 
+/* Tooltip.Arrow: data-side is the resolved side (after a flip too). */
+.tip-arrow {
+  position: absolute;
+  inline-size: 8px;
+  block-size: 8px;
+  background: inherit;
+  rotate: 45deg;
+}
+.tip-arrow[data-side="top"] {
+  bottom: -4px;
+  inset-inline-start: calc(50% - 4px);
+}
+.tip-arrow[data-side="bottom"] {
+  top: -4px;
+  inset-inline-start: calc(50% - 4px);
+}
+.tip-arrow[data-side="left"] {
+  right: -4px;
+  top: calc(50% - 4px);
+}
+.tip-arrow[data-side="right"] {
+  left: -4px;
+  top: calc(50% - 4px);
+}
+.tip-arrow:is([data-side="top"], [data-side="bottom"])[data-align="start"] {
+  inset-inline-start: 12px;
+}
+.tip-arrow:is([data-side="top"], [data-side="bottom"])[data-align="end"] {
+  inset-inline-start: auto;
+  inset-inline-end: 12px;
+}
+
 /* side={null}: the stylesheet owns placement entirely. */
 .tip-custom {
-  position-area: inline-end;
+  position-area: self-x-end; /* self-*: follows the popup's direction, an RTL container too */
   position-try-fallbacks: flip-inline;
   margin-inline: 14px;
   background: #c2410c;

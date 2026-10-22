@@ -127,19 +127,31 @@ function SaveButton({ flags }: { flags: Flags }) {
   );
 }
 
-const sides: readonly TooltipSide[] = ["top", "right", "bottom", "left"];
+const sides: readonly TooltipSide[] = [
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "inline-start",
+  "inline-end",
+];
 const aligns: readonly TooltipAlign[] = ["start", "center", "end"];
 
 function Placement({ flags }: { flags: Flags }) {
   const [side, setSide] = useState<TooltipSide | null>("right");
   const [align, setAlign] = useState<TooltipAlign>("start");
   const [delay, setDelay] = useState(250);
+  const [dir, setDir] = useState<"ltr" | "rtl">("ltr");
   return (
     <section>
-      <h3>Placement and delays</h3>
+      <h3>Placement, arrow, direction and delays</h3>
       <p>
         <code>side</code> / <code>align</code> become inline <code>position-area</code> and{" "}
-        <code>position-try-fallbacks</code> (the popup flips when it does not fit).{" "}
+        <code>position-try-fallbacks</code> (the popup flips when it does not fit). While shown,{" "}
+        <code>data-side</code> / <code>data-align</code> (and the state the text below prints) are
+        where the browser placed it, so the arrow follows a flip: scroll this stage to the top edge
+        of the window and hover. <code>inline-start</code> / <code>inline-end</code> and{" "}
+        <code>align</code> on a top / bottom side follow the stage's <code>dir</code>.{" "}
         <code>side=&#123;null&#125;</code> leaves placement to the stylesheet (here:{" "}
         <code>.tip-custom</code>, inline-end with a larger gap).
       </p>
@@ -177,8 +189,15 @@ function Placement({ flags }: { flags: Flags }) {
           />{" "}
           ms
         </label>
+        <label>
+          dir{" "}
+          <select value={dir} onChange={(e) => setDir(e.target.value as "ltr" | "rtl")}>
+            <option>ltr</option>
+            <option>rtl</option>
+          </select>
+        </label>
       </div>
-      <div className="tooltip-stage">
+      <div className="tooltip-stage" dir={dir}>
         <Tooltip.Root delay={delay}>
           <Tooltip.Trigger className="tooltip-btn" experimental_interestFor={flags.interestFor}>
             Hover me
@@ -189,9 +208,12 @@ function Placement({ flags }: { flags: Flags }) {
             align={align}
             experimental_hint={flags.hint}
           >
-            {({ side: s, align: a }) =>
-              s === null ? "Placed by the stylesheet" : `side="${s}" align="${a}"`
-            }
+            {({ side: s, align: a }) => (
+              <>
+                {s === null ? "Placed by the stylesheet" : `data-side="${s}" data-align="${a}"`}
+                <Tooltip.Arrow className="tip-arrow" />
+              </>
+            )}
           </Tooltip.Popup>
         </Tooltip.Root>
       </div>

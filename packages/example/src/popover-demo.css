@@ -14,18 +14,15 @@
   color: #111827;
   background: #fff;
 }
-/* The gap on the requested side (`data-side` is absent with `side={null}`). */
-.pop[data-side="bottom"] {
-  margin-block-start: 6px;
-}
+/* The gap. `data-side` is the side the browser placed the popup on (absent with `side={null}`);
+   a flip swaps the popup's margins, so the gap goes on both sides of the axis. */
+.pop[data-side="bottom"],
 .pop[data-side="top"] {
-  margin-block-end: 6px;
+  margin-block: 6px;
 }
-.pop[data-side="right"] {
-  margin-inline-start: 6px;
-}
+.pop[data-side="right"],
 .pop[data-side="left"] {
-  margin-inline-end: 6px;
+  margin-inline: 6px;
 }
 .pop h2 {
   margin-block: 0 8px;
