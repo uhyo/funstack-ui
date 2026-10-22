@@ -661,9 +661,9 @@ Nothing in Tooltip reads `direction`. The `self-x-*` keywords of the matrix make
 `start` / `end` and `side="inline-start"` / `"inline-end"` follow the popup's inherited
 direction, container-level `dir="rtl"` included, in Chromium and WebKit. **Firefox** misplaces
 any `position-area` popup along the inline axis when the popup's parent box has a direction
-different from the root's (Mozilla 2019601, conventions 13.3; physical keywords included, so v0
-was affected too). No workaround ships; the browser row asserts the degradation behind the
-`anchorPositionHonoursParentDirection` probe.
+different from the root's (Mozilla 2019601, conventions 13.3, human task #89; physical keywords
+included, so v0 was affected too). No workaround ships; the browser row asserts the degradation
+behind the `anchorPositionHonoursParentDirection` probe.
 
 ---
 
@@ -1259,7 +1259,7 @@ first real WebKit check of the computed-style claim, which the research took fro
 
 ## Amendment: resolved side and direction (wave 11, 2026-10-23, issues #20 and #53)
 
-Status: **proposed**. Inputs: `docs/research/positioning-wave11.md` (binding verdicts),
+Status: **accepted** (product owner, 2026-10-23; see "Decisions recorded" below). Inputs: `docs/research/positioning-wave11.md` (binding verdicts),
 conventions 13 (new, the cross-component rules), `memo/architect/positioning-wave11-notes.md`.
 The sections above are edited in place (decisions 7 and 11, the parts table, 3, 4, 7.1, 7.3,
 7.4, 7.5, 10, 12.1, 12.4, 13); this section is the audit trail, the migration notes and the
@@ -1356,6 +1356,17 @@ open, after scroll, on the native path, inline side and page RTL, container RTL 
    Recommendation: confirm (behaviour change under RTL only; type widening).
 5. **Firefox 2019601 ships unworked-around**, asserted by a runtime probe; the human comment
    on the bug is listed in the research. Recommendation: confirm.
+
+#### Decisions recorded (product owner, 2026-10-23)
+
+All five as recommended: (1) the observer runs on the native `interestfor` path, because it
+only observes and never interacts; (2) **`Tooltip.Arrow` ships now**: the user chose #20 for
+this wave, which supersedes conventions resolved question 10 (recorded there; the `::after`
+recipe stays as the zero-markup alternative); (3) `data-side` carries the resolved value under
+the same name; (4) inline-relative `align`, the `inline-start` / `inline-end` sides, `inline-end`
+as the submenu default; (5) no workaround for Mozilla 2019601, asserted through the probe,
+tracked as the human task **#89**. Part A is implementable as written; Part B below builds on
+it without reopening it.
 
 ### Part B: skip-delay (wave 11, 2026-10-23, issue #21)
 

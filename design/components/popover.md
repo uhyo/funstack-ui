@@ -1661,7 +1661,9 @@ All eight accepted as recommended:
 
 ## Amendment: resolved side and direction (wave 11, 2026-10-23, issues #20 and #53)
 
-Status: **proposed**; the cross-component rules are conventions 13 and the reasoning is in
+Status: **accepted** (product owner, 2026-10-23, with Tooltip's amendment: same name for the
+resolved value, inline-relative `align` and the new sides, Firefox 2019601 unworked-around and
+tracked as #89); the cross-component rules are conventions 13 and the reasoning is in
 Tooltip's amendment (same mechanism, same hook). Edited in place: decision 10, 3.3, 4, 8, 10,
 13.2, 13.3.
 

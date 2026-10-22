@@ -1496,8 +1496,9 @@ amendment below (the Firefox claim was wrong, see 7.2).
 
 ## Amendment: container direction (wave 11, 2026-10-23, issue #53)
 
-Status: **proposed**; the cross-component rules are conventions 13. Edited in place: decision
-10, the section 1 HTML, 7.2, 12.2, 13.
+Status: **accepted** (product owner, 2026-10-23: `self-*` keywords; no `data-side` now,
+recorded as a possible follow-up; Firefox 2019601 is #89); the cross-component rules are
+conventions 13. Edited in place: decision 10, the section 1 HTML, 7.2, 12.2, 13.
 
 | | v1 (as accepted) | Wave 11 |
 | --- | --- | --- |

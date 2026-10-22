@@ -1236,9 +1236,10 @@ All six accepted as implemented:
 
 ## Amendment: resolved side and direction (wave 11, 2026-10-23, issues #20 and #53)
 
-Status: **proposed**; the cross-component rules are conventions 13 and the reasoning is in
-Tooltip's amendment (same hook, same matrix). Edited in place: decision 7, the section 1 HTML
-and parts table, 3.3, 7, 9, 13.1, 13.2. The context menu's RTL point placement (#88) is in
+Status: **accepted** (product owner, 2026-10-23: `inline-end` as the submenu default and the
+rest as Tooltip's amendment; Firefox 2019601 is #89); the cross-component rules are
+conventions 13 and the reasoning is in Tooltip's amendment (same hook, same matrix). Edited in
+place: decision 7, the section 1 HTML and parts table, 3.3, 7, 9, 13.1, 13.2. The context menu's RTL point placement (#88) is in
 `design/components/context-menu.md`'s own amendment.
 
 | | v0 (as accepted) | Wave 11 |

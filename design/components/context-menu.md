@@ -1251,7 +1251,12 @@ All ten accepted as implemented:
 
 ## Amendment: wave 11 follow-ups (issue #88)
 
-Status: **proposed** (Part A, 2026-10-23). Inputs: `docs/research/positioning-wave11.md`
+Status: **Part A accepted** (product owner, 2026-10-23: the direction comes from the popup's
+computed `direction`); **Part B proposed** (2026-10-23). Part B extends Part A's shapes
+without reopening them: the point record gains `offset` next to `direction`, the shipped
+options grow from five to eight, and the fallback lists are keyed by direction and pointer
+kind (`MENU_POINT_FALLBACKS[direction][offset]`); an implementer landing Part A alone ships
+the five-option, direction-keyed form and Part B extends it. Inputs: `docs/research/positioning-wave11.md`
 (Part A, binding verdicts), `docs/research/interaction-wave11.md` (Part B), conventions 13.
 Each part edits the sections above in place and keeps its audit trail here.
 

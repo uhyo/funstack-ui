@@ -2039,8 +2039,9 @@ may ship **functional at-rules** it needs and cannot express inline, under these
 
 ## 13. Anchored placement
 
-**Proposed 2026-10-23** (wave 11: #20 resolved side, #53 container RTL, #88 RTL point
-placement; `docs/research/positioning-wave11.md`, whose verdicts are binding). Applies to every
+**Accepted 2026-10-23** (product owner; wave 11: #20 resolved side, #53 container RTL, #88 RTL
+point placement; `docs/research/positioning-wave11.md`, whose verdicts are binding; the
+decisions are recorded in the component amendments, resolved question 36). Applies to every
 part that places a top-layer element against an anchor: Tooltip, Popover and Menu `Popup` (the
 `side` / `align` matrix), Combobox `Popup` (fixed keywords) and the Select docs recipe for
 `::picker(select)`; and to the one part placed at a point (Menu's context open). The per-part
@@ -2212,7 +2213,7 @@ point-placed menu) are unaffected.
   `browserName === "firefox"` is not used: Playwright's Firefox may be ahead of the release.
 - **Human task** (never filed from an agent): comment on Mozilla 2019601 with the reduction
   in `docs/research/positioning-wave11.md` ("Upstream reports"), and suggest duplicating
-  2050071 into it. Recorded in this repository's issue #53.
+  2050071 into it. Tracked as this repository's issue **#89**; cite it from tests and docs.
 
 ### 13.4 Placement at a point and direction
 
@@ -2277,7 +2278,11 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     static-mode Accordion renders none; page-policy CSS is the consumer's choice; mount-prone parts
     get a browser test row asserting no `startViewTransition` call without the prop.
 10. **`Arrow` part held for v0** (from the Tooltip design). Popups ship without an `Arrow` part
-    until a component shows it cannot be done in CSS on the popup itself.
+    until a component shows it cannot be done in CSS on the popup itself. **Superseded
+    2026-10-23 (wave 11, #20):** the user chose the Tooltip arrow for wave 11, so
+    `Tooltip.Arrow` ships, echoing the resolved `data-side` / `data-align` (section 13.2,
+    `design/components/tooltip.md`); the pseudo-element recipe stays documented as the
+    zero-markup alternative. Popover and Menu still have no `Arrow`.
 11. **`provides="description" | "name"`** is the convention for any part whose content labels or
     describes another element (Tooltip's `Popup`, future `Label`/`Description` parts):
     `"description"` wires `aria-describedby`, `"name"` wires `aria-labelledby`. It is an
@@ -2487,6 +2492,16 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `nonce` deferred. **User decision:** positioning-only shipped CSS is allowed through React
     `<style href precedence>`, documented and overridable (section 12); the virtual-anchor
     alternative is rejected. The conventions changes (1.1, 2.2, 3.5, 4.1, 12) are applied.
+
+36. **Wave 11 Part A, positioning (#20, #53, #88 RTL)** accepted 2026-10-23
+    (`design/components/tooltip.md`, `popover.md`, `menu.md`, `context-menu.md` Part A,
+    `combobox.md` amendments; section 13), every recommendation as recommended: the resolved
+    `data-side` / `data-align` under the same names, observed on Tooltip's native path too;
+    inline-relative `align`, the `inline-start` / `inline-end` sides, `inline-end` as the
+    submenu default; no workaround for Mozilla 2019601 (asserted through the probe; human task
+    #89); the context-menu direction from the popup's computed `direction`; no `data-side` on
+    Combobox (possible follow-up). **User decision:** `Tooltip.Arrow` ships, superseding
+    resolved question 10. Part B (#21, #88 rest) is proposed in the same amendments.
 
 ## Open questions
 
