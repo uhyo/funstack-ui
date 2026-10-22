@@ -98,7 +98,7 @@ Rendered HTML (JS-free mode; ids come from one `useId` in Root):
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.open` (optimistic), `state.pending` in `children(state)` | Owns `useId`, mode, the state hook, refs and context. No `ref`, `className`, `style`. |
-| `Trigger` | `button` | button | `aria-expanded` (optimistic in library mode; DOM-synced in JS-free mode), `data-open`, `data-pending`, `data-disabled` (library mode) | `commandfor` + `command="toggle-popover"`. No `aria-haspopup` (APG disclosure has none; Menu adds `"menu"`). |
+| `Trigger` | `button` | button | `aria-expanded` (optimistic in library mode; DOM-synced in JS-free mode), `data-open`, `data-pending` (library mode), `data-disabled` whenever disabled, in every mode (wave 9, 5fc05d5) | `commandfor` + `command="toggle-popover"`. No `aria-haspopup` (APG disclosure has none; Menu adds `"menu"`). |
 | `Popup` | `dialog` | `dialog` (explicit) | `data-side`, `data-align`; no `data-open` (`:popover-open`) | Carries `id`, `popover="auto"`, `aria-modal="false"`, `aria-labelledby`, `aria-describedby`, inline placement. The content region: children render from committed state in library mode. |
 | `Close` | `button` | button | `data-pending` (when `action` runs), `data-disabled` | `command="hide-popover"`. |
 | `Title` | `h2` | heading | none | `id` wiring. `render={<h3 />}` changes the level. |

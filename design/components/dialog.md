@@ -93,7 +93,7 @@ Rendered HTML (JS-free mode; ids come from one `useId` in Root):
 | Part | Element | Role (native) | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.pending`, `state.open` (optimistic), `state.modal` in `children(state)` | Owns `useId`, mode, `modal`, the state hook and context. No `ref`, `className`, `style`. |
-| `Trigger` | `button` | button | `data-open` (optimistic), `data-pending`, `data-disabled` (library mode); nothing in JS-free mode | `commandfor` + `command="show-modal"`. Not an `aria-expanded` invoker (APG does not require one; research "Invoker state"). |
+| `Trigger` | `button` | button | `data-open` (optimistic), `data-pending` (library mode); `data-disabled` whenever disabled, in every mode (wave 9, 5fc05d5: the styling hook agrees with `disabled` / `aria-disabled` in JS-free mode too); otherwise nothing in JS-free mode | `commandfor` + `command="show-modal"`. Not an `aria-expanded` invoker (APG does not require one; research "Invoker state"). |
 | `Popup` | `dialog` | `dialog` (`aria-modal` from `showModal()`) | `data-modal`; no `data-open` (`:open`, `:modal`) | Carries `id`, `aria-labelledby`, `aria-describedby`, `closedby` (flag). The content region: children render from committed state in library mode. |
 | `Close` | `button` | button | `data-pending` (when `action` runs) | `command="request-close"`; `value` becomes `returnValue`. |
 | `Form` | `form` | form | none | `method="dialog"` or `action` + watcher. |
