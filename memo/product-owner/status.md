@@ -245,3 +245,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Design 63898db (+ acceptance 0289de6, fold 5c7d1cc). Impl 8b2666f..25629c8 (fixes in 25629c8). Review 04ea4b8: no must-fix.
 - Released 0.1.0-alpha.10 (version bump after 25629c8, master CI green). Closed #93.
 - Remaining: #19 zero-JS variants; human/upstream tasks #89 #90 #91 #92 #73 etc.
+- alpha.10 publish + deploy-docs green.
+
+## 2026-10-23 — wave 13 started (#19 zero-JS variants)
+- User picked #19; after it, the user will do a human review of everything built so far.
+- research-19 running → docs/research/zero-js-variants.md (cost of "use client" parts, RSC capabilities, packaging, per-component candidates, recommendation). Expect a user decision on "second anatomy" trade-off before design.
