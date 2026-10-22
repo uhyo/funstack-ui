@@ -71,7 +71,9 @@ function Toolbar({ flags }: { flags: Flags }) {
         keyboard opens after the same delay; a click does not), Escape closes. Skip-delay: once one
         tooltip shows, move straight to the other (or arrow to it) and it opens at once; with{" "}
         <code>experimental_interestFor</code> in Chromium the shipped{" "}
-        <code>@funstack/ui/tooltip-warm</code> rule does it natively.
+        <code>@funstack/ui/tooltip-warm</code> rule does it natively. The first tooltip fades in;
+        the next one carries <code>data-instant</code>, and <code>.tip[data-instant]</code> turns
+        its fade off.
       </p>
       <div className="tooltip-toolbar" role="toolbar" aria-label="Formatting">
         <Tooltip.Root provides="name">
