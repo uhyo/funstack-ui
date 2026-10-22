@@ -62,7 +62,8 @@ export function ContextMenuFiles() {
                       pending ? <span className="demo-spinner" aria-hidden /> : "⋯"
                     }
                   </Menu.Trigger>
-                  {/* In a table the Popup goes inside a cell: a <div> cannot sit next to a <tr>. */}
+                  {/* In a table the Popup goes inside a cell (a <div> cannot sit next to a <tr>);
+                      its clicks and keys then bubble to the row: check event.target there. */}
                   <Menu.Popup className="demo-menu" align="end">
                     <Menu.Item action={() => rename(file.id)}>Rename</Menu.Item>
                     <Menu.Item

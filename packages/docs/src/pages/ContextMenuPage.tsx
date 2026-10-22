@@ -103,7 +103,18 @@ export function ContextMenuPage() {
           <strong>Render the Popup next to the region</strong>, so the reading order is natural. In
           a table row (<code>{"render={<tr />}"}</code>) put it inside a cell instead: a{" "}
           <code>&lt;div&gt;</code> cannot be a sibling of a <code>&lt;tr&gt;</code>. Right-clicks
-          and long-presses inside the menu are never the region's.
+          and long-presses inside a menu (this one, or any other <code>Menu.Popup</code> inside the
+          region) are never the region's. Other events inside the menu do bubble to the row, in the
+          DOM and in React: a row <code>onClick</code> (selection) also sees item clicks, and
+          selectors such as <code>.row:hover *</code> reach the menu. Check{" "}
+          <code>event.target</code> in row handlers.
+        </li>
+        <li>
+          A right-click inside a popup that is not a menu (a <code>Popover.Popup</code>, a Select
+          picker) rendered inside the region is the region's: its menu opens and the other popup
+          closes, as any <code>popover="auto"</code> would. Keep such popups outside the region, or
+          give them <code>{"onContextMenu={(e) => e.preventDefault()}"}</code>, which keeps the
+          region quiet there.
         </li>
         <li>
           A <code>Menu.ContextTrigger</code> belongs to a top-level Root; inside a{" "}
