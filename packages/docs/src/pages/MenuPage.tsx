@@ -241,9 +241,13 @@ export function MenuPage() {
         ]}
       />
       <p>
-        <code>MenuRootState</code>: <code>{"{ open, pending, submenu }"}</code>. <code>open</code>{" "}
-        is optimistic; <code>submenu</code> is true for a Root rendered inside a{" "}
-        <code>Menu.Popup</code>.
+        <code>MenuRootState</code>: <code>{"{ open, pending, submenu, context }"}</code>.{" "}
+        <code>open</code> is optimistic; <code>submenu</code> is true for a Root rendered inside a{" "}
+        <code>Menu.Popup</code>; <code>context</code> is true while the open came from a{" "}
+        <a href="/components/context-menu">
+          <code>Menu.ContextTrigger</code>
+        </a>
+        .
       </p>
 
       <h4>
@@ -282,7 +286,7 @@ export function MenuPage() {
             type: '"top" | "bottom" | "left" | "right" | null',
             default: '"bottom" ("right" in a submenu)',
             description:
-              "Placement through inline `position-area`, with `position-try-fallbacks` flipping it (a submenu flips inline only). `null` emits no inline placement and no `data-side` / `data-align`.",
+              "Placement through inline `position-area`, with `position-try-fallbacks` flipping it (a submenu flips inline only). `null` emits no inline placement and no `data-side` / `data-align`. Ignored for an open from a [Menu.ContextTrigger](/components/context-menu), which is placed at the pointer; there `null` opts out of the inline point placement too.",
           },
           {
             name: "align",
@@ -315,15 +319,18 @@ export function MenuPage() {
         ]}
       />
       <p>
-        <code>MenuPopupState</code>: <code>{"{ open, side, align, submenu }"}</code> (committed{" "}
-        <code>open</code>). Owns <code>id</code>, <code>popover</code>, <code>role="menu"</code>,{" "}
-        <code>aria-labelledby</code> (merged), <code>tabIndex={"{-1}"}</code>,{" "}
-        <code>focusgroup</code> (with the flag), <code>onKeyDown</code>, <code>onBlur</code>,{" "}
-        <code>onMouseDown</code> (a press outside the items keeps focus on the current item),{" "}
-        <code>onPointerEnter</code>, <code>onPointerLeave</code>, and <code>data-side</code> /{" "}
-        <code>data-align</code>. Style it with <code>:popover-open</code>; it emits no{" "}
-        <code>data-open</code>. Render a <code>&lt;div&gt;</code>, not a <code>&lt;dialog&gt;</code>
-        .
+        <code>MenuPopupState</code>: <code>{"{ open, side, align, submenu, context }"}</code>{" "}
+        (committed <code>open</code>; <code>context</code> and <code>side: null</code> for an open
+        from a <code>Menu.ContextTrigger</code>). Owns <code>id</code>, <code>popover</code>,{" "}
+        <code>role="menu"</code>, <code>aria-labelledby</code> (merged),{" "}
+        <code>tabIndex={"{-1}"}</code>, <code>focusgroup</code> (with the flag),{" "}
+        <code>onKeyDown</code>, <code>onBlur</code>, <code>onMouseDown</code> (a press outside the
+        items keeps focus on the current item), <code>onContextMenu</code> (no browser menu over
+        this one), <code>onPointerEnter</code>, <code>onPointerLeave</code>, <code>data-side</code>{" "}
+        / <code>data-align</code>, and <code>data-context</code> with the inline{" "}
+        <code>--menu-point-x</code> / <code>--menu-point-y</code> for a context open. Style it with{" "}
+        <code>:popover-open</code>; it emits no <code>data-open</code>. Render a{" "}
+        <code>&lt;div&gt;</code>, not a <code>&lt;dialog&gt;</code>.
       </p>
 
       <h4>
@@ -605,8 +612,18 @@ export function MenuPage() {
           302008). If a submenu hits it, give its Popup <code>side={"{null}"}</code> and place it in
           CSS.
         </li>
-        <li>Context menus and menubars are not part of Menu.</li>
+        <li>Menubars are not part of Menu.</li>
       </ul>
+
+      <h3>Context menus</h3>
+      <p>
+        A <code>Menu.ContextTrigger</code> in the Root opens the same Popup at the pointer from a
+        right-click, Shift+F10 or a touch long-press, next to (or instead of) the Trigger: see{" "}
+        <a href="/components/context-menu">Context menu</a>. One behaviour applies to every menu,
+        context-opened or not: a right- or middle-click outside closes it at once (
+        <code>"dismiss"</code>), as native menus do; Chromium's light dismiss alone would leave it
+        open under the browser's own menu.
+      </p>
     </div>
   );
 }

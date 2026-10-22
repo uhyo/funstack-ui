@@ -154,6 +154,13 @@ export function RoadmapPage() {
           change for link and component renders only; a disabled link ToggleGroup.Item is now
           reached by the arrow keys. Form.Submit keeps native <code>disabled</code>.
         </li>
+        <li>
+          <a href="/components/context-menu">Context menu</a>: <code>Menu.ContextTrigger</code>, a
+          region whose right-click, Shift+F10 or touch long-press opens a Menu at the pointer,
+          placed with the library's first (positioning-only) shipped CSS; a Root may hold a Menu
+          button and a context region sharing one menu (<a href={issue(45)}>#45</a>). Behaviour
+          change for every Menu: a right- or middle-click outside now closes it.
+        </li>
       </ul>
 
       <h3>Next</h3>

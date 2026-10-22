@@ -1,0 +1,58 @@
+/* Context menu: the region (Menu.ContextTrigger) carries `data-open` while its menu is open and
+   `data-pending` while the open is in flight. The popup uses the Menu styles (menu.css); a
+   context open is `[data-context]` and is placed at the pointer by the library, so it gets no
+   anchored gap (menu.css only adds one for `[data-side]`). */
+
+.demo-files {
+  inline-size: 100%;
+  max-inline-size: 28rem;
+  border-collapse: collapse;
+}
+.demo-files th,
+.demo-files td {
+  padding: 6px 10px;
+  border-block-end: 1px solid var(--color-border);
+  text-align: start;
+}
+.demo-files td:last-child {
+  inline-size: 1%;
+  white-space: nowrap;
+}
+/* The row whose menu is open. */
+.demo-file-row[data-open] {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+.demo-file-row[data-pending] {
+  cursor: progress;
+}
+/* Touch: no text selection or loupe during the long-press. A trade-off (the row's text is not
+   selectable by touch), so it is the page's choice, not a library default. */
+.demo-file-row {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.demo-cm-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.demo-canvas {
+  display: block;
+  max-inline-size: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.demo-canvas:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.demo-canvas[data-open] {
+  border-color: var(--color-primary);
+}
