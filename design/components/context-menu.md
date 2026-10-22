@@ -2,7 +2,10 @@
 
 Status: **accepted** (2026-10-22, GitHub issue #45, wave 10 tracker #86; the product owner
 accepted every decision as proposed, and the user approved the positioning-only shipped CSS of
-section 4.2, see "Decisions recorded" at the end). Follows
+section 4.2, see "Decisions recorded" at the end). **Implemented** in 27c6c11 (docs page
+dc64c68, playground 9c69548) and reviewed the same day (`memo/reviewer/context-menu.md`,
+a8d09c7): the ten accepted deviations and the review corrections (H1, M1 and the design-text
+items) are folded into the sections below and listed at the end of this document. Follows
 `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win. **Read `design/components/menu.md` first** (accepted, implemented): a context
 menu is the Menu popup opened from a different trigger. Items, checkbox and radio items, groups,
@@ -61,17 +64,17 @@ import { Menu } from "@funstack/ui/menu";
       <Menu.Trigger aria-label={`Actions for ${file.name}`}>  {/* optional: the same menu as a button */}
         <DotsIcon />
       </Menu.Trigger>
+      <Menu.Popup aria-label="File actions">                   {/* in the row's last cell: a <div> cannot be a sibling of a <tr> */}
+        <Menu.Item action={rename.bind(null, file.id)}>Rename</Menu.Item>
+        <Menu.Item action={archive.bind(null, file.id)}>Archive</Menu.Item>
+        <Menu.Separator />
+        <Menu.Root>
+          <Menu.SubmenuTrigger>Move to</Menu.SubmenuTrigger>
+          <Menu.Popup>…</Menu.Popup>
+        </Menu.Root>
+      </Menu.Popup>
     </td>
   </Menu.ContextTrigger>
-  <Menu.Popup aria-label="File actions">                       {/* a sibling of the region, never inside it */}
-    <Menu.Item action={rename.bind(null, file.id)}>Rename</Menu.Item>
-    <Menu.Item action={archive.bind(null, file.id)}>Archive</Menu.Item>
-    <Menu.Separator />
-    <Menu.Root>
-      <Menu.SubmenuTrigger>Move to</Menu.SubmenuTrigger>
-      <Menu.Popup>…</Menu.Popup>
-    </Menu.Root>
-  </Menu.Popup>
 </Menu.Root>
 ```
 
@@ -81,12 +84,20 @@ Rendered HTML (closed; ids from the Root's `useId`):
 <tr style="-webkit-touch-callout: none">                      <!-- the region: no role, no ARIA -->
   <td>report.pdf</td>
   <td><button type="button" id="_r_1_-trigger" commandfor="_r_1_" command="toggle-popover"
-              aria-haspopup="menu" aria-expanded="false" aria-label="Actions for report.pdf">…</button></td>
+              aria-haspopup="menu" aria-expanded="false" aria-label="Actions for report.pdf">…</button>
+      <div id="_r_1_" popover="auto" role="menu" aria-labelledby="_r_1_-trigger" aria-label="File actions"
+           tabindex="-1" data-side="bottom" data-align="start"
+           style="position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline"></div></td>
 </tr>
-<div id="_r_1_" popover="auto" role="menu" aria-labelledby="_r_1_-trigger" aria-label="File actions"
-     tabindex="-1" data-side="bottom" data-align="start"
-     style="position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline"></div>
 ```
+
+Where the markup allows it (a `div`, `li` or `section` region), render the Popup as a sibling
+of the region instead; inside a table row it goes in a cell (review #5: the first draft's
+sibling `<div>` under `<tbody>` was invalid HTML and broke SSR). The region ignores
+`contextmenu` and long-press `pointerdown` events that come from its own popup, so a popup
+inside the region is never a move or a press of the region; DOM and React events from inside
+the menu still bubble to the row, so a row `onClick` (selection) must check `event.target`
+(docs, review L3).
 
 Open from a right-click at (312, 148):
 
@@ -105,7 +116,7 @@ Open from a right-click at (312, 148):
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | as Menu, plus `state.context` in `children(state)` | Unchanged props. Holds the placement of the current open (section 3.1). |
-| `ContextTrigger` | `div` | none | `data-open` (optimistic), `data-pending`, `data-disabled`; inline `-webkit-touch-callout: none` | New. Owns `contextmenu`, the long-press pointer handlers and the keyboard-modality bookkeeping. Only valid in a top-level Root (dev warning in a submenu). Several per Root are allowed; the one that opened is the `source`. |
+| `ContextTrigger` | `div` | none | `data-open` (optimistic), `data-pending`, `data-disabled`; inline `-webkit-touch-callout: none` | New. Owns `contextmenu`, the long-press pointer handlers and the keyboard-modality bookkeeping; ignores events from its own popup. Only valid in a top-level Root (dev warning in a submenu). Several per Root are allowed; the one that opened is the `source`. Provides `MenuRegionContext`, which lets a nested `Menu.Root` inside the region (2.4) exist without the "Root outside its parent's Popup" warning (deviation 6). |
 | `Trigger` | `button` | button | as Menu | Unchanged. In a Root with both, `aria-expanded` and `data-open` are `true` while the context-opened menu is open (it is the same menu), and a click then closes it. |
 | `Popup` | `div` | `menu` | as Menu, plus `data-context`; `data-side` / `data-align` only for anchored opens | Renders point placement for a context open, the shipped `<style>`, an owned `onContextMenu` (prevent the native menu inside), and the outside right / middle-click close for every menu. |
 | items, groups, submenus | | | as Menu | Unchanged. |
@@ -124,10 +135,11 @@ Why these choices:
   roles; deprecated as a global), no `aria-expanded` (same). Radix, Base UI and React Aria
   render no ARIA either. `tabIndex` is the consumer's: a region that keyboard users should be
   able to open must contain something focusable or be focusable itself, and the docs say so.
-- **The Popup is a sibling of the region**, never inside it: a right-click inside the menu must
-  not bubble into the region as a move, and the Popup needs to be the next element after the
-  region for the natural reading order. The Popup is a DOM descendant of whatever the region is
-  a descendant of (an open Popover or Dialog), and `source: region` nests it there.
+- **The Popup is a sibling of the region where the markup allows, and inside it otherwise**
+  (a table row, deviation 5). A right-click inside the menu is prevented by the Popup's own
+  handler and ignored by the region as coming from its own popup, so it is never a move; a
+  long-press inside it is ignored the same way. The Popup is a DOM descendant of whatever the
+  region is a descendant of (an open Popover or Dialog), and `source: region` nests it there.
 - **No `Menu.ContextTrigger` inside a `Menu.Popup`.** A `Menu.Root` inside a Popup is a submenu
   by definition (Menu 1), so a context menu on an item is not expressible and is not a thing in
   native UIs either. Dev warning.
@@ -202,11 +214,11 @@ whichever comes first opens once and cancels the other.
 
 | Event on the region | Effect |
 | --- | --- |
-| `pointerdown`, `pointerType` `"touch"` or `"pen"`, primary, not `disabled` | start the timer (`longPressDelay`, default 500 ms) with the point and the `pointerId`; a second `pointerdown` (multi-touch) cancels |
+| `pointerdown`, `pointerType` `"touch"` or `"pen"`, primary, not `disabled`, not from this Root's popup, not an editable target (2.3), **not already claimed** | **claim** the event (a module-level `WeakSet`; the innermost enabled region times the press and outer regions leave it, mirroring `contextmenu`'s `defaultPrevented` rule, deviation 7; **every `Menu.Popup` claims the `pointerdown`s inside it** too, so a long-press on an item of any menu rendered inside the region, a nested region's menu, a toolbar dropdown, never starts the region's timer, review M1), then start the timer (`longPressDelay`, default 500 ms) with the point and the `pointerId`; a second `pointerdown` (multi-touch) cancels |
 | `pointermove` more than 10 px from the start (`Math.hypot`) | cancel (Base UI's slop; Radix cancels on any move and loses presses to jitter) |
 | `pointerup`, `pointercancel` (the browser took the gesture for panning; `touch-action` is never set, the region stays scrollable) | cancel |
 | `contextmenu` during the gesture (Android, pen) | cancel; that event opens (2.1) |
-| timer expiry | open as 2.1 with `details.event` the `pointerdown`, pointer modality, `setPointerCapture(pointerId)` on the popup (the finger is still down: the `pointerup` would light-dismiss in WebKit exactly as the right button does), and a one-shot document-capture `click` swallow (`preventDefault()` + `stopPropagation()` for the next `click`, cleared by that click or by the next `pointerdown`), in case the engine synthesises a click on release that would land on an item |
+| timer expiry | open as 2.1 with `details.event` the `pointerdown`, pointer modality, `setPointerCapture(pointerId)` on the popup (the finger is still down: the `pointerup` would light-dismiss in WebKit exactly as the right button does), and a one-shot document-capture `click` swallow (`preventDefault()` + `stopPropagation()` for the next `click`), in case the engine synthesises a click on release that would land on an item. The swallow is scoped to the click that pointer's release could produce (review H1): it is **disarmed one task after the `pointerup` or `pointercancel` of that `pointerId`** (the synthesised click is dispatched in the release's task), by that click, by the next `pointerdown`, **on any `keydown`**, and **when the menu closes**. Without the scoping it outlived the gesture (no click follows a long-press on iOS) and ate the next keyboard or assistive-technology activation, which reaches items as a bare `click` (Menu 5.3). |
 
 Not done in v1 (recorded as follow-ups): offsetting the point so the menu does not open under
 the finger (Base UI anchors a 10 × 10 box), and `user-select`. The region renders inline
@@ -230,6 +242,13 @@ its own clipboard items). The long-press follows the same rule (a long-press in 
 the platform's selection gesture).
 
 ### 2.4 Nested regions and consumer handlers
+
+A `Menu.Root` rendered inside another Root's region (a nested region, a Menu in a card) is not a
+submenu: the region provides `MenuRegionContext`, which the Root reads to skip its "rendered
+inside another Menu.Root but outside its Popup" warning (deviation 6; a genuinely misplaced
+Root inside a region is no longer warned about, an accepted loss, since nothing can tell the two
+apart). The long-press follows the same inner-wins rule through the claimed-`pointerdown` set
+(2.2), and a `pointerdown` inside any `Menu.Popup` is claimed by that Popup (review M1).
 
 `contextmenu` bubbles. A region opens only when the event reaches it **not `defaultPrevented`**,
 and opening prevents it, so the innermost region wins and an outer one does nothing. A
@@ -269,16 +288,30 @@ type MenuPlacement =
       readonly generation: number; readonly source: HTMLElement };
 ```
 
-React state (`useState`), written inside `startTransition` by the trigger that opens: a
-`Menu.Trigger` click writes the `anchor` constant (a no-op re-render when unchanged), a
-ContextTrigger writes a fresh `point` with `generation + 1`. The same event's `requestOpen`
-dispatch lands in the same transition, so the open commit renders the point. The Root's context
-exposes `openAt(point, { source, event, pointer })` to the ContextTrigger and `placement` to the
-Popup. `generation` is what makes a second right-click at a new point a state change while the
-menu is open (section 4.3); `source` is what `showPopover({ source })` gets (section 2.6 of
+React state (`useState`), **written urgently** (a plain `setState` outside any transition,
+deviation 1; the first draft said `startTransition`): React entangles every transition update
+with any pending async action, so a move written in a transition would wait for an unrelated
+item action or pending open to settle and the menu would sit at the old point; placement is
+internal geometry, nothing is dispatched for it, and while the popup is closed the urgent
+render shows nothing. The placement also carries the `pointerId` of the opening pointer
+(deviation 9, for the re-capture after a move, 4.3). The Root's context exposes `openAt(point,
+{ source, event, pointer, pointerId })` to the ContextTrigger and `placement` to the Popup;
+`generation` is what makes a second right-click at a new point a state change while the menu is
+open (section 4.3); `source` is what `showPopover({ source })` gets (section 2.6 of
 Popover: it must be inside any open popover the region is in, so that the parent stays open).
 
 ### 3.2 `Menu.ContextTrigger`
+
+```ts
+**Reset to `anchor`** (deviation 2, better than the first draft's "a Trigger click writes the
+anchor constant"): the Root resets the placement in `onDispatch` for every open that is not
+`openAt`'s (a `Menu.Trigger` click, a foreign invoker, mount reconciliation), and the Popup
+resets it once a shown point open is no longer visible (hidden and its exit animation over), so
+a controlled open that sends no dispatch is anchored too and a CSS exit never jumps back to the
+Trigger. Known gap (review L1, follow-up): a point open that was refused or rejected before it
+was shown keeps `data-context` and the point style on the closed popup until the next open, so
+`context` is better read as "the placement of the latest point open until it is reset" than as
+strictly committed.
 
 ```ts
 export interface MenuContextTriggerState {
@@ -339,7 +372,7 @@ Rendering per placement (the apply effect, the focus resolver and everything els
 | Placement | Inline style | `data-*` | `showPopover` `source` | `<style>` |
 | --- | --- | --- | --- | --- |
 | `anchor`, `side` set | `position-area`, `position-try-fallbacks` from `side` / `align` (Menu 3.3) | `data-side`, `data-align` | the Trigger (`triggerRef`), or none | no |
-| `point`, `side` set | `--menu-point-x`, `--menu-point-y`, `inset: auto`, `left: var(--menu-point-x)`, `top: var(--menu-point-y)`, `position-area: none`, `position-try-fallbacks` = `--fsui-menu-up, --fsui-menu-left, --fsui-menu-up-left` (odd generations: `--fsui-menu-left, --fsui-menu-up, --fsui-menu-up-left`, section 4.3) | `data-context` | the region | yes (4.2) |
+| `point`, `side` set | `--menu-point-x`, `--menu-point-y`, the four inset longhands (`top: var(--menu-point-y)`, `right: auto`, `bottom: auto`, `left: var(--menu-point-x)`; longhands rather than `inset: auto` + two, which is equivalent and avoids React's warning about a shorthand and its longhands changing together, deviation 3), `position-area: none`, `position-try-fallbacks` = `--fsui-menu-up, --fsui-menu-left, --fsui-menu-up-left` (odd generations: `--fsui-menu-left, --fsui-menu-up, --fsui-menu-up-left`, section 4.3) | `data-context` | the region | yes (4.2) |
 | `point`, `side={null}` | `--menu-point-x`, `--menu-point-y` only | `data-context` | the region | no |
 | `anchor`, `side={null}` | none | none | the Trigger, or none | no |
 
@@ -441,19 +474,25 @@ somewhere else" and native menus simply appear at the new point. Two engine fact
   them can fix a given overflow, and the third is needed only when neither does).
 - Moving the point while the popup stays shown keeps the flip too (stability, by spec).
 
-So a move is: the ContextTrigger writes a new `point` placement (new `generation`,
-`requestOpen` is a no-op because `true` is already intended, no `openChangeAction`); the commit
-renders the new custom properties and the respelled fallbacks; the Popup's apply effect sees
-committed open, shown, and a `generation` it has not shown yet, and **re-shows** the popup:
-`hidePopover()` + `showPopover({ source })` under the hook's `opening` flag, with the focus
-resolver run again (first item, quiet or ring by the new modality). The platform coalesces the
-two toggles into one `toggle` with `oldState === newState === "open"`, so no `"dismiss"`
-notification fires and the `beforetoggle(closed)` bookkeeping (`awaitingClose`,
-`focusWasInside`) is consumed by that same event. Items keep their state (nothing unmounts), a
-pending item action keeps running, no `<ViewTransition>` runs (there is no React open or
-close), and the pointer capture taken in the handler covers the `pointerup` as for a fresh
-open. A move during a pending open (the items are still loading) is just the latest point: the
-open commit renders it.
+So a move is: the ContextTrigger writes a new `point` placement (new `generation`, written
+urgently, 3.1; `requestOpen` is a no-op because `true` is already intended, no
+`openChangeAction`); the commit renders the new custom properties and the respelled fallbacks;
+the Popup's apply effect sees committed open, shown, and a placement key it has not shown yet,
+and **re-shows** the popup: `hidePopover()` + `showPopover({ source })` under the hook's
+`opening` flag, with the focus resolver run again (first item, quiet or ring by the new
+modality). The platform coalesces the two toggles into one `toggle` with `oldState ===
+newState === "open"`, so no `"dismiss"` notification fires and the `beforetoggle(closed)`
+bookkeeping (`awaitingClose`, `focusWasInside`) is consumed by that same event. **A re-show does
+not advance the open generation** (the hook's `reshowing` flag skips `nextOpenGeneration()`,
+deviation 4): otherwise an item action pending across the move would drop its close through
+`closeStackLater`. Items keep their state (nothing unmounts), a pending item action keeps
+running, no `<ViewTransition>` runs (there is no React open or close), and the pointer capture
+is taken in the handler as for a fresh open and **re-taken after the re-show** with the
+`pointerId` kept in the placement (deviation 9: defensive, in case an engine drops capture on
+hide; a no-op with no button down, and the `NotFoundError` for a lifted touch is caught). An
+Android `contextmenu` that arrives after the timer already opened the menu is handled as a
+move at the same point: no native menu, no second dispatch. A move during a pending open (the
+items are still loading) is just the latest point: the open commit renders it.
 
 If a probe shows that respelling `position-try-fallbacks` while the popup stays shown already
 clears the remembered option (the spec text allows that reading; the research verified it only
@@ -537,7 +576,7 @@ nowhere; a context-only Root has no Trigger and the rule blurs nothing.
 | --- | --- | --- |
 | `open` | library (Root; browser for dismissals, as Menu) | `ContextTrigger` `data-open` (optimistic), `Trigger` as Menu, `Root.children(state)` |
 | `pending` | library (Root's transition) | `ContextTrigger`, `Trigger` `data-pending` |
-| `context` | library (Root placement) | `Popup` `data-context` (committed), `Root.children(state).context` (optimistic) |
+| `context` | library (Root placement, written urgently) | `Popup` `data-context` (from the point open's request until the popup is hidden and its exit is over, 3.1), `Root.children(state).context` (optimistic open and a point placement) |
 | placement point | library (Root placement) | `Popup` inline `--menu-point-x` / `--menu-point-y` |
 | `disabled` | prop | `ContextTrigger` `data-disabled` |
 | long-press in progress | library, region-local ref | nothing (no attribute for a gesture that may not happen; conventions 4.2) |
@@ -646,7 +685,7 @@ pointer timing (`contextmenu` between `pointerdown` and `pointerup`).
    as `details.event`, quiet focus, `setPointerCapture(id)` (the finger is still down), the
    one-shot click swallow armed. Commit, `showPopover`. The finger lifts: `pointerup` on the
    popup (capture) → WebKit's pointer-based dismiss finds a popover → stays open. No click is
-   synthesised after a long-press; the swallow disarms at the next `pointerdown`.
+   synthesised after a long-press; the swallow is disarmed one task after that `pointerup` (H1).
 6. **Right-click in a text field inside the region.** Target is a `<textarea>`,
    `editableTargets` is `"native"` → the region returns without preventing; the browser's menu
    opens. If this Root's menu was open, the document listener (unmarked event) closed it first.
@@ -686,21 +725,23 @@ export function FileRow({ file }: { file: File }) {
         <td>{file.size}</td>
         <td>
           <Menu.Trigger className="icon-btn" aria-label={`Actions for ${file.name}`}><DotsIcon /></Menu.Trigger>
+          <Menu.Popup className="menu" align="end">            {/* in the last cell: valid table markup */}
+            <Menu.Item action={renameFile.bind(null, file.id)}>Rename</Menu.Item>
+            <Menu.Item action={archiveFile.bind(null, file.id)}>
+              {({ pending }) => (pending ? "Archiving…" : "Archive")}
+            </Menu.Item>
+          </Menu.Popup>
         </td>
       </Menu.ContextTrigger>
-      <Menu.Popup className="menu" align="end">
-        <Menu.Item action={renameFile.bind(null, file.id)}>Rename</Menu.Item>
-        <Menu.Item action={archiveFile.bind(null, file.id)}>
-          {({ pending }) => (pending ? "Archiving…" : "Archive")}
-        </Menu.Item>
-      </Menu.Popup>
     </Menu.Root>
   );
 }
 ```
 
 One Root, two ways in: the button opens anchored below it (`align="end"`), a right-click
-anywhere on the row opens at the pointer, Shift+F10 on the button opens with the ring. The
+anywhere on the row opens at the pointer, Shift+F10 on the button opens with the ring. Events
+inside the menu bubble to the row: a row `onClick` or `:hover` rule must check `event.target`
+or `:not(:has([popover]:popover-open))` (review L3). The
 button is the required alternate path (section 12), and it gives keyboard and screen-reader
 users a focusable target inside the region.
 
@@ -789,12 +830,14 @@ menu). The Menu page gets one paragraph and a link.
 
 ### 13.1 jsdom (`menu-context-trigger.test.tsx`)
 
-The Popover shim (coalesced `toggle`, recorded `source`) covers the popover half.
-`setPointerCapture` is stubbed on `HTMLElement.prototype` by the shim (jsdom lacks it) and
-spied. `contextmenu` is dispatched as a `PointerEvent` (`new PointerEvent("contextmenu", {
-bubbles: true, cancelable: true, clientX, clientY, button: 2, buttons: 2, pointerId })`;
-jsdom's `PointerEvent` lacks `pointerType` / `pointerId` in some versions: the shim fills them).
-Fake timers for the long-press.
+The Popover shim (coalesced `toggle`, recorded `source`) covers the popover half and is
+unchanged. `setPointerCapture` is stubbed and spied **in the test file itself**, not in the
+shim (deviation 10: the Slider and NumberField suites install their own tracking stubs only
+when the method is missing, and a shim stub broke four of their rows). `contextmenu` is
+dispatched as a `PointerEvent` (`new PointerEvent("contextmenu", { bubbles: true, cancelable:
+true, clientX, clientY, button: 2, buttons: 2, pointerId })`; jsdom 30's `PointerEvent` has
+`pointerId` / `pointerType`, so nothing is filled). Fake timers for the long-press. jsdom has no
+`isContentEditable`; the editable check falls back to `[contenteditable]` there.
 
 | Row | Tests |
 | --- | --- |
@@ -804,7 +847,7 @@ Fake timers for the long-press.
 | Pointer capture | `setPointerCapture(pointerId)` called on the popup element **synchronously during the `contextmenu` dispatch** (assert from inside a listener registered after the region's, or by the spy's call order against `showPopover`) when `buttons !== 0`; not called when `buttons === 0`; a throwing stub is swallowed. |
 | `defaultPrevented` / nesting | An already-prevented `contextmenu` opens nothing; two nested regions: the inner opens and the outer does not; the inner `disabled` → the outer opens and the inner stays closed, `data-disabled` on the inner; a consumer `onContextMenu` on a child calling `preventDefault()` keeps both closed. |
 | Editable targets | `contextmenu` targeted at an `<input type="text">`, a `<textarea>`, a `contenteditable` child and a child of a `contenteditable`: nothing opens, the event is not prevented (default); `editableTargets="menu"`: opens; `<input type="checkbox">` and `<input type="button">`: opens by default. |
-| Long-press (both pointer types) | `pointerdown` (`touch`, primary) + 500 ms → open with `details.event` the `pointerdown`, quiet focus, `setPointerCapture` called; `longPressDelay={300}`; cancelled by `pointerup`, `pointercancel`, a `pointermove` 11 px away (not 9 px), a second `pointerdown`, a `contextmenu` during the gesture (which opens once, no double dispatch); a mouse `pointerdown` starts no timer; a `disabled` region none; the next document `click` after a long-press open is `defaultPrevented` and the one after that is not; a `pointerdown` disarms the swallow. |
+| Long-press (both pointer types) | `pointerdown` (`touch`, primary) + 500 ms → open with `details.event` the `pointerdown`, quiet focus, `setPointerCapture` called; `longPressDelay={300}`; cancelled by `pointerup`, `pointercancel`, a `pointermove` 11 px away (not 9 px), a second `pointerdown`, a `contextmenu` during the gesture (which opens once, no double dispatch); a mouse `pointerdown` starts no timer; a `disabled` region none; a `pointerdown` inside this Root's popup none. Swallow (H1): the document `click` in the release's task after a long-press open is `defaultPrevented`; a click one task after the `pointerup` is not; **Enter on an item after a long-press open and a `pointerup` activates it** (the `element.click()` path is not swallowed); a `keydown` disarms; closing the menu disarms; a `pointerdown` disarms. Nesting (M1): a long-press on an item of a menu rendered inside the region (another Root's Trigger + Popup, opened) does not open the region's menu and does not close the inner one; an outer region does not time a press the inner region claimed; a disabled inner region or an unclaimed editable target falls through to the outer region. |
 | Move | A second `contextmenu` inside the region while open: no `openChangeAction` dispatch; after the commit the inline variables are the new point and the fallback list is the other spelling; the shim saw `hidePopover` then `showPopover({ source })` once each (or, with the respell-only implementation, neither: assert the spelling and the focus); the first item is focused again; a pending item action keeps `data-pending`; a move during a pending open (deferred `openChangeAction`): on resolve the popup shows at the latest point, one `showPopover`. |
 | Outside close (every menu) | With the menu open (opened from a Trigger **and**, separately, from the region): a `contextmenu` on the document body → `hidePopover` at once (before any `await`), `openChangeAction(false, "dismiss")` after the shim's `toggle`; a middle `pointerdown` outside likewise; a `contextmenu` inside the popup → `defaultPrevented`, no hide, no move; a `contextmenu` on an editable target inside the region while open → hide (unmarked event); a `contextmenu` with `stopPropagation()` in a child → nothing (documented cost); listeners are removed after close (dispatch after close → no further calls); a submenu installs none. |
 | Dual-trigger Root | Trigger click → anchored inline style, `data-side`, `showPopover({ source: trigger })`; region → point style, `data-context`, `showPopover({ source: region })`; Trigger `aria-expanded="true"` and `data-open` during a context open; Trigger click while context-open → `requestClose` (`"activate"`); a context open after a Trigger open renders the point style (placement switches both ways); two ContextTriggers in one Root: the right-clicked one is the `source`. |
@@ -831,7 +874,7 @@ assert the documented degraded behaviour rather than skipping.
 | Row | Assertion | Engine branches |
 | --- | --- | --- |
 | Open at the pointer | Right-click at (x, y) inside a region in the middle of the viewport: `:popover-open`, `getBoundingClientRect()` left / top equal (x, y) (±1 px), the first item is `document.activeElement` and does not match `:focus-visible`. | none |
-| Survives the pending `pointerup` | `mouse.move`, `mouse.down({ button: "right" })` (Linux CI: `contextmenu` fires here), the menu opens; `mouse.move` 60 px away; `mouse.up()`: the menu is still open. | none: all three must pass; this row is what the pointer capture buys in Firefox and WebKit. A second variant opens the menu near the bottom-right so that it flips away from the pointer, then releases in place. |
+| Survives the pending `pointerup` | `mouse.move`, `mouse.down({ button: "right" })` (Linux CI: `contextmenu` fires here), the menu opens; `mouse.move` 60 px away; `mouse.up()`: the menu is still open. | none: all three must pass; this row is what the pointer capture buys in Firefox and WebKit. A second variant opens the menu near the bottom-right so that it flips away from the pointer, then releases in place. A third (review L4, follow-up) is the move with the button still held: press at a new point while open, move away, release, still open (the re-capture of deviation 9). The right-click goes through the `mouse` browser command (`page.mouse` with frame-mapped points, `__tests__/browser-commands.ts`), not `userEvent`, because the rows need the press and the release apart; a bounded `mouse("up")` in `afterEach` releases a button a failed row left down (Firefox shares one mouse across files, #62). With `capturePointer` made a no-op, both variants fail in Firefox: the rows test the workaround, not timing (reviewer probe). |
 | Flips | Right-click at (viewport.width − 20, 100): the popup's right edge is at x; at (100, viewport.height − 20): its bottom edge at y; at the corner: both. | none |
 | Transformed ancestor | The region inside `transform: translate(50px, 30px)`: the popup's top-left equals the click point (the top layer ignores the transform). | none (this row is why S4 was chosen over the virtual anchor) |
 | Re-open at a new point | Open at the corner (flipped), then right-click at (300, 250): the popup's top-left is (300, 250), not the stale flipped position. | none |
@@ -845,7 +888,7 @@ assert the documented degraded behaviour rather than skipping.
 | Submenu | ArrowRight on the SubmenuTrigger of a context-opened menu opens the submenu beside it. | none (Menu's rows cover the rest) |
 | Long-press | Dispatch a `pointerdown` with `pointerType: "touch"` and wait 600 ms real time: open; then a synthetic `pointerup` on the region: still open (the swallow and capture paths run; `setPointerCapture` on a synthetic pointer throws and is swallowed). | none; a real touch cannot be produced on desktop engines (research), so this row guards the wiring only. Chromium additionally tries CDP `Input.dispatchTouchEvent` `touchStart` held 600 ms and asserts open **if** it produced a `pointerdown` (recorded by a listener), else asserts that no `pointerdown` was seen (the row never skips silently). |
 | Editable target | Right-click in a `<textarea>` inside the region: the custom menu does not open (the native one does, unobservable); with `editableTargets="menu"` it opens. | none |
-| ViewTransition | With `transition`: a context open calls `startViewTransition` once; a move zero times; an outside right-click close zero times; item activation once. Without `transition`: zero. | assert on all three |
+| ViewTransition | With `transition`: a context open calls `startViewTransition` once; a move zero times; an outside right-click close **once** (deviation 8: as Escape in `menu.browser.test.tsx`, the dismissal's notification commit runs a view transition with the popup already hidden; the first draft said zero); item activation once. Without `transition`: zero. | assert on all three |
 | `<style>` once | Two Roots opened from their regions: one `<style>` in `<head>`; the computed `position-try-fallbacks` of the popup names the library options. | none |
 | Exit animation | After the outside right-click close with the docs CSS and no `transition`: items held until `getAnimations()` settle. | Firefox: no CSS exit, unmount with the commit (as Menu). |
 
@@ -858,12 +901,13 @@ packages/ui/src/menu/
   menu-context-trigger.tsx   # "use client": the region: contextmenu, long-press, modality refs, capture, click swallow
   menu-root.tsx              # + placement state, openAt(), state.context
   menu-popup.tsx             # + point style, <style>, data-context, onContextMenu, outside listeners, reshow on generation change
-  menu-context.ts            # + placement, openAt, markHandled / isHandled (a WeakSet of events)
+  menu-context.ts            # + MenuPlacement / ANCHOR_PLACEMENT, openAt / resetPlacement in the context, markHandled / isHandledBy (a WeakMap event → root popup ref), claimedPresses (M1), MenuRegionContext (deviation 6)
   menu-context-trigger.test.tsx, menu-context-trigger.browser.test.tsx
 packages/ui/src/internal/
   anchor-position.ts         # + MENU_POINT_RULES, MENU_POINT_FALLBACKS (two spellings), MENU_POINT_X / _Y names (directive-free)
   use-popover-popup.ts       # + `source` option (per-open source element), `reshow()` (hide + show under the opening flag)
-packages/ui/src/__tests__/popover-shim.ts  # + setPointerCapture stub, PointerEvent fill
+packages/ui/src/__tests__/browser-commands.ts  # + `mouse` command (page.mouse with frame-mapped points); popover-shim.ts unchanged
+packages/ui/vitest.config.ts                   # registers the command
 ```
 
 - **`usePopoverPopup` extension points.** `source?: () => HTMLElement | null` replaces the
@@ -876,21 +920,30 @@ packages/ui/src/__tests__/popover-shim.ts  # + setPointerCapture stub, PointerEv
   shown (a ref written after every `showPopup`). The jsdom shim already coalesces toggles.
 - **Placement state in the Root**, not a ref: the Popup must *render* the point (inline style,
   `data-context`, the `<style>`), and a DOM write before `showPopover()` would fight React's
-  `style` prop on the next render. `openAt` writes it with `startTransition` so it joins the
-  open's transition commit; a move is the same write with `requestOpen` a no-op.
+  `style` prop on the next render. `openAt` writes it **urgently** (3.1, deviation 1) and sets
+  a `pointDispatch` flag around its `requestOpen` so `onDispatch` knows not to reset to
+  anchored; a move is the same write with `requestOpen` a no-op. The Popup re-shows when the
+  shown placement key changes and resets the placement once a shown point open is no longer
+  visible (deviation 2).
 - **The document listeners** live in Menu.Popup (top-level only), installed in `onToggle` for
   `newState === "open"` and removed for `"closed"`: `contextmenu` (bubble; skip when
   `rootPopup.contains(target)` or `isHandled(event)`), `pointerdown` (`button === 1`, outside
   the tree). Both call `rootPopup.hidePopover()` directly, like the Tab-out path (Menu 2.2). The
-  handled-mark is a module-level `WeakSet<Event>` in `menu-context.ts`, written by the region
-  before `openAt`.
-- **Modality refs** in the region: `lastPointerDown` / `lastKeyDown` (`performance.now()`),
-  `pointerdown` from the owned handler, `keydown` from a ref-attached listener (not an owned
-  prop). Keyboard when `button === -1 || lastKeyDown > lastPointerDown`.
-- **Long-press**: a `useDelayedPair`-style single timer slot (reuse `internal/use-delayed-pair.ts`
-  if its shape fits; otherwise a local ref timer), start point and `pointerId` in a ref; the
-  owned pointer handlers; the one-shot click swallow is a `document.addEventListener("click",
-  …, { capture: true, once: true })` paired with a `pointerdown` disarm.
+  handled-mark is a module-level `WeakMap<Event, popupRef>` in `menu-context.ts` (keyed by the
+  event, valued by the root popup's ref object, which is stable across re-renders where the
+  context value is not), written by the region before `openAt`. Every `Menu.Popup` also adds
+  the `pointerdown`s inside it to the `claimedPresses` set (M1), through a native listener.
+- **Modality refs** in the region: a sequence counter stamped into `lastPointerDown` (the owned
+  `onPointerDown`) and `lastKeyDown` (a ref-attached **capture** `keydown` listener, not an
+  owned prop, so a descendant's `stopPropagation()` does not hide the key). Keyboard when
+  `button === -1 || lastKeyDown > lastPointerDown`. Review L2 (follow-up): the `pointerdown`
+  stamp should move to the same capture listener, since a descendant that stops `pointerdown`
+  propagation (a drag handle) currently hides the press and a later right-click shows the ring.
+- **Long-press**: a local ref timer with the start point and `pointerId`; the owned pointer
+  handlers; the one-shot click swallow is a document capture `click` listener plus the disarm
+  set of 2.2 (one task after the pointer's `pointerup` / `pointercancel`, `keydown`, close,
+  the next `pointerdown`, the swallowed click itself), all removed on unmount and when the
+  region becomes `disabled` mid-gesture.
 - **`isEditableTarget(target)`**: `target instanceof Element` and (`closest("textarea")`, or
   `closest("input")` whose `type` is not in the non-text set, or `target.isContentEditable`).
 - **The `<style>` element** is rendered inside the popup element's children (React hoists it;
@@ -945,3 +998,50 @@ anchor (4.5) is rejected.
 Earlier product-owner decisions on the research's open questions, built into the design:
 editable targets keep the native menu by default with an opt-in; press-drag-release deferred;
 shared items through one Root with two triggers; the research recommendations followed.
+
+---
+
+## Review corrections (2026-10-22)
+
+From `memo/reviewer/context-menu.md` (review of 27c6c11, dc64c68, 9c69548, 1cbabf4; verdict
+"acceptable with fixes") and the developer's notes in `memo/developer/context-menu.md`. Each
+item is folded into the section named; this list is the audit trail. Fix decisions were taken
+by the product owner.
+
+| Item | Correction | Section |
+| --- | --- | --- |
+| H1 (must fix) | The long-press click swallow outlived the gesture (no click follows a long-press on iOS) and ate the next keyboard or AT activation, since items activate through `element.click()`. It is now disarmed one task after the `pointerup` / `pointercancel` of that pointer, on `keydown`, and when the menu closes, with jsdom rows. | 2.2, 13.1, 14 |
+| M1 (must fix) | A long-press on an item of another Root's menu rendered inside the region started the region's timer, so the outer menu opened and the inner closed (the playground's nested card had this shape). Every `Menu.Popup` claims the `pointerdown`s inside it, so no region times them; jsdom row. | 2.2, 2.4, 14 |
+| L1 (follow-up) | A refused or rejected point open that was never shown keeps `data-context` and the point style on the closed popup until the next open; `context` reads "the latest point placement until reset" rather than strictly committed. Fix candidate: reset when nothing is intended or in flight and the popup is not visible. | 3.1, 6 |
+| L2 (follow-up) | The `pointerdown` modality stamp is in the bubble-phase owned handler while `keydown` is a capture listener; a descendant that stops `pointerdown` propagation makes a later right-click show the ring. Cosmetic; move the stamp to the capture listener. | 14 |
+| L3 | Docs: with the Popup in a row's cell, events inside the menu bubble to the row (`onClick`, `:hover`); one sentence in the docs and in 1 / 11.1. | 1, 11.1 |
+| L4 (follow-up) | Browser tests: restore a bounded right-button release in `afterEach` (Firefox shares one mouse, #62); add the "move with the button still held" row for the re-capture. | 13.2 |
+| L5 | Design text: the `<tr>` example, the urgent placement write, the re-show keeping the open generation, the long-press nesting rule, the test-local `setPointerCapture` stub, the ViewTransition count of 1, `MenuRegionContext`. All folded. | 1, 2.2, 2.4, 3.1, 4.3, 13.1, 13.2, 14 |
+
+## Accepted deviations (product owner, 2026-10-22)
+
+All ten accepted as implemented:
+
+1. **Placement is written urgently**, not in a transition: React's entanglement with a pending
+   async action would freeze a move at the old point; placement is geometry, not a consumer
+   state change (3.1).
+2. **Anchored reset in `onDispatch` for every non-point open, and in the Popup once a shown
+   point open is no longer visible** (exit animation over), so controlled and platform opens are
+   anchored and a CSS exit does not jump; needs L1's extra condition (3.1).
+3. **Inset longhands** instead of `inset: auto` plus `left` / `top`: equivalent, and no React
+   warning about a shorthand changing with its longhands (3.3).
+4. **A re-show does not advance the open generation** (`reshowing` flag): an item action
+   pending across a move keeps its close (4.3).
+5. **The Popup may be inside the region**: the sibling `<div>` under `<tbody>` was invalid HTML
+   and broke SSR; the region ignores events from its own popup; docs put the Popup in the last
+   cell (1, 11.1; L3 for the docs).
+6. **`MenuRegionContext` silences the nested-Root warning** for a Root inside a region (2.4).
+7. **The inner region wins for long-press too**, through the claimed-`pointerdown` set,
+   mirroring `contextmenu`'s `defaultPrevented` rule (2.2, 2.4).
+8. **The ViewTransition row counts 1 for the outside close**: the dismissal's notification
+   commit runs a view transition with the popup already hidden, as Escape does (13.2).
+9. **The move re-captures the pointer** after the re-show, with the `pointerId` kept in the
+   placement: defensive and harmless (4.3).
+10. **The jsdom `setPointerCapture` stub is local to the test file**, not the shim: the Slider
+    and NumberField suites install their own stubs only when the method is missing (13.1). The
+    `mouse` browser command (`page.mouse`, frame-mapped) is generic and bounded.

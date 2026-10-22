@@ -1233,7 +1233,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `paused` | boolean | Toast `Viewport` | A viewport-wide timer pause holds (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
 | `type` | string | Toast `Root` | The toast's consumer-defined `type` (`"error"`, `"success"`, …), an enum whose vocabulary is the consumer's. |
 | `complete` | boolean | Progress, every part | The clamped value reached `max` (#68). |
-| `context` | boolean | `Menu.Popup` | The current open came from a `Menu.ContextTrigger` and the popup is placed at a point: `--menu-point-x` / `--menu-point-y` are set inline and `data-side` / `data-align` are absent (#45). Committed, like the Popup's `open`. |
+| `context` | boolean | `Menu.Popup` | The current open came from a `Menu.ContextTrigger` and the popup is placed at a point: `--menu-point-x` / `--menu-point-y` are set inline and `data-side` / `data-align` are absent (#45). Written urgently with the placement (geometry, not a dispatch): present from the point open's request until the popup is hidden and its exit is over (`design/components/context-menu.md` 3.1). |
 | `region` | `"optimum" \| "suboptimum" \| "even-less-good"` | Meter, every part | HTML's meter region for the value against `low` / `high` / `optimum`, the platform's words (#68). |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
