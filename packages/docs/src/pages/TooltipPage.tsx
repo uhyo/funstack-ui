@@ -137,9 +137,10 @@ export function TooltipPage() {
               <>
                 Renders <code>interestfor</code> and <code>interest-delay-start/end</code> so the
                 browser owns hover, focus, Escape and long-press. Where the element implements{" "}
-                <code>interestForElement</code> (Chromium), the library attaches no listeners;
-                elsewhere the attribute is ignored and the JS path runs. Pair with{" "}
-                <code>Popup experimental_hint</code>. Also renders the{" "}
+                <code>interestForElement</code> (Chromium), the library attaches no interaction
+                listeners (only a passive <code>beforetoggle</code> that writes{" "}
+                <code>data-instant</code>); elsewhere the attribute is ignored and the JS path runs.
+                Pair with <code>Popup experimental_hint</code>. Also renders the{" "}
                 <code>data-fsui-tooltip-trigger</code> marker and the skip-delay stylesheet (see
                 Skip-delay).
               </>
@@ -430,7 +431,7 @@ export function TooltipPage() {
           ],
           [
             "`experimental_interestFor`",
-            "native trigger, no JS listeners",
+            "native trigger, no JS interaction listeners",
             "attribute ignored, JS path",
             "attribute ignored, JS path",
           ],

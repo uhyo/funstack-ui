@@ -54,7 +54,7 @@ function FlagsToggle({ flags, setFlags }: { flags: Flags; setFlags: (f: Flags) =
       <p className="tooltip-note">
         This browser {nativeInterest ? "supports" : "does not support"} <code>interestfor</code>
         {nativeInterest
-          ? ": with the flag on, the browser owns hover and focus and the library attaches no listeners."
+          ? ": with the flag on, the browser owns hover and focus and the library attaches no interaction listeners (only a passive beforetoggle that writes data-instant)."
           : ": the attribute is rendered but ignored, and the JS path runs underneath."}
       </p>
     </fieldset>

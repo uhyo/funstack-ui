@@ -912,7 +912,10 @@ describe("warm opens carry data-instant (wave 12, #93)", () => {
 
   // With the flags in Chromium the browser performs the warm open (`hint` stacking closes A after
   // B's `beforetoggle`) and the library's `beforetoggle` listener is the only JS; elsewhere the JS
-  // path runs under the same markup.
+  // path runs under the same markup. Firefox's flagged rows are the only coverage of the JS path
+  // with a real `hint` popup on a warm open (the show's `hint` stacking already hid A, so the
+  // guarded `hidePopover()` is skipped): the jsdom shim has no `hint` stacking, and WebKit treats
+  // `hint` as `manual`.
   it.each([
     ["baseline markup", false],
     ["experimental_interestFor markup", true],

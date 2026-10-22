@@ -33,8 +33,9 @@ export interface TooltipInteractionOptions {
  * moment (the skip-delay condition); on a close, never. `beforetoggle` is synchronous and precedes
  * the top-layer insertion, so the open's first style recalc already sees the attribute and
  * `.tip[data-instant] { transition: none }` creates no transition (a later write would start and
- * cancel one). A DOM write, never React state (conventions 7.4). The only listener on the native
- * path; it handles and cancels nothing.
+ * cancel one). A DOM write, never React state (conventions 7.4). This hook's only listener on the
+ * native path (the popup also has `useResolvedPlacement`'s `toggle`); it handles and cancels
+ * nothing.
  */
 export function useTooltipInteraction(
   trigger: HTMLElement | null,
@@ -60,7 +61,10 @@ export function useTooltipInteraction(
       );
     };
     popup.addEventListener("beforetoggle", onBeforeToggle);
-    const detach = attachInteraction(trigger, popup, disabled, interestForRequested, getDelays);
+    // The effect event is called (from the timers this effect sets up), never passed itself.
+    const detach = attachInteraction(trigger, popup, disabled, interestForRequested, () =>
+      getDelays(),
+    );
     return () => {
       detach?.();
       popup.removeEventListener("beforetoggle", onBeforeToggle);
@@ -89,8 +93,8 @@ function attachInteraction(
   if (trigger === null) return;
   // Native path (conventions 8): only when the flag put `interestfor` on the element, and per
   // element, so a `render`ed `<span>` (no `interestForElement`) keeps the JS path. No
-  // interaction listener is attached here (only the caller's `beforetoggle`), Escape included: the browser's interest handling and the `hint` close watcher
-  // decide, so in Chromium an Escape that closes the tooltip may also close an enclosing modal
+  // interaction listener is attached here (only the caller's `beforetoggle`), Escape included:
+  // the browser's interest handling and the `hint` close watcher decide, so in Chromium an Escape that closes the tooltip may also close an enclosing modal
   // `<dialog>` (the library cannot `preventDefault()` a keydown it never sees).
   if (
     interestForRequested &&
