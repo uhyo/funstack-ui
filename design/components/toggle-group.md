@@ -935,7 +935,10 @@ both resolve → committed [] (latest wins)
 > **Superseded (2026-10-22, Button #79).** With `Button` in place of `Toolbar.Button` the second
 > click is **ignored** while the first run is pending (`aria-disabled="true"` meanwhile), so the
 > walkthrough below no longer describes a toolbar button; see `design/components/button.md` 5.2
-> and 10 (walkthrough 2). Kept as the historical record of the #66 design.
+> and 10 (walkthrough 2). With #81 (wave 9) the same holds for every pure trigger
+> (`Dialog.Close`, `Popover.Close`, `Menu.Item`, `Toast.Action`; `button.md` 16), so "both runs
+> execute" describes no part of the library any more. Kept as the historical record of the #66
+> design.
 
 `useActionTrigger`: both runs execute; `data-pending` stays until both settle; the second run's
 rejection is React's route, the first's is surfaced from render if it rejects. No optimistic state

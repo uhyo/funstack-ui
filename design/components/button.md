@@ -483,7 +483,9 @@ them, for these reasons:
 | `Toolbar.Button` | Removed; `Button` replaces it (section 7.3), so a toolbar's command button is guarded in wave 8. | |
 | `Form.Submit` | **Unchanged, by design** (section 6.4). | |
 
-The follow-up is **#81**: switch `Dialog.Close`, `Popover.Close`, `Menu.Item` to
+**#81 is designed in section 16 (wave 9, 2026-10-22)**, which supersedes the rest of this
+subsection: the four pure triggers (`Toast.Action` included) are guarded and the guard is the
+hook's default. The follow-up as proposed here was: switch `Dialog.Close`, `Popover.Close`, `Menu.Item` to
 `useActionTrigger({ ignoreWhilePending: true })`, render `aria-disabled` while pending, make
 `menu-dom.ts` key disabled on `data-disabled`, rewrite the re-run walkthroughs and test rows in
 dialog.md, popover.md, menu.md and toggle-group.md 11.5, then make `ignoreWhilePending` the
@@ -1093,3 +1095,199 @@ the review's open items and the developer's deviations, folded into the sections
 ## Open questions
 
 None at present.
+
+---
+
+## 16. Wave 9, #81: re-entry for the other pure triggers
+
+Status: **design amendment, accepted by the user with wave 9 (tracker #85), 2026-10-22.** Applies
+the rule of 5.2 and conventions 2.5 to every pure trigger and settles the hook's default.
+
+### 16.1 Which `useActionTrigger` users are pure triggers
+
+| User | What `run` wraps | Pure trigger? | #81 |
+| --- | --- | --- | --- |
+| `Button` | its `action` | yes | guarded since #79 |
+| `Dialog.Close` | `action`, then the close | yes | **guard** |
+| `Popover.Close` | `action`, then the hide | yes | **guard** |
+| `Menu.Item` | `action`, then the menu close | yes | **guard** |
+| `Toast.Action` | `action`, then the toast close | yes: an Undo / Retry / View run twice is a duplicate side effect (toast.md 4.2 called it "harmless for an idempotent Undo"; it is not harmless for Retry) | **guard** |
+| `Slider.Root` (`runStep`) | each step's `valueChangeAction` | **no**: a continuous control dispatches one step per pointer move or key press and every step must run (conventions 2.1, 10.1 "Continuous control"); the hook is used for per-step `pending` and superseded-rejection surfacing only | unguarded, explicit |
+| `NumberField.Root` (`runStep`) | each step's `valueChangeAction` (press-and-hold) | **no**, as Slider | unguarded, explicit |
+
+### 16.2 The hook's default flips
+
+`ignoreWhilePending` becomes **`true` by default** and the option stays for the two continuous
+controls, which pass `ignoreWhilePending: false` with a comment ("a step is not a re-entry").
+Reasoning: five of seven users are pure triggers, the hook's own doc calls itself "the transition
+of a pure-trigger part", and the failure mode of a forgotten option should be the safe one (a
+guarded trigger) rather than the bug #79 exists to prevent (a duplicate side effect). The
+positional `useActionTrigger(openGeneration)` form is removed at the same time: every call site
+becomes the options object. `run` keeps returning `boolean`.
+
+### 16.3 Per-part behaviour
+
+Common to the four parts: while the part's own run is in flight (in-flight counter, never the
+rendered `pending`, 5.2), a click / Enter / Space starts nothing and is `preventDefault()`ed; the
+part renders `aria-disabled="true"` for exactly the renders where `data-pending` is set;
+`data-disabled` and `state.disabled` stay the consumer's `disabled`; every other listener keeps
+working. `aria-disabled` joins each part's owned keys. Walkthroughs that said "repeated clicks
+re-run the action; the first close wins" now read "a repeated click while pending is ignored";
+the superseded-rejection and overlap rows of each part become N/A with the #79 reason and are
+replaced by a Re-entry row (conventions 10.1).
+
+- **`Dialog.Close`** (dialog.md "Pending, in order"). The click is already always cancelled in
+  library mode; with `action`, `run` returning `false` makes the handler return before
+  `close()`. Pending spans the action **and** the close commit (entanglement), so the button is
+  `aria-disabled` until the dialog is closed; harmless, it is leaving. Without `action` nothing
+  changes (no run, no pending). The open-generation guard is unchanged. JS-free mode with
+  `action`: same guard before `dialog.close()`.
+- **`Popover.Close`** (popover.md 3.4): identical shape; pending spans the action and the hide.
+- **`Menu.Item`** (menu.md 2.3, 12). The activation path (`useMenuItem`'s `activate`) calls
+  `run`; when it returns `false` the keydown / click is `preventDefault()`ed and nothing else
+  happens. The item renders `aria-disabled="true"` while pending **and `menu-dom.ts` must stop
+  reading `aria-disabled`**: `isDisabledItem(item)` keys on **`data-disabled`** (present exactly
+  when the item's `disabled` prop is set, which is what the arrows, `edgeItem` for Home / End /
+  the open focus, and typeahead mean by "disabled"). `useMenuItem` already emits
+  `data-disabled`; `Menu.SubmenuTrigger` too. Consequence: a pending item is still the "first
+  enabled item" for Home and for a re-open, which is right (it is pending, not disabled).
+  `closeOnActivate={false}` items (a "Refresh" item) are the ones where the guard is visible:
+  the item stays, shows `data-pending`, and a second Enter does nothing until it settles.
+  `CheckboxItem` / `RadioItem` are state owners (`useControllableAction`), not pure triggers:
+  unchanged, latest intent wins.
+- **`Toast.Action`** (toast.md 4.2, walkthrough 5). `run` returning `false` returns from the
+  handler. `aria-disabled` while pending is a new owned key (the part owned no `disabled`
+  before; `rest.disabled` stays pass-through and the no-dispatch check on it stays). The Root's
+  `actionPending` (timer pause) is unchanged. Walkthrough 5 ("Undo clicked twice") becomes "the
+  second click is ignored; one dispatch, one close".
+
+### 16.4 Test rows per part
+
+The old rows named here are rewritten, not deleted, so the suites keep their coverage count.
+
+**`dialog.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| D1 | Re-entry (library mode, with `action`) | Deferred `action`: a second click, Enter and Space leave it at one call, each is `defaultPrevented`, `aria-disabled="true"` and `data-pending` are on and `data-disabled` is off; the button keeps focus; resolve → one `openChangeAction(false, "activate")`, one `close(value)`, attributes gone (the dialog is closed, so the button is gone with it in the usual harness; assert on the element reference). JS-free variant: one `dialog.close(value)`. |
+| D2 | Re-entry, same task | Two synchronous `fireEvent.click`s inside one `act`: one `action` call. |
+| D3 | No `action` | A Close without `action` clicked twice while the Root's close is pending: unchanged behaviour (`requestClose` no-op against `intended()`), no `aria-disabled` (no own run). |
+| D4 | Superseded rejection → N/A | `dialog.test.tsx:1240` ("with action: a superseded rejection still reaches the boundary") becomes a rejection row: the single run rejects → boundary above the Close, dialog stays open, a click after the boundary resets runs again. Top-of-file comment lists Overlap / Superseded rejection for the Close part as N/A (#79 reason). |
+| D5 | Stale close row (design table "Close part, stale close") | Unchanged except its last sentence: drop "a superseded click's rejection reaches the catcher". |
+| D6 | Owned `aria-disabled` | A `render` element's `aria-disabled` is removed when the Close is idle (owned `undefined`). |
+
+**`popover.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| P1 | Re-entry (library mode and JS-free mode, with `action`) | As D1 with `hidePopover` / `requestClose` (one `openChangeAction(false)` / one `hidePopover()`). |
+| P2 | Re-entry, same task | As D2. |
+| P3 | `popover.test.tsx:1360` ("a superseded rejection still reaches the boundary") | Becomes the single-run rejection row; N/A comment as D4. |
+| P4 | Owned `aria-disabled` | As D6. |
+
+**`menu.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| M1 | `menu.test.tsx:844` ("two activations run the action twice; the close happens once") | Rewritten: a deferred `action` on a `closeOnActivate` Item; a second Enter, Space and click leave it at one call and are `defaultPrevented`; the item has `aria-disabled="true"`, `data-pending`, no `data-disabled`; resolve → one `requestClose`, the menu closes. |
+| M2 | Re-entry on a `closeOnActivate={false}` Item | Deferred action: second activation ignored; resolve → attributes gone, menu still open, the next Enter runs again. |
+| M3 | Navigation ignores pending | While an Item is pending (`aria-disabled` on it): ArrowDown / ArrowUp from it move as from any item (they already did), **Home / End and a re-open treat it as enabled** (`edgeItem` keys on `data-disabled`): with the pending item first in the list, Home lands on it; a `disabled` first item is still skipped by Home / End / open (regression guard for the predicate change); typeahead still matches it. |
+| M4 | `menu.test.tsx:871` ("a superseded rejection reaches the boundary", Item) | Becomes the single-run rejection row (menu stays open, boundary above the item, the next activation runs after reset); N/A comment. `menu.test.tsx:1350` (RadioItem / CheckboxItem) is **unchanged**: state owners keep overlap and superseded rejection. |
+| M5 | Design table "Overlap" row (menu.md 966) | "Two Item clicks: action called twice, `requestClose` once effective" → "Two Item clicks: action called once (the second is ignored), one `requestClose`". The RadioItem half stays. |
+| M6 | `menu-dom.ts` unit | `isDisabledItem` is `true` for `data-disabled=""` and `false` for `aria-disabled="true"` without it. |
+
+**`toast.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| T1 | `toast.test.tsx:852` ("two Undo dispatches resolved out of order close the toast once") | Rewritten: a deferred Undo `action`; a second click leaves it at one call and is `defaultPrevented`; the Action has `aria-disabled="true"` and `data-pending`, the Root `data-pending`, the timer paused (existing assertion); resolve → one close (`"activate"`). |
+| T2 | Superseded rejection rows in that `describe` | Become the single-run rejection row (toast stays, boundary above the Viewport, as walkthrough 4); N/A comment for Overlap / Superseded rejection on `Toast.Action`. |
+| T3 | `Toast.Close` while Undo pending (walkthrough 6) | Unchanged: Close is not a `useActionTrigger` user. |
+| T4 | Owned `aria-disabled` | A `render` element's `aria-disabled` on an idle Action is removed. |
+
+**`use-action-trigger` and the continuous controls**
+
+| # | Row | Test |
+| --- | --- | --- |
+| H1 | Default | `useActionTrigger()` with no options ignores a second `run` while the first is in flight (`run` returns `false`), and runs it after settle; `{ ignoreWhilePending: false }` runs both. The existing superseded-rejection hook tests move under the `false` option. |
+| H2 | Slider / NumberField | `slider.test.tsx` and `number-field.test.tsx` step rows (two steps in flight, out-of-order resolution, superseded step rejection) pass unchanged with the explicit `false`; one new assertion per file: a second step dispatched while the first step's action pends is **called** (guards the explicit opt-out). |
+
+### 16.5 Docs
+
+Dialog, Popover, Menu and Toast pages: the sentence "repeated clicks re-run the action" becomes
+"a second click while pending is ignored and the button is `aria-disabled` meanwhile", with the
+non-awaiting spelling for "close now, work later" (menu.md 2.3 already shows it). Owned-keys
+lists gain `aria-disabled`. The "Pending & optimistic state" concept page gets one paragraph:
+every pure trigger ignores re-entry; state owners (Toggle, Tabs, Checkbox items) take every
+click and the latest intent wins. Changelog entry (behaviour change, not breaking).
+
+---
+
+## 17. Wave 9, #83: `disabled` on link and component renders, library-wide
+
+Status: **design amendment, accepted by the user with wave 9 (tracker #85), 2026-10-22.** Applies
+the conventions 1.2 rule of the #79 fold (a `disabled` part whose rendered element is not a host
+`<button>` renders `aria-disabled="true"`, not native `disabled`) to every part that owns
+`disabled` and accepts an arbitrary `render`.
+
+### 17.1 The sweep
+
+| Part | Today | Click handler always installed? | #83 |
+| --- | --- | --- | --- |
+| `Dialog.Close` | native `disabled`, owned | library mode or with `action`; JS-free mode without `action` is the browser's `request-close` command | **yes, when a click handler is installed**: `focusable = !isHostButton(render) && installClick`. In JS-free command mode a component render must render a `<button>` anyway (dev warning), and native `disabled` is what stops the command. |
+| `Popover.Close` | same | same | same |
+| `Dialog.Trigger` | native `disabled`, owned | library mode or non-modal; JS-free modal mode is the `show-modal` command | same condition (`installClick`) |
+| `Popover.Trigger` | native `disabled`, owned | library mode only; JS-free mode is `toggle-popover` | same condition (library mode) |
+| `Menu.Trigger` | native `disabled`, owned | always (`onClick` + `onKeyDown`) | **yes** |
+| `Toggle` | native `disabled`, owned | always | **yes** |
+| `ToggleGroup.Item` | native `disabled`, owned; roving skips `:disabled` | always | **yes**; a link / component Item that is disabled is then **reachable by the arrows** (the engine skips `:disabled` only), which is the APG Toolbar behaviour and acceptable for the rare non-button Item; row below records it |
+| `Combobox.Trigger`, `Combobox.Clear` | native `disabled`, owned (`tabIndex` owned too) | always | **yes** |
+| `NumberField.Increment` / `Decrement` | native `disabled` (also at bound / `readOnly`), owned | always (`useStepButton`) | **yes**; the at-bound case follows the same branch |
+| `Form.Submit` | native `disabled`, owned; **no click handler** | never: it is a native submitter | **no**. With `aria-disabled` a component render would still submit on click (nothing cancels it), and a link render is already a dev error ("only a submit button submits the form"). Native `disabled` is the only correct disabled state for a submitter; documented in its props table. |
+| `Select.Trigger` | native | must stay a `<button>` (conventions 1.2) | no (host button by contract) |
+| `Tabs.Tab`, `Accordion.Trigger`, `Menu.Item`, `Menu.CheckboxItem` / `RadioItem` / `SubmenuTrigger`, `Button` | `aria-disabled` already | | no change |
+| `Toast.Action`, `Toast.Close` | `disabled` is **pass-through** (not owned; the handler checks `rest.disabled`) | always | out of #83: they do not own `disabled`. Noted for a later "own `disabled` on the Toast parts" item; not a correctness bug today beyond the same link case, which the Toast parts never advertise. |
+| `Tooltip.Trigger` | renders no `disabled` attribute (`data-disabled` only; the Root's `disabled` switches the tooltip off) | | no change |
+
+Where the condition is "when a click handler is installed", the part computes `focusable` from
+the same `installClick` flag it already has, so the branch and the handler always agree: the
+handler is what makes `aria-disabled` safe (it returns before dispatch, and `preventDefault()`s
+so a link does not navigate), exactly as `Button` does.
+
+### 17.2 Shared mechanics
+
+- `isHostButton(render)` from `internal/render-element.ts` is the predicate (no `render`, the
+  function form, a host `"button"`), the same one `Button` uses.
+- In the focusable branch the part passes `disabled: undefined` (owned removal) and
+  `"aria-disabled": disabled ? true : undefined`; `data-disabled` and `state.disabled` are
+  unchanged. Parts that already own `aria-disabled` for another reason (`Menu.Trigger` does not;
+  none of the listed ones do) would merge the conditions.
+- The `onClick` guard `if (disabled) { event.preventDefault(); return; }` is already the shape in
+  `Toggle`, the Close parts and the Triggers (some return without `preventDefault()`; add it, so
+  a disabled link render does not navigate, as `Toolbar.Button` did in #66 and `Button` does).
+- No new prop: `focusableWhenDisabled` stays Button-only (the Toolbar context read is also
+  Button-only; a Toggle inside a Toolbar keeps native `disabled`, #66 decision 13).
+
+### 17.3 Test rows per part
+
+One jsdom row per part, in its own suite, plus the regression half:
+
+| Part | Row |
+| --- | --- |
+| `Dialog.Close`, `Popover.Close` | Library mode, `disabled` with `render={<a href="#x" />}` and with `render={<MyButton />}` (a component spreading onto a `<button>`): `aria-disabled="true"`, no `disabled` attribute, `data-disabled`, click `defaultPrevented` and no `openChangeAction` / `close` / `hidePopover`; `render={<button />}` and no `render`: native `disabled`, no `aria-disabled` (unchanged). JS-free mode without `action`, `render={<MyButton />}` disabled: native `disabled` (the command branch), `aria-disabled` absent. |
+| `Dialog.Trigger` | Library mode (modal and non-modal) and JS-free non-modal: link / component renders → `aria-disabled`, click cancelled, nothing opens; JS-free modal with a component render → native `disabled`. |
+| `Popover.Trigger` | Library mode: link / component renders → `aria-disabled`, click cancelled, no dispatch; JS-free mode with a component render → native `disabled`. |
+| `Menu.Trigger` | Link / component renders → `aria-disabled`; click, Enter, ArrowDown do not open; host button → native `disabled` (unchanged). |
+| `Toggle` | `disabled` with `render={<a href>}` / `render={<MyButton />}` → `aria-disabled`, no dispatch, `aria-pressed` still rendered, click `defaultPrevented`; host button unchanged. |
+| `ToggleGroup.Item` | Same, plus: a disabled link Item is reached by the arrows (documented), still never dispatches; a disabled host-button Item is skipped (unchanged). |
+| `Combobox.Trigger`, `Combobox.Clear` | Component render disabled → `aria-disabled`, `tabIndex` as before, click does nothing (no open / no clear). |
+| `NumberField.Increment` / `Decrement` | Component render: disabled by prop, by `readOnly`, and at the bound → `aria-disabled` and no step on click / pointerdown hold; host button → native `disabled` in all three (unchanged). |
+| `Form.Submit` | Regression: `disabled` with `render={<MyButton />}` renders native `disabled` and **no** `aria-disabled`; the props-table sentence "always native `disabled`: a submitter has no handler to honour `aria-disabled`" is in the docs. |
+| `Button` | Unchanged (#79 rows 1 and 2). |
+
+### 17.4 Docs
+
+Each affected page's `disabled` row gains the sentence "with a link or component `render`,
+`aria-disabled="true"` instead (the element stays focusable); native `disabled` on a `<button>`".
+Conventions 1.2's "the other `disabled` parts follow in a separate issue" is replaced by the list
+above. Changelog entry (behaviour change for link / component renders only).

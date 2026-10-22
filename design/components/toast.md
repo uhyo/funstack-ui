@@ -222,8 +222,11 @@ Rules:
 - the Action and the Root carry `data-pending`, and the Viewport pauses that toast's timer
   (a pending Undo must not vanish under the user);
 - the toast is **not** optimistically removed: a failed Undo must leave the toast on screen;
-- parts are never disabled while pending (conventions 3.6); a second click is a second dispatch
-  and latest intent wins (2.5), which for an idempotent Undo is harmless.
+- parts are never *natively* disabled while pending (conventions 3.6); **since #81 (2026-10-22,
+  `design/components/button.md` 16)** a second click while the Action's own run is pending is
+  ignored (`preventDefault()`ed) and the Action renders `aria-disabled="true"` while it shows
+  `data-pending`. Before #81 a second click was a second dispatch ("harmless for an idempotent
+  Undo", not for a Retry).
 
 When the action resolves, the toast closes with `details.reason: "activate"` (`closeOnSettle`,
 default `true`; `false` keeps it, for an action that only navigates). When it rejects, the toast
@@ -899,9 +902,10 @@ It is not set while content is merely suspended (that is the guard's job, and no
    error reaches the boundary above the Viewport. With the boundary around the Viewport's list
    (section 15.3), the list re-renders in error state and the toast is still in the queue; the
    boundary's reset re-renders it.
-5. **Undo clicked twice.** Two dispatches; `useActionTrigger` keeps the newest, surfaces the
-   older's rejection (conventions 2.4); the first resolve closes the toast, the second's `then`
-   finds it gone and does nothing (dismiss is idempotent).
+5. **Undo clicked twice.** (#81) One dispatch: the second click arrives while the first run is
+   in flight, `run` returns `false`, the click is `preventDefault()`ed, the Action is
+   `aria-disabled`; the resolve closes the toast once. (Before #81: two dispatches, the first
+   resolve closed, the second's `then` found it gone.)
 6. **Close pressed while Undo is pending.** The toast closes (`"dismiss"`), the Action's
    transition keeps running to completion in the unmounted part; its `then` is a no-op, its
    rejection is reported through the hook's unmounted path (`reportError`), never swallowed.
@@ -1124,7 +1128,7 @@ rule (no controlled state; the queue is not an `x` / `defaultX` triple), optimis
 | Sync action | `Toast.Action` calls `action(details)` with `details.id` and `details.event` the native click / keydown; `closeAction` receives `{ id, reason }`; Close dispatches `"dismiss"`; a disabled Action never dispatches; a default from `toast.action` and a prop `action` both work; no Action rendered without either. |
 | Async action | While the Undo promise is unresolved: `data-pending` on Action and Root, the toast's timer does not elapse (fake timers advanced past `duration`); after resolve: the toast closes with `reason: "activate"`; `closeOnSettle={false}` keeps it. |
 | Rejection | Undo rejects: the toast stays, `data-pending` gone, the error reaches an `<ErrorCatcher>` around the Viewport's list; caught-inside variant resolves and closes (the documented trap); caught-and-rethrown keeps the toast (15.3). |
-| Overlap and superseded rejection | Two Undo dispatches resolved out of order: one close; the older rejecting after the newer resolved, and while the newer is pending, both reach the boundary (`useActionTrigger` wiring through the Root). |
+| Overlap and superseded rejection | **N/A since #81** for `Toast.Action` (one run at a time); replaced by the Re-entry rows T1, T2 and T4 in `design/components/button.md` 16.4: the second Undo click is ignored and `defaultPrevented`, `aria-disabled` meanwhile, one close; a single rejecting run reaches the boundary above the Viewport and leaves the toast. |
 | `closeAction` | Called once per close with each reason (`"activate"`, `"dismiss"` for Close / Escape / `dismiss()`, `"timeout"`); runs in a transition (a `useTransition` probe inside it is not needed; assert it is not called synchronously inside the dismissal click, and that its rejection reaches the boundary above the Viewport); not called on Viewport unmount. |
 | Timers | Default 5000; Viewport `duration`; per-toast `duration`; `null` persistent; action toasts persistent by default and timed with `duration`; starts only when visible (queued beyond `limit`) and un-suspended; `update` with a new `duration` restarts. |
 | Pausing | `pointerenter` / `pointerleave`, `focusin` / `focusout`, `visibilitychange` (hidden / visible), window `blur` / `focus` pause and resume with the remaining time; `data-paused` on the Viewport; a `pending` toast's timer alone is paused while its siblings run; the hover pause ends when the region empties under the pointer (#63 L3). |

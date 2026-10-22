@@ -248,11 +248,17 @@ The three timings that were on the table, and why "stay open, then close in the 
 | Close at once, show pending on the Trigger | feedback lands on the wrong element (the user clicked an item, not the button) and only while the Root's transition is pending; the item's action is not the Root's | rejected |
 | **Stay open with `data-pending` on the item; close when the action settles** | sync and fast actions close in the same tick (indistinguishable from "at once"); slow ones show progress where the user clicked; a rejection keeps the menu open and reaches a boundary; the close is library-driven, so `<ViewTransition>` animates the exit in every engine (the research's reason for making activation library-owned) | **chosen** |
 
-This is the Dialog.Close / Popover.Close idiom applied to items, and the conventions' rule that a
-part is never disabled while pending holds: a second click re-runs the action (latest intent);
-the first `requestClose` wins and later ones are no-ops against `intended()`. A consumer who
-wants "close now, work later" writes `action={() => { void archive(id); }}` (not awaited;
-conventions 2.3 item 5).
+This is the Dialog.Close / Popover.Close idiom applied to items. **Amended with #81 (2026-10-22,
+`design/components/button.md` 16):** a second activation (click, Enter, Space) while the item's
+own action is pending is **ignored** (`useActionTrigger`'s in-flight guard; the event is
+`preventDefault()`ed) and the item renders `aria-disabled="true"` while it shows `data-pending`;
+`data-disabled`, `state.disabled` and the arrow keys are unaffected, because `menu-dom.ts`'s
+`isDisabledItem` keys on **`data-disabled`** (the `disabled` prop), not on `aria-disabled`, so a
+pending item is still an enabled item for Home / End, the open focus and typeahead. Before #81 a
+second click re-ran the action and the first `requestClose` won. The part is still never
+*natively* disabled while pending (conventions 3.6 as amended). A consumer who wants "close now,
+work later" writes `action={() => { void archive(id); }}` (not awaited; conventions 2.3 item 5).
+`CheckboxItem` and `RadioItem` are state owners, not pure triggers: unchanged, latest intent wins.
 
 `closeOnActivate` (boolean): `Item` defaults to `true`; `CheckboxItem` and `RadioItem` default to
 `false` (section 4). A `false` Item is a "keep open" action (a "Refresh" item, a zoom control):
@@ -926,10 +932,11 @@ server responds, then closes.
 
 Covered by Popover 4.3 / 5 for the open and the Root's closes. Item-level: an item's `action` is
 awaited inside the item's own transition through the shared `useActionTrigger` (conventions 3.4,
-landed with #41); a rejection goes to the boundary above the item and leaves the menu open; a
-superseded rejection on the same item (two clicks, the first rejects after the second resolved)
-is caught by the hook and thrown from the item's render, so it reaches the same boundary
-(`Popover.Close` and `Dialog.Close` share the hook; the gap Dialog had recorded is closed). A
+landed with #41); a rejection goes to the boundary above the item and leaves the menu open. (A
+superseded rejection on the same item, two clicks with the first rejecting after the second
+resolved, was caught by the hook and thrown from the item's render; since #81 an `Item` never has
+two runs in flight, so that row is N/A for `Item` and stays for `CheckboxItem` / `RadioItem`,
+`design/components/button.md` 16.4 M4.) A
 close that belongs to an earlier open is dropped (open-generation guard, section 14); this
 applies to `Item` and to `closeOnActivate` on `CheckboxItem` / `RadioItem` alike (deviation 6).
 Submenu content that suspends holds the submenu's open with `data-pending` on the
@@ -963,7 +970,7 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | Sync action (both for CheckboxItem / RadioGroup; Root as Popover) | `Menu.Item action` receives `(details)` with `details.event` the native `click` for pointer and keyboard alike (the Enter / Space keydown is prevented and `element.click()` called; `detail === 0` marks keyboard, 5.3); disabled items never dispatch; a selected RadioItem re-activated never dispatches (and still closes with `closeOnActivate`); `closeOnActivate={false}` keeps the menu (no `requestClose`). |
 | Async action (both) | Item: `data-pending` on the item while deferred; menu still open; resolve → root `openChangeAction(false, "activate")`, `hidePopover` called once. CheckboxItem: `aria-checked` / `data-checked` optimistic, `data-pending`, committed after resolve; stays open; with `closeOnActivate` closes after resolve. RadioGroup: `data-pending` on group and chosen item; previous item `aria-checked=false` at once. |
 | Rejection (both) | Item rejects: `ErrorCatcher` inside the Popup receives it, menu open, `hidePopover` not called. CheckboxItem rejects: `aria-checked` rolls back, catcher receives. RadioGroup likewise. Caught-inside variants commit. |
-| Overlap | Two RadioItem dispatches out of order: optimistic latest, committed latest. Two Item clicks: action called twice, `requestClose` once effective. |
+| Overlap | Two RadioItem dispatches out of order: optimistic latest, committed latest. Two Item clicks (#81): action called **once**, the second is ignored and `defaultPrevented`, `aria-disabled="true"` meanwhile, one `requestClose`. |
 | Open-generation guard | Dismiss (`hidePopover()`) and re-open while an Item's, a `closeOnActivate` CheckboxItem's and a `closeOnActivate` RadioItem's action is pending (`keepMounted` for the radio, since uncontrolled state unmounts with the items); on resolve the menu stays open, `requestClose` not called. The re-open commits only when the action settles (walkthrough 11). |
 | Superseded rejection (both) | CheckboxItem / RadioGroup: the older dispatch rejects after and while the newer is pending; the catcher gets it. Item: the older click's rejection reaches the catcher through `useActionTrigger` (one row each for `Popover.Close` and `Dialog.Close` as well; they fail without the hook). |
 | Suspending content (both) | Popup children suspend on open: `showPopover` not called, Trigger pending; resolve: called, first item focused. Submenu likewise with `data-pending` on the SubmenuTrigger. |

@@ -605,9 +605,13 @@ popovers have none. In library mode the click is always intercepted, with or wit
 so every Close goes through the Root's transition and the apply effect; in JS-free mode without
 `action` the browser runs the command, with `action` the part runs it then calls
 `popup.hidePopover()` directly (a browser-owned close; the `toggle` listener has no Root state to
-notify). Repeated clicks while pending re-run the action (latest intent); the first hide wins.
-The action runs through the shared `useActionTrigger(openGeneration)` (conventions 3.4; landed
-with #41), which also surfaces a superseded click's rejection.
+notify). **Amended with #81 (2026-10-22, `design/components/button.md` 16):** a repeated click
+while the Close's own action is pending is **ignored** (the hook's in-flight guard, click
+`preventDefault()`ed) and the button renders `aria-disabled="true"` while it shows `data-pending`
+(the action and the hide commit). Before #81 repeated clicks re-ran the action and the first hide
+won. The action runs through the shared `useActionTrigger({ openGeneration })` (conventions 3.4;
+landed with #41); its superseded-rejection path is no longer reachable from a Close (the row in
+the test plan becomes the single-run rejection row, `button.md` 16.4 P3).
 
 **A stale close is dropped.** The action's continuation runs after an `await`; if the user
 dismissed the popover and opened it again meanwhile, `intended()` is `true` again and a naive

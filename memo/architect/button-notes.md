@@ -65,3 +65,17 @@ Header; decisions row 2; 1.1 `Button` row; 2.3 item 3 (cancelled click, pure tri
 2.5 "Pure triggers ignore re-entry" bullet with the #81 rollout; 2.7 own-`formAction` reading;
 3.4 hook option and boolean `run`; 3.6 "never natively disabled" rewrite; 4.1 `pending` row; 5.3
 rows; 9.1 folder; 10.1 Re-entry row and the N/A note on the superseded-rejection row.
+
+## Wave 9 (#81, #83), 2026-10-22
+
+- `useActionTrigger` users: Button, Dialog.Close, Popover.Close, Menu.Item, Toast.Action (pure
+  triggers) and the `runStep` of Slider.Root / NumberField.Root (steps: every one must run). So the
+  option cannot be dropped; the default flips to `true` and the two continuous controls opt out
+  explicitly. Safer failure mode for a forgotten option is the guard, not the duplicate.
+- `isDisabledItem` is used only by `edgeItem` (Home / End, open focus) in menu-dom.ts; the arrows
+  never skipped disabled items (menu.md: "skipped by nothing"). Keying it on `data-disabled` is
+  enough; the typeahead never read it.
+- #83 rule: `aria-disabled` is only safe where the part cancels the click itself. Form.Submit has no
+  handler (a submitter), so it keeps native `disabled`; the JS-free command modes of the Dialog /
+  Popover Trigger and Close keep native `disabled` for the same reason (`installClick` is the
+  condition). Toast.Action / Toast.Close do not own `disabled` at all (pass-through); out of scope.
