@@ -284,12 +284,17 @@ export function TooltipPage() {
         <code>data-side</code> is where the popup <strong>is</strong>: the library reads which{" "}
         <code>position-try-fallbacks</code> option the browser applied from the popup's computed{" "}
         <code>position-area</code> when it opens, on scroll and on resize. The browser still does
-        the placing; a tooltip that opens where you asked costs no React render. The inline{" "}
-        <code>position-area</code> stays your request. Two caveats: an entry animation keyed on{" "}
-        <code>data-side</code> with <code>@starting-style</code> starts from the requested side on a
-        flipped open (key it on opacity or a fixed offset, as below), and a gap written as a
-        one-sided margin on <code>[data-side]</code> lands on the wrong edge after a flip, because
-        the flip swaps the popup's margins too: use a margin on both sides of the axis.
+        the placing. With a physical <code>side</code>, a tooltip that opens where you asked costs
+        no React render; a logical one (<code>inline-start</code> / <code>inline-end</code>) costs
+        one render on show and one on hide, since <code>data-side</code> turns physical while shown.
+        The inline <code>position-area</code> stays your request. Two caveats: an entry animation
+        keyed on <code>data-side</code> with <code>@starting-style</code> starts from the requested
+        side on a flipped open (key it on opacity or a fixed offset, as below), and a gap written as
+        a one-sided margin on <code>[data-side]</code> lands on the wrong edge after a flip, because
+        the flip swaps the popup's margins too. Either put a static margin on the requested edge
+        (not keyed on <code>data-side</code>; the flip moves it to the other edge), or key a margin
+        on both sides of the axis on <code>data-side</code>, including the closed{" "}
+        <code>inline-start</code> / <code>inline-end</code> values so the first layout has it.
       </p>
 
       <h3>Keyboard, pointer and ARIA</h3>

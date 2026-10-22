@@ -399,18 +399,25 @@ export function PopoverPage() {
 }
 .popover:popover-open { opacity: 1; translate: 0 0; }
 @starting-style { .popover:popover-open { opacity: 0; translate: 0 -4px; } }
-/* The gap on both sides of the axis: a flip swaps the popup's margins, so a one-sided margin
-   keyed on the resolved data-side would land on the far edge. */
-.popover[data-side="top"], .popover[data-side="bottom"] { margin-block: 6px; }
-.popover[data-side="left"], .popover[data-side="right"] { margin-inline: 6px; }
+/* The gap, static on the requested edge (side="bottom"): a flip swaps the popup's margins, so
+   it moves to the other edge by itself. */
+.popover { margin-block-start: 6px; }
+/* A class that serves any side: both sides of the axis, keyed on data-side, the closed logical
+   values included so the first layout has the gap. A one-sided margin keyed on the resolved
+   data-side is the wrong form: after a flip it lands on the far edge. */
+.popover-any[data-side="top"], .popover-any[data-side="bottom"] { margin-block: 6px; }
+.popover-any[data-side="left"], .popover-any[data-side="right"],
+.popover-any[data-side="inline-start"], .popover-any[data-side="inline-end"] { margin-inline: 6px; }
 @media (prefers-reduced-motion: reduce) { .popover { transition: none; } }`}</CodeBlock>
       <p>
         <code>data-side</code> is where the popup <strong>is</strong>: the library reads which{" "}
         <code>position-try-fallbacks</code> option the browser applied from the popup's computed{" "}
         <code>position-area</code> when it opens, on scroll and on resize; the browser still does
-        the placing, and an open where you asked costs no render. Popover has no Arrow part; an
-        arrow drawn with a pseudo-element on <code>[data-side]</code> follows a flip (see the{" "}
-        <a href="/components/tooltip#arrow">Tooltip arrow</a>).
+        the placing. With a physical <code>side</code>, an open where you asked costs no render; a
+        logical one (<code>inline-start</code> / <code>inline-end</code>) costs one render on show
+        and one on hide, since <code>data-side</code> turns physical while shown. Popover has no
+        Arrow part; an arrow drawn with a pseudo-element on <code>[data-side]</code> follows a flip
+        (see the <a href="/components/tooltip#arrow">Tooltip arrow</a>).
       </p>
       <h4>Right-to-left</h4>
       <p>

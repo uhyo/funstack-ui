@@ -325,7 +325,10 @@ export function MenuPage() {
         from a <code>Menu.ContextTrigger</code>). While the menu is shown, <code>side</code> /{" "}
         <code>align</code> and <code>data-side</code> / <code>data-align</code> are where the
         browser placed it (a physical side, after any flip: a submenu reads <code>right</code> in
-        LTR and <code>left</code> in RTL); otherwise your props. Owns <code>id</code>,{" "}
+        LTR and <code>left</code> in RTL); otherwise your props. A menu shown on the physical side
+        you asked for costs no render for this; a logical side (every submenu, by default{" "}
+        <code>inline-end</code>) costs one render on show and one on hide, since{" "}
+        <code>data-side</code> turns physical while shown. Owns <code>id</code>,{" "}
         <code>popover</code>, <code>role="menu"</code>, <code>aria-labelledby</code> (merged),{" "}
         <code>tabIndex={"{-1}"}</code>, <code>focusgroup</code> (with the flag),{" "}
         <code>onKeyDown</code>, <code>onBlur</code>, <code>onMouseDown</code> (a press outside the

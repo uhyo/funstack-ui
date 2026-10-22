@@ -31,13 +31,16 @@
 }
 /* The gaps. `data-side` is where the browser placed the menu (a submenu: right in LTR, left in
    RTL, either after a flip). A flip swaps the popup's margins, so each gap goes on both sides of
-   its axis. */
+   its axis. A submenu carries `inline-end` until it is shown: keyed too, so its first layout
+   already has the gap. */
 .demo-menu[data-side="bottom"],
 .demo-menu[data-side="top"] {
   margin-block: 4px;
 }
 .demo-menu[data-side="right"],
-.demo-menu[data-side="left"] {
+.demo-menu[data-side="left"],
+.demo-menu[data-side="inline-start"],
+.demo-menu[data-side="inline-end"] {
   margin-inline: 2px;
 }
 
