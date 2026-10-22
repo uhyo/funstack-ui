@@ -186,3 +186,13 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - User: wait for the Fable reset (don't switch models); remove Toolbar.Button now; include focusableWhenDisabled.
 - PO: staged re-entry rollout (follow-up issue for Dialog.Close, Popover.Close, Menu.Item), no opt-out prop.
 - On reset: SendMessage design-button with these decisions → commit → implement → review.
+
+## 2026-10-22 — wave 8 done, 0.1.0-alpha.6 released
+- Button (#79): design 6cdfc85 and fold aff64f3; implementation d8136b4..0201cec; review c8e09d1 (minor fixes); fixes a6c971f, 3bf3e0b, 6e50a26.
+- Decisions:
+  - The guard counts only the Button's own in-flight run (formAction uses formPending).
+  - rendersButton is true for component renders, library-wide (breaking change, in the notes).
+  - isHostButton drives the disabled branch.
+- #82 NumberField touch-hold flake fixed (05aeb98). It had turned master red once.
+- Follow-ups filed: #81 (pure triggers' re-entry guard), #83 (link-render disabled on the other parts).
+- Release 0.1.0-alpha.6 (be703ce).
