@@ -165,6 +165,72 @@ function SuspendingMenu() {
   );
 }
 
+/* 4. Context menu: Menu.ContextTrigger ------------------------------------------------------- */
+
+const cards = ["Inbox", "Drafts", "Archive"] as const;
+
+function ContextMenuCards() {
+  const [log, setLog] = useState<readonly string[]>([]);
+  const note = (line: string) => startTransition(() => setLog((l) => [line, ...l].slice(0, 5)));
+
+  return (
+    <section>
+      <h3>Context menu</h3>
+      <p>
+        Right-click a card (or Tab to its "⋯" button and press Shift+F10, or long-press on touch):
+        the same menu as the button opens at the pointer. Right-click elsewhere on the card to move
+        it; right- or middle-click outside to close it. The text field keeps the browser's own menu.
+        The inner box is a nested region: it wins over the card.
+      </p>
+      <div className="cm-cards">
+        {cards.map((name) => (
+          <Menu.Root key={name} openChangeAction={logChange(`context ${name}`)}>
+            <Menu.ContextTrigger className="cm-card">
+              <strong>{name}</strong>
+              <Menu.Trigger className="menu-btn" aria-label={`Actions for ${name}`}>
+                ⋯
+              </Menu.Trigger>
+              <input aria-label={`Note for ${name}`} placeholder="Note (native menu)" />
+              {name === "Archive" && (
+                <Menu.Root openChangeAction={logChange("nested region")}>
+                  <Menu.ContextTrigger className="cm-nested">Nested region</Menu.ContextTrigger>
+                  <Menu.Popup className="menu" aria-label="Nested actions">
+                    <Menu.Item action={() => note("Nested action")}>Nested action</Menu.Item>
+                  </Menu.Popup>
+                </Menu.Root>
+              )}
+            </Menu.ContextTrigger>
+            <Menu.Popup className="menu" align="end">
+              <Menu.Item action={() => note(`Opened ${name}`)}>Open</Menu.Item>
+              <Menu.Item
+                action={async () => {
+                  await sleep(1000);
+                  note(`Emptied ${name}`);
+                }}
+              >
+                {({ pending }) => (pending ? "Emptying…" : "Empty")}
+              </Menu.Item>
+              <Menu.Separator />
+              <Menu.Root>
+                <Menu.SubmenuTrigger>Color</Menu.SubmenuTrigger>
+                <Menu.Popup className="menu">
+                  <Menu.Item action={() => note(`${name}: red`)}>Red</Menu.Item>
+                  <Menu.Item action={() => note(`${name}: blue`)}>Blue</Menu.Item>
+                </Menu.Popup>
+              </Menu.Root>
+            </Menu.Popup>
+          </Menu.Root>
+        ))}
+      </div>
+      <ul>
+        {log.map((line, i) => (
+          <li key={i}>{line}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function MenuDemo() {
   return (
     <section className="demo">
@@ -172,6 +238,7 @@ export function MenuDemo() {
       <RowActions />
       <ViewOptions />
       <SuspendingMenu />
+      <ContextMenuCards />
     </section>
   );
 }

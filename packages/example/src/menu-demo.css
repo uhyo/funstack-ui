@@ -128,3 +128,36 @@
     rotate: 1turn;
   }
 }
+
+/* Context menu regions (Menu.ContextTrigger): `data-open` while their menu is open. A
+   point-placed popup is `[data-context]` and gets no anchored gap. */
+.cm-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cm-card {
+  display: grid;
+  gap: 8px;
+  inline-size: 12rem;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.cm-card[data-open] {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+.cm-card[data-pending] {
+  cursor: progress;
+}
+.cm-nested {
+  padding: 8px;
+  border: 1px dashed #9ca3af;
+}
+.cm-nested[data-open] {
+  border-style: solid;
+  border-color: #6366f1;
+}
