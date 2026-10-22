@@ -21,7 +21,7 @@ export function ToolbarVertical() {
         <Toolbar.Separator className="demo-toolbar-separator" />
         <Menu.Root>
           <Menu.Trigger className="demo-toolbar-button">Shapes</Menu.Trigger>
-          <Menu.Popup className="demo-menu" side="right">
+          <Menu.Popup className="demo-menu" side="inline-end">
             <Menu.Item action={() => setTool("rectangle")}>Rectangle</Menu.Item>
             <Menu.Item action={() => setTool("ellipse")}>Ellipse</Menu.Item>
           </Menu.Popup>

@@ -161,6 +161,18 @@ export function RoadmapPage() {
           button and a context region sharing one menu (<a href={issue(45)}>#45</a>). Behaviour
           change for every Menu: a right- or middle-click outside now closes it.
         </li>
+        <li>
+          Placement where the popup is: <code>data-side</code> / <code>data-align</code> on Tooltip,
+          Popover and Menu are the side the browser chose after a fallback flip while shown, and the
+          new <a href="/components/tooltip#arrow">Tooltip.Arrow</a> follows it (
+          <a href={issue(20)}>#20</a>). <code>align</code> start / end and the new{" "}
+          <code>side="inline-start"</code> / <code>"inline-end"</code> follow the direction of an
+          RTL page or container; submenus open on the inline-end side; Combobox follows an RTL
+          container (<a href={issue(53)}>#53</a>); a context menu in RTL opens to the left of the
+          pointer (<a href={issue(88)}>#88</a>). Behaviour changes: the attributes report the
+          resolved side, and start / end mirror under RTL. Firefox misplaces anchored popups in a
+          direction island (<a href={issue(89)}>#89</a>).
+        </li>
       </ul>
 
       <h3>Next</h3>
@@ -175,8 +187,7 @@ export function RoadmapPage() {
           <a href={issue(19)}>#19</a>).
         </li>
         <li>
-          Tooltip: an Arrow part that points the right way after a fallback flip (
-          <a href={issue(20)}>#20</a>) and a skip-delay group (<a href={issue(21)}>#21</a>).
+          Tooltip: a skip-delay group (<a href={issue(21)}>#21</a>).
         </li>
       </ul>
 

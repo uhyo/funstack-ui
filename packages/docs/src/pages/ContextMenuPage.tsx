@@ -169,20 +169,24 @@ export function ContextMenuPage() {
         at the bottom edge, leftward at the right edge, both in the corner. CSS anchor positioning
         anchors to elements, not points, so the Popup renders the point inline (
         <code>--menu-point-x</code>, <code>--menu-point-y</code>), puts <code>left</code> /{" "}
-        <code>top</code> there and names three <code>@position-try</code> options that mirror it.
-        The menu lives in the top layer, so a transformed or filtered ancestor of the region does
-        not move it.
+        <code>top</code> there and names three <code>@position-try</code> options that mirror it. A
+        right-to-left menu mirrors all of it (see below). The menu lives in the top layer, so a
+        transformed or filtered ancestor of the region does not move it.
       </p>
       <p>
         Those options are the library's only shipped CSS: a <code>&lt;style&gt;</code> React hoists
         into <code>&lt;head&gt;</code> once per page on the first context open (
-        <code>data-href="@funstack/ui/menu-point"</code>). It is functional only: three named
-        at-rules, no selectors, nothing visual.
+        <code>data-href="@funstack/ui/menu-point"</code>). It is functional only: five named
+        at-rules (an LTR menu names the first three, an RTL menu up, right and up-right), no
+        selectors, nothing visual.
       </p>
-      <CodeBlock language="css">{`@position-try --fsui-menu-up      { top: auto; bottom: calc(100% - var(--menu-point-y)); }
-@position-try --fsui-menu-left    { left: auto; right: calc(100% - var(--menu-point-x)); }
-@position-try --fsui-menu-up-left { top: auto; bottom: calc(100% - var(--menu-point-y));
-                                    left: auto; right: calc(100% - var(--menu-point-x)); }`}</CodeBlock>
+      <CodeBlock language="css">{`@position-try --fsui-menu-up       { top: auto; bottom: calc(100% - var(--menu-point-y)); }
+@position-try --fsui-menu-left     { left: auto; right: calc(100% - var(--menu-point-x)); }
+@position-try --fsui-menu-up-left  { top: auto; bottom: calc(100% - var(--menu-point-y));
+                                     left: auto; right: calc(100% - var(--menu-point-x)); }
+@position-try --fsui-menu-right    { right: auto; left: var(--menu-point-x); }
+@position-try --fsui-menu-up-right { top: auto; bottom: calc(100% - var(--menu-point-y));
+                                     right: auto; left: var(--menu-point-x); }`}</CodeBlock>
       <ul>
         <li>
           <strong>Adjust</strong> with the Popup's <code>style</code>, which wins over the inline
@@ -201,8 +205,16 @@ export function ContextMenuPage() {
         </li>
         <li>
           While the menu is open the page scrolls under it (the point is in viewport coordinates);
-          native menus block scrolling instead. Placement is physically bottom-right of the point,
-          also under <code>direction: rtl</code>.
+          native menus block scrolling instead.
+        </li>
+        <li>
+          <strong>Right-to-left:</strong> when the popup's computed <code>direction</code> is{" "}
+          <code>rtl</code> (an RTL page, or a <code>dir="rtl"</code> ancestor of the Popup), the
+          menu's <strong>right</strong> edge sits at the point (
+          <code>right: calc(100% - var(--menu-point-x))</code>) and it flips rightward at the left
+          edge, as native menus do under a right-to-left UI. The library reads the direction once
+          per open or move; nothing is read on the server. The point placement uses insets, so the
+          Firefox RTL-container bug of the anchored popups (Mozilla 2019601) does not apply.
         </li>
       </ul>
       <CodeBlock>{`<Menu.Popup side={null} className="menu">…</Menu.Popup>`}</CodeBlock>
@@ -213,7 +225,9 @@ export function ContextMenuPage() {
   position-try-fallbacks: --mine;
 }
 @position-try --mine { top: auto; bottom: calc(100% - var(--menu-point-y)); }
-.menu:not([data-context]) { position-area: bottom span-right; }`}</CodeBlock>
+/* self-*: follows the menu's direction (a plain logical keyword would follow the root's only). */
+.menu:not([data-context]) { position-area: bottom span-self-x-end; }
+/* An RTL menu at a point: right: calc(100% - var(--menu-point-x)) instead of left. */`}</CodeBlock>
 
       <h3>Moving and closing</h3>
       <Table

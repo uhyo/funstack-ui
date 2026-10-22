@@ -129,8 +129,10 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
 }
 .select:open::picker(select) { opacity: 1; @starting-style { opacity: 0; } }
 
-/* 5. Placement: the browser anchors the picker to the select; override its position. */
-.select::picker(select) { position-area: block-end span-inline-end; position-try-fallbacks: flip-block; }
+/* 5. Placement: the browser anchors the picker to the select; override its position. The self-*
+   keywords follow the select's own direction (an RTL container too); plain logical ones would
+   follow the root's, since the picker is in the top layer. */
+.select::picker(select) { position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; }
 
 @media (prefers-reduced-motion: reduce) {
   .select::picker(select), .select::picker-icon { transition: none; }

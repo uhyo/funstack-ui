@@ -400,8 +400,8 @@ export function ComboboxPage() {
         no role, and owns <code>id</code>, <code>popover</code>, <code>onPointerDown</code> and{" "}
         <code>onMouseDown</code> (a press anywhere in it keeps focus in the input). Inline style{" "}
         <code>
-          position-area: block-end span-inline-end; position-try-fallbacks: flip-block; min-width:
-          anchor-size(width)
+          position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block;
+          min-width: anchor-size(width)
         </code>{" "}
         places it below the input (above when it does not fit), at least as wide; your{" "}
         <code>style</code> wins per property. A <code>render</code> element must stay a{" "}
@@ -640,10 +640,14 @@ export function ComboboxPage() {
       <h3>Placement, nesting and browser notes</h3>
       <ul>
         <li>
-          The listbox follows the page's direction (logical keywords) when the whole page is{" "}
-          <code>dir="rtl"</code>. Logical <code>position-area</code> keywords resolve against the
-          popover's containing block, the root, so <code>dir="rtl"</code> on a container alone does
-          not flip them: set <code>positionArea</code> through <code>style</code> there.
+          <strong>Right-to-left:</strong> the listbox lines up with the input's inline-start edge
+          (the right edge in RTL) under a <code>dir="rtl"</code> page or container. The{" "}
+          <code>self-*</code> <code>position-area</code> keywords follow the popup's own inherited
+          direction, with no JavaScript; plain logical keywords would follow the root's only,
+          because the listbox is in the top layer. Firefox misplaces a popover inside a container
+          whose direction differs from the page's (Mozilla bug 2019601,{" "}
+          <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>); page-level RTL is fine.
+          The Popup emits no <code>data-side</code>.
         </li>
         <li>
           Inside a Dialog or a Popover the listbox nests in the top layer: the first Escape closes

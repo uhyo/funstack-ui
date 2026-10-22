@@ -34,6 +34,53 @@
   }
 }
 
+/* Tooltip.Arrow draws nothing itself. data-side is the side the browser placed the popup on
+   (after a flip too), so these rules keep the arrow on the edge that faces the trigger. */
+.demo-tip-arrowed {
+  margin: 8px; /* symmetric: a flip swaps the popup's margins, so one-sided gaps end up outside */
+  overflow: visible;
+}
+
+.demo-tip-arrow {
+  position: absolute;
+  inline-size: 8px;
+  block-size: 8px;
+  background: inherit;
+  rotate: 45deg;
+}
+
+.demo-tip-arrow[data-side="top"] {
+  bottom: -4px;
+  inset-inline-start: calc(50% - 4px);
+}
+
+.demo-tip-arrow[data-side="bottom"] {
+  top: -4px;
+  inset-inline-start: calc(50% - 4px);
+}
+
+.demo-tip-arrow[data-side="left"] {
+  right: -4px;
+  top: calc(50% - 4px);
+}
+
+.demo-tip-arrow[data-side="right"] {
+  left: -4px;
+  top: calc(50% - 4px);
+}
+
+/* data-align is inline-relative on a top / bottom side: logical insets keep it right in RTL. */
+.demo-tip-arrow[data-side="top"][data-align="start"],
+.demo-tip-arrow[data-side="bottom"][data-align="start"] {
+  inset-inline-start: 12px;
+}
+
+.demo-tip-arrow[data-side="top"][data-align="end"],
+.demo-tip-arrow[data-side="bottom"][data-align="end"] {
+  inset-inline-start: auto;
+  inset-inline-end: 12px;
+}
+
 .demo-toolbar {
   display: inline-flex;
   gap: 4px;

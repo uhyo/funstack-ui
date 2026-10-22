@@ -2,6 +2,8 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
+import { TooltipArrow } from "../examples/TooltipArrow.js";
+import tooltipArrowSource from "../examples/TooltipArrow.tsx?raw";
 import { TooltipToolbar } from "../examples/TooltipToolbar.js";
 import tooltipToolbarSource from "../examples/TooltipToolbar.tsx?raw";
 import tooltipCss from "../examples/tooltip.css?raw";
@@ -40,12 +42,16 @@ export function TooltipPage() {
 
 <Tooltip.Root>                              {/* no DOM: id, options, interaction */}
   <Tooltip.Trigger>Save</Tooltip.Trigger>   {/* button */}
-  <Tooltip.Popup>Saves the document (Ctrl+S)</Tooltip.Popup>  {/* div[popover][role=tooltip] */}
+  <Tooltip.Popup>                           {/* div[popover][role=tooltip] */}
+    Saves the document (Ctrl+S)
+    <Tooltip.Arrow />                       {/* optional: span[aria-hidden] */}
+  </Tooltip.Popup>
 </Tooltip.Root>`}</CodeBlock>
       <CodeBlock language="html">{`<button type="button" aria-describedby="_r_1_">Save</button>
 <div id="_r_1_" popover="manual" role="tooltip" data-side="top" data-align="center"
      style="position-area: top; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline">
   Saves the document (Ctrl+S)
+  <span aria-hidden="true" data-side="top" data-align="center"></span>
 </div>`}</CodeBlock>
       <ul>
         <li>
@@ -60,8 +66,9 @@ export function TooltipPage() {
         </li>
         <li>One trigger per Root.</li>
         <li>
-          There is no <code>Arrow</code> part in this version. Draw one on the popup with CSS if you
-          need it (it cannot follow a fallback flip).
+          <code>Arrow</code> is optional and draws nothing itself: it carries the Popup's{" "}
+          <code>data-side</code> / <code>data-align</code>, which are where the browser placed the
+          popup (see <a href="#arrow">Arrow</a>).
         </li>
       </ul>
 
@@ -155,14 +162,16 @@ export function TooltipPage() {
         rows={[
           {
             name: "side",
-            type: '"top" | "bottom" | "left" | "right" | null',
+            type: '"top" | "bottom" | "left" | "right" | "inline-start" | "inline-end" | null',
             default: '"top"',
             description: (
               <>
                 Placement through inline <code>position-area</code>, with{" "}
                 <code>position-try-fallbacks</code> flipping it when it does not fit.{" "}
-                <code>null</code> emits no inline positioning and no <code>data-side</code> /{" "}
-                <code>data-align</code>, so your stylesheet owns placement.
+                <code>"inline-start"</code> / <code>"inline-end"</code> follow the popup's direction
+                (<code>inline-end</code> is the right in LTR, the left in RTL); the other four are
+                physical. <code>null</code> emits no inline positioning and no{" "}
+                <code>data-side</code> / <code>data-align</code>, so your stylesheet owns placement.
               </>
             ),
           },
@@ -170,7 +179,14 @@ export function TooltipPage() {
             name: "align",
             type: '"start" | "center" | "end"',
             default: '"center"',
-            description: "Alignment along the side. Ignored when side is null.",
+            description: (
+              <>
+                Alignment along the side. On a top / bottom side, <code>start</code> /{" "}
+                <code>end</code> are inline-relative (<code>start</code> lines up the inline-start
+                edges: the left in LTR, the right in RTL); on the other sides they are the top /
+                bottom edges. Ignored when <code>side</code> is <code>null</code>.
+              </>
+            ),
           },
           {
             name: "experimental_hint",
@@ -193,10 +209,28 @@ export function TooltipPage() {
         ]}
       />
       <p>
-        <code>TooltipPopupState</code>: <code>{"{ disabled, side, align }"}</code>. <code>id</code>,{" "}
+        <code>TooltipPopupState</code>: <code>{"{ disabled, side, align }"}</code>. While the
+        tooltip is shown, <code>side</code> and <code>align</code> are where the browser placed it
+        (a physical side, after any fallback flip); otherwise they are your props (<code>side</code>{" "}
+        is <code>null</code> with <code>side={"{null}"}</code>). <code>id</code>,{" "}
         <code>popover</code> and <code>role</code> are owned by the library. Your <code>style</code>{" "}
         wins over the inline placement, so{" "}
-        <code>style={'{{ positionArea: "bottom span-right" }}'}</code> works for a one-off.
+        <code>style={'{{ positionArea: "bottom span-right" }}'}</code> works for a one-off;{" "}
+        <code>data-side</code> then reports where that put it.
+      </p>
+
+      <h4>
+        <code>Tooltip.Arrow</code>
+      </h4>
+      <PropsTable
+        rows={[...functionProps("TooltipArrowState"), renderProp("span", "TooltipArrowState")]}
+      />
+      <p>
+        <code>TooltipArrowState</code>: <code>{"{ side, align }"}</code>, the Popup's values
+        (resolved while shown). Renders a <code>&lt;span aria-hidden="true"&gt;</code> with{" "}
+        <code>data-side</code> / <code>data-align</code> (absent with the Popup's{" "}
+        <code>side={"{null}"}</code>); <code>aria-hidden</code> is owned by the library. Render it
+        inside <code>Tooltip.Popup</code>.
       </p>
 
       <h3>Open state belongs to the browser</h3>
@@ -233,14 +267,29 @@ export function TooltipPage() {
         head={["Hook", "On", "Meaning"]}
         rows={[
           ["`:popover-open`", "Popup", "The tooltip is showing."],
-          ["`data-side`", "Popup", "The requested side (absent with `side={null}`)."],
-          ["`data-align`", "Popup", "The requested alignment (absent with `side={null}`)."],
+          [
+            "`data-side`",
+            "Popup, Arrow",
+            "While shown: the side the browser placed the popup on (`top` / `bottom` / `left` / `right`, after any flip). Otherwise the requested side. Absent with `side={null}`.",
+          ],
+          [
+            "`data-align`",
+            "Popup, Arrow",
+            "While shown: the resolved alignment. Otherwise the requested one. Absent with `side={null}`.",
+          ],
           ["`data-disabled`", "Trigger, Popup", "The Root's `disabled` prop."],
         ]}
       />
       <p>
-        <code>data-side</code> is the side you asked for, not the side the browser picked after a
-        fallback flip; CSS exposes no signal for that yet.
+        <code>data-side</code> is where the popup <strong>is</strong>: the library reads which{" "}
+        <code>position-try-fallbacks</code> option the browser applied from the popup's computed{" "}
+        <code>position-area</code> when it opens, on scroll and on resize. The browser still does
+        the placing; a tooltip that opens where you asked costs no React render. The inline{" "}
+        <code>position-area</code> stays your request. Two caveats: an entry animation keyed on{" "}
+        <code>data-side</code> with <code>@starting-style</code> starts from the requested side on a
+        flipped open (key it on opacity or a fixed offset, as below), and a gap written as a
+        one-sided margin on <code>[data-side]</code> lands on the wrong edge after a flip, because
+        the flip swaps the popup's margins too: use a margin on both sides of the axis.
       </p>
 
       <h3>Keyboard, pointer and ARIA</h3>
@@ -322,6 +371,46 @@ export function TooltipPage() {
         tooltip never closes an open menu or listbox.
       </p>
 
+      <h3 id="arrow">Arrow</h3>
+      <Example
+        source={tooltipArrowSource}
+        fileName="TooltipArrow.tsx"
+        css={tooltipCss}
+        cssFileName="tooltip.css"
+      >
+        <TooltipArrow />
+      </Example>
+      <p>
+        Scroll the page until the first button is near the top of the window and hover it: the
+        browser flips the tooltip below, and the arrow, keyed on <code>[data-side]</code>, moves to
+        the edge that faces the button. With no <code>Arrow</code> element, the same CSS works on
+        the Popup itself as a pseudo-element:
+      </p>
+      <CodeBlock language="css">{`.tip::after { content: ""; position: absolute; width: 8px; height: 8px; background: inherit; rotate: 45deg; }
+.tip[data-side="top"]::after { bottom: -4px; inset-inline-start: calc(50% - 4px); }
+.tip[data-side="bottom"]::after { top: -4px; inset-inline-start: calc(50% - 4px); }`}</CodeBlock>
+
+      <h3>Right-to-left</h3>
+      <p>
+        Nothing reads <code>direction</code> in JavaScript. <code>side="inline-start"</code> /{" "}
+        <code>"inline-end"</code> and <code>align="start"</code> / <code>"end"</code> on a top or
+        bottom side use the <code>self-*</code> <code>position-area</code> keywords, which follow
+        the popup's own direction, inherited from where you render it: an RTL page and an RTL
+        container (<code>dir="rtl"</code> on any ancestor) both mirror them, before hydration too.{" "}
+        <code>top</code> / <code>bottom</code> / <code>left</code> / <code>right</code> stay
+        physical. While shown, <code>data-side</code> is physical (<code>inline-end</code> reads{" "}
+        <code>left</code> in RTL).
+      </p>
+      <Callout title="Firefox and RTL containers">
+        <p>
+          Firefox misplaces any anchored popover along the inline axis when its parent box has a
+          different direction from the page (an RTL island in an LTR page, or the reverse), with
+          physical keywords too (Mozilla bug 2019601, tracked in{" "}
+          <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>). Page-level RTL is fine.
+          The library ships no workaround.
+        </p>
+      </Callout>
+
       <h3>Recipes</h3>
       <h4>A link trigger</h4>
       <CodeBlock>{`<Tooltip.Root>
@@ -333,12 +422,18 @@ export function TooltipPage() {
         element (a focusable <code>&lt;span tabIndex={"{0}"}&gt;</code>) always uses the JS path.
       </p>
       <h4>Placement entirely in CSS</h4>
-      <CodeBlock>{`<Tooltip.Popup side={null} className="tip tip-inline-end">...</Tooltip.Popup>`}</CodeBlock>
-      <CodeBlock language="css">{`.tip-inline-end {
-  position-area: inline-end;
+      <CodeBlock>{`<Tooltip.Popup side={null} className="tip tip-beside">...</Tooltip.Popup>`}</CodeBlock>
+      <CodeBlock language="css">{`.tip-beside {
+  /* self-* keywords follow the popup's direction; plain logical ones (inline-end) would follow
+     the root's only, because the popup is in the top layer. */
+  position-area: self-x-end;
   position-try-fallbacks: flip-inline;
   margin-inline: 6px;
 }`}</CodeBlock>
+      <p>
+        With <code>side={"{null}"}</code> the library emits no <code>data-side</code>; it cannot
+        read placement your own <code>@position-try</code> rules produce.
+      </p>
       <Callout title="Async content">
         <p>
           The popup's content renders when the tooltip mounts, not when it opens. If it must

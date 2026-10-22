@@ -226,16 +226,17 @@ export function PopoverPage() {
         rows={[
           {
             name: "side",
-            type: '"top" | "bottom" | "left" | "right" | null',
+            type: '"top" | "bottom" | "left" | "right" | "inline-start" | "inline-end" | null',
             default: '"bottom"',
             description:
-              "Placement relative to the Trigger through inline `position-area`, with `position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline` flipping it when it does not fit. `null` emits no inline placement and no `data-side` / `data-align`: your stylesheet owns placement.",
+              "Placement relative to the Trigger through inline `position-area`, with `position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline` flipping it when it does not fit. `inline-start` / `inline-end` follow the popup's direction (`inline-end` is the right in LTR, the left in RTL); the other four are physical. `null` emits no inline placement and no `data-side` / `data-align`: your stylesheet owns placement.",
           },
           {
             name: "align",
             type: '"start" | "center" | "end"',
             default: '"center"',
-            description: "Alignment along the side. Ignored when `side` is `null`.",
+            description:
+              "Alignment along the side. On a top / bottom side `start` / `end` are inline-relative (`start` lines up the inline-start edges: the left in LTR, the right in RTL); on the other sides the top / bottom edges. Ignored when `side` is `null`.",
           },
           {
             name: "keepMounted",
@@ -281,7 +282,9 @@ export function PopoverPage() {
       <p>
         <code>PopoverPopupState</code>: <code>{"{ open, side, align }"}</code>, with{" "}
         <code>open</code> committed (<code>false</code> in JS-free mode; <code>:popover-open</code>{" "}
-        is the DOM truth). The Popup owns <code>id</code>, <code>popover</code> (<code>"auto"</code>
+        is the DOM truth) and <code>side</code> / <code>align</code> where the browser placed the
+        popup while it is shown (a physical side, after any fallback flip, in both modes), your
+        props otherwise. The Popup owns <code>id</code>, <code>popover</code> (<code>"auto"</code>
         ), <code>open</code> (never rendered), <code>aria-modal</code> (<code>"false"</code>:
         Chromium exposes a <code>&lt;dialog popover&gt;</code> as modal otherwise) and{" "}
         <code>data-side</code> / <code>data-align</code>; its <code>aria-labelledby</code> and{" "}
@@ -365,7 +368,7 @@ export function PopoverPage() {
           [
             "`data-side`, `data-align`",
             "Popup",
-            "The requested placement (absent with `side={null}`).",
+            "While shown: where the browser placed the popup (`top` / `bottom` / `left` / `right`, after any flip; read from the computed `position-area`). Otherwise the requested placement. Absent with `side={null}`.",
           ],
           ["`aria-expanded`", "Trigger", "Open state, both modes (optimistic in library mode)."],
           ["`data-open`", "Trigger", "Optimistic open state (library mode only)."],
@@ -396,8 +399,28 @@ export function PopoverPage() {
 }
 .popover:popover-open { opacity: 1; translate: 0 0; }
 @starting-style { .popover:popover-open { opacity: 0; translate: 0 -4px; } }
-.popover[data-side="bottom"] { margin-block-start: 6px; }
+/* The gap on both sides of the axis: a flip swaps the popup's margins, so a one-sided margin
+   keyed on the resolved data-side would land on the far edge. */
+.popover[data-side="top"], .popover[data-side="bottom"] { margin-block: 6px; }
+.popover[data-side="left"], .popover[data-side="right"] { margin-inline: 6px; }
 @media (prefers-reduced-motion: reduce) { .popover { transition: none; } }`}</CodeBlock>
+      <p>
+        <code>data-side</code> is where the popup <strong>is</strong>: the library reads which{" "}
+        <code>position-try-fallbacks</code> option the browser applied from the popup's computed{" "}
+        <code>position-area</code> when it opens, on scroll and on resize; the browser still does
+        the placing, and an open where you asked costs no render. Popover has no Arrow part; an
+        arrow drawn with a pseudo-element on <code>[data-side]</code> follows a flip (see the{" "}
+        <a href="/components/tooltip#arrow">Tooltip arrow</a>).
+      </p>
+      <h4>Right-to-left</h4>
+      <p>
+        <code>side="inline-start"</code> / <code>"inline-end"</code> and <code>align</code> on a top
+        or bottom side use the <code>self-*</code> keywords, which follow the popup's inherited
+        direction: an RTL page and an RTL container both mirror them, with no JavaScript. In
+        Firefox, a popover inside a container whose direction differs from the page's is misplaced
+        along the inline axis (Mozilla bug 2019601,{" "}
+        <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>); page-level RTL is fine.
+      </p>
       <p>
         The exit animates in Chromium and Safari; Firefox hides a popover instantly. The library
         keeps the content mounted until the exit animation ends, so a fading popover is never empty.

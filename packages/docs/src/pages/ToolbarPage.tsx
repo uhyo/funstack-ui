@@ -97,8 +97,8 @@ export function ToolbarPage() {
       <p>
         Up / Down walk the tools. A <code>Menu.Trigger</code> in a vertical toolbar opens on the
         inline-end arrow: ArrowRight, or ArrowLeft under <code>direction: rtl</code>. Put its popup
-        on that side: <code>side="right"</code>, or <code>side="left"</code> in a right-to-left
-        page. ArrowDown moves on to the next tool.
+        on that side: <code>side="inline-end"</code>, the right in LTR and the left in a
+        right-to-left page or container. ArrowDown moves on to the next tool.
       </p>
 
       <h3>Anatomy</h3>

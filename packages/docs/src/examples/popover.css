@@ -15,12 +15,11 @@
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
 }
 
-/* The gap on the requested side; `data-side` is absent with `side={null}`. */
-.demo-popover[data-side="bottom"] {
-  margin-block-start: 6px;
-}
+/* The gap. `data-side` is where the browser placed the popup (absent with `side={null}`); a
+   flip swaps the popup's margins, so the gap goes on both sides of the axis. */
+.demo-popover[data-side="bottom"],
 .demo-popover[data-side="top"] {
-  margin-block-end: 6px;
+  margin-block: 6px;
 }
 
 .demo-popover h2 {

@@ -283,16 +283,17 @@ export function MenuPage() {
         rows={[
           {
             name: "side",
-            type: '"top" | "bottom" | "left" | "right" | null',
-            default: '"bottom" ("right" in a submenu)',
+            type: '"top" | "bottom" | "left" | "right" | "inline-start" | "inline-end" | null',
+            default: '"bottom" ("inline-end" in a submenu)',
             description:
-              "Placement through inline `position-area`, with `position-try-fallbacks` flipping it (a submenu flips inline only). `null` emits no inline placement and no `data-side` / `data-align`. Ignored for an open from a [Menu.ContextTrigger](/components/context-menu), which is placed at the pointer; there `null` opts out of the inline point placement too.",
+              "Placement through inline `position-area`, with `position-try-fallbacks` flipping it (a submenu flips inline only). `inline-start` / `inline-end` follow the popup's direction: a submenu opens on the right of its item in LTR and on the left in RTL, the side the arrow keys point to. `left` / `right` stay physical. `null` emits no inline placement and no `data-side` / `data-align`. Ignored for an open from a [Menu.ContextTrigger](/components/context-menu), which is placed at the pointer; there `null` opts out of the inline point placement too.",
           },
           {
             name: "align",
             type: '"start" | "center" | "end"',
             default: '"start"',
-            description: "Alignment along the side.",
+            description:
+              "Alignment along the side. On a top / bottom side `start` / `end` are inline-relative (`start` lines up the inline-start edges: the left in LTR, the right in RTL); on the other sides the top / bottom edges.",
           },
           {
             name: "keepMounted",
@@ -321,8 +322,11 @@ export function MenuPage() {
       <p>
         <code>MenuPopupState</code>: <code>{"{ open, side, align, submenu, context }"}</code>{" "}
         (committed <code>open</code>; <code>context</code> and <code>side: null</code> for an open
-        from a <code>Menu.ContextTrigger</code>). Owns <code>id</code>, <code>popover</code>,{" "}
-        <code>role="menu"</code>, <code>aria-labelledby</code> (merged),{" "}
+        from a <code>Menu.ContextTrigger</code>). While the menu is shown, <code>side</code> /{" "}
+        <code>align</code> and <code>data-side</code> / <code>data-align</code> are where the
+        browser placed it (a physical side, after any flip: a submenu reads <code>right</code> in
+        LTR and <code>left</code> in RTL); otherwise your props. Owns <code>id</code>,{" "}
+        <code>popover</code>, <code>role="menu"</code>, <code>aria-labelledby</code> (merged),{" "}
         <code>tabIndex={"{-1}"}</code>, <code>focusgroup</code> (with the flag),{" "}
         <code>onKeyDown</code>, <code>onBlur</code>, <code>onMouseDown</code> (a press outside the
         items keeps focus on the current item), <code>onContextMenu</code> (no browser menu over
@@ -518,7 +522,13 @@ export function MenuPage() {
       />
       <ul>
         <li>
-          Under <code>direction: rtl</code> ArrowLeft opens and ArrowRight closes a submenu.
+          Under <code>direction: rtl</code> ArrowLeft opens and ArrowRight closes a submenu, and the
+          submenu opens on the left of its item (the default <code>side="inline-end"</code>); the
+          top-level menu's <code>align="start"</code> lines up the right edges. Both follow the
+          popup's inherited direction through <code>self-*</code> <code>position-area</code>{" "}
+          keywords, so an RTL container works as well as an RTL page. Firefox misplaces popups
+          inside a container whose direction differs from the page's (Mozilla bug 2019601,{" "}
+          <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>).
         </li>
         <li>
           <strong>Focus is real DOM focus</strong> on items (no <code>aria-activedescendant</code>).
@@ -552,8 +562,8 @@ export function MenuPage() {
         A <code>Menu.Trigger</code> inside a <a href="/components/toolbar">Toolbar</a> opens on the
         arrow key perpendicular to the toolbar's, leaving the toolbar's own arrows to it. Enter and
         Space open it in every case. In a vertical toolbar, put the popup beside it on the
-        inline-end side: <code>side="right"</code>, or <code>side="left"</code> under{" "}
-        <code>direction: rtl</code>.
+        inline-end side: <code>side="inline-end"</code> (the right in LTR, the left under{" "}
+        <code>direction: rtl</code>).
       </p>
       <Table
         head={[
