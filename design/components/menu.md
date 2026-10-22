@@ -786,7 +786,8 @@ on a top-level Root; a Popup rendered as a `<dialog>`; `transition` and `keepMou
 
 ```css
 .menu { margin: 0; inset: auto; min-inline-size: 12rem; padding: 4px; border: 0; border-radius: 8px; box-shadow: 0 8px 32px rgb(0 0 0 / .2); }
-.menu[data-side="right"], .menu[data-side="left"] { margin-inline: 2px; }  /* submenu gap: `data-side` is the resolved side (right in LTR, left in RTL, either after a flip) */
+.menu[data-side="right"], .menu[data-side="left"],
+.menu[data-side="inline-start"], .menu[data-side="inline-end"] { margin-inline: 2px; }  /* submenu gap, symmetric and keyed on the resolved side, the closed logical value included so the first layout has it (conventions 13.2); a static `margin-inline-start: 2px` on a submenu class is the other correct form */
 .menu [role^="menuitem"] { display: flex; inline-size: 100%; padding: 6px 10px; border: 0; background: none; text-align: start; }
 .menu [role^="menuitem"]:focus-visible, .menu [role^="menuitem"]:focus { background: var(--accent-weak); outline: none; }  /* hover focuses, so :focus is the hover style too */
 .menu [aria-disabled="true"] { opacity: .4; }

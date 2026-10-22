@@ -1901,7 +1901,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 | Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
 | Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
-| Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter). Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open, back on close; after a scroll that moves the trigger to an edge, `data-side` equals the side the popup box actually sits on (the geometry invariant: Chromium keeps the option chosen at show, Firefox and WebKit re-choose, section 13.2), never "flips to X"; `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
+| Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter); a logical `side` costs exactly one render per show and one per hide (render counter, review M1); the scroll path deterministically (review M2): with `requestAnimationFrame` replaced by a manual queue and `document.addEventListener` spied, a show installs the `scroll` / `resize` listeners, a dispatched `scroll` with the stub changed reads the old value at once and in frame 1 and the new one in frame 2, a scroll between the frames re-runs the pair, and a hide or an unmount removes both listeners, cancels the pending frame and reads nothing after. Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open, back on close; after a scroll that moves the trigger to an edge, `data-side` equals the side the popup box actually sits on (the geometry invariant: Chromium keeps the option chosen at show, #92; Firefox and WebKit re-choose, section 13.2), never "flips to X", with the engine outcome pinned behind a runtime probe so the Chromium row fails the day the bug is fixed (review L5); `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). jsdom tests assert that components render with and without `transition`
@@ -2167,20 +2167,31 @@ merges `ref` into its popup element's ref and renders the returned values.
   drives the jsdom row, which has no `ResizeObserver`. While shown: `scroll` on the document
   (capture, passive: nested scrollers included) and `resize` on the window. **Each `scroll` /
   `resize` reads at once and again in the next two animation frames** (coalesced; a scroll
-  during a pending pair re-runs it at the end): Firefox 157 re-chooses the option on scroll
-  but the computed value is current only at the second frame after the event, and Chromium
-  156 re-chooses only when the scroll comes within about a frame of the show, otherwise it
-  keeps the option chosen at show and scroll-compensates the popup (implementation finding,
-  `memo/developer/positioning-wave11.md`; the research probe scrolled one frame after the
-  show, which is why it saw "current inside the handler"). Either way `data-side` reports
-  what is applied; the library does not try to force a re-choice.
+  during a pending pair re-runs it at the end). **Both engines apply scroll-dependent
+  anchoring one frame after the `scroll` event**, geometry included: in the handler, after a
+  forced layout and in a frame registered from the handler the computed `position-area` and
+  the popup's rect are still the old ones; they are current at the second frame. The timing is
+  unspecified (css-anchor-position-1 §3.3 leaves the snapshot timing open), so the frame reads
+  are the mechanism, not a Firefox special case (review M3). **Chromium 156 additionally does
+  not re-run position-try fallback for a top-layer popover** once a few frames have passed
+  since the show: an option that now overflows is kept and the popup is scroll-compensated
+  off screen, while a non-top-layer `position-anchor` element in the same layout re-chooses
+  on every scroll; that is non-conformant (§6.5 re-chooses whenever the box overflows and
+  another option fits) and is the human upstream task **#92**, cited from the scroll rows.
+  The research probe scrolled in the same task as the show, the one case Chromium re-chooses.
+  Either way `data-side` reports what is applied; the library does not try to force a
+  re-choice (a later fallback-sensitive change does not trigger one either).
 - **Write.** A plain `useState` in the part (`flushSync` from the observer and event paths so
   the attribute lands before paint; a plain `setState` from the layout effect that re-reads
   when the request changes), written only when `side` or `align` changed (section 3.5);
   `null` while not shown **and when the parsed pair equals the request**, so the comparison is
   against what was last written. Returned value: the resolved pair, else the requested one. A
-  popup that opens without flipping costs **no render**, which keeps Tooltip's "no React work
-  per hover" (tooltip.md 4.1); a flip costs one render on open and one on close. The "only
+  popup **with a physical `side`** that opens without flipping costs **no render**, which keeps
+  Tooltip's "no React work per hover" (tooltip.md 4.1); a flip costs one render on open and one
+  on close. **A logical `side` (`inline-start` / `inline-end`) always costs that one render on
+  open and one on close**, since the physical `data-side` never equals the logical request
+  (review M1; inherent: the attribute must turn physical while shown). Menu's submenus pay it
+  by default; a jsdom render-count row pins "exactly one per show and one per hide". The "only
   when changed" rule also terminates the `ResizeObserver` loop a consumer's `[data-side]`
   padding rule could otherwise start. A popup hidden but still rendered (exit animation) keeps
   the resolved value until its box goes.
@@ -2188,15 +2199,31 @@ merges `ref` into its popup element's ref and renders the returned values.
   margins** along the flipped axis, so a one-sided gap keyed on the resolved side
   (`[data-side="top"] { margin-block-end: 6px }`) is applied as `margin-block-start` once the
   flipped option is in force: gap 0 against the trigger (measured in both engines; with v0's
-  requested-value `data-side` the swap was what put the gap right). The documented recipe is
-  a symmetric margin along the side's axis: `margin-block: 6px` for a top / bottom side,
-  `margin-inline: 2px` for a left / right / inline one. An **Arrow** is unaffected: the insets
-  of a child are not part of the option.
+  requested-value `data-side` the swap was what put the gap right). Two correct recipes
+  (review L4), both documented:
+  1. **A static margin on the requested edge, not keyed on `data-side`** (the preferred form
+     when a class knows its `side`): `margin-block-start: 6px` for a popover below its
+     trigger, `margin-inline-start: 2px` for a submenu. The flip swaps it to the right edge by
+     itself, it is present at the first layout (no gap-less first frame), and it changes with
+     nothing, so it never triggers a re-choice. The Combobox example already does this.
+  2. **A symmetric margin along the side's axis keyed on `data-side`**, when one class serves
+     several sides: `margin-block: 6px` for `top` / `bottom`, `margin-inline: 2px` for `left`
+     / `right` **and for the closed values `inline-start` / `inline-end`**, which a logical
+     side carries until the observer writes; without those keys the first layout of every
+     submenu open has no gap, and the write is then a margin change, a fallback-sensitive
+     change (§6.5.1) that re-runs the choice and, in a width-constrained cell, can trip a
+     "ResizeObserver loop" error. The symmetric form also flips a few pixels early (the far
+     margin is part of the overflow test).
+  A one-sided margin keyed on the resolved `data-side` is the one wrong form. An **Arrow** is
+  unaffected: the insets of a child are not part of the option.
 - **Idle** with `side={null}` (the stylesheet owns placement; the parser cannot interpret
   consumer `@position-try` rules that set insets) and for a point-placed menu (no anchor): no
   reads, nothing emitted, as today.
 - **Not covered.** An anchor that moves through a layout shift with no scroll or resize; the
-  next scroll corrects it. Chromium's anchored container queries
+  next scroll corrects it. After a scroll-driven flip, **one frame is painted with the old
+  `data-side`** (the engine applies the option a frame after the event, and the write follows
+  the second-frame read), so an arrow points the wrong way for that frame; the show path has
+  no such frame (ResizeObserver plus `flushSync` before paint). Chromium's anchored container queries
   (`@container anchored(fallback: …)`) would give a pure-CSS signal but are Chromium-only
   (BCD 143; Gecko and WebKit have no position), so they are a documented consumer recipe for
   `side={null}`, not library code.
