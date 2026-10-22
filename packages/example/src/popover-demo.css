@@ -21,7 +21,9 @@
   margin-block: 6px;
 }
 .pop[data-side="right"],
-.pop[data-side="left"] {
+.pop[data-side="left"],
+.pop[data-side="inline-start"],
+.pop[data-side="inline-end"] {
   margin-inline: 6px;
 }
 .pop h2 {

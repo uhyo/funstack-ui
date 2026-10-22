@@ -15,13 +15,16 @@
   background: #fff;
 }
 /* Gaps on the resolved side (`data-side` is where the browser placed the menu; a submenu is
-   right in LTR, left in RTL). A flip swaps the popup's margins: both sides of the axis. */
+   right in LTR, left in RTL). A flip swaps the popup's margins: both sides of the axis. The
+   closed logical values are keyed too, so a submenu's first layout already has the gap. */
 .menu[data-side="bottom"],
 .menu[data-side="top"] {
   margin-block: 4px;
 }
 .menu[data-side="right"],
-.menu[data-side="left"] {
+.menu[data-side="left"],
+.menu[data-side="inline-start"],
+.menu[data-side="inline-end"] {
   margin-inline: 2px;
 }
 .menu [role^="menuitem"] {
