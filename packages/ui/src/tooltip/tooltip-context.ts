@@ -1,5 +1,13 @@
 "use client";
 import { createContext, use } from "react";
+import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
+
+/**
+ * `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). While
+ * shown, the state carries the resolved physical side.
+ */
+export type TooltipSide = AnchorSide;
+export type TooltipAlign = AnchorAlign;
 
 /** Which accessibility relation the tooltip provides for its trigger (design section 5.1). */
 export type TooltipProvides = "description" | "name";
@@ -23,6 +31,15 @@ export interface TooltipContextValue {
 }
 
 export const TooltipContext = createContext<TooltipContextValue | null>(null);
+
+/** What `Tooltip.Popup` tells its `Tooltip.Arrow`: the placement it renders (design 12.2). */
+export interface TooltipPopupContextValue {
+  /** The resolved side while shown, else the requested one; `null` with `side={null}`. */
+  readonly side: TooltipSide | null;
+  readonly align: TooltipAlign;
+}
+
+export const TooltipPopupContext = createContext<TooltipPopupContextValue | null>(null);
 
 export function useTooltipContext(part: string): TooltipContextValue {
   const context = use(TooltipContext);

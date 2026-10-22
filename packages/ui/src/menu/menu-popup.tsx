@@ -34,6 +34,7 @@ import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
+import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { claimPress, isHandledBy, MenuListContext, useMenuContext } from "./menu-context.js";
@@ -50,14 +51,20 @@ import {
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
 
+/** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type MenuSide = AnchorSide;
 export type MenuAlign = AnchorAlign;
 
 export interface MenuPopupState {
   /** Committed open state. Read `:popover-open` for the DOM truth. */
   readonly open: boolean;
-  /** `null` with `side={null}`, and while the menu is placed at a point (`context`). */
+  /**
+   * While shown: the physical side the browser placed the popup on (after any fallback flip;
+   * conventions 13.2). Otherwise the `side` prop. `null` with `side={null}`, and while the menu
+   * is placed at a point (`context`).
+   */
   readonly side: MenuSide | null;
+  /** While shown: the resolved alignment; otherwise the `align` prop. */
   readonly align: MenuAlign;
   /** This popup belongs to a submenu. */
   readonly submenu: boolean;
@@ -89,15 +96,20 @@ export interface MenuPopupProps extends Omit<
 > {
   /**
    * Placement against the Trigger through inline `position-area`, with `position-try-fallbacks`
-   * flipping it when it does not fit. Default `"bottom"` for a top-level menu, `"right"` for a
-   * submenu (whose fallback is `flip-inline` only). `null` emits no inline positioning (and no
+   * flipping it when it does not fit. Default `"bottom"` for a top-level menu, `"inline-end"` for
+   * a submenu (the right of the item in LTR, its left in RTL; its fallback is `flip-inline`
+   * only). `"left"` / `"right"` stay physical. `null` emits no inline positioning (and no
    * `data-side` / `data-align`): the stylesheet owns placement. Ignored for an open from a
    * `Menu.ContextTrigger`, which is placed at the pointer; there `null` also opts out of the
    * inline point placement and the library's `@position-try` rules, leaving only
    * `--menu-point-x` / `--menu-point-y`.
    */
   side?: MenuSide | null;
-  /** Alignment along the side. Default `"start"`. Ignored when `side` is `null`. */
+  /**
+   * Alignment along the side. Default `"start"` (both levels): inline-relative on a top / bottom
+   * side (mirrored under `direction: rtl`), the top edges on the others. Ignored when `side` is
+   * `null`.
+   */
   align?: MenuAlign;
   /**
    * `false` (default): the items are not rendered while the menu is closed; mounting them is part
@@ -142,22 +154,25 @@ type PointPlacement = Extract<MenuPlacement, { kind: "point" }>;
 
 /**
  * The inline placement of a point open (context-menu.md 3.3): the point as two custom
- * properties, and unless the stylesheet owns placement, `left` / `top` at it with the other two
- * insets `auto` (longhands, so React never sees a shorthand next to its longhands),
- * `position-area: none` (a consumer's anchored `position-area` would otherwise place the popup
- * inside a grid area) and the library's fallbacks, spelled by generation parity (4.3).
+ * properties, and unless the stylesheet owns placement, `top` at it and, by the popup's
+ * direction read at the open (4.6, #88), `left` (LTR) or `right` (RTL: the menu's right edge at
+ * the point) with the other two insets `auto` (longhands, so React never sees a shorthand next to
+ * its longhands), `position-area: none` (a consumer's anchored `position-area` would otherwise
+ * place the popup inside a grid area) and the library's fallbacks for that direction, spelled by
+ * generation parity (4.3).
  */
 function pointStyle(point: PointPlacement, stylesheetOwned: boolean): CSSProperties {
   const vars = { [MENU_POINT_X]: `${point.x}px`, [MENU_POINT_Y]: `${point.y}px` };
   if (stylesheetOwned) return vars as CSSProperties;
+  const rtl = point.direction === "rtl";
   return {
     ...vars,
     top: `var(${MENU_POINT_Y})`,
-    right: "auto",
+    right: rtl ? `calc(100% - var(${MENU_POINT_X}))` : "auto",
     bottom: "auto",
-    left: `var(${MENU_POINT_X})`,
+    left: rtl ? "auto" : `var(${MENU_POINT_X})`,
     positionArea: "none",
-    positionTryFallbacks: MENU_POINT_FALLBACKS[point.generation % 2],
+    positionTryFallbacks: MENU_POINT_FALLBACKS[point.direction][point.generation % 2],
   } as CSSProperties;
 }
 
@@ -197,7 +212,9 @@ function listenOutside(popup: HTMLElement, menu: MenuContextValue): () => void {
  * ArrowUp / ArrowDown / Home / End move focus between items (or the browser does, with
  * `experimental_focusgroup` where supported), printable characters run typeahead, ArrowLeft
  * closes a submenu. The top-level popup closes the whole menu at once when focus leaves it (Tab).
- * Style it with `:popover-open`; it emits `data-side` / `data-align` but no `data-open`.
+ * Style it with `:popover-open`; it emits `data-side` / `data-align` but no `data-open`. While
+ * shown, those are where the browser placed it (conventions 13.2), otherwise the requested
+ * values.
  *
  * Owned keys (conventions 1.2): `id`, `popover`, `role`, `aria-labelledby` (token-merged),
  * `tabIndex`, `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
@@ -205,7 +222,8 @@ function listenOutside(popup: HTMLElement, menu: MenuContextValue): () => void {
  * one), `onPointerEnter` / `onPointerLeave`, `data-side` / `data-align` unless `side` is `null`
  * or the menu is placed at a point, and `data-context` for an open from a `Menu.ContextTrigger`
  * (placed at the pointer: `--menu-point-x` / `--menu-point-y` inline, and unless `side` is
- * `null`, `left` / `top` at the point with the library's `@position-try` fallbacks, whose rules
+ * `null`, `top` and `left` (`right` for an RTL popup) at the point with the library's
+ * `@position-try` fallbacks, whose rules
  * it renders as a hoisted `<style>`). A top-level menu closes at once on a right- or
  * middle-click outside it.
  */
@@ -223,10 +241,16 @@ export function MenuPopup({
 }: MenuPopupProps) {
   const menu = useMenuContext("Menu.Popup");
   const { popover, submenu, loop } = menu;
-  const sideOption = sideProp === undefined ? (submenu ? "right" : "bottom") : sideProp;
+  // A submenu opens on the inline-end side of its item: the side ArrowRight (ArrowLeft in RTL)
+  // points to (wave 11, #53).
+  const sideOption = sideProp === undefined ? (submenu ? "inline-end" : "bottom") : sideProp;
   // A ContextTrigger's open is placed at the point; nothing is anchored (context-menu.md 3.3).
   const point = menu.placement.kind === "point" ? menu.placement : null;
-  const side = point !== null ? null : sideOption;
+  const requestedSide = point !== null ? null : sideOption;
+  // Resolved while shown (conventions 13.2); idle for a point open, which has no side.
+  const placement = useResolvedPlacement({ side: requestedSide, align });
+  const { side } = placement;
+  const resolvedAlign = placement.align;
 
   // As Tabs.List (#43): detected only with the flag, never during SSR or hydration.
   const nativeFocusgroup = useSyncExternalStore(
@@ -316,7 +340,11 @@ export function MenuPopup({
     element.addEventListener("pointerdown", onPointerDown);
     return () => element.removeEventListener("pointerdown", onPointerDown);
   }, []);
-  const ref = useMemo(() => mergeRefs(setElement, devRef), [setElement, devRef]);
+  const placementRef = placement.ref;
+  const ref = useMemo(
+    () => mergeRefs(setElement, devRef, placementRef),
+    [setElement, devRef, placementRef],
+  );
 
   const listContext = useMemo<MenuListContextValue>(
     () => ({ menu, nativeFocusgroup, typingAhead }),
@@ -326,7 +354,7 @@ export function MenuPopup({
   const state: MenuPopupState = {
     open: popover.committed,
     side,
-    align,
+    align: resolvedAlign,
     submenu,
     context: point !== null,
   };
@@ -449,7 +477,7 @@ export function MenuPopup({
         if (event.pointerType !== "touch") scheduleHoverClose(menu, event.nativeEvent);
       },
     }),
-    ...(side !== null && { "data-side": side, "data-align": align }),
+    ...(side !== null && { "data-side": side, "data-align": resolvedAlign }),
     "data-context": point !== null ? "" : undefined,
   };
 
@@ -487,14 +515,15 @@ export function MenuPopup({
     render,
     state,
     className,
-    // The inline placement sits under the consumer's style: the consumer wins.
+    // The inline placement (the requested one: the browser keeps choosing from it) sits under
+    // the consumer's style: the consumer wins.
     style:
       point !== null
         ? (s) => ({ ...pointStyle(point, sideOption === null), ...resolveStateValue(style, s) })
-        : side === null
+        : requestedSide === null
           ? style
           : (s) => ({
-              positionArea: positionArea(side, align),
+              positionArea: positionArea(requestedSide, align),
               positionTryFallbacks: submenu ? "flip-inline" : POSITION_TRY_FALLBACKS,
               ...resolveStateValue(style, s),
             }),

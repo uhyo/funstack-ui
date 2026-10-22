@@ -1,5 +1,5 @@
 "use client";
-import { Activity } from "react";
+import { Activity, useMemo } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -8,22 +8,31 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
+import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
+import { mergeRefs } from "../internal/merge-props.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
+import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
 
-export type PopoverSide = "top" | "bottom" | "left" | "right";
-export type PopoverAlign = "start" | "center" | "end";
+/** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
+export type PopoverSide = AnchorSide;
+export type PopoverAlign = AnchorAlign;
 
 export interface PopoverPopupState {
   /** Committed open state (library mode); `false` in JS-free mode. Read `:popover-open` for the DOM truth. */
   readonly open: boolean;
+  /**
+   * While shown: the physical side the browser placed the popup on (after any fallback flip;
+   * conventions 13.2). Otherwise the `side` prop. `null` with `side={null}`.
+   */
   readonly side: PopoverSide | null;
+  /** While shown: the resolved alignment; otherwise the `align` prop. */
   readonly align: PopoverAlign;
 }
 
@@ -41,11 +50,16 @@ export interface PopoverPopupProps extends Omit<
 > {
   /**
    * Placement relative to the Trigger through inline `position-area`, with
-   * `position-try-fallbacks` flipping it when it does not fit. Default `"bottom"`. `null` emits
-   * no inline positioning (and no `data-side` / `data-align`), so a stylesheet owns placement.
+   * `position-try-fallbacks` flipping it when it does not fit. Default `"bottom"`.
+   * `"inline-start"` / `"inline-end"` follow the popup's direction. `null` emits no inline
+   * positioning (and no `data-side` / `data-align`), so a stylesheet owns placement.
    */
   side?: PopoverSide | null;
-  /** Alignment along the side. Default `"center"`. Ignored when `side` is `null`. */
+  /**
+   * Alignment along the side. Default `"center"`. On a top / bottom side `start` / `end` are
+   * inline-relative (mirrored under `direction: rtl`); on the other sides the top / bottom
+   * edges. Ignored when `side` is `null`.
+   */
   align?: PopoverAlign;
   /**
    * Library mode: what happens to the children while the popover is closed.
@@ -92,7 +106,9 @@ export interface PopoverPopupProps extends Omit<
  * The popover itself: a `<dialog popover="auto" aria-modal="false" role="dialog">` with the id
  * the Trigger's `commandfor` names, placed against the Trigger with CSS Anchor Positioning and
  * wired to Title and Description through `aria-labelledby` / `aria-describedby`. Style it with
- * `:popover-open`; it emits `data-side` / `data-align` but no `data-open`.
+ * `:popover-open`; it emits `data-side` / `data-align` but no `data-open`. While shown, those are
+ * where the browser placed it (the applied `position-try-fallbacks` option; conventions 13.2),
+ * in both modes; otherwise the requested values.
  *
  * In library mode the children render from committed state, so content that suspends keeps the
  * popover closed (and the Trigger pending) until it is ready; `showPopover({ source: trigger })`
@@ -105,8 +121,8 @@ export interface PopoverPopupProps extends Omit<
  * `role` is a default (`"dialog"`) the consumer may override.
  */
 export function PopoverPopup({
-  side = "bottom",
-  align = "center",
+  side: sideProp = "bottom",
+  align: alignProp = "center",
   keepMounted,
   initialFocus,
   transition,
@@ -137,6 +153,12 @@ export function PopoverPopup({
     keepMounted,
     transition: isLibrary ? transition : undefined,
   });
+
+  // Resolved while shown, in library and JS-free mode alike (it hangs off the element's ref and
+  // the platform's `toggle`, not off library state).
+  const placement = useResolvedPlacement({ side: sideProp, align: alignProp });
+  const { side, align } = placement;
+  const ref = useMemo(() => mergeRefs(setElement, placement.ref), [setElement, placement.ref]);
 
   const state: PopoverPopupState = { open: ctx.committed, side, align };
 
@@ -183,12 +205,13 @@ export function PopoverPopup({
     render,
     state,
     className,
-    // The inline placement sits under the consumer's style: the consumer wins (design 8).
+    // The inline placement is the requested one (the browser keeps choosing from it) and sits
+    // under the consumer's style: the consumer wins (design 8).
     style:
-      side === null
+      sideProp === null
         ? style
         : (s) => ({
-            positionArea: positionArea(side, align),
+            positionArea: positionArea(sideProp, alignProp),
             positionTryFallbacks: POSITION_TRY_FALLBACKS,
             ...resolveStateValue(style, s),
           }),
@@ -197,7 +220,7 @@ export function PopoverPopup({
     // minimum role for `[popover]`, and a `<div>` popup needs it.
     props: { role: "dialog", ...rest },
     libraryProps,
-    ref: setElement,
+    ref,
   });
 
   return useTransitionBoundary("Popover.Popup", isLibrary ? transition : undefined, element);

@@ -3,7 +3,12 @@
 // a real browser follow this file's naming convention.
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { browserName, supportsInterestFor, supportsPopoverHint } from "./engine.js";
+import {
+  anchorPositionHonoursParentDirection,
+  browserName,
+  supportsInterestFor,
+  supportsPopoverHint,
+} from "./engine.js";
 
 describe("browser test environment", () => {
   it("renders a React element into the real document", () => {
@@ -70,5 +75,21 @@ describe("browser test environment", () => {
     // `<details name>` (exclusive accordions) is everywhere.
     expect("name" in HTMLDetailsElement.prototype).toBe(true);
     console.info(`[${browserName}] popover=hint: ${supportsPopoverHint}`);
+  });
+
+  it("records which engines misplace anchored popups in a direction island (Mozilla 2019601)", () => {
+    // Conventions 13.3, #89. Pinned per engine so a fix (or a regression elsewhere) shows up here
+    // first; the component rows branch on the probe itself.
+    expect(anchorPositionHonoursParentDirection).toBe(browserName !== "firefox");
+    // The keyword groups the library emits parse in every engine (conventions 13.1).
+    for (const value of [
+      "bottom span-self-x-end",
+      "self-x-end span-bottom",
+      "self-block-end span-self-inline-end",
+    ]) {
+      expect(CSS.supports("position-area", value)).toBe(true);
+    }
+    // ...and a mixed pair does not (the old combobox note's trap).
+    expect(CSS.supports("position-area", "block-end span-self-inline-end")).toBe(false);
   });
 });

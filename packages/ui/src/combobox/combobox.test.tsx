@@ -260,8 +260,12 @@ describe("Combobox", () => {
       expect(p.tagName).toBe("DIV");
       expect(p).toHaveAttribute("popover", "auto");
       expect(p).not.toHaveAttribute("role");
-      expect(p.style.getPropertyValue("position-area")).toBe("block-end span-inline-end");
+      // `self-*` keywords (wave 11, #53): the popup's own direction, so an RTL container counts.
+      expect(p.style.getPropertyValue("position-area")).toBe("self-block-end span-self-inline-end");
       expect(p.style.getPropertyValue("position-try-fallbacks")).toBe("flip-block");
+      // No resolved-placement hook on the listbox (combobox.md 7.2).
+      expect(p).not.toHaveAttribute("data-side");
+      expect(p).not.toHaveAttribute("data-align");
       // Children render on open (conventions 3.7).
       expect(p.children).toHaveLength(0);
       expect(hidden()).toBeNull();
@@ -2314,7 +2318,9 @@ describe("Combobox", () => {
     it("consumer style wins per property over the inline placement", () => {
       render(<Harness popup={{ style: { positionTryFallbacks: "none" } }} />);
       expect(popup().style.getPropertyValue("position-try-fallbacks")).toBe("none");
-      expect(popup().style.getPropertyValue("position-area")).toBe("block-end span-inline-end");
+      expect(popup().style.getPropertyValue("position-area")).toBe(
+        "self-block-end span-self-inline-end",
+      );
     });
 
     it("forwards refs", () => {

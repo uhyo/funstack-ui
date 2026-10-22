@@ -26,10 +26,18 @@ import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import {
+  anchorPositionHonoursParentDirection,
   browserName,
   supportsFocusgroup,
   supportsFocusVisibleOption,
 } from "../__tests__/engine.js";
+import {
+  actPoll,
+  frames,
+  near,
+  placedSide,
+  withPageDirection,
+} from "../__tests__/placement-browser.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import { Menu } from "./index.js";
@@ -488,6 +496,11 @@ describe("submenus (browser)", () => {
     const m = item("move").getBoundingClientRect();
     const s = sub().getBoundingClientRect();
     expect(Math.round(s.right)).toBeLessThanOrEqual(Math.round(m.left) + 1);
+    // Wave 11 (#20): the submenu reports where it went, and the requested side once closed.
+    await actPoll(() => sub().getAttribute("data-side"), "left");
+    await user.keyboard("{Escape}");
+    await expect.poll(() => isOpen(sub())).toBe(false);
+    await actPoll(() => sub().getAttribute("data-side"), "inline-end");
   });
 
   // WebKit 302008 (design 13.2, review M3): the shipped default placement of a submenu keeps
@@ -523,6 +536,141 @@ describe("submenus (browser)", () => {
       await expect.poll(() => isOpen()).toBe(false);
     },
   );
+});
+
+describe("resolved side and direction (browser, wave 11)", () => {
+  const side = (element: Element = popup()) => element.getAttribute("data-side");
+
+  it("a Trigger at the viewport bottom: the open menu reports data-side top and state.side top", async () => {
+    let state: { side: string | null } = { side: null };
+    render(
+      <div style={{ position: "fixed", left: 20, bottom: 0 }}>
+        <Menu.Root>
+          <Menu.Trigger data-testid="trigger" style={{ width: 100, height: 30, margin: 0 }}>
+            Actions
+          </Menu.Trigger>
+          <Menu.Popup
+            data-testid="popup"
+            style={popupStyle}
+            className={(s) => {
+              state = s;
+              return undefined;
+            }}
+          >
+            <Menu.Item data-testid="rename">Rename</Menu.Item>
+          </Menu.Popup>
+        </Menu.Root>
+      </div>,
+    );
+    expect(side()).toBe("bottom");
+    await openWithKeyboard();
+    await actPoll(() => side(), "top");
+    expect(state.side).toBe("top");
+    expect(placedSide(popup(), trigger())).toBe("top");
+    await user.keyboard("{Escape}");
+    await expect.poll(() => isOpen()).toBe(false);
+    await actPoll(() => side(), "bottom");
+  });
+
+  /**
+   * In RTL: ArrowLeft opens the submenu on the item's left (`inline-end`), and the top-level
+   * `align="start"` menu's right edge meets the Trigger's. `mirrored`: whether the engine places
+   * the anchored popups where the keywords say (not in Firefox inside an RTL container).
+   */
+  async function expectRtlMenus(mirrored: boolean): Promise<void> {
+    await openWithKeyboard();
+    const t = trigger().getBoundingClientRect();
+    let p = popup().getBoundingClientRect();
+    expect(near(p.top, t.bottom)).toBe(true);
+    if (mirrored) {
+      expect(near(p.right, t.right)).toBe(true);
+    } else {
+      // Firefox (Mozilla 2019601, #89): the inline alignment is mirrored inside a direction
+      // island; no workaround ships (conventions 13.3). Delete this branch once it fails.
+      expect(near(p.right, t.right)).toBe(false);
+      expect(near(p.left, t.left)).toBe(false);
+    }
+    expect(popup()).toHaveAttribute("data-align", "start");
+    await user.keyboard("{ArrowDown}{ArrowLeft}");
+    await flush();
+    await expect.poll(() => isOpen(sub())).toBe(true);
+    expect(item("inbox")).toHaveFocus();
+    expect(sub().style.getPropertyValue("position-area")).toBe("self-x-end span-bottom");
+    await frames();
+    if (mirrored) {
+      await actPoll(() => side(sub()), "left");
+    } else {
+      // Firefox: the misplaced submenu overflows and `flip-inline` applies (seen: `self-x-start
+      // span-bottom`, placed 86..256 for an item at 5..165); `data-side` reports the applied
+      // option all the same.
+      const applied = getComputedStyle(sub()).positionArea.includes("self-x-start")
+        ? "right"
+        : "left";
+      await actPoll(() => side(sub()), applied);
+    }
+    const m = item("move").getBoundingClientRect();
+    const s = sub().getBoundingClientRect();
+    p = popup().getBoundingClientRect();
+    expect(near(s.top, m.top)).toBe(true);
+    if (mirrored) {
+      expect(near(s.right, m.left)).toBe(true);
+    } else {
+      // Mozilla 2019601, as above: the submenu meets neither edge of its item.
+      expect(near(s.right, m.left)).toBe(false);
+      expect(near(s.left, m.right)).toBe(false);
+    }
+    // ArrowRight closes it in RTL; the attribute is the requested side again.
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(() => isOpen(sub())).toBe(false);
+    await actPoll(() => side(sub()), "inline-end");
+    await user.keyboard("{Escape}");
+    await expect.poll(() => isOpen()).toBe(false);
+  }
+
+  function RtlMenus({ fixedLeft }: { fixedLeft?: boolean }) {
+    return (
+      <div style={fixedLeft ? { position: "fixed", top: 20, left: 10 } : { padding: "40px 20px" }}>
+        <Menu.Root>
+          <Menu.Trigger data-testid="trigger" style={{ width: 100, height: 30, margin: 0 }}>
+            Actions
+          </Menu.Trigger>
+          <Menu.Popup data-testid="popup" style={popupStyle}>
+            <Submenu />
+          </Menu.Popup>
+        </Menu.Root>
+      </div>
+    );
+  }
+
+  it('under <html dir="rtl">: the submenu opens on the left with ArrowLeft; align start mirrors', async () => {
+    await withPageDirection("rtl", async () => {
+      render(<RtlMenus />);
+      await expectRtlMenus(true);
+    });
+  });
+
+  it('under <html dir="rtl">, near the left edge the submenu flips to the right', async () => {
+    await withPageDirection("rtl", async () => {
+      render(<RtlMenus fixedLeft />);
+      await openWithKeyboard();
+      await user.keyboard("{ArrowDown}{ArrowLeft}");
+      await flush();
+      await expect.poll(() => isOpen(sub())).toBe(true);
+      await actPoll(() => side(sub()), "right");
+      const m = item("move").getBoundingClientRect();
+      const s = sub().getBoundingClientRect();
+      expect(Math.round(s.left)).toBeGreaterThanOrEqual(Math.round(m.right) - 1);
+    });
+  });
+
+  it('inside a dir="rtl" container (Firefox: Mozilla 2019601, asserted)', async () => {
+    render(
+      <div dir="rtl">
+        <RtlMenus />
+      </div>,
+    );
+    await expectRtlMenus(anchorPositionHonoursParentDirection);
+  });
 });
 
 describe("checkbox and radio items (browser)", () => {

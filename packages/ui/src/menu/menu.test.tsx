@@ -17,6 +17,7 @@ import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
+import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
   createSuspender,
@@ -187,7 +188,7 @@ describe("Menu", () => {
       expect(p).toHaveAttribute("tabindex", "-1");
       expect(p).toHaveAttribute("data-side", "bottom");
       expect(p).toHaveAttribute("data-align", "start");
-      expect(p.style.getPropertyValue("position-area")).toBe("bottom span-right");
+      expect(p.style.getPropertyValue("position-area")).toBe("bottom span-self-x-end");
       expect(p.style.getPropertyValue("position-try-fallbacks")).toBe(
         "flip-block, flip-inline, flip-block flip-inline",
       );
@@ -279,9 +280,10 @@ describe("Menu", () => {
       expect(move).toHaveAttribute("command", "toggle-popover");
       expect(move.id).toBe(`${sub.id}-trigger`);
       expect(sub).toHaveAttribute("aria-labelledby", move.id);
-      expect(sub).toHaveAttribute("data-side", "right");
+      // Wave 11 (#53): the inline-end side, the right in LTR and the left in RTL.
+      expect(sub).toHaveAttribute("data-side", "inline-end");
       expect(sub).toHaveAttribute("data-align", "start");
-      expect(sub.style.getPropertyValue("position-area")).toBe("right span-bottom");
+      expect(sub.style.getPropertyValue("position-area")).toBe("self-x-end span-bottom");
       expect(sub.style.getPropertyValue("position-try-fallbacks")).toBe("flip-inline");
     });
 
@@ -1855,6 +1857,55 @@ describe("submenus", () => {
     expect(isOpen(screen.getByTestId("subpopup"))).toBe(true);
   }
   const sub = () => screen.getByTestId("subpopup");
+
+  describe("resolved placement (wave 11)", () => {
+    // Conventions 13.2: `getComputedStyle` stubbed for one popup (jsdom has no layout); the
+    // shim's `toggle` drives the hook.
+    it("the top-level popup: requested while closed, the stubbed pair while shown, requested after", async () => {
+      const user = setupUser();
+      stubComputedPlacement(() => screen.queryByTestId("popup"), {
+        positionArea: "span-self-x-end top",
+        direction: "ltr",
+      });
+      const states: MenuPopupState[] = [];
+      render(
+        <Harness
+          popup={{
+            className: (s) => {
+              states.push(s);
+              return undefined;
+            },
+          }}
+        />,
+      );
+      expect(popup().style.getPropertyValue("position-area")).toBe("bottom span-self-x-end");
+      expect(popup()).toHaveAttribute("data-side", "bottom");
+      await openMenu(user);
+      expect(popup()).toHaveAttribute("data-side", "top");
+      expect(popup()).toHaveAttribute("data-align", "start");
+      expect(states.at(-1)).toMatchObject({ side: "top", align: "start" });
+      await act(async () => popup().hidePopover());
+      await flush();
+      expect(popup()).toHaveAttribute("data-side", "bottom");
+      expect(states.at(-1)).toMatchObject({ side: "bottom", align: "start" });
+    });
+
+    it("a submenu in RTL: self-x-end span-bottom reads as left / start, inline-end once closed", async () => {
+      const user = setupUser();
+      stubComputedPlacement(() => screen.queryByTestId("subpopup"), {
+        positionArea: "self-x-end span-bottom",
+        direction: "rtl",
+      });
+      render(<Harness content={<SubmenuContent />} />);
+      await openSub(user);
+      expect(sub()).toHaveAttribute("data-side", "left");
+      expect(sub()).toHaveAttribute("data-align", "start");
+      expect(sub().style.getPropertyValue("position-area")).toBe("self-x-end span-bottom");
+      await act(async () => sub().hidePopover());
+      await flush();
+      expect(sub()).toHaveAttribute("data-side", "inline-end");
+    });
+  });
 
   it("a nested Root is a submenu; ArrowRight opens it beside its trigger, first item focused", async () => {
     const user = setupUser();

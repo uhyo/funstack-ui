@@ -36,6 +36,9 @@ const clientFiles = [
   "tooltip/tooltip-trigger.mjs",
   "tooltip/tooltip-popup.mjs",
   "tooltip/use-tooltip-interaction.mjs",
+  "tooltip/tooltip-arrow.mjs",
+  // The resolved-placement observer shared by Tooltip, Popover and Menu (conventions 13.2).
+  "internal/use-resolved-placement.mjs",
   // Switch, Checkbox and the shared native-input machinery (design/components/switch.md row 25,
   // checkbox.md C10, conventions 3.8).
   "switch/switch.mjs",

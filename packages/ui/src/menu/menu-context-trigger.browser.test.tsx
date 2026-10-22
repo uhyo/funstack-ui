@@ -26,6 +26,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mouse, toPagePoint } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsFocusVisibleOption } from "../__tests__/engine.js";
+import { withPageDirection } from "../__tests__/placement-browser.js";
 import { Popover } from "../popover/index.js";
 import { Menu } from "./index.js";
 import type {
@@ -321,6 +322,85 @@ describe("placement (browser)", () => {
     );
     expect(fallbacks).toContain("--fsui-menu-up");
     expect(fallbacks).toContain("--fsui-menu-up-left");
+  });
+});
+
+describe("direction (browser, wave 11, #88)", () => {
+  // The popup's computed direction picks the edge at the point (context-menu.md 4.6): in RTL the
+  // menu's right edge sits at the point and the fallbacks mirror. Insets, so Mozilla 2019601
+  // does not apply: no engine branch.
+  async function expectRtlPointPlacement(): Promise<void> {
+    const { width, height } = viewport();
+    const mid = { x: Math.round(width / 2), y: Math.round(height / 3) };
+    await openAt(mid.x, mid.y);
+    let r = rect();
+    expect(Math.abs(r.right - lastMenu!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(r.top - lastMenu!.y)).toBeLessThanOrEqual(1);
+    expect(popup().style.getPropertyValue("right")).toBe("calc(100% - var(--menu-point-x))");
+    expect(getComputedStyle(popup()).getPropertyValue("position-try-fallbacks")).toContain(
+      "--fsui-menu-up-right",
+    );
+    await act(async () => popup().hidePopover());
+    await flush();
+
+    // Near the left edge: flipped rightward (`--fsui-menu-right`).
+    await openAt(20, mid.y);
+    r = rect();
+    expect(Math.abs(r.left - lastMenu!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(r.top - lastMenu!.y)).toBeLessThanOrEqual(1);
+    await act(async () => popup().hidePopover());
+    await flush();
+
+    // The bottom-left corner (the region ends 60 px above the bottom): `--fsui-menu-up-right`.
+    await openAt(20, height - 70);
+    r = rect();
+    expect(Math.abs(r.left - lastMenu!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(r.bottom - lastMenu!.y)).toBeLessThanOrEqual(1);
+
+    // A move back to the middle while open: right edge at the point again (the flip is not kept).
+    await openAt(mid.x, mid.y);
+    r = rect();
+    expect(Math.abs(r.right - lastMenu!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(r.top - lastMenu!.y)).toBeLessThanOrEqual(1);
+    expect(popup()).not.toHaveAttribute("data-side");
+  }
+
+  it('under <html dir="rtl"> the menu opens to the left of the point and mirrors its flips', async () => {
+    await withPageDirection("rtl", async () => {
+      render(<Harness />);
+      await expectRtlPointPlacement();
+    });
+  });
+
+  it('the same with dir="rtl" on a wrapper around the region and the Popup', async () => {
+    render(<Harness wrap={(menu) => <div dir="rtl">{menu}</div>} />);
+    await expectRtlPointPlacement();
+  });
+
+  it("an LTR region whose Popup is rendered under an RTL wrapper: the popup's direction wins", async () => {
+    render(
+      <Menu.Root>
+        <Menu.ContextTrigger
+          data-testid="region"
+          dir="ltr"
+          style={{ position: "fixed", left: 0, top: 0, right: 0, bottom: 60 }}
+        />
+        <div dir="rtl">
+          <Menu.Popup data-testid="popup" aria-label="Actions">
+            <Items />
+          </Menu.Popup>
+        </div>
+      </Menu.Root>,
+    );
+    await expectRtlPointPlacement();
+  });
+
+  it("an LTR popup inside the same layout keeps its left edge at the point", async () => {
+    render(<Harness />);
+    const { width, height } = viewport();
+    await openAt(Math.round(width / 2), Math.round(height / 3));
+    expectTopLeftAtPoint();
+    expect(popup().style.getPropertyValue("left")).toBe("var(--menu-point-x)");
   });
 });
 

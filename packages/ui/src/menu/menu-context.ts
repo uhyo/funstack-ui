@@ -37,6 +37,11 @@ export type MenuPlacement =
       readonly source: HTMLElement;
       /** The pointer held down at the open, re-captured after a move's re-show (2.1). */
       readonly pointerId: number | undefined;
+      /**
+       * The popup's computed `direction` at this open or move (#88, 4.6): which edge of the menu
+       * sits at the point. Read once by `openAt`, never during render.
+       */
+      readonly direction: "ltr" | "rtl";
     };
 
 export const ANCHOR_PLACEMENT: MenuPlacement = { kind: "anchor" };

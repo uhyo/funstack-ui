@@ -20,6 +20,7 @@ import {
   expectPending,
   setupUser,
 } from "../__tests__/helpers.js";
+import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { MENU_POINT_FALLBACKS } from "../internal/anchor-position.js";
 import { Menu } from "./index.js";
 import type {
@@ -338,7 +339,7 @@ describe("Menu.ContextTrigger", () => {
         right: "auto",
         bottom: "auto",
         positionArea: "none",
-        fallbacks: MENU_POINT_FALLBACKS[1],
+        fallbacks: MENU_POINT_FALLBACKS.ltr[1],
       });
       expect(popup()).not.toHaveAttribute("data-side");
       expect(item("rename")).toBeInTheDocument();
@@ -1144,7 +1145,7 @@ describe("Menu.ContextTrigger", () => {
       await flush();
       expect(calls.at(-1)!.source).toBe(t);
       expect(popup()).toHaveAttribute("data-side", "bottom");
-      expect(popup().style.getPropertyValue("position-area")).toBe("bottom span-right");
+      expect(popup().style.getPropertyValue("position-area")).toBe("bottom span-self-x-end");
       await act(async () => popup().hidePopover());
       await flush();
       await rightClick(screen.getByTestId("label"));
@@ -1229,6 +1230,70 @@ describe("Menu.ContextTrigger", () => {
     });
   });
 
+  describe("direction (wave 11, #88)", () => {
+    // The popup's computed direction, read by `openAt` once per open and per move, picks the
+    // edge at the point (context-menu.md 4.6). jsdom computes `direction` from `dir` for nothing,
+    // so it is stubbed for the popup.
+    const stubDirection = (direction: string) =>
+      stubComputedPlacement(() => screen.queryByTestId("popup"), { direction });
+
+    it("an RTL popup puts its right edge at the point and names the mirrored options", async () => {
+      stubDirection("rtl");
+      render(<Harness />);
+      await rightClick(region(), 312, 148);
+      expect(isOpen()).toBe(true);
+      const first = pointStyle(popup());
+      expect(first).toEqual({
+        x: "312px",
+        y: "148px",
+        left: "auto",
+        top: "var(--menu-point-y)",
+        right: "calc(100% - var(--menu-point-x))",
+        bottom: "auto",
+        positionArea: "none",
+        // Generation 1 is odd: `--fsui-menu-right` first.
+        fallbacks: MENU_POINT_FALLBACKS.rtl[1],
+      });
+      expect(first.fallbacks.startsWith("--fsui-menu-right")).toBe(true);
+      expect(first.fallbacks).toContain("--fsui-menu-up-right");
+      expect(popup()).toHaveAttribute("data-context", "");
+      expect(popup()).not.toHaveAttribute("data-side");
+    });
+
+    it("a move after the direction flipped back to LTR uses the LTR insets and list", async () => {
+      const stub = stubDirection("rtl");
+      render(<Harness />);
+      await rightClick(region(), 100, 100);
+      expect(pointStyle(popup()).right).toBe("calc(100% - var(--menu-point-x))");
+      stub.set({ direction: "ltr" });
+      await rightClick(region(), 300, 250);
+      expect(isOpen()).toBe(true);
+      expect(pointStyle(popup())).toEqual({
+        x: "300px",
+        y: "250px",
+        left: "var(--menu-point-x)",
+        top: "var(--menu-point-y)",
+        right: "auto",
+        bottom: "auto",
+        positionArea: "none",
+        fallbacks: MENU_POINT_FALLBACKS.ltr[0],
+      });
+      expect(popup()).toHaveAttribute("data-context", "");
+      expect(popup()).not.toHaveAttribute("data-side");
+    });
+
+    it("side={null}: the direction does not add insets", async () => {
+      stubDirection("rtl");
+      render(<Harness popup={{ side: null }} />);
+      await rightClick(region(), 312, 148);
+      const s = pointStyle(popup());
+      expect(s.x).toBe("312px");
+      expect(s.left).toBe("");
+      expect(s.right).toBe("");
+      expect(s.fallbacks).toBe("");
+    });
+  });
+
   describe("<style> resource", () => {
     it("one hoisted <style> after the first point open; a second Root adds none", async () => {
       render(
@@ -1247,6 +1312,10 @@ describe("Menu.ContextTrigger", () => {
       const style = rulesInHead()[0]!;
       expect(style.getAttribute("data-href")).toBe("@funstack/ui/menu-point");
       expect(style.getAttribute("data-precedence")).toBe("fsui");
+      // Five options since wave 11: the two mirrored ones for an RTL menu (#88).
+      for (const name of ["up", "left", "up-left", "right", "up-right"]) {
+        expect(style.textContent).toContain(`@position-try --fsui-menu-${name} {`);
+      }
       // Nothing lands inside the popup.
       expect(popup().querySelector("style")).toBeNull();
       await rightClick(screen.getByTestId("region2"));

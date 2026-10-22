@@ -145,9 +145,11 @@ export function ComboboxPopup({
     render,
     state,
     className,
-    // Logical keywords: right under `direction: rtl` with no JS (design 7.2). The consumer wins.
+    // `self-*` keywords resolve against the popup's own inherited direction, so a `dir="rtl"`
+    // page or container flips the listbox with no JS; plain logical keywords would follow the
+    // root only (design 7.2, conventions 13.1). The consumer wins.
     style: (s) => ({
-      positionArea: "block-end span-inline-end",
+      positionArea: "self-block-end span-self-inline-end",
       positionTryFallbacks: "flip-block",
       minWidth: "anchor-size(width)",
       ...resolveStateValue(style, s),

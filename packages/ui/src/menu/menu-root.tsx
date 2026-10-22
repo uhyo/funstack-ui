@@ -18,6 +18,7 @@ import type {
   MenuOpenFocus,
   MenuPlacement,
 } from "./menu-context.js";
+import { isRtl } from "./menu-dom.js";
 
 /** Details passed as the second argument of `Menu.Root`'s `openChangeAction`. */
 export interface MenuOpenChangeDetails extends ActionDetails {
@@ -143,10 +144,14 @@ export function MenuRoot({
     },
   });
 
-  const { intended, requestOpen } = popover;
+  const { intended, requestOpen, popupRef } = popover;
   const openAt = useCallback(
     (point: { readonly x: number; readonly y: number }, options: MenuOpenAtOptions) => {
       const generation = ++placementGeneration.current;
+      // The popup's direction picks the edge at the point (context-menu.md 4.6, conventions
+      // 13.4): the popup element exists while closed and `direction` is inherited, so it
+      // computes without a box. Stored, so the Popup's style stays a function of state.
+      const popup = popupRef.current;
       setPlacement({
         kind: "point",
         x: point.x,
@@ -154,6 +159,7 @@ export function MenuRoot({
         generation,
         source: options.source,
         pointerId: options.pointerId,
+        direction: popup !== null && isRtl(popup) ? "rtl" : "ltr",
       });
       const focus: MenuOpenFocus = { cause: "first", pointer: options.pointer };
       if (intended()) {
@@ -170,7 +176,7 @@ export function MenuRoot({
         pointDispatch.current = false;
       }
     },
-    [intended, requestOpen],
+    [intended, requestOpen, popupRef],
   );
   const resetPlacement = useCallback((generation: number) => {
     setPlacement((current) =>

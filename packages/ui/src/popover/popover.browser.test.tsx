@@ -22,7 +22,18 @@ import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
-import { browserName, supportsPopoverHint } from "../__tests__/engine.js";
+import {
+  anchorPositionHonoursParentDirection,
+  browserName,
+  supportsPopoverHint,
+} from "../__tests__/engine.js";
+import {
+  actPoll,
+  frames,
+  near,
+  placedSide,
+  withPageDirection,
+} from "../__tests__/placement-browser.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import { Popover } from "./index.js";
@@ -907,5 +918,261 @@ describe("stack interactions (browser)", () => {
     expect(action).toHaveBeenCalledTimes(2);
     expect(action.mock.calls[1]![0]).toBe(false);
     expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+  });
+});
+
+// --- Wave 11: resolved side and direction (design 8, 13.3; conventions 13) -------------------
+
+/**
+ * The docs' gap rule (section 10), symmetric along the side's axis. A one-sided margin keyed on
+ * the resolved `data-side` would end up on the far side after a flip: `flip-block` swaps the
+ * popup's own block margins too, so `[data-side="top"] { margin-block-end }` is applied as
+ * `margin-block-start` (measured in Chromium and Firefox; memo/developer/positioning-wave11.md).
+ */
+const GAP_CSS = `
+.w11-pop { margin: 0; }
+.w11-pop[data-side="top"], .w11-pop[data-side="bottom"] { margin-block: 6px; }
+`;
+
+/** A Trigger at a fixed spot and its Popup, inside an optional `dir` wrapper (the Popup's parent). */
+function Placed({
+  top = 300,
+  left = 150,
+  dir,
+  jsFree = false,
+  gap = false,
+  popup: popupProps,
+}: {
+  top?: number;
+  left?: number;
+  dir?: "ltr" | "rtl";
+  jsFree?: boolean;
+  gap?: boolean;
+  popup?: Partial<PopoverPopupProps>;
+}) {
+  return (
+    <div dir={dir}>
+      <style>{GAP_CSS}</style>
+      <Popover.Root {...(jsFree ? {} : { defaultOpen: false })}>
+        <Popover.Trigger
+          data-testid="trigger"
+          style={{ position: "fixed", top, left, width: 100, height: 30, margin: 0 }}
+        >
+          Filters
+        </Popover.Trigger>
+        <Popover.Popup
+          data-testid="popup"
+          className={gap ? "w11-pop" : undefined}
+          {...popupProps}
+          style={{
+            inset: "auto",
+            padding: 0,
+            border: 0,
+            width: 160,
+            height: 120,
+            ...(gap ? {} : { margin: 0 }),
+          }}
+        >
+          <Popover.Title>Filters</Popover.Title>
+        </Popover.Popup>
+      </Popover.Root>
+    </div>
+  );
+}
+
+const side = () => popup().getAttribute("data-side");
+
+async function openPlaced(): Promise<void> {
+  await user.click(trigger());
+  await actPoll(() => isOpen(), true);
+}
+
+async function closePlaced(): Promise<void> {
+  await act(async () => popup().hidePopover());
+  await actPoll(() => isOpen(), false);
+  await flush();
+}
+
+describe("resolved side (wave 11, #20)", () => {
+  it("near the viewport bottom the popup flips above: data-side top, the gap faces the Trigger", async () => {
+    render(<Placed top={window.innerHeight - 40} gap />);
+    expect(side()).toBe("bottom");
+    await openPlaced();
+    await actPoll(side, "top");
+    const t = trigger().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    // The `[data-side="top"]` gap rule now sits between the popup's bottom edge and the Trigger.
+    expect(t.top - p.bottom).toBeCloseTo(6, 0);
+    // The inline style is still the request.
+    expect(popup().style.getPropertyValue("position-area")).toBe("bottom");
+    await closePlaced();
+    expect(side()).toBe("bottom");
+  });
+
+  it("in the middle it stays below: data-side bottom, gap below the Trigger", async () => {
+    render(<Placed gap />);
+    await openPlaced();
+    await frames();
+    expect(side()).toBe("bottom");
+    const t = trigger().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    expect(p.top - t.bottom).toBeCloseTo(6, 0);
+    await closePlaced();
+  });
+
+  it("JS-free mode (a commandfor click) reports the resolved side the same way", async () => {
+    render(<Placed top={window.innerHeight - 40} jsFree />);
+    expect(trigger()).toHaveAttribute("commandfor", popup().id);
+    await user.click(trigger());
+    await actPoll(() => isOpen(), true);
+    await actPoll(side, "top");
+    expect(placedSide(popup(), trigger())).toBe("top");
+    await closePlaced();
+    expect(side()).toBe("bottom");
+  });
+
+  it("after a scroll that leaves no room below, data-side is the side the popup is on", async () => {
+    // As Tooltip's row: Firefox re-chooses the option on scroll (one frame after the event),
+    // Chromium 156 keeps the one chosen at the show (memo/developer/positioning-wave11.md); the
+    // attribute must match the geometry either way.
+    render(
+      <div
+        data-testid="scroller"
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          width: 400,
+          height: 300,
+          overflow: "auto",
+        }}
+      >
+        <div style={{ height: 500 }} />
+        <Popover.Root defaultOpen={false}>
+          <Popover.Trigger
+            data-testid="trigger"
+            style={{ display: "block", width: 100, height: 30, margin: 0 }}
+          >
+            Filters
+          </Popover.Trigger>
+          <Popover.Popup
+            data-testid="popup"
+            style={{ inset: "auto", margin: 0, padding: 0, border: 0, width: 160, height: 120 }}
+          >
+            <Popover.Title>Filters</Popover.Title>
+          </Popover.Popup>
+        </Popover.Root>
+        <div style={{ height: 1000 }} />
+      </div>,
+    );
+    const scroller = screen.getByTestId("scroller");
+    const placedOn = () => {
+      const t = trigger().getBoundingClientRect();
+      const p = popup().getBoundingClientRect();
+      return p.top >= t.bottom - 1 ? "bottom" : p.bottom <= t.top + 1 ? "top" : "overlapping";
+    };
+    const scrollTo = async (top: number) => {
+      const scrolled = new Promise((resolve) =>
+        scroller.addEventListener("scroll", resolve, { once: true }),
+      );
+      await act(async () => {
+        scroller.scrollTop = top;
+        await scrolled;
+      });
+      await frames();
+    };
+    // The Trigger 100 px into the scroller (300 px tall, at the viewport's bottom): room below.
+    await scrollTo(400);
+    await openPlaced();
+    await frames();
+    expect(side()).toBe("bottom");
+    expect(placedOn()).toBe("bottom");
+    // The Trigger moves to the scroller's bottom edge, which is the viewport's: no room below.
+    await scrollTo(500 + 30 - scroller.clientHeight);
+    await expect.poll(() => near(trigger().getBoundingClientRect().bottom, innerHeight)).toBe(true);
+    expect(isOpen()).toBe(true);
+    const afterScroll = placedOn();
+    expect(["top", "bottom"]).toContain(afterScroll);
+    await actPoll(side, afterScroll);
+    console.info(
+      `[popover resolved side after scroll] the engine placed the popup on ${afterScroll}`,
+    );
+    // Escape, back to the middle, open again: below.
+    await user.keyboard("{Escape}");
+    await actPoll(() => isOpen(), false);
+    await actPoll(side, "bottom");
+    await scrollTo(400);
+    await openPlaced();
+    await frames();
+    expect(placedOn()).toBe("bottom");
+    expect(side()).toBe("bottom");
+    await closePlaced();
+  });
+});
+
+describe("direction (wave 11, #53)", () => {
+  async function expectMirrored(): Promise<void> {
+    const t = trigger().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    expect(near(p.top, t.bottom)).toBe(true);
+    expect(near(p.right, t.right)).toBe(true);
+  }
+
+  it('align="start" and side="inline-end" mirror under <html dir="rtl">', async () => {
+    await withPageDirection("rtl", async () => {
+      const { unmount } = render(<Placed left={300} popup={{ align: "start" }} />);
+      await openPlaced();
+      await frames();
+      expect(side()).toBe("bottom");
+      expect(popup()).toHaveAttribute("data-align", "start");
+      await expectMirrored();
+      await closePlaced();
+      unmount();
+
+      render(<Placed left={300} popup={{ side: "inline-end" }} />);
+      expect(side()).toBe("inline-end");
+      await openPlaced();
+      await actPoll(side, "left");
+      expect(placedSide(popup(), trigger())).toBe("left");
+      await closePlaced();
+      expect(side()).toBe("inline-end");
+    });
+  });
+
+  it('the same inside a dir="rtl" container (Firefox: Mozilla 2019601, asserted)', async () => {
+    const { unmount } = render(<Placed dir="rtl" left={300} popup={{ align: "start" }} />);
+    await openPlaced();
+    await frames();
+    expect(popup()).toHaveAttribute("data-align", "start");
+    let t = trigger().getBoundingClientRect();
+    let p = popup().getBoundingClientRect();
+    expect(near(p.top, t.bottom)).toBe(true);
+    if (anchorPositionHonoursParentDirection) {
+      expect(near(p.right, t.right)).toBe(true);
+    } else {
+      // Firefox (Mozilla 2019601, #89): the popup's parent box has a direction different from
+      // the root's, so the inline alignment inside the cell is mirrored; no workaround ships
+      // (conventions 13.3). Its inline edges meet neither Trigger edge. When this fails, the bug
+      // is fixed: delete this branch.
+      expect(near(p.right, t.right)).toBe(false);
+      expect(near(p.left, t.left)).toBe(false);
+    }
+    await closePlaced();
+    unmount();
+
+    render(<Placed dir="rtl" left={300} popup={{ side: "inline-end" }} />);
+    await openPlaced();
+    // The side comes from the keywords and the popup's direction: right in every engine.
+    await actPoll(side, "left");
+    t = trigger().getBoundingClientRect();
+    p = popup().getBoundingClientRect();
+    if (anchorPositionHonoursParentDirection) {
+      expect(near(p.right, t.left)).toBe(true);
+    } else {
+      // Mozilla 2019601, as above.
+      expect(near(p.right, t.left)).toBe(false);
+      expect(near(p.left, t.right)).toBe(false);
+    }
+    await closePlaced();
   });
 });

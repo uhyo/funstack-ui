@@ -68,6 +68,36 @@ export const supportsAriaNotify =
   typeof Element !== "undefined" && "ariaNotify" in Element.prototype;
 
 /**
+ * Whether an anchored `position-area` popover lands where its keywords say when its parent box
+ * has a direction different from the root's. False in Firefox (Mozilla bug 2019601, #89): the
+ * inline-axis alignment inside the cell is applied mirrored, physical keywords included
+ * (`bottom span-right` under a 300..500 px anchor lands at -80 instead of 300). True in Chromium
+ * and WebKit. A runtime probe rather than `browserName === "firefox"` (conventions 13.3), so the
+ * container-RTL rows fail, and their degraded branch can be deleted, the day the bug is fixed.
+ * Evaluated at import, in the LTR test document.
+ */
+export const anchorPositionHonoursParentDirection = (() => {
+  const island = document.createElement("div");
+  island.dir = "rtl";
+  const anchor = document.createElement("button");
+  anchor.style.cssText =
+    "position: fixed; left: 300px; top: 100px; width: 200px; height: 20px; margin: 0; padding: 0; border: 0";
+  const popover = document.createElement("div");
+  popover.popover = "manual";
+  popover.style.cssText =
+    "margin: 0; padding: 0; border: 0; width: 120px; height: 20px; position-area: bottom span-right; position-try-fallbacks: none";
+  island.append(anchor, popover);
+  document.body.append(island);
+  try {
+    popover.showPopover({ source: anchor });
+    return Math.abs(popover.getBoundingClientRect().left - 300) < 1;
+  } finally {
+    if (popover.matches(":popover-open")) popover.hidePopover();
+    island.remove();
+  }
+})();
+
+/**
  * `focus({ focusVisible })` is read (Chromium 145+, Firefox 104+, Safari 18.4+): the bindings
  * read the dictionary member before the method runs, so a detached element is enough.
  */

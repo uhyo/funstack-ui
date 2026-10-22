@@ -26,7 +26,11 @@ import { Suspense, use } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
-import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
+import {
+  anchorPositionHonoursParentDirection,
+  browserName,
+  supportsAriaNotify,
+} from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Popover } from "../popover/index.js";
@@ -171,10 +175,9 @@ describe("Combobox (browser)", () => {
       expect(p.width).toBeGreaterThanOrEqual(i.width - 0.5);
     });
 
-    // Page-level RTL. The logical keywords of `position-area` resolve against the popover's
-    // containing block, which for a top-layer element is the root: `dir="rtl"` on a container
-    // only does not flip them (probed: Chromium 156 keeps the left edges aligned, Firefox 157
-    // gives offsets that match neither edge; the `self-` keywords fix Chromium only).
+    // Page-level RTL. Since wave 11 (#53) the listbox uses the `self-*` keywords
+    // (`self-block-end span-self-inline-end`), which resolve against the popup's own inherited
+    // direction, so a page and a container both flip it (next row).
     it("aligns the inline-start edges under a page-level dir=rtl (the right edges)", async () => {
       document.documentElement.dir = "rtl";
       cleanups.push(() => document.documentElement.removeAttribute("dir"));
@@ -189,6 +192,31 @@ describe("Combobox (browser)", () => {
       expect(Math.abs(p.right - i.right)).toBeLessThanOrEqual(1);
       expect(Math.abs(p.top - i.bottom)).toBeLessThanOrEqual(1);
       expect(p.width).toBeGreaterThanOrEqual(i.width - 0.5);
+    });
+
+    it('aligns the right edges inside a dir="rtl" container (Firefox: Mozilla 2019601, asserted)', async () => {
+      render(
+        <div dir="rtl" style={{ paddingInline: 40 }}>
+          <Harness />
+        </div>,
+      );
+      await typeInto("j");
+      expect(isOpen()).toBe(true);
+      const i = input().getBoundingClientRect();
+      const p = popup().getBoundingClientRect();
+      expect(Math.abs(p.top - i.bottom)).toBeLessThanOrEqual(1);
+      if (anchorPositionHonoursParentDirection) {
+        expect(Math.abs(p.right - i.right)).toBeLessThanOrEqual(1);
+      } else {
+        // Firefox (Mozilla 2019601, #89): the popup's parent box has a direction different from
+        // the root's, so the inline alignment inside the cell is mirrored; no workaround ships
+        // (conventions 13.3). The listbox meets neither input edge. When this fails, the bug is
+        // fixed: delete this branch.
+        expect(Math.abs(p.right - i.right)).toBeGreaterThan(1);
+        expect(Math.abs(p.left - i.left)).toBeGreaterThan(1);
+      }
+      // No resolved-placement observer on the listbox (design 7.2).
+      expect(popup()).not.toHaveAttribute("data-side");
     });
 
     it("flips above the input near the viewport bottom (flip-block)", async () => {

@@ -22,6 +22,7 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
+import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
   createSuspender,
@@ -47,6 +48,7 @@ import type {
 
 type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
 type Mode = ControlMode | "static";
+const controlModesWithStatic: readonly Mode[] = ["uncontrolled", "controlled", "static"];
 
 interface HarnessProps {
   mode: Mode;
@@ -973,7 +975,7 @@ describe("Popover", () => {
       expect(titleStates.at(-1)).toEqual({ open: true, side: "top", align: "end" });
       expect(screen.getByRole("heading")).toHaveTextContent("Filters true");
       expect(screen.getByRole("heading")).toHaveClass("title-open");
-      expect(popup().style.getPropertyValue("position-area")).toBe("top span-left");
+      expect(popup().style.getPropertyValue("position-area")).toBe("top span-self-x-start");
     });
 
     it("JS-free mode passes open: false and pending: false", () => {
@@ -1984,14 +1986,18 @@ describe("Popover", () => {
   });
 
   describe("positioning", () => {
+    // The shared matrix of conventions 13.1 (wave 11): inline-relative `align`, `self-x-*` sides.
     const matrix = [
       ["bottom", "center", "bottom"],
-      ["bottom", "start", "bottom span-right"],
-      ["bottom", "end", "bottom span-left"],
-      ["top", "start", "top span-right"],
+      ["bottom", "start", "bottom span-self-x-end"],
+      ["bottom", "end", "bottom span-self-x-start"],
+      ["top", "start", "top span-self-x-end"],
       ["left", "center", "left"],
       ["right", "start", "right span-bottom"],
       ["right", "end", "right span-top"],
+      ["inline-start", "center", "self-x-start"],
+      ["inline-end", "start", "self-x-end span-bottom"],
+      ["inline-end", "end", "self-x-end span-top"],
     ] as const;
 
     it.each(matrix)("side=%s align=%s sets position-area: %s", (side, align, area) => {
@@ -2013,6 +2019,103 @@ describe("Popover", () => {
     it("the consumer's style wins over the inline placement", () => {
       render(<Harness mode="static" popup={{ style: { positionArea: "block-end" } }} />);
       expect(popup().style.getPropertyValue("position-area")).toBe("block-end");
+    });
+  });
+
+  describe("resolved placement (wave 11)", () => {
+    // Conventions 13.2: `getComputedStyle` is stubbed for the popup (jsdom has no layout); the
+    // shim's `toggle` drives the hook (no ResizeObserver in jsdom).
+    const stub = (positionArea: string, direction = "ltr") =>
+      stubComputedPlacement(() => screen.queryByTestId("popup"), { positionArea, direction });
+
+    it("jsdom (no computed position-area): the requested values while open", async () => {
+      const user = setupUser();
+      render(<Harness mode="uncontrolled" popup={{ side: "top", align: "end" }} />);
+      await openThroughTrigger(user);
+      expect(popup()).toHaveAttribute("data-side", "top");
+      expect(popup()).toHaveAttribute("data-align", "end");
+    });
+
+    it.each(controlModesWithStatic)(
+      "%s mode: a flipped position-area is the data-side and the state while shown",
+      async (mode) => {
+        const user = setupUser();
+        stub("span-self-x-end top");
+        const states: PopoverPopupState[] = [];
+        render(
+          <Harness
+            mode={mode}
+            popup={{
+              align: "start",
+              className: (s) => {
+                states.push(s);
+                return `pop-${s.side}`;
+              },
+            }}
+          />,
+        );
+        expect(popup()).toHaveAttribute("data-side", "bottom");
+        if (mode === "static") {
+          await user.click(trigger());
+          await flush();
+        } else {
+          await openThroughTrigger(user);
+        }
+        expect(isOpen()).toBe(true);
+        expect(popup()).toHaveAttribute("data-side", "top");
+        expect(popup()).toHaveAttribute("data-align", "start");
+        expect(popup()).toHaveClass("pop-top");
+        expect(states.at(-1)).toMatchObject({ side: "top", align: "start" });
+        // The inline style keeps the requested keywords.
+        expect(popup().style.getPropertyValue("position-area")).toBe("bottom span-self-x-end");
+
+        await act(async () => popup().hidePopover());
+        await flush();
+        expect(popup()).toHaveAttribute("data-side", "bottom");
+        expect(states.at(-1)).toMatchObject({ side: "bottom", align: "start" });
+      },
+    );
+
+    it("an open where it was asked costs no Popup render beyond the open itself", async () => {
+      const user = setupUser();
+      stub("bottom");
+      let renders = 0;
+      render(
+        <Harness
+          mode="static"
+          popup={{
+            className: () => {
+              renders++;
+              return undefined;
+            },
+          }}
+        />,
+      );
+      const before = renders;
+      await user.click(trigger());
+      await flush();
+      expect(isOpen()).toBe(true);
+      expect(renders).toBe(before);
+    });
+
+    it('side="inline-end" renders self-x-end inline and data-side="inline-end" while closed', async () => {
+      const user = setupUser();
+      stub("self-x-end span-bottom", "rtl");
+      render(<Harness mode="uncontrolled" popup={{ side: "inline-end", align: "start" }} />);
+      expect(popup().style.getPropertyValue("position-area")).toBe("self-x-end span-bottom");
+      expect(popup()).toHaveAttribute("data-side", "inline-end");
+      await openThroughTrigger(user);
+      expect(popup()).toHaveAttribute("data-side", "left");
+      expect(popup()).toHaveAttribute("data-align", "start");
+    });
+
+    it("side={null} never reads the computed style", async () => {
+      const user = setupUser();
+      const s = stub("bottom");
+      render(<Harness mode="uncontrolled" popup={{ side: null }} />);
+      await openThroughTrigger(user);
+      expect(s.calls()).toBe(0);
+      expect(popup()).not.toHaveAttribute("data-side");
     });
   });
 

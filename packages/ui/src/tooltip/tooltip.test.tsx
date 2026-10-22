@@ -27,6 +27,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 import { createSuspender } from "../__tests__/helpers.js";
+import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { isPopoverOpen } from "../__tests__/popover-shim.js";
 import { Menu } from "../menu/index.js";
 import { Tabs } from "../tabs/index.js";
@@ -34,6 +35,7 @@ import { ToggleGroup } from "../toggle-group/index.js";
 import { Toolbar } from "../toolbar/index.js";
 import { Tooltip } from "./index.js";
 import type {
+  TooltipArrowState,
   TooltipPopupProps,
   TooltipPopupState,
   TooltipRootProps,
@@ -772,19 +774,27 @@ describe("Native step-aside (experimental_interestFor)", () => {
 });
 
 describe("Positioning", () => {
+  // Conventions 13.1: inline-relative `align` on a horizontal side, `self-x-*` for the inline
+  // sides; never a plain logical keyword.
   const matrix = [
-    ["top", "start", "top span-right"],
+    ["top", "start", "top span-self-x-end"],
     ["top", "center", "top"],
-    ["top", "end", "top span-left"],
-    ["bottom", "start", "bottom span-right"],
+    ["top", "end", "top span-self-x-start"],
+    ["bottom", "start", "bottom span-self-x-end"],
     ["bottom", "center", "bottom"],
-    ["bottom", "end", "bottom span-left"],
+    ["bottom", "end", "bottom span-self-x-start"],
     ["left", "start", "left span-bottom"],
     ["left", "center", "left"],
     ["left", "end", "left span-top"],
     ["right", "start", "right span-bottom"],
     ["right", "center", "right"],
     ["right", "end", "right span-top"],
+    ["inline-start", "start", "self-x-start span-bottom"],
+    ["inline-start", "center", "self-x-start"],
+    ["inline-start", "end", "self-x-start span-top"],
+    ["inline-end", "start", "self-x-end span-bottom"],
+    ["inline-end", "center", "self-x-end"],
+    ["inline-end", "end", "self-x-end span-top"],
   ] as const;
 
   it.each(matrix)("side=%s align=%s sets position-area: %s", (side, align, area) => {
@@ -820,6 +830,236 @@ describe("Positioning", () => {
     expect(popup().style.getPropertyValue("position-try-fallbacks")).toBe(
       "flip-block, flip-inline, flip-block flip-inline",
     );
+  });
+});
+
+describe("Resolved placement (wave 11)", () => {
+  // Conventions 13.2: while shown, data-side / data-align and the state are where the browser
+  // placed the popup (the computed position-area); otherwise the requested values. jsdom has no
+  // layout, so `getComputedStyle` is stubbed for the popup; the shim's `toggle` drives the hook
+  // (no ResizeObserver in jsdom).
+  const arrow = () => screen.getByTestId("arrow");
+
+  function Placed(props: { popup?: TooltipPopupProps; onRender?: (s: TooltipPopupState) => void }) {
+    const { popup: popupProps, onRender } = props;
+    return (
+      <Tooltip.Root>
+        <Tooltip.Trigger>Save</Tooltip.Trigger>
+        <Tooltip.Popup
+          data-testid="popup"
+          className={({ side, align }) => `tip tip-${side ?? "custom"}-${align}`}
+          {...popupProps}
+        >
+          {(s) => {
+            onRender?.(s);
+            return (
+              <>
+                Saves the document
+                <Tooltip.Arrow data-testid="arrow" className={({ side }) => `arrow-${side}`} />
+              </>
+            );
+          }}
+        </Tooltip.Popup>
+      </Tooltip.Root>
+    );
+  }
+
+  /** Shows (or hides) the popup and lets the shim's queued `toggle` task run. */
+  async function setShown(shown: boolean): Promise<void> {
+    await act(async () => {
+      if (shown) popup().showPopover({ source: trigger() });
+      else popup().hidePopover();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
+  it("renders the requested values while shown when the computed value is unknown (jsdom)", async () => {
+    render(<Placed popup={{ side: "bottom", align: "end" }} />);
+    await setShown(true);
+    expect(isPopoverOpen(popup())).toBe(true);
+    expect(popup()).toHaveAttribute("data-side", "bottom");
+    expect(popup()).toHaveAttribute("data-align", "end");
+    expect(arrow()).toHaveAttribute("data-side", "bottom");
+  });
+
+  it("a flipped position-area becomes data-side / data-align on Popup and Arrow, and the state", async () => {
+    const states: TooltipPopupState[] = [];
+    stubComputedPlacement(() => screen.queryByTestId("popup"), {
+      positionArea: "span-left bottom",
+      direction: "ltr",
+    });
+    render(<Placed onRender={(s) => states.push(s)} />);
+    expect(popup()).toHaveAttribute("data-side", "top");
+    await setShown(true);
+    expect(popup()).toHaveAttribute("data-side", "bottom");
+    expect(popup()).toHaveAttribute("data-align", "end");
+    expect(popup()).toHaveClass("tip-bottom-end");
+    expect(arrow()).toHaveAttribute("data-side", "bottom");
+    expect(arrow()).toHaveAttribute("data-align", "end");
+    expect(arrow()).toHaveClass("arrow-bottom");
+    expect(states.at(-1)).toEqual({ disabled: false, side: "bottom", align: "end" });
+    // The inline style keeps the requested keywords: the browser keeps choosing from them.
+    expect(popup().style.getPropertyValue("position-area")).toBe("top");
+
+    await setShown(false);
+    expect(popup()).toHaveAttribute("data-side", "top");
+    expect(popup()).toHaveAttribute("data-align", "center");
+    expect(arrow()).toHaveAttribute("data-side", "top");
+    expect(states.at(-1)).toEqual({ disabled: false, side: "top", align: "center" });
+  });
+
+  it.each([
+    ["span-all bottom", "ltr", "bottom", "center"], // Firefox's serialisation of a flip
+    ["span-self-x-end bottom", "ltr", "bottom", "start"],
+    ["span-self-x-end bottom", "rtl", "bottom", "start"],
+    ["self-x-end span-bottom", "rtl", "left", "start"],
+  ])("%s (%s) reads as %s / %s", async (positionArea, direction, side, align) => {
+    stubComputedPlacement(() => screen.queryByTestId("popup"), { positionArea, direction });
+    render(<Placed />);
+    await setShown(true);
+    expect(popup()).toHaveAttribute("data-side", side);
+    expect(popup()).toHaveAttribute("data-align", align);
+  });
+
+  it("an open where it was asked costs no render", async () => {
+    let renders = 0;
+    const stub = stubComputedPlacement(() => screen.queryByTestId("popup"), {
+      positionArea: "top",
+      direction: "ltr",
+    });
+    render(<Placed onRender={() => renders++} />);
+    const before = renders;
+    await setShown(true);
+    expect(stub.calls()).toBeGreaterThan(0);
+    expect(renders).toBe(before);
+    await setShown(false);
+    expect(renders).toBe(before);
+  });
+
+  it('side="inline-end" renders inline-end while closed and the physical side while shown', async () => {
+    const stub = stubComputedPlacement(() => screen.queryByTestId("popup"), {
+      positionArea: "self-x-end",
+      direction: "ltr",
+    });
+    render(<Placed popup={{ side: "inline-end" }} />);
+    expect(popup().style.getPropertyValue("position-area")).toBe("self-x-end");
+    expect(popup()).toHaveAttribute("data-side", "inline-end");
+    expect(arrow()).toHaveAttribute("data-side", "inline-end");
+    await setShown(true);
+    expect(popup()).toHaveAttribute("data-side", "right");
+    await setShown(false);
+    expect(popup()).toHaveAttribute("data-side", "inline-end");
+    stub.set({ positionArea: "self-x-end", direction: "rtl" });
+    await setShown(true);
+    expect(popup()).toHaveAttribute("data-side", "left");
+    expect(arrow()).toHaveAttribute("data-side", "left");
+  });
+
+  it("a changed side while shown is read again", async () => {
+    const stub = stubComputedPlacement(() => screen.queryByTestId("popup"), {
+      positionArea: "top",
+      direction: "ltr",
+    });
+    const { rerender } = render(<Placed popup={{ side: "top" }} />);
+    await setShown(true);
+    expect(popup()).toHaveAttribute("data-side", "top");
+    stub.set({ positionArea: "span-all top", direction: "ltr" });
+    rerender(<Placed popup={{ side: "bottom" }} />);
+    // The engine kept `top` (say, no room below): the attribute reports it.
+    expect(popup()).toHaveAttribute("data-side", "top");
+    stub.set({ positionArea: "bottom", direction: "ltr" });
+    rerender(<Placed popup={{ side: "bottom", align: "start" }} />);
+    expect(popup()).toHaveAttribute("data-side", "bottom");
+  });
+
+  it("side={null} never reads the computed style and emits nothing", async () => {
+    const stub = stubComputedPlacement(() => screen.queryByTestId("popup"), {
+      positionArea: "bottom",
+      direction: "ltr",
+    });
+    render(<Placed popup={{ side: null }} />);
+    await setShown(true);
+    await setShown(false);
+    expect(stub.calls()).toBe(0);
+    expect(popup()).not.toHaveAttribute("data-side");
+    expect(arrow()).not.toHaveAttribute("data-side");
+    expect(arrow()).not.toHaveAttribute("data-align");
+  });
+
+  it("the server renders the requested values on Popup and Arrow", () => {
+    const html = renderToString(<Placed popup={{ side: "inline-start", align: "end" }} />);
+    expect(html).toContain('data-side="inline-start"');
+    expect(html).toMatch(/<span[^>]*aria-hidden="true"[^>]*data-side="inline-start"/);
+    expect(html).toContain("position-area:self-x-start span-top");
+  });
+});
+
+describe("Arrow", () => {
+  it("renders an aria-hidden span with the Popup's data-side / data-align", () => {
+    render(
+      <Tooltip.Root>
+        <Tooltip.Trigger>Save</Tooltip.Trigger>
+        <Tooltip.Popup side="right" align="start">
+          Saves
+          <Tooltip.Arrow data-testid="arrow" className="arrow" />
+        </Tooltip.Popup>
+      </Tooltip.Root>,
+    );
+    const el = screen.getByTestId("arrow");
+    expect(el.tagName).toBe("SPAN");
+    expect(el).toHaveAttribute("aria-hidden", "true");
+    expect(el).toHaveAttribute("data-side", "right");
+    expect(el).toHaveAttribute("data-align", "start");
+    expect(el).toHaveClass("arrow");
+    expect(el).toBeEmptyDOMElement();
+  });
+
+  it("className / style / children / render receive { side, align }", () => {
+    const states: TooltipArrowState[] = [];
+    render(
+      <Tooltip.Root>
+        <Tooltip.Trigger>Save</Tooltip.Trigger>
+        <Tooltip.Popup side="bottom" align="end">
+          Saves
+          <Tooltip.Arrow
+            data-testid="arrow"
+            className={({ side }) => `arrow-${side}`}
+            style={({ align }) => ({ insetInlineEnd: align === "end" ? "12px" : undefined })}
+            render={(props, s) => {
+              states.push(s);
+              return <i {...props} />;
+            }}
+          >
+            {({ side, align }) => `${side}/${align}`}
+          </Tooltip.Arrow>
+        </Tooltip.Popup>
+      </Tooltip.Root>,
+    );
+    const el = screen.getByTestId("arrow");
+    expect(el.tagName).toBe("I");
+    expect(el).toHaveClass("arrow-bottom");
+    expect(el).toHaveStyle({ insetInlineEnd: "12px" });
+    expect(el).toHaveTextContent("bottom/end");
+    expect(el).toHaveAttribute("aria-hidden", "true");
+    expect(states.at(-1)).toEqual({ side: "bottom", align: "end" });
+  });
+
+  it("the consumer cannot remove aria-hidden", () => {
+    render(
+      <Tooltip.Root>
+        <Tooltip.Trigger>Save</Tooltip.Trigger>
+        <Tooltip.Popup>
+          Saves
+          <Tooltip.Arrow data-testid="arrow" render={<span aria-hidden={false} />} />
+        </Tooltip.Popup>
+      </Tooltip.Root>,
+    );
+    expect(screen.getByTestId("arrow")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("throws outside a Tooltip.Popup", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => render(<Tooltip.Arrow />)).toThrow(/Tooltip\.Popup/);
   });
 });
 

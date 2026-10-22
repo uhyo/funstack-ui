@@ -8,9 +8,20 @@ import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import { supportsInterestFor, supportsPopoverHint } from "../__tests__/engine.js";
+import {
+  anchorPositionHonoursParentDirection,
+  supportsInterestFor,
+  supportsPopoverHint,
+} from "../__tests__/engine.js";
+import {
+  actPoll,
+  frames,
+  near,
+  placedSide,
+  withPageDirection,
+} from "../__tests__/placement-browser.js";
 import { Tooltip } from "./index.js";
-import type { TooltipPopupProps, TooltipTriggerProps } from "./index.js";
+import type { TooltipPopupProps, TooltipPopupState, TooltipTriggerProps } from "./index.js";
 
 function Harness({
   trigger,
@@ -364,3 +375,283 @@ describe.skipIf(!supportsInterestFor)(
     });
   },
 );
+
+// --- Wave 11: resolved side, inline sides and direction (design 7.4, 7.5, 13; conventions 13) --
+
+/** The docs' Arrow recipe without the rotation, so the arrow's box is exactly 8 x 8. */
+const ARROW_CSS = `
+.t-arrow { position: absolute; width: 8px; height: 8px; background: black; }
+.t-arrow[data-side="top"] { bottom: -4px; inset-inline-start: calc(50% - 4px); }
+.t-arrow[data-side="bottom"] { top: -4px; inset-inline-start: calc(50% - 4px); }
+.t-arrow[data-side="left"] { right: -4px; top: calc(50% - 4px); }
+.t-arrow[data-side="right"] { left: -4px; top: calc(50% - 4px); }
+`;
+
+/**
+ * A trigger at a fixed spot (the viewport is wider than 400 px in every engine) with its Popup
+ * and an Arrow, inside an optional `dir` wrapper: the Popup's DOM parent, so with `dir="rtl"` it
+ * is a direction island in the LTR test document.
+ */
+function Placed({
+  dir,
+  top = 300,
+  left = 150,
+  popup: popupProps,
+  trigger: triggerProps,
+  onPopupRender,
+}: {
+  dir?: "ltr" | "rtl";
+  top?: number;
+  left?: number;
+  popup?: TooltipPopupProps;
+  trigger?: TooltipTriggerProps;
+  onPopupRender?: (state: TooltipPopupState) => void;
+}) {
+  return (
+    <div dir={dir}>
+      <style>{ARROW_CSS}</style>
+      <Tooltip.Root delay={0} closeDelay={0}>
+        <Tooltip.Trigger
+          {...triggerProps}
+          style={{ position: "fixed", top, left, width: 100, height: 30, margin: 0 }}
+        >
+          Save
+        </Tooltip.Trigger>
+        <Tooltip.Popup
+          data-testid="popup"
+          className={(s) => {
+            onPopupRender?.(s);
+            return `tip tip-${s.side}`;
+          }}
+          {...popupProps}
+          style={{ margin: 0, padding: 0, border: 0, width: 60, height: 20 }}
+        >
+          Tip
+          <Tooltip.Arrow data-testid="arrow" className="t-arrow" />
+        </Tooltip.Popup>
+      </Tooltip.Root>
+    </div>
+  );
+}
+
+const arrow = () => screen.getByTestId("arrow");
+const side = () => popup().getAttribute("data-side");
+
+/** Opens with the library's own call (no hover: the pointer must not decide the test). */
+async function show(): Promise<void> {
+  await act(async () => {
+    popup().showPopover({ source: trigger() });
+  });
+  await actPoll(isOpen, true);
+}
+
+describe("resolved side (wave 11, #20)", () => {
+  it("a tooltip flipped below the viewport top reports bottom on Popup, Arrow and state", async () => {
+    const states: TooltipPopupState[] = [];
+    render(<Placed top={0} onPopupRender={(s) => states.push(s)} />);
+    expect(side()).toBe("top");
+    await act(async () => {
+      await userEvent.hover(trigger());
+    });
+    await actPoll(isOpen, true);
+    await actPoll(side, "bottom");
+    expect(popup()).toHaveAttribute("data-align", "center");
+    expect(arrow()).toHaveAttribute("data-side", "bottom");
+    expect(states.at(-1)).toMatchObject({ side: "bottom", align: "center" });
+    expect(popup()).toHaveClass("tip-bottom");
+    const t = trigger().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    const a = arrow().getBoundingClientRect();
+    // The browser flipped it below the trigger...
+    expect(near(p.top, t.bottom)).toBe(true);
+    // ...and the Arrow, positioned by `[data-side="bottom"]`, straddles the popup's top edge,
+    // facing the trigger.
+    expect(near(a.top + a.height / 2, p.top)).toBe(true);
+    // The inline style is still the request.
+    expect(popup().style.getPropertyValue("position-area")).toBe("top");
+
+    await act(async () => popup().hidePopover());
+    await actPoll(side, "top");
+    expect(arrow()).toHaveAttribute("data-side", "top");
+  });
+
+  it("a tooltip with room above stays on top and its open costs no render", async () => {
+    let renders = 0;
+    render(<Placed onPopupRender={() => renders++} />);
+    const before = renders;
+    await act(async () => {
+      await userEvent.hover(trigger());
+    });
+    await actPoll(isOpen, true);
+    await frames();
+    expect(side()).toBe("top");
+    const t = trigger().getBoundingClientRect();
+    const a = arrow().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    expect(near(p.bottom, t.top)).toBe(true);
+    expect(near(a.top + a.height / 2, p.bottom)).toBe(true);
+    // The interaction effect writes no state and the observer wrote none.
+    expect(renders).toBe(before);
+  });
+
+  it("after a scroll that leaves no room above, data-side is the side the popup is on", async () => {
+    // Engines differ on whether a scroll re-chooses the option (memo/developer/
+    // positioning-wave11.md): Firefox 157 flips the popup below the trigger, in the layout of the
+    // frame after the `scroll` event; Chromium 156 keeps the option it chose at the show (it
+    // re-chooses on scroll only within a frame or so of the show), so its popup stays above,
+    // scroll-compensated off the top edge. Either way the attribute must report where the popup
+    // is: that is the assertion, read from the geometry, not from the engine's name.
+    render(
+      <div
+        data-testid="scroller"
+        style={{ position: "fixed", top: 0, left: 0, width: 400, height: 300, overflow: "auto" }}
+      >
+        <div style={{ height: 200 }} />
+        <Tooltip.Root>
+          <Tooltip.Trigger style={{ width: 100, height: 30, margin: 0, display: "block" }}>
+            Save
+          </Tooltip.Trigger>
+          <Tooltip.Popup
+            data-testid="popup"
+            style={{ margin: 0, padding: 0, border: 0, width: 60, height: 20 }}
+          >
+            Tip
+          </Tooltip.Popup>
+        </Tooltip.Root>
+        <div style={{ height: 1000 }} />
+      </div>,
+    );
+    const scroller = screen.getByTestId("scroller");
+    const placedOn = () => placedSide(popup(), trigger());
+    /** Scrolls the container and lets the engine lay out the frame after the `scroll` event. */
+    const scrollTo = async (top: number) => {
+      const scrolled = new Promise((resolve) =>
+        scroller.addEventListener("scroll", resolve, { once: true }),
+      );
+      await act(async () => {
+        scroller.scrollTop = top;
+        await scrolled;
+      });
+      await frames();
+    };
+
+    await show();
+    await frames();
+    expect(placedOn()).toBe("top");
+    expect(side()).toBe("top");
+    // The trigger reaches the viewport's top edge: no room above.
+    await scrollTo(200);
+    expect(isOpen()).toBe(true);
+    const afterScroll = placedOn();
+    expect(["top", "bottom"]).toContain(afterScroll);
+    await actPoll(side, afterScroll);
+    console.info(`[resolved side after scroll] the engine placed the popup on ${afterScroll}`);
+    // Back down: an engine keeps the last successful option while it still fits (spec); the
+    // attribute follows whatever is applied.
+    await scrollTo(0);
+    const afterReturn = placedOn();
+    expect(["top", "bottom"]).toContain(afterReturn);
+    await actPoll(side, afterReturn);
+    await act(async () => popup().hidePopover());
+    await actPoll(side, "top");
+  });
+
+  it("the native interestfor path reports the resolved side too", async () => {
+    // Chromium opens through `interestfor`, with no library interaction listeners; elsewhere the
+    // JS path opens it. The observer hangs off the Popup either way (PO decision, design 7.4).
+    render(
+      <Placed
+        top={0}
+        trigger={{ experimental_interestFor: true }}
+        popup={{ experimental_hint: true }}
+      />,
+    );
+    const showSpy = vi.spyOn(HTMLElement.prototype, "showPopover");
+    await act(async () => {
+      await userEvent.hover(trigger());
+    });
+    await actPoll(isOpen, true);
+    expect(showSpy).toHaveBeenCalledTimes(supportsInterestFor ? 0 : 1);
+    await actPoll(side, "bottom");
+    expect(arrow()).toHaveAttribute("data-side", "bottom");
+    // Closed inside `act`, so the reset to the requested side is not logged as outside it.
+    await act(async () => popup().hidePopover());
+    await actPoll(side, "top");
+  });
+});
+
+describe("inline sides and direction (wave 11, #53)", () => {
+  /** inline-end: beside the trigger's inline-end edge; checks the edges that should meet. */
+  async function expectInlineEnd(rtl: boolean): Promise<void> {
+    await show();
+    await actPoll(side, rtl ? "left" : "right");
+    const t = trigger().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    if (rtl) expect(near(p.right, t.left)).toBe(true);
+    else expect(near(p.left, t.right)).toBe(true);
+    expect(arrow()).toHaveAttribute("data-side", rtl ? "left" : "right");
+  }
+
+  it('side="inline-end" opens to the right in LTR', async () => {
+    render(<Placed popup={{ side: "inline-end" }} />);
+    expect(side()).toBe("inline-end");
+    expect(popup().style.getPropertyValue("position-area")).toBe("self-x-end");
+    await expectInlineEnd(false);
+    await act(async () => popup().hidePopover());
+    await actPoll(side, "inline-end");
+  });
+
+  it('side="inline-end" and align="start" mirror under <html dir="rtl">', async () => {
+    await withPageDirection("rtl", async () => {
+      const { unmount } = render(<Placed popup={{ side: "inline-end" }} />);
+      await expectInlineEnd(true);
+      unmount();
+
+      render(<Placed popup={{ side: "bottom", align: "start" }} />);
+      await show();
+      await frames();
+      // Inline-relative: the inline-start (right) edges meet; requested, so no write.
+      expect(side()).toBe("bottom");
+      expect(popup()).toHaveAttribute("data-align", "start");
+      const t = trigger().getBoundingClientRect();
+      const p = popup().getBoundingClientRect();
+      expect(near(p.top, t.bottom)).toBe(true);
+      expect(near(p.right, t.right)).toBe(true);
+    });
+  });
+
+  it('the same inside a dir="rtl" container (Firefox: Mozilla 2019601, asserted)', async () => {
+    const { unmount } = render(<Placed dir="rtl" popup={{ side: "inline-end" }} />);
+    await show();
+    // The side is read from the keywords and the popup's direction, so it is right everywhere.
+    await actPoll(side, "left");
+    let t = trigger().getBoundingClientRect();
+    let p = popup().getBoundingClientRect();
+    if (anchorPositionHonoursParentDirection) {
+      expect(near(p.right, t.left)).toBe(true);
+    } else {
+      // Firefox (Mozilla 2019601, #89): the popup's parent box has a direction different from
+      // the root's, so the inline alignment inside the cell is mirrored; no workaround ships
+      // (conventions 13.3). The popup meets neither trigger edge. When this fails, the bug is
+      // fixed: delete this branch.
+      expect(near(p.right, t.left)).toBe(false);
+      expect(near(p.left, t.right)).toBe(false);
+    }
+    unmount();
+
+    render(<Placed dir="rtl" popup={{ side: "bottom", align: "start" }} />);
+    await show();
+    await frames();
+    expect(side()).toBe("bottom");
+    t = trigger().getBoundingClientRect();
+    p = popup().getBoundingClientRect();
+    expect(near(p.top, t.bottom)).toBe(true);
+    if (anchorPositionHonoursParentDirection) {
+      expect(near(p.right, t.right)).toBe(true);
+    } else {
+      // Mozilla 2019601, as above.
+      expect(near(p.right, t.right)).toBe(false);
+      expect(near(p.left, t.left)).toBe(false);
+    }
+  });
+});

@@ -78,6 +78,8 @@ export type {
   TooltipPopupState,
   TooltipSide,
   TooltipAlign,
+  TooltipArrowProps,
+  TooltipArrowState,
 } from "./tooltip/index.js";
 
 export { Switch } from "./switch/index.js";
