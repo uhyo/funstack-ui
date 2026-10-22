@@ -632,10 +632,11 @@ export function MenuPage() {
       <p>
         A <code>Menu.ContextTrigger</code> in the Root opens the same Popup at the pointer from a
         right-click, Shift+F10 or a touch long-press, next to (or instead of) the Trigger: see{" "}
-        <a href="/components/context-menu">Context menu</a>. One behaviour applies to every menu,
+        <a href="/components/context-menu">Context menu</a>. Two behaviours apply to every menu,
         context-opened or not: a right- or middle-click outside closes it at once (
         <code>"dismiss"</code>), as native menus do; Chromium's light dismiss alone would leave it
-        open under the browser's own menu.
+        open under the browser's own menu. And a wheel over the menu never scrolls the page under
+        it: the library prevents it unless the menu itself can scroll that way.
       </p>
     </div>
   );

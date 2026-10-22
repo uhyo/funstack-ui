@@ -83,7 +83,7 @@ export function TooltipPage() {
             type: "number",
             default: "250",
             description:
-              "Milliseconds from hover or keyboard focus to open (Chromium's interest-delay-start). Hover and focus share it.",
+              "Milliseconds from hover or keyboard focus to open (Chromium's interest-delay-start). Hover and focus share it. Skipped while another tooltip is showing (see Skip-delay).",
           },
           {
             name: "closeDelay",
@@ -139,7 +139,9 @@ export function TooltipPage() {
                 browser owns hover, focus, Escape and long-press. Where the element implements{" "}
                 <code>interestForElement</code> (Chromium), the library attaches no listeners;
                 elsewhere the attribute is ignored and the JS path runs. Pair with{" "}
-                <code>Popup experimental_hint</code>.
+                <code>Popup experimental_hint</code>. Also renders the{" "}
+                <code>data-fsui-tooltip-trigger</code> marker and the skip-delay stylesheet (see
+                Skip-delay).
               </>
             ),
           },
@@ -278,6 +280,11 @@ export function TooltipPage() {
             "While shown: the resolved alignment. Otherwise the requested one. Absent with `side={null}`.",
           ],
           ["`data-disabled`", "Trigger, Popup", "The Root's `disabled` prop."],
+          [
+            "`data-fsui-tooltip-trigger`",
+            "Trigger",
+            "With `experimental_interestFor` only: what the skip-delay stylesheet matches. Not a styling hook.",
+          ],
         ]}
       />
       <p>
@@ -303,12 +310,12 @@ export function TooltipPage() {
         rows={[
           [
             "Hover the trigger",
-            "Opens after `delay`. Stays open while the pointer is over the trigger or the popup.",
+            "Opens after `delay`, or at once while another tooltip is showing (which then closes). Stays open while the pointer is over the trigger or the popup.",
           ],
           ["Pointer leaves both", "Closes after `closeDelay`."],
           [
             "Keyboard focus on the trigger",
-            "Opens after `delay` (focus from a click does not open).",
+            "Opens after `delay`, or at once while another tooltip is showing (focus from a click does not open).",
           ],
           ["Blur", "Closes after `closeDelay`."],
           ["Escape", "Closes; focus stays on the trigger."],
@@ -344,6 +351,54 @@ export function TooltipPage() {
         <code>aria-label</code>, when the trigger is not focusable, and when the popup contains
         focusable content.
       </p>
+
+      <h3 id="skip-delay">Skip-delay</h3>
+      <p>
+        Once one tooltip is showing, the next one appears at once, as on every desktop platform:
+        moving the pointer along a toolbar, or arrowing through it, shows each tooltip without
+        waiting. The rule is global to the page, and there is nothing to set up:
+      </p>
+      <p>
+        <strong>
+          A tooltip opens with no delay while any <code>[role="tooltip"]:popover-open</code> exists
+          in the document, and the tooltip that was showing is hidden at once.
+        </strong>
+      </p>
+      <ul>
+        <li>
+          <strong>No provider, no prop.</strong> The condition is read from the page when a hover or
+          focus starts, so it works across React roots, in Server Components with nothing around
+          them, and with tooltips that are not FUNSTACK's (any popover with{" "}
+          <code>role="tooltip"</code> counts). There is no opt-out.
+        </li>
+        <li>
+          <strong>The window is "while the previous tooltip is still showing"</strong>, its{" "}
+          <code>closeDelay</code> included (150 ms by default), which covers moving between adjacent
+          controls. After both have closed, the next tooltip waits its <code>delay</code> again;
+          there is no longer cooldown.
+        </li>
+        <li>
+          <strong>On the native path</strong> (<code>experimental_interestFor</code> in Chromium)
+          the browser reads the delay from the trigger's computed style, so the Trigger renders{" "}
+          <code>interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm)))</code> and a
+          small stylesheet that sets <code>--fsui-tooltip-warm</code> to 1 on marked triggers while
+          a tooltip is showing. React hoists it into <code>&lt;head&gt;</code> (during server
+          rendering too); it works before hydration. Nothing visual: it times the interaction only.
+          Under a strict <code>style-src</code> it needs its hash or a nonce (
+          <a href="/concepts/content-security-policy">Content Security Policy</a>); blocked, the
+          native path keeps its normal delay.
+        </li>
+        <li>
+          To skip the entry animation of a tooltip that opens at once, use the same condition in
+          your CSS.
+        </li>
+      </ul>
+      <CodeBlock language="css">{`/* The library's rule (rendered by a Trigger with experimental_interestFor): */
+@property --fsui-tooltip-warm { syntax: "<number>"; inherits: false; initial-value: 0; }
+:root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }
+
+/* Yours, optional: no entry animation while browsing from one tooltip to the next. */
+:root:has([role="tooltip"]:popover-open) .tip { transition: none; }`}</CodeBlock>
 
       <h3>Two mechanisms</h3>
       <Table

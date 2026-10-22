@@ -52,7 +52,7 @@ export function ExperimentalPage() {
           [
             "`Tooltip.Trigger experimental_interestFor`",
             "`interestfor`",
-            "Renders `interestfor` and `interest-delay-*`; where supported, the browser owns hover, focus, Escape and long-press and the library attaches no listeners.",
+            "Renders `interestfor` and `interest-delay-*` (plus the skip-delay stylesheet, see [Tooltip](/components/tooltip#skip-delay)); where supported, the browser owns hover, focus, Escape and long-press and the library attaches no listeners.",
           ],
           [
             "`Tooltip.Popup experimental_hint`",

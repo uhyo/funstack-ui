@@ -139,7 +139,7 @@ export function ContextMenuPage() {
           [
             "Long-press (touch, pen)",
             "the region",
-            "After `longPressDelay` (500 ms) held within 10 px: the menu at the touch point, first item focused quietly",
+            "After `longPressDelay` (500 ms) held within 10 px: the menu 16 px above the touch point (so the finger does not cover it), first item focused quietly",
           ],
         ]}
       />
@@ -155,7 +155,8 @@ export function ContextMenuPage() {
           The long-press runs on every platform for touch and pen pointers, because iOS fires no{" "}
           <code>contextmenu</code>. Where the platform fires its own (Android, Windows pen),
           whichever comes first opens once. The page stays scrollable: a pan cancels the press. The
-          one click a release may synthesise is swallowed.
+          one click a release may synthesise is swallowed. Keep the finger down to slide onto an
+          item (see Press-drag-release).
         </li>
         <li>
           <strong>Before hydration</strong> the browser's own menu shows. Nothing is half-open and
@@ -165,47 +166,61 @@ export function ContextMenuPage() {
 
       <h3>Placement</h3>
       <p>
-        The menu opens with its top-left corner at the point and flips when it does not fit: upward
-        at the bottom edge, leftward at the right edge, both in the corner. CSS anchor positioning
-        anchors to elements, not points, so the Popup renders the point inline (
-        <code>--menu-point-x</code>, <code>--menu-point-y</code>), puts <code>left</code> /{" "}
-        <code>top</code> there and names three <code>@position-try</code> options that mirror it. A
-        right-to-left menu mirrors all of it (see below). The menu lives in the top layer, so a
-        transformed or filtered ancestor of the region does not move it.
+        A mouse or keyboard open puts the menu's top-left corner at the point; a touch or pen open
+        puts the menu <strong>above</strong> the point with a 16 px gap, so the finger does not
+        cover it. Either flips when it does not fit: upward (touch: downward, below the finger) at
+        the edge, leftward at the right edge, both in the corner. CSS anchor positioning anchors to
+        elements, not points, so the Popup renders the point inline (<code>--menu-point-x</code>,{" "}
+        <code>--menu-point-y</code>, and the gap as <code>--menu-point-gap</code>: <code>0px</code>{" "}
+        for a mouse, <code>16px</code> for touch), puts the insets there and names three{" "}
+        <code>@position-try</code> options that mirror it. A right-to-left menu mirrors all of it
+        (see below). The menu lives in the top layer, so a transformed or filtered ancestor of the
+        region does not move it.
       </p>
       <p>
-        Those options are the library's only shipped CSS: a <code>&lt;style&gt;</code> React hoists
-        into <code>&lt;head&gt;</code> once per page on the first context open (
-        <code>data-href="@funstack/ui/menu-point"</code>). It is functional only: five named
-        at-rules (an LTR menu names the first three, an RTL menu up, right and up-right), no
+        Those options are shipped CSS: a <code>&lt;style&gt;</code> React hoists into{" "}
+        <code>&lt;head&gt;</code> once per page on the first context open (
+        <code>data-href="@funstack/ui/menu-point"</code>). It is functional only: eight named
+        at-rules (a menu names the three that apply to its direction and pointer kind), no
         selectors, nothing visual.
       </p>
-      <CodeBlock language="css">{`@position-try --fsui-menu-up       { top: auto; bottom: calc(100% - var(--menu-point-y)); }
-@position-try --fsui-menu-left     { left: auto; right: calc(100% - var(--menu-point-x)); }
-@position-try --fsui-menu-up-left  { top: auto; bottom: calc(100% - var(--menu-point-y));
-                                     left: auto; right: calc(100% - var(--menu-point-x)); }
-@position-try --fsui-menu-right    { right: auto; left: var(--menu-point-x); }
-@position-try --fsui-menu-up-right { top: auto; bottom: calc(100% - var(--menu-point-y));
-                                     right: auto; left: var(--menu-point-x); }`}</CodeBlock>
+      <CodeBlock language="css">{`@position-try --fsui-menu-up    { top: auto; bottom: calc(100% - var(--menu-point-y) + var(--menu-point-gap)); }
+@position-try --fsui-menu-down  { bottom: auto; top: calc(var(--menu-point-y) + var(--menu-point-gap)); }
+@position-try --fsui-menu-left  { left: auto; right: calc(100% - var(--menu-point-x)); }
+@position-try --fsui-menu-right { right: auto; left: var(--menu-point-x); }
+/* and the four corners: --fsui-menu-up-left, -up-right, -down-left, -down-right */`}</CodeBlock>
+      <Table
+        head={["Open", "Inline placement", "Fallbacks (LTR; RTL mirrors left and right)"]}
+        rows={[
+          [
+            "Mouse, keyboard",
+            "`top: calc(var(--menu-point-y) + var(--menu-point-gap))`, `left: var(--menu-point-x)`; gap `0px`",
+            "`--fsui-menu-up`, `--fsui-menu-left`, `--fsui-menu-up-left`",
+          ],
+          [
+            "Touch, pen",
+            "`bottom: calc(100% - var(--menu-point-y) + var(--menu-point-gap))`, `left: var(--menu-point-x)`; gap `16px`",
+            "`--fsui-menu-left`, `--fsui-menu-down`, `--fsui-menu-down-left`",
+          ],
+        ]}
+      />
       <ul>
         <li>
           <strong>Adjust</strong> with the Popup's <code>style</code>, which wins over the inline
-          placement (your own <code>position-try-fallbacks</code>, a <code>margin</code>).
+          placement (your own <code>position-try-fallbacks</code>, a <code>margin</code>, a
+          different touch gap: <code>{'style={{ "--menu-point-gap": "24px" }}'}</code>).
         </li>
         <li>
           <strong>Opt out</strong> with <code>side={"{null}"}</code> on the Popup: no inline
           placement and no <code>&lt;style&gt;</code> on either path; a context open still sets{" "}
-          <code>--menu-point-x</code> / <code>--menu-point-y</code> and <code>data-context</code>{" "}
-          for your stylesheet.
+          <code>--menu-point-x</code> / <code>--menu-point-y</code> / <code>--menu-point-gap</code>{" "}
+          and <code>data-context</code> for your stylesheet.
         </li>
         <li>
-          <strong>CSP:</strong> the inline <code>&lt;style&gt;</code> falls under the same{" "}
-          <code>style-src</code> directive as the inline <code>style</code> attributes every
-          anchored popup already uses, so nothing new is required.
-        </li>
-        <li>
-          While the menu is open the page scrolls under it (the point is in viewport coordinates);
-          native menus block scrolling instead.
+          <strong>Content Security Policy:</strong> under a strict <code>style-src</code> the
+          stylesheet needs its hash or a nonce (see{" "}
+          <a href="#content-security-policy">Content Security Policy</a> below). Blocked, the menu
+          still opens at the point but never flips.
         </li>
         <li>
           <strong>Right-to-left:</strong> when the popup's computed <code>direction</code> is{" "}
@@ -225,6 +240,7 @@ export function ContextMenuPage() {
   position-try-fallbacks: --mine;
 }
 @position-try --mine { top: auto; bottom: calc(100% - var(--menu-point-y)); }
+/* A touch open: bottom: calc(100% - var(--menu-point-y) + var(--menu-point-gap)). */
 /* self-*: follows the menu's direction (a plain logical keyword would follow the root's only). */
 .menu:not([data-context]) { position-area: bottom span-self-x-end; }
 /* An RTL menu at a point: right: calc(100% - var(--menu-point-x)) instead of left. */`}</CodeBlock>
@@ -249,6 +265,21 @@ export function ContextMenuPage() {
             "–",
           ],
           [
+            "Release of the held button or finger over an item, after sliding onto it",
+            "The item is activated, as a click would (see Press-drag-release)",
+            '`"activate"`',
+          ],
+          [
+            "Release of the held button outside the menu, after moving, at least 500 ms after the open",
+            "Closes at once",
+            '`"dismiss"`',
+          ],
+          [
+            "A scroll of the page, or of a scroller around the region",
+            "Closes at once (a menu at a point only; see Scrolling)",
+            '`"dismiss"`',
+          ],
+          [
             "An item's activation, Escape, Tab, a left click outside",
             "As Menu",
             '`"activate"` / `"dismiss"`',
@@ -261,6 +292,82 @@ export function ContextMenuPage() {
         (the right-button press already moved it there, as with native menus); with a{" "}
         <code>Menu.Trigger</code> in the same Root, focus goes to that button instead.
       </p>
+
+      <h3>Press-drag-release</h3>
+      <p>
+        On Linux and macOS the browser fires <code>contextmenu</code> on the button press, and
+        native menus let you keep the button down, slide onto an item and release to choose it. The
+        library does the same: the popup holds the pointer it captured at the open, and while the
+        button is down the item under the pointer gets focus (quietly, as with hover).
+      </p>
+      <Table
+        head={["Release", "What happens"]}
+        rows={[
+          [
+            "Over an enabled item, more than 4 px from where the menu opened",
+            "The item is activated through its `click()`: its `action`, `closeOnActivate`, checkbox and radio toggling behave exactly as a click",
+          ],
+          [
+            "Outside the menu (and its submenus), after moving more than 4 px, at least 500 ms after the open",
+            'The menu closes (`"dismiss"`)',
+          ],
+          [
+            "Anything else: in place, quick, over a disabled item, a separator or a submenu trigger",
+            "Nothing: the menu stays open and works with clicks and keys",
+          ],
+        ]}
+      />
+      <ul>
+        <li>
+          Time alone never chooses anything: the menu's corner is under the pointer, so a long,
+          still press must not activate the first item, and a menu that flipped away from the
+          pointer stays open after a still release. A submenu trigger opens its submenu while the
+          pointer rests on it, as with hover.
+        </li>
+        <li>
+          Windows fires <code>contextmenu</code> after the release and the keyboard holds no
+          pointer, so neither runs the gesture.
+        </li>
+        <li>
+          <strong>Touch</strong>: after a long-press, keep the finger down and slide onto an item;
+          lift to choose it (10 px slop). While that finger is down the page does not pan, and the
+          lift synthesises no click. A plain lift never closes the menu, which sits above the
+          finger. This is{" "}
+          <strong>
+            verified under Chromium's touch emulation; iOS and Android pending (
+            <a href="https://github.com/uhyo/funstack-ui/issues/90">#90</a>)
+          </strong>
+          .
+        </li>
+        <li>
+          During the drag the items do not match <code>:hover</code> (the popup holds the pointer):
+          style the current item with <code>:focus</code>, as for the keyboard.
+        </li>
+      </ul>
+
+      <h3>Scrolling</h3>
+      <ul>
+        <li>
+          <strong>A menu at a point closes when the page scrolls</strong> (<code>"dismiss"</code>):
+          a scroll of the document or of a scroller that contains the region. The point means
+          nothing once the content under it has moved. Scrolls of other scrollers (a log elsewhere)
+          and inside the menu are ignored. A menu opened from its <code>Menu.Trigger</code> stays
+          open and follows its button.
+        </li>
+        <li>
+          <strong>A wheel over any menu never scrolls the page</strong> (a menu opened from its
+          button too): the library prevents it unless the menu under the pointer can scroll that way
+          itself.
+        </li>
+        <li>
+          There is no scroll lock, which would fight your app's own and cannot stop a scrollbar
+          drag. To block page scrolling while a context menu is open, as native menus do, add:
+        </li>
+      </ul>
+      <CodeBlock language="css">{`html:has([role="menu"][data-context]:popover-open) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}`}</CodeBlock>
 
       <h3>Nested regions and editable targets</h3>
       <ul>
@@ -358,6 +465,11 @@ export function ContextMenuPage() {
           ],
           [
             "`Menu.Popup`",
+            "`--menu-point-gap`",
+            "The vertical gap between the point and the menu: `0px` for a mouse or keyboard open, `16px` for a touch or pen open, which is placed above the point. Inline; your `style` wins (also with `side={null}`).",
+          ],
+          [
+            "`Menu.Popup`",
             "`side`, `align`",
             "Apply to opens from a `Menu.Trigger`; ignored for a context open. `side={null}` opts out of the inline placement on both paths.",
           ],
@@ -393,6 +505,17 @@ export function ContextMenuPage() {
           region already suppresses the link and image callout inline.
         </li>
       </ul>
+
+      <h3 id="content-security-policy">Content Security Policy</h3>
+      <p>
+        The point rules are a <code>&lt;style&gt;</code> element inserted by script, which a{" "}
+        <code>style-src</code> with nonces or hashes blocks (unlike the inline <code>style</code>{" "}
+        attributes the library sets from the client, which it allows). Either allow its hash,{" "}
+        <code>STYLE_SHA256["@funstack/ui/menu-point"]</code> from <code>@funstack/ui/csp</code>, or
+        wrap the app in <code>{"<CSPProvider nonce>"}</code>, which puts your nonce on the element.
+        Details and the hash values:{" "}
+        <a href="/concepts/content-security-policy">Content Security Policy</a>.
+      </p>
 
       <h3>Browser notes</h3>
       <ul>

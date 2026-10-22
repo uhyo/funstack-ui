@@ -22,6 +22,7 @@ export const conceptNavItems: NavItem[] = [
   { path: "/concepts/server-components", label: "Server Components" },
   { path: "/concepts/browser-owned-state", label: "Browser-owned state" },
   { path: "/concepts/experimental", label: "Experimental features" },
+  { path: "/concepts/content-security-policy", label: "Content Security Policy" },
 ];
 
 export const componentNavItems: NavItem[] = [

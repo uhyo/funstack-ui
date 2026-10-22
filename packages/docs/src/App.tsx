@@ -35,6 +35,10 @@ const BrowserOwnedStatePage = lazyPage(
   "BrowserOwnedStatePage",
 );
 const ExperimentalPage = lazyPage(() => import("./pages/ExperimentalPage.js"), "ExperimentalPage");
+const ContentSecurityPolicyPage = lazyPage(
+  () => import("./pages/ContentSecurityPolicyPage.js"),
+  "ContentSecurityPolicyPage",
+);
 const ButtonPage = lazyPage(() => import("./pages/ButtonPage.js"), "ButtonPage");
 const TogglePage = lazyPage(() => import("./pages/TogglePage.js"), "TogglePage");
 const ToggleGroupPage = lazyPage(() => import("./pages/ToggleGroupPage.js"), "ToggleGroupPage");
@@ -127,6 +131,12 @@ export const routes = [
                     "/concepts/experimental",
                     ExperimentalPage,
                     "ExperimentalPage",
+                  ),
+                  page(
+                    "/content-security-policy",
+                    "/concepts/content-security-policy",
+                    ContentSecurityPolicyPage,
+                    "ContentSecurityPolicyPage",
                   ),
                 ],
               }),

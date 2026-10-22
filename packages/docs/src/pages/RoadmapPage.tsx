@@ -173,6 +173,24 @@ export function RoadmapPage() {
           resolved side, and start / end mirror under RTL. Firefox misplaces anchored popups in a
           direction island (<a href={issue(89)}>#89</a>).
         </li>
+        <li>
+          <a href="/components/tooltip#skip-delay">Tooltip skip-delay</a>: while a tooltip is
+          showing, the next one opens at once, page-wide, with no provider (
+          <a href={issue(21)}>#21</a>). Behaviour change: moving between tooltips no longer waits.
+        </li>
+        <li>
+          Context menu follow-ups (<a href={issue(88)}>#88</a>): press-drag-release (hold the button
+          or finger, slide onto an item, release), a touch menu placed above the finger, a point
+          menu closes when the page scrolls, and a wheel over any menu never scrolls the page. Touch
+          is verified under Chromium's touch emulation; iOS and Android pending (
+          <a href={issue(90)}>#90</a>).
+        </li>
+        <li>
+          <a href="/concepts/content-security-policy">Content Security Policy</a>:{" "}
+          <code>@funstack/ui/csp</code> exports <code>STYLE_SHA256</code>, the hashes of the two
+          shipped stylesheets, and <code>{"<CSPProvider nonce>"}</code> (<a href={issue(88)}>#88</a>
+          ).
+        </li>
       </ul>
 
       <h3>Next</h3>
@@ -185,9 +203,6 @@ export function RoadmapPage() {
         <li>
           Directive-free (truly zero-JS) variants of platform-native parts (
           <a href={issue(19)}>#19</a>).
-        </li>
-        <li>
-          Tooltip: a skip-delay group (<a href={issue(21)}>#21</a>).
         </li>
       </ul>
 
