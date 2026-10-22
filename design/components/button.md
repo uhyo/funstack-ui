@@ -1147,10 +1147,13 @@ replaced by a Re-entry row (conventions 10.1).
   `run`; when it returns `false` the keydown / click is `preventDefault()`ed and nothing else
   happens. The item renders `aria-disabled="true"` while pending **and `menu-dom.ts` must stop
   reading `aria-disabled`**: `isDisabledItem(item)` keys on **`data-disabled`** (present exactly
-  when the item's `disabled` prop is set, which is what the arrows, `edgeItem` for Home / End /
-  the open focus, and typeahead mean by "disabled"). `useMenuItem` already emits
-  `data-disabled`; `Menu.SubmenuTrigger` too. Consequence: a pending item is still the "first
-  enabled item" for Home and for a re-open, which is right (it is pending, not disabled).
+  when the item's `disabled` prop is set). Its only reader is `edgeItem` (the open focus, and
+  the Trigger's ArrowDown / ArrowUp while the menu is open); the in-menu arrows, Home / End and
+  typeahead walk every item, disabled included (menu.md 5, APG), and never read it (wave 9
+  review L1 corrects the draft of this bullet, which said they did). `useMenuItem` already
+  emits `data-disabled`; `Menu.SubmenuTrigger` too. Consequence: a pending item is an ordinary
+  item for navigation and still the "first enabled item" for the open focus, which is right (it
+  is pending, not disabled).
   `closeOnActivate={false}` items (a "Refresh" item) are the ones where the guard is visible:
   the item stays, shows `data-pending`, and a second Enter does nothing until it settles.
   `CheckboxItem` / `RadioItem` are state owners (`useControllableAction`), not pure triggers:
@@ -1191,7 +1194,7 @@ The old rows named here are rewritten, not deleted, so the suites keep their cov
 | --- | --- | --- |
 | M1 | `menu.test.tsx:844` ("two activations run the action twice; the close happens once") | Rewritten: a deferred `action` on a `closeOnActivate` Item; a second Enter, Space and click leave it at one call and are `defaultPrevented`; the item has `aria-disabled="true"`, `data-pending`, no `data-disabled`; resolve → one `requestClose`, the menu closes. |
 | M2 | Re-entry on a `closeOnActivate={false}` Item | Deferred action: second activation ignored; resolve → attributes gone, menu still open, the next Enter runs again. |
-| M3 | Navigation ignores pending | While an Item is pending (`aria-disabled` on it): ArrowDown / ArrowUp from it move as from any item (they already did), **Home / End and a re-open treat it as enabled** (`edgeItem` keys on `data-disabled`): with the pending item first in the list, Home lands on it; a `disabled` first item is still skipped by Home / End / open (regression guard for the predicate change); typeahead still matches it. |
+| M3 | Navigation ignores pending (split, wave 9 deviation 1) | Integration half (`menu.test.tsx`): while an Item is pending (`aria-disabled` on it), the arrows, Home, End and typeahead land on it as on any item (they never skipped disabled items). Unit half (`menu-dom.test.ts`): `edgeItem` returns a pending item (`aria-disabled` without `data-disabled`) as the first enabled item and skips a `data-disabled` one; the open-focus rows already cover `edgeItem`'s use. The "re-open while pending" case cannot be observed end to end: the re-open is entangled with the pending item's action and commits after it settles, so the pending state is gone by the time the open focus resolves. |
 | M4 | `menu.test.tsx:871` ("a superseded rejection reaches the boundary", Item) | Becomes the single-run rejection row (menu stays open, boundary above the item, the next activation runs after reset); N/A comment. `menu.test.tsx:1350` (RadioItem / CheckboxItem) is **unchanged**: state owners keep overlap and superseded rejection. |
 | M5 | Design table "Overlap" row (menu.md 966) | "Two Item clicks: action called twice, `requestClose` once effective" → "Two Item clicks: action called once (the second is ignored), one `requestClose`". The RadioItem half stays. |
 | M6 | `menu-dom.ts` unit | `isDisabledItem` is `true` for `data-disabled=""` and `false` for `aria-disabled="true"` without it. |
@@ -1260,8 +1263,24 @@ so a link does not navigate), exactly as `Button` does.
   function form, a host `"button"`), the same one `Button` uses.
 - In the focusable branch the part passes `disabled: undefined` (owned removal) and
   `"aria-disabled": disabled ? true : undefined`; `data-disabled` and `state.disabled` are
-  unchanged. Parts that already own `aria-disabled` for another reason (`Menu.Trigger` does not;
-  none of the listed ones do) would merge the conditions.
+  unchanged. Parts that already own `aria-disabled` for another reason (the Close parts, for
+  pending since #81) merge the conditions.
+- **`aria-disabled` is owned only where the part computes it** (wave 9 review deviation 5):
+  in the focusable branch, and always on the parts that render it for pending (#81). A
+  host-button Toggle / Trigger outside the branch does not own the key, so a consumer's own
+  `aria-disabled` passes through as before (conventions 1.2: "a part that does not own a key in
+  some mode omits the key instead").
+- **An invoker in the focusable-disabled branch owns `commandfor` and `command` as `undefined`**
+  (wave 9 review M1): `aria-disabled` has no behaviour, so a disabled component render that
+  spreads onto a real `<button commandfor command>` would be a live invoker in the server HTML
+  and open / close its target on a click before hydration, where native `disabled` used to make
+  the button "not a valid invoker". With the attributes removed there is nothing to invoke while
+  disabled; the implicit anchor and the platform's `aria-expanded` mapping are moot for a
+  disabled control, and both return when `disabled` is unset. Applies to `Popover.Trigger`,
+  `Menu.Trigger`, `Menu.SubmenuTrigger` (`use-popover-trigger.ts`), library-mode modal
+  `Dialog.Trigger`, `Dialog.Close` and `Popover.Close`; harmless on a link render (an `<a>` is
+  never an invoker). Row per part: a disabled component render has no `command` /
+  `commandfor` attribute (jsdom), plus a `renderToString` row for `Menu.Trigger`.
 - The `onClick` guard `if (disabled) { event.preventDefault(); return; }` is already the shape in
   `Toggle`, the Close parts and the Triggers (some return without `preventDefault()`; add it, so
   a disabled link render does not navigate, as `Toolbar.Button` did in #66 and `Button` does).
@@ -1291,3 +1310,25 @@ Each affected page's `disabled` row gains the sentence "with a link or component
 `aria-disabled="true"` instead (the element stays focusable); native `disabled` on a `<button>`".
 Conventions 1.2's "the other `disabled` parts follow in a separate issue" is replaced by the list
 above. Changelog entry (behaviour change for link / component renders only).
+
+---
+
+## Implementation and review fold (wave 9, #81 and #83, 2026-10-22)
+
+Implementation 27e64f4 (#81) and f827869 (#83) on `memo/developer/wave9-triggers.md`; review
+`memo/reviewer/wave9.md` (a29e3ad, "acceptable with fixes"). All six developer deviations
+accepted; the review's items decided as follows and folded into 16 and 17 above.
+
+| # | Item | Decision | Where |
+| --- | --- | --- | --- |
+| W1 | Review M1: the focusable-disabled branch kept `commandfor` / `command`, so a disabled component render was a live invoker before hydration. | **Fix in code**: own both as `undefined` in that branch (Popover / Menu / Submenu Triggers, library-mode modal Dialog.Trigger, both Close parts); rows per part plus a `renderToString` row for `Menu.Trigger`. | 17.2 |
+| W2 | Review M2 / L1: docs, jsdoc, menu.md 2.3 and 16.3 said the arrows, Home / End and typeahead skip disabled items; only `edgeItem` (open focus, Trigger arrows while open) does. | Corrected in menu.md 2.3 and 16.3 here; the developer corrects `MenuPage.tsx`, `menu-item.tsx`'s `disabled` jsdoc and `menu-dom.ts`'s jsdoc to "a pending item is an ordinary item for navigation; only the open focus skips items with the `disabled` prop". | 16.3, menu.md 2.3 |
+| W3 | Deviation 1: M3 split into the integration half (arrows / Home / End / typeahead land on a pending item) and an `edgeItem` unit row; the re-open half is unobservable end to end (entanglement). | Accepted; row rewritten. | 16.4 M3 |
+| W4 | Deviation 2: D3 asserted as two `openChangeAction` calls (the open and one close), one `close()`, no `aria-disabled`. | Accepted. | 16.4 D3 |
+| W5 | Deviation 3: D4 / P3 / M4 also reset the boundary (key bump) and check the next activation runs on the fresh instance. | Accepted; stronger than the design row (the in-flight decrement on reject is not observable through a boundary, which unmounts the part). | 16.4 |
+| W6 | Deviation 4: T2 split into "two clicks in one task → one dispatch; rejection reaches the boundary, toast not ending" and the `closeOnSettle={false}` variant (where the guard is visible). | Accepted. | 16.4 T2 |
+| W7 | Deviation 5: `aria-disabled` owned only in the focusable branch (and always on the Close parts for pending); host buttons keep a consumer's own `aria-disabled` as pass-through. | Accepted as the rule; recorded in 17.2. | 17.2 |
+| W8 | Deviation 6: JS-free non-modal `Dialog.Trigger` renders `aria-disabled` on a component render but no `data-disabled` (dialog.md 4.2: `data-disabled` is library-mode only); `Popover.Trigger` in JS-free mode has the same gap. | Accepted for wave 9 (17.2 said `data-disabled` is unchanged). **Needs a later conventions item**: 4.1's `disabled` row ("any" part) and 1.2's owned-keys rule should say that a part emits `data-disabled` in every mode in which it renders `disabled` *or* `aria-disabled`, so the styling hook and the ARIA state never disagree; the two JS-free Triggers are the only cases today, and the fix is `dataAttr(disabled)` without the `isLibrary &&`. Proposed as a small issue for the product owner to file; not wave 9. | this table |
+| W9 | Review L2: the NumberField disabled-link `preventDefault()` row clicks with `detail: 0`. | Developer adds a `detail: 1` assertion. | 17.3 |
+| W10 | Review L3: a pointer press on a disabled focusable step render takes focus from the input (`pointerdown` returns before `preventDefault()`). | **Accept the suggestion**: cancel the `pointerdown` when disabled too, so a disabled step button never steals focus (Combobox.Trigger / Clear already cancel unconditionally). | 17.1 NumberField row |
+| W11 | Review L4: the #81 changelog says "behaviour change"; a consumer counting clicks through `Menu.Item` / `Toast.Action` changes result silently. | Flag it in the alpha.7 release notes as breaking for that pattern, pointing at the non-awaiting spelling; 16.5 amended by this row. | 16.5 |

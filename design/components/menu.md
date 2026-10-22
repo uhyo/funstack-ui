@@ -252,9 +252,12 @@ This is the Dialog.Close / Popover.Close idiom applied to items. **Amended with 
 `design/components/button.md` 16):** a second activation (click, Enter, Space) while the item's
 own action is pending is **ignored** (`useActionTrigger`'s in-flight guard; the event is
 `preventDefault()`ed) and the item renders `aria-disabled="true"` while it shows `data-pending`;
-`data-disabled`, `state.disabled` and the arrow keys are unaffected, because `menu-dom.ts`'s
-`isDisabledItem` keys on **`data-disabled`** (the `disabled` prop), not on `aria-disabled`, so a
-pending item is still an enabled item for Home / End, the open focus and typeahead. Before #81 a
+`data-disabled` and `state.disabled` are unaffected. Navigation is unaffected too: the arrows,
+Home / End and typeahead never skipped disabled items (APG: disabled items are focusable; 5 and
+5.3), so a pending item is an ordinary item for them; the one place that reads disabledness,
+`edgeItem` (the open focus, and the Trigger's ArrowDown / ArrowUp while open), keys on
+**`data-disabled`** (the `disabled` prop), not on `aria-disabled`, so a pending item is still an
+enabled item for the open focus (wave 9 review L1). Before #81 a
 second click re-ran the action and the first `requestClose` won. The part is still never
 *natively* disabled while pending (conventions 3.6 as amended). A consumer who wants "close now,
 work later" writes `action={() => { void archive(id); }}` (not awaited; conventions 2.3 item 5).

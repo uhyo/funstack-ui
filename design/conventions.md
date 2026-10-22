@@ -210,8 +210,13 @@ Rules for the element passed to `render` (same as Base UI):
   Dialog and Popover in the modes where they handle the click; `design/components/button.md`
   17.1). The handler is what makes `aria-disabled` safe (it returns before dispatch and
   `preventDefault()`s), so a part that relies on the browser (`Form.Submit`, a JS-free command
-  Trigger / Close) keeps native `disabled`. When the element is unknown, each attribute takes the
-  choice that is harmless if the guess is wrong.
+  Trigger / Close) keeps native `disabled`. In that `aria-disabled` branch an **invoker also
+  owns `commandfor` and `command` as `undefined`** (wave 9 review M1): `aria-disabled` has no
+  behaviour, and a disabled component render spreading onto a real `<button commandfor
+  command>` would otherwise be a live invoker in the server HTML before hydration. The part owns
+  `aria-disabled` only where it computes it (that branch, or a pending pure trigger); on a host
+  button outside it the consumer's own `aria-disabled` passes through. When the element is
+  unknown, each attribute takes the choice that is harmless if the guess is wrong.
 - Library-controlled attributes (`role`, `aria-*` *state* the part computes such as
   `aria-pressed` / `aria-selected`, `id` wiring, `data-*` state) win over the element's, with one
   carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`, `aria-controls`,
