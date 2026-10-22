@@ -371,8 +371,16 @@ describe("NumberField (browser)", () => {
       });
       const session = cdp();
       const point = pagePoint(button);
+      // The hold as the component sees it (#82): stamped inside the dispatch of the pointerdown
+      // and the pointerup (capture listeners on the button run before React's root listener
+      // starts the 400 ms timer, and before the release stops the repeats). Stamping after
+      // `session.send` resolves adds each CDP round trip through the test server; under load the
+      // touchStart's is the longer one, the measured hold shrinks below the real one, and the
+      // bound fails while the component is correct.
       let downAt = 0;
       let upAt = 0;
+      button.addEventListener("pointerdown", () => (downAt = performance.now()), true);
+      button.addEventListener("pointerup", () => (upAt = performance.now()), true);
       await act(async () => {
         const down = nextEvent(button, "pointerdown");
         await session.send("Input.dispatchTouchEvent", {
@@ -380,20 +388,21 @@ describe("NumberField (browser)", () => {
           touchPoints: [point],
         });
         await down;
-        downAt = performance.now();
         await new Promise((resolve) => setTimeout(resolve, 700));
         const up = nextEvent(button, "pointerup");
         await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
         await up;
-        upAt = performance.now();
       });
       await flush();
       expect(pointerTypes).toEqual(["touch"]);
+      const held = upAt - downAt;
+      expect(held).toBeGreaterThanOrEqual(650);
       const value = Number(input().value);
-      // Measured against the press as the page saw it (#71): at least the first repeat, at most
-      // one step per elapsed interval.
+      // One step at the press, the first repeat no earlier than 400 ms after it, each further
+      // repeat no earlier than 60 ms after the previous one (chained timeouts), none after the
+      // release: at least the first repeat, at most one step per interval inside the hold.
       expect(value).toBeGreaterThanOrEqual(2);
-      expect(value).toBeLessThanOrEqual(2 + Math.ceil((upAt - downAt - 400) / 60));
+      expect(value).toBeLessThanOrEqual(2 + Math.ceil((held - 400) / 60));
       expect(onChange).toHaveBeenCalledTimes(value);
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![1].source).toBe("increment");
