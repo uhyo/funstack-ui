@@ -230,3 +230,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Design Part A 1559cba accepted (all 7 recs; user OK'd shipping Tooltip.Arrow). Part B 25fbe92 accepted; USER DECISION: skip-delay shipped CSS allowed (shipped CSS = placement + interaction timing, never visuals). CSPProvider + STYLE_SHA256; touch press-drag-release ships.
 - impl-wave11a (Part A) running in worktree wave11/positioning. Part B impl follows on top after merge.
 - Filed #89 (Firefox 2019601; rewritten after user asked what our reduction adds), #90 (device check), #91 (upstream: React style nonce, Static style nonce, Firefox overscroll).
+- Wave 11 code complete on master: Part A d3d0359..faa3dbb + fixes 0cb9d23..d0a48a3; Part B e357d85..1da713c + fixes a02e316..aaa49e2. Reviews: memo/reviewer/wave11-positioning.md, wave11-interaction.md.
+- Filed #92 (Chromium top-layer re-choose on scroll; Popover row unexplained), #93 (tooltip warm-open state). Added pen to #90.
+- USAGE LIMIT hit 2026-10-23. Left: master CI for aaa49e2 (was in progress); architect design-wave11 final alignment (L4/L6/M3 → #93); then release 0.1.0-alpha.9 and close #20 #21 #53 #88.
