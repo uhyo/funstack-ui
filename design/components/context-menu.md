@@ -238,7 +238,11 @@ the `pointerup` when no touch event follows (deviation B1): with the menu above 
 light-dismisses it (Chromium touch emulation: `pointerup` captured by the popup, `touchend`,
 then `beforetoggle(closed)` before any `click`); before wave 11 that click landed on the menu
 under the finger. Cancelling `touchend` suppresses the synthesised click, which is what the
-one-shot swallow of this section existed for on the mouse path. The region stays scrollable before the open. A lift without a drag never
+one-shot swallow of this section existed for on the mouse path. The guard cancels and ends only
+when **no finger is left** (`event.touches.length === 0`), so a second finger's tap while the
+first still holds does not end it and lose the slide (review L4). `pen` pointers get no
+`touchmove` guard; whether an Apple Pencil long-press drag is taken as a pan on iPadOS is on
+the #90 device checklist (review L7). The region stays scrollable before the open. A lift without a drag never
 closes the menu (the menu sits above the finger, 4.7, so the lift lands outside it; the
 outside-release rule requires movement, 2.6). Where the platform fires its own `contextmenu`
 first (Android), the capture and the gesture are taken for the touch pointer the region was
@@ -317,7 +321,7 @@ gesture is a hit-test loop on the captured pointer:
 | --- | --- |
 | `pointermove` | `elementFromPoint(clientX, clientY)` → `closest('[role^="menuitem"]')` inside the **root popup's tree** (submenus are descendants). An enabled or disabled item: focus it through the same quiet routine the item's own `pointermove` uses (Menu 6.2, `focus({ focusVisible: false })`), so keyboard and pointer still agree on the current item. A `SubmenuTrigger`: focus it and start its hover-open timer (Menu 7) as a real `pointerenter` would; leaving it starts the close timer. Nothing under the pointer (outside every popup, padding, a separator): nothing. |
 | `pointerup` (any button) over an **enabled, non-submenu item**, pointer moved more than the slop from the open point | **activate**: `item.click()` (Menu 5.3: one activation path, so `action`, `closeOnActivate`, checkbox and radio toggling are unchanged); a long-press swallow armed by this gesture (2.2, a document capture `click` listener that would eat the library's own `item.click()`) is **disarmed around the call and re-armed afterwards** (deviation B2), and the swallow then covers the `click` an engine may synthesise from this release (macOS Ctrl+click opens with the primary button held). |
-| `pointerup` **outside every popup of the tree**, pointer moved more than the slop, and at least **500 ms** since the open | **dismiss**: `rootPopup.hidePopover()` now (the Tab / outside-right-click shape, section 5), notified `"dismiss"`. |
+| `pointerup` **outside every popup of the tree**, pointer moved more than the slop, and at least **500 ms** since the open (the clock starts at the **first `toggle` that finds the popup `:popover-open`**, not at the press: an `openChangeAction` or suspending items that take 450 ms would otherwise let a 5 px drift and a release 70 ms after the menu appeared dismiss it; a move restarts it with the gesture; review M2) | **dismiss**: `rootPopup.hidePopover()` now (the Tab / outside-right-click shape, section 5), notified `"dismiss"`. |
 | any other `pointerup` (stationary or within the slop; a quick release outside; over a disabled item, a separator, padding, a `SubmenuTrigger`) | nothing: the menu stays open and the ordinary click model takes over. |
 | `lostpointercapture`, `pointercancel`, the menu closing | the gesture ends; listeners removed. |
 
@@ -693,14 +697,22 @@ honoured by Chromium 156 only; `docs/research/interaction-wave11.md` 2.3). Three
   `overflow: hidden` on `<html>`; neither stops a scrollbar drag and both fight an app's own
   lock. As Dialog 10.2, the lock is a documented CSS recipe:
   `html:has([role="menu"][data-context]:popover-open) { overflow: hidden; scrollbar-gutter: stable; }`.
-  With it in place the close-on-scroll listener simply never fires.
+  With it in place the close-on-scroll listener simply never fires. **A scroll already in
+  flight at the open closes the menu too** (review L6): a running smooth scroll (`scroll-behavior:
+  smooth` after a Tab that scrolled, then Shift+F10) or trackpad momentum opens and closes it
+  within a frame or two. Accepted as designed (React Aria's rule has the same edge) and said in
+  the docs' Scrolling list; ignoring scrolls before the first frame after the show is the
+  alternative if it bites.
 - **Wheel over the menu never scrolls the page.** Every root `Menu.Popup` (point- or
   Trigger-opened) installs, while shown, a **non-passive `wheel` listener on the popup element**
   that `preventDefault()`s unless **some element from the event's target up to the popup** can
   scroll in the wheel's direction on its **dominant axis** (`overflow: auto` / `scroll`, and
   room: `scrollHeight > clientHeight` and not at the end for the sign of `deltaY`; likewise
   for `deltaX`; deviation B4: the ancestor walk rather than the innermost `[role="menu"]`
-  alone, so a consumer scroller inside a menu keeps working). Scoped to the popup, so it costs nothing elsewhere; a small
+  alone, so a consumer scroller inside a menu keeps working). **A `wheel` with `ctrlKey` is
+  never prevented** (review L3): Chromium delivers trackpad pinch as `wheel` + `ctrlKey` and
+  Ctrl+wheel is browser zoom in every engine; the guard is for page scrolling only, and a
+  low-vision user zooming over an open menu must not be blocked. Scoped to the popup, so it costs nothing elsewhere; a small
   behaviour change for Trigger-opened menus too, like the outside right-click close (section 5),
   because native menus never scroll the page from inside the menu.
 
@@ -1041,8 +1053,8 @@ the same context provider").
 | `<style>` resource | After the first point open, `document.head` holds exactly one `<style>` whose text contains `@position-try --fsui-menu-up` and the five option names (wave 11); a second Root's point open adds none; `side={null}` renders none and the popup's inline style has only the two custom properties and no `inset` / `left` / `top` / fallbacks; an anchored-only Root renders none ever. |
 | Direction (wave 11) | With `getComputedStyle` stubbed to `direction: "rtl"` for the popup: a `contextmenu` renders `right: calc(100% - var(--menu-point-x))`, `left: auto`, `top` from the variable, and a fallback list naming `--fsui-menu-right` and `--fsui-menu-up-right` (odd generation: `--fsui-menu-right` first); `--menu-point-x` is still `<clientX>px`; a move after the stub flips back to `"ltr"` renders `left` from the variable and the LTR list; `data-context` and `data-side` unchanged. |
 | Touch offset (wave 11) | A long-press open (and a `contextmenu` with `pointerType: "touch"`): `--menu-point-gap: 16px`, `bottom: calc(100% - var(--menu-point-y) + var(--menu-point-gap))`, `top: auto`, the fallback list `--fsui-menu-left, --fsui-menu-down, --fsui-menu-down-left` (RTL stub: `--fsui-menu-right, --fsui-menu-down, --fsui-menu-down-right`); a mouse open: `--menu-point-gap: 0px`, `top` from the variable, the v1 list; a mouse move after a touch open switches back; the `<style>` text names all eight options; a consumer `style={{ "--menu-point-gap": "24px" }}` wins. |
-| Press-drag-release (wave 11) | `document.elementFromPoint` stubbed per test. Right-button `contextmenu` with `buttons: 2` (capture taken): `pointermove` on the popup with the stub returning the second item focuses it quietly (`activeElement`, no `focusVisible`); the stub returning a `SubmenuTrigger` focuses it and, after `delay`, its submenu opens; `pointerup` on the popup 10 px from the open point over an enabled item: the item's `action` called once (through `click`), the menu closes with `"activate"`, a following document `click` is `defaultPrevented` (the swallow); `pointerup` 2 px away over an item: nothing, still open; over a disabled item or a `SubmenuTrigger` at 10 px: nothing; `pointerup` outside (stub returns `body`) 10 px away at 600 ms (fake timers / `timeStamp`): `hidePopover`, `"dismiss"`; at 100 ms: still open; 0 px away at 600 ms: still open; a different `pointerId`: ignored; `lostpointercapture` ends the gesture (a later `pointerup` does nothing); a `contextmenu` with `buttons: 0` (Windows) starts no gesture (no popup `pointermove` listener; spy on `addEventListener`); a move (second `contextmenu`) restarts the gesture with the new point and time. Touch: a long-press open adds a document `touchmove` listener with `{ passive: false }` (spy) whose handler calls `preventDefault()`, removed at that pointer's `pointerup` / `pointercancel`; `pointerup` 0 px away at 700 ms: still open (never closes on a plain lift); 20 px away over an item: activated; 5 px away over an item: nothing (10 px slop). |
-| Close-on-scroll (wave 11) | After a point open: a `scroll` event dispatched on `document` → `hidePopover` at once, `"dismiss"`; on an ancestor element of the region → closes; on an unrelated element → open; on the popup itself → open; after a Trigger open → a document scroll leaves it open; listeners removed after close. Wheel: with the menu open (Trigger-opened too), a `wheel` dispatched on the popup is `defaultPrevented` when the popup cannot scroll; with the popup given `overflow: auto` and a stubbed `scrollHeight > clientHeight` and `scrollTop: 0`, `deltaY: 10` is not prevented and `deltaY: -10` is. |
+| Press-drag-release (wave 11) | `document.elementFromPoint` stubbed per test. Right-button `contextmenu` with `buttons: 2` (capture taken): `pointermove` on the popup with the stub returning the second item focuses it quietly (`activeElement`, no `focusVisible`); the stub returning a `SubmenuTrigger` focuses it and, after `delay`, its submenu opens; `pointerup` on the popup 10 px from the open point over an enabled item: the item's `action` called once (through `click`), the menu closes with `"activate"`, a following document `click` is `defaultPrevented` (the swallow); `pointerup` 2 px away over an item: nothing, still open; over a disabled item or a `SubmenuTrigger` at 10 px: nothing; `pointerup` outside (stub returns `body`) 10 px away at 600 ms (fake timers / `timeStamp`): `hidePopover`, `"dismiss"`; at 100 ms: still open; 0 px away at 600 ms: still open; a different `pointerId`: ignored; with a pending `openChangeAction` (deferred), a `pointerup` outside 10 px away 600 ms after the press but 100 ms after the show: still open (the clock starts at the show, M2), and 600 ms after the show: `"dismiss"`; `lostpointercapture` ends the gesture (a later `pointerup` does nothing); a `contextmenu` with `buttons: 0` (Windows) starts no gesture (no popup `pointermove` listener; spy on `addEventListener`); a move (second `contextmenu`) restarts the gesture with the new point and time. Touch: a long-press open adds a document `touchmove` listener with `{ passive: false }` (spy) whose handler calls `preventDefault()`, removed at that pointer's `pointerup` / `pointercancel`; `pointerup` 0 px away at 700 ms: still open (never closes on a plain lift); 20 px away over an item: activated; 5 px away over an item: nothing (10 px slop). |
+| Close-on-scroll (wave 11) | After a point open: a `scroll` event dispatched on `document` → `hidePopover` at once, `"dismiss"`; on an ancestor element of the region → closes; on an unrelated element → open; on the popup itself → open; after a Trigger open → a document scroll leaves it open; listeners removed after close. Wheel: with the menu open (Trigger-opened too), a `wheel` dispatched on the popup is `defaultPrevented` when the popup cannot scroll; with the popup given `overflow: auto` and a stubbed `scrollHeight > clientHeight` and `scrollTop: 0`, `deltaY: 10` is not prevented and `deltaY: -10` is; a `wheel` with `ctrlKey: true` is never prevented (L3). |
 | CSP (wave 11) | `<CSPProvider nonce="abc">` around the Root: the hoisted `<style>` has `nonce="abc"`; without the provider no `nonce` attribute; `STYLE_SHA256` (from `@funstack/ui/csp`) equals the base64 SHA-256 of `MENU_POINT_RULES` and of `TOOLTIP_WARM_RULES`, recomputed with `node:crypto` in the test. |
 | Closing paths as Menu | Item activation closes through the root Root with `"activate"`; Escape (`hidePopover()` in the shim) notifies `"dismiss"`; Tab-out closes; a controlled `open={false}` hides without a dispatch. |
 | Focus return | After a context open with focus on `<body>` and a `Menu.Trigger` in the Root, a hide with the focus-inside probe → the Trigger is focused (6.2 rule); without a Trigger nothing is focused (`activeElement === body`). |
@@ -1405,3 +1417,17 @@ review (`memo/reviewer/wave11-interaction.md`) may add to this list.
 | B6 | Tooltip's JS skip-delay iterates `[role="tooltip"][popover]` with `matches(":popover-open")` (jsdom's shim answers `matches` only). | tooltip.md 6 |
 | B7 | Press-drag browser rows reshaped for load-robustness: 2 px moves within the slop; the L4 row asserts the 500 ms rule against event timestamps, and the second press must be off the menu. | 13.2 |
 | B8, B9 | Style-counting rows render into a fresh document; the SSR nonce rows live in `csp/csp.test.tsx`. | 13.1 |
+
+#### Review fold (Part B, `memo/reviewer/wave11-interaction.md`, e411798, 2026-10-23)
+
+Verdict "acceptable with minor fixes"; the code fixes are the developer's (fix-wave11b).
+Design-side items, folded in place:
+
+| Item | What changed in the design | Where |
+| --- | --- | --- |
+| M2 | The outside-release clock starts at the first `toggle` that finds the popup shown, not at the press, so an async open does not shorten it; jsdom row with a pending open. | 2.6, 13.1 |
+| L3 | The wheel guard never prevents a `wheel` with `ctrlKey` (trackpad pinch, Ctrl+wheel zoom); jsdom row. | 4.8, 13.1 |
+| L4 | The touch guard cancels and ends only when no finger is left (`touches.length === 0`). | 2.2 |
+| L6 | A scroll already in flight at the open (smooth scroll, momentum) closes the menu; accepted, documented in the Scrolling list. | 4.8 |
+| L7 | Pen gets no `touchmove` guard; the Apple Pencil case is on the #90 checklist. | 2.2 |
+| L1, L2, M1, M3, L5 | Tooltip's and conventions 12's items (nonce cases, one SSR stylesheet per precedence, the `var()` fallback, the removed recipe, the hoverable trade-off). | tooltip.md, conventions 12 |

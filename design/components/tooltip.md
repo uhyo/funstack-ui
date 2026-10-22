@@ -22,7 +22,7 @@ thin, feature-detected shim for the trigger that steps aside wherever the browse
 | 3   | Mechanisms            | Baseline: `popover="manual"` + JS (hover/focus with delays, `showPopover({ source })`, Escape, pointerdown-anywhere). Flags: `Tooltip.Popup experimental_hint` renders `popover="hint"`; `Tooltip.Trigger experimental_interestFor` renders `interestfor` and the JS steps aside where `interestForElement` exists on the trigger element. |
 | 4   | Baseline popover type | `manual`, not `auto`: `auto` would close an open menu or combobox when a tooltip inside or beside it opens.                                                                                                                                                                                                                                |
 | 5   | Name vs description   | Explicit `provides="description" \| "name"` on `Root` (default `description`). `name` sets `aria-labelledby`, `description` sets `aria-describedby`; never both.                                                                                                                                                                           |
-| 6   | Delays                | `delay` (250 ms) and `closeDelay` (150 ms) on `Root`, matching Chromium's `interest-delay` defaults. Native path: inline `interest-delay-start/end` on the trigger. JS path: timers. Same delay for hover and keyboard focus. **Skip-delay (wave 11, #21): while any `[role="tooltip"]:popover-open` exists in the document, a tooltip opens with no delay and the other one is hidden at once; global, no provider, no prop.** Native path: a shipped `@property` + `:root:has()` rule feeding `interest-delay-start: calc(<delay> * (1 - var(--fsui-tooltip-warm)))`; JS path: a `querySelector` at hover / focus start. |
+| 6   | Delays                | `delay` (250 ms) and `closeDelay` (150 ms) on `Root`, matching Chromium's `interest-delay` defaults. Native path: inline `interest-delay-start/end` on the trigger. JS path: timers. Same delay for hover and keyboard focus. **Skip-delay (wave 11, #21): while any `[role="tooltip"]:popover-open` exists in the document, a tooltip opens with no delay and the other one is hidden at once; global, no provider, no prop.** Native path: a shipped `@property` + `:root:has()` rule feeding `interest-delay-start: calc(<delay> * (1 - var(--fsui-tooltip-warm, 0)))`; JS path: a `querySelector` at hover / focus start. |
 | 7   | Positioning           | `side` (`top`) and `align` (`center`) on `Popup` set inline `position-area` and `position-try-fallbacks` through the shared matrix of conventions 13.1: physical sides plus `inline-start` / `inline-end`, inline-relative `align` on a horizontal side (wave 11, #53). `side={null}` emits nothing so a stylesheet can take over.                                                                                                                                                                       |
 | 11  | Resolved side         | `data-side` / `data-align` on Popup and Arrow (and `state.side` / `state.align`) are the **resolved** placement while the tooltip is shown, read from the computed `position-area` by the shared observer (conventions 13.2), and the requested values otherwise. The Arrow therefore points at the trigger after a fallback flip (wave 11, #20). |
 | 8   | Animation             | CSS only (`@starting-style`, `transition-behavior: allow-discrete`, `overlay` required for Chromium's exit). Exit fade is progressive enhancement (none in Firefox); the library never waits on it. No `<ViewTransition>` and no `transition` prop on any Tooltip part (conventions 3.5).                                                                                                                                                                                 |
@@ -121,7 +121,7 @@ knowable through a custom component), so the rule is documented and checked at r
   interestfor="_r_1_"
   aria-describedby="_r_1_"
   data-fsui-tooltip-trigger=""
-  style="interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm))); interest-delay-end: 150ms"
+  style="interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm, 0))); interest-delay-end: 150ms"
 >
   Save
 </button>
@@ -523,7 +523,7 @@ reads them in `Root`'s effect.
     timestamp, nothing to share.
   - **Native path (`experimental_interestFor`).** Chromium reads `interest-delay-start` from the
     trigger's computed style when the hover starts, so the inline value becomes
-    `calc(<delay>ms * (1 - var(--fsui-tooltip-warm)))` and the flagged Trigger renders the
+    `calc(<delay>ms * (1 - var(--fsui-tooltip-warm, 0)))` and the flagged Trigger renders the
     library's second shipped stylesheet (conventions 12, the proposed selector exception):
 
     ```css
@@ -531,15 +531,25 @@ reads them in `Root`'s effect.
     :root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }
     ```
 
-    rendered as `<style href="@funstack/ui/tooltip-warm" precedence="fsui">` inside the Trigger
-    (React hoists it into `<head>` on the server and the client; nothing lands in place).
+    rendered as `<style href="@funstack/ui/tooltip-warm" precedence="fsui">` **beside** the
+    Trigger element (the part returns `<>{warmRules}{element}</>`; React hoists it into
+    `<head>` on the server and the client, nothing lands in place, and no `<ViewTransition>`
+    wraps a Trigger). Not inside `children`: a `render` element with its own children
+    (`render={<a href="/pricing">Pricing</a>}`) wins the `children` merge and would drop the
+    rule (review M1).
     Verified: the second tooltip opens 2 ms after the pointer arrives (probe `skip-delay.mjs`),
     and `hint` stacking closes the first natively. The registered non-inherited property
     invalidates only the marked triggers, not the document. The Trigger carries the marker
     `data-fsui-tooltip-trigger` only with the flag, so baseline markup is unchanged; it works
-    before hydration like the rest of the native path. **Degradation:** with the stylesheet
-    blocked (CSP, conventions 12) or the property unregistered, `var()` falls back to the
-    initial `0` and the normal delay applies; `interest-delay-end` is untouched. This is the
+    before hydration like the rest of the native path. **Degradation:** the `var()` carries an
+    explicit fallback, `var(--fsui-tooltip-warm, 0)`. Without it, a missing stylesheet (a
+    strict `style-src` without the hash or nonce; an app that passes `nonce: { style }` to React
+    but renders no `<CSPProvider>`, where Fizz drops the rule; a `render` element dropping it)
+    leaves the property unregistered and unset, the `var()` invalid at computed-value time, and
+    `interest-delay-start` at its initial `normal`: Chromium's **500 ms**, not the Root's
+    `delay` (review M1, probed). With the fallback the inline value computes to the Root's
+    `delay` and only the skip is lost, which is the intended degradation; `interest-delay-end`
+    is untouched either way. The `@property` initial value matters only once the rule is in. This is the
     first library stylesheet rendered during SSR, which is what makes the CSP nonce provider
     necessary (conventions 12, `<CSPProvider nonce>`; the Trigger reads it and forwards
     `nonce`).
@@ -548,11 +558,21 @@ reads them in `Root`'s effect.
   - **Not in v1:** a cooldown longer than `closeDelay` (Radix's 300 ms after a close; needs a
     `:root` transition that fights an app's `<html>` transition and restyles the document),
     an opt-out (a Root that always waits), and a `data-instant` / `state.warm` for skipping
-    the entry animation: CSS already has `:root:has([role="tooltip"]:popover-open) .tip
-    { transition: none }`, shown in the docs.
-  - **Accessibility:** WCAG 1.4.13's dismissible / hoverable / persistent requirements are
-    unchanged; skipping happens only after the user has already shown interest in a
-    neighbouring control, as on every desktop platform; nothing is announced on show.
+    the entry animation on a warm open. **No CSS recipe exists for the last one** (review M3):
+    `:root:has([role="tooltip"]:popover-open) .tip { transition: none }` matches the tooltip
+    being opened itself once it is `:popover-open`, so every cold open loses its entry
+    transition too, while on a skip the previous tooltip is already hidden when the next one's
+    style changes, so "another tooltip is open" is never observable from CSS at that moment.
+    Instant browsing that keeps cold entry animations needs library state; follow-up if asked.
+  - **Accessibility:** WCAG 1.4.13's dismissible and persistent requirements are unchanged;
+    **hoverable has one new trade-off** (review L5): the pointer crossing a neighbouring
+    trigger B on its way from trigger A to A's tooltip now opens B at once and hides A, where
+    before wave 11 B's 250 ms timer let A survive the crossing; both paths do it (the JS path's
+    `hidePopover()`, the native path's warm `0s` plus `hint` stacking), native platforms behave
+    the same way, and it matters only where the path to a tooltip crosses another trigger (a
+    tooltip beside a vertical toolbar). Documented: place tooltips away from neighbouring
+    triggers in dense toolbars. Skipping happens only after the user has already shown interest
+    in a neighbouring control; nothing is announced on show.
 
 ---
 
@@ -1210,7 +1230,7 @@ Coverage against conventions 10.1. "both" rows have no controlled mode here.
 | Roles and ARIA                                    | Default elements and `type="button"`; `div[popover="manual"][role="tooltip"]` with `id` equal to the trigger's `aria-describedby`; `provides="name"` yields `aria-labelledby` and no `aria-describedby`; consumer `aria-describedby="x"` becomes `"x <id>"`; `experimental_hint` renders `popover="hint"`; `experimental_interestFor` renders `interestfor="<id>"` and `interest-delay-start/end` styles from `delay`/`closeDelay`; `disabled` renders `data-disabled` on Trigger and Popup and no `interestfor`; Arrow renders `aria-hidden` and `data-side`. |
 | Keyboard                                          | Tab to trigger then advance `delay`: `showPopover` called once with `{ source: trigger }`; Escape: `hidePopover` called; Tab away then advance `closeDelay`: `hidePopover` called; Escape when closed: no call. `:focus-visible` in jsdom: verify nwsapi support in setup; if absent, stub `matches` for that selector in the shim.                                                                                                                                                                                                                            |
 | Hover (pattern-specific)                          | `pointerenter` then advance `delay`: shown; leave before `delay`: never shown; leave after open then advance `closeDelay`: hidden; enter popup inside `closeDelay`: not hidden; `pointerType: "touch"`: never shown; `pointerdown` on `document.body` while open: hidden immediately; `delay={0}`: shown on the next tick.                                                                                                                                                                                                                                     |
-| Skip-delay (wave 11)                              | Two Roots A and B. A open (shim `:popover-open` via the `WeakSet`, `matches` stubbed for `[role="tooltip"]:popover-open`): `pointerenter` on B's trigger calls `showPopover` on B **synchronously** (no timer advance) and `hidePopover` on A; the same for `:focus-visible` focus; A's pending close timer firing afterwards calls nothing more. Nothing open: B waits `delay`. A non-FUNSTACK `<div role="tooltip" popover>` open in the document counts. Re-entering A's own trigger while A is open: no call. Native markup: with `experimental_interestFor` the Trigger renders `interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm)))`, `data-fsui-tooltip-trigger`, and exactly one `<style>` in `document.head` whose text contains `@property --fsui-tooltip-warm` (two flagged Roots: still one); without the flag none of the three; `disabled`: none; `nonce` from a `<CSPProvider nonce="n">` lands on the `<style>`. |
+| Skip-delay (wave 11)                              | Two Roots A and B. A open (shim `:popover-open` via the `WeakSet`, `matches` stubbed for `[role="tooltip"]:popover-open`): `pointerenter` on B's trigger calls `showPopover` on B **synchronously** (no timer advance) and `hidePopover` on A; the same for `:focus-visible` focus; A's pending close timer firing afterwards calls nothing more. Nothing open: B waits `delay`. A non-FUNSTACK `<div role="tooltip" popover>` open in the document counts. Re-entering A's own trigger while A is open: no call. Native markup: with `experimental_interestFor` the Trigger renders `interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))`, `data-fsui-tooltip-trigger`, and exactly one `<style>` in `document.head` whose text contains `@property --fsui-tooltip-warm` (two flagged Roots: still one); without the flag none of the three; `disabled`: none; `nonce` from a `<CSPProvider nonce="n">` lands on the `<style>`. |
 | Sync action                                       | **N/A**: Tooltip has no action props. The test file states this in a leading comment and includes a type-level test (`// @ts-expect-error`) that `openChangeAction` and `open` are not accepted.                                                                                                                                                                                                                                                                                                                                                               |
 | Async action, Rejection, Overlap, Post-await rule | **N/A**, same reason.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Suspending content                                | Popup child suspends at mount with a `<Suspense>` inside Popup: fallback renders inside the popup, no `data-pending` anywhere, trigger still mounted; after resolve, content present.                                                                                                                                                                                                                                                                                                                                                                          |
@@ -1389,7 +1409,7 @@ entry), 12.4, the 13 rows. Inputs: `docs/research/interaction-wave11.md` 1 (bind
 | Second tooltip while one is showing | waits the full `delay` on both paths | opens at once; the showing one is hidden at once |
 | Scope | n/a | the document: any `[role="tooltip"]:popover-open`, FUNSTACK's or not |
 | API | none | **none** (no provider, no prop, no `data-` state); the warm condition is available to CSS as `:root:has([role="tooltip"]:popover-open)` |
-| Native path | inline `interest-delay-start: 250ms` | inline `calc(250ms * (1 - var(--fsui-tooltip-warm)))`, the `data-fsui-tooltip-trigger` marker, and a hoisted `<style href="@funstack/ui/tooltip-warm">` (`@property` + one `:root:has()` rule), rendered only by a flagged Trigger, during SSR too |
+| Native path | inline `interest-delay-start: 250ms` | inline `calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))`, the `data-fsui-tooltip-trigger` marker, and a hoisted `<style href="@funstack/ui/tooltip-warm">` (`@property` + one `:root:has()` rule), rendered only by a flagged Trigger, during SSR too |
 | JS path | timer | `querySelector('[role="tooltip"]:popover-open')` at hover / focus start; hide it, show now |
 | Files | | `internal/tooltip-warm.ts` (the CSS string and its hash entry, directive-free); `tooltip-trigger.tsx` renders the style and reads `CSPContext` |
 
@@ -1457,3 +1477,15 @@ popover.md 10, menu.md 9):
 | L5 | Tooltip's scroll row pins the engine outcome behind the async `topLayerAnchorReChoosesOnScroll` probe (Chromium false, Firefox true, stable at every show-to-scroll delay and under CPU load) so the Chromium branch fails, citing #92, when the bug is fixed; the Firefox container-RTL submenu row asserts `right` outright. **Popover's scroll row stays unpinned** (accepts either side, cites #92): Chromium re-chooses there in every run although the probe says it would not, an unexplained difference recorded in #92 (fixes 0cb9d23..d0a48a3). |
 | M2 note | A scroll before the first frame of a pending pair sets the same restart flag, so it costs at most one extra pair at the end (kept; a jsdom row pins "at most one more pair"). |
 | L4 landed | Menu docs and example CSS use the symmetric `data-side` form with the `inline-start` / `inline-end` keys (menu.md 9); the Popover page leads with the static requested-edge margin and shows the any-side keyed form second (popover.md 10). Both are the design's forms. |
+
+### Review fold (Part B, `memo/reviewer/wave11-interaction.md`, e411798, 2026-10-23)
+
+Verdict "acceptable with minor fixes"; the code fixes are the developer's (fix-wave11b).
+Design-side items, folded in place (section 6, decision 6, the 2.1 markup, 13; conventions 12):
+
+| Item | What changed in the design |
+| --- | --- |
+| M1 | The inline value is `calc(<delay>ms * (1 - var(--fsui-tooltip-warm, 0)))`: without the fallback a missing stylesheet (strict CSP, `nonce.style` without a provider, a `render` element with its own children dropping the rule) left the property unregistered, the `var()` invalid and the delay at the UA's `normal` (500 ms), not "the normal delay" the text claimed. The `<style>` renders beside the Trigger element, not in its `children`. |
+| M3 | The "skip the entry animation" CSS recipe is removed: it matches the opening tooltip itself and kills every cold entry transition. Instant browsing with cold animations kept needs library state; a follow-up if asked. |
+| L5 | WCAG 1.4.13 "hoverable" is a recorded trade-off (crossing a neighbouring trigger on the way to a tooltip hides it), not "unchanged"; docs note added. |
+| L1, L2 | Conventions 12 records Fizz's four nonce cases (the object form with no provider drops the rules) and the one-SSR-stylesheet-per-precedence constraint. |

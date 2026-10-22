@@ -2022,12 +2022,25 @@ may ship **functional at-rules** it needs and cannot express inline, under these
   renders it once; the library's only provider, decision 8's "no provider" being about
   experimental flags), whose context every part that renders a hoisted `<style>` reads and
   forwards as the element's `nonce`; the docs say "pass the same value as React's `nonce:
-  { style }` render option", because Fizz **drops** a hoisted `<style precedence>` whose
-  `nonce` differs from that option (react-dom 19.3.1), which matters for the first stylesheet
-  that renders during SSR (Tooltip's skip-delay, rendered by a Trigger with
-  `experimental_interestFor`); Menu's point rules render only after a client interaction.
-  No implicit `<meta property="csp-nonce">` read. A blocked stylesheet degrades: the point menu
-  opens at the point but never flips; the skip-delay `var()` falls back to the normal delay.
+  { style }` render option". Fizz's behaviour (react-dom 19.3.1, probed in the Part B review,
+  L1): with no `nonce` render option or the string form, a provider's nonce is **stripped**
+  and the rules are kept (a nonce policy then blocks them in the browser); with the object form
+  and a matching provider they carry the nonce; with the object form and a **different** nonce
+  **or no provider at all**, the rules are **dropped** (an empty `<style>`), which is the case an
+  app hits when it already passes `nonce.style` for its own CSS, so the docs say in one line:
+  "if you pass `nonce.style`, render `<CSPProvider>` with the same value". This matters for
+  the first stylesheet that renders during SSR (Tooltip's skip-delay, rendered by a Trigger
+  with `experimental_interestFor`); Menu's point rules render only after a client interaction.
+  **At most one shipped stylesheet may render during SSR per precedence bucket** (review L2):
+  Fizz writes every `<style href precedence="fsui">` of one flush as a single element
+  (`data-href="a b"`, texts concatenated), whose hash is in no `STYLE_SHA256` entry; a second
+  server-rendered stylesheet gets its own precedence, and the SSR row asserts exactly one
+  `fsui` `<style>` in the head hashing to its entry. No implicit `<meta property="csp-nonce">`
+  read. A blocked stylesheet degrades: the point menu opens at the point but never flips; the
+  skip-delay inline value carries an explicit `var(--fsui-tooltip-warm, 0)` fallback so it
+  computes to the Root's `delay` (without the fallback an unregistered property makes the
+  `var()` invalid and `interest-delay-start` falls to the UA's `normal`, 500 ms in Chromium;
+  review M1).
   Human items: FUNSTACK Static's SSR entry passes a string `nonce` (scripts only) and would
   need the object form for styles; React could emit the render nonce instead of dropping the
   rules (`docs/research/interaction-wave11.md`, "Upstream issues"; tracked with Firefox's `overscroll-behavior` gap as issue #91).
