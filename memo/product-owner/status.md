@@ -219,3 +219,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Release 0.1.0-alpha.8 (4c5bdcd). Publish green; the deploy-docs runner was queued for a long time.
 - Deferred context-menu follow-ups (design): press-drag-release, touch offset, close-on-scroll, RTL placement, a CSP nonce for the style.
 - Candidates next: #20/#21 Tooltip, #53 RTL, #19 zero-JS, context-menu follow-ups.
+
+## 2026-10-22 — wave 11 started (#20, #21, #53, #88)
+- User picked everything: Tooltip arrow (#20), skip-delay (#21), RTL popups (#53), context-menu follow-ups (filed as #88, checklist).
+- Research running in parallel: research-positioning (#20, #53, RTL point placement → docs/research/positioning-wave11.md), research-interaction (#21, #88 → docs/research/interaction-wave11.md).
+- Next: architect design(s) → PO acceptance → developer(s) in worktrees → review → fixes → alpha.9.
