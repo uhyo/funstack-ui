@@ -209,3 +209,15 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   every engine; the re-entry row passes `{ force: true }` for the click while pending.
 - Focus stays on a pending (aria-disabled, not natively disabled) Button after two animation
   frames in Chromium and Firefox (row 21); WebKit via CI.
+
+## NumberField touch hold (#82)
+
+- Master CI (run 39695447820, Chromium) failed the CDP touch-hold row with "expected 9 to be less
+  than or equal to 8". The row stamped `downAt` after `await session.send(touchStart)`, i.e. after
+  the CDP round trip through the vitest server, while the repeat timers (400 ms, then a chained
+  60 ms timeout) start inside the pointerdown dispatch; `upAt` likewise trailed the touchEnd round
+  trip. When the first round trip is the slower one the measured hold is shorter than the
+  component's. Not reproduced by 24 CPU burners (10/10 passed); reproduced exactly (9 > 8) by a
+  150 ms block in a document pointerdown bubble listener (after React's root handler started the
+  timer). Fix: stamp both ends in capture listeners on the button (as the mouse hold row did), and
+  assert the hold >= 650 ms. Rule: for CDP-driven rows, never stamp time after `session.send`.
