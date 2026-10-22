@@ -39,10 +39,11 @@ export interface ToastActionProps extends Omit<
 
 /**
  * The toast's action button (Undo, Retry, View): a `button type="button"` whose `action` runs as
- * a transition. Renders nothing when neither the part nor the toast has an action. Never disabled
- * while pending (a second click is a second dispatch, latest wins).
+ * a transition. Renders nothing when neither the part nor the toast has an action. Never natively
+ * disabled while pending: a second click meanwhile is ignored and the Action is `aria-disabled`.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `onClick`, `data-pending`.
+ * Owned keys (conventions 1.2): `type` (on a `<button>` only), `onClick`, `aria-disabled`,
+ * `data-pending`.
  */
 export function ToastAction({
   action,
@@ -72,18 +73,23 @@ export function ToastAction({
     if (effective === undefined || rest.disabled === true) return;
     const native = event.nativeEvent;
     const details = createActionDetails(native, { id: root.toast.id });
-    run(
+    // A second click while this Action's own run is in flight starts nothing and is cancelled
+    // (the hook's guard, #81): one Undo, one Retry.
+    const started = run(
       () => effective(details),
       () => {
-        // A second resolve finds the toast already closed (closing is idempotent).
+        // Closing is idempotent: a dismissal meanwhile already closed it.
         if (closeOnSettle) root.close("activate", native);
       },
     );
+    if (!started) event.preventDefault();
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     onClick,
+    // Exactly while `data-pending` (#81). Owned, so an idle Action removes a render element's own.
+    "aria-disabled": pending ? true : undefined,
     "data-pending": dataAttr(pending),
   };
 

@@ -307,10 +307,12 @@ export function DialogPage() {
                 set; the button stays pending until the dialog closes), in JS-free mode with{" "}
                 <code>close(value)</code>. A rejection reaches the nearest Error Boundary above the
                 button and leaves the dialog open. If the dialog was closed and opened again while
-                the action ran, the close is dropped: it belonged to the previous opening. Without{" "}
-                <code>action</code> the button is a native <code>command="request-close"</code>{" "}
-                invoker in JS-free mode and goes straight through the Root in library mode.{" "}
-                <code>details.returnValue</code> is the <code>value</code>.
+                the action ran, the close is dropped: it belonged to the previous opening. A second
+                click while it is pending is ignored, and the button is{" "}
+                <code>aria-disabled="true"</code> meanwhile. Without <code>action</code> the button
+                is a native <code>command="request-close"</code> invoker in JS-free mode and goes
+                straight through the Root in library mode. <code>details.returnValue</code> is the{" "}
+                <code>value</code>.
               </>
             ),
           },
@@ -331,9 +333,13 @@ export function DialogPage() {
         ]}
       />
       <p>
-        <code>DialogCloseState</code>: <code>{"{ pending, disabled }"}</code>. Repeated clicks while
-        pending re-run the action; the first close wins. The Close owns <code>disabled</code>, so a{" "}
-        <code>render</code> element cannot re-enable it.
+        <code>DialogCloseState</code>: <code>{"{ pending, disabled }"}</code>. A second click, Enter
+        or Space while the action is pending is ignored (and cancelled), and the button is{" "}
+        <code>aria-disabled="true"</code> for as long as it shows <code>data-pending</code>, which
+        spans the action and the close; it is never natively disabled, so it keeps focus. To close
+        at once and finish the work in the background, do not return the promise:{" "}
+        <code>{"action={() => { void save(); }}"}</code>. The Close owns <code>disabled</code> and{" "}
+        <code>aria-disabled</code>, so a <code>render</code> element cannot re-enable it.
       </p>
 
       <h4>
@@ -446,6 +452,11 @@ export function DialogPage() {
             "An open, a part's close, or a close notification is in flight (library mode only).",
           ],
           ["`data-pending`", "Close", "Its `action` is in flight."],
+          [
+            "`aria-disabled`",
+            "Close",
+            '`"true"` while `data-pending`: a second click is ignored meanwhile.',
+          ],
           ["`data-disabled`", "Trigger (library mode), Close", "The `disabled` prop."],
         ]}
       />

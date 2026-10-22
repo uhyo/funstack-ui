@@ -13,7 +13,9 @@
 //
 // N/A rows: none of conventions 10.1 is N/A in library mode. JS-free mode has no action state, so
 // its sync/async/rejection/overlap/parity rows do not apply (it is covered by the ARIA, platform
-// path, function props and Close rows).
+// path, function props and Close rows). For the Close part's own `action`, Overlap and Superseded
+// rejection are N/A: the re-entry guard means a Close never has two of its own runs in flight
+// (#79, #81); the Close rows P1-P4 (design/components/button.md 16.4) replace them.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -171,6 +173,14 @@ function spyHide() {
 }
 function silenceErrors() {
   return vi.spyOn(console, "error").mockImplementation(() => {});
+}
+
+/** `defaultPrevented` of every click once it bubbled past React's root listener. */
+function recordClicks(): { seen: boolean[]; stop: () => void } {
+  const seen: boolean[] = [];
+  const listener = (event: Event) => seen.push(event.defaultPrevented);
+  document.addEventListener("click", listener);
+  return { seen, stop: () => document.removeEventListener("click", listener) };
 }
 
 /** Opens a library-mode popover through the Trigger and waits for it to be shown. */
@@ -1357,35 +1367,134 @@ describe("Popover", () => {
         expect(isOpen()).toBe(true);
       });
 
-      it("a superseded rejection still reaches the boundary (useActionTrigger, #47)", async () => {
+      it("P3: a rejection reaches the boundary; after a reset the Close runs again", async () => {
         const user = setupUser();
         silenceErrors();
         const action = vi.fn<ActionFn>();
         const caught = vi.fn();
         const runs = [deferred(), deferred()];
         let call = 0;
-        render(
-          <Harness
-            mode={mode}
-            action={action}
-            content={
-              <ErrorCatcher onError={caught}>
+        function Resettable() {
+          const [key, setKey] = useState(0);
+          return (
+            <>
+              <button type="button" data-testid="reset" onClick={() => setKey((k) => k + 1)} />
+              <ErrorCatcher key={key} onError={caught}>
                 <Popover.Close data-testid="close" action={() => runs[call++]!.promise}>
                   Archive
                 </Popover.Close>
               </ErrorCatcher>
-            }
-          />,
-        );
+            </>
+          );
+        }
+        render(<Harness mode={mode} action={action} content={<Resettable />} />);
         await openThroughTrigger(user);
         await user.click(screen.getByTestId("close"));
-        await user.click(screen.getByTestId("close"));
-        // The newer run resolves first (its close is dispatched), then the older one rejects.
-        await act(async () => runs[1]!.resolve());
         await act(async () => runs[0]!.reject(new Error("first failed")));
         await flush();
         expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
+        expect(isOpen()).toBe(true);
+        expect(action).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByTestId("reset"));
+        await user.click(screen.getByTestId("close"));
+        expect(call).toBe(2);
+        await act(async () => runs[1]!.resolve());
+        await flush();
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
+        expect(isOpen()).toBe(false);
       });
+
+      it("P1: a second click, Enter and Space while pending are ignored and cancelled", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(<Harness mode={mode} action={action} close={{ action: closeAction }} />);
+        await openThroughTrigger(user);
+        const close = screen.getByTestId("close");
+        expect(close).not.toHaveAttribute("aria-disabled");
+        const clicks = recordClicks();
+        try {
+          await user.click(close);
+          await user.click(close);
+          close.focus();
+          await user.keyboard("{Enter}");
+          await user.keyboard(" ");
+        } finally {
+          clicks.stop();
+        }
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        expect(clicks.seen).toEqual([true, true, true, true]);
+        expect(close).toHaveAttribute("aria-disabled", "true");
+        expectPending(close);
+        expect(close).not.toHaveAttribute("data-disabled");
+        expect(close).not.toBeDisabled();
+        expect(document.activeElement).toBe(close);
+        await act(async () => work.resolve());
+        await flush();
+        expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+          [true, "activate"],
+          [false, "activate"],
+        ]);
+        expect(isOpen()).toBe(false);
+        expect(close).not.toHaveAttribute("aria-disabled");
+        expectNotPending(close);
+      });
+
+      it("P2: two clicks in one task call the action once", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(<Harness mode={mode} action={action} close={{ action: closeAction }} />);
+        await openThroughTrigger(user);
+        act(() => {
+          fireEvent.click(screen.getByTestId("close"));
+          fireEvent.click(screen.getByTestId("close"));
+        });
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        await act(async () => work.resolve());
+        await flush();
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(isOpen()).toBe(false);
+      });
+    });
+
+    it("P1: JS-free mode with action, a second click while pending is ignored; one hidePopover()", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const closeAction = vi.fn(() => work.promise);
+      render(<Harness mode="static" close={{ action: closeAction }} />);
+      await user.click(trigger());
+      const hidePopover = spyHide();
+      const close = screen.getByTestId("close");
+      const clicks = recordClicks();
+      try {
+        await user.click(close);
+        await user.click(close);
+        close.focus();
+        await user.keyboard("{Enter}");
+      } finally {
+        clicks.stop();
+      }
+      expect(closeAction).toHaveBeenCalledTimes(1);
+      expect(clicks.seen).toEqual([true, true, true]);
+      expect(close).toHaveAttribute("aria-disabled", "true");
+      expectPending(close);
+      await act(async () => work.resolve());
+      expect(hidePopover).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(false);
+      expect(close).not.toHaveAttribute("aria-disabled");
+    });
+
+    it("P4: a render element's aria-disabled is removed while the Close is idle (owned)", () => {
+      render(
+        <Harness
+          mode="static"
+          close={{ action: () => {}, render: <button type="button" aria-disabled="true" /> }}
+        />,
+      );
+      expect(screen.getByTestId("close")).not.toHaveAttribute("aria-disabled");
     });
 
     it("JS-free mode with action: hidePopover() after the action resolves", async () => {

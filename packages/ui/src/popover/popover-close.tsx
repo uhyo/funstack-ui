@@ -51,10 +51,12 @@ function isPopoverOpen(element: Element): boolean {
  * without `action` the browser hides the popover. In library mode the click is always cancelled
  * and the close goes through the Root (`openChangeAction(false)` awaited, `hidePopover()` in the
  * commit). With `action` the action runs first in this part's own transition (`data-pending` on
- * the button); a rejection leaves the popover open.
+ * the button, with `aria-disabled`; a second click meanwhile is ignored); a rejection leaves the
+ * popover open.
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`.
+ * `command`, `onClick` (library mode, or with `action`), `aria-disabled`, `data-pending`,
+ * `data-disabled`.
  */
 export function PopoverClose({
   action,
@@ -67,7 +69,7 @@ export function PopoverClose({
 }: PopoverCloseProps) {
   const ctx = usePopoverContext("Popover.Close");
   const { ids, popupRef, recordCloseIntent, openGeneration } = ctx;
-  const { pending, run } = useActionTrigger(openGeneration);
+  const { pending, run } = useActionTrigger({ openGeneration });
   const isLibrary = ctx.mode === "library";
   const hasAction = action !== undefined;
   const installClick = isLibrary || hasAction;
@@ -112,8 +114,9 @@ export function PopoverClose({
       return;
     }
     const details = createActionDetails(native, {});
-    // Repeated clicks re-run the action; the first close wins (design 3.4). A close whose open
-    // was superseded by a newer one (dismissed and re-opened meanwhile) is dropped by the hook.
+    // A second activation while this Close's own run is in flight starts nothing (the hook's
+    // guard; the click is already cancelled above, #81). A close whose open was superseded by a
+    // newer one (dismissed and re-opened meanwhile) is dropped by the hook.
     run(
       () => action(details),
       () => close(native),
@@ -127,6 +130,9 @@ export function PopoverClose({
     commandfor: ids.popup,
     command: "hide-popover",
     ...(installClick && { onClick }),
+    // Exactly while `data-pending` (#81): a Close that will not act is unavailable to AT. Owned,
+    // so an idle Close removes a render element's own `aria-disabled`.
+    "aria-disabled": pending ? true : undefined,
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
   };

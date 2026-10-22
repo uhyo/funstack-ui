@@ -849,37 +849,91 @@ describe("Toast", () => {
     });
   });
 
-  describe("overlap and superseded rejection", () => {
-    it("two Undo dispatches resolved out of order close the toast once", async () => {
-      const first = deferred();
-      const second = deferred();
+  // Overlap and Superseded rejection are N/A for `Toast.Action`: the re-entry guard means an
+  // Action never has two of its own runs in flight (#79, #81). These rows replace them
+  // (design/components/button.md 16.4 T1, T2, T4).
+  describe("re-entry", () => {
+    it("T1: a second Undo click while pending is ignored and cancelled; one dispatch, one close", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const d = deferred();
+      const undo = vi.fn(() => d.promise);
       const closeAction = vi.fn();
-      const queue = [first, second];
       render(<Harness manager={manager} />);
       const id = await call(() =>
         manager({
           title: "A",
-          action: { label: "Undo", action: () => queue.shift()!.promise },
+          duration: 1000,
+          action: { label: "Undo", action: undo },
           closeAction,
         }),
       );
+      const action = screen.getByTestId(`action-${id}`);
+      expect(action).not.toHaveAttribute("aria-disabled");
+      let first = false;
+      let second = true;
+      await act(async () => {
+        first = fireEvent.click(action);
+      });
+      await act(async () => {
+        second = fireEvent.click(action);
+      });
+      expect(undo).toHaveBeenCalledTimes(1);
+      expect(first).toBe(true); // not cancelled
+      expect(second).toBe(false); // cancelled
+      expect(action).toHaveAttribute("aria-disabled", "true");
+      expectPending(action);
+      expectPending(root(id));
+      // The timer is paused while the Undo runs.
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      await act(async () => d.resolve());
+      await flush();
+      expect(queryRoot(id)).toBeNull();
+      expect(closeAction).toHaveBeenCalledTimes(1);
+      expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
+    });
+
+    it("T2: two clicks in one task dispatch once; its rejection reaches the boundary, the toast stays", async () => {
+      silenceErrors();
+      const errors: unknown[] = [];
+      const d = deferred();
+      const undo = vi.fn(() => d.promise);
+      let last: ToastViewportState | undefined;
+      render(
+        <Harness
+          manager={manager}
+          list={(state) => {
+            last = state;
+            return (
+              <ErrorCatcher onError={(e) => errors.push(e)}>
+                {state.toasts.map((t) => renderToast(t))}
+              </ErrorCatcher>
+            );
+          }}
+        />,
+      );
+      const id = await call(() => manager({ title: "A", action: { label: "Undo", action: undo } }));
       await act(async () => {
         fireEvent.click(screen.getByTestId(`action-${id}`));
         fireEvent.click(screen.getByTestId(`action-${id}`));
       });
-      await act(async () => second.resolve());
-      await act(async () => first.resolve());
+      expect(undo).toHaveBeenCalledTimes(1);
+      const failure = new Error("undo failed");
+      await act(async () => d.reject(failure));
       await flush();
-      expect(queryRoot(id)).toBeNull();
-      expect(closeAction).toHaveBeenCalledTimes(1);
+      expect(errors).toEqual([failure]);
+      // The boundary above the list replaced it; the toast itself was not closed.
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("undo failed");
+      expect(last?.toasts.map((t) => [t.id, t.ending])).toEqual([[id, false]]);
     });
 
-    it("an older rejection after the newer resolved reaches the boundary", async () => {
+    it("T2: closeOnSettle={false}, an ignored second click, then a rejection: one error", async () => {
       silenceErrors();
       const errors: unknown[] = [];
-      const first = deferred();
-      const second = deferred();
-      const queue = [first, second];
+      const d = deferred();
+      const undo = vi.fn(() => d.promise);
       render(
         <Harness
           manager={manager}
@@ -894,52 +948,35 @@ describe("Toast", () => {
           )}
         />,
       );
-      await call(() =>
-        manager({ title: "A", action: { label: "Undo", action: () => queue.shift()!.promise } }),
-      );
+      await call(() => manager({ title: "A", action: { label: "Undo", action: undo } }));
       await act(async () => {
         fireEvent.click(screen.getByTestId("act"));
+      });
+      await act(async () => {
         fireEvent.click(screen.getByTestId("act"));
       });
-      await act(async () => second.resolve());
+      expect(undo).toHaveBeenCalledTimes(1);
       const failure = new Error("older");
-      await act(async () => first.reject(failure));
+      await act(async () => d.reject(failure));
       await flush();
       expect(errors).toEqual([failure]);
     });
 
-    it("an older rejection while the newer is pending reaches the boundary", async () => {
-      silenceErrors();
-      const errors: unknown[] = [];
-      const first = deferred();
-      const second = deferred();
-      const queue = [first, second];
+    it("T4: a render element's aria-disabled is removed while the Action is idle (owned)", async () => {
       render(
         <Harness
           manager={manager}
-          list={({ toasts }) => (
-            <ErrorCatcher onError={(e) => errors.push(e)}>
-              {toasts.map((t) => (
-                <Toast.Root key={t.id} toast={t}>
-                  <Toast.Action data-testid="act" />
-                </Toast.Root>
-              ))}
-            </ErrorCatcher>
-          )}
+          list={({ toasts }) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t}>
+                <Toast.Action data-testid="act" render={<button aria-disabled="true" />} />
+              </Toast.Root>
+            ))
+          }
         />,
       );
-      await call(() =>
-        manager({ title: "A", action: { label: "Undo", action: () => queue.shift()!.promise } }),
-      );
-      await act(async () => {
-        fireEvent.click(screen.getByTestId("act"));
-        fireEvent.click(screen.getByTestId("act"));
-      });
-      const failure = new Error("older");
-      await act(async () => first.reject(failure));
-      await flush();
-      expect(errors).toEqual([failure]);
-      await act(async () => second.resolve());
+      await call(() => manager({ title: "A", action: { label: "Undo", action: () => {} } }));
+      expect(screen.getByTestId("act")).not.toHaveAttribute("aria-disabled");
     });
   });
 

@@ -116,8 +116,11 @@ export function MenuPage() {
         Root (<code>openChangeAction(false, {'{ reason: "activate" }'})</code>, then{" "}
         <code>hidePopover()</code> in the commit, with a view transition if the Popup has{" "}
         <code>transition</code>). A synchronous action closes in the same tick. A rejection leaves
-        the menu open and reaches the nearest Error Boundary above the item. A second click re-runs
-        the action; the first close wins. For "close now, work in the background" do not return the
+        the menu open and reaches the nearest Error Boundary above the item. A second click, Enter
+        or Space while the action is pending is ignored (and cancelled), and the item is{" "}
+        <code>aria-disabled="true"</code> meanwhile; it is still an enabled item for the arrow keys,
+        Home / End and typeahead, which skip only items with the <code>disabled</code> prop (
+        <code>data-disabled</code>). For "close now, work in the background" do not return the
         promise: <code>{"action={() => { void archive(id); }}"}</code>.
       </p>
       <ul>
@@ -331,7 +334,7 @@ export function MenuPage() {
             name: "action",
             type: "Action<[details: MenuItemDetails]>",
             description:
-              "Runs in the item's own transition (`data-pending` on the item); the menu closes when it settles. May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item.",
+              'Runs in the item\'s own transition (`data-pending` on the item); the menu closes when it settles. A second activation while it is pending is ignored, and the item is `aria-disabled="true"` meanwhile. May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item.',
           },
           ...itemRows("MenuItemState", "true", "Close the whole menu once `action` settles."),
         ]}
@@ -339,9 +342,9 @@ export function MenuPage() {
       <p>
         <code>MenuItemState</code>: <code>{"{ pending, disabled }"}</code>. Owns <code>type</code>{" "}
         (on a button), <code>role</code>, <code>tabIndex</code>, <code>disabled</code> (always
-        absent), <code>aria-disabled</code>, <code>onClick</code>, <code>onKeyDown</code>,{" "}
-        <code>onPointerMove</code>, <code>data-pending</code>, <code>data-disabled</code> and{" "}
-        <code>data-typeahead</code>.
+        absent), <code>aria-disabled</code> (the <code>disabled</code> prop, or while pending),{" "}
+        <code>onClick</code>, <code>onKeyDown</code>, <code>onPointerMove</code>,{" "}
+        <code>data-pending</code>, <code>data-disabled</code> and <code>data-typeahead</code>.
       </p>
 
       <h4>

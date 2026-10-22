@@ -109,7 +109,7 @@ export function Button({
   // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
   // browser and hide the state from AT, so the focusable-disabled branch (review fold F1).
   const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
-  const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: true });
+  const { pending: ownPending, run } = useActionTrigger();
 
   // Per-submitter pending (design 6.2): React reports the submitter's function as
   // `status.action`. `submittedWith` keeps the function this Button last submitted with, so an

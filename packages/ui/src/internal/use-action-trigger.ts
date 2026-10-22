@@ -11,8 +11,9 @@ export interface ActionTriggerOptions {
    * Ignore `run` while a run is in flight (conventions 2.5): `run` returns `false` and starts
    * nothing. In flight means the hook's synchronous in-flight counter is non-zero (it also sees
    * two activations in one task, before React re-rendered); the last render's `pending` is not
-   * consulted, so a click in a settled-but-held commit window runs. Default `false`; on for
-   * `Button` (#79) until #81 makes it the only behaviour.
+   * consulted, so a click in a settled-but-held commit window runs. Default `true`: every pure
+   * trigger ignores re-entry (#79, #81). Only the continuous controls (`Slider`, `NumberField`)
+   * pass `false`, because a step is not a re-entry: every step must run.
    */
   readonly ignoreWhilePending?: boolean | undefined;
 }
@@ -25,7 +26,8 @@ export interface ActionTrigger {
    * transition: a Close part's close, a menu item's close). A rejection skips `then` and reaches
    * the nearest Error Boundary above the part, also when a later run superseded this one. With
    * `openGeneration`, `then` is skipped when a newer open of the overlay started after the run
-   * began. Returns `false` when the run was ignored (`ignoreWhilePending`), so the part can
+   * began. Returns `false` when the run was ignored (a run is in flight and `ignoreWhilePending`
+   * is on, the default), so the part can
    * `preventDefault()` the activation, and `true` otherwise.
    */
   readonly run: (work: () => unknown, then?: () => void) => boolean;
@@ -39,16 +41,17 @@ function report(error: unknown): void {
 
 /**
  * The transition of a pure-trigger part: an `action` with no state of its own (`Button`,
- * `Dialog.Close`, `Popover.Close`, `Menu.Item`; conventions 3.4). Same superseded-rejection
- * surfacing as `useControllableAction`: React keeps only the newest thenable per `useTransition`,
- * so the rejection of a run that a later run superseded would be dropped. The hook catches it and
- * throws it from render, so it reaches the same boundary as the latest run's rejection does.
+ * `Dialog.Close`, `Popover.Close`, `Menu.Item`, `Toast.Action`; conventions 3.4). A second `run`
+ * while one is in flight is ignored by default (conventions 2.5, design/components/button.md 16).
  *
- * The argument is the options object, or (the older positional form) `openGeneration` alone.
+ * With `ignoreWhilePending: false` (the continuous controls' steps) runs overlap, and the hook
+ * surfaces superseded rejections as `useControllableAction` does: React keeps only the newest
+ * thenable per `useTransition`, so the rejection of a run that a later run superseded would be
+ * dropped. The hook catches it and throws it from render, so it reaches the same boundary as the
+ * latest run's rejection does.
  */
-export function useActionTrigger(options?: ActionTriggerOptions | (() => number)): ActionTrigger {
-  const { openGeneration, ignoreWhilePending = false }: ActionTriggerOptions =
-    typeof options === "function" ? { openGeneration: options } : (options ?? {});
+export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrigger {
+  const { openGeneration, ignoreWhilePending = true } = options;
 
   // Thrown before `useTransition` on purpose (see use-controllable-action.ts): in the retry of
   // an errored render `useTransition` would suspend on the newer run's pending thenable.

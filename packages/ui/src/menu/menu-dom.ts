@@ -15,8 +15,13 @@ export function isMenuItem(element: Element, popup: Element): boolean {
   return element.matches(ITEM_SELECTOR) && element.closest('[role="menu"]') === popup;
 }
 
+/**
+ * Disabled by its `disabled` prop. Keys on `data-disabled`, not `aria-disabled`: an item is also
+ * `aria-disabled` while its own action is pending (#81), and a pending item is still an enabled
+ * item for Home / End, the open focus and typeahead.
+ */
 export function isDisabledItem(item: Element): boolean {
-  return item.getAttribute("aria-disabled") === "true";
+  return item.hasAttribute("data-disabled");
 }
 
 /** The first (or last) enabled item; the first (or last) item if all are disabled. */

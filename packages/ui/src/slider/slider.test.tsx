@@ -1437,6 +1437,30 @@ describe("pointer", () => {
     expectNotPending(root());
   });
 
+  it("a second step while the first step's action pends is called (no re-entry guard, #81 H2)", async () => {
+    const first = deferred<void>();
+    const second = deferred<void>();
+    const onChange = vi
+      .fn<ChangeFn>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    render(
+      <Slider.Root data-testid="root" defaultValue={20} valueChangeAction={onChange}>
+        <Parts count={1} />
+      </Slider.Root>,
+    );
+    press(thumbInput(), 21);
+    await flush();
+    expectPending(root());
+    press(thumbInput(), 22);
+    await flush();
+    // A step is not a re-entry: both steps ran.
+    expect(onChange.mock.calls.map((c) => c[0])).toEqual([21, 22]);
+    await act(async () => first.resolve());
+    await act(async () => second.resolve());
+    expectNotPending(root());
+  });
+
   it("ignores the pointer when disabled, and a non-primary button", async () => {
     const onChange = vi.fn<ChangeFn>();
     const { rerender } = render(

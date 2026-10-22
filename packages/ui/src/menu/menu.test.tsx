@@ -6,6 +6,11 @@
 // `hidePopover()` here), the platform's focusing steps (the `autofocus` write is asserted at the
 // `showPopover()` call instead), anchoring, native `focusgroup`, exit animations and
 // ViewTransition (smoke only).
+//
+// N/A rows: Overlap and Superseded rejection for `Menu.Item` (the re-entry guard means an Item
+// never has two of its own runs in flight, #79, #81); the Item re-entry rows M1-M4
+// (design/components/button.md 16.4) replace them. `CheckboxItem` / `RadioItem` are state owners
+// and keep both rows.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, useState } from "react";
@@ -841,61 +846,195 @@ describe("Menu.Item actions", () => {
     });
   });
 
-  it("two activations run the action twice; the close happens once", async () => {
-    const user = setupUser();
-    const runs = [deferred(), deferred()];
-    let call = 0;
-    const openChange = vi.fn<OpenAction>();
-    const hide = spyHide();
-    render(
-      <Harness
-        root={{ openChangeAction: openChange }}
-        content={
-          <Menu.Item data-testid="archive" action={() => runs[call++]!.promise}>
-            Archive
-          </Menu.Item>
-        }
-      />,
-    );
-    await openMenu(user);
-    await user.click(item("archive"));
-    await user.click(item("archive"));
-    await act(async () => runs[0]!.resolve());
-    await act(async () => runs[1]!.resolve());
-    await flush();
-    expect(call).toBe(2);
-    expect(openChange.mock.calls.filter(([next]) => !next)).toHaveLength(1);
-    expect(hide).toHaveBeenCalledTimes(1);
-  });
+  describe("re-entry (#81, design/components/button.md 16.4)", () => {
+    /** `defaultPrevented` of every click once it bubbled past React's root listener. */
+    function recordClicks(): { seen: boolean[]; stop: () => void } {
+      const seen: boolean[] = [];
+      const listener = (event: Event) => seen.push(event.defaultPrevented);
+      document.addEventListener("click", listener);
+      return { seen, stop: () => document.removeEventListener("click", listener) };
+    }
 
-  it("a superseded rejection reaches the boundary (useActionTrigger)", async () => {
-    const user = setupUser();
-    silenceErrors();
-    const caught = vi.fn();
-    const runs = [deferred(), deferred()];
-    let call = 0;
-    render(
-      <Harness
-        content={
-          <ErrorCatcher onError={caught}>
-            <Menu.Item
-              data-testid="archive"
-              closeOnActivate={false}
-              action={() => runs[call++]!.promise}
-            >
+    it("M1: a second Enter, Space and click while pending are ignored and cancelled; one close", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const action = vi.fn(() => work.promise);
+      const openChange = vi.fn<OpenAction>();
+      const hide = spyHide();
+      render(
+        <Harness
+          root={{ openChangeAction: openChange }}
+          content={
+            <Menu.Item data-testid="archive" action={action}>
               Archive
             </Menu.Item>
-          </ErrorCatcher>
-        }
-      />,
-    );
-    await openMenu(user);
-    await user.click(item("archive"));
-    await user.click(item("archive"));
-    await act(async () => runs[1]!.resolve());
-    await act(async () => runs[0]!.reject(new Error("first failed")));
-    await flush();
-    expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
+          }
+        />,
+      );
+      await openMenu(user);
+      const archive = item("archive");
+      expect(archive).not.toHaveAttribute("aria-disabled");
+      const clicks = recordClicks();
+      try {
+        await user.click(archive);
+        archive.focus();
+        await user.keyboard("{Enter}");
+        await user.keyboard(" ");
+        await user.click(archive);
+      } finally {
+        clicks.stop();
+      }
+      expect(action).toHaveBeenCalledTimes(1);
+      // The first click was not cancelled; Enter and Space reach the item through its click.
+      expect(clicks.seen).toEqual([false, true, true, true]);
+      expect(archive).toHaveAttribute("aria-disabled", "true");
+      expectPending(archive);
+      expect(archive).not.toHaveAttribute("data-disabled");
+      expect(archive).toHaveFocus();
+      expect(isOpen()).toBe(true);
+      await act(async () => work.resolve());
+      await flush();
+      expect(openChange.mock.calls.filter(([next]) => !next)).toHaveLength(1);
+      expect(hide).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(false);
+      expect(archive).not.toHaveAttribute("aria-disabled");
+    });
+
+    it("M1: two activations in one task call the action once", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const action = vi.fn(() => work.promise);
+      render(
+        <Harness
+          content={
+            <Menu.Item data-testid="archive" action={action}>
+              Archive
+            </Menu.Item>
+          }
+        />,
+      );
+      await openMenu(user);
+      let second = true;
+      act(() => {
+        fireEvent.click(item("archive"));
+        second = fireEvent.click(item("archive"));
+      });
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(second).toBe(false); // cancelled
+      await act(async () => work.resolve());
+      await flush();
+      expect(isOpen()).toBe(false);
+    });
+
+    it("M2: closeOnActivate={false}, the second activation is ignored; after settle the next one runs", async () => {
+      const user = setupUser();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      const action = vi.fn(() => runs[call++]!.promise);
+      render(
+        <Harness
+          content={
+            <Menu.Item data-testid="refresh" action={action} closeOnActivate={false}>
+              Refresh
+            </Menu.Item>
+          }
+        />,
+      );
+      await openMenu(user);
+      const refresh = item("refresh");
+      refresh.focus();
+      await user.keyboard("{Enter}");
+      await user.keyboard("{Enter}");
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(refresh).toHaveAttribute("aria-disabled", "true");
+      expectPending(refresh);
+      await act(async () => runs[0]!.resolve());
+      await flush();
+      expect(refresh).not.toHaveAttribute("aria-disabled");
+      expectNotPending(refresh);
+      expect(isOpen()).toBe(true);
+      await user.keyboard("{Enter}");
+      expect(action).toHaveBeenCalledTimes(2);
+      await act(async () => runs[1]!.resolve());
+    });
+
+    it("M3: a pending item is still an enabled item for the arrows, Home / End and typeahead", async () => {
+      const user = setupUser();
+      const work = deferred();
+      render(
+        <Harness
+          content={
+            <>
+              <Menu.Item data-testid="refresh" action={() => work.promise} closeOnActivate={false}>
+                Refresh
+              </Menu.Item>
+              <Menu.Item data-testid="rename">Rename</Menu.Item>
+              <Menu.Item data-testid="delete">Delete</Menu.Item>
+            </>
+          }
+        />,
+      );
+      await openMenu(user);
+      await user.click(item("refresh"));
+      expect(item("refresh")).toHaveAttribute("aria-disabled", "true");
+      item("refresh").focus();
+      await user.keyboard("{ArrowDown}");
+      expect(item("rename")).toHaveFocus();
+      await user.keyboard("{ArrowUp}");
+      expect(item("refresh")).toHaveFocus();
+      await user.keyboard("{End}");
+      expect(item("delete")).toHaveFocus();
+      await user.keyboard("{Home}");
+      expect(item("refresh")).toHaveFocus();
+      item("delete").focus();
+      await user.keyboard("r");
+      expect(item("refresh")).toHaveFocus();
+      expectPending(item("refresh"));
+      await act(async () => work.resolve());
+    });
+
+    it("M4: a rejection reaches the boundary above the item; the menu stays open; after a reset it runs again", async () => {
+      const user = setupUser();
+      silenceErrors();
+      const caught = vi.fn();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      function Resettable() {
+        const [key, setKey] = useState(0);
+        return (
+          <>
+            <Menu.Item
+              data-testid="reset"
+              closeOnActivate={false}
+              action={() => setKey((k) => k + 1)}
+            >
+              Reset
+            </Menu.Item>
+            <ErrorCatcher key={key} onError={caught}>
+              <Menu.Item
+                data-testid="archive"
+                closeOnActivate={false}
+                action={() => runs[call++]!.promise}
+              >
+                Archive
+              </Menu.Item>
+            </ErrorCatcher>
+          </>
+        );
+      }
+      render(<Harness content={<Resettable />} />);
+      await openMenu(user);
+      await user.click(item("archive"));
+      await act(async () => runs[0]!.reject(new Error("first failed")));
+      await flush();
+      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
+      expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
+      expect(isOpen()).toBe(true);
+      await user.click(item("reset"));
+      await user.click(item("archive"));
+      expect(call).toBe(2);
+      await act(async () => runs[1]!.resolve());
+    });
   });
 
   it("render={<a href />}: Enter clicks the link (activation through onClick)", async () => {

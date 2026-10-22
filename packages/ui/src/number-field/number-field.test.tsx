@@ -953,6 +953,35 @@ describe("steps run in transitions", () => {
     expect(input().value).toBe("2");
   });
 
+  it("a second step while the first step's action pends is called (no re-entry guard, #81 H2)", async () => {
+    const first = deferred();
+    const second = deferred();
+    const onChange = vi
+      .fn<Fn>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    render(
+      <NumberField.Root
+        data-testid="root"
+        locale="en-US"
+        defaultValue={1}
+        valueChangeAction={onChange}
+      >
+        <Parts />
+      </NumberField.Root>,
+    );
+    key("ArrowUp");
+    await flush();
+    expectPending(root());
+    key("ArrowUp");
+    await flush();
+    // A step is not a re-entry: both steps ran.
+    expect(onChange.mock.calls.map(([next]) => next)).toEqual([2, 3]);
+    await act(async () => first.resolve());
+    await act(async () => second.resolve());
+    expectNotPending(root());
+  });
+
   it("without a valueChangeAction a step starts no transition; the text holds until the commit", async () => {
     vi.useFakeTimers();
     render(

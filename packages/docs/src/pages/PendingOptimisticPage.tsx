@@ -103,6 +103,19 @@ export function PendingOptimisticPage() {
   {({ pending }) => <>Billing{pending && <Spinner />}</>}
 </Tabs.Tab>`}</CodeBlock>
 
+      <h3>A second click while pending</h3>
+      <p>
+        Parts that own state take every click: a second click on a pending Toggle, Tab or Checkbox
+        is a new intent, the optimistic value follows it, and the latest intent wins. Pure triggers,
+        buttons whose action has no state of their own (<code>Button</code>,{" "}
+        <code>Dialog.Close</code>, <code>Popover.Close</code>, <code>Menu.Item</code>,{" "}
+        <code>Toast.Action</code>), ignore a second click, Enter or Space while their own action is
+        pending, and render <code>aria-disabled="true"</code> for as long as they show{" "}
+        <code>data-pending</code>. They are never natively disabled, so focus stays on them. For a
+        button that should count every click (a "+1"), do not return the promise:{" "}
+        <code>{"action={() => { void increment(); }}"}</code>.
+      </p>
+
       <h3>Rollback</h3>
       <p>
         If the action rejects, or a controlled parent does not adopt the new value, the optimistic

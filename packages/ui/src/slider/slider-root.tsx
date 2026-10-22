@@ -311,7 +311,9 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   const { optimistic, committed, dispatch } = commitState;
   const committedRef = useLatest(committed);
 
-  const { pending: stepPending, run: runStep } = useActionTrigger();
+  // A step is not a re-entry: a continuous control dispatches one step per key press or pointer
+  // move and every step must run (design/components/button.md 16.1), so no in-flight guard.
+  const { pending: stepPending, run: runStep } = useActionTrigger({ ignoreWhilePending: false });
 
   const optimisticValues = useMemo(() => toArray(optimistic), [optimistic]);
   const held = gestureThumb !== null || stepHeld || stepPending || commitState.pending;

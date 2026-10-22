@@ -15,7 +15,9 @@
 //
 // N/A rows: none of conventions 10.1 is N/A in library mode. JS-free mode has no action props, so
 // its sync/async/rejection/overlap/parity rows do not apply (it is covered by the ARIA, function
-// props, Close and Form rows).
+// props, Close and Form rows). For the Close part's own `action`, Overlap and Superseded rejection
+// are N/A: the re-entry guard means a Close never has two of its own runs in flight (#79, #81);
+// the Close "re-entry" rows (D1-D6, design/components/button.md 16.4) replace them.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
   StrictMode,
@@ -1237,32 +1239,209 @@ describe("Dialog", () => {
       expect(popup().open).toBe(true);
     });
 
-    it("with action: a superseded rejection still reaches the boundary (useActionTrigger, #47)", async () => {
+    it("with action: a rejection reaches the boundary; after a reset the Close runs again (D4)", async () => {
       const user = setupUser();
       silenceErrors();
       const caught = vi.fn();
+      const close = spyClose();
       const runs = [deferred(), deferred()];
       let call = 0;
-      render(
-        <Harness
-          mode="uncontrolled"
-          content={
-            <ErrorCatcher onError={caught}>
+      function Resettable() {
+        const [key, setKey] = useState(0);
+        return (
+          <>
+            <button type="button" data-testid="reset" onClick={() => setKey((k) => k + 1)} />
+            <ErrorCatcher key={key} onError={caught}>
               <Dialog.Close data-testid="delete" action={() => runs[call++]!.promise}>
                 Delete
               </Dialog.Close>
             </ErrorCatcher>
-          }
-        />,
-      );
+          </>
+        );
+      }
+      render(<Harness mode="uncontrolled" content={<Resettable />} />);
       await openThroughTrigger(user);
       await user.click(screen.getByTestId("delete"));
-      await user.click(screen.getByTestId("delete"));
-      // The older run rejects while the newer one is still pending.
       await act(async () => runs[0]!.reject(new Error("first failed")));
       await flush();
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
+      expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
+      expect(popup().open).toBe(true);
+      expect(close).not.toHaveBeenCalled();
+      // The boundary sits above the Close: reset it and the next click runs the action again.
+      fireEvent.click(screen.getByTestId("reset"));
+      await user.click(screen.getByTestId("delete"));
+      expect(call).toBe(2);
       await act(async () => runs[1]!.resolve());
+      await flush();
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(popup().open).toBe(false);
+    });
+
+    describe("re-entry (#81, design/components/button.md 16.4)", () => {
+      /** `defaultPrevented` of every click once it bubbled past React's root listener. */
+      function recordClicks(): { seen: boolean[]; stop: () => void } {
+        const seen: boolean[] = [];
+        const listener = (event: Event) => seen.push(event.defaultPrevented);
+        document.addEventListener("click", listener);
+        return { seen, stop: () => document.removeEventListener("click", listener) };
+      }
+
+      it("D1: library mode, a second click, Enter and Space while pending are ignored and cancelled", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(
+          <Harness
+            mode="uncontrolled"
+            action={action}
+            content={
+              <Dialog.Close data-testid="delete" value="deleted" action={closeAction}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        const close = spyClose();
+        const button = screen.getByTestId("delete");
+        expect(button).not.toHaveAttribute("aria-disabled");
+        const clicks = recordClicks();
+        try {
+          await user.click(button);
+          await user.click(button);
+          button.focus();
+          await user.keyboard("{Enter}");
+          await user.keyboard(" ");
+        } finally {
+          clicks.stop();
+        }
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        // Library mode cancels every Close click (the command); the ignored ones are no exception.
+        expect(clicks.seen).toEqual([true, true, true, true]);
+        expect(button).toHaveAttribute("aria-disabled", "true");
+        expectPending(button);
+        expect(button).not.toHaveAttribute("data-disabled");
+        expect(button).not.toBeDisabled();
+        expect(document.activeElement).toBe(button);
+        expect(action).toHaveBeenCalledTimes(1); // the open only
+        await act(async () => work.resolve());
+        await flush();
+        expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+          [true, "activate"],
+          [false, "activate"],
+        ]);
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(close).toHaveBeenCalledWith("deleted");
+        expect(popup().open).toBe(false);
+        // The element reference: the attributes are gone with the settle.
+        expect(button).not.toHaveAttribute("aria-disabled");
+        expectNotPending(button);
+      });
+
+      it("D1: JS-free mode with action, a second click while pending is ignored; one close(value)", async () => {
+        const user = setupUser();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(
+          <Harness
+            mode="static"
+            content={
+              <Dialog.Close data-testid="delete" value="deleted" action={closeAction}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await act(async () => popup().showModal());
+        const close = spyClose();
+        const button = screen.getByTestId("delete");
+        const clicks = recordClicks();
+        try {
+          await user.click(button);
+          await user.click(button);
+          button.focus();
+          await user.keyboard("{Enter}");
+        } finally {
+          clicks.stop();
+        }
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        expect(clicks.seen).toEqual([true, true, true]);
+        expect(button).toHaveAttribute("aria-disabled", "true");
+        expectPending(button);
+        expect(popup().open).toBe(true);
+        await act(async () => work.resolve());
+        await flush();
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(close).toHaveBeenCalledWith("deleted");
+        expect(button).not.toHaveAttribute("aria-disabled");
+      });
+
+      it("D2: two clicks in one task call the action once", async () => {
+        const user = setupUser();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(
+          <Harness
+            mode="uncontrolled"
+            content={
+              <Dialog.Close data-testid="delete" action={closeAction}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        act(() => {
+          fireEvent.click(screen.getByTestId("delete"));
+          fireEvent.click(screen.getByTestId("delete"));
+        });
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        await act(async () => work.resolve());
+        await flush();
+        expect(popup().open).toBe(false);
+      });
+
+      it("D3: without action, a second click while the Root's close is pending changes nothing", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        render(<Harness mode="uncontrolled" action={action} />);
+        await openThroughTrigger(user);
+        const closing = deferred();
+        action.mockImplementation(() => closing.promise);
+        const close = spyClose();
+        await user.click(screen.getByTestId("close"));
+        await user.click(screen.getByTestId("close"));
+        // `requestClose` is a no-op against `intended()`: one dispatch. No own run, so no
+        // pending and no aria-disabled on the Close.
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(screen.getByTestId("close")).not.toHaveAttribute("aria-disabled");
+        expectNotPending(screen.getByTestId("close"));
+        await act(async () => closing.resolve());
+        await flush();
+        expect(close).toHaveBeenCalledTimes(1);
+      });
+
+      it("D6: a render element's aria-disabled is removed while the Close is idle (owned)", async () => {
+        const user = setupUser();
+        render(
+          <Harness
+            mode="uncontrolled"
+            content={
+              <Dialog.Close
+                data-testid="delete"
+                action={() => {}}
+                render={<button type="button" aria-disabled="true" />}
+              >
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        expect(screen.getByTestId("delete")).not.toHaveAttribute("aria-disabled");
+      });
     });
 
     renderBoth("open-generation guard (review M2)", (mode) => {

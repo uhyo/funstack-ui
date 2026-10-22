@@ -138,6 +138,13 @@ export function RoadmapPage() {
           removed; use <code>Button</code> from <code>@funstack/ui/button</code>, which behaves the
           same inside a toolbar.
         </li>
+        <li>
+          Every pure trigger ignores re-entry: <code>Dialog.Close</code>, <code>Popover.Close</code>
+          , <code>Menu.Item</code> and <code>Toast.Action</code> now behave like Button, ignoring a
+          second click while their own action is pending, with <code>aria-disabled</code> meanwhile
+          (<a href={issue(81)}>#81</a>). Behaviour change: before, a second click ran the action
+          again.
+        </li>
       </ul>
 
       <h3>Next</h3>

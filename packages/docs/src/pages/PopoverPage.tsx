@@ -306,8 +306,9 @@ export function PopoverPage() {
                 the popover: in library mode through the Root (<code>openChangeAction(false)</code>{" "}
                 awaited, view transition if set), in JS-free mode with <code>hidePopover()</code>. A
                 rejection reaches the nearest Error Boundary above the button and leaves the popover
-                open. Without <code>action</code> in JS-free mode the button is a native{" "}
-                <code>command="hide-popover"</code> invoker.
+                open. A second click while it is pending is ignored, and the button is{" "}
+                <code>aria-disabled="true"</code> meanwhile. Without <code>action</code> in JS-free
+                mode the button is a native <code>command="hide-popover"</code> invoker.
               </>
             ),
           },
@@ -323,10 +324,15 @@ export function PopoverPage() {
       />
       <p>
         <code>PopoverCloseState</code>: <code>{"{ pending, disabled }"}</code>. In library mode the
-        click is always intercepted, so every Close goes through the Root. Repeated clicks while
-        pending re-run the action; the first close wins. If the user dismisses the popover and opens
-        it again while the action runs, the action's close is dropped: it belonged to the earlier
-        open. Popovers have no return value.
+        click is always intercepted, so every Close goes through the Root. A second click while the
+        action is pending is ignored (and cancelled), and the button is{" "}
+        <code>aria-disabled="true"</code> for as long as it shows <code>data-pending</code> (the
+        action and the hide); never natively disabled, so it keeps focus. To hide at once and finish
+        the work in the background, do not return the promise:{" "}
+        <code>{"action={() => { void apply(); }}"}</code>. If the user dismisses the popover and
+        opens it again while the action runs, the action's close is dropped: it belonged to the
+        earlier open. Popovers have no return value. The Close owns <code>disabled</code> and{" "}
+        <code>aria-disabled</code>.
       </p>
 
       <h4>
@@ -368,6 +374,11 @@ export function PopoverPage() {
             "An open, a part-initiated close or a dismissal notification is in flight (library mode only).",
           ],
           ["`data-pending`", "Close", "Its `action` is in flight."],
+          [
+            "`aria-disabled`",
+            "Close",
+            '`"true"` while `data-pending`: a second click is ignored meanwhile.',
+          ],
           ["`data-disabled`", "Trigger (library mode), Close", "The `disabled` prop."],
         ]}
       />

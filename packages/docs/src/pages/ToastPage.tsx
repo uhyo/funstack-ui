@@ -391,8 +391,11 @@ toast({ title: "Link copied" });`}</CodeBlock>
         ]}
       />
       <p>
-        <code>ToastActionState</code>: <code>{"{ pending, toast }"}</code>. Never disabled while
-        pending: a second click is a second dispatch and the first resolve closes the toast.
+        <code>ToastActionState</code>: <code>{"{ pending, toast }"}</code>. A second click while the
+        action is pending is ignored (and cancelled): one Undo, one Retry. The Action is{" "}
+        <code>aria-disabled="true"</code> while it shows <code>data-pending</code>, never natively
+        disabled, so it keeps focus. Owns <code>type</code> (on a button), <code>onClick</code>,{" "}
+        <code>aria-disabled</code> and <code>data-pending</code>.
       </p>
 
       <h4>
@@ -416,6 +419,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
             "Root, Action",
             "The toast's promise is unsettled, or its Action's action runs (not set while its content merely suspends)",
           ],
+          ["`aria-disabled`", "Action", '`"true"` while `data-pending`: a second click is ignored'],
           [
             "`data-ending`",
             "Root",

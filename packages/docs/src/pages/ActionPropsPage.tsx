@@ -156,9 +156,14 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
           inputs too, and the form's author asked for it.)
         </li>
         <li>
-          <strong>Parts are never disabled while pending.</strong> The library only sets{" "}
-          <code>data-pending</code>; a second click is a new intent (below). If you want to block
-          it, use CSS: <code>[data-pending] {"{ pointer-events: none }"}</code>.
+          <strong>Parts are never natively disabled while pending.</strong> A part that owns state
+          (Toggle, Tabs, Checkbox, a menu's checkbox item) sets <code>data-pending</code> and takes
+          every click: a second click is a new intent (below). A <em>pure trigger</em>, a button
+          whose action has no state of its own (<a href="/components/button">Button</a>,{" "}
+          <code>Dialog.Close</code>, <code>Popover.Close</code>, <code>Menu.Item</code>,{" "}
+          <code>Toast.Action</code>), ignores a second activation while its own action is pending
+          and is <code>aria-disabled="true"</code> meanwhile, so a double click never runs a save
+          twice.
         </li>
       </ul>
 

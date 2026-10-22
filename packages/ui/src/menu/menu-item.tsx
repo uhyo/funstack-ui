@@ -30,7 +30,10 @@ export interface MenuItemProps extends Omit<
   action?: Action<[details: MenuItemDetails]>;
   /** Close the whole menu once `action` settles. Default `true`. */
   closeOnActivate?: boolean;
-  /** Renders `aria-disabled`: the item stays focusable and never activates. */
+  /**
+   * Renders `aria-disabled` and `data-disabled`: the item stays focusable and never activates;
+   * the arrows, Home / End and typeahead skip it.
+   */
   disabled?: boolean;
   /** Text typeahead matches when the item's text content is not representative (an icon). */
   label?: string;
@@ -42,7 +45,8 @@ export interface MenuItemProps extends Omit<
 
 /**
  * A menu command: `<button type="button" role="menuitem" tabindex="-1">`. Click, Enter or Space
- * runs `action` in the item's own transition; once it resolves the whole menu stack closes
+ * runs `action` in the item's own transition (`data-pending` and `aria-disabled` on the item; a
+ * second activation meanwhile is ignored); once it resolves the whole menu stack closes
  * through the top-level Root (`openChangeAction(false, { reason: "activate" })` awaited, view
  * transition if set). Hovering the item focuses it.
  *
@@ -63,7 +67,7 @@ export function MenuItem({
 }: MenuItemProps) {
   const menu = useMenuContext("Menu.Item");
   // The close belongs to the top-level menu, so its open generation guards it.
-  const { pending, run } = useActionTrigger(menu.root.popover.openGeneration);
+  const { pending, run } = useActionTrigger({ openGeneration: menu.root.popover.openGeneration });
 
   const { libraryProps } = useMenuItem({
     part: "Menu.Item",
@@ -72,11 +76,14 @@ export function MenuItem({
     label,
     activate: (event) => {
       const details: MenuItemDetails = createActionDetails(event, {});
-      // Repeated activations re-run the action; the first close wins (design 2.3).
-      run(
+      // A second activation while this item's own run is in flight starts nothing and is
+      // cancelled (the hook's guard, #81): a link does not navigate, a composed command does not
+      // run. Enter / Space reach here through the element's click, their keydown is cancelled.
+      const started = run(
         () => action?.(details),
         closeOnActivate ? () => menu.root.popover.requestClose(event, "activate") : undefined,
       );
+      if (!started) event.preventDefault();
     },
   });
 
@@ -93,6 +100,9 @@ export function MenuItem({
     libraryProps: {
       ...(rendersButton(render) && { type: "button" as const }),
       ...libraryProps,
+      // Also while pending (#81): an item that will not act is unavailable to AT. Navigation keys
+      // on `data-disabled` (the `disabled` prop), so a pending item is still an enabled item.
+      "aria-disabled": disabled || pending ? true : undefined,
       "data-pending": dataAttr(pending),
     },
   });

@@ -53,10 +53,11 @@ const isDev = process.env.NODE_ENV !== "production";
  * `value` as the `returnValue`. In library mode the click is always cancelled and the close goes
  * through the Root (`openChangeAction(false)` awaited, then `close(value)` in the commit, inside
  * the view transition if the Popup's `transition` is set). With `action` the action runs first in
- * this part's own transition (`data-pending` on the button); a rejection leaves the dialog open.
+ * this part's own transition (`data-pending` and `aria-disabled` on the button; a second click
+ * meanwhile is ignored); a rejection leaves the dialog open.
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command`, `value`, `onClick` (library mode, or with `action`), `data-pending`,
+ * `command`, `value`, `onClick` (library mode, or with `action`), `aria-disabled`, `data-pending`,
  * `data-disabled`.
  */
 export function DialogClose({
@@ -71,7 +72,7 @@ export function DialogClose({
 }: DialogCloseProps) {
   const ctx = useDialogContext("Dialog.Close");
   // The open-generation guard: a close from a previous opening must not close a new one.
-  const { pending, run } = useActionTrigger(ctx.openGeneration);
+  const { pending, run } = useActionTrigger({ openGeneration: ctx.openGeneration });
   const { ids, dialogRef, recordCloseIntent } = ctx;
   const isLibrary = ctx.mode === "library";
   const hasAction = action !== undefined;
@@ -119,8 +120,9 @@ export function DialogClose({
       return;
     }
     const details = createActionDetails(native, { returnValue });
-    // Repeated clicks re-run the action; the first close wins (design 3.4). A close whose open
-    // was superseded by a newer one (dismissed and re-opened meanwhile) is dropped by the hook.
+    // A second activation while this Close's own run is in flight starts nothing (the hook's
+    // guard; the click is already cancelled above, #81). A close whose open was superseded by a
+    // newer one (dismissed and re-opened meanwhile) is dropped by the hook.
     run(
       () => action(details),
       () => close(native, returnValue),
@@ -135,6 +137,9 @@ export function DialogClose({
     command: "request-close",
     value,
     ...(installClick && { onClick }),
+    // Exactly while `data-pending` (#81): a Close that will not act is unavailable to AT. Owned,
+    // so an idle Close removes a render element's own `aria-disabled`.
+    "aria-disabled": pending ? true : undefined,
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
   };

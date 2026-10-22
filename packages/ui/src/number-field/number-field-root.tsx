@@ -280,7 +280,9 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     [mirror],
   );
 
-  const { pending: stepPending, run: runStep } = useActionTrigger();
+  // A step is not a re-entry: a continuous control dispatches one step per key press or pointer
+  // move and every step must run (design/components/button.md 16.1), so no in-flight guard.
+  const { pending: stepPending, run: runStep } = useActionTrigger({ ignoreWhilePending: false });
 
   const runCommit = async (
     next: number | null,
