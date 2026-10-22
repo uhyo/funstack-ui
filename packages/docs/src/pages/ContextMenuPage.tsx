@@ -270,7 +270,7 @@ export function ContextMenuPage() {
             '`"activate"`',
           ],
           [
-            "Release of the held button outside the menu, after moving, at least 500 ms after the open",
+            "Release of the held button outside the menu, after moving, at least 500 ms after the menu appeared",
             "Closes at once",
             '`"dismiss"`',
           ],
@@ -308,7 +308,7 @@ export function ContextMenuPage() {
             "The item is activated through its `click()`: its `action`, `closeOnActivate`, checkbox and radio toggling behave exactly as a click",
           ],
           [
-            "Outside the menu (and its submenus), after moving more than 4 px, at least 500 ms after the open",
+            "Outside the menu (and its submenus), after moving more than 4 px, at least 500 ms after the menu appeared",
             'The menu closes (`"dismiss"`)',
           ],
           [
@@ -355,9 +355,15 @@ export function ContextMenuPage() {
           open and follows its button.
         </li>
         <li>
+          <strong>A scroll already running at the open does not count</strong>: a smooth scroll (for
+          example a Tab under <code>scroll-behavior: smooth</code> followed at once by Shift+F10) or
+          trackpad momentum. Scroll events are ignored until the first frame without one; the next
+          scroll closes the menu. A scroll that never pauses keeps the menu open until it does.
+        </li>
+        <li>
           <strong>A wheel over any menu never scrolls the page</strong> (a menu opened from its
           button too): the library prevents it unless the menu under the pointer can scroll that way
-          itself.
+          itself. Zooming is left alone: Ctrl+wheel and a trackpad pinch work over a menu.
         </li>
         <li>
           There is no scroll lock, which would fight your app's own and cannot stop a scrollbar

@@ -636,7 +636,8 @@ export function MenuPage() {
         context-opened or not: a right- or middle-click outside closes it at once (
         <code>"dismiss"</code>), as native menus do; Chromium's light dismiss alone would leave it
         open under the browser's own menu. And a wheel over the menu never scrolls the page under
-        it: the library prevents it unless the menu itself can scroll that way.
+        it: the library prevents it unless the menu itself can scroll that way (Ctrl+wheel and a
+        trackpad pinch still zoom).
       </p>
     </div>
   );

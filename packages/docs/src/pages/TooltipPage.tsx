@@ -380,25 +380,25 @@ export function TooltipPage() {
         <li>
           <strong>On the native path</strong> (<code>experimental_interestFor</code> in Chromium)
           the browser reads the delay from the trigger's computed style, so the Trigger renders{" "}
-          <code>interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm)))</code> and a
+          <code>interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))</code> and a
           small stylesheet that sets <code>--fsui-tooltip-warm</code> to 1 on marked triggers while
           a tooltip is showing. React hoists it into <code>&lt;head&gt;</code> (during server
           rendering too); it works before hydration. Nothing visual: it times the interaction only.
           Under a strict <code>style-src</code> it needs its hash or a nonce (
-          <a href="/concepts/content-security-policy">Content Security Policy</a>); blocked, the
-          native path keeps its normal delay.
+          <a href="/concepts/content-security-policy">Content Security Policy</a>). Without it
+          (blocked, or React dropped it), the <code>var()</code> falls back to <code>0</code>: each
+          tooltip opens after its own <code>delay</code>, and only skip-delay is lost.
         </li>
         <li>
-          To skip the entry animation of a tooltip that opens at once, use the same condition in
-          your CSS.
+          A tooltip that opens at once still runs its entry animation. CSS cannot tell such an open
+          from a cold one: by the time the new tooltip is <code>:popover-open</code>, the previous
+          one is already hidden, and a <code>:has(:popover-open)</code> condition matches the
+          tooltip that is opening, so it would remove the animation from every open.
         </li>
       </ul>
       <CodeBlock language="css">{`/* The library's rule (rendered by a Trigger with experimental_interestFor): */
 @property --fsui-tooltip-warm { syntax: "<number>"; inherits: false; initial-value: 0; }
-:root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }
-
-/* Yours, optional: no entry animation while browsing from one tooltip to the next. */
-:root:has([role="tooltip"]:popover-open) .tip { transition: none; }`}</CodeBlock>
+:root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }`}</CodeBlock>
 
       <h3>Two mechanisms</h3>
       <Table

@@ -95,11 +95,27 @@ export function Layout({ nonce, children }: { nonce: string; children: React.Rea
 renderToReadableStream(<App nonce={nonce} />, { nonce: { script: nonce, style: nonce } });`}</CodeBlock>
       <Callout kind="warning" title="Pass the same value as React's nonce.style">
         <p>
-          React writes a hoisted <code>&lt;style&gt;</code> into the server HTML with the{" "}
-          <code>nonce: {"{ style }"}</code> render option, and <strong>drops</strong> the rules when
-          the element's nonce differs from it (React 19.3). The string form <code>nonce: "…"</code>{" "}
-          covers scripts only. This matters for the tooltip stylesheet, which can render on the
-          server; the menu stylesheet is only ever inserted on the client.
+          During server rendering React (19.3) checks a hoisted <code>&lt;style&gt;</code> against
+          the <code>nonce: {"{ style }"}</code> render option:
+        </p>
+        <ul>
+          <li>Same value on the element and the option: written with the nonce.</li>
+          <li>
+            <strong>
+              If you pass <code>nonce.style</code>, render <code>{"<CSPProvider>"}</code> with the
+              same value; without it React drops the rule
+            </strong>{" "}
+            (the element has no nonce), and so does a different value.
+          </li>
+          <li>
+            No <code>nonce</code> option, or the string form <code>nonce: "…"</code> (scripts only):
+            the rule is written <strong>without</strong> a nonce, so a nonce policy blocks it in the
+            browser.
+          </li>
+        </ul>
+        <p>
+          This matters for the tooltip stylesheet, which can render on the server; the menu
+          stylesheet is only ever inserted on the client.
         </p>
       </Callout>
       <PropsTable
@@ -130,8 +146,9 @@ renderToReadableStream(<App nonce={nonce} />, { nonce: { script: nonce, style: n
         </li>
         <li>
           <strong>Tooltip skip-delay rule</strong>: on Chromium's native path the next tooltip waits
-          its normal delay instead of opening at once (the <code>var()</code> falls back to its
-          initial value). The JS path does not use the stylesheet.
+          its <code>delay</code> instead of opening at once (the Trigger's{" "}
+          <code>var(--fsui-tooltip-warm, 0)</code> falls back to <code>0</code>, not to the
+          browser's own delay). The JS path does not use the stylesheet.
         </li>
       </ul>
     </div>
