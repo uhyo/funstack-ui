@@ -34,6 +34,7 @@
     "./checkbox": "./dist/checkbox/index.mjs",
     "./checkbox-group": "./dist/checkbox-group/index.mjs",
     "./combobox": "./dist/combobox/index.mjs",
+    "./csp": "./dist/csp/index.mjs",
     "./dialog": "./dist/dialog/index.mjs",
     "./field": "./dist/field/index.mjs",
     "./form": "./dist/form/index.mjs",

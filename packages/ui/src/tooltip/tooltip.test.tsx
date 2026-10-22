@@ -29,6 +29,8 @@ import type { MockInstance } from "vitest";
 import { createSuspender } from "../__tests__/helpers.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { isPopoverOpen } from "../__tests__/popover-shim.js";
+import { CSPProvider } from "../csp/index.js";
+import { TOOLTIP_WARM_RULES } from "../internal/tooltip-warm.js";
 import { Menu } from "../menu/index.js";
 import { Tabs } from "../tabs/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
@@ -248,7 +250,10 @@ describe("Roles and ARIA", () => {
   it("experimental_interestFor renders interestfor and the interest-delay styles", () => {
     render(<Harness trigger={{ experimental_interestFor: true }} />);
     expect(trigger()).toHaveAttribute("interestfor", popup().id);
-    expect(trigger().style.getPropertyValue("interest-delay-start")).toBe("250ms");
+    // Zero while another tooltip is showing (skip-delay, design 6).
+    expect(trigger().style.getPropertyValue("interest-delay-start")).toBe(
+      "calc(250ms * (1 - var(--fsui-tooltip-warm)))",
+    );
     expect(trigger().style.getPropertyValue("interest-delay-end")).toBe("150ms");
   });
 
@@ -256,7 +261,9 @@ describe("Roles and ARIA", () => {
     render(
       <Harness root={{ delay: 400, closeDelay: 0 }} trigger={{ experimental_interestFor: true }} />,
     );
-    expect(trigger().style.getPropertyValue("interest-delay-start")).toBe("400ms");
+    expect(trigger().style.getPropertyValue("interest-delay-start")).toBe(
+      "calc(400ms * (1 - var(--fsui-tooltip-warm)))",
+    );
     expect(trigger().style.getPropertyValue("interest-delay-end")).toBe("0ms");
   });
 
@@ -296,7 +303,13 @@ describe("Roles and ARIA", () => {
     expect(id).toBeDefined();
     expect(html).toContain(`interestfor="${id}"`);
     expect(html).toContain(`aria-describedby="${id}"`);
-    expect(html).toContain("interest-delay-start:300ms;interest-delay-end:150ms");
+    expect(html).toContain(
+      "interest-delay-start:calc(300ms * (1 - var(--fsui-tooltip-warm)));interest-delay-end:150ms",
+    );
+    // The skip-delay rule is server-rendered too (React hoists it; `renderToString` has no
+    // <head>, so it precedes the button here).
+    expect(html).toContain('data-href="@funstack/ui/tooltip-warm"');
+    expect(html).toContain("data-fsui-tooltip-trigger");
     expect(html).toMatch(/popover="hint"/);
     expect(html).toContain("position-area:top");
     expect(html).not.toContain("interestFor");
@@ -684,6 +697,237 @@ describe("Hover", () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     }).not.toThrow();
     expect(hideSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("Skip-delay (wave 11, #21)", () => {
+  // Design section 6: while any `[role="tooltip"]:popover-open` exists in the document, a hover or
+  // keyboard focus opens the next tooltip at once and hides the showing one. Global, stateless.
+  function Pair({ flag = false }: { flag?: boolean }) {
+    return (
+      <>
+        <Tooltip.Root>
+          <Tooltip.Trigger experimental_interestFor={flag}>Bold</Tooltip.Trigger>
+          <Tooltip.Popup data-testid="tip-a">Bold text</Tooltip.Popup>
+        </Tooltip.Root>
+        <Tooltip.Root>
+          <Tooltip.Trigger experimental_interestFor={flag}>Italic</Tooltip.Trigger>
+          <Tooltip.Popup data-testid="tip-b">Italic text</Tooltip.Popup>
+        </Tooltip.Root>
+      </>
+    );
+  }
+  const triggerA = () => screen.getByRole("button", { name: "Bold" });
+  const triggerB = () => screen.getByRole("button", { name: "Italic" });
+  const tipA = () => screen.getByTestId("tip-a");
+  const tipB = () => screen.getByTestId("tip-b");
+  const enter = (element: Element) => {
+    act(() => {
+      fireEvent.pointerEnter(element, { pointerType: "mouse" });
+    });
+  };
+  const leave = (element: Element) => {
+    act(() => {
+      fireEvent.pointerLeave(element, { pointerType: "mouse" });
+    });
+  };
+  /** Opens A by hover and lets its `toggle` task run, then forgets the calls. */
+  const openA = () => {
+    enter(triggerA());
+    advance(250);
+    expect(isPopoverOpen(tipA())).toBe(true);
+    showSpy.mockClear();
+    hideSpy.mockClear();
+  };
+
+  it("hovering B while A is open shows B synchronously and hides A", () => {
+    setupTimers();
+    render(<Pair />);
+    openA();
+    leave(triggerA());
+    enter(triggerB());
+    // No timer advanced.
+    expect(showSpy).toHaveBeenCalledTimes(1);
+    expect(showSpy.mock.contexts[0]).toBe(tipB());
+    expect(showSpy).toHaveBeenCalledWith({ source: triggerB() });
+    expect(hideSpy).toHaveBeenCalledTimes(1);
+    expect(hideSpy.mock.contexts[0]).toBe(tipA());
+    expect(isPopoverOpen(tipB())).toBe(true);
+    expect(isPopoverOpen(tipA())).toBe(false);
+    // A's pending close timer finds A closed: nothing more.
+    advance(1000);
+    expect(hideSpy).toHaveBeenCalledTimes(1);
+    expect(showSpy).toHaveBeenCalledTimes(1);
+    expect(isPopoverOpen(tipB())).toBe(true);
+  });
+
+  it("keyboard focus on B while A is open shows B at once", () => {
+    setupTimers();
+    render(<Pair />);
+    openA();
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Tab" });
+      triggerB().focus();
+    });
+    expect(showSpy).toHaveBeenCalledTimes(1);
+    expect(showSpy.mock.contexts[0]).toBe(tipB());
+    expect(hideSpy.mock.contexts[0]).toBe(tipA());
+    expect(isPopoverOpen(tipA())).toBe(false);
+  });
+
+  it("with nothing open, B waits its delay", () => {
+    setupTimers();
+    render(<Pair />);
+    enter(triggerB());
+    expect(showSpy).not.toHaveBeenCalled();
+    advance(249);
+    expect(showSpy).not.toHaveBeenCalled();
+    advance(1);
+    expect(showSpy).toHaveBeenCalledTimes(1);
+    expect(hideSpy).not.toHaveBeenCalled();
+  });
+
+  it("after A closed, B waits its delay again (no cooldown)", () => {
+    setupTimers();
+    render(<Pair />);
+    openA();
+    leave(triggerA());
+    advance(150);
+    expect(isPopoverOpen(tipA())).toBe(false);
+    showSpy.mockClear();
+    enter(triggerB());
+    expect(showSpy).not.toHaveBeenCalled();
+    advance(250);
+    expect(showSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a tooltip popover that is not FUNSTACK's counts", () => {
+    setupTimers();
+    render(
+      <>
+        <div role="tooltip" popover="manual" data-testid="foreign">
+          Elsewhere
+        </div>
+        <Pair />
+      </>,
+    );
+    const foreign = screen.getByTestId("foreign");
+    act(() => foreign.showPopover());
+    enter(triggerB());
+    expect(showSpy.mock.contexts.at(-1)).toBe(tipB());
+    expect(isPopoverOpen(foreign)).toBe(false);
+    expect(isPopoverOpen(tipB())).toBe(true);
+  });
+
+  it("an open popover that is not a tooltip does not count", () => {
+    setupTimers();
+    render(
+      <>
+        <div popover="manual" data-testid="other">
+          Panel
+        </div>
+        <Pair />
+      </>,
+    );
+    act(() => screen.getByTestId("other").showPopover());
+    showSpy.mockClear();
+    enter(triggerB());
+    expect(showSpy).not.toHaveBeenCalled();
+    expect(isPopoverOpen(screen.getByTestId("other"))).toBe(true);
+  });
+
+  it("re-entering A's own trigger while A is open calls nothing", () => {
+    setupTimers();
+    render(<Pair />);
+    openA();
+    leave(triggerA());
+    enter(triggerA());
+    advance(1000);
+    expect(showSpy).not.toHaveBeenCalled();
+    expect(hideSpy).not.toHaveBeenCalled();
+    expect(isPopoverOpen(tipA())).toBe(true);
+  });
+
+  it("touch never opens, warm or not", () => {
+    setupTimers();
+    render(<Pair />);
+    openA();
+    act(() => {
+      fireEvent.pointerEnter(triggerB(), { pointerType: "touch" });
+    });
+    advance(1000);
+    expect(showSpy).not.toHaveBeenCalled();
+  });
+
+  describe("native markup (experimental_interestFor)", () => {
+    // React records a hoisted style per document and never removes it, so each row renders into
+    // a document of its own to count the <style> it inserts.
+    function renderFresh(ui: ReactNode) {
+      const doc = document.implementation.createHTMLDocument("");
+      const container = doc.createElement("div");
+      doc.body.append(container);
+      const result = render(ui, { container });
+      const styles = () =>
+        doc.head.querySelectorAll('style[data-href="@funstack/ui/tooltip-warm"]');
+      // Role queries need a window; the fresh document has none.
+      const button = (name: string) => {
+        const found = Array.from(container.querySelectorAll("button")).find(
+          (element) => element.textContent === name,
+        );
+        if (found === undefined) throw new Error(`no button "${name}"`);
+        return found;
+      };
+      return { ...result, doc, styles, button };
+    }
+
+    it("renders the warm delay, the marker and one hoisted <style> for any number of Triggers", () => {
+      const { styles, button, container } = renderFresh(<Pair flag />);
+      for (const element of [button("Bold"), button("Italic")]) {
+        expect(element.style.getPropertyValue("interest-delay-start")).toBe(
+          "calc(250ms * (1 - var(--fsui-tooltip-warm)))",
+        );
+        expect(element.getAttribute("data-fsui-tooltip-trigger")).toBe("");
+      }
+      // Nothing lands in place.
+      expect(container.querySelector("style")).toBeNull();
+      expect(styles()).toHaveLength(1);
+      const style = styles()[0]!;
+      expect(style.getAttribute("data-precedence")).toBe("fsui");
+      expect(style.textContent).toBe(TOOLTIP_WARM_RULES);
+      expect(style.textContent).toContain(
+        '@property --fsui-tooltip-warm { syntax: "<number>"; inherits: false; initial-value: 0; }',
+      );
+      expect(style.textContent).toContain(
+        ':root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }',
+      );
+      expect(style.hasAttribute("nonce")).toBe(false);
+    });
+
+    it("without the flag: no calc, no marker, no <style>", () => {
+      const { styles, button } = renderFresh(<Pair />);
+      expect(button("Bold").getAttribute("style")).toBeNull();
+      expect(button("Bold").hasAttribute("data-fsui-tooltip-trigger")).toBe(false);
+      expect(styles()).toHaveLength(0);
+    });
+
+    it("disabled: no calc, no marker, no <style>", () => {
+      const { styles, button } = renderFresh(
+        <Harness root={{ disabled: true }} trigger={{ experimental_interestFor: true }} />,
+      );
+      expect(button("Save").style.getPropertyValue("interest-delay-start")).toBe("");
+      expect(button("Save").hasAttribute("data-fsui-tooltip-trigger")).toBe(false);
+      expect(styles()).toHaveLength(0);
+    });
+
+    it("the nonce of a <CSPProvider> lands on the <style>", () => {
+      const { styles } = renderFresh(
+        <CSPProvider nonce="n0nce">
+          <Pair flag />
+        </CSPProvider>,
+      );
+      expect(styles()).toHaveLength(1);
+      expect(styles()[0]!.getAttribute("nonce")).toBe("n0nce");
+    });
   });
 });
 

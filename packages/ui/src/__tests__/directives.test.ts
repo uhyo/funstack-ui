@@ -190,6 +190,9 @@ const clientFiles = [
   "button/button.mjs",
   // The context menu region (design/components/context-menu.md 7, 13.1 "Directive").
   "menu/menu-context-trigger.mjs",
+  // The CSP provider and its context (conventions 12, wave 11).
+  "csp/csp-provider.mjs",
+  "internal/csp-context.mjs",
 ];
 
 const directiveFreeFiles = [
@@ -239,6 +242,10 @@ const directiveFreeFiles = [
   "number-field/number-field-arithmetic.mjs",
   "internal/decimal.mjs",
   "button/index.mjs",
+  // The CSP subpath's entry and data, and Tooltip's skip-delay constants (conventions 12).
+  "csp/index.mjs",
+  "csp/style-hashes.mjs",
+  "internal/tooltip-warm.mjs",
 ];
 
 /** Files a release removed; a stale build must not keep shipping them (button.md row 20). */

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   MENU_POINT_FALLBACKS,
+  MENU_POINT_GAP,
   MENU_POINT_RULES,
   MENU_POINT_X,
   MENU_POINT_Y,
@@ -154,29 +155,38 @@ describe("parsePositionArea", () => {
 });
 
 describe("point placement (context menu)", () => {
-  it("ships five @position-try options named --fsui-menu-*, no selectors", () => {
-    for (const name of [
-      "--fsui-menu-up",
-      "--fsui-menu-left",
-      "--fsui-menu-up-left",
-      "--fsui-menu-right",
-      "--fsui-menu-up-right",
-    ]) {
-      expect(MENU_POINT_RULES).toContain(`@position-try ${name} {`);
+  const OPTIONS = ["up", "down", "left", "right", "up-left", "up-right", "down-left", "down-right"];
+
+  it("ships eight @position-try options named --fsui-menu-*, no selectors", () => {
+    for (const name of OPTIONS) {
+      expect(MENU_POINT_RULES).toContain(`@position-try --fsui-menu-${name} {`);
     }
-    expect(MENU_POINT_RULES).toContain(`bottom: calc(100% - var(${MENU_POINT_Y}))`);
-    expect(MENU_POINT_RULES).toContain(`right: calc(100% - var(${MENU_POINT_X}))`);
+    // The vertical options carry the touch gap (0px for a mouse open, 4.7).
+    expect(MENU_POINT_RULES).toContain(
+      `@position-try --fsui-menu-up { top: auto; bottom: calc(100% - var(${MENU_POINT_Y}) + var(${MENU_POINT_GAP})); }`,
+    );
+    expect(MENU_POINT_RULES).toContain(
+      `@position-try --fsui-menu-down { bottom: auto; top: calc(var(${MENU_POINT_Y}) + var(${MENU_POINT_GAP})); }`,
+    );
+    expect(MENU_POINT_RULES).toContain(
+      `@position-try --fsui-menu-left { left: auto; right: calc(100% - var(${MENU_POINT_X})); }`,
+    );
     expect(MENU_POINT_RULES).toContain(
       `@position-try --fsui-menu-right { right: auto; left: var(${MENU_POINT_X}); }`,
     );
     // Only at-rules: every rule block starts with `@position-try`.
     const rules = MENU_POINT_RULES.replace(/\/\*[\s\S]*?\*\//g, "").match(/[^{}]+\{[^{}]*\}/g);
-    expect(rules).toHaveLength(5);
+    expect(rules).toHaveLength(8);
     for (const rule of rules!) expect(rule.trim().startsWith("@position-try --fsui-")).toBe(true);
   });
 
-  it.each(["ltr", "rtl"] as const)("has two spellings of the same %s option set", (direction) => {
-    const [a, b] = MENU_POINT_FALLBACKS[direction];
+  it.each([
+    ["ltr", "mouse", "--fsui-menu-up-left"],
+    ["rtl", "mouse", "--fsui-menu-up-right"],
+    ["ltr", "touch", "--fsui-menu-down-left"],
+    ["rtl", "touch", "--fsui-menu-down-right"],
+  ] as const)("has two spellings of the same %s %s option set", (direction, kind, corner) => {
+    const [a, b] = MENU_POINT_FALLBACKS[direction][kind];
     expect(a).not.toBe(b);
     const set = (s: string) =>
       s
@@ -184,13 +194,26 @@ describe("point placement (context menu)", () => {
         .map((x) => x.trim())
         .sort();
     expect(set(a)).toEqual(set(b));
-    const corner = direction === "ltr" ? "--fsui-menu-up-left" : "--fsui-menu-up-right";
     expect(a.endsWith(corner)).toBe(true);
     expect(b.endsWith(corner)).toBe(true);
+    // Every named option is shipped.
+    for (const name of set(a)) expect(MENU_POINT_RULES).toContain(`@position-try ${name} {`);
   });
 
   it("an LTR menu never names the RTL options, and the reverse", () => {
-    for (const spelling of MENU_POINT_FALLBACKS.ltr) expect(spelling).not.toMatch(/right/);
-    for (const spelling of MENU_POINT_FALLBACKS.rtl) expect(spelling).not.toMatch(/left/);
+    for (const kind of ["mouse", "touch"] as const) {
+      for (const spelling of MENU_POINT_FALLBACKS.ltr[kind]) expect(spelling).not.toMatch(/right/);
+      for (const spelling of MENU_POINT_FALLBACKS.rtl[kind]) expect(spelling).not.toMatch(/left/);
+    }
+  });
+
+  it("a touch menu flips down, a mouse menu up", () => {
+    for (const direction of ["ltr", "rtl"] as const) {
+      for (const spelling of MENU_POINT_FALLBACKS[direction].mouse) {
+        expect(spelling).not.toMatch(/down/);
+      }
+      for (const spelling of MENU_POINT_FALLBACKS[direction].touch)
+        expect(spelling).not.toMatch(/up/);
+    }
   });
 });

@@ -10,6 +10,7 @@ declare module "vitest/browser" {
       y: number,
       button?: "left" | "right" | "middle",
     ) => Promise<void>;
+    wheel: (x: number, y: number, deltaX: number, deltaY: number) => Promise<void>;
   }
 }
 
@@ -99,6 +100,17 @@ export const mouse = {
     await handled;
   },
 };
+
+/**
+ * A real wheel turn at client coordinates of this frame (see `toPagePoint`). Resolves once the
+ * `wheel` event reached this window and its task ran; the scroll it causes may come later.
+ */
+export async function wheel(x: number, y: number, deltaX: number, deltaY: number): Promise<void> {
+  const p = toPagePoint(x, y);
+  const handled = inputHandled("wheel");
+  await commands.wheel(p.x, p.y, deltaX, deltaY);
+  await handled;
+}
 
 /** Runs `body` with `prefers-reduced-motion: reduce` emulated, and restores it afterwards. */
 export async function withReducedMotion(body: () => Promise<void>): Promise<void> {

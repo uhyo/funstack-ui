@@ -17,9 +17,10 @@ import {
   isPressClaimed,
   markHandled,
   MenuRegionContext,
+  submenuHover,
   useMenuContext,
 } from "./menu-context.js";
-import { capturePointer, isEditableTarget } from "./menu-dom.js";
+import { capturePointer, isDisabledItem, isEditableTarget, ITEM_SELECTOR } from "./menu-dom.js";
 
 export interface MenuContextTriggerState {
   /** Optimistic open state (the Root's). */
@@ -56,16 +57,177 @@ export interface MenuContextTriggerProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuContextTriggerState>;
 }
 
-/** Movement that cancels a long-press (Base UI's slop). */
+/** Movement that cancels a long-press (Base UI's slop); also a touch drag's activation slop. */
 const LONG_PRESS_SLOP = 10;
+/**
+ * Movement a mouse or pen press-drag-release needs before a release activates or dismisses
+ * (Chromium's `kMaximumLengthMovedToActivate`, macOS's "moved"; context-menu.md 2.6).
+ */
+const DRAG_SLOP = 4;
+/** A release outside the menu dismisses it only this long after the open (GTK, Base UI). */
+const DRAG_DISMISS_DELAY = 500;
 
 const isDev = process.env.NODE_ENV !== "production";
 
 interface LongPress {
   readonly pointerId: number;
+  readonly pointerType: string;
   readonly x: number;
   readonly y: number;
   readonly timer: ReturnType<typeof setTimeout>;
+}
+
+interface DragOptions {
+  readonly pointerId: number;
+  /** The open point: the slop is measured from it. */
+  readonly x: number;
+  readonly y: number;
+  readonly slop: number;
+  /**
+   * Activates `item` for a release: through `item.click()`, with the click swallow of a long-press
+   * out of the way and armed again for the click an engine may synthesise from this release.
+   */
+  readonly activate: (item: HTMLElement) => void;
+}
+
+const isTouchLike = (pointerType: string) => pointerType === "touch" || pointerType === "pen";
+
+/**
+ * Press-drag-release (context-menu.md 2.6): while the popup holds the capture of `pointerId`
+ * (taken at the open), every `pointermove` and the `pointerup` target the popup and items never
+ * see boundary events, so the gesture hit-tests with `elementFromPoint`. A move focuses the item
+ * under the pointer quietly (a SubmenuTrigger also starts its hover intent); a release more than
+ * the slop away from the open point activates an enabled, non-submenu item through its
+ * `click()` (Menu's one activation path), or dismisses the menu when it lands outside every popup
+ * of the tree at least 500 ms after the open; any other release leaves the menu open. Ends at the
+ * release, `pointercancel`, `lostpointercapture` and the menu closing. Returns the cleanup.
+ */
+function startDrag(popup: HTMLElement, options: DragOptions): () => void {
+  const doc = popup.ownerDocument;
+  const startedAt = performance.now();
+  // The SubmenuTrigger the pointer is over, whose hover intent is running.
+  let submenuTrigger: HTMLElement | null = null;
+
+  const ours = (event: Event) => (event as globalThis.PointerEvent).pointerId === options.pointerId;
+  const hitTest = (event: globalThis.PointerEvent): Element | null =>
+    typeof doc.elementFromPoint === "function"
+      ? doc.elementFromPoint(event.clientX, event.clientY)
+      : null;
+  /** The item under the pointer, inside this menu's tree (submenus are DOM descendants). */
+  const itemAt = (target: Element | null): HTMLElement | null => {
+    const item = target?.closest<HTMLElement>(ITEM_SELECTOR) ?? null;
+    return item !== null && popup.contains(item) ? item : null;
+  };
+  /** The pointer is over the submenu `trigger` opens (its popup is the `commandfor` target). */
+  const inSubmenuOf = (trigger: HTMLElement, target: Element | null) => {
+    const id = trigger.getAttribute("commandfor");
+    const submenu = id === null ? null : doc.getElementById(id);
+    return submenu !== null && target !== null && submenu.contains(target);
+  };
+  const hoverSubmenu = (next: HTMLElement | null, event: Event) => {
+    if (next === submenuTrigger) return;
+    if (submenuTrigger !== null) submenuHover(submenuTrigger)?.leave(event);
+    submenuTrigger = next;
+    if (next !== null) submenuHover(next)?.enter(event);
+  };
+
+  const onMove = (event: globalThis.PointerEvent) => {
+    if (!ours(event)) return;
+    const target = hitTest(event);
+    const item = itemAt(target);
+    // Menu 6.2's pointer focus, without the ring: keyboard and pointer agree on the current item.
+    if (item !== null && doc.activeElement !== item) {
+      item.focus({ focusVisible: false } as FocusOptions);
+    }
+    if (item !== null && submenuHover(item) !== undefined) hoverSubmenu(item, event);
+    else if (submenuTrigger !== null && !inSubmenuOf(submenuTrigger, target)) {
+      hoverSubmenu(null, event);
+    }
+  };
+  const onUp = (event: globalThis.PointerEvent) => {
+    if (!ours(event)) return;
+    end();
+    const moved = Math.hypot(event.clientX - options.x, event.clientY - options.y) > options.slop;
+    // Time alone never activates or dismisses: a stationary release keeps the menu open.
+    if (!moved) return;
+    const target = hitTest(event);
+    if (target !== null && popup.contains(target)) {
+      const item = itemAt(target);
+      // A disabled item, a SubmenuTrigger (native menus activate nothing there), a separator or
+      // padding: the menu stays open.
+      if (item === null || isDisabledItem(item) || item.hasAttribute("aria-haspopup")) return;
+      options.activate(item);
+      return;
+    }
+    if (performance.now() - startedAt >= DRAG_DISMISS_DELAY && popup.matches(":popover-open")) {
+      popup.hidePopover();
+    }
+  };
+  const onEnd = (event: Event) => {
+    if (ours(event)) end();
+  };
+  const onToggle = () => {
+    if (!popup.matches(":popover-open")) end();
+  };
+  const end = () => {
+    popup.removeEventListener("pointermove", onMove);
+    popup.removeEventListener("pointerup", onUp);
+    popup.removeEventListener("pointercancel", onEnd);
+    popup.removeEventListener("lostpointercapture", onEnd);
+    popup.removeEventListener("toggle", onToggle);
+    submenuTrigger = null;
+  };
+  popup.addEventListener("pointermove", onMove);
+  popup.addEventListener("pointerup", onUp);
+  popup.addEventListener("pointercancel", onEnd);
+  popup.addEventListener("lostpointercapture", onEnd);
+  popup.addEventListener("toggle", onToggle);
+  return end;
+}
+
+/** How long the touch guard waits for the `touchend` that follows the finger's `pointerup`. */
+const TOUCH_END_WAIT = 250;
+
+/**
+ * While the finger that opened a touch menu is still down, the browser must not take its drag
+ * as a pan (it would end the stream with `pointercancel`): a non-passive document `touchmove`
+ * listener prevents it (context-menu.md 2.2). The lift's `touchend`, which follows that
+ * pointer's `pointerup`, is prevented as well, so the engine synthesises no click from it: a click
+ * where the finger was (beside the offset menu) would light-dismiss the menu in Chromium, and one
+ * over an item would activate it a second time. Ends at that `touchend` / `touchcancel`, at the
+ * pointer's `pointercancel`, and shortly after its `pointerup` if no touch event follows (a
+ * synthetic pointer). Returns the cleanup.
+ */
+function guardTouch(doc: Document, pointerId: number): () => void {
+  let fallback: ReturnType<typeof setTimeout> | undefined;
+  const onTouchMove = (event: Event) => {
+    if (event.cancelable) event.preventDefault();
+  };
+  const onTouchEnd = (event: Event) => {
+    if (event.cancelable) event.preventDefault();
+    end();
+  };
+  const onPointerUp = (event: Event) => {
+    if ((event as globalThis.PointerEvent).pointerId !== pointerId) return;
+    fallback ??= setTimeout(end, TOUCH_END_WAIT);
+  };
+  const onPointerCancel = (event: Event) => {
+    if ((event as globalThis.PointerEvent).pointerId === pointerId) end();
+  };
+  const end = () => {
+    if (fallback !== undefined) clearTimeout(fallback);
+    doc.removeEventListener("touchmove", onTouchMove);
+    doc.removeEventListener("touchend", onTouchEnd);
+    doc.removeEventListener("touchcancel", end, true);
+    doc.removeEventListener("pointerup", onPointerUp, true);
+    doc.removeEventListener("pointercancel", onPointerCancel, true);
+  };
+  doc.addEventListener("touchmove", onTouchMove, { passive: false });
+  doc.addEventListener("touchend", onTouchEnd, { passive: false });
+  doc.addEventListener("touchcancel", end, true);
+  doc.addEventListener("pointerup", onPointerUp, true);
+  doc.addEventListener("pointercancel", onPointerCancel, true);
+  return end;
 }
 
 /**
@@ -110,8 +272,10 @@ export function MenuContextTrigger({
   const lastPointerDown = useRef(-1);
   const lastKeyDown = useRef(-1);
   const longPress = useRef<LongPress | null>(null);
-  // Disarms the one-shot click swallow armed by a long-press open.
+  // Disarms the one-shot click swallow armed by a long-press open or a drag activation.
   const disarmSwallow = useRef<(() => void) | null>(null);
+  // Ends the running press-drag-release gesture and its touch guard (2.6).
+  const endDrag = useRef<(() => void) | null>(null);
   const warnedNoPopup = useRef(false);
 
   const cancelLongPress = useCallback(() => {
@@ -119,23 +283,31 @@ export function MenuContextTrigger({
     longPress.current = null;
   }, []);
 
+  const stopDrag = useCallback(() => {
+    endDrag.current?.();
+    endDrag.current = null;
+  }, []);
+
   useEffect(
     () => () => {
       cancelLongPress();
+      stopDrag();
       disarmSwallow.current?.();
     },
-    [cancelLongPress],
+    [cancelLongPress, stopDrag],
   );
   // A region disabled mid-gesture opens nothing.
   useEffect(() => {
     if (disabled) cancelLongPress();
   }, [disabled, cancelLongPress]);
 
-  // A close ends any armed click swallow (review H1).
+  // A close ends any armed click swallow (review H1) and the drag gesture.
   const open = popover.optimistic;
   useEffect(() => {
-    if (!open) disarmSwallow.current?.();
-  }, [open]);
+    if (open) return;
+    disarmSwallow.current?.();
+    stopDrag();
+  }, [open, stopDrag]);
 
   // The modality bookkeeping observes `keydown` and `pointerdown` without owning them (the region
   // is full of the consumer's interactive content), in the capture phase, so a descendant's
@@ -176,7 +348,7 @@ export function MenuContextTrigger({
    * after a long-press; a swallow left armed would eat the next keyboard activation
    * (`element.click()`).
    */
-  const armClickSwallow = (doc: Document, pointerId: number) => {
+  const armClickSwallow = (doc: Document, pointerId: number, releasing = false) => {
     disarmSwallow.current?.();
     let released: ReturnType<typeof setTimeout> | undefined;
     const onClick = (event: Event) => {
@@ -203,6 +375,39 @@ export function MenuContextTrigger({
     doc.addEventListener("pointerup", onRelease, true);
     doc.addEventListener("pointercancel", onRelease, true);
     disarmSwallow.current = disarm;
+    // Armed from inside the release itself (a drag activation): the click comes in this task.
+    if (releasing) released = setTimeout(disarm, 0);
+  };
+
+  /**
+   * Starts the press-drag-release gesture of 2.6 on the pointer the popup captured at this open
+   * or move (a new one replaces the running one), with the touch guard for a finger.
+   */
+  const beginDrag = (
+    popup: HTMLElement,
+    pointerId: number,
+    point: { readonly x: number; readonly y: number },
+    pointerType: string,
+    slop: number,
+  ) => {
+    stopDrag();
+    const doc = popup.ownerDocument;
+    const end = startDrag(popup, {
+      pointerId,
+      x: point.x,
+      y: point.y,
+      slop,
+      activate: (item) => {
+        disarmSwallow.current?.();
+        item.click();
+        armClickSwallow(doc, pointerId, true);
+      },
+    });
+    const unguard = pointerType === "touch" ? guardTouch(doc, pointerId) : null;
+    endDrag.current = () => {
+      end();
+      unguard?.();
+    };
   };
 
   /**
@@ -227,18 +432,37 @@ export function MenuContextTrigger({
     native.preventDefault();
     markHandled(native, menu);
     // Android and pen: the platform's own `contextmenu` arrived during our timer; it opens.
+    const timed = longPress.current;
     cancelLongPress();
     const keyboard = native.button === -1 || lastKeyDown.current > lastPointerDown.current;
-    const pointerId = (native as globalThis.PointerEvent).pointerId;
-    const id = typeof pointerId === "number" ? pointerId : undefined;
+    const pointerEvent = native as globalThis.PointerEvent;
+    const pointerType =
+      timed?.pointerType ??
+      (typeof pointerEvent.pointerType === "string" ? pointerEvent.pointerType : "mouse");
+    // The pointer still down: the one this event reports, or (Android, whose touch `contextmenu`
+    // has `buttons === 0`) the finger the long-press was timing.
+    const pointerId =
+      native.buttons !== 0 && typeof pointerEvent.pointerId === "number"
+        ? pointerEvent.pointerId
+        : (timed?.pointerId ?? undefined);
+    const point = { x: native.clientX, y: native.clientY };
     // whatwg/html#10905: in Firefox and WebKit the pending `pointerup` would light-dismiss a
     // menu opened between `pointerdown` and `pointerup`. Capture now, on the still-hidden popup:
-    // the open commit lands at an unpredictable time relative to the `pointerup`.
-    if (native.buttons !== 0) capturePointer(popup, id);
-    menu.openAt(
-      { x: native.clientX, y: native.clientY },
-      { source: event.currentTarget, event: native, pointer: !keyboard, pointerId: id },
-    );
+    // the open commit lands at an unpredictable time relative to the `pointerup`. With the
+    // capture, the press-drag-release gesture runs (2.6); Windows (`contextmenu` after the
+    // release) and the keyboard take neither.
+    if (pointerId !== undefined && capturePointer(popup, pointerId)) {
+      const slop = timed !== null || pointerType === "touch" ? LONG_PRESS_SLOP : DRAG_SLOP;
+      beginDrag(popup, pointerId, point, pointerType, slop);
+    }
+    menu.openAt(point, {
+      source: event.currentTarget,
+      event: native,
+      pointer: !keyboard,
+      pointerId,
+      // A touch or pen open is placed above the point (4.7).
+      offset: !keyboard && isTouchLike(pointerType),
+    });
   };
 
   // The long-press only; the modality bookkeeping is `modalityRef`'s.
@@ -259,23 +483,24 @@ export function MenuContextTrigger({
     // `defaultPrevented` rule, design 2.4).
     claimPress(native);
     const source = event.currentTarget;
-    const { pointerId, clientX, clientY } = native;
+    const { pointerId, pointerType, clientX, clientY } = native;
     const timer = setTimeout(
       () => {
         longPress.current = null;
         const popup = popupElement();
         if (popup === null) return;
-        // The finger is still down: its `pointerup` would light-dismiss in WebKit.
-        capturePointer(popup, pointerId);
+        const point = { x: clientX, y: clientY };
+        // The finger is still down: its `pointerup` would light-dismiss in WebKit. The capture
+        // also lets it slide onto an item and lift to activate it (2.6).
+        if (capturePointer(popup, pointerId)) {
+          beginDrag(popup, pointerId, point, pointerType, LONG_PRESS_SLOP);
+        }
         armClickSwallow(source.ownerDocument, pointerId);
-        menu.openAt(
-          { x: clientX, y: clientY },
-          { source, event: native, pointer: true, pointerId },
-        );
+        menu.openAt(point, { source, event: native, pointer: true, pointerId, offset: true });
       },
       Math.max(0, longPressDelay),
     );
-    longPress.current = { pointerId, x: clientX, y: clientY, timer };
+    longPress.current = { pointerId, pointerType, x: clientX, y: clientY, timer };
   };
 
   const onPointerMove = (event: PointerEvent<HTMLElement>) => {

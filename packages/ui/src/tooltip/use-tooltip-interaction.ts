@@ -22,6 +22,10 @@ export interface TooltipInteractionOptions {
  * `showPopover()` (the `toggle` event is queued as a task, so waiting for it would leave a window
  * in which an Escape or pointerdown does nothing) and detached when `toggle` reports a close,
  * including closes the library did not perform (native light dismiss of `popover="hint"`).
+ *
+ * Skip-delay (design 6, wave 11): while another tooltip is showing anywhere in the document
+ * (`[role="tooltip"]:popover-open`, FUNSTACK's or not), a hover or keyboard focus hides it and
+ * opens this one at once. Stateless: the DOM is read at the start of each hover or focus.
  */
 export function useTooltipInteraction(
   trigger: HTMLElement | null,
@@ -82,6 +86,18 @@ export function useTooltipInteraction(
       clear();
       hide();
     };
+    // Another tooltip is showing: hide it and open now, else wait `delay` (design 6). The other
+    // Root sees its `toggle` and detaches; its pending close timer finds it closed.
+    const showSoon = () => {
+      const other = isOpen(popup) ? null : otherOpenTooltip(doc, popup);
+      if (other === null) {
+        showLater();
+        return;
+      }
+      clear();
+      other.hidePopover();
+      show();
+    };
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -109,11 +125,11 @@ export function useTooltipInteraction(
     };
     const onTriggerEnter = (event: PointerEvent) => {
       // No hover on touch; the ARIA relation still works for screen-reader focus (design 5.3).
-      if (event.pointerType !== "touch") showLater();
+      if (event.pointerType !== "touch") showSoon();
     };
     const onTriggerFocus = () => {
       // Pointer focus (a click) does not open; keyboard focus does (design 5.2).
-      if (trigger.matches(":focus-visible")) showLater();
+      if (trigger.matches(":focus-visible")) showSoon();
     };
     // The document listeners exist only while the popup is open, so before that the trigger
     // itself cancels a pending open: a click or Escape before `delay` elapses must not open the
@@ -146,6 +162,19 @@ export function useTooltipInteraction(
       popup.removeEventListener("toggle", onToggle);
     };
   }, [trigger, popup, disabled, interestForRequested]);
+}
+
+/**
+ * A tooltip popover other than `popup` that is showing in the document, or `null` (the warm
+ * condition of design 6, the same one the native path's `:root:has()` rule reads). Walks the
+ * tooltip popovers and asks each for `:popover-open` rather than one `querySelector`, which the
+ * jsdom shim could not answer.
+ */
+function otherOpenTooltip(doc: Document, popup: HTMLElement): HTMLElement | null {
+  for (const element of doc.querySelectorAll<HTMLElement>('[role="tooltip"][popover]')) {
+    if (element !== popup && isOpen(element)) return element;
+  }
+  return null;
 }
 
 /** The popover's top-layer state, read from the DOM. A removed popover is never open. */

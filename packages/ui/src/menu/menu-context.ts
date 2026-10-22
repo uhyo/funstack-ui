@@ -42,6 +42,11 @@ export type MenuPlacement =
        * sits at the point. Read once by `openAt`, never during render.
        */
       readonly direction: "ltr" | "rtl";
+      /**
+       * A touch or pen open (#88, 4.7): the menu is placed above the point with
+       * `--menu-point-gap`, so it does not open under the finger.
+       */
+      readonly offset: boolean;
     };
 
 export const ANCHOR_PLACEMENT: MenuPlacement = { kind: "anchor" };
@@ -54,6 +59,8 @@ export interface MenuOpenAtOptions {
   /** A pointer opened (quiet focus); `false` for the keyboard (focus ring). */
   readonly pointer: boolean;
   readonly pointerId: number | undefined;
+  /** A touch or pen open: placed above the point (4.7). */
+  readonly offset: boolean;
 }
 
 /** One menu level: what its Root provides to its Trigger, Popup and items. */
@@ -124,6 +131,30 @@ export function claimPress(event: Event): void {
 
 export function isPressClaimed(event: Event): boolean {
   return claimedPresses.has(event);
+}
+
+/**
+ * What a hit on a `Menu.SubmenuTrigger` during a press-drag-release gesture does (context-menu.md
+ * 2.6): the hover intent a real `pointerenter` / `pointerleave` would start. Registered by the
+ * SubmenuTrigger on its element; the gesture runs under pointer capture, so the element never
+ * receives boundary events itself.
+ */
+export interface SubmenuHover {
+  readonly enter: (event: Event) => void;
+  readonly leave: (event: Event) => void;
+}
+
+const submenuHovers = new WeakMap<Element, SubmenuHover>();
+
+export function registerSubmenuHover(element: Element, hover: SubmenuHover): () => void {
+  submenuHovers.set(element, hover);
+  return () => {
+    if (submenuHovers.get(element) === hover) submenuHovers.delete(element);
+  };
+}
+
+export function submenuHover(element: Element): SubmenuHover | undefined {
+  return submenuHovers.get(element);
 }
 
 /** The top-level menu's identity: its popup ref object, stable for the Root's lifetime. */

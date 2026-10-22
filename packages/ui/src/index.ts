@@ -323,6 +323,9 @@ export type {
   MeterValueProps,
 } from "./meter/index.js";
 
+export { CSPProvider, STYLE_SHA256 } from "./csp/index.js";
+export type { CSPProviderProps } from "./csp/index.js";
+
 export type {
   Action,
   ActionDetails,

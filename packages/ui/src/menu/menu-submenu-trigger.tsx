@@ -1,4 +1,5 @@
 "use client";
+import { useCallback, useMemo } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -6,11 +7,13 @@ import type {
   PointerEvent,
   ReactNode,
 } from "react";
+import { mergeRefs } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useLatest } from "../internal/use-latest.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
-import { useMenuContext } from "./menu-context.js";
+import { registerSubmenuHover, useMenuContext } from "./menu-context.js";
 import { hasModifier, isRtl } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
 import type { MenuItemProps } from "./menu-item.js";
@@ -89,7 +92,37 @@ export function MenuSubmenuTrigger({
     open(event.nativeEvent);
   };
 
-  const { state, libraryProps, ref } = usePopoverTrigger(menu.popover, {
+  // Hover intent (design/components/menu.md 7), shared by the pointer handlers and a
+  // press-drag-release gesture of a context menu, whose captured pointer never enters this element
+  // (context-menu.md 2.6).
+  const hoverEnter = (native: Event) => {
+    if (disabled) return;
+    menu.timers.open(menu.delay, () => {
+      menu.setOpenCause("none");
+      menu.popover.requestOpen(native, "activate");
+    });
+  };
+  const hoverLeave = (native: Event) => {
+    // Leaving before the open delay cancels it; leaving an open submenu's trigger starts the
+    // close delay (cancelled by entering the submenu).
+    if (menu.popover.intended()) scheduleHoverClose(menu, native);
+    else menu.timers.cancel();
+  };
+  const latestHover = useLatest({ enter: hoverEnter, leave: hoverLeave });
+  const hoverRef = useCallback(
+    (element: HTMLElement) =>
+      registerSubmenuHover(element, {
+        enter: (event) => latestHover.current.enter(event),
+        leave: (event) => latestHover.current.leave(event),
+      }),
+    [latestHover],
+  );
+
+  const {
+    state,
+    libraryProps,
+    ref: triggerRef,
+  } = usePopoverTrigger(menu.popover, {
     part: "Menu.SubmenuTrigger",
     disabled,
     render,
@@ -102,24 +135,16 @@ export function MenuSubmenuTrigger({
       },
       onPointerMove: item.libraryProps.onPointerMove,
       onPointerEnter: (event: PointerEvent<HTMLButtonElement>) => {
-        if (disabled || event.pointerType === "touch") return;
-        const native = event.nativeEvent;
-        menu.timers.open(menu.delay, () => {
-          menu.setOpenCause("none");
-          menu.popover.requestOpen(native, "activate");
-        });
+        if (event.pointerType !== "touch") hoverEnter(event.nativeEvent);
       },
       onPointerLeave: (event: PointerEvent<HTMLButtonElement>) => {
-        if (event.pointerType === "touch") return;
-        // Leaving before the open delay cancels it; leaving an open submenu's trigger starts the
-        // close delay (cancelled by entering the submenu).
-        if (menu.popover.intended()) scheduleHoverClose(menu, event.nativeEvent);
-        else menu.timers.cancel();
+        if (event.pointerType !== "touch") hoverLeave(event.nativeEvent);
       },
     },
     // A click opens (or moves focus into the open submenu); it never closes.
     activate: (event) => open(event.nativeEvent),
   });
+  const ref = useMemo(() => mergeRefs(triggerRef, hoverRef), [triggerRef, hoverRef]);
 
   return useRender<ComponentPropsWithRef<"button">, MenuSubmenuTriggerState>({
     defaultElement: "button",

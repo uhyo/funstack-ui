@@ -160,6 +160,8 @@ export function MenuRoot({
         source: options.source,
         pointerId: options.pointerId,
         direction: popup !== null && isRtl(popup) ? "rtl" : "ltr",
+        // A touch or pen open is placed above the finger (4.7); re-evaluated on every move.
+        offset: options.offset,
       });
       const focus: MenuOpenFocus = { cause: "first", pointer: options.pointer };
       if (intended()) {

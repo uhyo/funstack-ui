@@ -9,8 +9,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { Suspense, startTransition, useState } from "react";
-import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type { CSSProperties, ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
   createSuspender,
@@ -21,7 +21,8 @@ import {
   setupUser,
 } from "../__tests__/helpers.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
-import { MENU_POINT_FALLBACKS } from "../internal/anchor-position.js";
+import { CSPProvider } from "../csp/index.js";
+import { MENU_POINT_FALLBACKS, MENU_POINT_RULES } from "../internal/anchor-position.js";
 import { Menu } from "./index.js";
 import type {
   MenuContextTriggerProps,
@@ -335,11 +336,11 @@ describe("Menu.ContextTrigger", () => {
         x: "312px",
         y: "148px",
         left: "var(--menu-point-x)",
-        top: "var(--menu-point-y)",
+        top: "calc(var(--menu-point-y) + var(--menu-point-gap))",
         right: "auto",
         bottom: "auto",
         positionArea: "none",
-        fallbacks: MENU_POINT_FALLBACKS.ltr[1],
+        fallbacks: MENU_POINT_FALLBACKS.ltr.mouse[1],
       });
       expect(popup()).not.toHaveAttribute("data-side");
       expect(item("rename")).toBeInTheDocument();
@@ -1247,12 +1248,12 @@ describe("Menu.ContextTrigger", () => {
         x: "312px",
         y: "148px",
         left: "auto",
-        top: "var(--menu-point-y)",
+        top: "calc(var(--menu-point-y) + var(--menu-point-gap))",
         right: "calc(100% - var(--menu-point-x))",
         bottom: "auto",
         positionArea: "none",
         // Generation 1 is odd: `--fsui-menu-right` first.
-        fallbacks: MENU_POINT_FALLBACKS.rtl[1],
+        fallbacks: MENU_POINT_FALLBACKS.rtl.mouse[1],
       });
       expect(first.fallbacks.startsWith("--fsui-menu-right")).toBe(true);
       expect(first.fallbacks).toContain("--fsui-menu-up-right");
@@ -1272,11 +1273,11 @@ describe("Menu.ContextTrigger", () => {
         x: "300px",
         y: "250px",
         left: "var(--menu-point-x)",
-        top: "var(--menu-point-y)",
+        top: "calc(var(--menu-point-y) + var(--menu-point-gap))",
         right: "auto",
         bottom: "auto",
         positionArea: "none",
-        fallbacks: MENU_POINT_FALLBACKS.ltr[0],
+        fallbacks: MENU_POINT_FALLBACKS.ltr.mouse[0],
       });
       expect(popup()).toHaveAttribute("data-context", "");
       expect(popup()).not.toHaveAttribute("data-side");
@@ -1312,8 +1313,17 @@ describe("Menu.ContextTrigger", () => {
       const style = rulesInHead()[0]!;
       expect(style.getAttribute("data-href")).toBe("@funstack/ui/menu-point");
       expect(style.getAttribute("data-precedence")).toBe("fsui");
-      // Five options since wave 11: the two mirrored ones for an RTL menu (#88).
-      for (const name of ["up", "left", "up-left", "right", "up-right"]) {
+      // Eight options since wave 11: mirrored for an RTL menu, offset for a touch open (#88).
+      for (const name of [
+        "up",
+        "down",
+        "left",
+        "right",
+        "up-left",
+        "up-right",
+        "down-left",
+        "down-right",
+      ]) {
         expect(style.textContent).toContain(`@position-try --fsui-menu-${name} {`);
       }
       // Nothing lands inside the popup.
@@ -1369,6 +1379,576 @@ describe("Menu.ContextTrigger", () => {
     });
   });
 
+  describe("touch offset (wave 11, #88)", () => {
+    // A touch or pen open is placed above the point with `--menu-point-gap` (4.7).
+    const ABOVE = "calc(100% - var(--menu-point-y) + var(--menu-point-gap))";
+    const BELOW = "calc(var(--menu-point-y) + var(--menu-point-gap))";
+    const gap = () => popup().style.getPropertyValue("--menu-point-gap");
+
+    async function longPress(target: Element, x = 100, y = 120) {
+      vi.useFakeTimers();
+      act(() => {
+        target.dispatchEvent(
+          pointerEvent("pointerdown", {
+            pointerType: "touch",
+            button: 0,
+            buttons: 1,
+            pointerId: 5,
+            clientX: x,
+            clientY: y,
+          }),
+        );
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(520);
+      });
+    }
+
+    it("a long-press opens above the point with a 16 px gap and the touch fallbacks", async () => {
+      render(<Harness />);
+      await longPress(region());
+      expect(isOpen()).toBe(true);
+      expect(gap()).toBe("16px");
+      expect(pointStyle(popup())).toEqual({
+        x: "100px",
+        y: "120px",
+        left: "var(--menu-point-x)",
+        top: "auto",
+        right: "auto",
+        bottom: ABOVE,
+        positionArea: "none",
+        fallbacks: MENU_POINT_FALLBACKS.ltr.touch[1],
+      });
+    });
+
+    it("a contextmenu with pointerType touch is placed the same way", async () => {
+      render(<Harness />);
+      await rightClick(region(), 200, 220, { pointerType: "touch", pointerId: 7 });
+      expect(gap()).toBe("16px");
+      expect(pointStyle(popup()).bottom).toBe(ABOVE);
+      expect(pointStyle(popup()).top).toBe("auto");
+      expect(pointStyle(popup()).fallbacks).toBe(MENU_POINT_FALLBACKS.ltr.touch[1]);
+    });
+
+    it("an RTL touch open names the mirrored touch options", async () => {
+      stubComputedPlacement(() => screen.queryByTestId("popup"), { direction: "rtl" });
+      render(<Harness />);
+      await rightClick(region(), 200, 220, { pointerType: "pen", pointerId: 7 });
+      const s = pointStyle(popup());
+      expect(s.right).toBe("calc(100% - var(--menu-point-x))");
+      expect(s.left).toBe("auto");
+      expect(s.bottom).toBe(ABOVE);
+      expect(s.fallbacks).toBe(MENU_POINT_FALLBACKS.rtl.touch[1]);
+      expect(s.fallbacks).toBe("--fsui-menu-down, --fsui-menu-right, --fsui-menu-down-right");
+    });
+
+    it("a mouse open has a 0px gap and opens below; a mouse move after a touch open switches back", async () => {
+      render(<Harness />);
+      await rightClick(region(), 200, 220, { pointerType: "touch", pointerId: 7 });
+      expect(gap()).toBe("16px");
+      await rightClick(region(), 300, 250);
+      expect(isOpen()).toBe(true);
+      expect(gap()).toBe("0px");
+      expect(pointStyle(popup())).toEqual({
+        x: "300px",
+        y: "250px",
+        left: "var(--menu-point-x)",
+        top: BELOW,
+        right: "auto",
+        bottom: "auto",
+        positionArea: "none",
+        fallbacks: MENU_POINT_FALLBACKS.ltr.mouse[0],
+      });
+    });
+
+    it("the keyboard is placed as a mouse", async () => {
+      render(<Harness />);
+      await dispatch(region(), pointerEvent("contextmenu", { button: -1, buttons: 0 }));
+      await flush();
+      expect(gap()).toBe("0px");
+      expect(pointStyle(popup()).top).toBe(BELOW);
+    });
+
+    it("a consumer's --menu-point-gap wins", async () => {
+      render(<Harness popup={{ style: { "--menu-point-gap": "24px" } as CSSProperties }} />);
+      await rightClick(region(), 200, 220, { pointerType: "touch", pointerId: 7 });
+      expect(gap()).toBe("24px");
+    });
+
+    it("side={null} still hands the gap over with the point", async () => {
+      render(<Harness popup={{ side: null }} />);
+      await rightClick(region(), 200, 220, { pointerType: "touch", pointerId: 7 });
+      expect(gap()).toBe("16px");
+      expect(pointStyle(popup()).bottom).toBe("");
+    });
+  });
+
+  describe("press-drag-release (wave 11, #88)", () => {
+    // context-menu.md 2.6. jsdom has no `elementFromPoint` and no pointer capture: the hit is
+    // stubbed per test, and the events the captured pointer would deliver are dispatched at the
+    // popup. The clock is `performance.now()`.
+    let hit: Element | null = null;
+    let now = 1000;
+    beforeEach(() => {
+      hit = null;
+      now = 1000;
+      Object.defineProperty(document, "elementFromPoint", {
+        configurable: true,
+        value: vi.fn(() => hit),
+      });
+      vi.spyOn(performance, "now").mockImplementation(() => now);
+    });
+    afterEach(() => {
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+    });
+
+    const actions = {
+      rename: vi.fn(),
+      archive: vi.fn(),
+      delete: vi.fn(),
+    };
+    beforeEach(() => {
+      for (const fn of Object.values(actions)) fn.mockReset();
+    });
+
+    function DragItems() {
+      return (
+        <>
+          <Menu.Item data-testid="rename" action={actions.rename}>
+            Rename
+          </Menu.Item>
+          <Menu.Item data-testid="archive" action={actions.archive}>
+            Archive
+          </Menu.Item>
+          <Menu.Item data-testid="delete" action={actions.delete} disabled>
+            Delete
+          </Menu.Item>
+          <Menu.Separator data-testid="separator" />
+          <Menu.Root>
+            <Menu.SubmenuTrigger data-testid="move">Move to</Menu.SubmenuTrigger>
+            <Menu.Popup data-testid="submenu" aria-label="Folders">
+              <Menu.Item data-testid="inbox">Inbox</Menu.Item>
+            </Menu.Popup>
+          </Menu.Root>
+        </>
+      );
+    }
+
+    /** What the captured pointer delivers: dispatched at the popup, at (x, y). */
+    function captured(type: string, x: number, y: number, init: PointerEventInit = {}) {
+      act(() => {
+        popup().dispatchEvent(
+          pointerEvent(type, { clientX: x, clientY: y, button: 2, buttons: 2, ...init }),
+        );
+      });
+    }
+
+    it("a move over an item focuses it quietly", async () => {
+      render(<Harness content={<DragItems />} />);
+      await rightClick(region(), 312, 148);
+      const quiet = watchQuietFocus();
+      hit = item("archive");
+      captured("pointermove", 320, 180);
+      expect(document.activeElement).toBe(item("archive"));
+      expect(quiet).toEqual([item("archive")]);
+      // A disabled item is focused too (keyboard and pointer agree on the current item).
+      hit = item("delete");
+      captured("pointermove", 320, 200);
+      expect(document.activeElement).toBe(item("delete"));
+      // Nothing under the pointer: nothing.
+      hit = document.body;
+      captured("pointermove", 20, 20);
+      expect(document.activeElement).toBe(item("delete"));
+    });
+
+    it("a move over a SubmenuTrigger focuses it and opens its submenu after the delay", async () => {
+      render(<Harness content={<DragItems />} />);
+      await rightClick(region(), 312, 148);
+      hit = item("move");
+      captured("pointermove", 320, 230);
+      expect(document.activeElement).toBe(item("move"));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+      await flush();
+      expect(isOpen(screen.getByTestId("submenu"))).toBe(true);
+      // Into the submenu: the submenu stays open, its item takes focus.
+      hit = item("inbox");
+      captured("pointermove", 420, 230);
+      expect(document.activeElement).toBe(item("inbox"));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+      await flush();
+      expect(isOpen(screen.getByTestId("submenu"))).toBe(true);
+    });
+
+    it("a release 10 px away over an enabled item activates it and closes with 'activate'", async () => {
+      const open = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: open }} content={<DragItems />} />);
+      await rightClick(region(), 312, 148);
+      hit = item("archive");
+      captured("pointermove", 318, 156);
+      let click: Event | undefined;
+      act(() => {
+        popup().dispatchEvent(
+          pointerEvent("pointerup", { clientX: 318, clientY: 156, button: 2, buttons: 0 }),
+        );
+        // The click an engine may synthesise from this release, in the same task: swallowed.
+        click = new MouseEvent("click", { bubbles: true, cancelable: true });
+        document.body.dispatchEvent(click);
+      });
+      expect(actions.archive).toHaveBeenCalledTimes(1);
+      expect(click!.defaultPrevented).toBe(true);
+      await flush();
+      expect(isOpen()).toBe(false);
+      expect(open.mock.calls.at(-1)).toEqual([
+        false,
+        expect.objectContaining({ reason: "activate" }),
+      ]);
+      // One task later the swallow is gone.
+      const later = new MouseEvent("click", { bubbles: true, cancelable: true });
+      document.body.dispatchEvent(later);
+      expect(later.defaultPrevented).toBe(false);
+    });
+
+    it("a release within the slop, over a disabled item or a SubmenuTrigger does nothing", async () => {
+      render(<Harness content={<DragItems />} />);
+      for (const [target, dx] of [
+        ["archive", 2],
+        ["delete", 10],
+        ["move", 10],
+        ["separator", 10],
+      ] as const) {
+        await rightClick(region(), 312, 148);
+        hit = item(target);
+        captured("pointerup", 312 + dx, 148, { buttons: 0 });
+        await flush();
+        expect(isOpen()).toBe(true);
+      }
+      expect(actions.archive).not.toHaveBeenCalled();
+      expect(actions.delete).not.toHaveBeenCalled();
+    });
+
+    it("a release outside after moving dismisses only after 500 ms", async () => {
+      const open = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: open }} content={<DragItems />} />);
+      // 100 ms after the open, 10 px away, outside: still open.
+      await rightClick(region(), 312, 148);
+      hit = document.body;
+      now += 100;
+      captured("pointerup", 322, 148, { buttons: 0 });
+      await flush();
+      expect(isOpen()).toBe(true);
+      // 600 ms after a fresh open (a move restarts the clock), 0 px away: still open.
+      await rightClick(region(), 312, 148);
+      now += 600;
+      captured("pointerup", 312, 148, { buttons: 0 });
+      await flush();
+      expect(isOpen()).toBe(true);
+      // 600 ms, 10 px away: dismissed.
+      await rightClick(region(), 312, 148);
+      const hide = vi.spyOn(HTMLElement.prototype, "hidePopover");
+      now += 600;
+      captured("pointerup", 322, 148, { buttons: 0 });
+      expect(hide).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(false);
+      await flush();
+      expect(open.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    });
+
+    it("ignores another pointer, and ends at lostpointercapture", async () => {
+      render(<Harness content={<DragItems />} />);
+      await rightClick(region(), 312, 148);
+      hit = item("archive");
+      captured("pointerup", 330, 148, { pointerId: 9, buttons: 0 });
+      expect(actions.archive).not.toHaveBeenCalled();
+      captured("lostpointercapture", 330, 148);
+      captured("pointerup", 330, 148, { buttons: 0 });
+      await flush();
+      expect(actions.archive).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(true);
+    });
+
+    it("the release ends the gesture: a later pointerup does nothing", async () => {
+      render(<Harness content={<DragItems />} />);
+      await rightClick(region(), 312, 148);
+      hit = item("archive");
+      captured("pointerup", 313, 148, { buttons: 0 });
+      captured("pointerup", 330, 148, { buttons: 0 });
+      await flush();
+      expect(actions.archive).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(true);
+    });
+
+    it("no gesture without a button down (Windows, the keyboard)", async () => {
+      render(<Harness content={<DragItems />} />);
+      await dispatch(region(), pointerEvent("contextmenu", { buttons: 0 }));
+      await flush();
+      expect(isOpen()).toBe(true);
+      hit = item("archive");
+      captured("pointermove", 330, 160, { buttons: 0 });
+      expect(document.activeElement).toBe(item("rename"));
+      captured("pointerup", 330, 160, { buttons: 0 });
+      await flush();
+      expect(actions.archive).not.toHaveBeenCalled();
+    });
+
+    it("a move restarts the gesture from the new point", async () => {
+      render(<Harness content={<DragItems />} />);
+      await rightClick(region(), 312, 148);
+      await rightClick(region(), 100, 100);
+      hit = item("archive");
+      // 2 px from the new point (far from the first one): within the slop.
+      captured("pointerup", 102, 100, { buttons: 0 });
+      await flush();
+      expect(actions.archive).not.toHaveBeenCalled();
+      await rightClick(region(), 100, 100);
+      captured("pointerup", 110, 100, { buttons: 0 });
+      await flush();
+      expect(actions.archive).toHaveBeenCalledTimes(1);
+    });
+
+    describe("touch", () => {
+      async function longPress() {
+        vi.useFakeTimers();
+        act(() => {
+          region().dispatchEvent(
+            pointerEvent("pointerdown", {
+              pointerType: "touch",
+              button: 0,
+              buttons: 1,
+              pointerId: 5,
+              clientX: 100,
+              clientY: 120,
+            }),
+          );
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(510);
+        });
+        expect(isOpen()).toBe(true);
+      }
+      const touch = (type: string, x: number, y: number) =>
+        captured(type, x, y, { pointerType: "touch", pointerId: 5, button: 0, buttons: 0 });
+
+      it("guards touchmove while the finger is down; cancels the lift's touchend (no click), then stops", async () => {
+        const listen = vi.spyOn(document, "addEventListener");
+        render(<Harness content={<DragItems />} />);
+        await longPress();
+        const call = listen.mock.calls.find(([type]) => type === "touchmove");
+        expect(call?.[2]).toEqual({ passive: false });
+        const move = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(move);
+        expect(move.defaultPrevented).toBe(true);
+        hit = null;
+        // The pointerup comes first; the touch events of the same lift follow.
+        touch("pointerup", 100, 120);
+        const stillDown = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(stillDown);
+        expect(stillDown.defaultPrevented).toBe(true);
+        const end = new Event("touchend", { cancelable: true });
+        document.dispatchEvent(end);
+        expect(end.defaultPrevented).toBe(true);
+        const after = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(after);
+        expect(after.defaultPrevented).toBe(false);
+        const nextEnd = new Event("touchend", { cancelable: true });
+        document.dispatchEvent(nextEnd);
+        expect(nextEnd.defaultPrevented).toBe(false);
+        expect(isOpen()).toBe(true);
+      });
+
+      it("without a touchend after the pointerup, the guard stops on its own", async () => {
+        render(<Harness content={<DragItems />} />);
+        await longPress();
+        hit = null;
+        touch("pointerup", 100, 120);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(300);
+        });
+        const after = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(after);
+        expect(after.defaultPrevented).toBe(false);
+      });
+
+      it("pointercancel lifts the guard too", async () => {
+        render(<Harness content={<DragItems />} />);
+        await longPress();
+        touch("pointercancel", 100, 120);
+        const after = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(after);
+        expect(after.defaultPrevented).toBe(false);
+      });
+
+      it("a plain lift never closes, even late", async () => {
+        render(<Harness content={<DragItems />} />);
+        await longPress();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(700);
+        });
+        hit = document.body;
+        touch("pointerup", 100, 120);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10);
+        });
+        expect(isOpen()).toBe(true);
+      });
+
+      it("a slide of 20 px onto an item activates it; 5 px does not (10 px slop)", async () => {
+        render(<Harness content={<DragItems />} />);
+        await longPress();
+        hit = item("archive");
+        touch("pointerup", 105, 120);
+        expect(actions.archive).not.toHaveBeenCalled();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10);
+        });
+        expect(isOpen()).toBe(true);
+        // The release ended that gesture; a fresh long-press for the second half.
+        act(() => popup().hidePopover());
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10);
+        });
+        await longPress();
+        hit = item("archive");
+        touch("pointermove", 100, 140);
+        expect(document.activeElement).toBe(item("archive"));
+        touch("pointerup", 100, 140);
+        // The long-press click swallow did not eat the activation.
+        expect(actions.archive).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("close-on-scroll and the wheel guard (wave 11, #88)", () => {
+    const scroll = (target: EventTarget) => {
+      act(() => {
+        // `scroll` does not bubble; the library listens in the capture phase.
+        target.dispatchEvent(new Event("scroll"));
+      });
+    };
+
+    it("a point menu closes on a scroll of the document, with 'dismiss'", async () => {
+      const open = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: open }} />);
+      await rightClick(region());
+      const hide = vi.spyOn(HTMLElement.prototype, "hidePopover");
+      scroll(document);
+      expect(hide).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(false);
+      await flush();
+      expect(open.mock.calls.at(-1)![1].reason).toBe("dismiss");
+      // Removed with the close.
+      await rightClick(region());
+      hide.mockClear();
+      act(() => popup().hidePopover());
+      await flush();
+      hide.mockClear();
+      scroll(document);
+      expect(hide).not.toHaveBeenCalled();
+    });
+
+    it("closes on a scroll of an ancestor of the region, not of an unrelated element or the popup", async () => {
+      const { container } = render(<Harness />);
+      await rightClick(region());
+      scroll(screen.getByTestId("elsewhere"));
+      expect(isOpen()).toBe(true);
+      scroll(popup());
+      expect(isOpen()).toBe(true);
+      scroll(item("rename"));
+      expect(isOpen()).toBe(true);
+      scroll(container);
+      expect(isOpen()).toBe(false);
+    });
+
+    it("a Trigger-opened menu stays open on a document scroll", async () => {
+      const user = setupUser();
+      render(<Harness withTrigger />);
+      await user.click(screen.getByTestId("trigger"));
+      await flush();
+      expect(isOpen()).toBe(true);
+      scroll(document);
+      expect(isOpen()).toBe(true);
+      // Re-placed at a point by a right-click: the rule applies from then on.
+      await rightClick(region());
+      expect(popup()).toHaveAttribute("data-context", "");
+      scroll(document);
+      expect(isOpen()).toBe(false);
+    });
+
+    const wheel = (target: Element, deltaY: number) => {
+      const event = new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true });
+      act(() => {
+        target.dispatchEvent(event);
+      });
+      return event;
+    };
+
+    it.each(["region", "Trigger"])(
+      "a wheel over a menu opened from the %s never scrolls the page",
+      async (from) => {
+        const user = setupUser();
+        render(<Harness withTrigger />);
+        if (from === "region") await rightClick(region());
+        else {
+          await user.click(screen.getByTestId("trigger"));
+          await flush();
+        }
+        expect(wheel(item("archive"), 10).defaultPrevented).toBe(true);
+        expect(wheel(popup(), -10).defaultPrevented).toBe(true);
+        // Removed with the close.
+        act(() => popup().hidePopover());
+        await flush();
+        expect(wheel(popup(), 10).defaultPrevented).toBe(false);
+      },
+    );
+
+    it("a menu that can scroll that way takes the wheel", async () => {
+      render(<Harness popup={{ style: { overflowY: "auto" } }} />);
+      await rightClick(region());
+      Object.defineProperties(popup(), {
+        scrollHeight: { configurable: true, value: 400 },
+        clientHeight: { configurable: true, value: 100 },
+      });
+      popup().scrollTop = 0;
+      expect(wheel(item("archive"), 10).defaultPrevented).toBe(false);
+      expect(wheel(item("archive"), -10).defaultPrevented).toBe(true);
+    });
+  });
+
+  describe("CSP (wave 11, #88)", () => {
+    // React records a hoisted style per document and never removes it: each row renders into a
+    // document of its own.
+    function renderFresh(ui: ReactNode) {
+      const doc = document.implementation.createHTMLDocument("");
+      const container = doc.createElement("div");
+      doc.body.append(container);
+      render(ui, { container });
+      const regionIn = container.querySelector<HTMLElement>('[data-testid="region"]')!;
+      const styles = () => doc.head.querySelectorAll('style[data-href="@funstack/ui/menu-point"]');
+      return { regionIn, styles };
+    }
+
+    it("the nonce of a <CSPProvider> lands on the hoisted <style>", async () => {
+      const { regionIn, styles } = renderFresh(
+        <CSPProvider nonce="abc">
+          <Harness />
+        </CSPProvider>,
+      );
+      await rightClick(regionIn);
+      expect(styles()).toHaveLength(1);
+      expect(styles()[0]!.getAttribute("nonce")).toBe("abc");
+      expect(styles()[0]!.textContent).toBe(MENU_POINT_RULES);
+    });
+
+    it("without the provider, no nonce attribute", async () => {
+      const { regionIn, styles } = renderFresh(<Harness />);
+      await rightClick(regionIn);
+      expect(styles()).toHaveLength(1);
+      expect(styles()[0]!.hasAttribute("nonce")).toBe(false);
+    });
+  });
   describe("closing paths as Menu", () => {
     it("item activation closes through the Root with 'activate'", async () => {
       const action = vi.fn<OpenAction>();

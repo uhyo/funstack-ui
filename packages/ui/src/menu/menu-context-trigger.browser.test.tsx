@@ -23,7 +23,7 @@ import { act, render, screen } from "@testing-library/react";
 import { cdp } from "vitest/browser";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mouse, toPagePoint } from "../__tests__/browser-commands.js";
+import { mouse, toPagePoint, wheel } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsFocusVisibleOption } from "../__tests__/engine.js";
 import { withPageDirection } from "../__tests__/placement-browser.js";
@@ -87,6 +87,7 @@ afterEach(async () => {
   }
   for (const cleanup of cleanups.splice(0)) cleanup();
   vi.restoreAllMocks();
+  window.scrollTo(0, 0);
 });
 
 interface HarnessProps {
@@ -202,7 +203,7 @@ describe("opening at the pointer (browser)", () => {
     expect(action.mock.calls[0]![1].event!.type).toBe("contextmenu");
   });
 
-  it("survives the pending pointerup: press, menu opens, move 60 px away, release", async () => {
+  it("survives the pending pointerup: press, menu opens, move off the menu, release", async () => {
     render(<Harness />);
     const { width, height } = viewport();
     const x = Math.round(width / 3);
@@ -212,9 +213,12 @@ describe("opening at the pointer (browser)", () => {
     });
     await expect.poll(() => isOpen()).toBe(true);
     await flush();
+    // Above the menu's top edge, so over no popover: the release Firefox and WebKit would
+    // light-dismiss on. Within the press-drag-release slop (4 px, wave 11), so the gesture keeps
+    // the menu open whatever the time; a release farther away is the press-drag-release rows'.
     await act(async () => {
-      await mouse.move(x + 60, y - 60);
-      await mouse.up(x + 60, y - 60, "right");
+      await mouse.move(x + 2, y - 2);
+      await mouse.up(x + 2, y - 2, "right");
     });
     await flush();
     await flush();
@@ -442,10 +446,11 @@ describe("move (browser)", () => {
     await expect.poll(() => Math.abs(rect().left - lastMenu!.x)).toBeLessThanOrEqual(1);
     expect(lastMenu!.x).toBeGreaterThan(200);
     await flush();
-    // Away from the menu (it spans 240.. on both axes), still inside the region.
+    // Within the slop of the new point and off the menu (it spans 240.. on both axes): the
+    // press-drag-release gesture (wave 11) keeps it open, so this is the capture's doing alone.
     await act(async () => {
-      await mouse.move(180, 160);
-      await mouse.up(180, 160, "right");
+      await mouse.move(238, 218);
+      await mouse.up(238, 218, "right");
     });
     await flush();
     await flush();
@@ -698,7 +703,8 @@ describe("long-press (browser)", () => {
     await flush();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![1].event!.type).toBe("pointerdown");
-    expectTopLeftAt(150, 120);
+    // Above the touch point with the 16 px gap (wave 11, 4.7).
+    expectBottomLeftAt(150, 120 - 16);
     await act(async () => {
       region().dispatchEvent(new PointerEvent("pointerup", { ...init, buttons: 0 }));
     });
@@ -905,9 +911,363 @@ describe("exit animation (browser)", () => {
   });
 });
 
+/** The popup's bottom-left equals (x, y). */
+function expectBottomLeftAt(x: number, y: number) {
+  const r = rect();
+  expect(Math.abs(r.left - x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(r.bottom - y)).toBeLessThanOrEqual(1);
+}
+
 /** The popup's top-left equals (x, y). */
 function expectTopLeftAt(x: number, y: number) {
   const r = rect();
   expect(Math.abs(r.left - x)).toBeLessThanOrEqual(1);
   expect(Math.abs(r.top - y)).toBeLessThanOrEqual(1);
 }
+// --- Wave 11 (#88): press-drag-release, touch offset, scrolling --------------------------------
+
+/** Where an item of the open menu is: its centre. */
+function centre(element: Element) {
+  const r = element.getBoundingClientRect();
+  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+}
+
+/**
+ * The time between the `contextmenu` that opened (or moved) the menu and the next `pointerup`,
+ * from the events' own timestamps: the 500 ms dismissal rule is asserted against what happened,
+ * never against a sleep that load could stretch.
+ */
+function watchGestureTime() {
+  const times = { menu: Number.NaN, up: Number.NaN };
+  const onMenu = () => (times.menu = performance.now());
+  const onUp = () => (times.up = performance.now());
+  window.addEventListener("contextmenu", onMenu, true);
+  window.addEventListener("pointerup", onUp, true);
+  cleanups.push(() => {
+    window.removeEventListener("contextmenu", onMenu, true);
+    window.removeEventListener("pointerup", onUp, true);
+  });
+  return { elapsed: () => times.up - times.menu };
+}
+
+describe("press-drag-release (browser, wave 11, #88)", () => {
+  // context-menu.md 2.6. Linux CI fires `contextmenu` on the right-button press, so the menu
+  // opens with the button down and the popup holds the capture for the rest of the gesture.
+  function DragItems({ archive }: { archive: () => void }) {
+    return (
+      <>
+        <Menu.Item data-testid="rename">Rename</Menu.Item>
+        <Menu.Item data-testid="archive" action={archive}>
+          Archive
+        </Menu.Item>
+        <Menu.Item data-testid="delete">Delete</Menu.Item>
+      </>
+    );
+  }
+
+  it("press, slide onto an item, release: the item is activated and the menu closes", async () => {
+    const archive = vi.fn();
+    const action = vi.fn<OpenAction>();
+    render(
+      <Harness root={{ openChangeAction: action }} content={<DragItems archive={archive} />} />,
+    );
+    const { width, height } = viewport();
+    const x = Math.round(width / 3);
+    const y = Math.round(height / 3);
+    await act(async () => {
+      await mouse.down(x, y, "right");
+    });
+    await expect.poll(() => isOpen()).toBe(true);
+    await flush();
+    const target = centre(item("archive"));
+    await act(async () => {
+      await mouse.move(target.x, target.y);
+    });
+    await expect.poll(() => document.activeElement).toBe(item("archive"));
+    // The gesture's focus is quiet, as a hover's.
+    expect(item("archive").matches(":focus-visible")).toBe(false);
+    await act(async () => {
+      await mouse.up(target.x, target.y, "right");
+    });
+    await expect.poll(() => archive.mock.calls.length).toBe(1);
+    await expect.poll(() => isOpen()).toBe(false);
+    await flush();
+    expect(action.mock.calls.at(-1)).toEqual([
+      false,
+      expect.objectContaining({ reason: "activate" }),
+    ]);
+  });
+
+  it("a stationary press and release keeps it open; a later left click on an item activates", async () => {
+    const archive = vi.fn();
+    render(<Harness content={<DragItems archive={archive} />} />);
+    const { width, height } = viewport();
+    const x = Math.round(width / 3);
+    const y = Math.round(height / 3);
+    await act(async () => {
+      await mouse.down(x, y, "right");
+    });
+    await expect.poll(() => isOpen()).toBe(true);
+    await act(async () => {
+      await mouse.up(x, y, "right");
+    });
+    await flush();
+    expect(isOpen()).toBe(true);
+    expect(item("rename")).toHaveFocus();
+    expect(archive).not.toHaveBeenCalled();
+    const target = centre(item("archive"));
+    await act(async () => {
+      await mouse.click(target.x, target.y);
+    });
+    await expect.poll(() => archive.mock.calls.length).toBe(1);
+    await expect.poll(() => isOpen()).toBe(false);
+  });
+
+  it("review L4: a held-button move released off the menu stays open before 500 ms and closes after", async () => {
+    const action = vi.fn<OpenAction>();
+    const time = watchGestureTime();
+    render(<Harness root={{ openChangeAction: action }} />);
+    await openAt(100, 100);
+    // A move with the button held: the menu re-shows at the new point and re-captures.
+    await act(async () => {
+      await mouse.down(240, 220, "right");
+    });
+    await expect.poll(() => Math.abs(rect().left - lastMenu!.x)).toBeLessThanOrEqual(1);
+    // Off the menu (it spans 240.. on both axes), more than the slop away, at once.
+    await act(async () => {
+      await mouse.move(180, 160);
+      await mouse.up(180, 160, "right");
+    });
+    await flush();
+    await flush();
+    if (time.elapsed() < 500) {
+      // A quick release is not a dismissal (and the capture held through the re-show).
+      expect(isOpen()).toBe(true);
+      expectTopLeftAtPoint();
+    } else {
+      // The machine was slow enough for the release to count as a deliberate one.
+      console.warn(`[L4] the release came ${Math.round(time.elapsed())} ms after the move`);
+      expect(isOpen()).toBe(false);
+    }
+    expect(action.mock.calls.filter(([next]) => next)).toHaveLength(1);
+
+    // The same release at least 500 ms after a move (or an open, if the first release closed
+    // it), pressed off the current menu: dismissed.
+    await act(async () => {
+      await mouse.down(100, 400, "right");
+    });
+    await expect.poll(() => isOpen()).toBe(true);
+    await expect.poll(() => Math.abs(rect().top - 400)).toBeLessThanOrEqual(1);
+    await act(async () => {
+      await sleep(600);
+      await mouse.move(60, 340);
+      await mouse.up(60, 340, "right");
+    });
+    expect(time.elapsed()).toBeGreaterThanOrEqual(500);
+    await expect.poll(() => isOpen()).toBe(false);
+    await flush();
+    expect(action.mock.calls.at(-1)).toEqual([
+      false,
+      expect.objectContaining({ reason: "dismiss" }),
+    ]);
+  });
+
+  it("flipped away from the pointer, held still for 600 ms and released in place: still open", async () => {
+    render(<Harness />);
+    const { width, height } = viewport();
+    const x = width - 10;
+    const y = height - 70;
+    await act(async () => {
+      await mouse.down(x, y, "right");
+    });
+    await expect.poll(() => isOpen()).toBe(true);
+    await flush();
+    // Flipped up-left: the pointer is at the corner, over no item.
+    expect(Math.abs(rect().right - lastMenu!.x)).toBeLessThanOrEqual(1);
+    await act(async () => {
+      await sleep(600);
+      await mouse.up(x, y, "right");
+    });
+    await flush();
+    await flush();
+    // Movement is required to dismiss as well as time.
+    expect(isOpen()).toBe(true);
+  });
+
+  it.runIf(browserName === "chromium")(
+    "touch: long-press, slide onto an item, lift (CDP touch emulation, if it produces pointer events)",
+    async () => {
+      const archive = vi.fn();
+      render(<Harness content={<DragItems archive={archive} />} />);
+      const downs: string[] = [];
+      region().addEventListener("pointerdown", (e) => downs.push(e.pointerType), true);
+      const session = cdp();
+      const start = { x: 200, y: 300 };
+      await act(async () => {
+        await session.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [toPagePoint(start.x, start.y)],
+        });
+        await sleep(600);
+      });
+      if (!downs.includes("touch")) {
+        // This Chromium produced no pointer events for the emulated touch: nothing to drive.
+        expect(downs).toEqual([]);
+        await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        return;
+      }
+      await expect.poll(() => isOpen()).toBe(true);
+      await flush();
+      // Above the finger with the 16 px gap (4.7).
+      expectBottomLeftAt(start.x, start.y - 16);
+      const target = centre(item("archive"));
+      await act(async () => {
+        for (let step = 1; step <= 5; step++) {
+          const x = start.x + ((target.x - start.x) * step) / 5;
+          const y = start.y + ((target.y - start.y) * step) / 5;
+          await session.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [toPagePoint(x, y)],
+          });
+        }
+      });
+      await expect.poll(() => document.activeElement).toBe(item("archive"));
+      await act(async () => {
+        await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      });
+      await expect.poll(() => archive.mock.calls.length).toBe(1);
+      await expect.poll(() => isOpen()).toBe(false);
+    },
+  );
+});
+
+describe("touch offset (browser, wave 11, #88)", () => {
+  async function longPressAt(x: number, y: number) {
+    await act(async () => {
+      region().dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerType: "touch",
+          isPrimary: true,
+          pointerId: 43,
+          clientX: x,
+          clientY: y,
+          button: 0,
+          buttons: 1,
+        }),
+      );
+      await sleep(600);
+    });
+    await expect.poll(() => isOpen()).toBe(true);
+    await flush();
+  }
+
+  it("a touch open sits 16 px above the point, start-aligned; near the top it opens below", async () => {
+    render(<Harness />);
+    const { height } = viewport();
+    const y = Math.round(height / 2);
+    await longPressAt(150, y);
+    expectBottomLeftAt(150, y - 16);
+    expect(popup().style.getPropertyValue("--menu-point-gap")).toBe("16px");
+    await act(async () => popup().hidePopover());
+    await flush();
+
+    // No room above: `--fsui-menu-down`, below the point with the same gap.
+    await longPressAt(150, 30);
+    expectTopLeftAt(150, 30 + 16);
+  });
+
+  it("a mouse open after it is placed at the point again (0px gap)", async () => {
+    render(<Harness />);
+    const { height } = viewport();
+    await longPressAt(150, Math.round(height / 2));
+    await openAt(200, 120);
+    expectTopLeftAtPoint();
+    expect(popup().style.getPropertyValue("--menu-point-gap")).toBe("0px");
+  });
+});
+
+describe("scrolling (browser, wave 11, #88)", () => {
+  // A page taller than the viewport; the region is fixed, so a wheel over it scrolls the document.
+  function ScrollPage(props: HarnessProps) {
+    return (
+      <>
+        <Harness {...props} />
+        <div style={{ height: 4000 }} />
+      </>
+    );
+  }
+
+  /** Whether the page saw the wheel event prevented (a window listener, after the library's). */
+  function watchWheel() {
+    const seen = { prevented: null as boolean | null };
+    const onWheel = (event: WheelEvent) => (seen.prevented = event.defaultPrevented);
+    window.addEventListener("wheel", onWheel, { passive: true });
+    cleanups.push(() => window.removeEventListener("wheel", onWheel));
+    return seen;
+  }
+
+  it("a wheel over the page closes a point menu ('dismiss') and the page scrolls", async () => {
+    const action = vi.fn<OpenAction>();
+    render(<ScrollPage root={{ openChangeAction: action }} />);
+    await openAt(100, 100);
+    await act(async () => {
+      await wheel(400, 400, 0, 200);
+    });
+    await expect.poll(() => window.scrollY).toBeGreaterThan(0);
+    await expect.poll(() => isOpen()).toBe(false);
+    await flush();
+    expect(action.mock.calls.at(-1)).toEqual([
+      false,
+      expect.objectContaining({ reason: "dismiss" }),
+    ]);
+  });
+
+  it("a Trigger-opened menu stays open and on its Trigger while the page scrolls", async () => {
+    render(<ScrollPage withTrigger />);
+    await user.click(screen.getByTestId("trigger"));
+    await expect.poll(() => isOpen()).toBe(true);
+    await flush();
+    await act(async () => {
+      await wheel(400, 400, 0, 200);
+    });
+    await expect.poll(() => window.scrollY).toBeGreaterThan(0);
+    await flush();
+    expect(isOpen()).toBe(true);
+    const t = screen.getByTestId("trigger").getBoundingClientRect();
+    expect(Math.abs(rect().top - t.bottom)).toBeLessThanOrEqual(1);
+  });
+
+  it("a wheel over a menu that cannot scroll never scrolls the page", async () => {
+    const seen = watchWheel();
+    render(<ScrollPage />);
+    await openAt(100, 100);
+    const over = centre(item("archive"));
+    await act(async () => {
+      await wheel(over.x, over.y, 0, 200);
+    });
+    // The condition, not a wait for "nothing happened": the library prevented the wheel.
+    expect(seen.prevented).toBe(true);
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    expect(window.scrollY).toBe(0);
+    expect(isOpen()).toBe(true);
+  });
+
+  it("a wheel over a menu that can scroll scrolls the menu, not the page", async () => {
+    const seen = watchWheel();
+    render(<ScrollPage popup={{ style: { maxHeight: 40, overflowY: "auto" } }} />);
+    await openAt(100, 100);
+    const over = centre(popup());
+    await act(async () => {
+      await wheel(over.x, over.y, 0, 30);
+    });
+    expect(seen.prevented).toBe(false);
+    await expect.poll(() => popup().scrollTop).toBeGreaterThan(0);
+    expect(isOpen()).toBe(true);
+    expect(window.scrollY).toBe(0);
+  });
+});

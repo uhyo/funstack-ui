@@ -67,6 +67,22 @@ const mouse: BrowserCommand<
 };
 
 /**
+ * A real wheel turn at a page point (Playwright `page.mouse.wheel` after a move), for the context
+ * menu's scroll rows (design/components/context-menu.md 13.2, wave 11). Does not wait for the
+ * scroll it may cause.
+ */
+const wheel: BrowserCommand<[x: number, y: number, deltaX: number, deltaY: number]> = async (
+  context,
+  x,
+  y,
+  deltaX,
+  deltaY,
+) => {
+  await context.page.mouse.move(x, y);
+  await context.page.mouse.wheel(deltaX, deltaY);
+};
+
+/**
  * Engines for the browser project.
  * - `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) selects them explicitly; a missing
  *   build then fails loudly.
@@ -136,7 +152,7 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            commands: { emulateReducedMotion, mouse },
+            commands: { emulateReducedMotion, mouse, wheel },
             // Firefox runs its files one at a time: headless Firefox shares one mouse and one
             // pointer-capture state between the pages of the browser, so another file's
             // Playwright pointer input lands in a running drag or click (#62).

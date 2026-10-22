@@ -658,3 +658,91 @@ describe("inline sides and direction (wave 11, #53)", () => {
     }
   });
 });
+describe("skip-delay (wave 11, #21)", () => {
+  // Design section 6: while a tooltip is showing, the next one opens at once and the showing one
+  // is hidden. The rows assert conditions, not wall-clock bounds: a skipped open happens in the
+  // same task as the other tooltip's close (the JS path hides it and shows the next; `hint`
+  // stacking hides it while showing the next), whereas without the skip they are two timers,
+  // `closeDelay` and `delay` after the pointer moved. A cold open waits at least `delay`.
+  function Pair({ native }: { native: boolean }) {
+    const tip = { margin: 0, padding: 0, border: 0, width: 60, height: 20 };
+    return (
+      <div style={{ padding: 120, display: "flex", gap: 0 }}>
+        <button type="button" style={{ marginRight: 80 }}>
+          Elsewhere
+        </button>
+        <Tooltip.Root delay={400}>
+          <Tooltip.Trigger experimental_interestFor={native} style={{ width: 100, height: 30 }}>
+            Bold
+          </Tooltip.Trigger>
+          <Tooltip.Popup experimental_hint={native} data-testid="tip-a" style={tip}>
+            Bold text
+          </Tooltip.Popup>
+        </Tooltip.Root>
+        <Tooltip.Root delay={400}>
+          <Tooltip.Trigger experimental_interestFor={native} style={{ width: 100, height: 30 }}>
+            Italic
+          </Tooltip.Trigger>
+          <Tooltip.Popup experimental_hint={native} data-testid="tip-b" style={tip}>
+            Italic text
+          </Tooltip.Popup>
+        </Tooltip.Root>
+      </div>
+    );
+  }
+  const triggerA = () => screen.getByRole("button", { name: "Bold" });
+  const triggerB = () => screen.getByRole("button", { name: "Italic" });
+  const tipA = () => screen.getByTestId("tip-a");
+  const tipB = () => screen.getByTestId("tip-b");
+  const open = (element: Element) => element.matches(":popover-open");
+  const delayStart = (element: Element) =>
+    getComputedStyle(element).getPropertyValue("interest-delay-start");
+
+  /** Records, for B's opens, whether A closed in the same task (or was still open). */
+  function watchSkip() {
+    let aClosedThisTask = false;
+    const record = { enteredB: Number.NaN, openedB: Number.NaN, withA: false };
+    tipA().addEventListener("beforetoggle", (event) => {
+      if ((event as ToggleEvent).newState !== "closed") return;
+      aClosedThisTask = true;
+      setTimeout(() => (aClosedThisTask = false), 0);
+    });
+    triggerB().addEventListener("pointerenter", () => (record.enteredB = performance.now()));
+    tipB().addEventListener("beforetoggle", (event) => {
+      if ((event as ToggleEvent).newState !== "open") return;
+      record.openedB = performance.now();
+      record.withA = aClosedThisTask || open(tipA());
+    });
+    return record;
+  }
+
+  it.each([
+    ["baseline markup", false],
+    ["experimental_interestFor markup", true],
+  ])("%s: straight from A to B opens B at once; after both closed, B waits", async (_, native) => {
+    // With the flags in Chromium the browser owns the interaction (native path); elsewhere the
+    // JS path runs under the same markup, and hides A itself where `hint` is `manual` (Safari
+    // 27.0).
+    render(<Pair native={native} />);
+    const record = watchSkip();
+    await userEvent.hover(triggerA());
+    await expect.poll(() => open(tipA()), { timeout: 3000 }).toBe(true);
+    if (native && supportsInterestFor) {
+      // The shipped rule: zero while a tooltip is showing.
+      expect(delayStart(triggerB())).toBe("0s");
+    }
+    await userEvent.hover(triggerB());
+    await expect.poll(() => open(tipB()), { timeout: 3000 }).toBe(true);
+    expect(record.withA).toBe(true);
+    expect(open(tipA())).toBe(false);
+
+    // Leave both; once both are closed, a hover waits the full delay again (no cooldown).
+    await userEvent.hover(screen.getByRole("button", { name: "Elsewhere" }));
+    await expect.poll(() => open(tipA()) || open(tipB()), { timeout: 3000 }).toBe(false);
+    if (native && supportsInterestFor) expect(delayStart(triggerB())).toBe("0.4s");
+    await userEvent.hover(triggerB());
+    await expect.poll(() => open(tipB()), { timeout: 3000 }).toBe(true);
+    // Timer clamping can fire a few ms early relative to `performance.now()`.
+    expect(record.openedB - record.enteredB).toBeGreaterThanOrEqual(395);
+  });
+});
