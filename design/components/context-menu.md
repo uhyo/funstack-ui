@@ -236,7 +236,7 @@ outside-release rule requires movement, 2.6). Where the platform fires its own `
 first (Android), the capture and the gesture are taken for the touch pointer the region was
 timing, even though that event's `buttons` is `0`. Real iOS and Android were not available to
 the research; **a human device pass is required before the touch gesture is called verified**
-(a repository issue filed by the product owner; the docs page says "verified under Chromium's
+(issue #90; the docs page says "verified under Chromium's
 touch emulation; iOS and Android pending" until it closes).
 
 Not done in v1 (recorded as follow-ups; the offset landed in wave 11, 4.7): offsetting the
@@ -1360,7 +1360,7 @@ Questions for the product owner (continuing the list; Part A's is question 1 of 
 #### Decisions recorded (product owner, 2026-10-23)
 
 All as recommended: (2) touch press-drag-release ships; the real-device check on iOS and
-Android is a human task filed as a repository issue by the product owner, and the docs say the
+Android is a human task, issue #90, and the docs say the
 gesture is verified under Chromium's touch emulation only until it closes; (3) the wheel guard
 applies to every menu; (4) no scroll lock, close-on-scroll for point opens only; (5)
 `nativeMenu` rejected; (6) `<CSPProvider nonce>` and `STYLE_SHA256` from `@funstack/ui/csp`.

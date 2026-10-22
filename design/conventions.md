@@ -2030,7 +2030,7 @@ may ship **functional at-rules** it needs and cannot express inline, under these
   opens at the point but never flips; the skip-delay `var()` falls back to the normal delay.
   Human items: FUNSTACK Static's SSR entry passes a string `nonce` (scripts only) and would
   need the object form for styles; React could emit the render nonce instead of dropping the
-  rules (`docs/research/interaction-wave11.md`, "Upstream issues").
+  rules (`docs/research/interaction-wave11.md`, "Upstream issues"; tracked with Firefox's `overscroll-behavior` gap as issue #91).
 - The CSS text lives in a directive-free module next to the placement helpers
   (`internal/anchor-position.ts`), as a string constant, and is covered by a jsdom row (one
   `<style>` in `document.head` after use, none without) and a browser row (the computed
@@ -2506,7 +2506,7 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     close-on-scroll, CSP) accepted 2026-10-23** (`tooltip.md` Part B, `context-menu.md` Part B,
     `menu.md` note; section 12), as recommended: global provider-less skip-delay with no
     opt-out and no cooldown; touch press-drag-release ships, with the iOS / Android device
-    check a human task (issue filed by the product owner); the wheel guard on every menu; no
+    check a human task (#90; upstream items #91); the wheel guard on every menu; no
     scroll lock, close-on-scroll for point opens only; `nativeMenu` rejected; `<CSPProvider
     nonce>` and `STYLE_SHA256` from `@funstack/ui/csp`. **User decision:** the skip-delay
     stylesheet's selector rule is allowed; shipped CSS is "placement and interaction timing,
