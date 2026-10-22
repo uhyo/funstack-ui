@@ -224,3 +224,5 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - User picked everything: Tooltip arrow (#20), skip-delay (#21), RTL popups (#53), context-menu follow-ups (filed as #88, checklist).
 - Research running in parallel: research-positioning (#20, #53, RTL point placement → docs/research/positioning-wave11.md), research-interaction (#21, #88 → docs/research/interaction-wave11.md).
 - Next: architect design(s) → PO acceptance → developer(s) in worktrees → review → fixes → alpha.9.
+- Research landed: cef96d3 (positioning), 94b5303 (interaction). Architect design-wave11 running Part A (positioning) then Part B (skip-delay + #88).
+- #89 filed (user asked): Firefox Mozilla 2019601 human task. Researcher had been denied filing it; surfaced to user first.
