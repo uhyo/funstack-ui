@@ -1,0 +1,13 @@
+Chromium 156.0.8078.4
+base     gap=0ms: B opened 402 ms after hover; A closed 153 ms after hover of B
+base     gap=300ms: B opened 402 ms after hover; A closed -155 ms after hover of B
+base     gap=800ms: B opened 403 ms after hover; A closed -655 ms after hover of B
+has      gap=0ms: B opened 3 ms after hover; A closed 3 ms after hover of B
+has      gap=300ms: B opened 403 ms after hover; A closed -158 ms after hover of B
+has      gap=800ms: B opened 403 ms after hover; A closed -656 ms after hover of B
+trig     gap=0ms: B opened 2 ms after hover; A closed 2 ms after hover of B
+trig     gap=300ms: B opened 402 ms after hover; A closed -155 ms after hover of B
+trig     gap=800ms: B opened 402 ms after hover; A closed -656 ms after hover of B
+cooldown gap=0ms: B opened 3 ms after hover; A closed 3 ms after hover of B
+cooldown gap=300ms: B opened 2 ms after hover; A closed -154 ms after hover of B
+cooldown gap=800ms: B opened 402 ms after hover; A closed -655 ms after hover of B

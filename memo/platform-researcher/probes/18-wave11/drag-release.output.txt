@@ -1,0 +1,79 @@
+== chromium 156.0.8078.4 capture=true
+  pointerover target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  pointermove target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  contextmenu buttons=2 pointerId=1
+  captured
+  pointerover target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  gotpointercapture target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  toggle open
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i2 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i2 i2hover=false
+  -- before release: i2 :hover=false
+  pointerup target=menu btn=2 buttons=0 fromPoint=i2 i2hover=false
+  mouseup target=menu btn=2 buttons=0 fromPoint=i2 i2hover=false
+  lostpointercapture target=menu btn=2 buttons=0 fromPoint=i2 i2hover=true
+  auxclick target=menu btn=2 buttons=0 fromPoint=i2 i2hover=true
+  pointerover target=i2 btn=2 buttons=0 fromPoint=i2 i2hover=true
+  open after release: true
+== chromium 156.0.8078.4 capture=false
+  pointerover target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  pointermove target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  contextmenu buttons=2 pointerId=1
+  pointerover target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  toggle open
+  pointermove target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointerover target=i2 btn=-1 buttons=2 fromPoint=i2 i2hover=true
+  pointermove target=i2 btn=-1 buttons=2 fromPoint=i2 i2hover=true
+  pointermove target=i2 btn=-1 buttons=2 fromPoint=i2 i2hover=true
+  -- before release: i2 :hover=true
+  pointerup target=i2 btn=2 buttons=0 fromPoint=i2 i2hover=true
+  mouseup target=i2 btn=2 buttons=0 fromPoint=i2 i2hover=true
+  auxclick target=BODY btn=2 buttons=0 fromPoint=i2 i2hover=true
+  open after release: true
+== firefox 157.0 capture=true
+  pointerover target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  pointermove target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  contextmenu buttons=2 pointerId=0
+  captured
+  pointerover target=menu btn=-1 buttons=2 fromPoint=menu i2hover=false
+  toggle open
+  gotpointercapture target=menu btn=-1 buttons=2 fromPoint=menu i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=menu i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i2 i2hover=false
+  pointermove target=menu btn=-1 buttons=2 fromPoint=i2 i2hover=false
+  -- before release: i2 :hover=false
+  pointerup target=menu btn=2 buttons=0 fromPoint=i2 i2hover=false
+  lostpointercapture target=menu btn=2 buttons=0 fromPoint=i2 i2hover=false
+  pointerover target=i2 btn=-1 buttons=1 fromPoint=i2 i2hover=true
+  mouseup target=menu btn=2 buttons=0 fromPoint=i2 i2hover=true
+  auxclick target=menu btn=2 buttons=0 fromPoint=i2 i2hover=true
+  open after release: true
+== firefox 157.0 capture=false
+  pointerover target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  pointermove target=region btn=-1 buttons=0 fromPoint=region i2hover=false
+  contextmenu buttons=2 pointerId=0
+  pointerover target=menu btn=-1 buttons=2 fromPoint=menu i2hover=false
+  toggle open
+  pointermove target=menu btn=-1 buttons=2 fromPoint=menu i2hover=false
+  pointerover target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointermove target=i1 btn=-1 buttons=2 fromPoint=i1 i2hover=false
+  pointerover target=i2 btn=-1 buttons=2 fromPoint=i2 i2hover=true
+  pointermove target=i2 btn=-1 buttons=2 fromPoint=i2 i2hover=true
+  pointermove target=i2 btn=-1 buttons=2 fromPoint=i2 i2hover=true
+  -- before release: i2 :hover=true
+  pointerup target=i2 btn=2 buttons=0 fromPoint=i2 i2hover=true
+  mouseup target=i2 btn=2 buttons=0 fromPoint=i2 i2hover=true
+  auxclick target=BODY btn=2 buttons=0 fromPoint=i2 i2hover=true
+  open after release: true

@@ -1,0 +1,21 @@
+== Chromium 156.0.8078.4 touch, block=false
+  pointerdown region from=region t=36
+  captured
+  toggle open
+  pointermove menu from=region t=847
+  pointermove menu from=i1 t=880
+  pointercancel menu from=BODY t=1012
+  lostpointercapture menu from=BODY t=1012
+  touchend region t=1177
+  open after lift: true, scrollY=0
+== Chromium 156.0.8078.4 touch, block=true
+  pointerdown region from=region t=30
+  captured
+  toggle open
+  pointermove menu from=region t=850
+  pointermove menu from=i1 t=895
+  pointermove menu from=i2 t=1329
+  pointerup menu from=i2 t=1496
+  lostpointercapture menu from=i2 t=1496
+  touchend region t=1496
+  open after lift: true, scrollY=0
