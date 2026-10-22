@@ -28,6 +28,11 @@
   }
 }
 
+/* A warm open (another tooltip was showing, skip-delay): no entry animation. */
+.demo-tip[data-instant] {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .demo-tip {
     transition: none;

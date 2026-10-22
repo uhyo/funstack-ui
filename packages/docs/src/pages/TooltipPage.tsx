@@ -256,6 +256,9 @@ export function TooltipPage() {
   translate: 0 0;
   @starting-style { opacity: 0; translate: 0 4px; }
 }
+.tip[data-instant] {
+  transition: none; /* a warm open (another tooltip was showing): no entry animation */
+}
 @media (prefers-reduced-motion: reduce) {
   .tip { transition: none; }
 }`}</CodeBlock>
@@ -278,6 +281,11 @@ export function TooltipPage() {
             "`data-align`",
             "Popup, Arrow",
             "While shown: the resolved alignment. Otherwise the requested one. Absent with `side={null}`.",
+          ],
+          [
+            "`data-instant`",
+            "Popup",
+            "While shown by an open that began while another tooltip was showing (a skip-delay open; see Skip-delay). Written by the library from the popup's `beforetoggle`, before the open's first frame; removed when it closes. No `state` counterpart.",
           ],
           ["`data-disabled`", "Trigger, Popup", "The Root's `disabled` prop."],
           [
@@ -390,10 +398,19 @@ export function TooltipPage() {
           tooltip opens after its own <code>delay</code>, and only skip-delay is lost.
         </li>
         <li>
-          A tooltip that opens at once still runs its entry animation. CSS cannot tell such an open
-          from a cold one: by the time the new tooltip is <code>:popover-open</code>, the previous
-          one is already hidden, and a <code>:has(:popover-open)</code> condition matches the
-          tooltip that is opening, so it would remove the animation from every open.
+          <strong>Skip the entry animation of an open like that</strong> with{" "}
+          <code>data-instant</code>: the Popup carries it while it is shown by an open that began
+          while another <code>[role="tooltip"]:popover-open</code> existed, so{" "}
+          <code>.tip[data-instant] {"{ transition: none; }"}</code> (or <code>animation: none</code>{" "}
+          for a keyframe entry) makes browsing a toolbar instant while the first tooltip still fades
+          in. The library writes it from the popup's <code>beforetoggle</code> event, on both paths,
+          before the open's first frame, so no transition starts; it is removed when the tooltip
+          closes, so every exit animates as usual. It is a DOM attribute only (no <code>state</code>{" "}
+          field), and like the skip itself it counts any <code>role="tooltip"</code> popover. Before
+          hydration, on the native path, a warm open still opens at once but has no{" "}
+          <code>data-instant</code>, so its animation plays. CSS alone cannot express it: by the
+          time the new tooltip is <code>:popover-open</code> the previous one is already hidden, and
+          a <code>:has(:popover-open)</code> condition matches the opening tooltip itself.
         </li>
       </ul>
       <CodeBlock language="css">{`/* The library's rule (rendered by a Trigger with experimental_interestFor): */
