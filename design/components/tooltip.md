@@ -512,9 +512,12 @@ reads them in `Root`'s effect.
     DOM fact (`:popover-open`), so it is read from the DOM (conventions 3.5, "read the DOM when
     it needs the value"); it counts any popover tooltip on the page, FUNSTACK's or not, which
     is what a user moving along a toolbar expects.
-  - **JS path.** At `pointerenter` / `:focus-visible` focus: `const other =
-    doc.querySelector('[role="tooltip"]:popover-open')`; if `other !== null && other !==
-    popup`, `other.hidePopover()` (its own Root sees the `toggle` and detaches its listeners; a
+  - **JS path.** At `pointerenter` / `:focus-visible` focus: find the open tooltip
+    (`otherOpenTooltip(doc, popup)`: iterate `[role="tooltip"][popover]` and ask each
+    `matches(":popover-open")`, rather than one
+    `querySelector('[role="tooltip"]:popover-open')`: the same result in browsers, and jsdom's
+    shim answers `matches` only; deviation B6); if found and not this popup, `clear()`,
+    `other.hidePopover()` (its own Root sees the `toggle` and detaches its listeners; a
     pending close timer of that Root finds it closed and does nothing) and `show()` now, no
     timer. Otherwise the ordinary `delay` timer. The check is stateless: no module-level
     timestamp, nothing to share.

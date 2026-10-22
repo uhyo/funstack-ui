@@ -208,8 +208,10 @@ commit lands at an unpredictable time relative to the `pointerup`). The call is 
 `try` / `catch` (`NotFoundError` for a pointer the engine no longer tracks). The popup element
 exists while closed (Menu.Popup unmounts its children, not itself); a Root without a mounted
 Popup captures nothing and opens nothing. Since wave 11 the capture is also what makes
-**press-drag-release** possible: whenever it was taken, the region starts the gesture of 2.6 on
-the same pointer (`startDrag(popup, pointerId, point, timeStamp, slop)`).
+**press-drag-release** possible: whenever it was **actually taken** (`capturePointer` returns
+whether `setPointerCapture` succeeded; a synthetic pointer throws, and a gesture started on
+one could double-activate an item at a later real release, deviation B3), the region starts
+the gesture of 2.6 on the same pointer (`startDrag(popup, pointerId, point, timeStamp, slop)`).
 
 ### 2.2 Long-press (touch and pen)
 
@@ -228,9 +230,15 @@ whichever comes first opens once and cancels the other.
 
 On expiry the region also starts the drag gesture of 2.6 for that pointer, with the long-press
 slop (10 px) and, for a `touch` pointer, a non-passive document `touchmove` listener that
-`preventDefault()`s until that pointer's `pointerup` / `pointercancel`, so the browser does not
-take the drag as a pan (probe `touch-drag.mjs`: without it the stream ends in `pointercancel`
-after two moves). The region stays scrollable before the open. A lift without a drag never
+`preventDefault()`s so the browser does not take the drag as a pan (probe `touch-drag.mjs`:
+without it the stream ends in `pointercancel` after two moves). The guard **also cancels the
+lift's `touchend`** and ends at `touchend` / `touchcancel` / `pointercancel`, or 250 ms after
+the `pointerup` when no touch event follows (deviation B1): with the menu above the finger
+(4.7), the tap the engine synthesises from the lift lands beside the popover and
+light-dismisses it (Chromium touch emulation: `pointerup` captured by the popup, `touchend`,
+then `beforetoggle(closed)` before any `click`); before wave 11 that click landed on the menu
+under the finger. Cancelling `touchend` suppresses the synthesised click, which is what the
+one-shot swallow of this section existed for on the mouse path. The region stays scrollable before the open. A lift without a drag never
 closes the menu (the menu sits above the finger, 4.7, so the lift lands outside it; the
 outside-release rule requires movement, 2.6). Where the platform fires its own `contextmenu`
 first (Android), the capture and the gesture are taken for the touch pointer the region was
@@ -308,7 +316,7 @@ gesture is a hit-test loop on the captured pointer:
 | Event on the popup (captured pointer only, `pointerId` matched) | Behaviour |
 | --- | --- |
 | `pointermove` | `elementFromPoint(clientX, clientY)` → `closest('[role^="menuitem"]')` inside the **root popup's tree** (submenus are descendants). An enabled or disabled item: focus it through the same quiet routine the item's own `pointermove` uses (Menu 6.2, `focus({ focusVisible: false })`), so keyboard and pointer still agree on the current item. A `SubmenuTrigger`: focus it and start its hover-open timer (Menu 7) as a real `pointerenter` would; leaving it starts the close timer. Nothing under the pointer (outside every popup, padding, a separator): nothing. |
-| `pointerup` (any button) over an **enabled, non-submenu item**, pointer moved more than the slop from the open point | **activate**: `item.click()` (Menu 5.3: one activation path, so `action`, `closeOnActivate`, checkbox and radio toggling are unchanged), then arm the one-shot click swallow of 2.2 for the `click` an engine may synthesise from this release (macOS Ctrl+click opens with the primary button held). |
+| `pointerup` (any button) over an **enabled, non-submenu item**, pointer moved more than the slop from the open point | **activate**: `item.click()` (Menu 5.3: one activation path, so `action`, `closeOnActivate`, checkbox and radio toggling are unchanged); a long-press swallow armed by this gesture (2.2, a document capture `click` listener that would eat the library's own `item.click()`) is **disarmed around the call and re-armed afterwards** (deviation B2), and the swallow then covers the `click` an engine may synthesise from this release (macOS Ctrl+click opens with the primary button held). |
 | `pointerup` **outside every popup of the tree**, pointer moved more than the slop, and at least **500 ms** since the open | **dismiss**: `rootPopup.hidePopover()` now (the Tab / outside-right-click shape, section 5), notified `"dismiss"`. |
 | any other `pointerup` (stationary or within the slop; a quick release outside; over a disabled item, a separator, padding, a `SubmenuTrigger`) | nothing: the menu stays open and the ordinary click model takes over. |
 | `lostpointercapture`, `pointercancel`, the menu closing | the gesture ends; listeners removed. |
@@ -442,7 +450,7 @@ Rendering per placement (the apply effect, the focus resolver and everything els
 | --- | --- | --- | --- | --- |
 | `anchor`, `side` set | `position-area`, `position-try-fallbacks` from `side` / `align` (Menu 3.3) | `data-side`, `data-align` | the Trigger (`triggerRef`), or none | no |
 | `point`, `side` set | `--menu-point-x`, `--menu-point-y`, `--menu-point-gap` (`0px`; `16px` for a touch or pen open, 4.7), the four inset longhands (longhands rather than `inset: auto` + two, which is equivalent and avoids React's warning about a shorthand and its longhands changing together, deviation 3) and `position-area: none`. Mouse / keyboard, LTR: `top: calc(var(--menu-point-y) + var(--menu-point-gap))`, `left: var(--menu-point-x)`, `right: auto`, `bottom: auto`; RTL (`placement.direction === "rtl"`, wave 11): `right: calc(100% - var(--menu-point-x))`, `left: auto`. Touch / pen (`placement.offset`, wave 11): `bottom: calc(100% - var(--menu-point-y) + var(--menu-point-gap))`, `top: auto`, the same inline inset by direction. `position-try-fallbacks`: mouse LTR `--fsui-menu-up, --fsui-menu-left, --fsui-menu-up-left`; mouse RTL `--fsui-menu-up, --fsui-menu-right, --fsui-menu-up-right`; touch LTR `--fsui-menu-left, --fsui-menu-down, --fsui-menu-down-left`; touch RTL `--fsui-menu-right, --fsui-menu-down, --fsui-menu-down-right` (odd generations with the first two swapped, 4.3) | `data-context` | the region | yes (4.2) |
-| `point`, `side={null}` | `--menu-point-x`, `--menu-point-y` only | `data-context` | the region | no |
+| `point`, `side={null}` | `--menu-point-x`, `--menu-point-y` and `--menu-point-gap` only (the gap is handed over too, so a stylesheet-owned touch placement can use it; deviation B5) | `data-context` | the region | no |
 | `anchor`, `side={null}` | none | none | the Trigger, or none | no |
 
 `position-area: none` is restated for the point path because a consumer stylesheet may set
@@ -688,9 +696,11 @@ honoured by Chromium 156 only; `docs/research/interaction-wave11.md` 2.3). Three
   With it in place the close-on-scroll listener simply never fires.
 - **Wheel over the menu never scrolls the page.** Every root `Menu.Popup` (point- or
   Trigger-opened) installs, while shown, a **non-passive `wheel` listener on the popup element**
-  that `preventDefault()`s unless the innermost `[role="menu"]` under the event can scroll in
-  the wheel's direction (`scrollHeight > clientHeight` and not at the end for the sign of
-  `deltaY`; likewise for `deltaX`). Scoped to the popup, so it costs nothing elsewhere; a small
+  that `preventDefault()`s unless **some element from the event's target up to the popup** can
+  scroll in the wheel's direction on its **dominant axis** (`overflow: auto` / `scroll`, and
+  room: `scrollHeight > clientHeight` and not at the end for the sign of `deltaY`; likewise
+  for `deltaX`; deviation B4: the ancestor walk rather than the innermost `[role="menu"]`
+  alone, so a consumer scroller inside a menu keeps working). Scoped to the popup, so it costs nothing elsewhere; a small
   behaviour change for Trigger-opened menus too, like the outside right-click close (section 5),
   because native menus never scroll the page from inside the menu.
 
@@ -1007,7 +1017,14 @@ when the method is missing, and a shim stub broke four of their rows). `contextm
 dispatched as a `PointerEvent` (`new PointerEvent("contextmenu", { bubbles: true, cancelable:
 true, clientX, clientY, button: 2, buttons: 2, pointerId })`; jsdom 30's `PointerEvent` has
 `pointerId` / `pointerType`, so nothing is filled). Fake timers for the long-press. jsdom has no
-`isContentEditable`; the editable check falls back to `[contenteditable]` there.
+`isContentEditable`; the editable check falls back to `[contenteditable]` there. Rows that
+**count hoisted `<style>` elements** render into a fresh
+`document.implementation.createHTMLDocument()` (deviation B8: React keeps one hoisted style per
+document and never re-inserts one a test removed by hand; such a document has no window, so
+assert with `getAttribute`, not jest-dom or role queries). The **SSR nonce rows** live in
+`csp/csp.test.tsx`, not next to the client rows (deviation B9: a `renderToReadableStream` in a
+file that later renders on the client logs React's "multiple renderers concurrently rendering
+the same context provider").
 
 | Row | Tests |
 | --- | --- |
@@ -1049,7 +1066,7 @@ assert the documented degraded behaviour rather than skipping.
 | Row | Assertion | Engine branches |
 | --- | --- | --- |
 | Open at the pointer | Right-click at (x, y) inside a region in the middle of the viewport: `:popover-open`, `getBoundingClientRect()` left / top equal (x, y) (±1 px), the first item is `document.activeElement` and does not match `:focus-visible`. | none |
-| Survives the pending `pointerup` | `mouse.move`, `mouse.down({ button: "right" })` (Linux CI: `contextmenu` fires here), the menu opens; `mouse.move` 60 px away; `mouse.up()`: the menu is still open. | none: all three must pass; this row is what the pointer capture buys in Firefox and WebKit. A second variant opens the menu near the bottom-right so that it flips away from the pointer, then releases in place. A third (review L4, follow-up) is the move with the button still held: press at a new point while open, move away, release, still open (the re-capture of deviation 9). The right-click goes through the `mouse` browser command (`page.mouse` with frame-mapped points, `__tests__/browser-commands.ts`), not `userEvent`, because the rows need the press and the release apart; a bounded `mouse("up")` in `afterEach` releases a button a failed row left down (Firefox shares one mouse across files, #62). With `capturePointer` made a no-op, both variants fail in Firefox: the rows test the workaround, not timing (reviewer probe). |
+| Survives the pending `pointerup` | `mouse.move`, `mouse.down({ button: "right" })` (Linux CI: `contextmenu` fires here), the menu opens; `mouse.move` 2 px (within the slop, so the release is neither an activation nor a dismissal under 2.6; it was 60 px before wave 11); `mouse.up()`: the menu is still open. | none: all three must pass; this row is what the pointer capture buys in Firefox and WebKit. A second variant opens the menu near the bottom-right so that it flips away from the pointer, then releases in place. A third (review L4) is the move with the button still held: press at a new point while open, move within the slop, release, still open (the re-capture of deviation 9); the timing-dependent half of L4 is in the press-drag-release row below (deviation B7). The right-click goes through the `mouse` browser command (`page.mouse` with frame-mapped points, `__tests__/browser-commands.ts`), not `userEvent`, because the rows need the press and the release apart; a bounded `mouse("up")` in `afterEach` releases a button a failed row left down (Firefox shares one mouse across files, #62). With `capturePointer` made a no-op, both variants fail in Firefox: the rows test the workaround, not timing (reviewer probe). |
 | Flips | Right-click at (viewport.width − 20, 100): the popup's right edge is at x; at (100, viewport.height − 20): its bottom edge at y; at the corner: both. | none |
 | Transformed ancestor | The region inside `transform: translate(50px, 30px)`: the popup's top-left equals the click point (the top layer ignores the transform). | none (this row is why S4 was chosen over the virtual anchor) |
 | Re-open at a new point | Open at the corner (flipped), then right-click at (300, 250): the popup's top-left is (300, 250), not the stale flipped position. | none |
@@ -1066,7 +1083,7 @@ assert the documented degraded behaviour rather than skipping.
 | ViewTransition | With `transition`: a context open calls `startViewTransition` once; a move zero times; an outside right-click close **once** (deviation 8: as Escape in `menu.browser.test.tsx`, the dismissal's notification commit runs a view transition with the popup already hidden; the first draft said zero); item activation once. Without `transition`: zero. | assert on all three |
 | `<style>` once | Two Roots opened from their regions: one `<style>` in `<head>`; the computed `position-try-fallbacks` of the popup names the library options. | none |
 | Exit animation | After the outside right-click close with the docs CSS and no `transition`: items held until `getAnimations()` settle. | Firefox: no CSS exit, unmount with the commit (as Menu). |
-| Press-drag-release (wave 11; review L4) | Linux CI (`contextmenu` on `mouse.down`): `mouse.down({ button: "right" })` at a point in the middle, the menu opens; `mouse.move` onto the second item (more than 4 px): the item is `document.activeElement` without `:focus-visible`; `mouse.up()`: the item's action was called and the menu is closed. Variant: down, `mouse.up()` without moving: still open, the first item focused, a later left click on an item activates it. Variant (L4): open, then `mouse.down` right at a new point inside the region (a move), `mouse.move` 60 px away outside the menu, `mouse.up()` **within 500 ms**: still open (the re-capture of deviation 9 held and the quick release is not a dismissal); the same release after 600 ms with the pointer outside: closed, `"dismiss"`. Variant: open near the right edge so the menu flips away from the pointer, hold still 600 ms, release: still open (movement required). | none; all three engines. A bounded `mouse("up")` in `afterEach` (Firefox shares one mouse, #62). The touch half runs under Chromium's CDP touch emulation as the long-press row does (open if a `pointerdown` was produced, then a `touchmove` stream over an item and a `touchend`: activated), asserting "no `pointerdown` seen" otherwise; real devices are a human task. |
+| Press-drag-release (wave 11; review L4) | Linux CI (`contextmenu` on `mouse.down`): `mouse.down({ button: "right" })` at a point in the middle, the menu opens; `mouse.move` onto the second item (more than 4 px): the item is `document.activeElement` without `:focus-visible`; `mouse.up()`: the item's action was called and the menu is closed. Variant: down, `mouse.up()` without moving: still open, the first item focused, a later left click on an item activates it. Variant (L4): open, then `mouse.down` right at a new point inside the region **off the menu** (a press on the menu's top-left pixel targets the popup and is no move; a move), `mouse.move` away outside the menu, `mouse.up()`: the 500 ms rule is asserted **against the events' own timestamps**, not the wall clock (deviation B7, load-robust): a release the timestamps show under 500 ms after the open leaves the menu open, else it is closed with `"dismiss"` and the row warns that the quick branch was not exercised; the second half sleeps 600 ms, asserts `elapsed >= 500` from the timestamps and expects `"dismiss"`. Variant: open near the right edge so the menu flips away from the pointer, hold still 600 ms, release: still open (movement required). | none; all three engines. A bounded `mouse("up")` in `afterEach` (Firefox shares one mouse, #62). The touch half runs under Chromium's CDP touch emulation as the long-press row does (open if a `pointerdown` was produced, then a `touchmove` stream over an item and a `touchend`: activated), asserting "no `pointerdown` seen" otherwise; real devices are a human task. |
 | Touch offset (wave 11) | Chromium CDP touch (as above): the menu's **bottom** edge is 16 px above the touch point and its left edge at x; near the top of the viewport it opens below with the gap. Synthetic fallback in every engine: dispatch `pointerdown` with `pointerType: "touch"` and wait 600 ms: the same geometry assertions (the inline style is what positions, the pointer type is read from the event). | none |
 | Close-on-scroll (wave 11) | Open at a point in a scrollable page; `mouse.wheel` over the page outside the menu: the page scrolled and the menu closed with `"dismiss"`. Open from the `Menu.Trigger`, wheel over the page: still open and still on its Trigger. Open at a point, `mouse.wheel` **over the menu** (non-overflowing): the page did not scroll (`scrollY` unchanged) and the menu is open; with a tall menu (`max-height` + `overflow: auto` in the test CSS), the wheel scrolls the menu and the page stays. | none |
 | RTL point placement (wave 11) | Under `document.documentElement.dir = "rtl"`: right-click at (x, y) in the middle: the popup's **right** edge is at x (±1 px) and its top at y; at (20, y): its left edge is at 20 (flipped rightward, `--fsui-menu-right`); at (20, viewport.height − 20): left edge 20 and bottom edge at y (`--fsui-menu-up-right`); a move to the middle lands right-edge-at-point again (the remembered flip was cleared). The same with `dir="rtl"` on a wrapper around the region and Popup in an LTR document, and once more with an LTR region whose Popup is rendered under an RTL wrapper (the popup's direction wins). | none: the point path uses insets, which Mozilla 2019601 does not affect (verified), so the container case has no Firefox branch. |
@@ -1366,3 +1383,19 @@ applies to every menu; (4) no scroll lock, close-on-scroll for point opens only;
 `nativeMenu` rejected; (6) `<CSPProvider nonce>` and `STYLE_SHA256` from `@funstack/ui/csp`.
 The skip-delay stylesheet that motivates the provider is allowed by the user (Tooltip's Part B,
 conventions 12).
+
+#### Implementation deviations folded (Part B, e357d85..1da713c, 2026-10-23)
+
+From `memo/developer/interaction-wave11.md`; each is edited into the section named. The Part B
+review (`memo/reviewer/wave11-interaction.md`) may add to this list.
+
+| # | Finding | Where |
+| --- | --- | --- |
+| B1 | The touch guard also cancels the lift's `touchend` (the synthesised tap beside the offset menu light-dismissed it in Chromium), and ends at `touchend` / `touchcancel` / `pointercancel` or 250 ms after `pointerup`. | 2.2 |
+| B2 | A drag activation disarms the long-press click swallow around its `item.click()` and re-arms it afterwards. | 2.6 |
+| B3 | The gesture starts only when `setPointerCapture` succeeded (`capturePointer` returns a boolean). | 2.1, 14 |
+| B4 | The wheel guard walks from the target up to the popup and lets the wheel through if any of them can scroll that way, on the dominant axis only. | 4.8 |
+| B5 | `--menu-point-gap` is emitted with `side={null}` too. | 3.3 |
+| B6 | Tooltip's JS skip-delay iterates `[role="tooltip"][popover]` with `matches(":popover-open")` (jsdom's shim answers `matches` only). | tooltip.md 6 |
+| B7 | Press-drag browser rows reshaped for load-robustness: 2 px moves within the slop; the L4 row asserts the 500 ms rule against event timestamps, and the second press must be off the menu. | 13.2 |
+| B8, B9 | Style-counting rows render into a fresh document; the SSR nonce rows live in `csp/csp.test.tsx`. | 13.1 |
