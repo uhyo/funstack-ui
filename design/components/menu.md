@@ -1265,3 +1265,14 @@ Questions for the product owner: Tooltip's amendment questions 3 to 5 apply. Men
 1. **Submenu default `side="inline-end"`.** The alternative is to keep `"right"` and leave RTL
    consumers to pass `side="left"` by hand (which they cannot do per direction without JS).
    Recommendation: `inline-end`.
+
+### Part B note: the wheel guard (wave 11, #88)
+
+Every root `Menu.Popup`, Trigger-opened included, installs a non-passive `wheel` listener on
+its element while shown that `preventDefault()`s unless the menu under the pointer can scroll in
+the wheel's direction, so a wheel over a menu never scrolls the page under it (native menus
+consume wheel events; a non-overflowing popup chains to the page in both engines today). A
+small behaviour change for Menu, as the outside right-click close was; specified in
+`design/components/context-menu.md` 4.8 and its Part B amendment (product-owner question 3
+there). Close-on-scroll applies to point-placed menus only; a Trigger-opened menu keeps
+following its Trigger.

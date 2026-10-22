@@ -90,3 +90,36 @@ Not a spec; the design docs are.
   Chromium-only exact signal exists (`transitionrun` from an anchored query) and is not built.
 - Part B (#21 skip-delay, #88 rest) goes into the same amendment sections once
   `docs/research/interaction-wave11.md` is read.
+
+## Part B (interaction: #21 skip-delay, #88 rest), 2026-10-23
+
+Research: `docs/research/interaction-wave11.md`. Decisions I went back and forth on:
+
+- **Skip-delay without a provider.** React Aria's module-level globals would also work but
+  fail across two library copies; the DOM query (`[role="tooltip"]:popover-open`) is stateless
+  and is what the native-path CSS checks too, so both paths agree by construction.
+- **The selector in the shipped stylesheet.** Conventions 12 (a user decision) allows only
+  selector-less at-rules. The native path needs a selector because an inline delay cannot see
+  another element. Kept the rule minimal (library marker attribute, one `--fsui-` property) and
+  escalated as a user question rather than hiding it under "positioning".
+- **Cooldown.** Radix's 300 ms needs a `:root` transition that fights the app's `<html>`
+  transition; the plain window (while the previous tooltip shows, 150 ms close delay included)
+  covers adjacent controls. Omitted.
+- **Dismissal needs movement, not only time.** GTK closes on any release after 500 ms; that
+  would close a touch menu on every plain lift (menu above the finger) and a flipped mouse menu
+  on a stationary hold. Required movement for both activation and dismissal; time only for
+  dismissal.
+- **Touch drag ships unverified.** Considered holding it; the failure modes are bounded and a
+  plain lift cannot close. Escalated with the device pass as a human task.
+- **Touch offset as `--menu-point-gap` inline** with the gap folded into every option, so the
+  mouse case computes exactly as before and the consumer knob is a custom property.
+- **Eight options, four fallback lists.** Direction × pointer kind, each with two parity
+  spellings. Considered one list naming all options; rejected because option order decides the
+  flip preference (up before left for mouse, across before down for touch).
+- **Wheel guard for every menu** (scoped to the popup element, cheap), close-on-scroll for point
+  opens only (anchored menus follow their trigger).
+- **CSP.** Hashes exported as a constant with a test that recomputes them (no build step in the
+  package); the provider named `CSPProvider` after Base UI, under `@funstack/ui/csp` because it
+  is not a part. Per-part `nonce` props rejected once two parts render styles.
+- **`nativeMenu` predicate: out.** Not serialisable; `stopPropagation()` is the escape hatch.
+- **L1** was already fixed in c6cb71f; folded. **L4** written against the new gesture rules.
