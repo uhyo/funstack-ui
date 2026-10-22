@@ -233,3 +233,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Wave 11 code complete on master: Part A d3d0359..faa3dbb + fixes 0cb9d23..d0a48a3; Part B e357d85..1da713c + fixes a02e316..aaa49e2. Reviews: memo/reviewer/wave11-positioning.md, wave11-interaction.md.
 - Filed #92 (Chromium top-layer re-choose on scroll; Popover row unexplained), #93 (tooltip warm-open state). Added pen to #90.
 - USAGE LIMIT hit 2026-10-23. Left: master CI for aaa49e2 (was in progress); architect design-wave11 final alignment (L4/L6/M3 → #93); then release 0.1.0-alpha.9 and close #20 #21 #53 #88.
+
+## 2026-10-23 — wave 11 done, 0.1.0-alpha.9 released
+- Release dceec9a; publish + deploy-docs succeeded. Closed #20 #21 #53 #88. Architect final alignment 4499ff4.
+- Open follow-ups: #89 #91 #92 (upstream human tasks), #90 (device check incl. pen), #93 (tooltip warm-open state), #19 zero-JS, #73 human checks.
+- User: OK to file issues in other FUNSTACK repos ourselves.
