@@ -196,3 +196,15 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #82 NumberField touch-hold flake fixed (05aeb98). It had turned master red once.
 - Follow-ups filed: #81 (pure triggers' re-entry guard), #83 (link-render disabled on the other parts).
 - Release 0.1.0-alpha.6 (be703ce).
+
+## 2026-10-22 — wave 9 done, 0.1.0-alpha.7 released
+- #81: every pure trigger is guarded (the hook default flipped; Slider and NumberField opt out). Commit 27e64f4.
+- #83: link and component renders use aria-disabled. Commit f827869.
+- Review a29e3ad, then fixes 5fc05d5:
+  - must-fix: disabled component renders kept command/commandfor, so they acted before hydration;
+  - menu docs corrected;
+  - W8: data-disabled in every mode.
+- Design folds 2240658, 091d100, 4b3c427.
+- PO decision: a disabled link ToggleGroup.Item stays arrow-reachable (APG toolbar); the user was told the one-line alternative.
+- Release 0.1.0-alpha.7 (f714102); #81 flagged as breaking.
+- Candidates next: #45 context menu, #20/#21 Tooltip arrow and skip-delay, #53 RTL, #19 zero-JS variants.
