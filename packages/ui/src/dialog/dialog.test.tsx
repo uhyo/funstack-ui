@@ -28,7 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand, isModal } from "../__tests__/dialog-shim.js";
@@ -2809,6 +2809,158 @@ describe("Dialog", () => {
       await act(async () => popup().close());
       await flush();
       expect(trigger()).toHaveFocus();
+    });
+  });
+
+  describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
+    function MyButton(props: ComponentPropsWithRef<"button">) {
+      return <button {...props} />;
+    }
+    const renders = [
+      ["a link", <a key="link" href="#x" />],
+      ["a component", <MyButton key="component" />],
+    ] as const;
+
+    /** Dispatches a cancelable click and reports whether it was cancelled. */
+    const cancelled = (el: Element) => !fireEvent.click(el);
+
+    function expectAriaDisabled(el: Element) {
+      expect(el).toHaveAttribute("aria-disabled", "true");
+      expect(el).not.toHaveAttribute("disabled");
+      expect(el).toHaveAttribute("data-disabled", "");
+    }
+
+    describe.each(renders)("Close, %s render", (_, element) => {
+      it("library mode: aria-disabled, the click is cancelled, nothing closes", async () => {
+        const action = vi.fn<ActionFn>();
+        const closeAction = vi.fn();
+        render(
+          <Harness
+            mode="uncontrolled"
+            initialOpen
+            action={action}
+            content={
+              <Dialog.Close data-testid="close" disabled action={closeAction} render={element}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await flush();
+        const close = spyClose();
+        expectAriaDisabled(screen.getByTestId("close"));
+        expect(cancelled(screen.getByTestId("close"))).toBe(true);
+        await flush();
+        expect(closeAction).not.toHaveBeenCalled();
+        expect(action).not.toHaveBeenCalled();
+        expect(close).not.toHaveBeenCalled();
+      });
+
+      it("JS-free mode with action: aria-disabled, the click is cancelled, nothing closes", async () => {
+        const closeAction = vi.fn();
+        render(
+          <Harness
+            mode="static"
+            content={
+              <Dialog.Close data-testid="close" disabled action={closeAction} render={element}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await act(async () => popup().showModal());
+        const close = spyClose();
+        expect(screen.getByTestId("close")).toHaveAttribute("aria-disabled", "true");
+        expect(screen.getByTestId("close")).not.toHaveAttribute("disabled");
+        expect(cancelled(screen.getByTestId("close"))).toBe(true);
+        await flush();
+        expect(closeAction).not.toHaveBeenCalled();
+        expect(close).not.toHaveBeenCalled();
+        expect(popup().open).toBe(true);
+      });
+    });
+
+    it("Close, a host <button> render and no render: native disabled, no aria-disabled", async () => {
+      render(
+        <Harness
+          mode="uncontrolled"
+          initialOpen
+          content={
+            <>
+              <Dialog.Close data-testid="a" disabled render={<button type="button" />} />
+              <Dialog.Close data-testid="b" disabled />
+            </>
+          }
+        />,
+      );
+      await flush();
+      for (const id of ["a", "b"]) {
+        expect(screen.getByTestId(id)).toBeDisabled();
+        expect(screen.getByTestId(id)).not.toHaveAttribute("aria-disabled");
+      }
+    });
+
+    it("Close, JS-free mode without action, a component render: native disabled (the command)", () => {
+      render(
+        <Harness
+          mode="static"
+          content={<Dialog.Close data-testid="close" disabled render={<MyButton />} />}
+        />,
+      );
+      expect(screen.getByTestId("close")).toBeDisabled();
+      expect(screen.getByTestId("close")).not.toHaveAttribute("aria-disabled");
+    });
+
+    describe.each(renders)("Trigger, %s render", (_, element) => {
+      it.each([true, false])(
+        "library mode (modal=%s): aria-disabled, cancelled, nothing opens",
+        async (modal) => {
+          const action = vi.fn<ActionFn>();
+          const showModal = spyShowModal();
+          render(
+            <Harness
+              mode="uncontrolled"
+              modal={modal}
+              action={action}
+              trigger={{ disabled: true, render: element }}
+            />,
+          );
+          expectAriaDisabled(trigger());
+          expect(cancelled(trigger())).toBe(true);
+          await flush();
+          expect(action).not.toHaveBeenCalled();
+          expect(showModal).not.toHaveBeenCalled();
+          expect(popup().open).toBe(false);
+        },
+      );
+
+      it("JS-free non-modal: aria-disabled, cancelled, nothing opens", async () => {
+        render(
+          <Harness mode="static" modal={false} trigger={{ disabled: true, render: element }} />,
+        );
+        expect(trigger()).toHaveAttribute("aria-disabled", "true");
+        expect(trigger()).not.toHaveAttribute("disabled");
+        expect(cancelled(trigger())).toBe(true);
+        await flush();
+        expect(popup().open).toBe(false);
+      });
+    });
+
+    it("Trigger, JS-free modal with a component render: native disabled (the command)", () => {
+      render(<Harness mode="static" trigger={{ disabled: true, render: <MyButton /> }} />);
+      expect(trigger()).toBeDisabled();
+      expect(trigger()).not.toHaveAttribute("aria-disabled");
+    });
+
+    it("Trigger, a host <button> render in library mode: native disabled, no aria-disabled", () => {
+      render(
+        <Harness
+          mode="uncontrolled"
+          trigger={{ disabled: true, render: <button type="button" /> }}
+        />,
+      );
+      expect(trigger()).toBeDisabled();
+      expect(trigger()).not.toHaveAttribute("aria-disabled");
     });
   });
 

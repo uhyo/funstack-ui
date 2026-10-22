@@ -10,7 +10,7 @@ import type {
 import { dataAttr } from "../internal/data-attr.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import { useToggleGroupContext } from "./toggle-group-context.js";
 import type { ToggleGroupOrientation } from "./toggle-group-context.js";
 
@@ -30,7 +30,11 @@ export interface ToggleGroupItemProps extends Omit<
 > {
   /** The value this Item presses. Unique within the group. */
   value: string;
-  /** Renders a native disabled button; never dispatches; skipped by arrow keys. */
+  /**
+   * Never dispatches. Native `disabled` on a `<button>` (skipped by the arrow keys); with a link
+   * or component `render`, `aria-disabled="true"` instead: the element stays focusable and the
+   * arrow keys reach it (the APG Toolbar behaviour).
+   */
   disabled?: boolean;
   /**
    * Forwarded as `default` to the Item's `<ViewTransition>`. As on Toggle: animates the commit
@@ -53,7 +57,7 @@ export interface ToggleGroupItemProps extends Omit<
  * by the roving engine (the group's, or the enclosing Toolbar's).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `aria-pressed`, `disabled`,
- * `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, `onClick`, and
+ * `aria-disabled` (link or component `render`), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, `onClick`, and
  * `focusgroupstart` while the Root renders `focusgroup`.
  */
 export function ToggleGroupItem({
@@ -73,6 +77,10 @@ export function ToggleGroupItem({
   const { register } = ctx;
   const registerRef = useCallback((el: HTMLElement) => register(el, value), [register, value]);
 
+  // Not a host <button> (a link, a component): `aria-disabled`, enforced by the click handler
+  // (#83). The roving engine skips `:disabled` only, so such an Item is reached by the arrows.
+  const focusable = !isHostButton(render);
+
   const state: ToggleGroupItemState = {
     pressed,
     pending,
@@ -90,7 +98,9 @@ export function ToggleGroupItem({
     // Pass-through layer, as Toggle: a `render` element's own `type` wins.
     props: rendersButton(render) ? { ...rest, type: "button" } : rest,
     libraryProps: {
-      disabled,
+      disabled: focusable ? undefined : disabled,
+      // Owned only in the focusable branch: a host button keeps a consumer's own.
+      ...(focusable && { "aria-disabled": disabled ? true : undefined }),
       "aria-pressed": pressed,
       "data-pressed": dataAttr(pressed),
       "data-pending": dataAttr(pending),
@@ -100,8 +110,12 @@ export function ToggleGroupItem({
         focusgroupstart: ctx.focusgroupStartValue === value ? "" : undefined,
       }),
       onClick: (event: MouseEvent<HTMLButtonElement>) => {
-        // Native buttons do not fire `click` when disabled; the guard covers `render` elements.
-        if (disabled) return;
+        // Native buttons do not fire `click` when disabled; the guard covers `render` elements
+        // (a link must not navigate either).
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
         ctx.toggle(value, event.nativeEvent);
       },
     },

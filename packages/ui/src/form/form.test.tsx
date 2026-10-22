@@ -12,7 +12,7 @@
 // content apply to the submission and are covered below.
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, Suspense, useActionState, useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -701,6 +701,29 @@ describe("Form: function props and render", () => {
     expect(other).toBeDisabled();
     expect(other).toHaveAttribute("data-disabled", "");
     await act(async () => d.resolve());
+  });
+
+  it("Form.Submit disabled with a component render stays natively disabled, no aria-disabled (#83)", async () => {
+    function MyButton(props: ComponentPropsWithRef<"button">) {
+      return <button {...props} />;
+    }
+    const action = vi.fn();
+    render(
+      <Form.Root action={action}>
+        <EmailField />
+        <Form.Submit disabled render={<MyButton />}>
+          Save
+        </Form.Submit>
+      </Form.Root>,
+    );
+    // A submitter has no click handler to honour `aria-disabled`: native `disabled` is the only
+    // state that stops the submission.
+    expect(submit()).toBeDisabled();
+    expect(submit()).not.toHaveAttribute("aria-disabled");
+    expect(submit()).toHaveAttribute("data-disabled", "");
+    await setupUser().click(submit());
+    await flush();
+    expect(action).not.toHaveBeenCalled();
   });
 
   it("Form.Submit works in a plain React form (useFormStatus of the nearest form)", async () => {

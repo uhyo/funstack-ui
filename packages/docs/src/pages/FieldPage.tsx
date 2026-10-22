@@ -545,7 +545,8 @@ form[data-pending]           { cursor: progress; }
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`. Never set by the library while pending.",
+            description:
+              "Native `disabled`. Never set by the library while pending. Always native `disabled`, also with a component `render`: a submitter has no handler to honour `aria-disabled`.",
           },
           ...functionProps("FormSubmitState"),
           renderProp("button", "FormSubmitState"),

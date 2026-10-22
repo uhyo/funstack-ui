@@ -145,6 +145,15 @@ export function RoadmapPage() {
           (<a href={issue(81)}>#81</a>). Behaviour change: before, a second click ran the action
           again.
         </li>
+        <li>
+          <code>disabled</code> on a link or component <code>render</code>: Toggle,
+          ToggleGroup.Item, Menu.Trigger, Combobox.Trigger and Clear, NumberField.Increment and
+          Decrement, and the Dialog and Popover Trigger and Close parts (where they handle the
+          click) render <code>aria-disabled="true"</code> instead of native <code>disabled</code>,
+          which means nothing on a link, as Button does (<a href={issue(83)}>#83</a>). Behaviour
+          change for link and component renders only; a disabled link ToggleGroup.Item is now
+          reached by the arrow keys. Form.Submit keeps native <code>disabled</code>.
+        </li>
       </ul>
 
       <h3>Next</h3>

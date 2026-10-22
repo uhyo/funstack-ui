@@ -12,7 +12,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { Component, StrictMode, Suspense, startTransition, useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactElement, ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
@@ -752,6 +752,78 @@ describe("hold", () => {
     press(dec());
     await flush();
     expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  describe("disabled on component renders (#83, design/components/button.md 17.3)", () => {
+    function MyButton(props: ComponentPropsWithRef<"button">) {
+      return <button {...props} />;
+    }
+    const cases = [
+      ["the prop", { disabled: true }, {}],
+      ["readOnly", {}, { readOnly: true }],
+      ["the bound", {}, { max: 1 }],
+    ] as const;
+
+    function Box({
+      own,
+      rootProps,
+      element,
+      onChange,
+    }: {
+      own: { disabled?: boolean };
+      rootProps: Partial<NumberFieldRootProps>;
+      element?: ReactElement<ComponentPropsWithRef<"button">>;
+      onChange: Fn;
+    }) {
+      return (
+        <NumberField.Root
+          data-testid="root"
+          locale="en-US"
+          defaultValue={1}
+          valueChangeAction={onChange}
+          {...rootProps}
+        >
+          <NumberField.Input data-testid="input" />
+          <NumberField.Increment data-testid="inc" {...own} render={element}>
+            +
+          </NumberField.Increment>
+        </NumberField.Root>
+      );
+    }
+
+    it.each(cases)(
+      "disabled by %s with a component render: aria-disabled, no step on click or hold",
+      async (_, own, rootProps) => {
+        vi.useFakeTimers();
+        const onChange = vi.fn<Fn>();
+        render(<Box own={own} rootProps={rootProps} element={<MyButton />} onChange={onChange} />);
+        expect(inc()).toHaveAttribute("aria-disabled", "true");
+        expect(inc()).not.toHaveAttribute("disabled");
+        expect(inc()).toHaveAttribute("data-disabled", "");
+        pointer("pointerDown", inc());
+        act(() => {
+          vi.advanceTimersByTime(1000);
+        });
+        pointer("pointerUp", inc());
+        let notCancelled = true;
+        act(() => {
+          notCancelled = fireEvent.click(inc(), { detail: 0 });
+        });
+        expect(notCancelled).toBe(false); // cancelled: a link render does not navigate
+        await flush();
+        expect(onChange).not.toHaveBeenCalled();
+        expect(input().value).toBe("1");
+      },
+    );
+
+    it.each(cases)(
+      "disabled by %s with a host button: native disabled (unchanged)",
+      (_, own, rootProps) => {
+        render(<Box own={own} rootProps={rootProps} onChange={vi.fn<Fn>()} />);
+        expect(inc()).toBeDisabled();
+        expect(inc()).not.toHaveAttribute("aria-disabled");
+      },
+    );
   });
 
   it("data-pending lands on the button whose gesture is pending", async () => {

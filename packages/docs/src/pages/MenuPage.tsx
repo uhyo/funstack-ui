@@ -255,7 +255,8 @@ export function MenuPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`. Owned, so a `render` element cannot re-enable it.",
+            description:
+              'Native `disabled`. Owned, so a `render` element cannot re-enable it. With a link or component `render`, `aria-disabled="true"` instead (the element stays focusable); a click, Enter and the arrow keys do not open.',
           },
           ...functionProps("MenuTriggerState", "Rendered from optimistic state; must not suspend."),
           renderProp("button", "MenuTriggerState"),
@@ -266,9 +267,9 @@ export function MenuPage() {
         <code>aria-expanded</code> and <code>data-open</code> (optimistic),{" "}
         <code>data-pending</code> (an open or close of the Root in flight) and{" "}
         <code>data-disabled</code>. Owns <code>type</code>, <code>id</code>, <code>disabled</code>,{" "}
-        <code>commandfor</code>, <code>command</code>, <code>aria-haspopup</code>,{" "}
-        <code>aria-expanded</code>, <code>onClick</code> and <code>onKeyDown</code>. Use it in a
-        top-level Root only.
+        <code>aria-disabled</code> (link or component <code>render</code>), <code>commandfor</code>,{" "}
+        <code>command</code>, <code>aria-haspopup</code>, <code>aria-expanded</code>,{" "}
+        <code>onClick</code> and <code>onKeyDown</code>. Use it in a top-level Root only.
       </p>
 
       <h4>

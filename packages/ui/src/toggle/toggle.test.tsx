@@ -699,6 +699,46 @@ describe("Toggle", () => {
       expect(action).toHaveBeenCalledTimes(1);
     });
 
+    it.each([
+      ["a link", <a key="link" href="#x" />],
+      ["a component", <MyButton key="component" />],
+    ] as const)(
+      "disabled with %s render: aria-disabled, no native disabled, the click is cancelled (#83)",
+      async (_, element) => {
+        const action = vi.fn();
+        render(
+          <Toggle disabled pressedChangeAction={action} render={element}>
+            Favorite
+          </Toggle>,
+        );
+        const el = screen.getByText("Favorite");
+        expect(el).toHaveAttribute("aria-disabled", "true");
+        expect(el).not.toHaveAttribute("disabled");
+        expect(el).toHaveAttribute("data-disabled", "");
+        expect(el).toHaveAttribute("aria-pressed", "false");
+        expect(fireEvent.click(el)).toBe(false); // cancelled: a link does not navigate
+        await setupUser().click(el);
+        expect(action).not.toHaveBeenCalled();
+        expect(el).toHaveAttribute("aria-pressed", "false");
+      },
+    );
+
+    it("disabled with a host <button> render or none: native disabled, no aria-disabled (#83)", () => {
+      render(
+        <>
+          <Toggle disabled render={<button />}>
+            A
+          </Toggle>
+          <Toggle disabled>B</Toggle>
+        </>,
+      );
+      for (const name of ["A", "B"]) {
+        const el = screen.getByRole("button", { name });
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+      }
+    });
+
     it("element form cannot re-introduce an owned attribute the library left off", async () => {
       const d = deferred();
       render(

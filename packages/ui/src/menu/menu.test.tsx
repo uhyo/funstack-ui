@@ -14,7 +14,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
@@ -108,6 +108,10 @@ function SubmenuContent({
       <Menu.Item data-testid="delete">Delete</Menu.Item>
     </>
   );
+}
+
+function MyButton(props: ComponentPropsWithRef<"button">) {
+  return <button {...props} />;
 }
 
 const trigger = () => screen.getByTestId("trigger");
@@ -395,6 +399,52 @@ describe("Menu", () => {
       fireEvent.click(trigger());
       await flush();
       expect(isOpen()).toBe(false);
+    });
+
+    it.each([
+      ["a link", <a key="link" href="#x" />],
+      ["a component", <MyButton key="component" />],
+    ] as const)(
+      "a disabled Trigger with %s render is aria-disabled; click, Enter and ArrowDown do not open (#83)",
+      async (_, element) => {
+        const user = setupUser();
+        const openChange = vi.fn<OpenAction>();
+        render(
+          <Menu.Root openChangeAction={openChange}>
+            <Menu.Trigger data-testid="trigger" disabled render={element}>
+              Actions
+            </Menu.Trigger>
+            <Menu.Popup data-testid="popup">
+              <Menu.Item>A</Menu.Item>
+            </Menu.Popup>
+          </Menu.Root>,
+        );
+        expect(trigger()).toHaveAttribute("aria-disabled", "true");
+        expect(trigger()).not.toHaveAttribute("disabled");
+        expect(trigger()).toHaveAttribute("data-disabled", "");
+        expect(fireEvent.click(trigger())).toBe(false); // cancelled: a link does not navigate
+        trigger().focus();
+        await user.keyboard("{Enter}");
+        await user.keyboard("{ArrowDown}");
+        await flush();
+        expect(isOpen()).toBe(false);
+        expect(openChange).not.toHaveBeenCalled();
+      },
+    );
+
+    it("a disabled Trigger with a host <button> render stays natively disabled (#83)", () => {
+      render(
+        <Menu.Root>
+          <Menu.Trigger data-testid="trigger" disabled render={<button type="button" />}>
+            Actions
+          </Menu.Trigger>
+          <Menu.Popup data-testid="popup">
+            <Menu.Item>A</Menu.Item>
+          </Menu.Popup>
+        </Menu.Root>,
+      );
+      expect(trigger()).toBeDisabled();
+      expect(trigger()).not.toHaveAttribute("aria-disabled");
     });
   });
 

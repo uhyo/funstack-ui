@@ -5,7 +5,7 @@ import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
 
@@ -28,7 +28,11 @@ export interface PopoverCloseProps extends Omit<
    * mode the button is a native `command="hide-popover"` invoker.
    */
   action?: Action<[details: ActionDetails]>;
-  /** Native `disabled`; owned, so a `render` element cannot re-enable the button. */
+  /**
+   * Never closes. Native `disabled` on a `<button>`; owned, so a `render` element cannot
+   * re-enable it. With a link or component `render` whose click this part handles (library mode,
+   * or with `action`), `aria-disabled="true"` instead: the element stays focusable.
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, PopoverCloseState>;
   style?: StateValue<CSSProperties | undefined, PopoverCloseState>;
@@ -73,6 +77,10 @@ export function PopoverClose({
   const isLibrary = ctx.mode === "library";
   const hasAction = action !== undefined;
   const installClick = isLibrary || hasAction;
+  // A link or component render whose click this part handles: `aria-disabled`, enforced by the
+  // handler (#83). JS-free mode without `action` is the browser's `hide-popover` command,
+  // which only native `disabled` stops.
+  const focusable = installClick && !isHostButton(render);
 
   const state: PopoverCloseState = { pending, disabled };
 
@@ -125,14 +133,14 @@ export function PopoverClose({
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
-    // Owned: a render element must not re-enable a disabled Close.
-    disabled,
+    // Owned: a render element must not re-enable a disabled Close. Absent in the focusable branch.
+    disabled: focusable ? undefined : disabled,
     commandfor: ids.popup,
     command: "hide-popover",
     ...(installClick && { onClick }),
     // Exactly while `data-pending` (#81): a Close that will not act is unavailable to AT. Owned,
     // so an idle Close removes a render element's own `aria-disabled`.
-    "aria-disabled": pending ? true : undefined,
+    "aria-disabled": pending || (focusable && disabled) ? true : undefined,
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
   };

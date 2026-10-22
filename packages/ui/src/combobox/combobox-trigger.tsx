@@ -9,7 +9,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
 
@@ -35,7 +35,10 @@ export interface ComboboxTriggerProps extends Omit<
   | "style"
   | "children"
 > {
-  /** Disables this button; the Root's `disabled` does too. */
+  /**
+   * Disables this button; the Root's `disabled` does too. Native `disabled` on a `<button>`; with
+   * a link or component `render`, `aria-disabled="true"` instead.
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, ComboboxTriggerState>;
   style?: StateValue<CSSProperties | undefined, ComboboxTriggerState>;
@@ -75,7 +78,8 @@ export function useNameWarning(part: string): (element: HTMLElement) => () => vo
  * stop). A press does not take focus from the input, and a click focuses the input. No
  * `commandfor`: the listbox is anchored to the input, never to this button (design 1).
  *
- * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-expanded`,
+ * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or
+ * component `render`), `aria-expanded`,
  * `aria-controls` (token-merged), `onClick`, `onPointerDown`, `onPointerCancel`, `onMouseDown`,
  * `data-open`, `data-pending`, `data-disabled`.
  */
@@ -95,6 +99,10 @@ export function ComboboxTrigger({
   const openAtPress = useRef<boolean | null>(null);
   const ref = useNameWarning("Combobox.Trigger");
 
+  // A link or component render: native `disabled` would mean nothing on a link; the click
+  // handler refuses, so `aria-disabled` (#83).
+  const focusable = !isHostButton(render);
+
   const state: ComboboxTriggerState = {
     open: popover.optimistic,
     pending: popover.pending,
@@ -104,7 +112,8 @@ export function ComboboxTrigger({
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     tabIndex: -1,
-    disabled,
+    disabled: focusable ? undefined : disabled,
+    ...(focusable && { "aria-disabled": disabled ? true : undefined }),
     "aria-expanded": popover.optimistic,
     "aria-controls": ctx.ids.list,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
@@ -124,7 +133,11 @@ export function ComboboxTrigger({
       const pressed = event.detail === 0 ? null : openAtPress.current;
       const wasOpen = pressed ?? popover.intended();
       openAtPress.current = null;
-      if (disabled) return;
+      if (disabled) {
+        // A disabled link must not navigate either.
+        event.preventDefault();
+        return;
+      }
       const native = event.nativeEvent;
       if (wasOpen) popover.requestClose(native, "activate");
       else popover.requestOpen(native, "activate");

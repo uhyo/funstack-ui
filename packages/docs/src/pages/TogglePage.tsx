@@ -71,7 +71,8 @@ export function TogglePage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Renders a native disabled button; never dispatches.",
+            description:
+              'Never dispatches. Native `disabled` on a `<button>`; with a link or component `render`, `aria-disabled="true"` instead (the element stays focusable).',
           },
           {
             name: "transition",

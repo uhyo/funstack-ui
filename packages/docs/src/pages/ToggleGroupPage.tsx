@@ -171,7 +171,8 @@ export function ToggleGroupPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Disables every Item (native `disabled`).",
+            description:
+              'Disables every Item (native `disabled`; `aria-disabled="true"` on an Item with a link or component `render`).',
           },
           {
             name: "experimental_focusgroup",
@@ -211,7 +212,8 @@ export function ToggleGroupPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`; never dispatches; skipped by the arrow keys.",
+            description:
+              'Never dispatches. Native `disabled` on a `<button>`, skipped by the arrow keys. With a link or component `render`, `aria-disabled="true"` instead: the element stays focusable and the arrow keys reach it (the APG Toolbar behaviour).',
           },
           {
             name: "transition",
@@ -284,8 +286,10 @@ export function ToggleGroupPage() {
           follows the optimistic state. Focus never changes it.
         </li>
         <li>
-          Disabled Items are natively disabled and leave the arrow-key sequence. A rejected action
-          rolls the pressed state back; focus stays where it is.
+          Disabled Items are natively disabled and leave the arrow-key sequence. An Item rendered as
+          a link or a component is <code>aria-disabled</code> instead, and the arrow keys still
+          reach it (it never dispatches). A rejected action rolls the pressed state back; focus
+          stays where it is.
         </li>
         <li>
           Before hydration every Item is a Tab stop; the single Tab stop is set up by the first

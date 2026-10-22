@@ -113,6 +113,8 @@ export function useStepButton(
   };
 
   const onClick = (event: ReactMouseEvent<HTMLElement>): void => {
+    // A disabled link or component render (`aria-disabled`, #83) must not navigate either.
+    if (disabled) event.preventDefault();
     if (pointerSeen.current || active.current !== null || event.detail !== 0) {
       pointerSeen.current = false;
       return;

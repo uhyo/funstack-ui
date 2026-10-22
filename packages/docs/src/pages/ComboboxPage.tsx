@@ -350,7 +350,8 @@ export function ComboboxPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`; the Root's `disabled` applies too.",
+            description:
+              'Native `disabled`; the Root\'s `disabled` applies too. With a link or component `render`, `aria-disabled="true"` instead.',
           },
           ...functionProps(
             "ComboboxTriggerState | ComboboxClearState",

@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import type { ComponentPropsWithRef, DOMAttributes, MouseEvent } from "react";
 import { dataAttr } from "./data-attr.js";
 import type { RenderProp } from "./types.js";
-import { rendersButton } from "./use-render.js";
+import { isHostButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
@@ -39,7 +39,9 @@ export interface UsePopoverTriggerOptions<State> {
   readonly activate?: (event: MouseEvent<HTMLElement>) => void;
   /**
    * How `disabled` is rendered. `"native"` (default): the `disabled` attribute, so the button is
-   * no invoker at all. `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
+   * no invoker at all; in library mode a link or component `render` still gets the `"aria"`
+   * branch, because native `disabled` means nothing on a link and the installed click handler is
+   * what refuses (#83). `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
    * focusable); the click handler still refuses.
    */
   readonly disabledAs?: "native" | "aria";
@@ -138,13 +140,16 @@ export function usePopoverTrigger<State>(
             onClick(event);
           };
   }
-  const ariaDisabled = disabledAs === "aria";
+  // A link or component render in library mode: the click handler (installed only there) cancels
+  // and refuses, so `aria-disabled` is safe and native `disabled` would mean nothing (#83). In
+  // JS-free mode the command needs native `disabled` to stop it.
+  const ariaDisabled = disabledAs === "aria" || (isLibrary && !isHostButton(render));
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     // `type` only applies to a <button>; on any other element the key is not owned.
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the browser
-    // would run its command). With `disabledAs: "aria"` it is owned as absent.
+    // would run its command). In the `aria-disabled` branch it is owned as absent.
     disabled: ariaDisabled ? undefined : disabled,
     ...(ariaDisabled && { "aria-disabled": disabled ? true : undefined }),
     commandfor: ids.popup,

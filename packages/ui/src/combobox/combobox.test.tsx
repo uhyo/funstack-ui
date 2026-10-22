@@ -1827,6 +1827,80 @@ describe("Combobox", () => {
     });
   });
 
+  describe("disabled on component renders (#83, design/components/button.md 17.3)", () => {
+    function MyButton(props: React.ComponentPropsWithRef<"button">) {
+      return <button {...props} />;
+    }
+
+    function Box({
+      disabled,
+      render: element,
+    }: {
+      disabled: boolean;
+      render?: React.ReactElement<React.ComponentPropsWithRef<"button">>;
+    }) {
+      return (
+        <Combobox.Root
+          defaultValue="fr"
+          defaultInputValue="France"
+          openChangeAction={openAction}
+          valueChangeAction={valueAction}
+        >
+          <Combobox.Input data-testid="input" />
+          <Combobox.Trigger
+            data-testid="trigger"
+            aria-label="Show all"
+            disabled={disabled}
+            render={element}
+          />
+          <Combobox.Clear
+            data-testid="clear"
+            aria-label="Clear"
+            disabled={disabled}
+            render={element}
+          />
+          <Combobox.Popup data-testid="popup">
+            <Combobox.List data-testid="list">
+              {({ query }) => <Options query={query} />}
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Root>
+      );
+    }
+    const openAction = vi.fn<OpenAction>();
+    const valueAction = vi.fn<ValueAction>();
+    afterEach(() => {
+      openAction.mockReset();
+      valueAction.mockReset();
+    });
+
+    it("a component render disabled: aria-disabled, tabIndex -1, a click neither opens nor clears", async () => {
+      render(<Box disabled render={<MyButton />} />);
+      for (const el of [trigger(), clearButton()]) {
+        expect(el).toHaveAttribute("aria-disabled", "true");
+        expect(el).not.toHaveAttribute("disabled");
+        expect(el).toHaveAttribute("data-disabled", "");
+        expect(el).toHaveAttribute("tabindex", "-1");
+        expect(fireEvent.click(el)).toBe(false); // cancelled
+      }
+      await setupUser().click(trigger());
+      await setupUser().click(clearButton());
+      await flush();
+      expect(openAction).not.toHaveBeenCalled();
+      expect(valueAction).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(false);
+      expect(input().value).toBe("France");
+    });
+
+    it("a host button (no render) disabled: native disabled, no aria-disabled (unchanged)", () => {
+      render(<Box disabled />);
+      for (const el of [trigger(), clearButton()]) {
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+      }
+    });
+  });
+
   describe("platform: mount reconciliation", () => {
     async function hydrate(ui: ReactNode, typed: string) {
       const container = document.createElement("div");

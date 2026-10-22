@@ -203,7 +203,8 @@ export function DialogPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`: a disabled button is not an invoker and never opens.",
+            description:
+              'Native `disabled`: a disabled button is not an invoker and never opens. With a link or component `render` where the Trigger handles the click (library mode, or a non-modal dialog), `aria-disabled="true"` instead (the element stays focusable).',
           },
           ...functionProps(
             "DialogTriggerState",
@@ -326,7 +327,8 @@ export function DialogPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`; owned, so a `render` element cannot re-enable it.",
+            description:
+              'Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render` where the Close handles the click (library mode, or with `action`), `aria-disabled="true"` instead (the element stays focusable).',
           },
           ...functionProps("DialogCloseState"),
           renderProp("button", "DialogCloseState"),

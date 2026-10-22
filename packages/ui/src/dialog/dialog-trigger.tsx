@@ -3,7 +3,7 @@ import { useCallback, useEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 
@@ -23,7 +23,11 @@ export interface DialogTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "className" | "style" | "children"
 > {
-  /** Native `disabled`: a disabled button is not a valid invoker and never dispatches. */
+  /**
+   * Never dispatches. Native `disabled` on a `<button>` (no longer an invoker); with a link or
+   * component `render` where the Trigger handles the click (library mode, or a non-modal
+   * dialog), `aria-disabled="true"` instead: the element stays focusable.
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, DialogTriggerState>;
   style?: StateValue<CSSProperties | undefined, DialogTriggerState>;
@@ -42,8 +46,9 @@ const isDev = process.env.NODE_ENV !== "production";
  * `data-pending` until the dialog has opened. Non-modal dialogs have no command and always use a
  * click handler (`show()`).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command`, `onClick`, `data-open`, `data-pending`, `data-disabled`.
+ * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled` (a
+ * link or component `render` with the click handler installed), `commandfor`, `command`,
+ * `onClick`, `data-open`, `data-pending`, `data-disabled`.
  */
 export function DialogTrigger({
   disabled = false,
@@ -97,6 +102,10 @@ export function DialogTrigger({
   // Library mode (both modal and non-modal) and non-modal JS-free mode need a click handler;
   // modal JS-free mode is the browser's command.
   const installClick = isLibrary || !modal;
+  // A link or component render whose click this part handles: native `disabled` would mean
+  // nothing on a link; the handler refuses and cancels, so `aria-disabled` is safe (#83). The
+  // modal JS-free command needs native `disabled` to stop it.
+  const focusable = installClick && !isHostButton(render);
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (isLibrary) {
       // Cancelling the click cancels the command (it runs as the button's activation
@@ -106,7 +115,11 @@ export function DialogTrigger({
       ctx.requestOpen(event.nativeEvent, "activate");
       return;
     }
-    if (disabled) return;
+    if (disabled) {
+      // A disabled link must not navigate either.
+      event.preventDefault();
+      return;
+    }
     const dialog = dialogRef.current;
     if (dialog !== null && !dialog.open && dialog.isConnected) dialog.show();
   };
@@ -115,8 +128,9 @@ export function DialogTrigger({
     // `type` only applies to a <button>; on any other element the key is not owned.
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the
-    // browser would run its command).
-    disabled,
+    // browser would run its command). Owned as absent in the focusable branch.
+    disabled: focusable ? undefined : disabled,
+    ...(focusable && { "aria-disabled": disabled ? true : undefined }),
     commandfor: modal ? ids.dialog : undefined,
     command: modal ? "show-modal" : undefined,
     // Only owned when installed, so a render element keeps its own `onClick` in modal JS-free

@@ -8,7 +8,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
 import { useNameWarning } from "./combobox-trigger.js";
@@ -31,7 +31,10 @@ export interface ComboboxClearProps extends Omit<
   | "style"
   | "children"
 > {
-  /** Disables this button; the Root's `disabled` does too. */
+  /**
+   * Disables this button; the Root's `disabled` does too. Native `disabled` on a `<button>`; with
+   * a link or component `render`, `aria-disabled="true"` instead.
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, ComboboxClearState>;
   style?: StateValue<CSSProperties | undefined, ComboboxClearState>;
@@ -47,8 +50,8 @@ export interface ComboboxClearProps extends Omit<
  * A click while the listbox is open closes it (the platform's light dismiss: the button is
  * outside the popup).
  *
- * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `onClick`, `onPointerDown`,
- * `onMouseDown`, `data-disabled`.
+ * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or component
+ * `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`.
  */
 export function ComboboxClear({
   disabled: ownDisabled = false,
@@ -61,12 +64,16 @@ export function ComboboxClear({
   const ctx = useComboboxContext("Combobox.Clear");
   const disabled = ownDisabled || ctx.disabled;
   const ref = useNameWarning("Combobox.Clear");
+  // A link or component render: native `disabled` would mean nothing on a link; the click
+  // handler refuses, so `aria-disabled` (#83).
+  const focusable = !isHostButton(render);
   const state: ComboboxClearState = { value: ctx.value, inputValue: ctx.inputValue, disabled };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     tabIndex: -1,
-    disabled,
+    disabled: focusable ? undefined : disabled,
+    ...(focusable && { "aria-disabled": disabled ? true : undefined }),
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
     },
@@ -74,7 +81,11 @@ export function ComboboxClear({
       event.preventDefault();
     },
     onClick: (event: MouseEvent<HTMLButtonElement>) => {
-      if (disabled) return;
+      if (disabled) {
+        // A disabled link must not navigate either.
+        event.preventDefault();
+        return;
+      }
       ctx.clear(event.nativeEvent);
     },
     "data-disabled": dataAttr(disabled),

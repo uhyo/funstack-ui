@@ -344,7 +344,7 @@ export function NumberFieldPage() {
             type: "boolean",
             default: "false",
             description:
-              "Also disabled by the Root's `disabled` / `readOnly`, and when the next step would change nothing.",
+              'Also disabled by the Root\'s `disabled` / `readOnly`, and when the next step would change nothing. Native `disabled` on a `<button>`; with a link or component `render`, `aria-disabled="true"` instead, in all three cases.',
           },
           {
             name: "aria-label",
@@ -361,7 +361,8 @@ export function NumberFieldPage() {
         <code>NumberFieldButtonState</code>: <code>{"{ pending, disabled }"}</code>, where{" "}
         <code>pending</code> is true while the latest step or commit came from this button and is in
         flight. The buttons own <code>type="button"</code> (on a <code>&lt;button&gt;</code> only),{" "}
-        <code>tabIndex={"{-1}"}</code>, <code>aria-controls</code> and <code>disabled</code>.
+        <code>tabIndex={"{-1}"}</code>, <code>aria-controls</code>, <code>disabled</code> and{" "}
+        <code>aria-disabled</code> (link or component <code>render</code>).
       </p>
 
       <h4>

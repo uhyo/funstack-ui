@@ -800,6 +800,65 @@ describe("ToggleGroup", () => {
     });
   });
 
+  describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
+    function MyButton(props: ComponentPropsWithRef<"button">) {
+      return <button {...props} />;
+    }
+
+    it.each([
+      ["a link", <a key="link" href="#b" />],
+      ["a component", <MyButton key="component" />],
+    ] as const)(
+      "a disabled Item with %s render: aria-disabled, reached by the arrows, never dispatches",
+      async (_, element) => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <ToggleGroup.Root aria-label="x" valueChangeAction={action}>
+            <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+            <ToggleGroup.Item value="b" disabled render={element}>
+              B
+            </ToggleGroup.Item>
+            <ToggleGroup.Item value="c">C</ToggleGroup.Item>
+          </ToggleGroup.Root>,
+        );
+        const b = screen.getByText("B");
+        expect(b).toHaveAttribute("aria-disabled", "true");
+        expect(b).not.toHaveAttribute("disabled");
+        expect(b).toHaveAttribute("data-disabled", "");
+        expect(b).toHaveAttribute("aria-pressed", "false");
+        const user = setupUser();
+        act(() => item("A").focus());
+        // The roving engine skips `:disabled` only: the APG Toolbar behaviour (documented).
+        await user.keyboard("{ArrowRight}");
+        expect(b).toHaveFocus();
+        await user.keyboard(" ");
+        await user.keyboard("{Enter}");
+        expect(fireEvent.click(b)).toBe(false); // cancelled: a link does not navigate
+        await user.click(b);
+        expect(action).not.toHaveBeenCalled();
+        expect(b).toHaveAttribute("aria-pressed", "false");
+      },
+    );
+
+    it("a disabled host-button Item stays natively disabled and is skipped (unchanged)", async () => {
+      render(
+        <ToggleGroup.Root aria-label="x">
+          <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+          <ToggleGroup.Item value="b" disabled render={<button />}>
+            B
+          </ToggleGroup.Item>
+          <ToggleGroup.Item value="c">C</ToggleGroup.Item>
+        </ToggleGroup.Root>,
+      );
+      expect(item("B")).toBeDisabled();
+      expect(item("B")).not.toHaveAttribute("aria-disabled");
+      const user = setupUser();
+      act(() => item("A").focus());
+      await user.keyboard("{ArrowRight}");
+      expect(item("C")).toHaveFocus();
+    });
+  });
+
   describe("roving tab stop, standalone (row 11)", () => {
     it("one tab stop: the first pressed enabled Item, else the first enabled", () => {
       const { unmount } = render(

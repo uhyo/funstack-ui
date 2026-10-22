@@ -21,7 +21,10 @@ export interface MenuTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "onKeyDown" | "aria-expanded" | "aria-haspopup" | "className" | "style" | "children"
 > {
-  /** Native `disabled`: the menu cannot be opened from this button. */
+  /**
+   * The menu cannot be opened from this button. Native `disabled` on a `<button>`; with a link or
+   * component `render`, `aria-disabled="true"` instead (the element stays focusable).
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, MenuTriggerState>;
   style?: StateValue<CSSProperties | undefined, MenuTriggerState>;
@@ -64,8 +67,8 @@ export function isPointerClick(event: Event): boolean {
  * Root's transition; ArrowDown / ArrowUp open it with the first / last item focused (inside a
  * vertical `Toolbar.Root`: the inline-end arrow, with the first item focused).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `commandfor`,
- * `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `data-open`,
+ * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
+ * (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `data-open`,
  * `data-pending`, `data-disabled`.
  */
 export function MenuTrigger({

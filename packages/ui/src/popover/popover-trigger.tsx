@@ -17,7 +17,11 @@ export interface PopoverTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "aria-expanded" | "className" | "style" | "children"
 > {
-  /** Native `disabled`: a disabled button is not a valid invoker and never dispatches. */
+  /**
+   * Never dispatches. Native `disabled` on a `<button>` (no longer an invoker); in library mode
+   * with a link or component `render`, `aria-disabled="true"` instead: the element stays
+   * focusable.
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, PopoverTriggerState>;
   style?: StateValue<CSSProperties | undefined, PopoverTriggerState>;
@@ -34,9 +38,9 @@ export interface PopoverTriggerProps extends Omit<
  * Root's transition: an open, or a library-owned close while open. The button shows optimistic
  * `data-open` / `aria-expanded` and `data-pending` until the change has landed.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command`, `aria-expanded`, `onClick` (library mode), `data-open`, `data-pending`,
- * `data-disabled`. `aria-haspopup` and `aria-controls` pass through.
+ * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`
+ * (library mode, link or component `render`), `commandfor`, `command`, `aria-expanded`,
+ * `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `aria-haspopup` and `aria-controls` pass through.
  */
 export function PopoverTrigger({
   disabled = false,

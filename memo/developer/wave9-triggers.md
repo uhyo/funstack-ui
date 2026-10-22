@@ -34,3 +34,30 @@ Design: design/components/button.md sections 16 and 17 (2240658). Branch `wave9/
    observable through a boundary because the boundary unmounts the part).
 4. T2: two rows (two clicks in one task -> one dispatch, rejection reaches the boundary, the toast
    is not ending; and the `closeOnSettle={false}` variant), replacing the two superseded rows.
+
+## #83
+
+- `focusable = !isHostButton(render) && installClick` per part; in that branch `disabled:
+  undefined` (owned absent) and `aria-disabled` owned. Outside it `aria-disabled` stays
+  pass-through (not owned), so a host-button Toggle / Trigger keeps a consumer's own
+  `aria-disabled` as before; only the Close parts own it always (pending, #81).
+- `usePopoverTrigger` (Popover.Trigger, Menu.Trigger, Menu.SubmenuTrigger): `ariaDisabled =
+  disabledAs === "aria" || (isLibrary && !isHostButton(render))`. Menu is always library mode,
+  so Menu.Trigger is always in the branch for link / component renders. Its click handler already
+  `preventDefault()`s first.
+- Dialog.Trigger: `installClick = isLibrary || !modal`; the JS-free non-modal disabled branch now
+  `preventDefault()`s. Close parts: the click is already always cancelled.
+- Toggle, ToggleGroup.Item, Combobox.Trigger / Clear: `if (disabled) { preventDefault; return }`.
+- NumberField step buttons: `useStepButton`'s `onClick` `preventDefault()`s when disabled, before
+  the pointer-gesture early return (a pointer click on a disabled link render would otherwise
+  navigate: `pointerdown` returns early on disabled, so the click arrives with `detail > 0`).
+- Form.Submit unchanged; regression row + jsdoc + docs sentence.
+- Mutation check: `isHostButton` forced to `true` fails 26 rows (every new aria-disabled row).
+
+### Deviations / findings
+
+1. Not a deviation, a scope note: `aria-disabled` is owned only in the focusable branch (design
+   17.2 only specifies that branch). Recorded so a reviewer does not expect it removed from a
+   host button's pass-through.
+2. Dialog.Trigger in JS-free non-modal mode keeps `data-disabled` absent (it is library-mode only
+   today); the design says `data-disabled` is unchanged, so it stays absent there.

@@ -18,7 +18,7 @@
 // (#79, #81); the Close rows P1-P4 (design/components/button.md 16.4) replace them.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
@@ -1541,6 +1541,109 @@ describe("Popover", () => {
       );
       expect(trigger()).toBeDisabled();
       expect(screen.getByTestId("close")).toBeDisabled();
+    });
+  });
+
+  describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
+    function MyButton(props: ComponentPropsWithRef<"button">) {
+      return <button {...props} />;
+    }
+    const renders = [
+      ["a link", <a key="link" href="#x" />],
+      ["a component", <MyButton key="component" />],
+    ] as const;
+    const cancelled = (el: Element) => !fireEvent.click(el);
+
+    describe.each(renders)("%s render", (_, element) => {
+      it("Close, library mode: aria-disabled, the click is cancelled, nothing closes", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const closeAction = vi.fn();
+        render(
+          <Harness
+            mode="uncontrolled"
+            action={action}
+            close={{ disabled: true, action: closeAction, render: element }}
+          />,
+        );
+        await openThroughTrigger(user);
+        const hide = spyHide();
+        const close = screen.getByTestId("close");
+        expect(close).toHaveAttribute("aria-disabled", "true");
+        expect(close).not.toHaveAttribute("disabled");
+        expect(close).toHaveAttribute("data-disabled", "");
+        expect(cancelled(close)).toBe(true);
+        await flush();
+        expect(closeAction).not.toHaveBeenCalled();
+        expect(action).toHaveBeenCalledTimes(1); // the open only
+        expect(hide).not.toHaveBeenCalled();
+        expect(isOpen()).toBe(true);
+      });
+
+      it("Close, JS-free mode with action: aria-disabled, cancelled, nothing hides", async () => {
+        const user = setupUser();
+        const closeAction = vi.fn();
+        render(
+          <Harness
+            mode="static"
+            close={{ disabled: true, action: closeAction, render: element }}
+          />,
+        );
+        await user.click(trigger());
+        const hide = spyHide();
+        expect(screen.getByTestId("close")).toHaveAttribute("aria-disabled", "true");
+        expect(cancelled(screen.getByTestId("close"))).toBe(true);
+        expect(closeAction).not.toHaveBeenCalled();
+        expect(hide).not.toHaveBeenCalled();
+      });
+
+      it("Trigger, library mode: aria-disabled, the click is cancelled, no dispatch", async () => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode="uncontrolled"
+            action={action}
+            trigger={{ disabled: true, render: element }}
+          />,
+        );
+        expect(trigger()).toHaveAttribute("aria-disabled", "true");
+        expect(trigger()).not.toHaveAttribute("disabled");
+        expect(trigger()).toHaveAttribute("data-disabled", "");
+        expect(cancelled(trigger())).toBe(true);
+        await flush();
+        expect(action).not.toHaveBeenCalled();
+        expect(isOpen()).toBe(false);
+      });
+    });
+
+    it("JS-free mode with a component render: native disabled on Trigger and action-less Close", () => {
+      render(
+        <Harness
+          mode="static"
+          trigger={{ disabled: true, render: <MyButton /> }}
+          close={{ disabled: true, render: <MyButton /> }}
+        />,
+      );
+      for (const el of [trigger(), screen.getByTestId("close")]) {
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+      }
+    });
+
+    it("library mode, a host <button> render and no render: native disabled, no aria-disabled", async () => {
+      render(
+        <Harness
+          mode="uncontrolled"
+          initialOpen
+          trigger={{ disabled: true, render: <button type="button" /> }}
+          close={{ disabled: true }}
+        />,
+      );
+      await flush();
+      for (const el of [trigger(), screen.getByTestId("close")]) {
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+      }
     });
   });
 

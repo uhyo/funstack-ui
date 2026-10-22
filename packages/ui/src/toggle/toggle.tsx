@@ -12,7 +12,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 
 export interface ToggleState {
   /** Optimistic pressed state: what the user sees, including an in-flight change. */
@@ -45,7 +45,10 @@ export interface ToggleProps extends Omit<
    * `startTransition` (React limitation).
    */
   pressedChangeAction?: ChangeAction<boolean, TogglePressedChangeDetails>;
-  /** Renders a native disabled button; never dispatches. Default `false`. */
+  /**
+   * Never dispatches. Native `disabled` on a `<button>`; with a link or component `render`,
+   * `aria-disabled="true"` instead (the element stays focusable). Default `false`.
+   */
   disabled?: boolean;
   /**
    * Forwarded as `default` to the Toggle's `<ViewTransition>`. Default: no boundary. Animates the
@@ -96,6 +99,9 @@ export function Toggle({
   });
 
   const state: ToggleState = { pressed: optimistic, pending, disabled };
+  // Not a host <button> (a link, a component): native `disabled` would mean nothing to a link and
+  // hide the state from AT, so `aria-disabled`; the click handler enforces it (#83).
+  const focusable = !isHostButton(render);
 
   const element = useRender<ComponentPropsWithRef<"button">, ToggleState>({
     defaultElement: "button",
@@ -111,15 +117,21 @@ export function Toggle({
     libraryProps: {
       // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
       // `render` element cannot re-enable (`disabled={false}`) or disable the button on its own.
-      disabled,
+      // `undefined` (not `false`) in the focusable branch, so a render element's own is removed.
+      disabled: focusable ? undefined : disabled,
+      // Owned only in the focusable branch: a host button keeps a consumer's own.
+      ...(focusable && { "aria-disabled": disabled ? true : undefined }),
       "aria-pressed": optimistic,
       "data-pressed": dataAttr(optimistic),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
       onClick: (event: MouseEvent<HTMLButtonElement>) => {
         // Native buttons do not fire `click` when disabled; the guard covers `render` elements
-        // that do not honour `disabled`.
-        if (disabled) return;
+        // that do not honour `disabled` (a link must not navigate either).
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
         dispatch(!optimistic, createActionDetails(event.nativeEvent, {}));
       },
     },
