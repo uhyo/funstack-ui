@@ -16,3 +16,17 @@
 - If a dependency ever logs a harmless console.error during the build, the guard will fail; fix
   or filter it in `guardBuild` explicitly rather than removing the check.
 - Upstream report text posted on #72 for a human to file.
+
+## Removed (2026-10-23, @funstack/static 1.3.3)
+
+- 1.3.3 (uhyo/funstack-static#194, PR #195) passes `onError` to every renderer: RSC payload and
+  RSC shell (`rsc/entry.mjs`), deferred components (`rsc/defer.mjs`), and HTML `prerender`
+  ("HTML of <page>"). Errors are collected and `buildApp` throws an AggregateError. Opt-out:
+  `failOnRenderError: false` (default `true`), so nothing to configure.
+- Re-verified with the same MeterStorage break and our guard disabled: exit 1, 6 errors (3
+  `deferred component "MeterPage"`, 3 `HTML of "components/meter.html"`). That covers both output
+  traces the guard scanned for (E rows come from RSC errors, `<!--$!-->` from prerender errors).
+- `buildGuard.ts` deleted; `build.ts` just runs `build()` alongside the sitemap. The guard's
+  catch-all "any console.error fails" was broader than render errors but had no concrete case
+  behind it, so it was dropped too.
+- 1.3.3 declares peer `@funstack/router ^1.6.0`; the docs still use 1.5.0 (optional peer).
