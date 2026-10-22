@@ -66,3 +66,29 @@ jsdom: tooltip skip-delay (8 rows + 4 native-markup rows), csp (5), context menu
 tooltip skip-delay (baseline and flagged markup; condition: B opened in the same task as A's
 close), context menu press-drag-release (4 + CDP touch drag), touch offset (2), scrolling (4).
 Mutation-checked: the warm rule set to 0 fails the flagged Chromium row.
+
+## Review fixes (wave11/interaction-fixes, memo/reviewer/wave11-interaction.md)
+
+- M1: `warmDelay` is `calc(<delay>ms * (1 - var(--fsui-tooltip-warm, 0)))`. Without the
+  fallback, an unregistered property makes the declaration invalid at computed-value time and
+  Chromium uses `normal` (500 ms). The `<style>` renders beside the Trigger element (fragment), so
+  `render={<a href>Text</a>}` (render children win in mergeProps) keeps it. Browser rows: style
+  removed by hand (re-inserted in `finally`; React never re-inserts it) and a CSP-blocked iframe
+  (`srcdoc` with `<meta http-equiv=CSP content="style-src 'none'">`, render into its body; the
+  blocked `<style>` has `sheet === null` in Chromium and Firefox). Firefox drops the unknown
+  `interest-delay-start` from the inline style entirely, so assert computed values only where
+  `CSS.supports("interest-delay-start", "0s")`.
+- M2: the 500 ms count from the first open `toggle` (`shownAt`), or from the gesture start when
+  the popup is already showing (a move). Browser timing helper uses max(contextmenu, menu toggle).
+- M3: recipe removed; CSS cannot tell a warm open from a cold one. Needs library state
+  (`data-instant`), follow-up for the architect.
+- L1/L2: csp.test.tsx rows: object nonce without provider drops the rule; none / string form
+  keep it without nonce; Fizz merges same-precedence styles (probe precedence); guard: SSR of
+  tooltip + context menu emits exactly one fsui `<style>` matching its hash. Constraint comment on
+  `FSUI_PRECEDENCE`.
+- L3: `ctrlKey` wheels pass. L4: the touch guard ends only at a `touchend` after the gesture
+  pointer's own `pointerup` (no Touch.identifier on pointer events; pairing by dispatch order);
+  other fingers' `touchend` is still prevented.
+- L6: close-on-scroll ignores scroll events until the first animation frame without one after
+  the open toggle (scroll events run before rAF callbacks in a frame). jsdom has rAF; rows wait
+  one frame (`nextFrame`) before scrolling. Browser scroll row waits for the toggle + one frame.
