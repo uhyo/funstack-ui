@@ -125,6 +125,11 @@ export function MenuPage() {
           <code>closeOnActivate={"{false}"}</code> keeps the menu open (a "Refresh" item).
         </li>
         <li>
+          A <a href="/components/button">Button</a> inside a <code>Menu.Popup</code> is not a menu
+          item: no <code>role="menuitem"</code>, not in the arrow-key set, and it does not close the
+          menu. Use <code>Menu.Item</code> for actions in a menu.
+        </li>
+        <li>
           Activating an item in a submenu closes the whole stack: the top-level Root gets{" "}
           <code>"activate"</code>, each submenu Root <code>"dismiss"</code>. The submenu disappears
           at once (it is hidden as a nested popover); the top-level menu animates.

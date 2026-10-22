@@ -8,6 +8,7 @@
 
 /* Styles of the live examples. Each file is also shown next to its example. */
 @import "./examples/demo.css";
+@import "./examples/button.css";
 @import "./examples/toggle.css";
 @import "./examples/tabs.css";
 @import "./examples/accordion.css";

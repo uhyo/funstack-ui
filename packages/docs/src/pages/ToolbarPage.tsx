@@ -23,8 +23,20 @@ export function ToolbarPage() {
         a <a href="/components/toggle-group">ToggleGroup</a>, a{" "}
         <a href="/components/menu">Menu.Trigger</a>, a <a href="/components/toggle">Toggle</a>, a
         plain <code>&lt;button&gt;</code>, a link or an input all join the sequence without a
-        wrapper. <code>Toolbar.Button</code> is a command button with an <code>action</code>.
+        wrapper. A command button is a <a href="/components/button">Button</a>, which stays
+        focusable when disabled inside a toolbar.
       </p>
+
+      <Callout title="Toolbar.Button was removed" kind="warning">
+        <p>
+          <code>Toolbar.Button</code> was removed in this release (a breaking change). Use{" "}
+          <a href="/components/button">Button</a> from <code>@funstack/ui/button</code>: it behaves
+          the same inside a toolbar (a disabled Button is <code>aria-disabled</code> and stays in
+          the arrow-key sequence; props and <code>data-*</code> attributes are the same), and also
+          ignores a second click while its action is pending, with <code>aria-disabled</code>{" "}
+          meanwhile.
+        </p>
+      </Callout>
 
       <Example
         source={toolbarEditorSource}
@@ -90,10 +102,11 @@ export function ToolbarPage() {
       </p>
 
       <h3>Anatomy</h3>
-      <CodeBlock>{`import { Toolbar } from "@funstack/ui/toolbar";
+      <CodeBlock>{`import { Button } from "@funstack/ui/button";
+import { Toolbar } from "@funstack/ui/toolbar";
 
 <Toolbar.Root aria-label="Formatting">
-  <Toolbar.Button action={cut}>Cut</Toolbar.Button>
+  <Button action={cut}>Cut</Button>
   <Toolbar.Separator />
   <ToggleGroup.Root aria-label="Text style">…</ToggleGroup.Root>
   <Menu.Root>…</Menu.Root>
@@ -107,11 +120,6 @@ export function ToolbarPage() {
             "Finds its items in the DOM and moves focus between them.",
           ],
           [
-            "`Toolbar.Button`",
-            '`<button type="button">`',
-            "A command: `action` in its own transition, `data-pending`, focusable when disabled.",
-          ],
-          [
             "`Toolbar.Separator`",
             "`<hr aria-orientation>`",
             "A divider, perpendicular to the toolbar. Not focusable.",
@@ -120,9 +128,12 @@ export function ToolbarPage() {
       />
       <p>
         There are no <code>Toolbar.Link</code>, <code>Toolbar.Group</code> or{" "}
-        <code>Toolbar.ToggleGroup</code> parts: put the element itself in the toolbar. Do not pass{" "}
-        <code>tabIndex</code> to toolbar items; the toolbar writes <code>tabindex</code> itself. An
-        element with its own <code>tabIndex={"{-1}"}</code> stays out of the sequence.
+        <code>Toolbar.ToggleGroup</code> parts: put the element itself in the toolbar. A command is
+        a <a href="/components/button">Button</a>; inside a toolbar its <code>disabled</code>{" "}
+        renders <code>aria-disabled="true"</code> (it implies <code>focusableWhenDisabled</code>
+        ), so it stays focusable and is announced. Do not pass <code>tabIndex</code> to toolbar
+        items; the toolbar writes <code>tabindex</code> itself. An element with its own{" "}
+        <code>tabIndex={"{-1}"}</code> stays out of the sequence.
       </p>
 
       <h3>Props</h3>
@@ -165,38 +176,6 @@ export function ToolbarPage() {
         <code>onPointerDown</code> are the library's and are not props.
       </p>
 
-      <h4>Toolbar.Button</h4>
-      <PropsTable
-        rows={[
-          {
-            name: "action",
-            type: "Action<[details: ToolbarButtonActionDetails]>",
-            description:
-              "Runs inside the button's own transition on click, Enter or Space. Sync or async (a Server Function too); rejections reach the nearest Error Boundary above the button.",
-          },
-          {
-            name: "disabled",
-            type: "boolean",
-            default: "false",
-            description:
-              'Renders `aria-disabled="true"`: the button stays focusable and in the arrow-key sequence (APG), and never dispatches.',
-          },
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Forwarded to the button's `<ViewTransition default>`: animates the commit that ends the action.",
-          },
-          ...functionProps("ToolbarButtonState"),
-          renderProp("button", "ToolbarButtonState"),
-        ]}
-      />
-      <p>
-        <code>ToolbarButtonState</code> is <code>{"{ pending, disabled }"}</code>. With{" "}
-        <code>render={"{<a href />}"}</code> the link navigates before hydration and runs{" "}
-        <code>action</code> after it; it gets no <code>type</code>.
-      </p>
-
       <h4>Toolbar.Separator</h4>
       <PropsTable
         rows={[
@@ -224,8 +203,6 @@ export function ToolbarPage() {
         rows={[
           ["`data-orientation`", "Root", "The toolbar's orientation."],
           ["`data-orientation`", "Separator", "The separator's own (perpendicular) orientation."],
-          ["`data-pending`", "Button", "Its `action` is in flight."],
-          ["`data-disabled`", "Button", 'The `disabled` prop (with `aria-disabled="true"`).'],
         ]}
       />
 
@@ -271,7 +248,12 @@ export function ToolbarPage() {
             "",
             "Leaves the toolbar; re-entry lands on the last focused item.",
           ],
-          ["Enter / Space on `Toolbar.Button`", "", "", "Runs `action`, unless disabled."],
+          [
+            "Enter / Space on a `Button`",
+            "",
+            "",
+            "Runs `action`, unless disabled or already pending.",
+          ],
           [
             "A key the item handled itself",
             "",
@@ -328,7 +310,7 @@ export function ToolbarPage() {
 .toolbar-separator { margin: 0; border: 0; background: var(--line); }
 .toolbar-separator[data-orientation="vertical"] { inline-size: 1px; align-self: stretch; }
 .toolbar-separator[data-orientation="horizontal"] { block-size: 1px; }
-.toolbar-button[aria-disabled="true"] { opacity: .5; }
+.toolbar-button[data-disabled] { opacity: .5; }
 .toolbar-button[data-pending] { cursor: progress; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -339,9 +321,9 @@ export function ToolbarPage() {
   }
 }`}</CodeBlock>
       <p>
-        <code>Toolbar.Button transition</code> animates the commit that ends its action with a view
-        transition; keep the reduced-motion block above in your stylesheet. The Toolbar adds no view
-        transition types of its own.
+        A <code>Button</code>'s <code>transition</code> animates the commit that ends its action
+        with a view transition; keep the reduced-motion block above in your stylesheet. The Toolbar
+        adds no view transition types of its own.
       </p>
     </div>
   );

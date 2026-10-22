@@ -9,7 +9,7 @@ const navItems = [
   { path: "/", match: "/", label: "Home" },
   { path: "/getting-started", match: "/getting-started", label: "Getting started" },
   { path: "/concepts/action-props", match: "/concepts", label: "Concepts" },
-  { path: "/components/toggle", match: "/components", label: "Components" },
+  { path: "/components/button", match: "/components", label: "Components" },
   { path: "/roadmap", match: "/roadmap", label: "Roadmap" },
 ];
 

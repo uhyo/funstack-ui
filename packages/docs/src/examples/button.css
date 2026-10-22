@@ -1,0 +1,48 @@
+/* Button: [data-pending] is the in-flight state, [data-disabled] the consumer's `disabled`. A
+   pending Button is also aria-disabled="true", so style "unavailable" from [data-disabled] (or
+   aria-disabled without data-pending), not from aria-disabled alone. */
+.demo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.35em 0.9em;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+
+.demo-btn:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, var(--color-bg));
+}
+
+.demo-btn-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.demo-btn[data-pending] {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.demo-btn[data-disabled],
+.demo-btn[aria-disabled="true"]:not([data-pending]) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demo-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-btn {
+    transition: none;
+  }
+}

@@ -129,6 +129,15 @@ export function RoadmapPage() {
           constraint messages, press-and-hold buttons, and Slider's step / commit pair with rollback
           (<a href={issue(67)}>#67</a>).
         </li>
+        <li>
+          <a href="/components/button">Button</a>: a button whose click is a transition, with{" "}
+          <code>data-pending</code>, a second click ignored while the action is pending (
+          <code>aria-disabled</code> meanwhile, never native <code>disabled</code>), per-submitter
+          pending for <code>formAction</code>, and <code>focusableWhenDisabled</code> (
+          <a href={issue(79)}>#79</a>). <strong>Breaking:</strong> <code>Toolbar.Button</code> is
+          removed; use <code>Button</code> from <code>@funstack/ui/button</code>, which behaves the
+          same inside a toolbar.
+        </li>
       </ul>
 
       <h3>Next</h3>

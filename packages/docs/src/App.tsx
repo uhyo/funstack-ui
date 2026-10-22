@@ -35,6 +35,7 @@ const BrowserOwnedStatePage = lazyPage(
   "BrowserOwnedStatePage",
 );
 const ExperimentalPage = lazyPage(() => import("./pages/ExperimentalPage.js"), "ExperimentalPage");
+const ButtonPage = lazyPage(() => import("./pages/ButtonPage.js"), "ButtonPage");
 const TogglePage = lazyPage(() => import("./pages/TogglePage.js"), "TogglePage");
 const ToggleGroupPage = lazyPage(() => import("./pages/ToggleGroupPage.js"), "ToggleGroupPage");
 const ToolbarPage = lazyPage(() => import("./pages/ToolbarPage.js"), "ToolbarPage");
@@ -132,6 +133,7 @@ export const routes = [
                 path: "/components",
                 component: <Outlet />,
                 children: [
+                  page("/button", "/components/button", ButtonPage, "ButtonPage"),
                   page("/toggle", "/components/toggle", TogglePage, "TogglePage"),
                   page("/tabs", "/components/tabs", TabsPage, "TabsPage"),
                   page("/accordion", "/components/accordion", AccordionPage, "AccordionPage"),

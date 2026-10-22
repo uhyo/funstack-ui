@@ -25,6 +25,7 @@ export const conceptNavItems: NavItem[] = [
 ];
 
 export const componentNavItems: NavItem[] = [
+  { path: "/components/button", label: "Button" },
   { path: "/components/toggle", label: "Toggle" },
   { path: "/components/toggle-group", label: "ToggleGroup" },
   { path: "/components/tabs", label: "Tabs" },

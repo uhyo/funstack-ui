@@ -92,6 +92,10 @@ import { saveOpenSections } from "./actions"; // "use server"
             "Tabs",
             'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML and searchable. Switching tabs needs JavaScript.',
           ],
+          [
+            "Button",
+            "A `commandfor` / `command` Button runs its command, a Server Function `formAction` submits (React's progressive enhancement) and a `render={<a href>}` link navigates. An `action` Button needs JavaScript; a Server Function is a valid `action` once hydrated.",
+          ],
           ["Toggle", "Markup and ARIA. Pressing needs JavaScript."],
           [
             "Dialog, JS-free mode",
