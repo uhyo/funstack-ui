@@ -226,3 +226,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Next: architect design(s) → PO acceptance → developer(s) in worktrees → review → fixes → alpha.9.
 - Research landed: cef96d3 (positioning), 94b5303 (interaction). Architect design-wave11 running Part A (positioning) then Part B (skip-delay + #88).
 - #89 filed (user asked): Firefox Mozilla 2019601 human task. Researcher had been denied filing it; surfaced to user first.
+- Static 1.3.3 + router 1.6.0 landed (e59b524, 85a3f27, 60c7019); #72 build guard removed. Stale worktrees cleaned.
+- Design Part A 1559cba accepted (all 7 recs; user OK'd shipping Tooltip.Arrow). Part B 25fbe92 accepted; USER DECISION: skip-delay shipped CSS allowed (shipped CSS = placement + interaction timing, never visuals). CSPProvider + STYLE_SHA256; touch press-drag-release ships.
+- impl-wave11a (Part A) running in worktree wave11/positioning. Part B impl follows on top after merge.
+- Filed #89 (Firefox 2019601; rewritten after user asked what our reduction adds), #90 (device check), #91 (upstream: React style nonce, Static style nonce, Firefox overscroll).
