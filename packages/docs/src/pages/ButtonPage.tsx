@@ -88,7 +88,11 @@ export function ButtonPage() {
                 defaults to <code>type="submit"</code>. Prefer a stable function (a Server Function,
                 a <code>useActionState</code> dispatch, <code>useCallback</code>) when the form is
                 also submitted from script with <code>requestSubmit(button)</code>; an inline
-                function works for clicks and Enter.
+                function works for clicks and Enter. The match is by function identity (React
+                reports no submitter), so Buttons that share one function (one dispatch, different{" "}
+                <code>name</code> / <code>value</code>) all show pending while either submits; give
+                each its own function (<code>{'dispatch.bind(null, "draft")'}</code>) to tell them
+                apart.
               </>
             ),
           },
@@ -97,7 +101,7 @@ export function ButtonPage() {
             type: '"button" | "submit" | "reset"',
             default: '"button", or "submit" with formAction',
             description:
-              "Owned on a `<button>`: set it here, not on a `render` element. Omitted for any other element. `action` together with `submit` / `reset` warns in development (one click would do two things).",
+              "Owned on a `<button>` and on a component `render` element (assumed to render a `<button>`; it should spread the prop): set it here, not on the element. Omitted for a host element of another tag (`<a>`). `action` together with `submit` / `reset` warns in development (one click would do two things).",
           },
           {
             name: "disabled",
@@ -172,15 +176,20 @@ export function ButtonPage() {
           becomes disabled.
         </li>
         <li>
-          The guard also covers the window after the action settled but before React commits its
-          end, which React may hold while another async action elsewhere is pending: the button
-          still looks pending there, and behaves pending.
+          The guard is the Button's own run, not its look. React may hold the commit that ends the
+          action while another async action elsewhere is pending (or while the result suspends): the
+          button keeps <code>data-pending</code> and <code>aria-disabled</code> in that window, but
+          its own work has settled, so a click there starts a new run rather than being dropped. A{" "}
+          <code>formAction</code> Button follows React's form status instead and stays guarded until
+          its submission commits.
         </li>
         <li>
           Want every click to count (a "+1" button)? Do not await the work:{" "}
-          <code>{"action={() => { void increment(); }}"}</code> ends <code>pending</code> at once.
-          An ordered sequence whose steps see each other's results is <code>useActionState</code>{" "}
-          (pass its dispatch as <code>formAction</code>, or call it from the action).
+          <code>{"action={() => { void increment(); }}"}</code>. The run is over a moment after the
+          click, so every click runs the action, even while an unrelated action elsewhere holds the
+          Button's commit (then only the pending look lingers until that commit lands). An ordered
+          sequence whose steps see each other's results is <code>useActionState</code> (pass its
+          dispatch as <code>formAction</code>, or call it from the action).
         </li>
       </ul>
 
