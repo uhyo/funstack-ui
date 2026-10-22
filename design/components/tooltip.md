@@ -23,7 +23,8 @@ thin, feature-detected shim for the trigger that steps aside wherever the browse
 | 4   | Baseline popover type | `manual`, not `auto`: `auto` would close an open menu or combobox when a tooltip inside or beside it opens.                                                                                                                                                                                                                                |
 | 5   | Name vs description   | Explicit `provides="description" \| "name"` on `Root` (default `description`). `name` sets `aria-labelledby`, `description` sets `aria-describedby`; never both.                                                                                                                                                                           |
 | 6   | Delays                | `delay` (250 ms) and `closeDelay` (150 ms) on `Root`, matching Chromium's `interest-delay` defaults. Native path: inline `interest-delay-start/end` on the trigger. JS path: timers. Same delay for hover and keyboard focus. No "skip delay" group in v0.                                                                                 |
-| 7   | Positioning           | `side` (`top`) and `align` (`center`) on `Popup` set inline `position-area` and `position-try-fallbacks`. `side={null}` emits nothing so a stylesheet can take over.                                                                                                                                                                       |
+| 7   | Positioning           | `side` (`top`) and `align` (`center`) on `Popup` set inline `position-area` and `position-try-fallbacks` through the shared matrix of conventions 13.1: physical sides plus `inline-start` / `inline-end`, inline-relative `align` on a horizontal side (wave 11, #53). `side={null}` emits nothing so a stylesheet can take over.                                                                                                                                                                       |
+| 11  | Resolved side         | `data-side` / `data-align` on Popup and Arrow (and `state.side` / `state.align`) are the **resolved** placement while the tooltip is shown, read from the computed `position-area` by the shared observer (conventions 13.2), and the requested values otherwise. The Arrow therefore points at the trigger after a fallback flip (wave 11, #20). |
 | 8   | Animation             | CSS only (`@starting-style`, `transition-behavior: allow-discrete`, `overlay` required for Chromium's exit). Exit fade is progressive enhancement (none in Firefox); the library never waits on it. No `<ViewTransition>` and no `transition` prop on any Tooltip part (conventions 3.5).                                                                                                                                                                                 |
 | 9   | Directives            | Every file is `"use client"`. No directive-free part is possible because the trigger/popup id link needs context and only Client Components read context. "Zero-JS" here means no runtime behaviour JS on the native path, not no hydration.                                                                                               |
 | 10  | Touch                 | JS path ignores `pointerType === "touch"`; no long-press in v0. Chromium's native long-press works on the native path. Tooltip content must never be the only place information lives.                                                                                                                                                     |
@@ -66,7 +67,7 @@ Rendered HTML (baseline, no flags):
 | `Tooltip.Root`    | none                          | Generates the popup id (`useId`), holds `delay` / `closeDelay` / `disabled` / `provides`, provides context, and runs the one interaction effect once both elements are mounted. No `ref`. |
 | `Tooltip.Trigger` | `button` (`type="button"`)    | The element the user hovers or focuses. Receives the ARIA relation and, with the flag, `interestfor` plus `interest-delay-*`. Registers its element with `Root`.                          |
 | `Tooltip.Popup`   | `div[popover] role="tooltip"` | The content, in the top layer. Carries the id, the popover type, and the inline placement. Registers its element with `Root`.                                                             |
-| `Tooltip.Arrow`   | `span aria-hidden="true"`     | Decorative. Echoes `data-side` / `data-align` from the enclosing `Popup` so CSS can draw and place it. Must be a descendant of `Popup`.                                                   |
+| `Tooltip.Arrow`   | `span aria-hidden="true"`     | Decorative. Echoes the **resolved** `data-side` / `data-align` from the enclosing `Popup` (wave 11, #20) so CSS can draw and place it on the edge that faces the trigger, after a fallback flip too. Must be a descendant of `Popup`. Held by conventions resolved question 10 until wave 11; see the amendment at the end. |
 
 Why `Root` renders no DOM: a wrapper would sit between the trigger and its layout parent (a
 toolbar, a flex row) and change the layout of every call site. The popup is in the top layer, so
@@ -291,16 +292,24 @@ export interface TooltipTriggerState {
 ### `Tooltip.Popup`
 
 ```ts
-export type TooltipSide = "top" | "bottom" | "left" | "right";
+/** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
+export type TooltipSide = "top" | "bottom" | "left" | "right" | "inline-start" | "inline-end";
 export type TooltipAlign = "start" | "center" | "end";
 
 export interface TooltipPopupProps extends Omit<
   ComponentPropsWithRef<"div">,
   "id" | "popover" | "role" | "className" | "style" | "children"
 > {
-  /** Placement relative to the trigger via inline `position-area`. Default "top". `null` emits no inline positioning. */
+  /**
+   * Placement relative to the trigger via inline `position-area`. Default "top". `null` emits
+   * no inline positioning. `"inline-start"` / `"inline-end"` follow the popup's direction.
+   */
   side?: TooltipSide | null;
-  /** Alignment along the side. Default "center". Ignored when `side` is null. */
+  /**
+   * Alignment along the side. Default "center". On a top / bottom side `start` / `end` are
+   * inline-relative (mirrored under `direction: rtl`); on the other sides they are the top /
+   * bottom edges. Ignored when `side` is null.
+   */
   align?: TooltipAlign;
   /**
    * Experimental (Chrome 151+, Firefox 153+; Safari 27.0 treats it as "manual"). Renders
@@ -316,14 +325,21 @@ export interface TooltipPopupProps extends Omit<
 
 export interface TooltipPopupState {
   readonly disabled: boolean;
+  /**
+   * While shown: the physical side the browser placed the popup on (`"top"` / `"bottom"` /
+   * `"left"` / `"right"`, after any fallback flip). Otherwise the `side` prop. `null` with
+   * `side={null}`.
+   */
   readonly side: TooltipSide | null;
+  /** While shown: the resolved alignment; otherwise the `align` prop. */
   readonly align: TooltipAlign;
 }
 ```
 
 `id`, `popover` and `role` are library-controlled and removed from the type. The consumer's
 `style` is merged over the library's inline positioning (consumer wins), so
-`style={{ positionArea: "bottom span-right" }}` overrides `side` for one-offs.
+`style={{ positionArea: "bottom span-right" }}` overrides `side` for one-offs; `data-side`
+then reports what that override resolved to while shown (section 7.4).
 
 ### `Tooltip.Arrow`
 
@@ -344,11 +360,12 @@ export interface TooltipArrowState {
 }
 ```
 
-The arrow is deliberately thin: it reflects the _requested_ side, not the side the browser
-resolved after a `position-try-fallbacks` flip. CSS exposes no resolved-placement signal, and
-measuring it in JS on every open would reintroduce the positioning code this design exists to
-avoid. An arrow therefore points the wrong way after a flip in v0; consumers who care can drop the
-arrow or disable fallbacks. Resolved-side exposure is listed as future work (section 7.3).
+The arrow is deliberately thin: a `span` that echoes the Popup's `side` / `align` through
+`TooltipPopupContext` and draws nothing itself. Since wave 11 (#20) those are the **resolved**
+values while the tooltip is shown (section 7.4), so the arrow sits on the edge that faces the
+trigger after a `position-try-fallbacks` flip as well. (The v0 text here said CSS exposes no
+resolved-placement signal and that measuring in JS would reintroduce positioning code; the
+computed `position-area` is that signal, read without geometry.)
 
 ---
 
@@ -358,7 +375,7 @@ arrow or disable fallbacks. Resolved-side exposure is listed as future work (sec
 | ----------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | open        | **browser** (popover visibility state, top layer) | `:popover-open` on the popup; `.trigger:has(+ .popup:popover-open)` on the trigger; Chromium native path also `:interest-source` / `:interest-target` |
 | disabled    | library (prop, not changeable by the user)        | `data-disabled` on Trigger and Popup; `state.disabled`                                                                                                |
-| side, align | library (props)                                   | `data-side`, `data-align` on Popup and Arrow; `state.side`, `state.align`                                                                             |
+| side, align | props while closed; **browser** (the applied `position-try-fallbacks` option, observed, written urgently; conventions 3.5 and 13.2) while shown | `data-side`, `data-align` on Popup and Arrow; `state.side`, `state.align`: the resolved placement while shown, the requested one otherwise (wave 11, #20) |
 | pending     | n/a                                               | never emitted: no action, no transition                                                                                                               |
 
 ### 4.1 No `open`, no `openChangeAction`, no `data-open`
@@ -485,12 +502,14 @@ reads them in `Root`'s effect.
 
 `Popup` sets, inline, from `side` and `align`:
 
-| `side` \ `align` | `start`             | `center` | `end`              |
-| ---------------- | ------------------- | -------- | ------------------ |
-| `top`            | `top span-right`    | `top`    | `top span-left`    |
-| `bottom`         | `bottom span-right` | `bottom` | `bottom span-left` |
-| `left`           | `left span-bottom`  | `left`   | `left span-top`    |
-| `right`          | `right span-bottom` | `right`  | `right span-top`   |
+| `side` \ `align` | `start`                    | `center`       | `end`                        |
+| ---------------- | -------------------------- | -------------- | ---------------------------- |
+| `top`            | `top span-self-x-end`      | `top`          | `top span-self-x-start`      |
+| `bottom`         | `bottom span-self-x-end`   | `bottom`       | `bottom span-self-x-start`   |
+| `left`           | `left span-bottom`         | `left`         | `left span-top`              |
+| `right`          | `right span-bottom`        | `right`        | `right span-top`             |
+| `inline-start`   | `self-x-start span-bottom` | `self-x-start` | `self-x-start span-top`      |
+| `inline-end`     | `self-x-end span-bottom`   | `self-x-end`   | `self-x-end span-top`        |
 
 plus `position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline`. The `center`
 column uses the single-keyword form (`top` means the top row spanning all three columns) because
@@ -499,8 +518,16 @@ trigger and may be wider than it. The popover UA stylesheet already supplies `po
 and the implicit anchor comes from `interestfor` or `showPopover({ source })`, so no `anchor-name`
 or `position-anchor` is needed anywhere.
 
-Physical keywords only, matching every prior-art library. Writing-mode-aware placement is a CSS
-override (`position-area: block-start`), which is why the override path has to be first class.
+The matrix is the shared one of conventions 13.1 (wave 11, #53; the v0 matrix was physical
+throughout, `top span-right` for `start`). `top` / `bottom` / `left` / `right` are physical;
+`inline-start` / `inline-end` follow the popup's own `direction` through the `self-x-*`
+keywords, which resolve against the popup's writing mode and so honour a `dir="rtl"` container,
+unlike the plain logical keywords (`inline-end`), which resolve against the root. `align`
+`start` / `end` on a horizontal side is inline-relative for the same reason (`span-self-x-end`:
+the popup's inline-start edge meets the trigger's). In an LTR page every cell places exactly
+where the v0 matrix did; under RTL, `start` / `end` and the inline sides mirror. Writing-mode
+placement beyond that (vertical text) is a CSS override, which is why the override path has to
+be first class.
 
 ### 7.2 Override paths
 
@@ -530,10 +557,56 @@ accepted over shipping a mandatory CSS file.
   `position-area` (the spec resolves auto margins to 0 under `position-area`, and non-auto insets
   resolve against the position-area cell, so it should). If any engine misplaces the popup, the
   inline style additionally sets `inset: auto`, nothing more.
-- Arrow placement that survives a fallback flip has no CSS solution today. Candidates for later:
-  `@position-try` rules cannot carry custom properties; a JS `data-side` resolved from
-  `getBoundingClientRect` after `toggle` is possible but is exactly the positioning JS the design
-  avoids. Deferred.
+- Arrow placement that survives a fallback flip: resolved in wave 11 by section 7.4 (the v0
+  text deferred it, since `@position-try` rules cannot carry custom properties and a
+  `getBoundingClientRect` comparison would have been positioning JS; the computed
+  `position-area` needs neither).
+
+### 7.4 Resolved side (wave 11, #20)
+
+While the tooltip is shown, `Popup` reads which `position-try-fallbacks` option the browser
+applied from `getComputedStyle(popup).positionArea` (every engine reports the applied option;
+research `arrow-flip.mjs`, `resolved-side-timing.mjs`) and renders **that** as `data-side` /
+`data-align` and `state.side` / `state.align`; the Arrow echoes it through
+`TooltipPopupContext`. Closed, on the server, or when the computed value cannot be mapped, the
+requested values are rendered. The mechanism is the shared hook of conventions 13.2
+(`internal/use-resolved-placement.ts`): a `ResizeObserver` on the popup from mount (hidden to
+shown is a resize delivered after layout and before paint, so the first frame is right), the
+`toggle` event, and `scroll` (document, capture, passive) plus `resize` (window) while shown;
+a plain `useState` written only when the pair changed. A tooltip that opens where it was asked
+to costs **no render** (4.1's "no React work per hover" holds); a flipped one costs one render
+on open and one on close.
+
+```html
+<!-- requested side="top", no room above: -->
+<div popover="manual" role="tooltip" data-side="bottom" data-align="center"
+     style="position-area: top; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline">
+  Saves the document (Ctrl+S)
+  <span aria-hidden="true" data-side="bottom" data-align="center"></span>
+</div>
+```
+
+The inline style keeps the requested `position-area` (the browser needs it to keep choosing);
+only the attributes report the outcome. With `side={null}` the hook is idle and nothing is
+emitted, as before: the parser cannot interpret consumer `@position-try` rules that set insets.
+A consumer who positions in CSS and wants a pure-CSS arrow has Chromium's anchored container
+queries (`container-type: anchored; @container anchored(fallback: flip-block) { … }`),
+documented as a recipe, not shipped (Chromium-only).
+
+Known limit: `@starting-style` is resolved before the observer's write, so an entry animation
+keyed on `data-side` starts from the requested side's starting values on a flipped open
+(conventions 13.2). The docs' entry recipe (section 8) keys on opacity and a fixed `translate`,
+which is unaffected.
+
+### 7.5 Direction (wave 11, #53)
+
+Nothing in Tooltip reads `direction`. The `self-x-*` keywords of the matrix make `align`
+`start` / `end` and `side="inline-start"` / `"inline-end"` follow the popup's inherited
+direction, container-level `dir="rtl"` included, in Chromium and WebKit. **Firefox** misplaces
+any `position-area` popup along the inline axis when the popup's parent box has a direction
+different from the root's (Mozilla 2019601, conventions 13.3; physical keywords included, so v0
+was affected too). No workaround ships; the browser row asserts the degradation behind the
+`anchorPositionHonoursParentDirection` probe.
 
 ---
 
@@ -717,13 +790,14 @@ the same markup.
   background: inherit;
   rotate: 45deg;
 }
+/* `data-side` is the side the browser resolved, so these hold after a flip (7.4). */
 .tip-arrow[data-side="top"] {
   bottom: -4px;
-  left: calc(50% - 4px);
+  inset-inline-start: calc(50% - 4px);
 }
 .tip-arrow[data-side="bottom"] {
   top: -4px;
-  left: calc(50% - 4px);
+  inset-inline-start: calc(50% - 4px);
 }
 .tip-arrow[data-side="left"] {
   right: -4px;
@@ -733,6 +807,30 @@ the same markup.
   left: -4px;
   top: calc(50% - 4px);
 }
+/* `data-align` is inline-relative on a top / bottom side: logical insets keep it right in RTL. */
+.tip-arrow[data-align="start"] {
+  inset-inline-start: 12px;
+}
+.tip-arrow[data-align="end"] {
+  inset-inline-start: auto;
+  inset-inline-end: 12px;
+}
+```
+
+The same drawing with no Arrow part, as a pseudo-element on the popup (what resolved question
+10 of the conventions asked for; works since `data-side` is resolved on the Popup itself):
+
+```css
+.tip::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  rotate: 45deg;
+}
+.tip[data-side="top"]::after { bottom: -4px; inset-inline-start: calc(50% - 4px); }
+.tip[data-side="bottom"]::after { top: -4px; inset-inline-start: calc(50% - 4px); }
 ```
 
 ### Function props
@@ -805,6 +903,8 @@ packages/ui/src/tooltip/
   use-tooltip-interaction.ts   # "use client": the effect from section 2.2
   tooltip.test.tsx
 packages/ui/src/internal/platform-attributes.d.ts   # add interestfor + interest-delay-* (section 9)
+packages/ui/src/internal/anchor-position.ts         # positionArea(side, align), parsePositionArea (conventions 13; directive-free)
+packages/ui/src/internal/use-resolved-placement.ts  # "use client": useResolvedPlacement({ side, align }) → { side, align, ref } (conventions 13.2)
 packages/ui/src/__tests__/popover-shim.ts            # jsdom shim (section 13)
 ```
 
@@ -985,10 +1085,14 @@ pointerdown in the same task would otherwise leave the popup open).
   entries only when `experimental_interestFor && !disabled`; `aria-describedby` / `aria-labelledby`
   merged token lists per `provides`; `data-disabled` by presence. No `aria-expanded`.
 - `Popup`: `id={popupId}`, `popover={experimental_hint ? "hint" : "manual"}`, `role="tooltip"`,
-  inline positioning per section 7, `data-side` / `data-align` when `side !== null` (owned keys
-  only then; with `side={null}` they are neither emitted nor owned, so a `render` element or
-  stylesheet-driven `data-side` passes through), `data-disabled`. Provides `TooltipPopupContext`.
-- `Arrow`: `aria-hidden="true"`, `data-side` / `data-align` from `TooltipPopupContext`.
+  inline positioning per section 7 (the requested keywords), `data-side` / `data-align` when
+  `side !== null` (owned keys only then; with `side={null}` they are neither emitted nor owned,
+  so a `render` element or stylesheet-driven `data-side` passes through), `data-disabled`.
+  The values come from `useResolvedPlacement({ side, align })` (7.4), whose `ref` is merged
+  with `ctx.setPopupElement` and the consumer's ref; `state` carries the same values. Provides
+  `TooltipPopupContext` with them.
+- `Arrow`: `aria-hidden="true"`, `data-side` / `data-align` from `TooltipPopupContext` (the
+  resolved values).
 - All three resolve `className` / `style` / `children` / `render` through the shared
   `use-render.tsx` helper. Props spread order: library attributes, then consumer attributes, then
   library-controlled attributes re-applied (`id`, `popover`, `role`, `aria-hidden`, data state),
@@ -1043,7 +1147,8 @@ Coverage against conventions 10.1. "both" rows have no controlled mode here.
 | `render` element                                  | `render={<a href="/x" />}` renders an anchor with the ARIA relation and working hover; a custom component receives `ref`; `render={<span />}` with `experimental_interestFor` still uses the JS path (and the dev warning fires for `tabIndex < 0`).                                                                                                                                                                                                                                                                                                           |
 | Controlled/uncontrolled parity                    | **N/A**: no controllable state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Native step-aside                                 | Define `interestForElement` on `HTMLButtonElement.prototype` for one test, render with `experimental_interestFor`, hover and advance: `showPopover` **not** called. Without the flag under the same stub: called (flag gates the detection).                                                                                                                                                                                                                                                                                                                   |
-| Positioning                                       | `side`/`align` matrix produces the `position-area` values in section 7.1 and the fallbacks string; `side={null}` emits neither style nor `data-side`; consumer `style.positionArea` wins.                                                                                                                                                                                                                                                                                                                                                                      |
+| Positioning                                       | `side`/`align` matrix produces the `position-area` values in section 7.1 and the fallbacks string (the six-row matrix of conventions 13.1, including `inline-end` → `self-x-end`); `side={null}` emits neither style nor `data-side`; consumer `style.positionArea` wins.                                                                                                                                                                                                                                                                                                                                                                      |
+| Resolved placement (wave 11)                      | In jsdom (no layout, `getComputedStyle(popup).positionArea` is `""`) `data-side` / `data-align` on Popup and Arrow equal the requested values while open; with `getComputedStyle` stubbed to return `positionArea: "span-left bottom"` (`direction: "ltr"`) and the shim's `toggle(open)` dispatched, both read `data-side="bottom" data-align="end"` and the function props agree; the stub returning `"span-all bottom"` (Firefox's form) gives `bottom` / `center`; `"span-self-x-end bottom"` gives `start` in LTR and in RTL alike; `toggle(closed)` restores the requested values; a render counter on Popup shows no extra render when the stub returns the requested keywords; `side="inline-end"` renders `data-side="inline-end"` while closed and `right` / `left` by the stubbed `direction` while open; `side={null}` never calls `getComputedStyle`. No `ResizeObserver` in jsdom: the hook guards `typeof ResizeObserver`. The parser table itself lives in `anchor-position.test.ts` (conventions 13.2's serialisations, `null` for `none`, `""`, unknown tokens and a vertical `writing-mode`). |
 | Disabled                                          | Hover and focus never call `showPopover`; toggling `disabled` to true while open hides the popup on **both** paths: JS via the effect cleanup, native by an explicit `hidePopover()` when `interestfor` is removed (the browser does not hide it; reviewer probe).                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Dev warnings                                      | `provides="name"` plus `aria-label`, a non-focusable trigger, and interactive popup content each log one `console.error` per instance.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Directive                                         | All five part files in `src/tooltip/` (`tooltip-context`, `-root`, `-trigger`, `-popup`, `use-tooltip-interaction`; no Arrow in v0) begin with `"use client"` in `dist`; `index.ts` does not.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -1052,7 +1157,18 @@ Browser mode only (not covered by jsdom; noted at the top of the test file, per 
 10.1): actual visibility and `:popover-open`, anchor placement and fallback flips, the
 `@starting-style` animation, Chromium's native `interestfor` behaviour, Safari's `hint` to
 `manual` degradation, `hint` stacking over an `auto` menu. These are demonstrated in the example
-app until vitest browser mode is adopted (separate decision).
+app until vitest browser mode is adopted (separate decision; adopted since, `tooltip.browser.test.tsx`).
+
+Browser rows added in wave 11 (`tooltip.browser.test.tsx`, Chromium, Firefox, WebKit; the
+first real WebKit check of the computed-style claim, which the research took from source):
+
+| Row | Assertion | Engine branches |
+| --- | --- | --- |
+| Resolved side on open | A trigger at the top of the viewport with `side="top"`: once shown, `data-side="bottom"` on Popup and Arrow, `state.side === "bottom"` in a `className` function; the Arrow's rect touches the popup's top edge (the docs CSS). A trigger in the middle: `data-side="top"`, and a render counter shows one render for the open (the `toggle`-driven interaction effect writes no state; the hook wrote none). | none |
+| Resolved side after scroll | The trigger inside a scrollable container, tooltip open above it; scroll the container so the trigger reaches the container's top: `data-side` becomes `bottom` without closing (read in the `scroll` handler); scroll back: stays `bottom` (the last successful option is kept while it still fits, spec; the row documents this rather than expecting `top`). On close, `data-side` is `top` again. | none |
+| Native path | With `experimental_interestFor` and `experimental_hint`, the row above on open: the observer runs on the native path too (product-owner question 1 of the amendment). | `supportsInterestFor`: native open by real hover; elsewhere the JS path opens, same assertion. |
+| Inline side and RTL | `side="inline-end"`: the popup's left edge meets the trigger's right edge in LTR with `data-side="right"`; under `document.documentElement.dir = "rtl"` the popup's right edge meets the trigger's left edge with `data-side="left"`. `align="start"` on `side="bottom"` under page RTL: the right edges meet (`data-align="start"`). | none |
+| Container RTL | The same two assertions with `dir="rtl"` on a wrapper `div` around the Trigger and Popup and an LTR document. | `anchorPositionHonoursParentDirection` true (Chromium, WebKit): mirrored as above. False (Firefox, Mozilla 2019601): the popup's inline edges meet neither trigger edge (the mirrored offset); assert that and the comment names the bug. Never skipped. |
 
 ---
 
@@ -1072,6 +1188,109 @@ app until vitest browser mode is adopted (separate decision).
    boolean `label` (ambiguous with string labels), `relation` (vague).
 6. **No skip-delay group** in v0 (section 6).
 7. **Arrow ships thin** and mis-points after a fallback flip (section 3). Ship it, or hold it
-   back until a resolved-side signal exists?
+   back until a resolved-side signal exists? (Held: conventions resolved question 10. The
+   signal exists since wave 11, section 7.4; see the amendment below.)
 8. **vitest browser mode** is the only way to test what this component actually does in a
    browser. The jsdom plan tests the JS shim and the markup only.
+
+---
+
+## Amendment: resolved side and direction (wave 11, 2026-10-23, issues #20 and #53)
+
+Status: **proposed**. Inputs: `docs/research/positioning-wave11.md` (binding verdicts),
+conventions 13 (new, the cross-component rules), `memo/architect/positioning-wave11-notes.md`.
+The sections above are edited in place (decisions 7 and 11, the parts table, 3, 4, 7.1, 7.3,
+7.4, 7.5, 10, 12.1, 12.4, 13); this section is the audit trail, the migration notes and the
+questions.
+
+### What changed
+
+| | v0 (as accepted) | Wave 11 |
+| --- | --- | --- |
+| `data-side` / `data-align`, `state.side` / `state.align` | the requested props | the **resolved** placement while shown (computed `position-area`, parsed by the shared hook; conventions 13.2), the requested props otherwise |
+| Arrow after a `position-try-fallbacks` flip | points away from the trigger (documented) | points at the trigger (the attribute moved) |
+| `side` values | `top` / `bottom` / `left` / `right` | plus `inline-start` / `inline-end` (`self-x-*`) |
+| `align` `start` / `end` on `top` / `bottom` | physical (`span-right` / `span-left`) | inline-relative (`span-self-x-end` / `span-self-x-start`): identical in LTR, mirrored in RTL |
+| Container `dir="rtl"` | ignored by `start` / `end` (physical) | followed (Chromium, WebKit); Firefox misplaced by Mozilla 2019601, asserted, no workaround |
+| Renders per open | none | none unless the popup flipped (then one on open, one on close) |
+| Files | | `internal/anchor-position.ts` gains `parsePositionArea`; new `internal/use-resolved-placement.ts` |
+
+### Why this way
+
+- **Resolved, under the same name.** The research asked whether `data-side` should become
+  the resolved value or a new attribute should carry it. Same name: conventions 4.1 gives a
+  state one name in three forms, every arrow or gap recipe would otherwise need two selectors,
+  and the requested value is the consumer's own prop. Prior art (Radix, Base UI) does the same.
+- **Observation, not positioning.** The v0 objection to a resolved side was that it needed
+  `getBoundingClientRect` comparisons after every open and scroll, which is Floating UI's job
+  re-done. The computed `position-area` is exact, includes the flip the browser chose, is
+  current synchronously and inside `scroll` handlers, and needs no rectangle. The browser keeps
+  placing; the hook reports (conventions 3.5, a new rule).
+- **First frame right.** A `ResizeObserver` observing from mount sees the hidden-to-shown size
+  change after layout and before paint, so the attribute is in the DOM before the first paint
+  without touching the `showPopover()` call sites. `toggle` alone would leave one task (and
+  possibly one frame) with the requested side.
+- **No render for the common case.** The hook writes state only when the resolved pair
+  differs from what it holds; most tooltips open where asked. This preserves 4.1's reason for
+  not emitting `data-open`.
+- **`self-*`, not a direction read.** The #53 proposal was to read the anchor's computed
+  `direction` at open and pick physical keywords. The `self-x-*` keywords give the same answer
+  from CSS, before hydration, and never go stale; and they gain nothing in Firefox either way,
+  whose bug is independent of the keywords (conventions 13.1, 13.3).
+- **Inline-relative `align`.** A reader of `align="start"` on a bottom tooltip in an RTL page
+  expects the inline-start edges to meet. v0 said "physical keywords only, matching every
+  prior-art library", which was true of Floating UI without a direction provider and not of
+  React Aria; with `self-x-*` the library gets the logical reading for free.
+- **`inline-start` / `inline-end` as public `side` values**, rather than a Menu-internal
+  submenu default: a tooltip or popover "beside the trigger in reading direction" is a real
+  call site that otherwise needs `side={null}` and a stylesheet, and the shared helper has the
+  cells anyway. `block-*` values are not offered: the library assumes `horizontal-tb`, where
+  they equal `top` / `bottom`.
+- **The Arrow part.** Conventions resolved question 10 held `Arrow` "until a component shows it
+  cannot be done in CSS on the popup itself". A pseudo-element arrow keyed on the Popup's
+  resolved `data-side` is now correct after flips (the `::after` recipe in section 10), so the
+  CSS route works; the part is still the better call site for an SVG arrow, a two-layer
+  border-plus-fill arrow, or `render`, and the user picked #20 for this wave. Recommendation
+  below.
+
+### Test rows
+
+jsdom: the "Resolved placement" row of section 13 and the parser table in
+`anchor-position.test.ts`. Browser: the five rows at the end of section 13 (resolved side on
+open, after scroll, on the native path, inline side and page RTL, container RTL with the
+`anchorPositionHonoursParentDirection` branch). The probe itself is in
+`src/__tests__/engine.ts` (conventions 13.3).
+
+### Migration (0.1.0-alpha.9)
+
+- A stylesheet that keyed a gap or an arrow on `data-side` now follows flips; nothing to do
+  unless the stylesheet relied on the stale value.
+- `align="start"` / `"end"` on `side="top"` / `"bottom"` mirror under RTL; an RTL consumer who
+  compensated with `style={{ positionArea }}` can drop the override.
+- `TooltipSide` widens by two members; exhaustive switches gain two cases. `state.side` is
+  physical only while shown.
+- Entry animations keyed on `data-side` with `@starting-style` start from the requested side on
+  a flipped open (7.4); key them on opacity, or accept it.
+- Docs: the Tooltip page's data-attribute table and the sentence "`data-side` is the side you
+  asked for" change; the Arrow recipe uses logical insets; the `inline-end` example is added.
+
+### Questions for the product owner
+
+1. **The observer runs on the native path too.** With `experimental_interestFor` the
+   interaction effect attaches nothing ("the library attaches nothing on the native path",
+   2.1). The resolved-side hook attaches a `ResizeObserver`, `toggle`, `scroll` and `resize`
+   through the Popup's ref regardless of path. Recommendation: accept; that decision was about
+   not altering interaction, and the hook changes no behaviour. Alternative: skip the hook when
+   the trigger has native `interestfor`, leaving `data-side` requested there (the Arrow would
+   mis-point on the native path only).
+2. **Ship `Tooltip.Arrow` now** (designed in section 3, never implemented under resolved
+   question 10), or keep it held and document the `::after` recipe only? Recommendation: ship
+   it, since the resolved side removes the reason to hold and the user chose #20; the recipe
+   stays in the docs as the zero-markup alternative. If held, nothing else in this amendment
+   changes.
+3. **Same name for the resolved value** (`data-side`), no `data-resolved-side`. Recommendation:
+   confirm.
+4. **Inline-relative `align`** and the two new `side` values on Tooltip, Popover and Menu.
+   Recommendation: confirm (behaviour change under RTL only; type widening).
+5. **Firefox 2019601 ships unworked-around**, asserted by a runtime probe; the human comment
+   on the bug is listed in the research. Recommendation: confirm.

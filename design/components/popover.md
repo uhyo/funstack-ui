@@ -50,7 +50,7 @@ animate the exit in every engine, Firefox included.
 | 7 | Pending UI | Trigger: `aria-expanded` and `data-open` (optimistic), `data-pending` (library mode). The Popup emits no `data-open` (`:popover-open` is exact). Root has no DOM, so `pending` lives on the Trigger and in Root's `children(state)`. JS-free mode: `aria-expanded` is written on the Trigger from the popup's `toggle` listener (no React state). |
 | 8 | Reasons | `details.reason`: `"activate"` (Trigger, Close, a foreign invoker), `"dismiss"` (Escape, light dismiss, script `hidePopover()`), `"platform"` (found open on mount after a pre-hydration click). No `returnValue`: popovers have none. |
 | 9 | Content mounting | Library mode: children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">` (boolean only). Unmount waits for the popover's CSS exit animation **unless `transition` is set**, in which case a library-driven close unmounts in the close commit and the view transition carries the content out (section 4.4). JS-free mode: always mounted. |
-| 10 | Positioning | `side` (`"bottom"`) and `align` (`"center"`) on Popup set inline `position-area` and `position-try-fallbacks`, the Tooltip matrix through one shared helper; `side={null}` emits nothing. Anchor: the implicit anchor from `commandfor` (JS-free) or `showPopover({ source: trigger })` (library). |
+| 10 | Positioning | `side` (`"bottom"`) and `align` (`"center"`) on Popup set inline `position-area` and `position-try-fallbacks`, the shared matrix of conventions 13.1 (physical sides plus `inline-start` / `inline-end`; inline-relative `align` on a horizontal side; wave 11, #53); `side={null}` emits nothing. `data-side` / `data-align` and `state.side` / `state.align` are the **resolved** placement while shown (conventions 13.2; wave 11, #20). Anchor: the implicit anchor from `commandfor` (JS-free) or `showPopover({ source: trigger })` (library). |
 | 11 | Animation | CSS (`@starting-style`, `allow-discrete`, `overlay`) for every open and for browser-owned closes; exit is progressive enhancement (none in Firefox). With `transition`, `<ViewTransition>` wraps **the `<dialog popover>` element itself** and animates library-driven opens and closes in all three engines, Firefox's exit included (research, "ViewTransition"). |
 | 12 | Directives | Every part file is `"use client"` (context for ids and mode). "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration, as in Dialog. |
 | 13 | For Menu | The Root state, the Popup machinery (apply effect, listeners, close intents, focus-return fallback, deferred unmount, `aria-expanded` sync), the Trigger interception and the positioning helper are internal hooks that `Menu` (#39) composes with `role="menu"`, `aria-haspopup`, item parts and keyboard handling of its own (section 15). |
@@ -86,7 +86,7 @@ Rendered HTML (JS-free mode; ids come from one `useId` in Root):
   aria-describedby="_r_1_-description"
   data-side="bottom"
   data-align="start"
-  style="position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline"
+  style="position-area: bottom span-self-x-end; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline"
 >
   <h2 id="_r_1_-title">Filters</h2>
   <p id="_r_1_-description">Narrow the list.</p>
@@ -497,13 +497,19 @@ listener (section 9).
 ### 3.3 `Popover.Popup`
 
 ```ts
-export type PopoverSide = "top" | "bottom" | "left" | "right";
+/** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
+export type PopoverSide = "top" | "bottom" | "left" | "right" | "inline-start" | "inline-end";
 export type PopoverAlign = "start" | "center" | "end";
 
 export interface PopoverPopupState {
   /** Committed open state (library mode); `false` in JS-free mode. Read `:popover-open` for the DOM truth. */
   readonly open: boolean;
+  /**
+   * While shown: the physical side the browser placed the popup on (after any fallback flip;
+   * conventions 13.2). Otherwise the `side` prop. `null` with `side={null}`.
+   */
   readonly side: PopoverSide | null;
+  /** While shown: the resolved alignment; otherwise the `align` prop. */
   readonly align: PopoverAlign;
 }
 
@@ -516,9 +522,14 @@ export interface PopoverPopupProps
    * Placement relative to the Trigger through inline `position-area`, with
    * `position-try-fallbacks` flipping it when it does not fit. Default `"bottom"`. `null` emits
    * no inline positioning (and no `data-side` / `data-align`), so a stylesheet owns placement.
+   * `"inline-start"` / `"inline-end"` follow the popup's direction.
    */
   side?: PopoverSide | null;
-  /** Alignment along the side. Default `"center"`. Ignored when `side` is `null`. */
+  /**
+   * Alignment along the side. Default `"center"`. On a top / bottom side `start` / `end` are
+   * inline-relative (mirrored under `direction: rtl`); on the other sides the top / bottom
+   * edges. Ignored when `side` is `null`.
+   */
   align?: PopoverAlign;
   /**
    * Library mode: what happens to the children while the popover is closed.
@@ -653,7 +664,8 @@ export const Popover = {
 | `pending` | Root `useTransition` | library | Trigger `data-pending` (whenever the Root is pending, Dialog 4.2), Root `state.pending` |
 | Close `pending` | Close part `useTransition` | library | `data-pending` on that Close button |
 | `held` | Popup local state | library (derived from committed and the DOM's running animations) | keeps children mounted until the hide has finished animating; not exposed |
-| `side`, `align`, `keepMounted`, `initialFocus` | props | n/a | `data-side`, `data-align` on Popup |
+| `side`, `align` | props while closed; the browser's applied `position-try-fallbacks` option while shown (observed, urgent; conventions 3.5, 13.2; wave 11, #20) | browser (observed) | `data-side`, `data-align`, `state.side`, `state.align` on Popup: resolved while shown, requested otherwise |
+| `keepMounted`, `initialFocus` | props | n/a | nothing |
 | focus position, top-layer order, implicit anchor | browser | browser | `document.activeElement`, `:popover-open` |
 
 ### 4.1 The hook and the reducer
@@ -880,18 +892,40 @@ apply to popovers. Escape cannot be disabled in v0 (as Dialog).
 ## 8. Positioning
 
 `Popup` sets, inline, from `side` (default `"bottom"`) and `align` (default `"center"`), the
-same `position-area` matrix as Tooltip 7.1 (`bottom` → `bottom`, `bottom` + `start` → `bottom
-span-right`, `right` + `start` → `right span-bottom`, and so on; physical keywords) plus
-`position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline`. The popover UA
-stylesheet supplies `position: fixed` and the implicit anchor comes from `commandfor` or
-`showPopover({ source })`, so no `anchor-name` or `position-anchor` is needed. The matrix moves
-into one shared helper, `internal/anchor-position.ts` (`positionArea(side, align)`,
-`POSITION_TRY_FALLBACKS`), which Tooltip, Popover and Menu import; `PopoverSide` / `PopoverAlign`
-are the flat public names for Popover.
+same `position-area` matrix as Tooltip 7.1, the shared one of conventions 13.1 (`bottom` →
+`bottom`, `bottom` + `start` → `bottom span-self-x-end`, `right` + `start` → `right
+span-bottom`, `inline-end` → `self-x-end`, and so on) plus `position-try-fallbacks: flip-block,
+flip-inline, flip-block flip-inline`. The popover UA stylesheet supplies `position: fixed` and
+the implicit anchor comes from `commandfor` or `showPopover({ source })`, so no `anchor-name`
+or `position-anchor` is needed. The matrix lives in one shared helper,
+`internal/anchor-position.ts` (`positionArea(side, align)`, `POSITION_TRY_FALLBACKS`), which
+Tooltip, Popover and Menu import; `PopoverSide` / `PopoverAlign` are the flat public names for
+Popover.
 
-Override paths, as Tooltip 7.2: `style` on Popup (consumer wins over the inline values), or
-`side={null}` for stylesheet-owned placement (no inline properties, no `data-side` /
-`data-align`). Writing-mode-aware placement is a CSS override (`position-area: block-end`).
+Since wave 11 (#53) the matrix is direction-aware without JS: `top` / `bottom` / `left` /
+`right` are physical, `inline-start` / `inline-end` and the `start` / `end` alignment on a
+horizontal side use the `self-x-*` keywords, which resolve against the popup's own inherited
+`direction` and so follow a `dir="rtl"` container as well as an RTL page (plain logical
+keywords would resolve against the root; conventions 13.1). An LTR page places exactly as the
+v0 physical matrix did. Firefox misplaces any anchored popup whose parent box has a direction
+different from the root's (Mozilla 2019601, conventions 13.3); no workaround ships.
+
+Since wave 11 (#20) `data-side` / `data-align` and `state.side` / `state.align` are the
+**resolved** placement while the popup is shown: the applied `position-try-fallbacks` option
+read from `getComputedStyle(popup).positionArea` by the shared `useResolvedPlacement` hook
+(conventions 13.2: a `ResizeObserver` from mount, `toggle`, `scroll` and `resize` while shown;
+a plain state written only when the pair changed, so an unflipped open costs no render). Closed,
+on the server, or unmappable: the requested values. The gap rules of section 10 therefore sit on
+the side that actually faces the Trigger after a flip; the inline `position-area` stays the
+requested one. In JS-free mode the hook runs the same way (it hangs off the Popup's ref and the
+platform's `toggle`, not off library state), so a `commandfor`-opened popover reports its
+resolved side too. Popover has no Arrow part (conventions resolved question 10); a pseudo-element
+arrow keyed on the Popup's `data-side` is the recipe (Tooltip 10).
+
+Override paths, as Tooltip 7.2: `style` on Popup (consumer wins over the inline values; the
+resolved `data-side` then reports what the override produced), or `side={null}` for
+stylesheet-owned placement (no inline properties, no `data-side` / `data-align`, the hook idle).
+Vertical writing modes are a CSS override.
 
 Default `bottom` / `center` rather than Tooltip's `top`: a popover is a panel the user works in,
 and every prior-art library opens it below the trigger.
@@ -931,7 +965,7 @@ The library ships no CSS. Hooks, both modes:
 
 ```css
 .popover { margin: 0; inset: auto; padding: 16px; border: 0; border-radius: 8px; box-shadow: 0 8px 32px rgb(0 0 0 / .2); }
-.popover[data-side="top"] { margin-block-end: 6px; }      /* gap on the requested side */
+.popover[data-side="top"] { margin-block-end: 6px; }      /* gap on the resolved side: holds after a flip (section 8) */
 .popover[data-side="bottom"] { margin-block-start: 6px; }
 .btn[aria-expanded="true"] { background: var(--accent-weak); }  /* both modes */
 .btn[data-pending] { cursor: progress; }                  /* library mode */
@@ -1286,7 +1320,8 @@ update-on-success). Library mode unless stated.
 | Platform path | Mount with the popup already `:popover-open` (shim state set before `hydrateRoot`): one dispatch with `reason: "platform"`, `event: undefined`, StrictMode still one; parent accepts → children mount and `showPopover` not called again; parent refuses → `hidePopover` called and no notification. Controlled `open` flipping programmatically calls `showPopover` / `hidePopover` and the resulting `toggle` does not dispatch (echo). JS-free mode: a native-style open (shim `showPopover` + `toggle`) writes `aria-expanded="true"` on the Trigger element, a close writes `"false"`, and no React state changes (render count). |
 | Close part | Without `action` in JS-free mode: `command="hide-popover"`, no handler. In library mode: click default-prevented and `openChangeAction(false, "activate")` dispatched; with `action`: `data-pending` on the Close while the deferred action runs, dispatch after resolve, nothing on reject (error in the catcher inside the popup). JS-free mode with `action`: `hidePopover` called directly after resolve. Dismissed and re-opened while the action runs: the stale close is dropped (3.4; the re-open click is entangled with the Close's pending async transition in jsdom and commits with it). |
 | Focus | `initialFocus` ref / selector: the element has `autofocus=""` when `showPopover` is called (spy inspects the DOM) and not afterwards; missing target warns. Shim focusing steps: after a library open focus is on the `initialFocus` target, else the first focusable, else the popup. Nested focus return: with focus inside the popup, `hidePopover()` (shim: focus untouched) + `toggle` → the Trigger is focused; with focus on an outside button before the hide → focus untouched; with the Trigger unmounted → `blur()`. Unmounted content (6.2, H1): a Close / Trigger-inside / controlled close activated with focus inside and `transition` set returns focus to the Trigger (jsdom moves focus to `<body>` on removal, as browsers do); with `keepMounted` likewise. |
-| Positioning | `side` / `align` matrix produces the `position-area` values and the fallbacks string (shared helper tests); `side={null}` emits neither style nor `data-side`; consumer `style.positionArea` wins. |
+| Positioning | `side` / `align` matrix produces the `position-area` values and the fallbacks string (shared helper tests; the six-row matrix of conventions 13.1 since wave 11); `side={null}` emits neither style nor `data-side`; consumer `style.positionArea` wins. |
+| Resolved placement (wave 11) | As Tooltip 13: requested values in jsdom; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle(open)`, `data-side` / `data-align` and the function-prop state are the resolved pair (library mode and JS-free mode alike); `toggle(closed)` restores the requested ones; no extra render when the stub returns the requested keywords; `side="inline-end"` renders `self-x-end` inline and `data-side="inline-end"` while closed. |
 | Mode guard | Changing Root from JS-free to library mode after mount warns; `transition` / `keepMounted={false}` in JS-free mode warn. |
 | `transition` smoke | Popup renders with and without `transition`; with `transition` absent a part-initiated close keeps the children through the close commit (`held`) and unmounts after `toggle` (fake timers); with `transition` set the children are gone in the close commit. |
 
@@ -1306,6 +1341,8 @@ asserting the documented degraded behaviour rather than skipping:
 | ViewTransition | With `transition="pop"`: a library open calls `document.startViewTransition` once and the popup is `:popover-open` when the update callback has run; a part-initiated close calls it once and the old snapshot exists (`document.getAnimations()` includes a `::view-transition-old(…)` pseudo during the transition); a dismissal calls it only for the notification commit with the popup already hidden; **`transition="pop"` plus the 10.1 CSS exit: a dismissal calls it once, not twice** (the `held` release is a normal update; fails without the M1 fix in Chromium, Firefox animates no exit). Without `transition`: zero calls for an open and a close. A `Popover.Root` inserted by a transition with `transition="none"` calls it once (conventions 10.1 mount row); a plain open with `"none"` calls it zero times. **`transition="pop"` plus the 10.1 CSS exit, a part-initiated close** (`it.each` over the recipe): with `html:active-view-transition .fade { transition: none }` the popup is `display: none` at `ready` and only the old image of its group exists; the characterisation variant without the recipe has a live new image of the fading popup in Chromium (pseudo-element names read from `document.getAnimations()` at `ready`, reported in the failure message). | None for the mechanism: the old-snapshot row passes on all three engines (WebKit on CI). The recipe rows branch per engine: the live new image exists in Chromium only (Firefox animates no exit; WebKit has the box `display: none` by `ready`, and its pseudo-element names are unreliable, so it asserts `display` only, as Dialog 13.3). |
 | Stack interactions | A Tooltip (`manual`, and `hint` where `supportsPopoverHint`) opened inside the popup does not close it; a modal Dialog opened from inside keeps it open and Escape closes the Dialog first; opening an unrelated `auto` popover closes it with `"dismiss"`. | `supportsPopoverHint` for the hint variant (Safari 27.0 maps it to `manual`; same assertion). |
 | Accessibility | `aria-modal="false"` and `role="dialog"` present on the `<dialog>` (attribute assertions; no AX tree access in vitest browser mode, Chromium's `modal=true` exposure without the attribute is #44). | none |
+| Resolved side (wave 11) | A Trigger at the bottom of the viewport with the default `side="bottom"`: once shown, `data-side="top"` and the section 10 gap sits between the popup's bottom edge and the Trigger (`getBoundingClientRect`); a Trigger in the middle: `data-side="bottom"`. Inside a scrollable container, scrolling the Trigger to the container's bottom edge flips `data-side` to `top` while open; Escape then re-open in the middle: `bottom`. JS-free mode (a `commandfor` click) reports the resolved side the same way. | none (WebKit's computed-style behaviour is from source; this row is one of its first real checks) |
+| Direction (wave 11) | `align="start"` under `document.documentElement.dir = "rtl"`: the popup's right edge meets the Trigger's right edge, `data-align="start"`; `side="inline-end"`: the popup sits left of the Trigger with `data-side="left"`. The same inside a `dir="rtl"` wrapper in an LTR document. | Container case: `anchorPositionHonoursParentDirection` true: mirrored; false (Firefox, Mozilla 2019601): the inline edges meet neither Trigger edge, asserted with the bug named. Page case: none. |
 
 ---
 
@@ -1619,3 +1656,27 @@ All eight accepted as recommended:
    accepted.
 8. **Trigger-less controlled popovers have no anchor** (2.7; `anchor` prop deferred). Decision:
    accepted for v0.
+
+---
+
+## Amendment: resolved side and direction (wave 11, 2026-10-23, issues #20 and #53)
+
+Status: **proposed**; the cross-component rules are conventions 13 and the reasoning is in
+Tooltip's amendment (same mechanism, same hook). Edited in place: decision 10, 3.3, 4, 8, 10,
+13.2, 13.3.
+
+| | v0 (as accepted) | Wave 11 |
+| --- | --- | --- |
+| `data-side` / `data-align`, `state.side` / `state.align` | the requested props | the resolved placement while shown (both modes), the requested props otherwise |
+| Section 10 gap after a flip | on the wrong side | on the side facing the Trigger |
+| `side` values | four physical | plus `inline-start` / `inline-end` |
+| `align` `start` / `end` on `top` / `bottom` | physical | inline-relative (identical in LTR, mirrored in RTL); container `dir="rtl"` followed in Chromium and WebKit, Firefox misplaced (Mozilla 2019601, asserted) |
+| Files | | `usePopoverPopup` is unchanged; `Popover.Popup` merges `useResolvedPlacement`'s `ref` with `setElement` |
+
+Migration: as conventions 13.5. `PopoverSide` widens by two members; a stylesheet that keyed
+the gap on `data-side` now follows flips. The Popover docs page's props and data-attribute
+tables and `popover.css` ("the gap on the requested side") change wording.
+
+Questions for the product owner: Tooltip's amendment questions 3 to 5 cover Popover (same name
+for the resolved value; inline-relative `align` and the two new `side` values; Firefox
+unworked-around). Nothing Popover-specific.

@@ -53,7 +53,7 @@ and a hidden input that follows the optimistic value.
 | 7 | Accepting an option | Enter or click on an option: the input text becomes the option's label **at once** (urgent), the option shows `data-pending`, `valueChangeAction` is awaited inside the Root's transition, and the listbox closes in the commit that ends it (Menu decision 3). A rejection rolls the text and `data-selected` back and leaves the listbox open; a controlled parent that does not adopt the value gets the same rollback but the listbox closes (5.5); typing while the action is pending drops its close (5.2). Tab does **not** accept (manual selection; question 5). |
 | 8 | Free text | `allowCustomValue`: Enter with no active option, or focus leaving, commits the text as the value (`details.custom: true`). Without it the text reverts on focus loss to the committed value's label (React Aria's rule). |
 | 9 | Form | `name` / `form` on Root render `<input type="hidden" name value={optimistic ?? ""}>`; `required` goes on `Combobox.Input` and is native (empty text is `valueMissing`). No `setCustomValidity` (conventions 3.6). Form reset dispatches `"platform"` for both states, with reset targets computed in JS (a hidden input has no reset behaviour, 11.1); a pre-hydration typed text is reconciled at mount for `inputValue`. |
-| 10 | Positioning | Inline `position-area: block-end span-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)` on Popup (logical keywords: a page-level `dir="rtl"` flips the listbox; a `dir="rtl"` *container* does not in v1, 7.2). No `side` / `align`: a listbox goes below or above its input. `style` overrides. |
+| 10 | Positioning | Inline `position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)` on Popup (`self-*` logical keywords since wave 11, #53: the listbox follows the popup's own inherited direction, so a `dir="rtl"` container flips it as a page-level `dir="rtl"` does, 7.2; v1 used the plain `block-end span-inline-end`, which resolves against the root). No `side` / `align`: a listbox goes below or above its input. No `data-side`. `style` overrides. |
 | 11 | Announcements | `ariaNotify()` on the List when results settle (not while stale or loading; the counts are read through refs, 6.4); no live region. **A default English message ships** (`"No results"`, `"1 result"`, `"N results"`; user decision on question 6), overridable through `announce(count, state)` for localisation. The library's first built-in UI string; the convention it sets (built-in strings are English defaults, always overridable) is in conventions 11. |
 | 12 | Pending and state exposure | `data-pending` on Input (value or open in flight), Trigger (open in flight), the optimistic target Option; `data-open` on Input and Trigger; `data-selected`, `data-active`, `data-disabled` on Option; `data-stale` on Popup and List; `aria-busy` on the List while stale or loading; `data-empty` on List. |
 | 13 | ViewTransition | `transition` on `Combobox.Popup`, wrapping the `<div popover>` itself (conventions 5.1): library-driven opens and closes animate in every engine. A deferred results render also activates the boundary (React rule), so the docs recommend a type map with `default: "none"`. Types `fsui-combobox`, `fsui-combobox-open` / `-close`, `fsui-combobox-select`. |
@@ -96,7 +96,7 @@ Rendered HTML (closed, `value` is `"jp"`, text "Japan"; ids come from one `useId
 <button type="button" tabindex="-1" aria-label="Show all countries" aria-expanded="false" aria-controls="_r_1_-list"></button>
 <button type="button" tabindex="-1" aria-label="Clear"></button>
 <div id="_r_1_-popup" popover="auto"
-     style="position-area: block-end span-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)">
+     style="position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)">
   <!-- children render while open; shown as they will be, with "ja" typed -->
   <div id="_r_1_-list" role="listbox" aria-labelledby="_r_1_-label">
     <div id="_r_1_-option-jp" role="option" aria-selected="true" data-selected="" data-active="">Japan</div>
@@ -859,27 +859,36 @@ never fires because nothing inside the popup ever holds focus.
 The Popup renders, inline:
 
 ```css
-position-area: block-end span-inline-end;
+position-area: self-block-end span-self-inline-end;
 position-try-fallbacks: flip-block;
 min-width: anchor-size(width);
 ```
 
 The implicit anchor is the input (`showPopover({ source: input })`). Logical keywords, not the
-physical `side` / `align` matrix of Popover and Menu: a listbox is always below (or, flipped,
-above) its input, aligned to the input's inline-start edge. **Direction is page-level in v1.**
-The logical keywords resolve against the containing block of the top-layer popup, which is the
-root, so a `dir="rtl"` document flips the listbox and a `dir="rtl"` *container* does not
-(verified: Chromium 156 keeps the left edges aligned, Firefox 157 aligns neither edge;
-`span-self-inline-end` would read the popup's own direction, but Firefox lacks it). A consumer
-with an RTL island overrides the keyword, `style={{ positionArea: "block-end span-left" }}`.
-Follow-up (repo issue, deviation 1): read the input's computed `direction` at open, as Popover
-and Menu read computed style for their physical matrix, and emit `span-left` / `span-right`, or
-adopt `span-self-inline-end` once every engine has it. `min-width: anchor-size(width)`
+`side` / `align` matrix of Popover and Menu: a listbox is always below (or, flipped, above) its
+input, aligned to the input's inline-start edge. **The `self-*` group, since wave 11 (#53).**
+A plain logical keyword (`block-end span-inline-end`, v1) resolves against the containing
+block of the top-layer popup, which is the root, so it followed a `dir="rtl"` document and not
+a `dir="rtl"` *container* (deviation 1; verified: Chromium 156 kept the left edges aligned).
+The `self-*` keywords resolve against the popup's **own** direction, inherited from its DOM
+parent, so the container case works with no JS and no stale value (conventions 13.1). v1's
+note that "Firefox lacks `span-self-inline-end`" was a grammar trap, not an engine gap: `block-end
+span-self-inline-end` mixes keyword groups and is invalid everywhere; the valid spelling is
+`self-block-end span-self-inline-end`, supported in Chrome 129+, Firefox 147+, Safari 26+. The
+alternative the follow-up issue proposed (read the input's computed `direction` at open and emit
+`span-left` / `span-right`) is rejected: it needs JS, is wrong before hydration, goes stale
+when `dir` changes, and gains nothing in Firefox, whose bug is independent of the keywords:
+**Firefox** misplaces any `position-area` popup along the inline axis when the popup's parent
+box has a direction different from the root's (Mozilla 2019601, conventions 13.3); the listbox
+in an RTL island is misplaced there, physical keywords would be too, and no workaround ships. A
+consumer `style={{ positionArea }}` still wins per property. `min-width: anchor-size(width)`
 makes the listbox at least as wide as the input in every engine (research: verified in Chromium
 and Firefox, width = input width + border). A consumer who wants the listbox as wide as an
 input-plus-trigger group sets `anchor-name` on the group and `position-anchor` plus
 `min-width: anchor-size(--group width)` through `style`; consumer `style` wins per property.
-No `data-side` / `data-align`.
+No `data-side` / `data-align`: the Popup does not use the resolved-placement hook of
+conventions 13.2 (a listbox has no arrow and no `side`); a `data-side` of `top` / `bottom` for
+styling a flipped listbox's corners is a possible follow-up if a consumer asks.
 
 The Popup should be rendered as a sibling right after the Input (or after the Trigger / Clear).
 It need not be; `showPopover({ source })` links them by reference. But Safari 27.0 inserts a far
@@ -1208,7 +1217,7 @@ Element.prototype` (all three stable engines; asserted true, branch kept for Pla
 
 | Row | Assertion | Engine branches |
 | --- | --- | --- |
-| Placement and width | After typing: the popup's top edge equals the input's bottom edge, its left (inline-start) edge the input's, and `getBoundingClientRect().width >= input width` (`anchor-size`). Under `dir="rtl"` on the **document** (`document.documentElement.dir`) the inline-start edges still coincide (the right edges); a `dir="rtl"` container is documented as not flipping (7.2) and not asserted. Near the viewport bottom the popup flips above (`flip-block`). | none |
+| Placement and width | After typing: the popup's top edge equals the input's bottom edge, its left (inline-start) edge the input's, and `getBoundingClientRect().width >= input width` (`anchor-size`). Under `dir="rtl"` on the **document** (`document.documentElement.dir`) the inline-start edges still coincide (the right edges). **Container RTL (wave 11):** with `dir="rtl"` on a wrapper around the Combobox in an LTR document, the right edges coincide. Near the viewport bottom the popup flips above (`flip-block`). | Container row: `anchorPositionHonoursParentDirection` (`engine.ts`, conventions 13.3) true: right edges coincide; false (Firefox, Mozilla 2019601): the listbox's inline edges coincide with neither input edge, asserted with the bug named, never skipped. Page row: none. |
 | Focus stays | Click an option with the real pointer: `document.activeElement` is the input before, during and after; the selection dispatched; the popup closed after the action. Click the Trigger: input focused, popup open. Click Clear: input focused. | none |
 | Escape | Escape closes the popup, `openChangeAction(false, "dismiss")`, focus in the input, text kept; a second Escape inside a `Dialog.Popup` closes the Dialog; inside a `Popover.Popup` closes the Popover. | none |
 | Tab closes | Tab from the input: focus on the next field, popup hidden, text reverted (or custom value committed); Shift+Tab likewise. | none |
@@ -1237,8 +1246,9 @@ Element.prototype` (all three stable engines; asserted true, branch kept for Pla
   and the input lives in the popup): a different focus model (focus moves into the popup).
   Could be a Select-like variant later.
 - **`Separator`** (not in a listbox's content model).
-- **Container-level `dir="rtl"`** (7.2): the listbox follows the document direction only;
-  a repo issue tracks reading the input's direction at open.
+- ~~**Container-level `dir="rtl"`** (7.2): the listbox follows the document direction only;
+  a repo issue tracks reading the input's direction at open.~~ Done in wave 11 (#53) with
+  `self-*` keywords; Firefox remains misplaced in direction islands (Mozilla 2019601).
 - **`loading` in `state` / `data-loading`**: the library knows the loading state (6.3) but
   exposes it only as `aria-busy` on the List (style with `[aria-busy="true"]`) until a consumer
   asks for more.
@@ -1479,4 +1489,27 @@ the items below are corrections to this document and the code fixes it now requi
 
 Repo issue to record (human): "Combobox: container-level `dir=rtl` does not flip the listbox
 (logical `position-area` keywords resolve against the top-layer containing block; Firefox lacks
-`span-self-inline-end`)", the follow-up for deviation 1.
+`span-self-inline-end`)", the follow-up for deviation 1. Filed as #53; resolved by the wave 11
+amendment below (the Firefox claim was wrong, see 7.2).
+
+---
+
+## Amendment: container direction (wave 11, 2026-10-23, issue #53)
+
+Status: **proposed**; the cross-component rules are conventions 13. Edited in place: decision
+10, the section 1 HTML, 7.2, 12.2, 13.
+
+| | v1 (as accepted) | Wave 11 |
+| --- | --- | --- |
+| Inline `position-area` | `block-end span-inline-end` (plain logical: the root's direction) | `self-block-end span-self-inline-end` (the popup's own direction) |
+| `dir="rtl"` container | left edges aligned (Chromium), documented | right edges aligned (Chromium, WebKit); Firefox misplaced (Mozilla 2019601), asserted in the browser row |
+| Follow-up "read the input's direction at open" | planned | rejected (JS, pre-hydration, staleness; no gain in Firefox) |
+| `data-side` | none | none (a possible follow-up, 7.2) |
+
+Migration: an RTL island's listbox moves to the correct side in Chromium and WebKit; a consumer
+who compensated with `style={{ positionArea: "block-end span-left" }}` can drop it. Nothing
+else changes.
+
+Questions for the product owner: none beyond Tooltip's amendment question 5 (Firefox
+unworked-around). The absence of `data-side` on `Combobox.Popup` is a choice (7.2), not an
+omission; say so if a `data-side` for the flipped listbox is wanted now.

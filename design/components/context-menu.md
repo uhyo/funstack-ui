@@ -37,7 +37,7 @@ runs with `data-pending` on the item and the menu closes in the commit that ends
 | 1 | Anatomy | **One new part, `Menu.ContextTrigger`**, in the Menu namespace: a plain element (default `div`) with no role and no ARIA, whose `contextmenu` opens the Root's `Menu.Popup` at the pointer. No `ContextMenu` namespace: `Menu.Root` + `Menu.ContextTrigger` + `Menu.Popup` + the existing items. A Root may hold a `Menu.Trigger` **and** a `Menu.ContextTrigger` (a "More" button and a right-click region sharing one popup), which is how shared items fall out (research question 4). |
 | 2 | Mode | Library mode only, as Menu. `open` / `defaultOpen` / `openChangeAction` as Menu. Before hydration the browser's native menu shows; nothing is replayed. |
 | 3 | Opening | A `contextmenu` on the region that is not `defaultPrevented`, not on an editable target (section 2.3) and not `disabled` → `preventDefault()`, record the point and the modality, **`popup.setPointerCapture(pointerId)` now** if a button is down, then the library-owned open (`openChangeAction(true, { reason: "activate" })`, apply effect `showPopover({ source: region })`, first item focused: quiet after a pointer, ring after the keyboard). A library long-press (500 ms, touch and pen pointers, 10 px slop) opens the same way on every platform; a `contextmenu` during the gesture wins and cancels the timer. |
-| 4 | Placement | **At the point, with no anchor (research S4)**: the Popup renders inline `--menu-point-x` / `--menu-point-y`, `inset: auto; left: var(--menu-point-x); top: var(--menu-point-y); position-area: none` and `position-try-fallbacks` naming three library `@position-try` rules that mirror the popup around the point (up, left, up-left). The rules are the library's **first shipped CSS**: a React 19 `<style href precedence>` rendered by the Popup on a point open, hoisted, deduplicated, functional only. `side={null}` opts out (no inline placement, no stylesheet; the point is still exposed as the two custom properties). **User decision (2026-10-22): positioning-only shipped CSS is allowed** (conventions 12); the virtual-anchor alternative S2 was rejected (4.5). |
+| 4 | Placement | **At the point, with no anchor (research S4)**: the Popup renders inline `--menu-point-x` / `--menu-point-y`, `inset: auto; left: var(--menu-point-x); top: var(--menu-point-y); position-area: none` and `position-try-fallbacks` naming library `@position-try` rules that mirror the popup around the point (up, left, up-left; since wave 11 also right and up-right, for a right-to-left menu whose **right** edge sits at the point, read from the popup's computed `direction` once per open, #88). The rules are the library's **first shipped CSS**: a React 19 `<style href precedence>` rendered by the Popup on a point open, hoisted, deduplicated, functional only. `side={null}` opts out (no inline placement, no stylesheet; the point is still exposed as the two custom properties). **User decision (2026-10-22): positioning-only shipped CSS is allowed** (conventions 12); the virtual-anchor alternative S2 was rejected (4.5). |
 | 5 | Move | A `contextmenu` inside the region **while open** moves the menu: no `openChangeAction`, items keep their state, the first item is focused again. The Popup re-shows itself at the new point with the fallback list respelled, so the remembered flip is cleared (research: a same-task hide + show keeps the stale flip otherwise). |
 | 6 | Closing | Everything in Menu 2.2. Added, for **every** menu (context-opened or not): a `contextmenu` or a middle-button `pointerdown` **outside** the menu tree closes the stack at once (`hidePopover()`, `"dismiss"`), as Tab does, since Chromium's click-based light dismiss ignores those buttons and native menus close on any click. A `contextmenu` inside the popup is `preventDefault()`ed and does nothing else. |
 | 7 | Editable targets | `input` (text-taking types), `textarea` and `contenteditable` targets keep the browser's menu by default (copy and paste); `editableTargets="menu"` overrides. Product-owner decision. |
@@ -47,7 +47,7 @@ runs with `data-pending` on the item and the menu closes in the commit that ends
 | 11 | Pending UI | Region: `data-open` (optimistic), `data-pending` (the Root's transition). Popup: `data-context` while the current open came from a ContextTrigger (and no `data-side` / `data-align`). Items as Menu. |
 | 12 | Animation | As Menu 9: `transition` on the Popup animates the open commit and library-driven closes (item activation, controlled close). The outside-right-click close, Tab and dismissals are CSS exits; a move is instant (no React open or close). Types unchanged (`fsui-menu-open` / `-close`). |
 | 13 | Touch | Long-press on every platform (iOS has no `contextmenu`; Android's own `contextmenu` and the timer race harmlessly). Inline `-webkit-touch-callout: none` on the region. The one `click` that may follow a long-press open is swallowed. `user-select: none` for regions with text is the consumer's CSS (documented trade-off). |
-| 14 | Deferred | Press-drag-release (hold the right button, release on an item; the pointer capture keeps it possible), a touch offset so the menu does not open under the finger, close-on-scroll, RTL-aware point placement (physical bottom-right in v1), a `nativeMenu` predicate prop. Follow-ups, not v1. |
+| 14 | Deferred | Press-drag-release (hold the right button, release on an item; the pointer capture keeps it possible), a touch offset so the menu does not open under the finger, close-on-scroll, a `nativeMenu` predicate prop. Follow-ups, not v1 (#88; wave 11 Part B). RTL-aware point placement was deferred here too and landed in wave 11 Part A (4.6). |
 | 15 | Docs | Every context-menu action must be reachable another way (a visible Menu button, a toolbar, shortcuts): iOS with or without VoiceOver may never open it. Targets that matter to keyboard users must be focusable (`contextmenu` fires at the DOM-focused element). Required content of the docs page (section 12). |
 
 ---
@@ -87,7 +87,7 @@ Rendered HTML (closed; ids from the Root's `useId`):
               aria-haspopup="menu" aria-expanded="false" aria-label="Actions for report.pdf">…</button>
       <div id="_r_1_" popover="auto" role="menu" aria-labelledby="_r_1_-trigger" aria-label="File actions"
            tabindex="-1" data-side="bottom" data-align="start"
-           style="position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline"></div></td>
+           style="position-area: bottom span-self-x-end; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline"></div></td>
 </tr>
 ```
 
@@ -285,8 +285,16 @@ came from a ContextTrigger). Internally the Root holds the **placement** of the 
 type MenuPlacement =
   | { readonly kind: "anchor" }                                             // Menu.Trigger, foreign invoker, controlled, platform
   | { readonly kind: "point"; readonly x: number; readonly y: number;       // Menu.ContextTrigger
-      readonly generation: number; readonly source: HTMLElement };
+      readonly generation: number; readonly source: HTMLElement;
+      readonly pointerId: number | undefined;                               // deviation 9: re-capture after a move
+      readonly direction: "ltr" | "rtl" };                                  // wave 11 (#88): the popup's computed direction at this open or move
 ```
+
+`direction` is read by `openAt` from the popup element (`isRtl(popupRef.current)`,
+`menu-dom.ts`; the element exists while closed and `direction` is inherited, so it computes
+without a box), once per open and per move, and stored so the Popup's inline style stays a pure
+function of the placement (nothing is read during render or on the server). It picks which
+edge of the menu sits at the point (4.6).
 
 React state (`useState`), **written urgently** (a plain `setState` outside any transition,
 deviation 1; the first draft said `startTransition`): React entangles every transition update
@@ -372,7 +380,7 @@ Rendering per placement (the apply effect, the focus resolver and everything els
 | Placement | Inline style | `data-*` | `showPopover` `source` | `<style>` |
 | --- | --- | --- | --- | --- |
 | `anchor`, `side` set | `position-area`, `position-try-fallbacks` from `side` / `align` (Menu 3.3) | `data-side`, `data-align` | the Trigger (`triggerRef`), or none | no |
-| `point`, `side` set | `--menu-point-x`, `--menu-point-y`, the four inset longhands (`top: var(--menu-point-y)`, `right: auto`, `bottom: auto`, `left: var(--menu-point-x)`; longhands rather than `inset: auto` + two, which is equivalent and avoids React's warning about a shorthand and its longhands changing together, deviation 3), `position-area: none`, `position-try-fallbacks` = `--fsui-menu-up, --fsui-menu-left, --fsui-menu-up-left` (odd generations: `--fsui-menu-left, --fsui-menu-up, --fsui-menu-up-left`, section 4.3) | `data-context` | the region | yes (4.2) |
+| `point`, `side` set | `--menu-point-x`, `--menu-point-y`, the four inset longhands (longhands rather than `inset: auto` + two, which is equivalent and avoids React's warning about a shorthand and its longhands changing together, deviation 3): LTR `top: var(--menu-point-y)`, `right: auto`, `bottom: auto`, `left: var(--menu-point-x)`; RTL (`placement.direction === "rtl"`, wave 11) `top: var(--menu-point-y)`, `right: calc(100% - var(--menu-point-x))`, `bottom: auto`, `left: auto`; `position-area: none`; `position-try-fallbacks` = LTR `--fsui-menu-up, --fsui-menu-left, --fsui-menu-up-left`, RTL `--fsui-menu-up, --fsui-menu-right, --fsui-menu-up-right` (odd generations with the first two swapped, section 4.3) | `data-context` | the region | yes (4.2) |
 | `point`, `side={null}` | `--menu-point-x`, `--menu-point-y` only | `data-context` | the region | no |
 | `anchor`, `side={null}` | none | none | the Trigger, or none | no |
 
@@ -414,18 +422,26 @@ region's ancestors do (verified, `point-try-transform.mjs`). Context menus insid
 
 ```css
 /* @funstack/ui: placement of a menu at a point (design/components/context-menu.md 4.2).
-   Functional only. The base position is inline on the popup: left/top at the point. These
-   options mirror it around the point when it does not fit: upward, leftward, both. */
-@position-try --fsui-menu-up      { top: auto; bottom: calc(100% - var(--menu-point-y)); }
-@position-try --fsui-menu-left    { left: auto; right: calc(100% - var(--menu-point-x)); }
-@position-try --fsui-menu-up-left { top: auto; bottom: calc(100% - var(--menu-point-y));
-                                    left: auto; right: calc(100% - var(--menu-point-x)); }
+   Functional only. The base position is inline on the popup: top at the point and, by the
+   popup's direction, left (LTR) or right (RTL) at the point. These options mirror it around the
+   point when it does not fit: upward, across, both. A menu references the three for its
+   direction. */
+@position-try --fsui-menu-up       { top: auto; bottom: calc(100% - var(--menu-point-y)); }
+@position-try --fsui-menu-left     { left: auto; right: calc(100% - var(--menu-point-x)); }
+@position-try --fsui-menu-up-left  { top: auto; bottom: calc(100% - var(--menu-point-y));
+                                     left: auto; right: calc(100% - var(--menu-point-x)); }
+@position-try --fsui-menu-right    { right: auto; left: var(--menu-point-x); }
+@position-try --fsui-menu-up-right { top: auto; bottom: calc(100% - var(--menu-point-y));
+                                     right: auto; left: var(--menu-point-x); }
 ```
 
 Verified at the four corners in Chromium 156 and Firefox 157 (`anchor-point.mjs`: (780, 580)
-with a 120 × 80 popup lands at (660, 500)); `@position-try` is Chrome 125, Firefox 147, Safari
-26, so every stable engine has it. `100%` resolves against the viewport (the top layer's
-containing block), which is what `clientX` / `clientY` are measured in.
+with a 120 × 80 popup lands at (660, 500); the RTL pair in `rtl-point-and-submenu.mjs`: a point
+at (200, 200) puts a 120 px menu at 80..200, at (50, 200) it flips to 50..170, and the same
+inside an RTL container); `@position-try` is Chrome 125, Firefox 147, Safari 26, so every
+stable engine has it. `100%` resolves against the viewport (the top layer's containing block),
+which is what `clientX` / `clientY` are measured in. The two right-to-left options were added
+in wave 11 (#88, section 4.6); they are inert for an LTR menu, which never names them.
 
 Shipped as a **React 19 hoisted style**, rendered by `Menu.Popup` whenever it renders a point
 placement with `side !== null`:
@@ -471,7 +487,10 @@ somewhere else" and native menus simply appear at the new point. Two engine fact
   (300, 250) lands at (180, 170). Changing `position-try-fallbacks` clears it synchronously
   (verified in both engines), hence the two equivalent spellings of the fallback list,
   alternated by `generation` parity (the first two options are order-independent: only one of
-  them can fix a given overflow, and the third is needed only when neither does).
+  them can fix a given overflow, and the third is needed only when neither does). There is a
+  pair of spellings per direction (`MENU_POINT_FALLBACKS.ltr` / `.rtl`, wave 11); a move that
+  also changes direction (a `dir` toggled while the menu is open, then a right-click) changes
+  the list either way, so the remembered option is cleared in that case too.
 - Moving the point while the popup stays shown keeps the flip too (stability, by spec).
 
 So a move is: the ContextTrigger writes a new `point` placement (new `generation`, written
@@ -524,15 +543,38 @@ see it; a `tr` cannot contain a `span`) and **a transformed, filtered or contain
 misplaces the menu**, in different directions per engine, with no correction right in both
 (research 2). Rejected with the user's decision to allow positioning-only shipped CSS.
 
-### 4.6 Keyboard, scrolling, RTL
+### 4.6 Keyboard, scrolling, direction
 
 The keyboard uses the point path: the engines put the coordinates on the focused element
 (research 1), and an element-anchored fallback would break for a large focused region (a
 canvas) where "below the element" is off-screen. While open the page scrolls under the menu
 (the point is in viewport coordinates and the popup is fixed; native menus block scrolling
-instead; light dismiss does not run on scroll); close-on-scroll is a follow-up. Placement is
-physically bottom-right of the point in v1; RTL platforms open native menus to the left of the
-cursor, which the respelled rules could do later (`--fsui-menu-left` first) and is a follow-up.
+instead; light dismiss does not run on scroll); close-on-scroll is a follow-up (#88, Part B).
+
+**Direction** (wave 11, #88; `docs/research/positioning-wave11.md` 3, conventions 13.4).
+Native context menus open to the **left** of the pointer under a right-to-left UI: Chromium
+Views flips its anchor when `base::i18n::IsRTL()`, Gecko's XUL popup follows the chrome
+document's direction, GTK flips for `GTK_TEXT_DIR_RTL`, AppKit follows
+`NSMenu.userInterfaceLayoutDirection`. Every one of them reads the **browser or OS UI locale**;
+none reads the page's `dir`, which a page cannot influence anyway. A FUNSTACK menu is page
+content whose items are laid out by the page's direction, so the in-page counterpart of that
+convention is the **popup's computed `direction`**: in RTL the menu's right edge sits at the
+point and the fallbacks mirror (rightward instead of leftward). The popup's direction rather
+than the region's, because it is what lays out the items; a region in an LTR table whose menu
+is rendered under a `dir="rtl"` ancestor gets an RTL menu and an RTL placement together.
+
+Mechanics: `openAt` reads `isRtl(popup)` once per open and per move and stores
+`placement.direction` (3.1); the Popup renders, for `"rtl"`, `right: calc(100% -
+var(--menu-point-x)); left: auto` and `position-try-fallbacks: --fsui-menu-up,
+--fsui-menu-right, --fsui-menu-up-right` (3.3), two shipped options more (4.2). Physical insets
+are used on purpose: insets have no `self-*` form, which makes this the one placement in the
+library that reads `direction` in JS (conventions 13.1 rule 2's exception), and insets are
+also why the Firefox parent-direction bug (Mozilla 2019601, conventions 13.3) does not affect
+the point path: verified in an RTL container and an RTL page in both engines. `--menu-point-x`
+is still the point's x coordinate in either direction; a `side={null}` consumer who wants the
+mirrored placement writes `right: calc(100% - var(--menu-point-x))` in their own rule (4.4).
+The touch offset of Part B is to be applied in the same place, toward the side the menu opens
+on.
 
 ---
 
@@ -789,7 +831,7 @@ path).
 ```css
 .menu[data-context] { inset: auto; left: var(--menu-point-x); top: var(--menu-point-y); position-try-fallbacks: --mine; }
 @position-try --mine { top: auto; bottom: calc(100% - var(--menu-point-y)); }
-.menu:not([data-context]) { position-area: bottom span-right; }
+.menu:not([data-context]) { position-area: bottom span-self-x-end; }   /* self-*: follows the menu's direction (conventions 13.1) */
 ```
 
 ---
@@ -851,7 +893,8 @@ true, clientX, clientY, button: 2, buttons: 2, pointerId })`; jsdom 30's `Pointe
 | Move | A second `contextmenu` inside the region while open: no `openChangeAction` dispatch; after the commit the inline variables are the new point and the fallback list is the other spelling; the shim saw `hidePopover` then `showPopover({ source })` once each (or, with the respell-only implementation, neither: assert the spelling and the focus); the first item is focused again; a pending item action keeps `data-pending`; a move during a pending open (deferred `openChangeAction`): on resolve the popup shows at the latest point, one `showPopover`. |
 | Outside close (every menu) | With the menu open (opened from a Trigger **and**, separately, from the region): a `contextmenu` on the document body → `hidePopover` at once (before any `await`), `openChangeAction(false, "dismiss")` after the shim's `toggle`; a middle `pointerdown` outside likewise; a `contextmenu` inside the popup → `defaultPrevented`, no hide, no move; a `contextmenu` on an editable target inside the region while open → hide (unmarked event); a `contextmenu` with `stopPropagation()` in a child → nothing (documented cost); listeners are removed after close (dispatch after close → no further calls); a submenu installs none. |
 | Dual-trigger Root | Trigger click → anchored inline style, `data-side`, `showPopover({ source: trigger })`; region → point style, `data-context`, `showPopover({ source: region })`; Trigger `aria-expanded="true"` and `data-open` during a context open; Trigger click while context-open → `requestClose` (`"activate"`); a context open after a Trigger open renders the point style (placement switches both ways); two ContextTriggers in one Root: the right-clicked one is the `source`. |
-| `<style>` resource | After the first point open, `document.head` holds exactly one `<style>` whose text contains `@position-try --fsui-menu-up`; a second Root's point open adds none; `side={null}` renders none and the popup's inline style has only the two custom properties and no `inset` / `left` / `top` / fallbacks; an anchored-only Root renders none ever. |
+| `<style>` resource | After the first point open, `document.head` holds exactly one `<style>` whose text contains `@position-try --fsui-menu-up` and the five option names (wave 11); a second Root's point open adds none; `side={null}` renders none and the popup's inline style has only the two custom properties and no `inset` / `left` / `top` / fallbacks; an anchored-only Root renders none ever. |
+| Direction (wave 11) | With `getComputedStyle` stubbed to `direction: "rtl"` for the popup: a `contextmenu` renders `right: calc(100% - var(--menu-point-x))`, `left: auto`, `top` from the variable, and a fallback list naming `--fsui-menu-right` and `--fsui-menu-up-right` (odd generation: `--fsui-menu-right` first); `--menu-point-x` is still `<clientX>px`; a move after the stub flips back to `"ltr"` renders `left` from the variable and the LTR list; `data-context` and `data-side` unchanged. |
 | Closing paths as Menu | Item activation closes through the root Root with `"activate"`; Escape (`hidePopover()` in the shim) notifies `"dismiss"`; Tab-out closes; a controlled `open={false}` hides without a dispatch. |
 | Focus return | After a context open with focus on `<body>` and a `Menu.Trigger` in the Root, a hide with the focus-inside probe → the Trigger is focused (6.2 rule); without a Trigger nothing is focused (`activeElement === body`). |
 | Suspense / rejection | Items suspend on open: `showPopover` not called, `data-pending` on the region (and the Trigger); resolve → shown at the point. `openChangeAction` rejects: `data-open` gone, nothing shown, the catcher above the Root has it. |
@@ -891,6 +934,7 @@ assert the documented degraded behaviour rather than skipping.
 | ViewTransition | With `transition`: a context open calls `startViewTransition` once; a move zero times; an outside right-click close **once** (deviation 8: as Escape in `menu.browser.test.tsx`, the dismissal's notification commit runs a view transition with the popup already hidden; the first draft said zero); item activation once. Without `transition`: zero. | assert on all three |
 | `<style>` once | Two Roots opened from their regions: one `<style>` in `<head>`; the computed `position-try-fallbacks` of the popup names the library options. | none |
 | Exit animation | After the outside right-click close with the docs CSS and no `transition`: items held until `getAnimations()` settle. | Firefox: no CSS exit, unmount with the commit (as Menu). |
+| RTL point placement (wave 11) | Under `document.documentElement.dir = "rtl"`: right-click at (x, y) in the middle: the popup's **right** edge is at x (±1 px) and its top at y; at (20, y): its left edge is at 20 (flipped rightward, `--fsui-menu-right`); at (20, viewport.height − 20): left edge 20 and bottom edge at y (`--fsui-menu-up-right`); a move to the middle lands right-edge-at-point again (the remembered flip was cleared). The same with `dir="rtl"` on a wrapper around the region and Popup in an LTR document, and once more with an LTR region whose Popup is rendered under an RTL wrapper (the popup's direction wins). | none: the point path uses insets, which Mozilla 2019601 does not affect (verified), so the container case has no Firefox branch. |
 
 ---
 
@@ -904,7 +948,7 @@ packages/ui/src/menu/
   menu-context.ts            # + MenuPlacement / ANCHOR_PLACEMENT, openAt / resetPlacement in the context, markHandled / isHandledBy (a WeakMap event → root popup ref), claimedPresses (M1), MenuRegionContext (deviation 6)
   menu-context-trigger.test.tsx, menu-context-trigger.browser.test.tsx
 packages/ui/src/internal/
-  anchor-position.ts         # + MENU_POINT_RULES, MENU_POINT_FALLBACKS (two spellings), MENU_POINT_X / _Y names (directive-free)
+  anchor-position.ts         # + MENU_POINT_RULES (five options since wave 11), MENU_POINT_FALLBACKS ({ ltr, rtl }, two spellings each), MENU_POINT_X / _Y names (directive-free)
   use-popover-popup.ts       # + `source` option (per-open source element), `reshow()` (hide + show under the opening flag)
 packages/ui/src/__tests__/browser-commands.ts  # + `mouse` command (page.mouse with frame-mapped points); popover-shim.ts unchanged
 packages/ui/vitest.config.ts                   # registers the command
@@ -951,6 +995,9 @@ packages/ui/vitest.config.ts                   # registers the command
   Render it only when `placement.kind === "point" && side !== null`.
 - **Point style** goes through `useRender`'s `style` as the anchored one does, so the
   consumer's `style` still wins; custom properties are plain keys (`"--menu-point-x": "312px"`).
+  `pointStyle(point, stylesheetOwned)` branches on `point.direction` for the inset pair and
+  the fallback list (3.3); `openAt` fills `direction` from `isRtl(popover.popupRef.current)`
+  (`"ltr"` when the popup is not mounted, in which case nothing opens anyway).
 - **Details**: the open dispatch builds `createActionDetails(event, { reason: "activate" })`
   through the Root's existing factory; nothing new.
 - **Dev warnings** per section 8.
@@ -1045,3 +1092,44 @@ All ten accepted as implemented:
 10. **The jsdom `setPointerCapture` stub is local to the test file**, not the shim: the Slider
     and NumberField suites install their own stubs only when the method is missing (13.1). The
     `mouse` browser command (`page.mouse`, frame-mapped) is generic and bounded.
+
+---
+
+## Amendment: wave 11 follow-ups (issue #88)
+
+Status: **proposed** (Part A, 2026-10-23). Inputs: `docs/research/positioning-wave11.md`
+(Part A, binding verdicts), `docs/research/interaction-wave11.md` (Part B), conventions 13.
+Each part edits the sections above in place and keeps its audit trail here.
+
+### Part A: direction-aware point placement (2026-10-23)
+
+Edited in place: decisions 4 and 14, 3.1 (`placement.direction`), 3.3 (the point row), 4.2
+(five options), 4.3 (spellings per direction), 4.6 (the direction rule and the platform
+survey), 13.1, 13.2, 14.
+
+| | v1 (as accepted) | Wave 11 |
+| --- | --- | --- |
+| Edge at the point | the menu's left edge, always | its left edge in an LTR menu, its **right** edge in an RTL one (the popup's computed `direction`, read once per open and per move) |
+| Fallbacks | up, left, up-left | LTR as before; RTL up, right, up-right |
+| Shipped options | three | five (`--fsui-menu-right`, `--fsui-menu-up-right` added; an LTR menu never names them) |
+| `MenuPlacement` point record | `x`, `y`, `generation`, `source`, `pointerId` | plus `direction` |
+| Firefox 2019601 | n/a | does not apply (insets), verified in an RTL container |
+
+Why the popup's direction and not the UI locale that native menus use: conventions 13.4. Why a
+JS read here when every anchored placement avoids one: insets have no `self-*` form, and the
+read is one `getComputedStyle` per open on an element the region already holds; it is stored in
+state so the Popup's style stays a pure function and the server renders nothing for it.
+
+Migration: an RTL menu (page or container) now opens to the left of the point; the
+`<style>` text grows by two options (the jsdom row counts five). A `side={null}` consumer
+rule is unaffected (`--menu-point-x` keeps its meaning).
+
+Question for the product owner: **direction from the popup's computed `direction`**, as above,
+rather than from the region or the document. Recommendation: confirm.
+
+### Part B: press-drag-release, touch offset, close-on-scroll, CSP nonce, review L1 / L4
+
+To follow once `docs/research/interaction-wave11.md` is read (not started in Part A). Hooks
+left for it: the touch offset applies in `pointStyle` toward the side the menu opens on (4.6);
+close-on-scroll joins the document listeners of section 5; the `nonce` reaches the hoisted
+`<style>` of 4.2; L1 is the placement reset condition of 3.1; L4 is a browser row in 13.2.

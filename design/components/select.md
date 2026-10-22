@@ -640,8 +640,11 @@ selectedcontent .icon { inline-size: 1em; }          /* the clone, not the optio
 }
 .select:open::picker(select) { opacity: 1; @starting-style { opacity: 0; } }
 
-/* 5. Placement: the UA anchors the picker to the select; override the UA's position. */
-.select::picker(select) { position-area: block-end span-inline-end; position-try-fallbacks: flip-block; }
+/* 5. Placement: the UA anchors the picker to the select; override the UA's position. The
+   `self-*` keywords follow the select's own direction (a `dir="rtl"` container included); plain
+   logical keywords would follow the root, since the picker is in the top layer (conventions
+   13.1; the UA's own fallbacks use `self-*` too, w3c/csswg-drafts#13738). */
+.select::picker(select) { position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; }
 
 @media (prefers-reduced-motion: reduce) { .select::picker(select), .select::picker-icon { transition: none; } }
 ```

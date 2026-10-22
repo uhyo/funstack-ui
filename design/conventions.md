@@ -71,6 +71,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
 | 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
+| 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13, wave 11: #20, #53, #88). |
 
 ---
 
@@ -995,6 +996,15 @@ Rules:
   new point, #45) is not a state change: no dispatch, the part re-shows the popover under its
   own "opening" flag so the coalesced `toggle` (`open` → `open`) notifies nothing, and the
   component doc says what else the move does (focus, pointer capture).
+- **Resolved placement is browser-owned geometry, observed** (wave 11, #20, section 13). Which
+  `position-try-fallbacks` option the browser applied is read from the computed style of the
+  shown popup (`position-area`) and mirrored into a plain `useState` in the part, written
+  **urgently** from platform events (`toggle`, a `ResizeObserver`, `scroll`, `resize`) and
+  only when the value changed, so a popup that did not flip costs no render. It is exposed as
+  `data-side` / `data-align` / `state.side` / `state.align` (section 4.1) and is never the
+  source of anything: the browser keeps placing the popup; the library only reports where.
+  Same lane as the context menu's placement (#45): a transition write would wait for an
+  unrelated pending action and the arrow would point the wrong way meanwhile.
 - Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
   dispatches use `"activate"`.
 - A **module-level registry** is an allowed shape for a cross-component fact the DOM does not
@@ -1235,6 +1245,8 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `complete` | boolean | Progress, every part | The clamped value reached `max` (#68). |
 | `context` | boolean | `Menu.Popup` | The current open came from a `Menu.ContextTrigger` and the popup is placed at a point: `--menu-point-x` / `--menu-point-y` are set inline and `data-side` / `data-align` are absent (#45). Written urgently with the placement (geometry, not a dispatch): present from the point open's request until the popup is hidden and its exit is over (`design/components/context-menu.md` 3.1). |
 | `region` | `"optimum" \| "suboptimum" \| "even-less-good"` | Meter, every part | HTML's meter region for the value against `low` / `high` / `optimum`, the platform's words (#68). |
+| `side` | `"top" \| "bottom" \| "left" \| "right"` while shown; the requested `side` (which may be `"inline-start"` / `"inline-end"`) otherwise | Tooltip, Popover and Menu `Popup`; Tooltip `Arrow` | **The resolved side** (#20, section 13): while the popup is shown, the side of the anchor the browser actually placed it on, read from the computed `position-area` after `position-try-fallbacks` chose an option, so it changes after a flip (on open, on scroll, on resize); on the server, while closed, and when the computed value cannot be read (a vertical writing mode, a consumer `position-area` the parser does not know), the value of the `side` prop. Absent with `side={null}` and on a point-placed menu (`context`). Written urgently (geometry, observed; conventions 3.5). |
+| `align` | `"start" \| "center" \| "end"` | same parts | The resolved alignment along that side, same rules. `start` / `end` are **inline-relative** on a top / bottom side (`start`: the popup's inline-start edge meets the anchor's; mirrored under `direction: rtl`) and block-relative on a left / right / inline side (`start`: top edges meet). |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
 their value. Negative pairs (`data-closed`, `data-unchecked`) are not emitted; use `:not([data-open])`.
@@ -1887,6 +1899,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 | Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
 | Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
+| Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter). Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open and after a scroll that forces a flip, back on close; `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
 
 ViewTransition cannot be observed in jsdom (`document.startViewTransition` is absent and React
 falls back silently). jsdom tests assert that components render with and without `transition`
@@ -1968,8 +1981,9 @@ The library ships no visual CSS: no reset, no theme, no colours, sizes or motion
 may ship **functional at-rules** it needs and cannot express inline, under these rules:
 
 - **Only at-rules with no selectors** (`@position-try` options for placement are the first
-  case, `Menu.Popup`'s point placement, `design/components/context-menu.md` 4.2). Nothing
-  cascades onto any element; the inline `style` the part renders is what references the rules.
+  case, `Menu.Popup`'s point placement, `design/components/context-menu.md` 4.2: five options
+  since wave 11, the two mirrored ones for a right-to-left menu, #88). Nothing cascades onto
+  any element; the inline `style` the part renders is what references the rules.
 - **Rendered by the part that needs them**, as a React 19 hoisted style, never as a stylesheet
   file the consumer imports: `<style href="@funstack/ui/<name>" precedence="fsui">`. React moves
   it into `<head>` in the commit (before layout effects), deduplicates it by `href` across
@@ -1987,6 +2001,219 @@ may ship **functional at-rules** it needs and cannot express inline, under these
   (`internal/anchor-position.ts`), as a string constant, and is covered by a jsdom row (one
   `<style>` in `document.head` after use, none without) and a browser row (the computed
   property names the option).
+
+---
+
+## 13. Anchored placement
+
+**Proposed 2026-10-23** (wave 11: #20 resolved side, #53 container RTL, #88 RTL point
+placement; `docs/research/positioning-wave11.md`, whose verdicts are binding). Applies to every
+part that places a top-layer element against an anchor: Tooltip, Popover and Menu `Popup` (the
+`side` / `align` matrix), Combobox `Popup` (fixed keywords) and the Select docs recipe for
+`::picker(select)`; and to the one part placed at a point (Menu's context open). The per-part
+details and migration notes are in the component documents' wave 11 amendments.
+
+### 13.1 Keyword policy
+
+The browser places the popup (vision principle 5); the library emits `position-area` and
+`position-try-fallbacks` inline and reads nothing to choose them. Three rules follow from how
+the spec resolves keywords on a top-layer element (css-anchor-position-1 §3.1.2: a **plain**
+logical keyword refers to the writing mode of the **containing block**, which for a popover in
+the top layer is the initial containing block, so the root's direction; a **`self-*`** keyword
+refers to the popup's **own** writing mode, which it inherits from its DOM parent):
+
+1. **Never a plain logical keyword** (`block-end`, `span-inline-end`, `end`) on a top-layer
+   popup. It ignores a `dir="rtl"` container (#53) and the CSSWG resolved this is intended
+   (w3c/csswg-drafts#13734; #13738 moved the customizable-select picker to `self-*` for the
+   same reason). The physical keywords (`top`, `span-right`) and the `self-*` group are the
+   library's whole vocabulary.
+2. **Direction-following placement uses `self-*` keywords, never a JS read of `direction` to
+   pick physical ones.** The popup inherits `direction` from the DOM parent the consumer
+   rendered it in, so `self-x-end` is "the popup's inline-end" with no script, no stale value
+   when `dir` changes, and the right answer on the server. (The exception is a popup with no
+   anchor, 13.4: insets have no `self-*` form.)
+3. **Keyword groups cannot be mixed.** `block-end span-self-inline-end` and `bottom span-end`
+   are invalid and dropped at parse time. Valid pairs are one group each: physical with
+   `self-x-*` / `self-y-*` (`bottom span-self-x-end`, `self-x-end span-bottom`), or
+   `self-block-*` with `span-self-inline-*` (`self-block-end span-self-inline-end`). The
+   combobox note "Firefox lacks `span-self-inline-end`" was this trap, not an engine gap: BCD
+   lists every `self-*` keyword in Chrome 129+, Firefox 147+, Safari 26+.
+
+The matrix the shared helper (`internal/anchor-position.ts`, directive-free) emits, assuming
+`horizontal-tb` (the library does not design for vertical writing modes; `block-start` /
+`block-end` would add nothing over `top` / `bottom` there):
+
+```ts
+export type AnchorSide = "top" | "bottom" | "left" | "right" | "inline-start" | "inline-end";
+export type PhysicalSide = "top" | "bottom" | "left" | "right";
+export type AnchorAlign = "start" | "center" | "end";
+export function positionArea(side: AnchorSide, align: AnchorAlign): string;
+```
+
+| `side` \ `align` | `start` | `center` | `end` |
+| --- | --- | --- | --- |
+| `top` | `top span-self-x-end` | `top` | `top span-self-x-start` |
+| `bottom` | `bottom span-self-x-end` | `bottom` | `bottom span-self-x-start` |
+| `left` | `left span-bottom` | `left` | `left span-top` |
+| `right` | `right span-bottom` | `right` | `right span-top` |
+| `inline-start` | `self-x-start span-bottom` | `self-x-start` | `self-x-start span-top` |
+| `inline-end` | `self-x-end span-bottom` | `self-x-end` | `self-x-end span-top` |
+
+- **`side`**: `top` / `bottom` / `left` / `right` are physical, as before. `inline-start` /
+  `inline-end` (new) follow the popup's direction: `inline-end` is the right of the anchor in
+  LTR and its left in RTL. Menu's submenu default is `inline-end`, so the submenu opens on the
+  side the already-mirrored ArrowRight / ArrowLeft keys point to. Vertical logical sides are
+  not offered (see above).
+- **`align`** on a horizontal side (`top` / `bottom`) is **inline-relative**: `start` aligns
+  the popup's inline-start edge with the anchor's (`span-self-x-end`: the popup spans toward
+  the popup's inline-end), `end` the inline-end edges. On a vertical or inline side it is
+  block-relative and physical: `start` aligns the top edges (`span-bottom`), `end` the bottom
+  edges. In an LTR document nothing changes from the previous physical matrix; under RTL,
+  `start` / `end` are now mirrored, as a reader of "start" expects and as React Aria and the
+  direction-aware Floating UI libraries do.
+- **`center`** stays the single-keyword form (the span-all cell is `anchor-center` aligned).
+- `position-try-fallbacks` is unchanged (`flip-block, flip-inline, flip-block flip-inline`;
+  `flip-inline` for a submenu). The `flip-*` tactics flip the containing block's axes, which in
+  `horizontal-tb` are the x and y axes whatever the direction, so they apply to `self-x-*`
+  tokens too (verified: `self-x-end span-bottom` flips to `self-x-start span-top`).
+- **Combobox** uses the fixed `self-block-end span-self-inline-end` with `flip-block` (no
+  `side` / `align`); **Select**'s docs recipe for `::picker(select)` uses the same spelling.
+
+### 13.2 Resolved placement: `data-side` is where the popup is
+
+Every engine reports the **applied** `position-try-fallbacks` option in
+`getComputedStyle(popup).positionArea`, synchronously after `showPopover()`, in the `toggle`
+event and inside a `scroll` handler (research 1; Chromium and Firefox probed, WebKit by source:
+the chosen option is a full style resolution). So the library can tell where the popup landed
+with no geometry: parse the computed value, map it to a physical side and an alignment. This
+replaces the requested-value echo that made an arrow point the wrong way after a flip (#20)
+and answers tooltip.md's "a resolved `data-side` is exactly the positioning JS the design
+avoids": it is observation, the browser still places.
+
+**One vocabulary, one meaning.** `data-side` / `data-align` and `state.side` / `state.align`
+**are the resolved placement while the popup is shown** and the requested values otherwise (on
+the server, while closed, and when the computed value cannot be mapped). No second attribute
+(`data-resolved-side`): a CSS recipe for an arrow or a gap would otherwise need two selectors,
+and nobody needs "the side I asked for" as an attribute, since they asked for it. Floating
+UI-based libraries (Radix, Base UI) expose the resolved side under the same name.
+
+The parser (`parsePositionArea(value, selfDirection, rootDirection)` in
+`internal/anchor-position.ts`, pure, total: it returns `null` rather than throwing) maps the
+full keyword grammar in `horizontal-tb`:
+
+- The side token is the one that is neither `center`, `span-all` nor `span-*`. Physical tokens
+  map directly; `self-x-*` / `self-inline-*` through the popup's computed `direction`;
+  `x-*` / `inline-*` through the root's (read lazily, only when such a token appears: a
+  consumer `style` override may use them); `y-*` / `block-*` / `self-block-*` and a bare
+  `start` / `end` / `self-start` / `self-end` in first position are the block axis (`top` /
+  `bottom`).
+- The align token is the `span-*` token, mapped to a physical direction the same way, then to
+  `start` / `end` relative to the side's cross axis (inline-relative on a horizontal side: the
+  popup's inline-end is `start`; block-relative on a vertical side: bottom is `start`). No
+  span token, `center` or `span-all` is `center`.
+- Engines serialise in grammar order and in short logical forms: `span-left top`, `top`,
+  `self-end span-self-end`, `span-self-x-end bottom`, `self-x-start span-top`; Firefox writes a
+  flipped single keyword as `span-all bottom` where Chromium writes `bottom`
+  (`computed-serialization.mjs`). The jsdom row feeds the parser exactly these strings.
+- `none`, an empty value, a vertical `writing-mode` on the popup, or any token the table does
+  not know → `null`: the part keeps the requested values. The parser is only ever run on a
+  shown popup.
+
+The observer (`internal/use-resolved-placement.ts`, `"use client"`, shared by Tooltip, Popover
+and Menu) is a hook: `useResolvedPlacement({ side, align }) → { side, align, ref }`. The part
+merges `ref` into its popup element's ref and renders the returned values.
+
+- **Sources.** A `ResizeObserver` on the popup from mount: a popover going from hidden to
+  shown is a resize (`0 × 0` to its size), delivered after layout and **before paint**, so the
+  first painted frame already carries the resolved side; a content resize while shown can
+  change the fit, so it reads again; hidden again is a reset. `toggle` on the popup (open:
+  read, and install the two listeners below; closed: remove them and reset); it is also what
+  drives the jsdom row, which has no `ResizeObserver`. While shown: `scroll` on the document
+  (capture, passive: nested scrollers included) and `resize` on the window. Reading inside the
+  `scroll` handler already returns the new option; no `requestAnimationFrame`.
+- **Write.** A plain `useState` in the part, written only when `side` or `align` changed
+  (section 3.5); `null` while not shown. Returned value: the resolved pair, else the requested
+  one. A popup that opens without flipping costs **no render**, which keeps Tooltip's "no React
+  work per hover" (tooltip.md 4.1); a flip costs one render on open and one on close. The
+  "only when changed" rule also terminates the `ResizeObserver` loop a consumer's
+  `[data-side]` padding rule could otherwise start.
+- **Idle** with `side={null}` (the stylesheet owns placement; the parser cannot interpret
+  consumer `@position-try` rules that set insets) and for a point-placed menu (no anchor): no
+  reads, nothing emitted, as today.
+- **Not covered.** An anchor that moves through a layout shift with no scroll or resize; the
+  next scroll corrects it. Chromium's anchored container queries
+  (`@container anchored(fallback: …)`) would give a pure-CSS signal but are Chromium-only
+  (BCD 143; Gecko and WebKit have no position), so they are a documented consumer recipe for
+  `side={null}`, not library code.
+- **Known cosmetic limit.** `@starting-style` is computed at the first style resolution after
+  the show, before the observer's write lands, so an entry animation keyed on `data-side`
+  (`[data-side="top"] { @starting-style { translate: 0 4px } }`) starts from the **requested**
+  side's starting values when a flip occurred, then transitions to the resolved side's. Key
+  entry animations on something direction-neutral (opacity, scale), or accept a reversed
+  4 px slide on the rare flipped open. The exit uses the resolved values throughout.
+- The hook attaches native listeners through the ref (section 7.4) and is independent of the
+  trigger mechanism: it runs on Tooltip's native `interestfor` path as well, where the
+  interaction effect attaches nothing. The research-era reading of "attach nothing" was about
+  interaction; this is observation. (Product-owner question in tooltip.md.)
+
+### 13.3 The Firefox parent-direction bug (Mozilla 2019601)
+
+When the popup's **parent box** has a different `direction` from the root (an RTL island in an
+LTR page, or an LTR island in an RTL page; `display: contents` ancestors do not count), Firefox
+applies the inline-axis alignment offset of any `position-area` cell mirrored, **physical
+keywords included**: `bottom span-right` under a 300..500 px anchor lands at −80 instead of
+300. Every anchored FUNSTACK popup rendered inside such an island is misplaced in Firefox
+today, independently of the keyword change above; the block axis and `anchor()` insets (the
+point-placed menu) are unaffected.
+
+- **No workaround ships.** `anchor()` insets fix `start` / `end` but not `center`
+  (`anchor-center` is broken too), and a wrapper box with the root's direction changes layout
+  and cannot be chosen on the server. One engine's bug does not earn a fallback (vision, browser
+  support policy).
+- **Tests assert the degradation.** `src/__tests__/engine.ts` gains
+  `anchorPositionHonoursParentDirection`, a synchronous runtime probe (an RTL `div` holding a
+  physical-keyword popover shown against an anchor inside it; `true` when the inline edge lands
+  where the keyword says). Container-RTL browser rows branch on it, assert the mirrored
+  placement where it is `true` and the documented misplacement where it is `false`, with a
+  comment naming the bug, so the day Firefox fixes it the row fails and the branch is deleted.
+  `browserName === "firefox"` is not used: Playwright's Firefox may be ahead of the release.
+- **Human task** (never filed from an agent): comment on Mozilla 2019601 with the reduction
+  in `docs/research/positioning-wave11.md` ("Upstream reports"), and suggest duplicating
+  2050071 into it. Recorded in this repository's issue #53.
+
+### 13.4 Placement at a point and direction
+
+A popup with **no anchor** (Menu's context open, `design/components/context-menu.md` 4) is
+placed with insets, which have no `self-*` form, so this is the one place the library reads
+`direction` in JS: `getComputedStyle(popup).direction` (`isRtl(popup)` in `menu-dom.ts`), read
+**once per open and per move** by the region's `openAt` and stored in the placement record,
+so the Popup's inline style stays a pure function of state and the server never reads anything.
+The popup's direction, not the region's or the OS locale's: a native RTL context menu opens to
+the left of the pointer because the **UI** is RTL (Chromium Views `base::i18n::IsRTL()`, Gecko's
+chrome document, GTK's `default:RTL`, AppKit's layout direction; no platform reads the page's
+`dir`), and for an in-page menu the content direction is the counterpart, since it governs how
+the items read. In RTL the menu's **right** edge sits at the point (`right: calc(100% -
+var(--menu-point-x)); left: auto`) and the shipped `@position-try` options are mirrored
+(`--fsui-menu-right`, `--fsui-menu-up-right`, section 12: five options in all). The Firefox bug
+of 13.3 does not apply to insets.
+
+### 13.5 Migration (0.1.0-alpha.9)
+
+- `data-side` / `data-align` / `state.side` / `state.align` change meaning while shown:
+  resolved, not requested. CSS that used them for an arrow or a gap now follows flips (the
+  intent); code that wanted the requested value reads its own prop.
+- `align="start"` / `"end"` on a `top` / `bottom` side are inline-relative: unchanged in LTR,
+  mirrored under `direction: rtl`.
+- `side` gains `"inline-start"` / `"inline-end"` (Tooltip, Popover, Menu). The state types
+  widen accordingly: an exhaustive switch over `TooltipSide` / `PopoverSide` / `MenuSide` gains
+  two cases, and `state.side` is physical only while shown.
+- Menu's submenu default side is `inline-end`: in RTL the submenu opens on the left and its
+  `data-side` is `left` while shown; the docs' gap rule covers both sides.
+- Combobox's listbox follows a `dir="rtl"` container (Chromium, WebKit; Firefox under 13.3).
+- A context menu in an RTL popup opens to the left of the point; the shipped stylesheet has
+  five options instead of three.
+- The Tooltip docs sentence "`data-side` is the side you asked for" and the Popover / Menu
+  props tables are updated by hand (CLAUDE.md, docs site).
 
 ---
 

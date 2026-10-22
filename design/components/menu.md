@@ -46,7 +46,7 @@ with a view transition in every engine.
 | 4 | Checkbox / radio items | `CheckboxItem` (`checked` / `defaultChecked` / `checkedChangeAction`) and `RadioGroup` (`value` / `defaultValue` / `valueChangeAction`) are state owners with `useOptimistic`: `aria-checked` and `data-checked` flip at once, `data-pending` while the action runs, rollback on rejection. **They keep the menu open by default** (APG: Space toggles without closing; toggling several options is the use case); `closeOnActivate` on every item kind overrides the default either way (`Item` defaults to `true`). |
 | 5 | Keyboard | APG Menu Button + Menu: Enter / Space / ArrowDown open with the first item focused, ArrowUp with the last; Up / Down move (wrap by default, `loop={false}` stops), Home / End, typeahead, Enter / Space activate, Escape closes the innermost menu, Tab / Shift+Tab close the whole stack and move on, ArrowRight / ArrowLeft open / close submenus (mirrored under `direction: rtl`). Disabled items are focusable (`aria-disabled`) and never activate. |
 | 6 | Focus model | Real DOM focus on items (roving: `tabindex="-1"` on every item, focus moved by script), never `aria-activedescendant`. On every open the first item is focused (last for ArrowUp) through the Popover hook's `autofocus` write; a hover-opened submenu keeps focus on its trigger. Pointer movement over an item focuses it, so keyboard and pointer always agree on the current item; pressing non-item space (padding, a separator) never moves focus off it. Whether the item shows a ring after a pointer open is the engine's `:focus-visible` heuristic (WebKit may show one; 6.1). |
-| 7 | Submenus | A nested `Menu.Root` whose `Menu.SubmenuTrigger` is an item of the parent menu. Opened with `showPopover({ source: submenuTrigger })` (nested auto popover: the parent stays open, siblings close each other), placed `side="right" align="start"` with `position-try-fallbacks: flip-inline`. Opened by ArrowRight / Enter / Space / click (first item focused) or by hover intent (`delay` 100 ms, no focus move); closed by ArrowLeft, Escape (innermost only), hover leaving to a sibling item (`closeDelay` 150 ms), or the stack closing. Focus returns to the SubmenuTrigger through Popover 6.2's rule (the platform restores nothing for nested popovers). |
+| 7 | Submenus | A nested `Menu.Root` whose `Menu.SubmenuTrigger` is an item of the parent menu. Opened with `showPopover({ source: submenuTrigger })` (nested auto popover: the parent stays open, siblings close each other), placed `side="inline-end" align="start"` (`self-x-end span-bottom`: the right of the item in LTR, its left in RTL, the side the mirrored arrow keys point to; wave 11, #53; `side="right"` before) with `position-try-fallbacks: flip-inline`. Opened by ArrowRight / Enter / Space / click (first item focused) or by hover intent (`delay` 100 ms, no focus move); closed by ArrowLeft, Escape (innermost only), hover leaving to a sibling item (`closeDelay` 150 ms), or the stack closing. Focus returns to the SubmenuTrigger through Popover 6.2's rule (the platform restores nothing for nested popovers). |
 | 8 | Hover intent (research Q5) | Timers only: `delay` / `closeDelay` on the submenu's `Menu.Root`, defaults 100 / 150 ms, implemented with the same small internal timer helper Tooltip's interaction uses for its delays, **not** Tooltip's interaction hook (focus, blur, document listeners and `interestfor` do not apply). No "safe triangle" in v0; `closeDelay` covers a diagonal move into the submenu. `interestfor` is not used (research: opens on focus and collapses the stack on Escape). |
 | 9 | `experimental_focusgroup` | On `Menu.Popup`: renders `focusgroup="menu wrap|nowrap"` (`wrap` from `loop`), detected with `"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore` (#43); on the native path items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out of the group) and the JS Up / Down / Home / End branch steps aside. Typeahead, Enter / Space, submenu keys and Tab-closes-stack stay JS everywhere. |
 | 10 | Closing the stack on Tab | A `focusout` listener on the **root** menu's Popup: when `relatedTarget` is outside the menu tree (the root Popup's subtree, which contains every submenu as a DOM descendant, since nothing portals), the root Popup hides itself (`hidePopover()`, the platform hides nested popovers) and every Root is notified with `reason: "dismiss"`. A null `relatedTarget` (window blur) closes nothing. |
@@ -100,8 +100,9 @@ Rendered HTML (closed; ids come from one `useId` per Root):
         aria-haspopup="menu" aria-expanded="false">Actions</button>
 <div id="_r_1_" popover="auto" role="menu" aria-labelledby="_r_1_-trigger"
      data-side="bottom" data-align="start"
-     style="position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline">
-  <!-- children render on open (default); shown here as they will be -->
+     style="position-area: bottom span-self-x-end; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline">
+  <!-- children render on open (default); shown here as they will be. `data-side` / `data-align`
+       are the resolved placement while shown (conventions 13.2): `top` here if the menu flipped. -->
   <button type="button" role="menuitem" tabindex="-1">Rename</button>
   <button type="button" role="menuitem" tabindex="-1">Archive</button>
   <hr>
@@ -117,8 +118,11 @@ Rendered HTML (closed; ids come from one `useId` per Root):
   <button type="button" id="_r_2_-trigger" role="menuitem" tabindex="-1"
           commandfor="_r_2_" command="toggle-popover" aria-haspopup="menu" aria-expanded="false">Move to</button>
   <div id="_r_2_" popover="auto" role="menu" aria-labelledby="_r_2_-trigger"
-       data-side="right" data-align="start"
-       style="position-area: right span-bottom; position-try-fallbacks: flip-inline">…</div>
+       data-side="inline-end" data-align="start"
+       style="position-area: self-x-end span-bottom; position-try-fallbacks: flip-inline">…</div>
+  <!-- the submenu's `data-side` is `right` (LTR) or `left` (RTL) once shown -->
+  <!-- the closed value is the requested `inline-end` -->
+
   <button type="button" role="menuitem" tabindex="-1" class="danger">Delete</button>
 </div>
 ```
@@ -127,7 +131,7 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.open` (optimistic), `state.pending`, `state.submenu` in `children(state)` | `usePopoverRoot({ component: "menu", mode: "library" })`. A Root under a `MenuContext` is a submenu. |
 | `Trigger` | `button` | button | `aria-expanded`, `data-open` (optimistic), `data-pending`, `data-disabled` | `usePopoverTrigger` plus `id`, `aria-haspopup="menu"` and the open-with-focus keys. Only valid in a top-level Root (dev warning otherwise). |
-| `Popup` | `div` | `menu` | `data-side`, `data-align` | `usePopoverPopup` with Menu's initial-focus resolver, keyboard handling, typeahead, `focusout`, `focusgroup`. |
+| `Popup` | `div` | `menu` | `data-side`, `data-align` (the resolved placement while shown, conventions 13.2) | `usePopoverPopup` with Menu's initial-focus resolver, keyboard handling, typeahead, `focusout`, `focusgroup`; `useResolvedPlacement` for the attributes. |
 | `Item` | `button` | `menuitem` | `data-pending`, `data-disabled` | `action`, `closeOnActivate` (default `true`). |
 | `CheckboxItem` | `button` | `menuitemcheckbox` | `aria-checked`, `data-checked` (optimistic), `data-pending`, `data-disabled` | `checked` triple; `closeOnActivate` default `false`. |
 | `RadioGroup` | `div` | `group` | `data-pending` | `value` triple; `aria-labelledby` → a `GroupLabel` child. |
@@ -330,21 +334,24 @@ a submenu Root is a dev warning ("use `Menu.SubmenuTrigger`").
 ### 3.3 `Menu.Popup`
 
 ```ts
-export type MenuSide = PopoverSide;   // "top" | "bottom" | "left" | "right"
+export type MenuSide = PopoverSide;   // "top" | "bottom" | "left" | "right" | "inline-start" | "inline-end" (wave 11)
 export type MenuAlign = PopoverAlign; // "start" | "center" | "end"
 
 export interface MenuPopupState {
   readonly open: boolean;        // committed
-  readonly side: MenuSide | null;
-  readonly align: MenuAlign;
+  readonly side: MenuSide | null; // resolved (physical) while shown; the prop otherwise; null with side={null} and during a context open
+  readonly align: MenuAlign;      // resolved while shown; the prop otherwise
   readonly submenu: boolean;
 }
 
 export interface MenuPopupProps
   extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "role" | "aria-labelledby" | "onKeyDown" | "onFocus" | "onBlur" | "onMouseDown" | "onContextMenu" | "onPointerEnter" | "onPointerLeave" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"> {
-  /** Default `"bottom"` for a top-level menu, `"right"` for a submenu. `null`: stylesheet-owned placement. */
+  /**
+   * Default `"bottom"` for a top-level menu, `"inline-end"` for a submenu (the right of the item
+   * in LTR, its left in RTL). `"left"` / `"right"` stay physical. `null`: stylesheet-owned placement.
+   */
   side?: MenuSide | null;
-  /** Default `"start"` (both levels). */
+  /** Default `"start"` (both levels): inline-relative on a top / bottom side, the top edges on the others. */
   align?: MenuAlign;
   /** Conventions 3.7: `false` (default) unmounts the items while closed; `true` keeps them in a hidden Activity. */
   keepMounted?: boolean;
@@ -694,9 +701,14 @@ No `returnFocus` prop.
   submenu closes when another opens (the platform; the closing sibling's Root is notified with
   `"dismiss"`), Escape closes the innermost, an outside click closes the stack. `commandfor` on
   the SubmenuTrigger keeps the declarative nesting for a pre-hydration click.
-- **Placement.** `side="right"`, `align="start"`: `position-area: right span-bottom` (the
-  submenu's top edge aligns with the item's top, its left edge with the item's right; research
-  verified the implicit anchor from `source`), `position-try-fallbacks: flip-inline`. A
+- **Placement.** `side="inline-end"`, `align="start"` (wave 11, #53; `side="right"` in v0):
+  `position-area: self-x-end span-bottom` (the submenu's top edge aligns with the item's top,
+  its inline-start edge with the item's inline-end edge: to the right in LTR, to the left in
+  RTL, where ArrowLeft is already the open key; research `rtl-point-and-submenu.mjs` verified
+  both and the flip), `position-try-fallbacks: flip-inline`. `self-x-end` resolves against the
+  submenu's own inherited `direction`, so an RTL container is followed too (Chromium, WebKit;
+  Firefox is misplaced there by Mozilla 2019601, conventions 13.3). While shown, `data-side` is
+  the resolved physical side (`right` or `left`), so a gap rule addresses both (section 9). A
   horizontal gap is the stylesheet's (`margin-inline-start`). **WebKit 302008**
   (`position-try-fallbacks` on a nested popover hangs or spins): the default keeps the fallback,
   because the bug is NEW against a platform feature the vision adopts and the reporter says the
@@ -773,7 +785,7 @@ on a top-level Root; a Popup rendered as a `<dialog>`; `transition` and `keepMou
 
 ```css
 .menu { margin: 0; inset: auto; min-inline-size: 12rem; padding: 4px; border: 0; border-radius: 8px; box-shadow: 0 8px 32px rgb(0 0 0 / .2); }
-.menu[data-side="right"] { margin-inline-start: 2px; }              /* submenu gap */
+.menu[data-side="right"], .menu[data-side="left"] { margin-inline: 2px; }  /* submenu gap: `data-side` is the resolved side (right in LTR, left in RTL, either after a flip) */
 .menu [role^="menuitem"] { display: flex; inline-size: 100%; padding: 6px 10px; border: 0; background: none; text-align: start; }
 .menu [role^="menuitem"]:focus-visible, .menu [role^="menuitem"]:focus { background: var(--accent-weak); outline: none; }  /* hover focuses, so :focus is the hover style too */
 .menu [aria-disabled="true"] { opacity: .4; }
@@ -994,10 +1006,11 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | Post-await rule | Controlled Root and controlled CheckboxItem / RadioGroup updating after `await`. |
 | Directive | Every file under `src/menu/` except `index.ts` is `"use client"`. |
 | Platform path | Mount with the popup already open (shim) → one `"platform"` dispatch; a foreign `show-popover` command is cancelled and routed; a controlled `open` flip calls `showPopover` / `hidePopover` with no echo dispatch. |
-| Submenus | A nested Root detects `submenu`; its Popup defaults `side="right"`, `align="start"`, fallbacks `flip-inline`; `showPopover` called with `{ source: submenuTrigger }`; ArrowRight / Enter / Space / click open with the first item `autofocus`ed; hover: `pointerenter` + 100 ms → open with no `autofocus`; `pointerleave` + 150 ms → `requestClose` ("dismiss"); entering the submenu popup cancels; keyboard focus inside blocks the hover close; ArrowLeft → `requestClose` ("activate") and, after `hidePopover` + `toggle` with focus moved to body by the test, the SubmenuTrigger is focused; `Menu.Trigger` in a submenu warns; `delay` on a top-level Root warns. |
+| Submenus | A nested Root detects `submenu`; its Popup defaults `side="inline-end"` (`position-area: self-x-end span-bottom`, `data-side="inline-end"` while closed), `align="start"`, fallbacks `flip-inline`; `showPopover` called with `{ source: submenuTrigger }`; ArrowRight / Enter / Space / click open with the first item `autofocus`ed; hover: `pointerenter` + 100 ms → open with no `autofocus`; `pointerleave` + 150 ms → `requestClose` ("dismiss"); entering the submenu popup cancels; keyboard focus inside blocks the hover close; ArrowLeft → `requestClose` ("activate") and, after `hidePopover` + `toggle` with focus moved to body by the test, the SubmenuTrigger is focused; `Menu.Trigger` in a submenu warns; `delay` on a top-level Root warns. |
 | Stack close | Item activation in a submenu calls the root Root's close; root `openChangeAction(false, "activate")`, submenu `openChangeAction(false, "dismiss")` after the shim's nested hide (the shim must hide nested popovers when an ancestor hides: addition). `focusout` to an outside element → root `hidePopover` at once, `"dismiss"` everywhere; `relatedTarget: null` → nothing; `focusout` into a submenu item → nothing. |
 | Pointer focus | `pointermove` on an item focuses it (no `focusVisible`); on the already-focused item nothing. `mousedown` on a Separator or the popup's padding is `defaultPrevented` and focus stays on the item; with focus on the popup itself, ArrowDown / Home focus the first item and ArrowUp / End the last (M1). |
 | `transition` smoke | As Popover 13.2; plus item activation with `transition` unmounts in the close commit. |
+| Resolved placement (wave 11) | As Tooltip 13: the top-level popup renders `bottom span-self-x-end`; `data-side` / `data-align` and `state` are the requested values with no layout, the stubbed `getComputedStyle` pair after the shim's `toggle(open)` (`"self-x-end span-bottom"` with `direction: "rtl"` → `data-side="left"`, `data-align="start"`), the requested ones after `toggle(closed)`; a context open emits neither (unchanged). |
 
 ### 13.2 Browser mode (`menu.browser.test.tsx`, Chromium, Firefox, WebKit)
 
@@ -1011,6 +1024,8 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | ViewTransition | With `transition`: open calls `startViewTransition` once; item activation once with a `::view-transition-old` of the popup present during the transition; Escape only for the notification commit; without `transition` zero calls. | Assert on all three. |
 | Light dismiss and layering | Click outside closes with `"dismiss"`; a Tooltip (`manual` / `hint`) on an item does not close the menu; a modal Dialog opened from an item keeps the menu open while it is a DOM descendant (and closes it when opened outside). | `supportsPopoverHint` for the hint variant. |
 | Pointer focus | Moving the real pointer over items focuses them; `:focus-visible` is false after a pointer open (the quiet focus path, 6.1); a click on a Separator leaves focus on the current item and ArrowDown still moves (M1). | none: all three engines implement `focus({ focusVisible })` (WebKit verified on CI run 39021387650, H1). |
+| Resolved side (wave 11) | A Trigger at the bottom of the viewport: the open menu reports `data-side="top"` and `state.side === "top"`; the existing inline-flip submenu row (near the right edge) additionally asserts the submenu's `data-side="left"` while shown and `"inline-end"` once closed. | none |
+| Submenu direction (wave 11) | Under `document.documentElement.dir = "rtl"`: ArrowLeft on the SubmenuTrigger opens the submenu with its right edge at the item's left edge (`getBoundingClientRect`) and `data-side="left"`; near the left viewport edge it flips to the right (`flip-inline`); the top-level `align="start"` menu's right edge meets the Trigger's right edge. The same inside a `dir="rtl"` wrapper in an LTR document, Trigger and Popups inside it. | Container case: `anchorPositionHonoursParentDirection` true: as above; false (Firefox, Mozilla 2019601): the submenu's inline edges meet neither item edge (probe: 0 instead of 180 for a 300..500 anchor), asserted with the bug named. Page case: none. |
 
 ---
 
@@ -1216,3 +1231,37 @@ All six accepted as implemented:
    ignored by accname, so a consumer's `aria-label` still names the group (3.6).
 6. **The open-generation guard also applies to `closeOnActivate` checkable items**: a close from
    a previous opening must not close a new one, the same rule applied the same way (12, 14).
+
+---
+
+## Amendment: resolved side and direction (wave 11, 2026-10-23, issues #20 and #53)
+
+Status: **proposed**; the cross-component rules are conventions 13 and the reasoning is in
+Tooltip's amendment (same hook, same matrix). Edited in place: decision 7, the section 1 HTML
+and parts table, 3.3, 7, 9, 13.1, 13.2. The context menu's RTL point placement (#88) is in
+`design/components/context-menu.md`'s own amendment.
+
+| | v0 (as accepted) | Wave 11 |
+| --- | --- | --- |
+| `data-side` / `data-align`, `state.side` / `state.align` | the requested props (`null` during a context open) | the resolved placement while shown, the requested props otherwise (`null` during a context open, unchanged) |
+| Submenu default | `side="right"` (`right span-bottom`), physical: opened on the right in RTL while ArrowLeft opened it | `side="inline-end"` (`self-x-end span-bottom`): the side the arrow keys point to; `data-side` is `right` or `left` while shown |
+| Top-level `align="start"` (default) | `bottom span-right`, physical | `bottom span-self-x-end`: right edges meet under RTL |
+| `side` values | four physical | plus `inline-start` / `inline-end` |
+| Container `dir="rtl"` | ignored | followed (Chromium, WebKit); Firefox misplaced (Mozilla 2019601, asserted) |
+| Files | | `Menu.Popup` merges `useResolvedPlacement`'s `ref` with `setElement` / `devRef`; the hook is idle for a point open (`side` is `null` then) |
+
+Why the submenu default is a public `side` value and not an internal "same as the arrow keys"
+rule: the keyboard already reads `getComputedStyle(popup).direction` at keydown (section 5), so
+an internal rule could have read it at open too; but a CSS keyword needs no read, is right
+before hydration, and the same cell serves Tooltip and Popover (`side="inline-end"`), so the
+helper gets the row and Menu gets the default (Tooltip amendment, "Why this way").
+
+Migration: as conventions 13.5. The submenu's `data-side` while shown is `left` in RTL, so the
+docs gap rule (`menu.css`, the playground's `menu-demo.css`) covers both sides; `MenuSide`
+widens by two members; the Menu docs page's `side` row and data-attribute table change.
+
+Questions for the product owner: Tooltip's amendment questions 3 to 5 apply. Menu-specific:
+
+1. **Submenu default `side="inline-end"`.** The alternative is to keep `"right"` and leave RTL
+   consumers to pass `side="left"` by hand (which they cannot do per direction without JS).
+   Recommendation: `inline-end`.
