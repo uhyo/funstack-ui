@@ -68,7 +68,10 @@ function Toolbar({ flags }: { flags: Flags }) {
       <p>
         <code>provides="name"</code> wires <code>aria-labelledby</code>, so the buttons are named
         "Bold" and "Italic" without an <code>aria-label</code>. Hover, or Tab to a button (focus by
-        keyboard opens after the same delay; a click does not), Escape closes.
+        keyboard opens after the same delay; a click does not), Escape closes. Skip-delay: once one
+        tooltip shows, move straight to the other (or arrow to it) and it opens at once; with{" "}
+        <code>experimental_interestFor</code> in Chromium the shipped{" "}
+        <code>@funstack/ui/tooltip-warm</code> rule does it natively.
       </p>
       <div className="tooltip-toolbar" role="toolbar" aria-label="Formatting">
         <Tooltip.Root provides="name">

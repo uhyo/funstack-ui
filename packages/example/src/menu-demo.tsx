@@ -180,7 +180,10 @@ function ContextMenuCards() {
         Right-click a card (or Tab to its "⋯" button and press Shift+F10, or long-press on touch):
         the same menu as the button opens at the pointer. Right-click elsewhere on the card to move
         it; right- or middle-click outside to close it. The text field keeps the browser's own menu.
-        The inner box is a nested region: it wins over the card.
+        The inner box is a nested region: it wins over the card. Press-drag-release (Linux, macOS):
+        hold the right button, slide onto an item, release to choose it; on touch, keep the finger
+        down after the long-press (the menu opens above it). Scrolling the page closes a menu opened
+        at the pointer; a wheel over a menu never scrolls the page.
       </p>
       <div className="cm-cards">
         {cards.map((name) => (
