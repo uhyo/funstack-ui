@@ -252,7 +252,7 @@ describe("Roles and ARIA", () => {
     expect(trigger()).toHaveAttribute("interestfor", popup().id);
     // Zero while another tooltip is showing (skip-delay, design 6).
     expect(trigger().style.getPropertyValue("interest-delay-start")).toBe(
-      "calc(250ms * (1 - var(--fsui-tooltip-warm)))",
+      "calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))",
     );
     expect(trigger().style.getPropertyValue("interest-delay-end")).toBe("150ms");
   });
@@ -262,7 +262,7 @@ describe("Roles and ARIA", () => {
       <Harness root={{ delay: 400, closeDelay: 0 }} trigger={{ experimental_interestFor: true }} />,
     );
     expect(trigger().style.getPropertyValue("interest-delay-start")).toBe(
-      "calc(400ms * (1 - var(--fsui-tooltip-warm)))",
+      "calc(400ms * (1 - var(--fsui-tooltip-warm, 0)))",
     );
     expect(trigger().style.getPropertyValue("interest-delay-end")).toBe("0ms");
   });
@@ -304,7 +304,7 @@ describe("Roles and ARIA", () => {
     expect(html).toContain(`interestfor="${id}"`);
     expect(html).toContain(`aria-describedby="${id}"`);
     expect(html).toContain(
-      "interest-delay-start:calc(300ms * (1 - var(--fsui-tooltip-warm)));interest-delay-end:150ms",
+      "interest-delay-start:calc(300ms * (1 - var(--fsui-tooltip-warm, 0)));interest-delay-end:150ms",
     );
     // The skip-delay rule is server-rendered too (React hoists it; `renderToString` has no
     // <head>, so it precedes the button here).
@@ -884,7 +884,7 @@ describe("Skip-delay (wave 11, #21)", () => {
       const { styles, button, container } = renderFresh(<Pair flag />);
       for (const element of [button("Bold"), button("Italic")]) {
         expect(element.style.getPropertyValue("interest-delay-start")).toBe(
-          "calc(250ms * (1 - var(--fsui-tooltip-warm)))",
+          "calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))",
         );
         expect(element.getAttribute("data-fsui-tooltip-trigger")).toBe("");
       }
@@ -927,6 +927,28 @@ describe("Skip-delay (wave 11, #21)", () => {
       );
       expect(styles()).toHaveLength(1);
       expect(styles()[0]!.getAttribute("nonce")).toBe("n0nce");
+    });
+
+    it("a render element with its own children keeps the <style> (review M1)", () => {
+      // `mergeProps` lets the render element's children win over `children`, so the rule must
+      // not travel in them.
+      const doc = document.implementation.createHTMLDocument("");
+      const container = doc.createElement("div");
+      doc.body.append(container);
+      render(
+        <Tooltip.Root>
+          <Tooltip.Trigger experimental_interestFor render={<a href="/pricing">Pricing</a>} />
+          <Tooltip.Popup>Plans and prices</Tooltip.Popup>
+        </Tooltip.Root>,
+        { container },
+      );
+      const link = container.querySelector("a")!;
+      expect(link.textContent).toBe("Pricing");
+      expect(link.getAttribute("data-fsui-tooltip-trigger")).toBe("");
+      expect(container.querySelector("style")).toBeNull();
+      const styles = doc.head.querySelectorAll('style[data-href="@funstack/ui/tooltip-warm"]');
+      expect(styles).toHaveLength(1);
+      expect(styles[0]!.textContent).toBe(TOOLTIP_WARM_RULES);
     });
   });
 });

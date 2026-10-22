@@ -101,10 +101,15 @@ const isTouchLike = (pointerType: string) => pointerType === "touch" || pointerT
  * `click()` (Menu's one activation path), or dismisses the menu when it lands outside every popup
  * of the tree at least 500 ms after the open; any other release leaves the menu open. Ends at the
  * release, `pointercancel`, `lostpointercapture` and the menu closing. Returns the cleanup.
+ *
+ * The 500 ms count from when the popup is shown, not from the press: with an async
+ * `openChangeAction` or suspending items the menu appears only when they settle (review M2). A
+ * gesture that starts on a popup already showing (a move) counts from its start.
  */
 function startDrag(popup: HTMLElement, options: DragOptions): () => void {
   const doc = popup.ownerDocument;
-  const startedAt = performance.now();
+  // `performance.now()` at the first open `toggle`; null until the popup has been shown.
+  let shownAt: number | null = popup.matches(":popover-open") ? performance.now() : null;
   // The SubmenuTrigger the pointer is over, whose hover intent is running.
   let submenuTrigger: HTMLElement | null = null;
 
@@ -159,7 +164,11 @@ function startDrag(popup: HTMLElement, options: DragOptions): () => void {
       options.activate(item);
       return;
     }
-    if (performance.now() - startedAt >= DRAG_DISMISS_DELAY && popup.matches(":popover-open")) {
+    if (
+      shownAt !== null &&
+      performance.now() - shownAt >= DRAG_DISMISS_DELAY &&
+      popup.matches(":popover-open")
+    ) {
       popup.hidePopover();
     }
   };
@@ -168,6 +177,7 @@ function startDrag(popup: HTMLElement, options: DragOptions): () => void {
   };
   const onToggle = () => {
     if (!popup.matches(":popover-open")) end();
+    else shownAt ??= performance.now();
   };
   const end = () => {
     popup.removeEventListener("pointermove", onMove);
@@ -197,18 +207,27 @@ const TOUCH_END_WAIT = 250;
  * over an item would activate it a second time. Ends at that `touchend` / `touchcancel`, at the
  * pointer's `pointercancel`, and shortly after its `pointerup` if no touch event follows (a
  * synthetic pointer). Returns the cleanup.
+ *
+ * Only the gesture finger's lift ends it (review L4): another finger lifting while it is still
+ * down must not hand its next slide to panning. Pointer events expose no `Touch.identifier`, so
+ * the lift is recognised by order: the engines dispatch a lift's `pointerup` and `touchend` from
+ * the same input, the `pointerup` first. A `touchend` before that pointer's `pointerup` is another
+ * finger's; it is still prevented (no click may light-dismiss the menu mid-gesture).
  */
 function guardTouch(doc: Document, pointerId: number): () => void {
   let fallback: ReturnType<typeof setTimeout> | undefined;
+  // The gesture's pointer has lifted: the next `touchend` is its own.
+  let lifted = false;
   const onTouchMove = (event: Event) => {
     if (event.cancelable) event.preventDefault();
   };
   const onTouchEnd = (event: Event) => {
     if (event.cancelable) event.preventDefault();
-    end();
+    if (lifted) end();
   };
   const onPointerUp = (event: Event) => {
     if ((event as globalThis.PointerEvent).pointerId !== pointerId) return;
+    lifted = true;
     fallback ??= setTimeout(end, TOUCH_END_WAIT);
   };
   const onPointerCancel = (event: Event) => {

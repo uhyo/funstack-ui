@@ -30,8 +30,11 @@ export interface TooltipTriggerProps extends Omit<
    * attribute is ignored and the JS path runs). Pair with `Tooltip.Popup experimental_hint`.
    * Skip-delay on this path comes from a shipped rule: the Trigger renders the
    * `data-fsui-tooltip-trigger` marker, an `interest-delay-start` of
-   * `calc(<delay>ms * (1 - var(--fsui-tooltip-warm)))` and a hoisted
-   * `<style href="@funstack/ui/tooltip-warm">` (nonce from `<CSPProvider>`). Default `false`.
+   * `calc(<delay>ms * (1 - var(--fsui-tooltip-warm, 0)))` and a hoisted
+   * `<style href="@funstack/ui/tooltip-warm">` (nonce from `<CSPProvider>`), rendered beside the
+   * element so a `render` element with its own children keeps it. When that stylesheet is
+   * missing (a CSP blocks it), the tooltip opens after its `delay` and only skip-delay is lost.
+   * Default `false`.
    */
   experimental_interestFor?: boolean;
   className?: StateValue<string | undefined, TooltipTriggerState>;
@@ -88,14 +91,15 @@ export function TooltipTrigger({
   // Skip-delay on the native path (design 6, conventions 12): the browser reads the delay from
   // the computed style when the hover starts, and only a rule can see that another tooltip is
   // showing. Hoisted into <head> by React (during SSR too) and deduplicated; nothing lands in
-  // place.
+  // place. Rendered beside the element, not in its children: a `render` element with its own
+  // children (`render={<a href>Text</a>}`) wins over `children` and would drop it.
   const warmRules = native ? (
     <style href={TOOLTIP_WARM_HREF} precedence={FSUI_PRECEDENCE} nonce={csp?.nonce}>
       {TOOLTIP_WARM_RULES}
     </style>
   ) : null;
 
-  return useRender<ComponentPropsWithRef<"button">, TooltipTriggerState>({
+  const element = useRender<ComponentPropsWithRef<"button">, TooltipTriggerState>({
     defaultElement: "button",
     render,
     state,
@@ -109,20 +113,19 @@ export function TooltipTrigger({
           ...resolveStateValue(style, s),
         })
       : style,
-    children: native
-      ? (s) => (
-          <>
-            {warmRules}
-            {resolveStateValue(children, s)}
-          </>
-        )
-      : children,
+    children,
     // `type="button"` only on a real button (the consumer may override it); a link or a
     // component element does not get it.
     props: rendersButton(render) ? { type: "button", ...rest } : rest,
     libraryProps,
     ref: ctx.setTriggerElement,
   });
+  return (
+    <>
+      {warmRules}
+      {element}
+    </>
+  );
 }
 
 TooltipTrigger.displayName = "TooltipTrigger";

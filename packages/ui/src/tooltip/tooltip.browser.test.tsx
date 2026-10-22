@@ -745,4 +745,61 @@ describe("skip-delay (wave 11, #21)", () => {
     // Timer clamping can fire a few ms early relative to `performance.now()`.
     expect(record.openedB - record.enteredB).toBeGreaterThanOrEqual(395);
   });
+
+  // Without the warm stylesheet `--fsui-tooltip-warm` is unregistered and unset; the `var()`'s
+  // own `0` fallback keeps the Root's `delay` instead of the browser's `normal` (review M1).
+  // `interest-delay-start` exists in Chromium only; elsewhere the JS path runs from `delay`.
+  const supportsInterestDelay =
+    typeof CSS !== "undefined" && CSS.supports("interest-delay-start", "0s");
+
+  it("with the warm stylesheet removed, a flagged Trigger keeps the Root's delay", async () => {
+    render(<Pair native />);
+    const style = document.head.querySelector('style[data-href="@funstack/ui/tooltip-warm"]');
+    expect(style).not.toBeNull();
+    // React never re-inserts a hoisted style removed by hand: put it back for later rows.
+    const parent = style!.parentNode!;
+    const next = style!.nextSibling;
+    style!.remove();
+    try {
+      if (supportsInterestDelay) expect(delayStart(triggerB())).toBe("0.4s");
+      else expect(delayStart(triggerB())).toBe("");
+    } finally {
+      parent.insertBefore(style!, next);
+    }
+  });
+
+  it("with the warm stylesheet blocked by a CSP, a flagged Trigger keeps the Root's delay", async () => {
+    const frame = document.createElement("iframe");
+    frame.srcdoc =
+      '<!doctype html><meta http-equiv="Content-Security-Policy" content="style-src \'none\'">' +
+      "<body></body>";
+    const loaded = new Promise((resolve) =>
+      frame.addEventListener("load", resolve, { once: true }),
+    );
+    document.body.append(frame);
+    try {
+      await loaded;
+      const doc = frame.contentDocument!;
+      const container = doc.createElement("div");
+      doc.body.append(container);
+      render(<Pair native />, { container });
+      const style = doc.head.querySelector<HTMLStyleElement>(
+        'style[data-href="@funstack/ui/tooltip-warm"]',
+      );
+      // The precondition: the rule is in the document but the policy blocked it.
+      expect(style).not.toBeNull();
+      expect(style!.sheet).toBeNull();
+      const italic = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Italic",
+      )!;
+      const computed = frame.contentWindow!.getComputedStyle(italic);
+      if (supportsInterestDelay) {
+        expect(computed.getPropertyValue("interest-delay-start")).toBe("0.4s");
+      } else {
+        expect(computed.getPropertyValue("interest-delay-start")).toBe("");
+      }
+    } finally {
+      frame.remove();
+    }
+  });
 });

@@ -222,9 +222,12 @@ function scrollsWithin(popup: HTMLElement, target: EventTarget | null, event: Wh
  *
  * Wave 11 (#88, 4.8): while the menu is placed at a point (read at each event: a right-click may
  * re-place a Trigger-opened menu), a `scroll` of the document or of an element that contains the
- * region closes it the same way; scrolls elsewhere and inside the menu are ignored. And a `wheel`
+ * region closes it the same way; scrolls elsewhere and inside the menu are ignored. Scrolling
+ * already in flight at the open (a smooth scroll, trackpad momentum) does not count: scroll
+ * events are ignored until the first animation frame without one (review L6). And a `wheel`
  * over any menu never scrolls the page: it is prevented unless something in the menu under the
- * pointer can scroll that way. Returns the cleanup.
+ * pointer can scroll that way, or it is a zoom (`ctrlKey`: Ctrl+wheel, trackpad pinch). Returns
+ * the cleanup.
  */
 function listenOutside(
   popup: HTMLElement,
@@ -245,7 +248,24 @@ function listenOutside(
     if ((event as globalThis.PointerEvent).button !== 1 || inside(event.target)) return;
     close();
   };
+  // Scroll events run in a frame's rendering steps, before its animation frame callbacks: the
+  // first callback that saw none since the last one ends the in-flight scroll window.
+  const view = doc.defaultView;
+  let settling = typeof view?.requestAnimationFrame === "function";
+  let scrolledThisFrame = false;
+  let frame = 0;
+  const tick = () => {
+    if (scrolledThisFrame) {
+      scrolledThisFrame = false;
+      frame = view!.requestAnimationFrame(tick);
+    } else settling = false;
+  };
+  if (settling) frame = view!.requestAnimationFrame(tick);
   const onScroll = (event: Event) => {
+    if (settling) {
+      scrolledThisFrame = true;
+      return;
+    }
     const current = placement();
     if (current.kind !== "point") return;
     const target = event.target;
@@ -259,6 +279,9 @@ function listenOutside(
   // Native menus never scroll the page from inside the menu; a non-overflowing popup would chain
   // the wheel to the page (Firefox ignores `overscroll-behavior` there).
   const onWheel = (event: WheelEvent) => {
+    // A zoom, not a scroll: Ctrl+wheel and a trackpad pinch (`wheel` with `ctrlKey`) stay the
+    // user's (review L3).
+    if (event.ctrlKey) return;
     if (!scrollsWithin(popup, event.target, event)) event.preventDefault();
   };
   doc.addEventListener("contextmenu", onContextMenu);
@@ -266,6 +289,7 @@ function listenOutside(
   doc.addEventListener("scroll", onScroll, { capture: true, passive: true });
   popup.addEventListener("wheel", onWheel, { passive: false });
   return () => {
+    if (settling) view!.cancelAnimationFrame(frame);
     doc.removeEventListener("contextmenu", onContextMenu);
     doc.removeEventListener("pointerdown", onPointerDown, true);
     doc.removeEventListener("scroll", onScroll, { capture: true });

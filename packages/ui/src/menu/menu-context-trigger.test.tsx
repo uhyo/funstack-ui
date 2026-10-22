@@ -1657,6 +1657,31 @@ describe("Menu.ContextTrigger", () => {
       expect(open.mock.calls.at(-1)![1].reason).toBe("dismiss");
     });
 
+    it("the 500 ms count from the show, not the press: a pending openChangeAction (review M2)", async () => {
+      let settle: () => void = () => {};
+      // Only the open is slow.
+      const open = vi.fn<OpenAction>().mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            settle = resolve;
+          }),
+      );
+      render(<Harness root={{ openChangeAction: open }} content={<DragItems />} />);
+      await rightClick(region(), 312, 148);
+      // The action is pending: the popup is not shown yet.
+      expect(isOpen()).toBe(false);
+      now += 500;
+      await act(async () => settle());
+      await flush();
+      expect(isOpen()).toBe(true);
+      // 600 ms after the press but 100 ms after the show, 10 px away, outside: still open.
+      hit = document.body;
+      now += 100;
+      captured("pointerup", 322, 148, { buttons: 0 });
+      await flush();
+      expect(isOpen()).toBe(true);
+    });
+
     it("ignores another pointer, and ends at lostpointercapture", async () => {
       render(<Harness content={<DragItems />} />);
       await rightClick(region(), 312, 148);
@@ -1759,6 +1784,41 @@ describe("Menu.ContextTrigger", () => {
         expect(isOpen()).toBe(true);
       });
 
+      it("another finger's lift does not end the guard; the gesture finger's does (review L4)", async () => {
+        render(<Harness content={<DragItems />} />);
+        await longPress();
+        // A second finger taps and lifts while the first is still down: its touchend is
+        // prevented (no click mid-gesture) but the first finger's slide stays guarded.
+        const other = new Event("touchend", { cancelable: true });
+        document.dispatchEvent(other);
+        expect(other.defaultPrevented).toBe(true);
+        const slide = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(slide);
+        expect(slide.defaultPrevented).toBe(true);
+        // Another pointer's pointerup is not the gesture's either.
+        captured("pointerup", 300, 300, {
+          pointerType: "touch",
+          pointerId: 9,
+          button: 0,
+          buttons: 0,
+        });
+        const second = new Event("touchend", { cancelable: true });
+        document.dispatchEvent(second);
+        const stillDown = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(stillDown);
+        expect(stillDown.defaultPrevented).toBe(true);
+        // The gesture finger lifts: pointerup, then its touchend ends the guard.
+        hit = null;
+        touch("pointerup", 100, 120);
+        const own = new Event("touchend", { cancelable: true });
+        document.dispatchEvent(own);
+        expect(own.defaultPrevented).toBe(true);
+        const after = new Event("touchmove", { cancelable: true });
+        document.dispatchEvent(after);
+        expect(after.defaultPrevented).toBe(false);
+        expect(isOpen()).toBe(true);
+      });
+
       it("without a touchend after the pointerup, the guard stops on its own", async () => {
         render(<Harness content={<DragItems />} />);
         await longPress();
@@ -1828,11 +1888,19 @@ describe("Menu.ContextTrigger", () => {
         target.dispatchEvent(new Event("scroll"));
       });
     };
+    /**
+     * One animation frame. Registered after the library's frame callback, so that callback has
+     * run when this resolves. Scroll events in flight at the open are ignored until the first
+     * frame that had none (review L6).
+     */
+    const nextFrame = () =>
+      act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 
     it("a point menu closes on a scroll of the document, with 'dismiss'", async () => {
       const open = vi.fn<OpenAction>();
       render(<Harness root={{ openChangeAction: open }} />);
       await rightClick(region());
+      await nextFrame();
       const hide = vi.spyOn(HTMLElement.prototype, "hidePopover");
       scroll(document);
       expect(hide).toHaveBeenCalledTimes(1);
@@ -1852,6 +1920,7 @@ describe("Menu.ContextTrigger", () => {
     it("closes on a scroll of an ancestor of the region, not of an unrelated element or the popup", async () => {
       const { container } = render(<Harness />);
       await rightClick(region());
+      await nextFrame();
       scroll(screen.getByTestId("elsewhere"));
       expect(isOpen()).toBe(true);
       scroll(popup());
@@ -1868,6 +1937,7 @@ describe("Menu.ContextTrigger", () => {
       await user.click(screen.getByTestId("trigger"));
       await flush();
       expect(isOpen()).toBe(true);
+      await nextFrame();
       scroll(document);
       expect(isOpen()).toBe(true);
       // Re-placed at a point by a right-click: the rule applies from then on.
@@ -1877,8 +1947,34 @@ describe("Menu.ContextTrigger", () => {
       expect(isOpen()).toBe(false);
     });
 
-    const wheel = (target: Element, deltaY: number) => {
-      const event = new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true });
+    it("a scroll in flight at the open is ignored until a frame passes without one (review L6)", async () => {
+      render(<Harness />);
+      await rightClick(region());
+      // A smooth scroll or momentum: one scroll event per frame.
+      scroll(document);
+      await nextFrame();
+      expect(isOpen()).toBe(true);
+      scroll(document);
+      await nextFrame();
+      expect(isOpen()).toBe(true);
+      // A frame with no scroll: the in-flight scroll is over, and the next one is the user's.
+      await nextFrame();
+      expect(isOpen()).toBe(true);
+      scroll(document);
+      expect(isOpen()).toBe(false);
+    });
+
+    it("the frame watch stops with the close", async () => {
+      render(<Harness />);
+      await rightClick(region());
+      const cancel = vi.spyOn(window, "cancelAnimationFrame");
+      act(() => popup().hidePopover());
+      await flush();
+      expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    const wheel = (target: Element, deltaY: number, init: WheelEventInit = {}) => {
+      const event = new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true, ...init });
       act(() => {
         target.dispatchEvent(event);
       });
@@ -1903,6 +1999,14 @@ describe("Menu.ContextTrigger", () => {
         expect(wheel(popup(), 10).defaultPrevented).toBe(false);
       },
     );
+
+    it("a zoom (Ctrl+wheel, trackpad pinch) is never prevented (review L3)", async () => {
+      render(<Harness />);
+      await rightClick(region());
+      expect(wheel(item("archive"), 10, { ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(wheel(popup(), -10, { ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(wheel(item("archive"), 10).defaultPrevented).toBe(true);
+    });
 
     it("a menu that can scroll that way takes the wheel", async () => {
       render(<Harness popup={{ style: { overflowY: "auto" } }} />);

@@ -8,7 +8,8 @@ export interface CSPProviderProps {
   /**
    * The per-response nonce of a nonce-based `style-src` policy. Pass the same value as React's
    * `nonce: { style }` render option: during server rendering React drops a hoisted
-   * `<style precedence>` whose `nonce` differs from it.
+   * `<style precedence>` whose `nonce` differs from it (a missing provider included), and strips
+   * the `nonce` when the option is absent or in its string form.
    */
   nonce?: string;
   children?: ReactNode;

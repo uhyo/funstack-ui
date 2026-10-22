@@ -933,21 +933,34 @@ function centre(element: Element) {
 }
 
 /**
- * The time between the `contextmenu` that opened (or moved) the menu and the next `pointerup`,
- * from the events' own timestamps: the 500 ms dismissal rule is asserted against what happened,
- * never against a sleep that load could stretch.
+ * The time between the start of the gesture's 500 ms and the next `pointerup`, from the events'
+ * own timestamps: the dismissal rule is asserted against what happened, never against a sleep
+ * that load could stretch. The library counts from the popup's open `toggle` (review M2), or from
+ * the `contextmenu` of a move on a menu already showing; the later of the two is used here, which
+ * can only make `elapsed` smaller than the library's.
  */
 function watchGestureTime() {
-  const times = { menu: Number.NaN, up: Number.NaN };
+  const times = { menu: Number.NaN, shown: Number.NaN, up: Number.NaN };
   const onMenu = () => (times.menu = performance.now());
+  const onToggle = (event: Event) => {
+    const target = event.target as Element;
+    if ((event as ToggleEvent).newState === "open" && target.matches('[role="menu"]')) {
+      times.shown = performance.now();
+    }
+  };
   const onUp = () => (times.up = performance.now());
   window.addEventListener("contextmenu", onMenu, true);
+  window.addEventListener("toggle", onToggle, true);
   window.addEventListener("pointerup", onUp, true);
   cleanups.push(() => {
     window.removeEventListener("contextmenu", onMenu, true);
+    window.removeEventListener("toggle", onToggle, true);
     window.removeEventListener("pointerup", onUp, true);
   });
-  return { elapsed: () => times.up - times.menu };
+  return {
+    elapsed: () =>
+      times.up - (Number.isNaN(times.shown) ? times.menu : Math.max(times.menu, times.shown)),
+  };
 }
 
 describe("press-drag-release (browser, wave 11, #88)", () => {
@@ -1209,10 +1222,31 @@ describe("scrolling (browser, wave 11, #88)", () => {
     return seen;
   }
 
+  /**
+   * Opens at (x, y) and waits for close-on-scroll to be armed: scroll events are ignored until
+   * the first frame without one after the popup's open `toggle` (review L6). A frame callback
+   * registered after that `toggle` runs after the library's in the same frame.
+   */
+  async function openArmed(x: number, y: number) {
+    const shown = new Promise<void>((resolve) => {
+      const onToggle = (event: Event) => {
+        if ((event as ToggleEvent).newState !== "open") return;
+        popup().removeEventListener("toggle", onToggle);
+        resolve();
+      };
+      popup().addEventListener("toggle", onToggle);
+    });
+    await openAt(x, y);
+    await act(async () => {
+      await shown;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+  }
+
   it("a wheel over the page closes a point menu ('dismiss') and the page scrolls", async () => {
     const action = vi.fn<OpenAction>();
     render(<ScrollPage root={{ openChangeAction: action }} />);
-    await openAt(100, 100);
+    await openArmed(100, 100);
     await act(async () => {
       await wheel(400, 400, 0, 200);
     });

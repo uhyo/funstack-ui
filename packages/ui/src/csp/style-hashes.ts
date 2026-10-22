@@ -11,8 +11,8 @@
  * - `"@funstack/ui/tooltip-warm"`: `Tooltip.Trigger`'s skip-delay rule, rendered only with
  *   `experimental_interestFor` (during server rendering too).
  *
- * A blocked stylesheet degrades: the point menu opens at the point but never flips, and the
- * native tooltip path keeps its normal delay.
+ * A blocked stylesheet degrades: the point menu opens at the point but never flips, and on the
+ * native tooltip path each tooltip waits its own `delay` (no skip-delay).
  */
 export const STYLE_SHA256 = {
   "@funstack/ui/menu-point": "Wm5aBRstuZ3S9kDs0IbldhidU/prqpIW69jEAS0N9mc=",
