@@ -48,6 +48,8 @@ jobs:
   browser:
     name: browser (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    # Backstop for any step without its own bound; a normal cold run takes about 3 minutes.
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
@@ -69,8 +71,65 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Installing the engine has two halves with very different failure modes (#87). The browser
+      # build itself comes from Playwright's CDN in seconds. The system libraries come through
+      # apt-get from the runner's Azure Ubuntu mirror, which is sometimes slow enough to look like
+      # a hang: 117 MB at 98 kB/s (20 minutes) for WebKit's 181 packages, 52 MB at 52 kB/s for
+      # Firefox's, and one WebKit job sat there for over an hour. So the two halves are separate
+      # steps with their own timeouts, and both the browser build and the downloaded .deb files are
+      # cached. The key names the OS release (the builds and packages are per release, and
+      # ubuntu-latest moves between them) and the Playwright version (which decides both the build
+      # and the package list).
+      - name: Read Playwright version and OS release
+        id: playwright
+        run: |
+          version=$(pnpm --filter @funstack/ui exec playwright --version | awk '{print $2}')
+          test -n "$version"
+          . /etc/os-release
+          echo "Playwright $version on $ID $VERSION_ID"
+          echo "key=playwright-$ID-$VERSION_ID-${{ matrix.browser }}-$version" >> "$GITHUB_OUTPUT"
+
+      # The saved key ends with a hash of the cached .deb names (see the save step), so restore by
+      # prefix and take the newest.
+      - name: Restore Playwright browser and system packages
+        id: playwright-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-debs
+          key: ${{ steps.playwright.outputs.key }}
+          restore-keys: ${{ steps.playwright.outputs.key }}-
+
+      # apt-get reuses a .deb already in its archive directory when the version and checksum match,
+      # so with a warm cache only the package index and any newer package versions are downloaded.
+      - name: Install Playwright system dependencies
+        id: playwright-deps
+        timeout-minutes: 15
+        run: |
+          mkdir -p ~/apt-debs
+          sudo cp ~/apt-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          pnpm --filter @funstack/ui exec playwright install-deps ${{ matrix.browser }}
+          cp /var/cache/apt/archives/*.deb ~/apt-debs/ 2>/dev/null || true
+          echo "$(ls ~/apt-debs | wc -l) .deb files for the cache"
+          echo "debs=$(ls ~/apt-debs | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
       - name: Install Playwright browser
-        run: pnpm --filter @funstack/ui exec playwright install --with-deps ${{ matrix.browser }}
+        timeout-minutes: 5
+        run: pnpm --filter @funstack/ui exec playwright install ${{ matrix.browser }}
+
+      # Runner images differ in which packages are preinstalled or need upgrading, so a later job
+      # can download debs the restored cache lacked. Save a new entry whenever the set changed,
+      # before the tests run so a test failure does not discard it.
+      - name: Save Playwright browser and system packages
+        if: steps.playwright-cache.outputs.cache-matched-key != format('{0}-{1}', steps.playwright.outputs.key, steps.playwright-deps.outputs.debs)
+        timeout-minutes: 5
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-debs
+          key: ${{ steps.playwright.outputs.key }}-${{ steps.playwright-deps.outputs.debs }}
 
       # Bounded: a hang of the engine (WebKit 302008, the submenu placement row) must fail the
       # job rather than stall it. A normal run takes about a minute.
