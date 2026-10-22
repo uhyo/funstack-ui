@@ -1545,7 +1545,7 @@ Design-side items, folded in place (section 6, decision 6, the 2.1 markup, 13; c
 
 ## Amendment: warm opens exposed as `data-instant` (wave 12, 2026-10-23, issue #93)
 
-Status: **proposed** (questions 9 to 12 at the end). Inputs: the Part B review (M3),
+Status: **accepted** (product owner, 2026-10-23; decisions recorded at the end). Inputs: the Part B review (M3),
 `docs/research/interaction-wave11.md` 1.2 (Base UI's `data-instant`, React Aria's
 `shouldSkipAnimation`), and the probe `memo/architect/probes/tooltip-instant-beforetoggle.mjs`
 (Chromium 156.0.8078.4 and Firefox 157.0 through Playwright; WebKit could not be launched on the
@@ -1725,3 +1725,10 @@ None: additive. Wave 11 consumers see no change until they style `[data-instant]
 11. **Cleared at the close; exits always animate in v1.** Recommendation: accept; a
     closing-side marker is a follow-up if browsing exits should be instant too.
 12. **The name `data-instant`.** Recommendation: accept.
+
+#### Decisions recorded (product owner, 2026-10-23)
+
+9 to 12 accepted as recommended: one passive `beforetoggle` listener on the native path (2.1
+now reads "no interaction listeners"); `data-instant` is attribute only, no `state.instant`;
+cleared at the close, so exits always animate in v1 (a closing-side marker is a follow-up if
+asked); the name `data-instant`.

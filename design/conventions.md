@@ -2576,6 +2576,12 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     stylesheet's selector rule is allowed; shipped CSS is "placement and interaction timing,
     never visuals" (section 12).
 
+37. **Wave 12, Tooltip warm opens (#93)** accepted 2026-10-23 (`design/components/tooltip.md`
+    amendment for #93; sections 4.1 and 7.4), every recommendation as recommended:
+    `data-instant` on `Tooltip.Popup`, attribute only with no `state.instant`, written from the
+    popup's synchronous `beforetoggle` on both paths (the native path's one passive listener)
+    and cleared at the close's, so exits always animate; no prop, no CSS-only route.
+
 ## Open questions
 
 None at present.
