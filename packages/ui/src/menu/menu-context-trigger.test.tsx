@@ -585,7 +585,7 @@ describe("Menu.ContextTrigger", () => {
       ["contenteditable", <div key="c" data-testid="target" contentEditable />],
       [
         "a child of contenteditable",
-        <div key="cc" contentEditable>
+        <div key="cc" contentEditable suppressContentEditableWarning>
           <b data-testid="target">bold</b>
         </div>,
       ],

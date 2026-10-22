@@ -35,25 +35,53 @@ export function toPagePoint(x: number, y: number): { x: number; y: number } {
 
 type Button = "left" | "right" | "middle";
 
-/** Real mouse input at client coordinates of this frame (see `toPagePoint`). */
+/**
+ * Resolves once `type` reached this window (capture phase) and the rest of that input task ran
+ * (one macrotask later: `mousedown` / `contextmenu` follow `pointerdown`, `click` / `auxclick`
+ * follow `pointerup`, in the same task). The command's reply can arrive before the page handled
+ * the input, so a caller inside `act` awaits this to keep the handlers' updates in its scope.
+ * The fallback only bounds a press that produced no event (a release with no button down).
+ */
+function inputHandled(type: string): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      window.removeEventListener(type, done, true);
+      clearTimeout(fallback);
+      setTimeout(resolve, 0);
+    };
+    const fallback = setTimeout(done, 5000);
+    window.addEventListener(type, done, true);
+  });
+}
+
+/**
+ * Real mouse input at client coordinates of this frame (see `toPagePoint`). `down`, `up` and
+ * `click` resolve after the page handled the input (`inputHandled`).
+ */
 export const mouse = {
   move: (x: number, y: number) => {
     const p = toPagePoint(x, y);
     return commands.mouse("move", p.x, p.y);
   },
   /** Moves to (x, y) and presses `button`. */
-  down: (x: number, y: number, button: Button = "left") => {
+  down: async (x: number, y: number, button: Button = "left") => {
     const p = toPagePoint(x, y);
-    return commands.mouse("down", p.x, p.y, button);
+    const handled = inputHandled("pointerdown");
+    await commands.mouse("down", p.x, p.y, button);
+    await handled;
   },
   /** Moves to (x, y) and releases `button`. */
-  up: (x: number, y: number, button: Button = "left") => {
+  up: async (x: number, y: number, button: Button = "left") => {
     const p = toPagePoint(x, y);
-    return commands.mouse("up", p.x, p.y, button);
+    const handled = inputHandled("pointerup");
+    await commands.mouse("up", p.x, p.y, button);
+    await handled;
   },
-  click: (x: number, y: number, button: Button = "left") => {
+  click: async (x: number, y: number, button: Button = "left") => {
     const p = toPagePoint(x, y);
-    return commands.mouse("click", p.x, p.y, button);
+    const handled = inputHandled("pointerup");
+    await commands.mouse("click", p.x, p.y, button);
+    await handled;
   },
 };
 

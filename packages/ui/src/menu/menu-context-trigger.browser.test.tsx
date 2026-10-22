@@ -77,14 +77,12 @@ beforeEach(() => {
   );
 });
 
-afterEach(async () => {
+afterEach(() => {
   for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
     if (element.matches(":popover-open")) element.hidePopover();
   }
   for (const cleanup of cleanups.splice(0)) cleanup();
   vi.restoreAllMocks();
-  // Release any button a failed row left down.
-  await mouse.up(1, 1, "right").catch(() => {});
 });
 
 interface HarnessProps {
@@ -529,6 +527,7 @@ describe("nesting (browser)", () => {
         </Popover.Popup>
       </Popover.Root>,
     );
+    await flush();
     await expect.poll(() => isOpen(item("panel"))).toBe(true);
     await openAt(120, 100);
     expect(isOpen(item("panel"))).toBe(true);
@@ -559,6 +558,7 @@ describe("nesting (browser)", () => {
     );
     await openAt(100, 100);
     await user.keyboard("{ArrowDown}{ArrowRight}");
+    await flush();
     await expect.poll(() => isOpen(item("subpopup"))).toBe(true);
     expect(item("inbox")).toHaveFocus();
     const t = rect(item("move"));
@@ -585,8 +585,11 @@ describe("long-press (browser)", () => {
     };
     await act(async () => {
       region().dispatchEvent(new PointerEvent("pointerdown", init));
+      // Inside `act`: the 500 ms timer (earlier deadline, same thread) has fired by then and its
+      // updates are in this scope.
+      await sleep(600);
     });
-    await expect.poll(() => isOpen(), { timeout: 2000 }).toBe(true);
+    await expect.poll(() => isOpen()).toBe(true);
     await flush();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![1].event!.type).toBe("pointerdown");
