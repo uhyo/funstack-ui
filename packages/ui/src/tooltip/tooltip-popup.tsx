@@ -68,6 +68,12 @@ export interface TooltipPopupProps extends Omit<
  * `position-try-fallbacks` option it applied, read from the computed `position-area`;
  * conventions 13.2) and the requested values otherwise; `Tooltip.Arrow` echoes them.
  *
+ * `data-instant` is present while the tooltip is shown by an open that began while another
+ * `[role="tooltip"]:popover-open` existed (a warm open, skip-delay), so
+ * `[data-instant] { transition: none }` skips its entry animation. Not rendered by this part: the
+ * Root's effect writes it on the element from the popup's `beforetoggle` (on both paths), before
+ * the open's first style recalc, and removes it at the close's. No `state` counterpart.
+ *
  * Owned keys (conventions 1.2): `id`, `popover`, `role`, `data-disabled`, and `data-side` /
  * `data-align` unless `side` is `null`.
  */

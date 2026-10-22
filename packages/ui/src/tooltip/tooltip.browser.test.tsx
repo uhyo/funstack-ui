@@ -803,3 +803,150 @@ describe("skip-delay (wave 11, #21)", () => {
     }
   });
 });
+
+describe("warm opens carry data-instant (wave 12, #93)", () => {
+  // Design amendment for #93 and section 8: the attribute is written from the popup's synchronous
+  // `beforetoggle`, before the open's first style recalc, so `.tip[data-instant]` suppresses the
+  // entry transition outright. The oracle is the event count, not `getAnimations()`: a late write
+  // starts the transitions and cancels them, after which the list is empty too (probe P2). Every
+  // row renders afresh, so each popup's first open begins from a settled closed state. Conditions
+  // only: the counts are read once the open is observed, two frames later.
+  const STYLES = `
+.tip {
+  opacity: 0;
+  translate: 0 4px;
+  transition: opacity 1s, translate 1s, display 1s allow-discrete, overlay 1s allow-discrete;
+}
+.tip:popover-open {
+  opacity: 1;
+  translate: 0 0;
+  @starting-style {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+.tip[data-instant] { transition: none; }
+.tip-keyframes:popover-open { animation: fsui-test-tip-in 1s; }
+.tip-keyframes[data-instant] { animation: none; }
+@keyframes fsui-test-tip-in { from { opacity: 0; } }
+`;
+  let sheet: HTMLStyleElement | null = null;
+  afterEach(() => {
+    sheet?.remove();
+    sheet = null;
+  });
+  function injectStyles() {
+    sheet = document.createElement("style");
+    sheet.textContent = STYLES;
+    document.head.append(sheet);
+  }
+
+  function AnimatedPair({ native, className }: { native: boolean; className: string }) {
+    const tip = { margin: 0, padding: 0, border: 0, width: 60, height: 20 };
+    return (
+      <div style={{ padding: 120, display: "flex", gap: 0 }}>
+        <button type="button" style={{ marginRight: 80 }}>
+          Elsewhere
+        </button>
+        <Tooltip.Root delay={400}>
+          <Tooltip.Trigger experimental_interestFor={native} style={{ width: 100, height: 30 }}>
+            Bold
+          </Tooltip.Trigger>
+          <Tooltip.Popup
+            experimental_hint={native}
+            className={className}
+            data-testid="tip-a"
+            style={tip}
+          >
+            Bold text
+          </Tooltip.Popup>
+        </Tooltip.Root>
+        <Tooltip.Root delay={400}>
+          <Tooltip.Trigger experimental_interestFor={native} style={{ width: 100, height: 30 }}>
+            Italic
+          </Tooltip.Trigger>
+          <Tooltip.Popup
+            experimental_hint={native}
+            className={className}
+            data-testid="tip-b"
+            style={tip}
+          >
+            Italic text
+          </Tooltip.Popup>
+        </Tooltip.Root>
+      </div>
+    );
+  }
+  const triggerA = () => screen.getByRole("button", { name: "Bold" });
+  const triggerB = () => screen.getByRole("button", { name: "Italic" });
+  const tipA = () => screen.getByTestId("tip-a");
+  const tipB = () => screen.getByTestId("tip-b");
+  const open = (element: Element) => element.matches(":popover-open");
+
+  /** Counts `type` events dispatched at `element` itself; registered before any gesture. */
+  function count(element: Element, type: "transitionrun" | "animationstart") {
+    const counter = { value: 0 };
+    element.addEventListener(type, (event) => {
+      if (event.target === element) counter.value += 1;
+    });
+    return counter;
+  }
+
+  /** Hovers A (a cold open), then B (a warm one); returns B's counter. */
+  async function coldThenWarm(type: "transitionrun" | "animationstart") {
+    const a = count(tipA(), type);
+    const b = count(tipB(), type);
+    await userEvent.hover(triggerA());
+    await expect.poll(() => open(tipA()), { timeout: 3000 }).toBe(true);
+    expect(tipA()).not.toHaveAttribute("data-instant");
+    // The cold entry runs (one event per transitioned property, or the keyframe animation).
+    await expect.poll(() => a.value, { timeout: 3000 }).toBeGreaterThan(0);
+
+    await userEvent.hover(triggerB());
+    await expect.poll(() => open(tipB()), { timeout: 3000 }).toBe(true);
+    expect(tipB()).toHaveAttribute("data-instant", "");
+    expect(open(tipA())).toBe(false);
+    await frames();
+    return b;
+  }
+
+  // With the flags in Chromium the browser performs the warm open (`hint` stacking closes A after
+  // B's `beforetoggle`) and the library's `beforetoggle` listener is the only JS; elsewhere the JS
+  // path runs under the same markup.
+  it.each([
+    ["baseline markup", false],
+    ["experimental_interestFor markup", true],
+  ])("%s: a warm open runs no entry transition; a cold one does", async (_, native) => {
+    injectStyles();
+    render(<AnimatedPair native={native} className="tip" />);
+    const b = await coldThenWarm("transitionrun");
+    expect(b.value).toBe(0);
+    expect(tipB().getAnimations()).toHaveLength(0);
+  });
+
+  it.each([
+    ["baseline markup", false],
+    ["experimental_interestFor markup", true],
+  ])("%s: a warm open starts no keyframe entry animation", async (_, native) => {
+    injectStyles();
+    render(<AnimatedPair native={native} className="tip-keyframes" />);
+    const b = await coldThenWarm("animationstart");
+    expect(b.value).toBe(0);
+    expect(tipB().getAnimations()).toHaveLength(0);
+  });
+
+  it.each([
+    ["baseline markup", false],
+    ["experimental_interestFor markup", true],
+  ])("%s: the attribute is gone once the warm-opened tooltip closes", async (_, native) => {
+    // Asserted on the attribute only: the exit transition is not observed (Firefox runs none,
+    // and nothing may wait on it, section 8).
+    injectStyles();
+    render(<AnimatedPair native={native} className="tip" />);
+    await coldThenWarm("transitionrun");
+    await userEvent.hover(screen.getByRole("button", { name: "Elsewhere" }));
+    await expect.poll(() => open(tipB()), { timeout: 3000 }).toBe(false);
+    expect(tipB()).not.toHaveAttribute("data-instant");
+    expect(tipA()).not.toHaveAttribute("data-instant");
+  });
+});

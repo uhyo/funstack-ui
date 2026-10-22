@@ -17,14 +17,15 @@
 //
 // Moved to tooltip.browser.test.tsx (real Chromium): actual visibility and `:popover-open`,
 // anchor placement next to the trigger, the native `interestfor` path, Escape inside a modal
-// `<dialog>` and a `popover="auto"` menu, `hint` stacking over an `auto` menu. Not covered anywhere
-// automated: the `@starting-style` animation and Safari's `hint` -> `manual` degradation.
+// `<dialog>` and a `popover="auto"` menu, `hint` stacking over an `auto` menu, and the `@starting-style`
+// entry transition that `data-instant` suppresses on a warm open (counted `transitionrun`). Not
+// covered anywhere automated: the exit animation and Safari's `hint` -> `manual` degradation.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { Suspense, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { MockInstance } from "vitest";
 import { createSuspender } from "../__tests__/helpers.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
@@ -953,6 +954,304 @@ describe("Skip-delay (wave 11, #21)", () => {
   });
 });
 
+describe("Warm open attribute (wave 12, #93)", () => {
+  // Design amendment for #93: `data-instant` on the Popup, written by presence from its own
+  // `beforetoggle` (the shim dispatches it synchronously, before `:popover-open` matches, like
+  // browsers): present iff another `[role="tooltip"]:popover-open` exists at that moment, removed
+  // at the close's `beforetoggle`. Never rendered by React.
+  function Pair({
+    flag = false,
+    disabledB = false,
+    popupB,
+  }: {
+    flag?: boolean;
+    disabledB?: boolean;
+    popupB?: TooltipPopupProps;
+  }) {
+    return (
+      <>
+        <button type="button">Elsewhere</button>
+        <Tooltip.Root>
+          <Tooltip.Trigger experimental_interestFor={flag}>Bold</Tooltip.Trigger>
+          <Tooltip.Popup data-testid="tip-a">Bold text</Tooltip.Popup>
+        </Tooltip.Root>
+        <Tooltip.Root disabled={disabledB}>
+          <Tooltip.Trigger experimental_interestFor={flag}>Italic</Tooltip.Trigger>
+          <Tooltip.Popup data-testid="tip-b" {...popupB}>
+            Italic text
+          </Tooltip.Popup>
+        </Tooltip.Root>
+      </>
+    );
+  }
+  const triggerA = () => screen.getByRole("button", { name: "Bold" });
+  const triggerB = () => screen.getByRole("button", { name: "Italic" });
+  const tipA = () => screen.getByTestId("tip-a");
+  const tipB = () => screen.getByTestId("tip-b");
+  const enter = (element: Element) => {
+    act(() => {
+      fireEvent.pointerEnter(element, { pointerType: "mouse" });
+    });
+  };
+  /** Opens A by hover (a cold open) and lets its `toggle` task run. */
+  const openA = () => {
+    enter(triggerA());
+    advance(250);
+    expect(isPopoverOpen(tipA())).toBe(true);
+    expect(tipA()).not.toHaveAttribute("data-instant");
+  };
+  /** Opens A, then B warm by hover; B carries the attribute. */
+  const openWarmB = () => {
+    openA();
+    enter(triggerB());
+    expect(isPopoverOpen(tipB())).toBe(true);
+    expect(tipB()).toHaveAttribute("data-instant", "");
+  };
+  /**
+   * Records, at each `beforetoggle` / `toggle` of `element`, whether it had the attribute, and at
+   * its opening `beforetoggle` whether A matched `:popover-open`. A capture listener on the
+   * document, so it runs before the library's listener on the popup.
+   */
+  function watch(element: Element) {
+    const log: string[] = [];
+    const onEvent = (event: Event) => {
+      if (event.target !== element) return;
+      const { newState } = event as ToggleEvent;
+      const extra =
+        event.type === "beforetoggle" && newState === "open"
+          ? ` A-open:${String(tipA().matches(":popover-open"))}`
+          : "";
+      log.push(
+        `${event.type}:${newState}${extra} instant:${String(element.hasAttribute("data-instant"))}`,
+      );
+    };
+    document.addEventListener("beforetoggle", onEvent, true);
+    document.addEventListener("toggle", onEvent, true);
+    onTestFinished(() => {
+      document.removeEventListener("beforetoggle", onEvent, true);
+      document.removeEventListener("toggle", onEvent, true);
+    });
+    return log;
+  }
+
+  it("hovering B while A is open: B carries it synchronously, A still open at B's beforetoggle", () => {
+    setupTimers();
+    render(<Pair />);
+    openA();
+    const log = watch(tipB());
+    enter(triggerB());
+    // Synchronously, no timer advanced: B open with the attribute, A closed.
+    expect(tipB()).toHaveAttribute("data-instant", "");
+    expect(isPopoverOpen(tipB())).toBe(true);
+    expect(isPopoverOpen(tipA())).toBe(false);
+    // Show before hide: A was still showing when B's `beforetoggle` classified the open.
+    expect(log).toEqual(["beforetoggle:open A-open:true instant:false"]);
+    expect(showSpy.mock.invocationCallOrder.at(-1)!).toBeLessThan(
+      hideSpy.mock.invocationCallOrder.at(-1)!,
+    );
+    advance(0);
+    expect(log.at(-1)).toBe("toggle:open instant:true");
+  });
+
+  it("keyboard focus on B while A is open: the same", () => {
+    setupTimers();
+    render(<Pair />);
+    openA();
+    const log = watch(tipB());
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Tab" });
+      triggerB().focus();
+    });
+    expect(tipB()).toHaveAttribute("data-instant", "");
+    expect(isPopoverOpen(tipA())).toBe(false);
+    expect(log).toEqual(["beforetoggle:open A-open:true instant:false"]);
+  });
+
+  it("with nothing open, B opens after its delay without the attribute", () => {
+    setupTimers();
+    render(<Pair />);
+    enter(triggerB());
+    advance(250);
+    expect(isPopoverOpen(tipB())).toBe(true);
+    expect(tipB()).not.toHaveAttribute("data-instant");
+  });
+
+  it("Escape removes it at the close's beforetoggle, before toggle", () => {
+    setupTimers();
+    render(<Pair />);
+    openWarmB();
+    advance(0);
+    const log = watch(tipB());
+    escape(triggerB());
+    expect(isPopoverOpen(tipB())).toBe(false);
+    expect(tipB()).not.toHaveAttribute("data-instant");
+    advance(0);
+    // The capture listener ran before the library's: present then, absent by `toggle`.
+    expect(log).toEqual(["beforetoggle:closed instant:true", "toggle:closed instant:false"]);
+  });
+
+  it("a pointerdown removes it", () => {
+    setupTimers();
+    render(<Pair />);
+    openWarmB();
+    act(() => {
+      fireEvent.pointerDown(document.body);
+    });
+    expect(isPopoverOpen(tipB())).toBe(false);
+    expect(tipB()).not.toHaveAttribute("data-instant");
+  });
+
+  it("the closeDelay timer removes it", () => {
+    setupTimers();
+    render(<Pair />);
+    openWarmB();
+    act(() => {
+      fireEvent.pointerLeave(triggerB(), { pointerType: "mouse" });
+    });
+    expect(tipB()).toHaveAttribute("data-instant", "");
+    advance(150);
+    expect(isPopoverOpen(tipB())).toBe(false);
+    expect(tipB()).not.toHaveAttribute("data-instant");
+  });
+
+  it("disabled flipped while warm-open removes it on the JS path", () => {
+    setupTimers();
+    const { rerender } = render(<Pair />);
+    openWarmB();
+    rerender(<Pair disabledB />);
+    expect(isPopoverOpen(tipB())).toBe(false);
+    expect(tipB()).not.toHaveAttribute("data-instant");
+  });
+
+  it("an open the library did not perform is classified too; alone, it carries nothing", () => {
+    setupTimers();
+    render(<Pair />);
+    // Stands in for the browser's `interestfor` open, or a consumer's `showPopover()`.
+    act(() => tipB().showPopover());
+    expect(tipB()).not.toHaveAttribute("data-instant");
+    act(() => tipB().hidePopover());
+    openA();
+    act(() => tipB().showPopover());
+    expect(tipB()).toHaveAttribute("data-instant", "");
+    // Nothing hid A here: the library only hides on its own warm open.
+    expect(isPopoverOpen(tipA())).toBe(true);
+  });
+
+  it("a foreign open tooltip popover counts", () => {
+    setupTimers();
+    render(
+      <>
+        <div role="tooltip" popover="manual" data-testid="foreign">
+          Elsewhere
+        </div>
+        <Pair />
+      </>,
+    );
+    act(() => screen.getByTestId("foreign").showPopover());
+    enter(triggerB());
+    expect(isPopoverOpen(tipB())).toBe(true);
+    expect(tipB()).toHaveAttribute("data-instant", "");
+  });
+
+  it("an open popover that is not a tooltip does not count", () => {
+    setupTimers();
+    render(
+      <>
+        <div popover="manual" data-testid="other">
+          Panel
+        </div>
+        <Pair />
+      </>,
+    );
+    act(() => screen.getByTestId("other").showPopover());
+    act(() => tipB().showPopover());
+    expect(tipB()).not.toHaveAttribute("data-instant");
+  });
+
+  it("render={<section />} on Popup: the attribute lands on the section", () => {
+    setupTimers();
+    render(<Pair popupB={{ render: <section data-testid="tip-b-section" /> }} />);
+    openA();
+    enter(triggerB());
+    const section = screen.getByTestId("tip-b-section");
+    expect(section.localName).toBe("section");
+    expect(section).toHaveAttribute("data-instant", "");
+  });
+
+  it("is never rendered: not in server markup, and a consumer prop is removed by a cold open", () => {
+    expect(renderToString(<Pair flag />)).not.toContain("data-instant");
+    setupTimers();
+    render(<Pair popupB={{ "data-instant": "" } as TooltipPopupProps} />);
+    expect(tipB()).toHaveAttribute("data-instant", "");
+    enter(triggerB());
+    advance(250);
+    expect(isPopoverOpen(tipB())).toBe(true);
+    expect(tipB()).not.toHaveAttribute("data-instant");
+  });
+
+  it("unmounting while warm-open writes nothing afterwards", () => {
+    setupTimers();
+    const { unmount } = render(<Pair />);
+    openWarmB();
+    const popupB = tipB();
+    const setSpy = vi.spyOn(popupB, "setAttribute");
+    const removeSpy = vi.spyOn(popupB, "removeAttribute");
+    unmount();
+    advance(1000);
+    expect(setSpy).not.toHaveBeenCalledWith("data-instant", expect.anything());
+    expect(removeSpy).not.toHaveBeenCalledWith("data-instant");
+  });
+
+  describe("under the interestForElement stub (native path)", () => {
+    beforeEach(() => {
+      Object.defineProperty(HTMLButtonElement.prototype, "interestForElement", {
+        configurable: true,
+        get() {
+          return null;
+        },
+      });
+    });
+    afterEach(() => {
+      delete (HTMLButtonElement.prototype as { interestForElement?: unknown }).interestForElement;
+    });
+
+    it("the beforetoggle listener is still attached, and the only one", () => {
+      setupTimers();
+      const added = vi.spyOn(HTMLElement.prototype, "addEventListener");
+      render(<Pair flag />);
+      const typesOn = (element: Element) =>
+        new Set(
+          added.mock.contexts.flatMap((context, index) =>
+            context === element ? [added.mock.calls[index]![0]] : [],
+          ),
+        );
+      // No interaction listener (the JS path would add pointer, focus and key listeners); the
+      // popup's `toggle` is `useResolvedPlacement`'s, attached on every path (7.4).
+      expect(typesOn(triggerA())).toEqual(new Set());
+      expect(typesOn(tipA())).toEqual(new Set(["beforetoggle", "toggle"]));
+      // The browser performed both opens (stand-in: `showPopover()` from the test).
+      act(() => tipB().showPopover());
+      expect(tipB()).not.toHaveAttribute("data-instant");
+      act(() => tipB().hidePopover());
+      act(() => tipA().showPopover());
+      act(() => tipB().showPopover());
+      expect(tipB()).toHaveAttribute("data-instant", "");
+      expect(tipA()).not.toHaveAttribute("data-instant");
+    });
+
+    it("disabled flipped while warm-open removes it", () => {
+      setupTimers();
+      const { rerender } = render(<Pair flag />);
+      act(() => tipA().showPopover());
+      act(() => tipB().showPopover());
+      expect(tipB()).toHaveAttribute("data-instant", "");
+      rerender(<Pair flag disabledB />);
+      expect(isPopoverOpen(tipB())).toBe(false);
+      expect(tipB()).not.toHaveAttribute("data-instant");
+    });
+  });
+});
+
 describe("Native step-aside (experimental_interestFor)", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLButtonElement.prototype, "interestForElement", {
@@ -1715,6 +2014,22 @@ describe("Popover shim (jsdom) fidelity", () => {
     expect(popup().matches(":popover-open")).toBe(false);
     advance(0);
     expect(events).toEqual(["before:open", "before:closed", "toggle:closed->closed"]);
+  });
+
+  it("dispatches beforetoggle synchronously, before :popover-open matches, and toggle after", () => {
+    setupTimers();
+    render(<Harness />);
+    const events: string[] = [];
+    popup().addEventListener("beforetoggle", () => {
+      events.push(`before open:${String(popup().matches(":popover-open"))}`);
+    });
+    popup().addEventListener("toggle", () => {
+      events.push(`toggle open:${String(popup().matches(":popover-open"))}`);
+    });
+    act(() => popup().showPopover());
+    expect(events).toEqual(["before open:false"]);
+    advance(0);
+    expect(events).toEqual(["before open:false", "toggle open:true"]);
   });
 
   it("throws on a state change of a disconnected element, like browsers", () => {

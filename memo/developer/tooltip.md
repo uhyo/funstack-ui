@@ -90,3 +90,22 @@ Implementation of `design/components/tooltip.md` on branch `worktree-agent-ae02d
   without any tabindex. Checked once at mount (roving tabindex values change later; fine).
 - Menu browser row "a Tooltip on an item" now asserts no "not focusable" error (Chromium items
   have no tabindex under native focusgroup, so the row only bites in Firefox/WebKit).
+
+## Wave 12: `data-instant` for warm opens (#93), 2026-10-23
+
+- `use-tooltip-interaction.ts`: the effect attaches one `beforetoggle` listener on the popup
+  first (before the `disabled` / native-path branches), writes `data-instant` with
+  `syncPresence` (open: another `[role="tooltip"]:popover-open` exists; close: absent), and
+  removes it last in the cleanup. The old effect body moved to a module-level
+  `attachInteraction(trigger, popup, disabled, interestForRequested, getDelays)` returning its
+  cleanup, so the listener wraps every path without duplicating cleanup code.
+- `showSoon` warm branch: `show()` then `if (isOpen(other)) other.hidePopover()` (was hide then
+  show), so B's `beforetoggle` still sees A open on the JS path.
+- Sanity check: registering the listener on `toggle` instead of `beforetoggle` fails all six
+  browser rows, so the rows pin the timing.
+- Browser rows count `transitionrun` / `animationstart` with `event.target === popup` (the events
+  bubble) and read the counts two frames after `:popover-open` is observed. Chromium and Firefox
+  pass locally; WebKit only in CI.
+- jsdom: under the `interestForElement` stub the popup also gets `useResolvedPlacement`'s `toggle`
+  listener, so the "only listener" row asserts the trigger gets none and the popup exactly
+  {beforetoggle, toggle}.
