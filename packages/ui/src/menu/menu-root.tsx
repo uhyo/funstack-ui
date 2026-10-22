@@ -1,13 +1,23 @@
 "use client";
-import { use, useCallback, useMemo, useRef } from "react";
+import { use, useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
 import { useDelayedPair } from "../internal/use-delayed-pair.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { usePopoverRoot } from "../internal/use-popover-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
-import { MenuContext, MenuListContext } from "./menu-context.js";
-import type { MenuContextValue, MenuOpenFocus } from "./menu-context.js";
+import {
+  ANCHOR_PLACEMENT,
+  MenuContext,
+  MenuListContext,
+  MenuRegionContext,
+} from "./menu-context.js";
+import type {
+  MenuContextValue,
+  MenuOpenAtOptions,
+  MenuOpenFocus,
+  MenuPlacement,
+} from "./menu-context.js";
 
 /** Details passed as the second argument of `Menu.Root`'s `openChangeAction`. */
 export interface MenuOpenChangeDetails extends ActionDetails {
@@ -30,6 +40,11 @@ export interface MenuRootState {
   readonly pending: boolean;
   /** This Root is a submenu (rendered inside a `Menu.Popup`). */
   readonly submenu: boolean;
+  /**
+   * The current open (optimistic) came from a `Menu.ContextTrigger`: the menu is placed at the
+   * pointer rather than against the Trigger.
+   */
+  readonly context: boolean;
 }
 
 export interface MenuRootProps {
@@ -89,8 +104,9 @@ export function MenuRoot({
     "Menu.Root: `delay` and `closeDelay` only apply to a submenu (a Menu.Root inside a " +
       "Menu.Popup); a top-level menu does not open on hover.",
   );
+  const inRegion = use(MenuRegionContext);
   useDevWarning(
-    parent !== null && !submenu,
+    parent !== null && !submenu && !inRegion,
     "Menu.Root: rendered inside another Menu.Root but outside its Menu.Popup. A submenu's Root " +
       "goes inside the parent's Menu.Popup.",
   );
@@ -100,6 +116,15 @@ export function MenuRoot({
   // shown (design 14, "Open cause").
   const nextCause = useRef<MenuOpenFocus | null>(null);
   const openCause = useRef<MenuOpenFocus | null>(null);
+
+  // Placement of the current open (context-menu.md 3.1). Written urgently, not in a transition:
+  // while closed it renders nothing visible, and a move of an open menu (4.3) answers the
+  // right-click at once, where a transition would be entangled with any pending async action
+  // (an item's, the open's) and the menu would stay at the old point until it settled.
+  const [placement, setPlacement] = useState<MenuPlacement>(ANCHOR_PLACEMENT);
+  const placementGeneration = useRef(0);
+  // Set by `openAt` around its `requestOpen`: the dispatch is a point open.
+  const pointDispatch = useRef(false);
 
   const popover = usePopoverRoot<MenuOpenChangeDetails>({
     component: "menu",
@@ -113,8 +138,45 @@ export function MenuRoot({
       timers.cancel();
       if (next) openCause.current = nextCause.current ?? DEFAULT_FOCUS;
       nextCause.current = null;
+      // Every other open (Trigger, foreign invoker, mount reconciliation) is anchored.
+      if (next && !pointDispatch.current) setPlacement(ANCHOR_PLACEMENT);
     },
   });
+
+  const { intended, requestOpen } = popover;
+  const openAt = useCallback(
+    (point: { readonly x: number; readonly y: number }, options: MenuOpenAtOptions) => {
+      const generation = ++placementGeneration.current;
+      setPlacement({
+        kind: "point",
+        x: point.x,
+        y: point.y,
+        generation,
+        source: options.source,
+        pointerId: options.pointerId,
+      });
+      const focus: MenuOpenFocus = { cause: "first", pointer: options.pointer };
+      if (intended()) {
+        // A move, or a right-click while the open is still pending: no dispatch. The re-show
+        // (or the open being shown) focuses the first item by this event's modality.
+        openCause.current = focus;
+        return;
+      }
+      nextCause.current = focus;
+      pointDispatch.current = true;
+      try {
+        requestOpen(options.event, "activate");
+      } finally {
+        pointDispatch.current = false;
+      }
+    },
+    [intended, requestOpen],
+  );
+  const resetPlacement = useCallback((generation: number) => {
+    setPlacement((current) =>
+      current.kind === "point" && current.generation === generation ? ANCHOR_PLACEMENT : current,
+    );
+  }, []);
 
   const setOpenCause = useCallback((cause: MenuOpenFocus["cause"], pointer = false) => {
     nextCause.current = { cause, pointer };
@@ -145,6 +207,9 @@ export function MenuRoot({
       setOpenCause,
       takeOpenCause,
       timers,
+      placement,
+      openAt,
+      resetPlacement,
     };
     return self;
   }, [
@@ -157,12 +222,16 @@ export function MenuRoot({
     setOpenCause,
     takeOpenCause,
     timers,
+    placement,
+    openAt,
+    resetPlacement,
   ]);
 
   const state: MenuRootState = {
     open: popover.optimistic,
     pending: popover.pending,
     submenu,
+    context: popover.optimistic && placement.kind === "point",
   };
 
   return <MenuContext value={value}>{resolveStateValue(children, state)}</MenuContext>;

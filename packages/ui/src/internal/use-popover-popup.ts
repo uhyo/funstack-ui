@@ -29,8 +29,14 @@ export interface UsePopoverPopupOptions {
   readonly transition: ViewTransitionClass | undefined;
   /** Runs after the library's own `beforetoggle` handling (Menu: focus bookkeeping). */
   readonly onBeforeToggle?: (event: ToggleEvent) => void;
-  /** Runs after the library's own `toggle` handling (Menu: close the stack on Tab-out). */
+  /** Runs after the library's own `toggle` handling (Menu: the outside right-click listeners). */
   readonly onToggle?: (event: ToggleEvent) => void;
+  /**
+   * The `source` of each library `showPopover({ source })`, read right before the call. Default:
+   * the registered Trigger. Menu passes the ContextTrigger region for a point open
+   * (design/components/context-menu.md 14).
+   */
+  readonly source?: () => HTMLElement | null;
 }
 
 /**
@@ -60,6 +66,14 @@ export interface PopoverPopupHook {
    * that follows returns focus to the Trigger (design 6.2).
    */
   readonly wrapContent: (children: ReactNode) => ReactNode;
+  /**
+   * Re-shows a shown popup in place (`hidePopover()` + `showPopover({ source })` under the
+   * opening flag, initial focus resolved again): Menu's move to a new point
+   * (design/components/context-menu.md 4.3). The platform coalesces the two toggles into one
+   * `toggle` (`open` to `open`), so nothing is dispatched. No-op (`false`) when the popup is not
+   * shown.
+   */
+  readonly reshow: () => boolean;
 }
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -131,6 +145,8 @@ export function usePopoverPopup(
 
   // The opening `beforetoggle` lets this one through: the library's own `showPopover()`.
   const opening = useRef(false);
+  // Set across `reshow()`: the show is not a new open.
+  const reshowing = useRef(false);
   // Set by the synchronous `beforetoggle` of a close, cleared by `toggle` a task later: the
   // popup is hidden but its `toggle` has not arrived, so the apply effect must not re-open it
   // from a commit that lands in between (design 2.5).
@@ -219,8 +235,8 @@ export function usePopoverPopup(
     if (added) target.setAttribute("autofocus", "");
     opening.current = true;
     try {
-      const source = triggerRef.current;
-      element.showPopover(source !== null && source.isConnected ? { source } : undefined);
+      const source = options.source !== undefined ? options.source() : triggerRef.current;
+      element.showPopover(source != null && source.isConnected ? { source } : undefined);
     } finally {
       opening.current = false;
       if (added) target.removeAttribute("autofocus");
@@ -228,6 +244,28 @@ export function usePopoverPopup(
     if (quiet && isPopoverOpen(element) && element.contains(target)) {
       target.focus({ focusVisible: false } as FocusOptions);
     }
+  };
+
+  const reshow = (): boolean => {
+    const element = popupRef.current;
+    if (!isLibrary || element === null || !isPopoverOpen(element)) return false;
+    // The hide half's `beforetoggle` records `awaitingClose` / `focusWasInside`; the coalesced
+    // `toggle` finds the popup open again, so it clears `awaitingClose`, returns no focus and
+    // notifies nothing. The opening flag covers both halves (conventions 3.5, the move).
+    opening.current = true;
+    reshowing.current = true;
+    try {
+      element.hidePopover();
+      showPopup(element);
+    } finally {
+      opening.current = false;
+      reshowing.current = false;
+    }
+    // Whether or not the engine fires the coalesced `toggle`, the close bookkeeping of the hide
+    // half is void: the popup is open again.
+    awaitingClose.current = false;
+    focusWasInside.current = false;
+    return isPopoverOpen(element);
   };
 
   // Mount reconciliation (design 2.4): a click before hydration opened the popover natively.
@@ -298,8 +336,9 @@ export function usePopoverPopup(
       if (isLibrary && !opening.current) {
         event.preventDefault();
         ctx.requestOpen(event, "activate");
-      } else {
-        // A Close action that resolves after this open must not close it (design 3.4).
+      } else if (!reshowing.current) {
+        // A Close action that resolves after this open must not close it (design 3.4). A re-show
+        // (Menu's move) is the same open: an item action pending across it still closes.
         ctx.nextOpenGeneration();
       }
       contentProbe.forget();
@@ -427,5 +466,5 @@ export function usePopoverPopup(
     );
   }, [popupRef, shown, part]);
 
-  return { setElement, visible: ctx.committed || exit.held, wrapContent };
+  return { setElement, visible: ctx.committed || exit.held, wrapContent, reshow };
 }

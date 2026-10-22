@@ -1,5 +1,13 @@
 "use client";
-import { Activity, useCallback, useMemo, useRef, useSyncExternalStore } from "react";
+import {
+  Activity,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -10,7 +18,16 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
-import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
+import {
+  FSUI_PRECEDENCE,
+  MENU_POINT_FALLBACKS,
+  MENU_POINT_HREF,
+  MENU_POINT_RULES,
+  MENU_POINT_X,
+  MENU_POINT_Y,
+  POSITION_TRY_FALLBACKS,
+  positionArea,
+} from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { mergeRefs } from "../internal/merge-props.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
@@ -19,9 +36,10 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { MenuListContext, useMenuContext } from "./menu-context.js";
-import type { MenuListContextValue } from "./menu-context.js";
+import { isHandledBy, MenuListContext, useMenuContext } from "./menu-context.js";
+import type { MenuContextValue, MenuListContextValue, MenuPlacement } from "./menu-context.js";
 import {
+  capturePointer,
   edgeItem,
   focusItem,
   hasModifier,
@@ -38,10 +56,16 @@ export type MenuAlign = AnchorAlign;
 export interface MenuPopupState {
   /** Committed open state. Read `:popover-open` for the DOM truth. */
   readonly open: boolean;
+  /** `null` with `side={null}`, and while the menu is placed at a point (`context`). */
   readonly side: MenuSide | null;
   readonly align: MenuAlign;
   /** This popup belongs to a submenu. */
   readonly submenu: boolean;
+  /**
+   * The current open came from a `Menu.ContextTrigger`: the popup is placed at the pointer, with
+   * `--menu-point-x` / `--menu-point-y` set inline (`data-context`).
+   */
+  readonly context: boolean;
 }
 
 export interface MenuPopupProps extends Omit<
@@ -54,6 +78,7 @@ export interface MenuPopupProps extends Omit<
   | "onFocus"
   | "onBlur"
   | "onMouseDown"
+  | "onContextMenu"
   | "onPointerEnter"
   | "onPointerLeave"
   | "onToggle"
@@ -66,7 +91,10 @@ export interface MenuPopupProps extends Omit<
    * Placement against the Trigger through inline `position-area`, with `position-try-fallbacks`
    * flipping it when it does not fit. Default `"bottom"` for a top-level menu, `"right"` for a
    * submenu (whose fallback is `flip-inline` only). `null` emits no inline positioning (and no
-   * `data-side` / `data-align`): the stylesheet owns placement.
+   * `data-side` / `data-align`): the stylesheet owns placement. Ignored for an open from a
+   * `Menu.ContextTrigger`, which is placed at the pointer; there `null` also opts out of the
+   * inline point placement and the library's `@position-try` rules, leaving only
+   * `--menu-point-x` / `--menu-point-y`.
    */
   side?: MenuSide | null;
   /** Alignment along the side. Default `"start"`. Ignored when `side` is `null`. */
@@ -110,6 +138,59 @@ const isDev = process.env.NODE_ENV !== "production";
 const FOCUSABLE_SELECTOR =
   'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"])';
 
+type PointPlacement = Extract<MenuPlacement, { kind: "point" }>;
+
+/**
+ * The inline placement of a point open (context-menu.md 3.3): the point as two custom
+ * properties, and unless the stylesheet owns placement, `left` / `top` at it with the other two
+ * insets `auto` (longhands, so React never sees a shorthand next to its longhands),
+ * `position-area: none` (a consumer's anchored `position-area` would otherwise place the popup
+ * inside a grid area) and the library's fallbacks, spelled by generation parity (4.3).
+ */
+function pointStyle(point: PointPlacement, stylesheetOwned: boolean): CSSProperties {
+  const vars = { [MENU_POINT_X]: `${point.x}px`, [MENU_POINT_Y]: `${point.y}px` };
+  if (stylesheetOwned) return vars as CSSProperties;
+  return {
+    ...vars,
+    top: `var(${MENU_POINT_Y})`,
+    right: "auto",
+    bottom: "auto",
+    left: `var(${MENU_POINT_X})`,
+    positionArea: "none",
+    positionTryFallbacks: MENU_POINT_FALLBACKS[point.generation % 2],
+  } as CSSProperties;
+}
+
+/**
+ * The outside right- and middle-click close of a top-level menu (context-menu.md 5): a
+ * `contextmenu` outside the menu tree that this menu's ContextTrigger did not handle, or a
+ * middle-button `pointerdown` outside it, hides the root popup at once (`"dismiss"` through the
+ * `toggle` notification). Chromium's click-based light dismiss ignores those buttons. Returns the
+ * cleanup.
+ */
+function listenOutside(popup: HTMLElement, menu: MenuContextValue): () => void {
+  const doc = popup.ownerDocument;
+  const inside = (target: EventTarget | null) => target instanceof Node && popup.contains(target);
+  const close = () => {
+    if (popup.matches(":popover-open")) popup.hidePopover();
+  };
+  // Bubble phase: the region's handler ran first and marked a move.
+  const onContextMenu = (event: Event) => {
+    if (inside(event.target) || isHandledBy(event, menu)) return;
+    close();
+  };
+  const onPointerDown = (event: Event) => {
+    if ((event as globalThis.PointerEvent).button !== 1 || inside(event.target)) return;
+    close();
+  };
+  doc.addEventListener("contextmenu", onContextMenu);
+  doc.addEventListener("pointerdown", onPointerDown, true);
+  return () => {
+    doc.removeEventListener("contextmenu", onContextMenu);
+    doc.removeEventListener("pointerdown", onPointerDown, true);
+  };
+}
+
 /**
  * The menu itself: `<div popover="auto" role="menu" aria-labelledby={trigger} tabindex="-1">`,
  * placed against its Trigger with CSS Anchor Positioning. Owns the keyboard model (design 5):
@@ -120,8 +201,13 @@ const FOCUSABLE_SELECTOR =
  *
  * Owned keys (conventions 1.2): `id`, `popover`, `role`, `aria-labelledby` (token-merged),
  * `tabIndex`, `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
- * non-item space keeps focus on the current item), `onPointerEnter` / `onPointerLeave`, and
- * `data-side` / `data-align` unless `side` is `null`.
+ * non-item space keeps focus on the current item), `onContextMenu` (no native menu over this
+ * one), `onPointerEnter` / `onPointerLeave`, `data-side` / `data-align` unless `side` is `null`
+ * or the menu is placed at a point, and `data-context` for an open from a `Menu.ContextTrigger`
+ * (placed at the pointer: `--menu-point-x` / `--menu-point-y` inline, and unless `side` is
+ * `null`, `left` / `top` at the point with the library's `@position-try` fallbacks, whose rules
+ * it renders as a hoisted `<style>`). A top-level menu closes at once on a right- or
+ * middle-click outside it.
  */
 export function MenuPopup({
   side: sideProp,
@@ -137,7 +223,10 @@ export function MenuPopup({
 }: MenuPopupProps) {
   const menu = useMenuContext("Menu.Popup");
   const { popover, submenu, loop } = menu;
-  const side = sideProp === undefined ? (submenu ? "right" : "bottom") : sideProp;
+  const sideOption = sideProp === undefined ? (submenu ? "right" : "bottom") : sideProp;
+  // A ContextTrigger's open is placed at the point; nothing is anchored (context-menu.md 3.3).
+  const point = menu.placement.kind === "point" ? menu.placement : null;
+  const side = point !== null ? null : sideOption;
 
   // As Tabs.List (#43): detected only with the flag, never during SSR or hydration.
   const nativeFocusgroup = useSyncExternalStore(
@@ -152,7 +241,15 @@ export function MenuPopup({
     return text !== "" && Date.now() - at <= TYPEAHEAD_RESET_MS;
   }, []);
 
-  const { setElement, visible, wrapContent } = usePopoverPopup(popover, {
+  // The outside right- / middle-click listeners of a top-level menu, while it is shown.
+  const outside = useRef<(() => void) | null>(null);
+  const stopOutside = useCallback(() => {
+    outside.current?.();
+    outside.current = null;
+  }, []);
+  useEffect(() => stopOutside, [stopOutside]);
+
+  const { setElement, visible, wrapContent, reshow } = usePopoverPopup(popover, {
     part: "Menu.Popup",
     initialFocus: undefined,
     // Design 6.1: the first (or last) enabled item by open cause, nothing for a hover open, the
@@ -166,6 +263,44 @@ export function MenuPopup({
     },
     keepMounted,
     transition,
+    // A point open nests through the region that opened it (context-menu.md 3.1).
+    source: () => (point !== null ? point.source : popover.triggerRef.current),
+    onToggle: (event) => {
+      if (submenu) return;
+      const element = popover.popupRef.current;
+      if (event.newState === "open" && element !== null && element.matches(":popover-open")) {
+        outside.current ??= listenOutside(element, menu);
+      } else if (event.newState === "closed") {
+        stopOutside();
+      }
+    },
+  });
+
+  // A move (context-menu.md 4.3): the popup is shown and the placement changed since it was
+  // shown (a new point, or a right-click in the region while a Trigger open is shown). Re-show
+  // it so the respelled fallbacks place it afresh, the source is the region and the first item
+  // is focused again; then capture the still-pressed pointer again, against the Firefox / WebKit
+  // `pointerup` light dismiss. Runs after the hook's apply effect (declared after it).
+  // Once a point open has been shown and the popup is no longer visible (hidden, exit animation
+  // over), the placement goes back to anchored for the next open that is not a ContextTrigger's.
+  const shownKey = useRef<number | "anchor" | null>(null);
+  const shownPoint = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const element = popover.popupRef.current;
+    if (element === null) return;
+    const key = point !== null ? point.generation : "anchor";
+    if (element.matches(":popover-open")) {
+      if (shownKey.current !== null && shownKey.current !== key && reshow()) {
+        capturePointer(element, point?.pointerId);
+      }
+      shownKey.current = key;
+      if (point !== null) shownPoint.current = point.generation;
+    } else {
+      shownKey.current = null;
+      if (!visible && point !== null && shownPoint.current === point.generation) {
+        menu.resetPlacement(point.generation);
+      }
+    }
   });
 
   const devRef = useCallback((element: HTMLElement) => {
@@ -184,7 +319,13 @@ export function MenuPopup({
     [menu, nativeFocusgroup, typingAhead],
   );
 
-  const state: MenuPopupState = { open: popover.committed, side, align, submenu };
+  const state: MenuPopupState = {
+    open: popover.committed,
+    side,
+    align,
+    submenu,
+    context: point !== null,
+  };
 
   const runTypeahead = (popup: HTMLElement, current: HTMLElement | null, key: string): boolean => {
     const now = Date.now();
@@ -291,6 +432,11 @@ export function MenuPopup({
     onKeyDown,
     onBlur,
     onMouseDown,
+    // No native menu over the custom one. The popup is a sibling of any ContextTrigger, so this
+    // event never reaches a region as a move; an outer region sees it prevented and stays quiet.
+    onContextMenu: (event: MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+    },
     ...(submenu && {
       onPointerEnter: (event: PointerEvent<HTMLElement>) => {
         if (event.pointerType !== "touch") menu.timers.cancelClose();
@@ -300,7 +446,17 @@ export function MenuPopup({
       },
     }),
     ...(side !== null && { "data-side": side, "data-align": align }),
+    "data-context": point !== null ? "" : undefined,
   };
+
+  // The shipped `@position-try` rules (conventions 12): hoisted into <head> and deduplicated by
+  // React, rendered only by a point open that does not opt out with `side={null}`.
+  const pointRules =
+    point !== null && sideOption !== null ? (
+      <style href={MENU_POINT_HREF} precedence={FSUI_PRECEDENCE}>
+        {MENU_POINT_RULES}
+      </style>
+    ) : null;
 
   const content = (s: MenuPopupState): ReactNode => {
     let node: ReactNode;
@@ -316,6 +472,7 @@ export function MenuPopup({
     // Not part of an enclosing Toolbar: a Menu.Trigger or ToggleGroup in here sees no Toolbar.
     return (
       <MenuListContext value={listContext}>
+        {pointRules}
         <ToolbarContext value={null}>{node}</ToolbarContext>
       </MenuListContext>
     );
@@ -328,13 +485,15 @@ export function MenuPopup({
     className,
     // The inline placement sits under the consumer's style: the consumer wins.
     style:
-      side === null
-        ? style
-        : (s) => ({
-            positionArea: positionArea(side, align),
-            positionTryFallbacks: submenu ? "flip-inline" : POSITION_TRY_FALLBACKS,
-            ...resolveStateValue(style, s),
-          }),
+      point !== null
+        ? (s) => ({ ...pointStyle(point, sideOption === null), ...resolveStateValue(style, s) })
+        : side === null
+          ? style
+          : (s) => ({
+              positionArea: positionArea(side, align),
+              positionTryFallbacks: submenu ? "flip-inline" : POSITION_TRY_FALLBACKS,
+              ...resolveStateValue(style, s),
+            }),
     children: content,
     props: rest,
     libraryProps,

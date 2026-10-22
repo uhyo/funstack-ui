@@ -41,6 +41,31 @@ const emulateReducedMotion: BrowserCommand<[reduce: boolean]> = async (context, 
   await context.page.emulateMedia({ reducedMotion: reduce ? "reduce" : "no-preference" });
 };
 
+type MouseButton = "left" | "right" | "middle";
+
+/**
+ * Real mouse input at page coordinates (Playwright `page.mouse`), for rows that need a press and
+ * a release apart or a click at a point (the context menu, design/components/context-menu.md
+ * 13.2). Coordinates are in the top-level page's viewport; the test maps its iframe's client
+ * coordinates first (src/__tests__/browser-commands.ts).
+ */
+const mouse: BrowserCommand<
+  [action: "move" | "down" | "up" | "click", x: number, y: number, button?: MouseButton]
+> = async (context, action, x, y, button = "left") => {
+  const { mouse } = context.page;
+  if (action === "click") {
+    await mouse.click(x, y, { button });
+    return;
+  }
+  if (action === "move") {
+    await mouse.move(x, y);
+    return;
+  }
+  await mouse.move(x, y);
+  if (action === "down") await mouse.down({ button });
+  else await mouse.up({ button });
+};
+
 /**
  * Engines for the browser project.
  * - `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) selects them explicitly; a missing
@@ -111,7 +136,7 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            commands: { emulateReducedMotion },
+            commands: { emulateReducedMotion, mouse },
             // Firefox runs its files one at a time: headless Firefox shares one mouse and one
             // pointer-capture state between the pages of the browser, so another file's
             // Playwright pointer input lands in a running drag or click (#62).

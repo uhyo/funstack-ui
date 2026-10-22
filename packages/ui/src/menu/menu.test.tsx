@@ -1657,10 +1657,16 @@ describe("Menu.Root", () => {
         }}
       </Menu.Root>,
     );
-    expect(seen.root).toEqual({ open: false, pending: false, submenu: false });
-    expect(seen.popup).toEqual({ open: false, side: "bottom", align: "start", submenu: false });
+    expect(seen.root).toEqual({ open: false, pending: false, submenu: false, context: false });
+    expect(seen.popup).toEqual({
+      open: false,
+      side: "bottom",
+      align: "start",
+      submenu: false,
+      context: false,
+    });
     await user.click(trigger());
-    expect(seen.root).toEqual({ open: true, pending: true, submenu: false });
+    expect(seen.root).toEqual({ open: true, pending: true, submenu: false, context: false });
     expect(seen.trigger).toEqual({ open: true, pending: true, disabled: false });
     expectPending(trigger());
     expect(trigger()).toHaveClass("open");
@@ -2174,6 +2180,56 @@ describe("submenus", () => {
     await openMenu(user);
     act(() => {
       fireEvent.blur(item("rename"), { relatedTarget: trigger() });
+    });
+    expect(isOpen()).toBe(false);
+  });
+});
+
+describe("right- and middle-click (context-menu.md 5, every menu)", () => {
+  const contextMenuEvent = () =>
+    new PointerEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, buttons: 2 });
+
+  it("onContextMenu is owned on the Popup: the library's preventDefault runs", async () => {
+    const user = setupUser();
+    const consumer = vi.fn();
+    // @ts-expect-error -- owned key, omitted from MenuPopupProps
+    const props: MenuPopupProps = { onContextMenu: consumer };
+    render(<Harness popup={props} />);
+    await openMenu(user);
+    const event = contextMenuEvent();
+    act(() => {
+      item("rename").dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(isOpen()).toBe(true);
+  });
+
+  it("a Trigger-opened menu closes at once on a right-click outside ('dismiss')", async () => {
+    const user = setupUser();
+    const action = vi.fn<OpenAction>();
+    render(<Harness root={{ openChangeAction: action }} />);
+    await openMenu(user);
+    const hide = spyHide();
+    act(() => {
+      screen.getByTestId("elsewhere").dispatchEvent(contextMenuEvent());
+    });
+    expect(hide).toHaveBeenCalledTimes(1);
+    expect(isOpen()).toBe(false);
+    await flush();
+    expect(action.mock.calls.at(-1)).toEqual([
+      false,
+      expect.objectContaining({ reason: "dismiss" }),
+    ]);
+  });
+
+  it("a Trigger-opened menu closes on a middle-button pointerdown outside", async () => {
+    const user = setupUser();
+    render(<Harness />);
+    await openMenu(user);
+    act(() => {
+      screen
+        .getByTestId("elsewhere")
+        .dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 1, buttons: 4 }));
     });
     expect(isOpen()).toBe(false);
   });

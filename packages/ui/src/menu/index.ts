@@ -2,6 +2,7 @@
 // (conventions 7.4). Type-only: the built JS has no import of it.
 import "../internal/platform-attributes.js";
 import { MenuCheckboxItem } from "./menu-checkbox-item.js";
+import { MenuContextTrigger } from "./menu-context-trigger.js";
 import { MenuGroup, MenuGroupLabel, MenuSeparator } from "./menu-group.js";
 import { MenuItem } from "./menu-item.js";
 import { MenuPopup } from "./menu-popup.js";
@@ -17,6 +18,8 @@ import { MenuTrigger } from "./menu-trigger.js";
  * `CheckboxItem`, `RadioGroup` > `RadioItem`, `Group` > `GroupLabel`, `Separator`, and submenus
  * (a `Root` inside a `Popup`, opened by its `SubmenuTrigger`). An item's `action` runs in its own
  * transition with `data-pending` on the item, and the whole menu closes when it settles.
+ * `ContextTrigger` is a region whose right-click (or Shift+F10, or a touch long-press) opens the
+ * same `Popup` at the pointer; a Root may hold a `Trigger` and a `ContextTrigger`.
  */
 export const Menu = {
   Root: MenuRoot,
@@ -30,6 +33,7 @@ export const Menu = {
   GroupLabel: MenuGroupLabel,
   Separator: MenuSeparator,
   SubmenuTrigger: MenuSubmenuTrigger,
+  ContextTrigger: MenuContextTrigger,
 } as const;
 
 export type { MenuRootProps, MenuRootState, MenuOpenChangeDetails } from "./menu-root.js";
@@ -48,3 +52,4 @@ export type {
   MenuSeparatorState,
 } from "./menu-group.js";
 export type { MenuSubmenuTriggerProps, MenuSubmenuTriggerState } from "./menu-submenu-trigger.js";
+export type { MenuContextTriggerProps, MenuContextTriggerState } from "./menu-context-trigger.js";

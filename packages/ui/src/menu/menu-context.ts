@@ -20,6 +20,37 @@ export interface MenuOpenFocus {
   readonly pointer: boolean;
 }
 
+/**
+ * How the current open is placed (design/components/context-menu.md 3.1): against the Trigger
+ * (`anchor`: a Menu.Trigger, a foreign invoker, a controlled or platform open), or at a point
+ * (`point`: a Menu.ContextTrigger). `generation` grows with every point open or move, so a second
+ * right-click at a new point is a state change while the menu is open (4.3).
+ */
+export type MenuPlacement =
+  | { readonly kind: "anchor" }
+  | {
+      readonly kind: "point";
+      readonly x: number;
+      readonly y: number;
+      readonly generation: number;
+      /** The region that opened: the `source` of `showPopover({ source })` (nesting). */
+      readonly source: HTMLElement;
+      /** The pointer held down at the open, re-captured after a move's re-show (2.1). */
+      readonly pointerId: number | undefined;
+    };
+
+export const ANCHOR_PLACEMENT: MenuPlacement = { kind: "anchor" };
+
+/** What a ContextTrigger passes to `openAt`. */
+export interface MenuOpenAtOptions {
+  readonly source: HTMLElement;
+  /** The `contextmenu` event, or the long-press `pointerdown` (`details.event`). */
+  readonly event: Event;
+  /** A pointer opened (quiet focus); `false` for the keyboard (focus ring). */
+  readonly pointer: boolean;
+  readonly pointerId: number | undefined;
+}
+
 /** One menu level: what its Root provides to its Trigger, Popup and items. */
 export interface MenuContextValue {
   /** The shared popover machinery (`usePopoverRoot`). */
@@ -41,9 +72,49 @@ export interface MenuContextValue {
   readonly takeOpenCause: () => MenuOpenFocus;
   /** Submenu hover-intent timers, shared by the SubmenuTrigger and the Popup. */
   readonly timers: DelayedPair;
+  /** Placement of the current (or last) open (context-menu.md 3.1). */
+  readonly placement: MenuPlacement;
+  /**
+   * A ContextTrigger opens the menu at `point`, or moves it there when it is already open (no
+   * dispatch, 4.3).
+   */
+  readonly openAt: (
+    point: { readonly x: number; readonly y: number },
+    options: MenuOpenAtOptions,
+  ) => void;
+  /**
+   * Back to the anchored placement once a point open has been shown and hidden (the popup is no
+   * longer visible): the next open that is not a ContextTrigger's (controlled, platform, foreign
+   * invoker) places against the Trigger. Ignored when a newer point was recorded meanwhile.
+   */
+  readonly resetPlacement: (generation: number) => void;
 }
 
 export const MenuContext = createContext<MenuContextValue | null>(null);
+
+/**
+ * `true` inside a `Menu.ContextTrigger`: a `Menu.Root` there is a nested context region's own
+ * top-level menu (context-menu.md 2.4), not a misplaced submenu.
+ */
+export const MenuRegionContext = createContext(false);
+
+/**
+ * `contextmenu` events a ContextTrigger handled (opened or moved its menu), with the top-level
+ * menu they belong to: that menu's document listener leaves its menu open for them
+ * (context-menu.md 5 and 14).
+ */
+const handledEvents = new WeakMap<Event, object>();
+
+/** The top-level menu's identity: its popup ref object, stable for the Root's lifetime. */
+const menuKey = (menu: MenuContextValue): object => menu.root.popover.popupRef;
+
+export function markHandled(event: Event, menu: MenuContextValue): void {
+  handledEvents.set(event, menuKey(menu));
+}
+
+export function isHandledBy(event: Event, menu: MenuContextValue): boolean {
+  return handledEvents.get(event) === menuKey(menu);
+}
 
 /**
  * The close an activated item runs once its action settled: the whole stack, through the

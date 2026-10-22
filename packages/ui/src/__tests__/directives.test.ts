@@ -185,6 +185,8 @@ const clientFiles = [
   "internal/announce.mjs",
   // Button (design/components/button.md 11, row 20).
   "button/button.mjs",
+  // The context menu region (design/components/context-menu.md 7, 13.1 "Directive").
+  "menu/menu-context-trigger.mjs",
 ];
 
 const directiveFreeFiles = [
