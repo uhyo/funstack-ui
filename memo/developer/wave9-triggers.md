@@ -61,3 +61,21 @@ Design: design/components/button.md sections 16 and 17 (2240658). Branch `wave9/
    host button's pass-through.
 2. Dialog.Trigger in JS-free non-modal mode keeps `data-disabled` absent (it is library-mode only
    today); the design says `data-disabled` is unchanged, so it stays absent there.
+
+## Review fixes (memo/reviewer/wave9.md, a29e3ad), branch wave9/fixes
+
+- M1: in the aria-disabled branch a disabled part also owns `commandfor` / `command` as absent
+  (use-popover-trigger `noInvoker = ariaDisabled && disabled`, which also covers a disabled
+  SubmenuTrigger; Dialog.Trigger `invoker = modal && !(focusable && disabled)`; Close parts
+  `noInvoker = focusable && disabled`). I missed that without native `disabled` a component render
+  is a live invoker before hydration. Rows per part + renderToString row for Menu.Trigger + an
+  "enabled keeps its command" row.
+- M2 / L1: MenuPage, Menu.Item `disabled` jsdoc and `isDisabledItem` jsdoc corrected: only the
+  open focus (`edgeItem`) skips disabled items.
+- L2: pointer click (`detail: 1`) assertion. L3: step-button `pointerdown` is cancelled before the
+  disabled return (focus stays in the input); row per disabled cause. Mutation-checked.
+- Fold 091d100 W8: `data-disabled` in every mode in which the part renders `disabled` /
+  `aria-disabled`: JS-free Dialog.Trigger (modal and non-modal) and Popover.Trigger now emit it
+  (`dataAttr(disabled)`). The old popover row "data-disabled is library mode only" was rewritten;
+  Dialog / Popover data-attribute tables say "Trigger, Close ... (both modes)". W2 wording used
+  for the Menu.Item and menu-dom jsdocs.

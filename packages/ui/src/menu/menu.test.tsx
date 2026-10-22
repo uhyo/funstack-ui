@@ -432,6 +432,49 @@ describe("Menu", () => {
       },
     );
 
+    it("a disabled Trigger with a component render is no invoker: no commandfor / command (review M1)", () => {
+      render(
+        <Menu.Root>
+          <Menu.Trigger data-testid="trigger" disabled render={<MyButton />}>
+            Actions
+          </Menu.Trigger>
+          <Menu.Popup data-testid="popup">
+            <Menu.Item>A</Menu.Item>
+          </Menu.Popup>
+        </Menu.Root>,
+      );
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(trigger()).not.toHaveAttribute("command");
+    });
+
+    it("server HTML: a disabled Trigger with a component render is an enabled button with no command (review M1)", () => {
+      const container = document.createElement("div");
+      container.innerHTML = renderToString(
+        <Menu.Root>
+          <Menu.Trigger disabled render={<MyButton />}>
+            Actions
+          </Menu.Trigger>
+          <Menu.Popup>
+            <Menu.Item>A</Menu.Item>
+          </Menu.Popup>
+        </Menu.Root>,
+      );
+      const button = container.querySelector("button")!;
+      expect(button).toHaveAttribute("aria-disabled", "true");
+      expect(button).not.toHaveAttribute("commandfor");
+      expect(button).not.toHaveAttribute("command");
+      // Enabled again: the command is back.
+      container.innerHTML = renderToString(
+        <Menu.Root>
+          <Menu.Trigger render={<MyButton />}>Actions</Menu.Trigger>
+          <Menu.Popup>
+            <Menu.Item>A</Menu.Item>
+          </Menu.Popup>
+        </Menu.Root>,
+      );
+      expect(container.querySelector("button")).toHaveAttribute("command", "toggle-popover");
+    });
+
     it("a disabled Trigger with a host <button> render stays natively disabled (#83)", () => {
       render(
         <Menu.Root>

@@ -31,8 +31,8 @@ export interface MenuItemProps extends Omit<
   /** Close the whole menu once `action` settles. Default `true`. */
   closeOnActivate?: boolean;
   /**
-   * Renders `aria-disabled` and `data-disabled`: the item stays focusable and never activates;
-   * the arrows, Home / End and typeahead skip it.
+   * Renders `aria-disabled` and `data-disabled`: the item stays focusable and never activates.
+   * It is an ordinary item for navigation; only the open focus skips items with `disabled`.
    */
   disabled?: boolean;
   /** Text typeahead matches when the item's text content is not representative (an icon). */

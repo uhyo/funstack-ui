@@ -85,6 +85,10 @@ export function DialogClose({
   // handler (#83). JS-free mode without `action` is the browser's `request-close` command,
   // which only native `disabled` stops.
   const focusable = installClick && !isHostButton(render);
+  // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
+  // `disabled` the element would still be a live invoker before hydration (a component render
+  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  const noInvoker = focusable && disabled;
 
   const state: DialogCloseState = { pending, disabled };
 
@@ -141,8 +145,8 @@ export function DialogClose({
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Close. Absent in the focusable branch.
     disabled: focusable ? undefined : disabled,
-    commandfor: ids.dialog,
-    command: "request-close",
+    commandfor: noInvoker ? undefined : ids.dialog,
+    command: noInvoker ? undefined : "request-close",
     value,
     ...(installClick && { onClick }),
     // Exactly while `data-pending` (#81): a Close that will not act is unavailable to AT. Owned,

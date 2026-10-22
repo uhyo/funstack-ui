@@ -810,9 +810,29 @@ describe("hold", () => {
           notCancelled = fireEvent.click(inc(), { detail: 0 });
         });
         expect(notCancelled).toBe(false); // cancelled: a link render does not navigate
+        // A pointer click (`detail > 0`) is cancelled too (wave 9 review L2).
+        act(() => {
+          notCancelled = fireEvent.click(inc(), { detail: 1 });
+        });
+        expect(notCancelled).toBe(false);
         await flush();
         expect(onChange).not.toHaveBeenCalled();
         expect(input().value).toBe("1");
+      },
+    );
+
+    it.each(cases)(
+      "disabled by %s with a component render: a press keeps focus in the input (review L3)",
+      async (_, own, rootProps) => {
+        render(
+          <Box own={own} rootProps={rootProps} element={<MyButton />} onChange={vi.fn<Fn>()} />,
+        );
+        act(() => input().focus());
+        expect(pointer("pointerDown", inc())).toBe(false); // the press is cancelled
+        pointer("pointerUp", inc());
+        const user = setupUser();
+        await user.pointer({ keys: "[MouseLeft]", target: inc() });
+        expect(document.activeElement).toBe(input());
       },
     );
 

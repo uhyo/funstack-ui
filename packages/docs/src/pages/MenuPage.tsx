@@ -118,8 +118,8 @@ export function MenuPage() {
         <code>transition</code>). A synchronous action closes in the same tick. A rejection leaves
         the menu open and reaches the nearest Error Boundary above the item. A second click, Enter
         or Space while the action is pending is ignored (and cancelled), and the item is{" "}
-        <code>aria-disabled="true"</code> meanwhile; it is still an enabled item for the arrow keys,
-        Home / End and typeahead, which skip only items with the <code>disabled</code> prop (
+        <code>aria-disabled="true"</code> meanwhile. A pending item is an ordinary item for
+        navigation; only the open focus skips items with the <code>disabled</code> prop (
         <code>data-disabled</code>). For "close now, work in the background" do not return the
         promise: <code>{"action={() => { void archive(id); }}"}</code>.
       </p>

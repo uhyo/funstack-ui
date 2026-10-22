@@ -49,7 +49,13 @@ export function useStepButton(
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
     if (event.button !== 0 || !event.isPrimary) return;
-    if (disabled || active.current !== null) return;
+    if (disabled) {
+      // A focusable disabled render (`aria-disabled`, #83) must not take focus from the input
+      // either; native `disabled` focused nothing.
+      event.preventDefault();
+      return;
+    }
+    if (active.current !== null) return;
     const element = event.currentTarget;
     const native = event.nativeEvent;
     // No focus move off the input, no touch keyboard, no text selection.

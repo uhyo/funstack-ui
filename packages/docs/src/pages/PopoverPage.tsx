@@ -380,7 +380,7 @@ export function PopoverPage() {
             "Close",
             '`"true"` while `data-pending`: a second click is ignored meanwhile.',
           ],
-          ["`data-disabled`", "Trigger (library mode), Close", "The `disabled` prop."],
+          ["`data-disabled`", "Trigger, Close", "The `disabled` prop (both modes)."],
         ]}
       />
       <p>

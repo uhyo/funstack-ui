@@ -2946,6 +2946,64 @@ describe("Dialog", () => {
       });
     });
 
+    it("disabled component renders in library mode are no invokers: no commandfor / command (review M1)", async () => {
+      render(
+        <Harness
+          mode="uncontrolled"
+          initialOpen
+          trigger={{ disabled: true, render: <MyButton /> }}
+          content={<Dialog.Close data-testid="close" disabled render={<MyButton />} />}
+        />,
+      );
+      await flush();
+      for (const el of [trigger(), screen.getByTestId("close")]) {
+        expect(el).not.toHaveAttribute("commandfor");
+        expect(el).not.toHaveAttribute("command");
+      }
+    });
+
+    it("JS-free mode with action, a disabled component-render Close is no invoker (review M1)", async () => {
+      render(
+        <Harness
+          mode="static"
+          content={
+            <Dialog.Close data-testid="close" disabled action={() => {}} render={<MyButton />} />
+          }
+        />,
+      );
+      await act(async () => popup().showModal());
+      expect(screen.getByTestId("close")).not.toHaveAttribute("command");
+      expect(screen.getByTestId("close")).not.toHaveAttribute("commandfor");
+    });
+
+    it("an enabled component-render Trigger and Close keep their commands", async () => {
+      render(
+        <Harness
+          mode="uncontrolled"
+          initialOpen
+          trigger={{ render: <MyButton /> }}
+          content={<Dialog.Close data-testid="close" render={<MyButton />} />}
+        />,
+      );
+      await flush();
+      expect(trigger()).toHaveAttribute("command", "show-modal");
+      expect(screen.getByTestId("close")).toHaveAttribute("command", "request-close");
+    });
+
+    it.each([
+      ["modal, host button", true, undefined],
+      ["non-modal, host button", false, undefined],
+      ["non-modal, component render", false, <MyButton key="component" />],
+    ] as const)(
+      "Trigger, JS-free %s: a disabled Trigger carries data-disabled (fold W8)",
+      (_, modal, element) => {
+        render(
+          <Harness mode="static" modal={modal} trigger={{ disabled: true, render: element }} />,
+        );
+        expect(trigger()).toHaveAttribute("data-disabled", "");
+      },
+    );
+
     it("Trigger, JS-free modal with a component render: native disabled (the command)", () => {
       render(<Harness mode="static" trigger={{ disabled: true, render: <MyButton /> }} />);
       expect(trigger()).toBeDisabled();

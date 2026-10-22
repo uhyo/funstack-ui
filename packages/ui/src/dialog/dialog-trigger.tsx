@@ -106,6 +106,10 @@ export function DialogTrigger({
   // nothing on a link; the handler refuses and cancels, so `aria-disabled` is safe (#83). The
   // modal JS-free command needs native `disabled` to stop it.
   const focusable = installClick && !isHostButton(render);
+  // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
+  // `disabled` the element would still be a live invoker before hydration (a component render
+  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  const invoker = modal && !(focusable && disabled);
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (isLibrary) {
       // Cancelling the click cancels the command (it runs as the button's activation
@@ -131,14 +135,16 @@ export function DialogTrigger({
     // browser would run its command). Owned as absent in the focusable branch.
     disabled: focusable ? undefined : disabled,
     ...(focusable && { "aria-disabled": disabled ? true : undefined }),
-    commandfor: modal ? ids.dialog : undefined,
-    command: modal ? "show-modal" : undefined,
+    commandfor: invoker ? ids.dialog : undefined,
+    command: invoker ? "show-modal" : undefined,
     // Only owned when installed, so a render element keeps its own `onClick` in modal JS-free
     // mode (Accordion's rule).
     ...(installClick && { onClick }),
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),
-    "data-disabled": dataAttr(isLibrary && disabled),
+    // Every mode: the styling hook agrees with the rendered `disabled` / `aria-disabled`
+    // (conventions 1.2, wave 9 fold W8).
+    "data-disabled": dataAttr(disabled),
   };
 
   return useRender<ComponentPropsWithRef<"button">, DialogTriggerState>({

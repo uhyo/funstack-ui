@@ -144,6 +144,10 @@ export function usePopoverTrigger<State>(
   // and refuses, so `aria-disabled` is safe and native `disabled` would mean nothing (#83). In
   // JS-free mode the command needs native `disabled` to stop it.
   const ariaDisabled = disabledAs === "aria" || (isLibrary && !isHostButton(render));
+  // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
+  // `disabled` the element would still be a live invoker before hydration (a component render
+  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  const noInvoker = ariaDisabled && disabled;
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     // `type` only applies to a <button>; on any other element the key is not owned.
@@ -152,15 +156,17 @@ export function usePopoverTrigger<State>(
     // would run its command). In the `aria-disabled` branch it is owned as absent.
     disabled: ariaDisabled ? undefined : disabled,
     ...(ariaDisabled && { "aria-disabled": disabled ? true : undefined }),
-    commandfor: ids.popup,
-    command: "toggle-popover",
+    commandfor: noInvoker ? undefined : ids.popup,
+    command: noInvoker ? undefined : "toggle-popover",
     // Library mode: optimistic. JS-free mode: "false" in React; the Popup's `toggle` listener
     // writes the DOM value, and React never rewrites an unchanged prop.
     "aria-expanded": isLibrary ? state.open : false,
     ...merged,
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),
-    "data-disabled": dataAttr((isLibrary || ariaDisabled) && disabled),
+    // Every mode: the styling hook agrees with the rendered `disabled` / `aria-disabled`
+    // (conventions 1.2, wave 9 fold W8).
+    "data-disabled": dataAttr(disabled),
   };
 
   return { state, libraryProps, ref };

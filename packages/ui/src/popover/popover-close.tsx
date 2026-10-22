@@ -81,6 +81,10 @@ export function PopoverClose({
   // handler (#83). JS-free mode without `action` is the browser's `hide-popover` command,
   // which only native `disabled` stops.
   const focusable = installClick && !isHostButton(render);
+  // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
+  // `disabled` the element would still be a live invoker before hydration (a component render
+  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  const noInvoker = focusable && disabled;
 
   const state: PopoverCloseState = { pending, disabled };
 
@@ -135,8 +139,8 @@ export function PopoverClose({
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Close. Absent in the focusable branch.
     disabled: focusable ? undefined : disabled,
-    commandfor: ids.popup,
-    command: "hide-popover",
+    commandfor: noInvoker ? undefined : ids.popup,
+    command: noInvoker ? undefined : "hide-popover",
     ...(installClick && { onClick }),
     // Exactly while `data-pending` (#81): a Close that will not act is unavailable to AT. Owned,
     // so an idle Close removes a render element's own `aria-disabled`.

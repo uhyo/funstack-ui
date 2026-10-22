@@ -375,8 +375,8 @@ describe("Popover", () => {
       fireEvent.click(trigger());
       expect(isOpen()).toBe(false);
       expect(trigger()).toBeDisabled();
-      // `data-disabled` is library mode only.
-      expect(trigger()).not.toHaveAttribute("data-disabled");
+      // Every mode: the styling hook agrees with native `disabled` (fold W8).
+      expect(trigger()).toHaveAttribute("data-disabled", "");
     });
 
     it("keeps aria-expanded current on the Trigger element without a React render", async () => {
@@ -1614,6 +1614,48 @@ describe("Popover", () => {
         expect(action).not.toHaveBeenCalled();
         expect(isOpen()).toBe(false);
       });
+    });
+
+    it("library mode, disabled component renders are no invokers: no commandfor / command (review M1)", async () => {
+      render(
+        <Harness
+          mode="uncontrolled"
+          initialOpen
+          trigger={{ disabled: true, render: <MyButton /> }}
+          close={{ disabled: true, render: <MyButton /> }}
+        />,
+      );
+      await flush();
+      for (const el of [trigger(), screen.getByTestId("close")]) {
+        expect(el).not.toHaveAttribute("commandfor");
+        expect(el).not.toHaveAttribute("command");
+      }
+    });
+
+    it("JS-free mode with action, a disabled component-render Close is no invoker (review M1)", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          mode="static"
+          close={{ disabled: true, action: () => {}, render: <MyButton /> }}
+        />,
+      );
+      await user.click(trigger());
+      expect(screen.getByTestId("close")).not.toHaveAttribute("command");
+      expect(screen.getByTestId("close")).not.toHaveAttribute("commandfor");
+    });
+
+    it("JS-free mode, a disabled component-render Close with action carries data-disabled", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          mode="static"
+          close={{ disabled: true, action: () => {}, render: <MyButton /> }}
+        />,
+      );
+      await user.click(trigger());
+      expect(screen.getByTestId("close")).toHaveAttribute("aria-disabled", "true");
+      expect(screen.getByTestId("close")).toHaveAttribute("data-disabled", "");
     });
 
     it("JS-free mode with a component render: native disabled on Trigger and action-less Close", () => {
