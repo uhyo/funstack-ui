@@ -1032,9 +1032,11 @@ describe("resolved side (wave 11, #20)", () => {
   });
 
   it("after a scroll that leaves no room below, data-side is the side the popup is on", async () => {
-    // As Tooltip's row: Firefox re-chooses the option on scroll (one frame after the event),
-    // Chromium 156 keeps the one chosen at the show (memo/developer/positioning-wave11.md); the
-    // attribute must match the geometry either way.
+    // As Tooltip's row: both engines apply a scroll's option one frame after the event, and
+    // Chromium 156 may keep an overflowing option of a top-layer popover (#92); the attribute must
+    // match the geometry either way. Not pinned on `topLayerAnchorReChoosesOnScroll`: here, with
+    // the scroll soon after the show, Chromium re-chose in every run (locally and on CI) although
+    // the probe reports that it does not, so the probe does not predict this row.
     render(
       <div
         data-testid="scroller"

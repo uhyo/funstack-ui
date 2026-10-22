@@ -12,6 +12,7 @@ import {
   anchorPositionHonoursParentDirection,
   supportsInterestFor,
   supportsPopoverHint,
+  topLayerAnchorReChoosesOnScroll,
 } from "../__tests__/engine.js";
 import {
   actPoll,
@@ -495,12 +496,13 @@ describe("resolved side (wave 11, #20)", () => {
   });
 
   it("after a scroll that leaves no room above, data-side is the side the popup is on", async () => {
-    // Engines differ on whether a scroll re-chooses the option (memo/developer/
-    // positioning-wave11.md): Firefox 157 flips the popup below the trigger, in the layout of the
-    // frame after the `scroll` event; Chromium 156 keeps the option it chose at the show (it
-    // re-chooses on scroll only within a frame or so of the show), so its popup stays above,
-    // scroll-compensated off the top edge. Either way the attribute must report where the popup
-    // is: that is the assertion, read from the geometry, not from the engine's name.
+    // Engines differ on whether a scroll re-chooses the option: Firefox 157 flips the popup below
+    // the trigger; Chromium 156 keeps the overflowing option of a top-layer popover (a bug,
+    // css-anchor-position-1 §6.5; Chromium, #92), so its popup stays above, scroll-compensated off
+    // the top edge. Both apply a scroll's option only in the frame after the event (§3.3 leaves
+    // the timing open). Either way the attribute must report where the popup is: that is the
+    // library's assertion, read from the geometry. The engine outcome is pinned on the probe.
+    const reChooses = await topLayerAnchorReChoosesOnScroll();
     render(
       <div
         data-testid="scroller"
@@ -543,9 +545,10 @@ describe("resolved side (wave 11, #20)", () => {
     await scrollTo(200);
     expect(isOpen()).toBe(true);
     const afterScroll = placedOn();
-    expect(["top", "bottom"]).toContain(afterScroll);
+    // Chromium (#92): kept above. Flip this branch to "bottom" (and drop the probe) once #92 is
+    // fixed; the probe makes this row fail that day.
+    expect(afterScroll).toBe(reChooses ? "bottom" : "top");
     await actPoll(side, afterScroll);
-    console.info(`[resolved side after scroll] the engine placed the popup on ${afterScroll}`);
     // Back down: an engine keeps the last successful option while it still fits (spec); the
     // attribute follows whatever is applied.
     await scrollTo(0);

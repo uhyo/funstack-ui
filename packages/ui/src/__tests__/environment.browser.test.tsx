@@ -8,6 +8,7 @@ import {
   browserName,
   supportsInterestFor,
   supportsPopoverHint,
+  topLayerAnchorReChoosesOnScroll,
 } from "./engine.js";
 
 describe("browser test environment", () => {
@@ -91,5 +92,14 @@ describe("browser test environment", () => {
     }
     // ...and a mixed pair does not (the old combobox note's trap).
     expect(CSS.supports("position-area", "block-end span-self-inline-end")).toBe(false);
+  });
+
+  it("records which engines keep an overflowing option of a top-layer popover after a scroll (#92)", async () => {
+    // Conventions 13.2, #92: Chromium does not re-run position-try fallback for a top-layer
+    // popover after a scroll. Pinned for the two engines measured; WebKit is logged only. When
+    // this fails in Chromium, #92 is fixed: flip the Tooltip scroll row's branch.
+    const reChooses = await topLayerAnchorReChoosesOnScroll();
+    if (browserName !== "webkit") expect(reChooses).toBe(browserName !== "chromium");
+    console.info(`[${browserName}] top-layer anchor re-chooses on scroll: ${reChooses}`);
   });
 });

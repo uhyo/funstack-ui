@@ -111,3 +111,47 @@ export const supportsFocusVisibleOption = (() => {
   } as FocusOptions);
   return read;
 })();
+
+let topLayerReChoice: Promise<boolean> | undefined;
+
+/**
+ * Whether an anchored **top-layer** popover re-runs `position-try-fallbacks` after a scroll makes
+ * its option overflow (css-anchor-position-1 §6.5). False in Chromium 156, which keeps the
+ * overflowing option (#92, a human upstream task); true in Firefox 157. The reduction from #92:
+ * show, wait 300 ms, scroll the anchor to the viewport top, wait 500 ms, see whether the popover
+ * is still above the viewport. Async, so evaluated once on first use and shared. Measured
+ * 2026-10-23 in this harness: the same answer at every show-to-scroll delay from 0 to 300 ms
+ * (60 runs per engine), so it is not load-sensitive. The Tooltip scroll row pins the engine's
+ * outcome on it, so its Chromium branch fails the day #92 is fixed.
+ */
+export function topLayerAnchorReChoosesOnScroll(): Promise<boolean> {
+  topLayerReChoice ??= (async () => {
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const scroller = document.createElement("div");
+    scroller.style.cssText =
+      "position: fixed; top: 0; left: 0; width: 400px; height: 300px; overflow: auto";
+    const before = document.createElement("div");
+    before.style.height = "200px";
+    const anchor = document.createElement("button");
+    anchor.style.cssText = "display: block; width: 100px; height: 30px; margin: 0";
+    const popover = document.createElement("div");
+    popover.popover = "manual";
+    popover.style.cssText =
+      "margin: 0; padding: 0; border: 0; width: 60px; height: 20px; position-area: top; position-try-fallbacks: flip-block";
+    const after = document.createElement("div");
+    after.style.height = "1000px";
+    scroller.append(before, anchor, popover, after);
+    document.body.append(scroller);
+    try {
+      popover.showPopover({ source: anchor });
+      await wait(300);
+      scroller.scrollTop = 200;
+      await wait(500);
+      return popover.getBoundingClientRect().bottom > 0;
+    } finally {
+      if (popover.matches(":popover-open")) popover.hidePopover();
+      scroller.remove();
+    }
+  })();
+  return topLayerReChoice;
+}

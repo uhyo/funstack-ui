@@ -602,11 +602,8 @@ describe("resolved side and direction (browser, wave 11)", () => {
     } else {
       // Firefox: the misplaced submenu overflows and `flip-inline` applies (seen: `self-x-start
       // span-bottom`, placed 86..256 for an item at 5..165); `data-side` reports the applied
-      // option all the same.
-      const applied = getComputedStyle(sub()).positionArea.includes("self-x-start")
-        ? "right"
-        : "left";
-      await actPoll(() => side(sub()), applied);
+      // option, `right` (menu.md 13.2).
+      await actPoll(() => side(sub()), "right");
     }
     const m = item("move").getBoundingClientRect();
     const s = sub().getBoundingClientRect();

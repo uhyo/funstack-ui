@@ -38,11 +38,13 @@ const toDirection = (value: string): Direction => (value === "rtl" ? "rtl" : "lt
  * after layout and before paint, so the first painted frame carries the resolved side), `toggle`
  * (and the jsdom shim's), and while shown `scroll` on the document (capture, passive: nested
  * scrollers too) and `resize` on the window, each read at once and again in the next two
- * animation frames (an engine may re-choose the option only in the layout after the event). The
- * write is urgent (`flushSync`, so the attribute
- * lands before paint; conventions 3.5) and happens only when the rendered pair would change, so
- * a popup that opens where it was asked costs no render (the state holds `null` then). Hidden again resets to the requested values, once the
- * popup no longer renders (an exit animation keeps the resolved side to its end).
+ * animation frames (an engine applies the option a scroll calls for only in the layout after the
+ * event). The write is urgent (`flushSync`, so the attribute lands before paint; conventions 3.5)
+ * and happens only when the rendered pair would change: a popup with a physical `side` that opens
+ * where it was asked costs no render (the state holds `null` then). A logical side
+ * (`inline-start` / `inline-end`) costs one render on show and one on hide, because `data-side`
+ * turns physical while shown. Hidden again resets to the requested values, once the popup no
+ * longer renders (an exit animation keeps the resolved side to its end).
  *
  * Idle with `side: null` (a stylesheet's `@position-try` rules may set insets the parser cannot
  * interpret): no reads, the result's `side` is `null`. Runs whatever opened the popup, the
@@ -102,11 +104,16 @@ export function useResolvedPlacement<Side extends AnchorSide>(
       }
     };
 
-    // Firefox 157 applies the option a scroll calls for in the layout of the frame after the
-    // `scroll` event, so a read in the handler (or in a rAF registered from it, which runs before
-    // that layout) sees the old one, unless the scroll comes within a frame or so of the show
-    // (memo/developer/positioning-wave11.md). Read again in the next two frames; a scroll that
+    // Both engines (Chromium 156, Firefox 157) apply the scroll-dependent anchoring state, the
+    // option and the scroll-compensated geometry alike, in the layout of the frame after the
+    // `scroll` event: a read in the handler, or in a rAF registered from it (which runs before
+    // that layout), sees the old option even after a forced layout. The timing is unspecified
+    // (css-anchor-position-1 §3.3 issue), so read again in the next two frames; a scroll that
     // arrives while that is pending restarts it at the end, so the last scroll is always followed.
+    // Separately, Chromium 156 keeps an overflowing option for a top-layer popover once the first
+    // frames after the show have passed (a bug, §6.5; upstream item #92): then no frame reads a
+    // new option, and `data-side` correctly keeps reporting the applied one. Do not drop the
+    // frame reads "because Chromium does not re-choose": when it does, it lags like Firefox.
     let frame = 0;
     let again = false;
     const cancelFrames = () => {
@@ -121,6 +128,8 @@ export function useResolvedPlacement<Side extends AnchorSide>(
       }
       frame = win.requestAnimationFrame(() => {
         read(true);
+        // The popup was found hidden (or `side` turned null): `listen(false)` ended the pair.
+        if (!listening) return;
         frame = win.requestAnimationFrame(() => {
           frame = 0;
           read(true);
@@ -153,13 +162,23 @@ export function useResolvedPlacement<Side extends AnchorSide>(
       listen(false);
       // Hidden, but still rendered while an exit animation runs: keep the resolved side to the
       // end of it. The ResizeObserver sees the box go and resets then.
-      if (!element.isConnected || element.getClientRects().length === 0) write(null, urgent);
+      // Nothing written, nothing to reset: skip the forced layout (every mount and request change
+      // of a hidden popup comes through here).
+      if (
+        written.current !== null &&
+        (!element.isConnected || element.getClientRects().length === 0)
+      ) {
+        write(null, urgent);
+      }
     };
 
     function onEvent() {
       read(true);
     }
     function onMove() {
+      // In every Chromium 156 / Firefox 157 probe this read still saw the old option (see the
+      // frame reads above); kept as cover for WebKit, which was not probed, at the cost of one
+      // style read per scroll event.
       read(true);
       if (listening) readLater();
     }
