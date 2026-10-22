@@ -53,7 +53,8 @@
   cursor: progress;
 }
 
-.tb-item[aria-disabled="true"],
+/* [data-disabled], not [aria-disabled]: a pending Button is aria-disabled too. */
+.tb-item[data-disabled],
 .tb-item:disabled {
   opacity: 0.5;
 }

@@ -3,6 +3,7 @@
 // and closes the dialog before hydration and with JavaScript off. A Server Function would also be
 // a valid `action` or `formAction` here; this static site has none.
 import { Button } from "@funstack/ui/button";
+import { ButtonCssPending } from "./ButtonCssPending.js";
 
 export function ButtonInvoker() {
   return (
@@ -19,6 +20,8 @@ export function ButtonInvoker() {
           </Button>
         </div>
       </dialog>
+      {/* Pending styled by [data-pending] CSS only (no function children). */}
+      <ButtonCssPending />
     </div>
   );
 }

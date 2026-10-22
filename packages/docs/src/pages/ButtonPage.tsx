@@ -6,6 +6,7 @@ import { ButtonCompose } from "../examples/ButtonCompose.js";
 import buttonComposeSource from "../examples/ButtonCompose.tsx?raw";
 import { ButtonFormActions } from "../examples/ButtonFormActions.js";
 import buttonFormActionsSource from "../examples/ButtonFormActions.tsx?raw";
+import buttonCssPendingSource from "../examples/ButtonCssPending.tsx?raw";
 import { ButtonInvoker } from "../examples/ButtonInvoker.js";
 import buttonInvokerSource from "../examples/ButtonInvoker.tsx?raw";
 import { ButtonSave } from "../examples/ButtonSave.js";
@@ -103,7 +104,7 @@ export function ButtonPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled` and `data-disabled`; never dispatches, and a disabled link does not navigate. With `focusableWhenDisabled`, or inside a [Toolbar](/components/toolbar), renders `aria-disabled="true"` instead.',
+              'Native `disabled` and `data-disabled`; never dispatches, and a disabled link does not navigate. With `focusableWhenDisabled`, inside a [Toolbar](/components/toolbar), or when `render` is not a `<button>` (a link, where native `disabled` means nothing), renders `aria-disabled="true"` instead.',
           },
           {
             name: "focusableWhenDisabled",
@@ -143,7 +144,7 @@ export function ButtonPage() {
           ["`data-disabled`", "The `disabled` prop. Not set by pending."],
           [
             "`aria-disabled`",
-            '`"true"` while pending, and while `disabled` with `focusableWhenDisabled` or inside a Toolbar.',
+            '`"true"` while pending, and while `disabled` with `focusableWhenDisabled`, inside a Toolbar, or on a non-`<button>` `render` element.',
           ],
         ]}
       />
@@ -311,14 +312,18 @@ export function ButtonPage() {
       <p>
         <code>ButtonInvoker.tsx</code> has no <code>"use client"</code>: it is a Server Component
         that renders Button (a client module) with serialisable props. The Preview button opens the
-        dialog through the browser's Invoker Commands, before hydration and without JavaScript. A
-        Server Component can also pass a Server Function as <code>action</code> (it receives{" "}
-        <code>details</code> with <code>event</code> undefined) or as <code>formAction</code>{" "}
-        (progressively enhanced: the button submits before hydration), and style pending with{" "}
-        <code>[data-pending]</code> CSS. It cannot pass function <code>children</code>,{" "}
-        <code>className</code>, <code>style</code> or <code>render</code>, nor a plain client
-        function as <code>action</code>: the spinner-in-children pattern needs a Client Component.
+        dialog through the browser's Invoker Commands, before hydration and without JavaScript. Sync
+        shows a pending look made by <code>[data-pending]</code> CSS alone (
+        <code>ButtonCssPending.tsx</code> below; its fake action is the only reason it is a client
+        module on this static site). A Server Component can also pass a Server Function as{" "}
+        <code>action</code> (it receives <code>details</code> with <code>event</code> undefined) or
+        as <code>formAction</code> (progressively enhanced: the button submits before hydration),
+        and style pending with <code>[data-pending]</code> CSS. It cannot pass function{" "}
+        <code>children</code>, <code>className</code>, <code>style</code> or <code>render</code>,
+        nor a plain client function as <code>action</code>: the spinner-in-children pattern needs a
+        Client Component.
       </p>
+      <CodeBlock title="ButtonCssPending.tsx">{buttonCssPendingSource}</CodeBlock>
       <CodeBlock>{`// A Server Component
 import { Button } from "@funstack/ui/button";
 import { archive } from "./actions"; // "use server"

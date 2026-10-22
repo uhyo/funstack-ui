@@ -1,16 +1,18 @@
 "use client";
-import { startTransition, useState } from "react";
+import { startTransition, useOptimistic, useState } from "react";
 import { Button } from "@funstack/ui/button";
 import { toast } from "@funstack/ui/toast";
 import { DemoErrorBoundary } from "./DemoErrorBoundary.js";
 import { fakeSave } from "./fake-api.js";
 
 // Three Buttons with a 1.2 s fake save. Click Save several times quickly: the action runs once
-// (the call counter), because a Button ignores activation while its own action is pending. The
+// (the call counter, optimistic so it counts at once), because a Button ignores activation while
+// its own action is pending. The
 // second Button rejects into the Error Boundary; the third catches inside and shows a toast.
 export function ButtonSave() {
   const [calls, setCalls] = useState(0);
   const [saved, setSaved] = useState(0);
+  const [optimisticCalls, addCall] = useOptimistic(calls, (n) => n + 1);
 
   return (
     <div className="demo-stack">
@@ -18,7 +20,8 @@ export function ButtonSave() {
         <Button
           className="demo-btn"
           action={async () => {
-            startTransition(() => setCalls((c) => c + 1));
+            addCall(undefined);
+            setCalls((c) => c + 1);
             await fakeSave("the draft", { ms: 1200 });
             startTransition(() => setSaved((s) => s + 1));
           }}
@@ -31,7 +34,7 @@ export function ButtonSave() {
           )}
         </Button>
         <output className="demo-readout">
-          Action calls: {calls}. Saves: {saved}.
+          Action calls: {optimisticCalls}. Saves: {saved}.
         </output>
       </div>
 

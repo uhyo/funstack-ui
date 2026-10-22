@@ -122,6 +122,21 @@ describe("Button", () => {
       // focusableWhenDisabled alone (not disabled) changes nothing.
     });
 
+    it("a disabled non-<button> render element is aria-disabled, without disabled", () => {
+      const action = vi.fn();
+      render(
+        <Button disabled action={action} render={<a href="#x" />}>
+          Link
+        </Button>,
+      );
+      const link = screen.getByText("Link");
+      expect(link).toHaveAttribute("aria-disabled", "true");
+      expect(link).not.toHaveAttribute("disabled");
+      expect(link).toHaveAttribute("data-disabled", "");
+      expect(click(link).defaultPrevented).toBe(true);
+      expect(action).not.toHaveBeenCalled();
+    });
+
     it("focusableWhenDisabled without disabled renders no aria-disabled", () => {
       render(<Button focusableWhenDisabled>On</Button>);
       expect(button("On")).not.toHaveAttribute("aria-disabled");
@@ -661,6 +676,12 @@ describe("Button", () => {
       await act(async () => {
         da.resolve();
       });
+      // Only A clears; B's own submission and the form channel are still pending.
+      expectNotPending(button("A"));
+      expect(button("A")).not.toHaveAttribute("aria-disabled");
+      expectPending(button("B"));
+      expect(button("B")).toHaveAttribute("aria-disabled", "true");
+      expectPending(button("Publish"));
       await act(async () => {
         db.resolve();
       });

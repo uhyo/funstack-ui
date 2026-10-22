@@ -30,6 +30,28 @@
   opacity: 0.75;
 }
 
+/* CSS-only pending: the label hides and a spinner takes its place, no function children. */
+.demo-btn-css-spinner {
+  position: relative;
+}
+
+.demo-btn-css-spinner[data-pending] {
+  color: transparent;
+}
+
+.demo-btn-css-spinner[data-pending]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  inline-size: 0.9em;
+  block-size: 0.9em;
+  border: 2px solid var(--color-text);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: demo-spin 700ms linear infinite;
+}
+
 .demo-btn[data-disabled],
 .demo-btn[aria-disabled="true"]:not([data-pending]) {
   opacity: 0.5;
@@ -44,5 +66,9 @@
 @media (prefers-reduced-motion: reduce) {
   .demo-btn {
     transition: none;
+  }
+
+  .demo-btn-css-spinner[data-pending]::after {
+    animation-duration: 2s;
   }
 }

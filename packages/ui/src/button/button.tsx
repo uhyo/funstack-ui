@@ -57,8 +57,8 @@ export interface ButtonProps extends Omit<
   type?: "button" | "submit" | "reset";
   /**
    * Native `disabled` (owned; a `render` element cannot re-enable it) and `data-disabled`.
-   * Never dispatches. With `focusableWhenDisabled`, or inside a `Toolbar.Root`, renders
-   * `aria-disabled="true"` instead so the Button stays focusable.
+   * Never dispatches. With `focusableWhenDisabled`, inside a `Toolbar.Root`, or when `render`
+   * is not a `<button>` (a link), renders `aria-disabled="true"` instead.
    */
   disabled?: boolean;
   /**
@@ -103,7 +103,10 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const toolbar = useToolbarContext();
-  const focusable = focusableWhenDisabled || toolbar !== null;
+  // Native `disabled` means nothing on a non-<button> element (a `render={<a href>}` link), so
+  // such an element always takes the focusable-disabled branch: `aria-disabled` tells assistive
+  // technology what the cancelled click already does (review finding 1).
+  const focusable = focusableWhenDisabled || toolbar !== null || !rendersButton(render);
   const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: true });
 
   // Per-submitter pending (design 6.2): React reports the submitter's function as
