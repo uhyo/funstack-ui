@@ -77,7 +77,10 @@ beforeEach(() => {
   );
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // A row that failed between `mouse.down` and `mouse.up` must not leave the (in Firefox, shared,
+  // #62) button down for the next rows.
+  await mouse.releaseHeld();
   for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
     if (element.matches(":popover-open")) element.hidePopover();
   }
@@ -346,6 +349,28 @@ describe("move (browser)", () => {
     expectTopLeftAtPoint();
     expect(item("grid")).toHaveAttribute("aria-checked", "true");
     expect(item("rename")).toHaveFocus();
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it("a move with the button held survives the pending pointerup (re-capture after the re-show)", async () => {
+    const action = vi.fn<OpenAction>();
+    render(<Harness root={{ openChangeAction: action }} />);
+    await openAt(100, 100);
+    await act(async () => {
+      await mouse.down(240, 220, "right");
+    });
+    await expect.poll(() => Math.abs(rect().left - lastMenu!.x)).toBeLessThanOrEqual(1);
+    expect(lastMenu!.x).toBeGreaterThan(200);
+    await flush();
+    // Away from the menu (it spans 240.. on both axes), still inside the region.
+    await act(async () => {
+      await mouse.move(180, 160);
+      await mouse.up(180, 160, "right");
+    });
+    await flush();
+    await flush();
+    expect(isOpen()).toBe(true);
+    expectTopLeftAtPoint();
     expect(action).toHaveBeenCalledTimes(1);
   });
 });

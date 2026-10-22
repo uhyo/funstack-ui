@@ -12,7 +12,13 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { markHandled, MenuRegionContext, useMenuContext } from "./menu-context.js";
+import {
+  claimPress,
+  isPressClaimed,
+  markHandled,
+  MenuRegionContext,
+  useMenuContext,
+} from "./menu-context.js";
 import { capturePointer, isEditableTarget } from "./menu-dom.js";
 
 export interface MenuContextTriggerState {
@@ -54,9 +60,6 @@ export interface MenuContextTriggerProps extends Omit<
 const LONG_PRESS_SLOP = 10;
 
 const isDev = process.env.NODE_ENV !== "production";
-
-/** `pointerdown` events a region already started a long-press for (nested regions). */
-const claimedPresses = new WeakSet<Event>();
 
 interface LongPress {
   readonly pointerId: number;
@@ -128,14 +131,28 @@ export function MenuContextTrigger({
     if (disabled) cancelLongPress();
   }, [disabled, cancelLongPress]);
 
-  // `keydown` is observed, not owned: the region is full of the consumer's interactive content.
-  // Capture, so a descendant's `stopPropagation()` does not hide the key from the bookkeeping.
-  const keyRef = useCallback((element: HTMLElement) => {
+  // A close ends any armed click swallow (review H1).
+  const open = popover.optimistic;
+  useEffect(() => {
+    if (!open) disarmSwallow.current?.();
+  }, [open]);
+
+  // The modality bookkeeping observes `keydown` and `pointerdown` without owning them (the region
+  // is full of the consumer's interactive content), in the capture phase, so a descendant's
+  // `stopPropagation()` (a slider, a drag handle) does not hide them (review L2).
+  const modalityRef = useCallback((element: HTMLElement) => {
     const onKeyDown = () => {
       lastKeyDown.current = ++sequence.current;
     };
+    const onPointerDown = () => {
+      lastPointerDown.current = ++sequence.current;
+    };
     element.addEventListener("keydown", onKeyDown, true);
-    return () => element.removeEventListener("keydown", onKeyDown, true);
+    element.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      element.removeEventListener("keydown", onKeyDown, true);
+      element.removeEventListener("pointerdown", onPointerDown, true);
+    };
   }, []);
 
   /** The popup element to capture on and open, or `null` (no Popup mounted: nothing opens). */
@@ -151,21 +168,40 @@ export function MenuContextTrigger({
     return popup;
   };
 
-  /** One-shot swallow of the `click` an engine may synthesise when the long-press ends (2.2). */
-  const armClickSwallow = (doc: Document) => {
+  /**
+   * One-shot swallow of the `click` an engine may synthesise when the long-press ends (2.2),
+   * scoped to that release (review H1): the click comes in the same task as the `pointerup` of
+   * `pointerId`, so the swallow ends one task after that `pointerup` (or `pointercancel`), and at
+   * once on any `keydown`, the next `pointerdown`, or the menu closing. iOS synthesises no click
+   * after a long-press; a swallow left armed would eat the next keyboard activation
+   * (`element.click()`).
+   */
+  const armClickSwallow = (doc: Document, pointerId: number) => {
     disarmSwallow.current?.();
+    let released: ReturnType<typeof setTimeout> | undefined;
     const onClick = (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
       disarm();
     };
+    const onRelease = (event: Event) => {
+      if ((event as globalThis.PointerEvent).pointerId !== pointerId) return;
+      if (released === undefined) released = setTimeout(disarm, 0);
+    };
     const disarm = () => {
+      if (released !== undefined) clearTimeout(released);
       doc.removeEventListener("click", onClick, true);
       doc.removeEventListener("pointerdown", disarm, true);
+      doc.removeEventListener("keydown", disarm, true);
+      doc.removeEventListener("pointerup", onRelease, true);
+      doc.removeEventListener("pointercancel", onRelease, true);
       if (disarmSwallow.current === disarm) disarmSwallow.current = null;
     };
     doc.addEventListener("click", onClick, true);
     doc.addEventListener("pointerdown", disarm, true);
+    doc.addEventListener("keydown", disarm, true);
+    doc.addEventListener("pointerup", onRelease, true);
+    doc.addEventListener("pointercancel", onRelease, true);
     disarmSwallow.current = disarm;
   };
 
@@ -205,8 +241,8 @@ export function MenuContextTrigger({
     );
   };
 
+  // The long-press only; the modality bookkeeping is `modalityRef`'s.
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
-    lastPointerDown.current = ++sequence.current;
     const native = event.nativeEvent;
     if (longPress.current !== null) {
       // A second finger: not a long-press.
@@ -214,12 +250,14 @@ export function MenuContextTrigger({
       return;
     }
     if (disabled || (native.pointerType !== "touch" && native.pointerType !== "pen")) return;
+    // A press inside any Menu.Popup (this Root's, or another menu inside the region) is claimed by
+    // that popup; a press an inner region already times is claimed by it.
     if (fromOwnPopup(native.target)) return;
-    if (!native.isPrimary || claimedPresses.has(native)) return;
+    if (!native.isPrimary || isPressClaimed(native)) return;
     if (editableTargets === "native" && isEditableTarget(native.target)) return;
     // The innermost enabled region times the press; outer regions leave it (as `contextmenu`'s
     // `defaultPrevented` rule, design 2.4).
-    claimedPresses.add(native);
+    claimPress(native);
     const source = event.currentTarget;
     const { pointerId, clientX, clientY } = native;
     const timer = setTimeout(
@@ -229,7 +267,7 @@ export function MenuContextTrigger({
         if (popup === null) return;
         // The finger is still down: its `pointerup` would light-dismiss in WebKit.
         capturePointer(popup, pointerId);
-        armClickSwallow(source.ownerDocument);
+        armClickSwallow(source.ownerDocument, pointerId);
         menu.openAt(
           { x: clientX, y: clientY },
           { source, event: native, pointer: true, pointerId },
@@ -284,7 +322,7 @@ export function MenuContextTrigger({
     ),
     props: rest,
     libraryProps,
-    ref: keyRef,
+    ref: modalityRef,
   });
 }
 

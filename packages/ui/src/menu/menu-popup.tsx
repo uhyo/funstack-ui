@@ -36,7 +36,7 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { isHandledBy, MenuListContext, useMenuContext } from "./menu-context.js";
+import { claimPress, isHandledBy, MenuListContext, useMenuContext } from "./menu-context.js";
 import type { MenuContextValue, MenuListContextValue, MenuPlacement } from "./menu-context.js";
 import {
   capturePointer,
@@ -281,10 +281,11 @@ export function MenuPopup({
   // it so the respelled fallbacks place it afresh, the source is the region and the first item
   // is focused again; then capture the still-pressed pointer again, against the Firefox / WebKit
   // `pointerup` light dismiss. Runs after the hook's apply effect (declared after it).
-  // Once a point open has been shown and the popup is no longer visible (hidden, exit animation
-  // over), the placement goes back to anchored for the next open that is not a ContextTrigger's.
+  // Once the popup is not visible (hidden, exit animation over) and no open is intended or in
+  // flight, a point placement goes back to anchored for the next open that is not a
+  // ContextTrigger's: after a point open that was shown and closed, and after one that was
+  // rejected or refused (review L1).
   const shownKey = useRef<number | "anchor" | null>(null);
-  const shownPoint = useRef<number | null>(null);
   useLayoutEffect(() => {
     const element = popover.popupRef.current;
     if (element === null) return;
@@ -294,10 +295,9 @@ export function MenuPopup({
         capturePointer(element, point?.pointerId);
       }
       shownKey.current = key;
-      if (point !== null) shownPoint.current = point.generation;
     } else {
       shownKey.current = null;
-      if (!visible && point !== null && shownPoint.current === point.generation) {
+      if (!visible && point !== null && !popover.pending && !popover.intended()) {
         menu.resetPlacement(point.generation);
       }
     }
@@ -310,7 +310,11 @@ export function MenuPopup({
           "focusing steps, which fight the menu's item focus.",
       );
     }
-    return () => {};
+    // A press inside a menu is never a long-press of a Menu.ContextTrigger around it (review M1).
+    // Native, so it runs before React's root listener dispatches to the region.
+    const onPointerDown = (event: Event) => claimPress(event);
+    element.addEventListener("pointerdown", onPointerDown);
+    return () => element.removeEventListener("pointerdown", onPointerDown);
   }, []);
   const ref = useMemo(() => mergeRefs(setElement, devRef), [setElement, devRef]);
 

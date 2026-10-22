@@ -54,11 +54,24 @@ function inputHandled(type: string): Promise<void> {
   });
 }
 
+/** Buttons `mouse.down` pressed and no `mouse.up` released yet. */
+const held = new Set<Button>();
+
 /**
  * Real mouse input at client coordinates of this frame (see `toPagePoint`). `down`, `up` and
  * `click` resolve after the page handled the input (`inputHandled`).
  */
 export const mouse = {
+  /**
+   * Releases every button a row left down (an afterEach: in Firefox the files share one mouse,
+   * #62, so a row failing between `down` and `up` would cascade). Bounded: no event wait.
+   */
+  releaseHeld: async () => {
+    for (const button of [...held]) {
+      held.delete(button);
+      await commands.mouse("up", 1, 1, button);
+    }
+  },
   move: (x: number, y: number) => {
     const p = toPagePoint(x, y);
     return commands.mouse("move", p.x, p.y);
@@ -67,6 +80,7 @@ export const mouse = {
   down: async (x: number, y: number, button: Button = "left") => {
     const p = toPagePoint(x, y);
     const handled = inputHandled("pointerdown");
+    held.add(button);
     await commands.mouse("down", p.x, p.y, button);
     await handled;
   },
@@ -74,6 +88,7 @@ export const mouse = {
   up: async (x: number, y: number, button: Button = "left") => {
     const p = toPagePoint(x, y);
     const handled = inputHandled("pointerup");
+    held.delete(button);
     await commands.mouse("up", p.x, p.y, button);
     await handled;
   },

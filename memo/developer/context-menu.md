@@ -65,6 +65,30 @@ Branch `wave10/context-menu`.
    their rows. jsdom's `PointerEvent` already has `pointerId` / `pointerType`, so the shim needs no
    fill either; `popover-shim.ts` is unchanged.
 
+## Review fixes (memo/reviewer/context-menu.md, branch `wave10/context-menu-fixes`)
+
+- H1: the long-press click swallow is armed with the pointer id and ends one task after that
+  pointer's `pointerup` / `pointercancel` (document capture), on any `keydown`, the next
+  `pointerdown`, or the menu closing (effect on the optimistic open). jsdom rows: Enter after
+  release, Enter with no release (iOS), bare click after the release task, same-task click
+  swallowed (another pointer's release ignored), close disarms. Mutation-checked: dropping the
+  release disarm fails the bare-click row, dropping the keydown disarm fails the no-release row.
+  Note for tests: an item's Enter handler already calls `element.click()`; a helper that fires
+  `keydown` and then `click()` activates twice.
+- M1: `claimPress` / `isPressClaimed` in `menu-context.ts`; every `Menu.Popup` claims the
+  `pointerdown`s inside it through a native listener on the popup element (runs before React's
+  root listener reaches the region). Row: long-press on another menu's item inside the region.
+- L1: the placement resets when the popup is not visible and `!pending && !intended()`, not only
+  after a shown point open (a refused or rejected point open no longer leaves `data-context`).
+- L2: `pointerdown` modality bookkeeping moved to the capture listener next to `keydown`.
+- L3: docs say events inside a Popup in the row bubble to the row; also the low note on
+  non-menu popups inside a region.
+- L4: `mouse.releaseHeld()` in the browser afterEach (only buttons `mouse.down` left pressed, no
+  event wait); a held-button move row. Probe: with the re-show re-capture removed, and even with
+  the handler's capture removed, a held-button **move** survives the `pointerup` in Chromium and
+  Firefox (a popover is already open at that `pointerdown`), so the row guards the behaviour
+  (and WebKit on CI) rather than the re-capture itself; the re-capture stays defensive.
+
 ## Notes
 
 - jsdom: `PointerEvent` has `pointerId` / `pointerType` (jsdom 30); no `setPointerCapture`, no

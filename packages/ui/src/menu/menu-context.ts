@@ -105,6 +105,22 @@ export const MenuRegionContext = createContext(false);
  */
 const handledEvents = new WeakMap<Event, object>();
 
+/**
+ * `pointerdown` events that are not a long-press of an enclosing region: claimed by the innermost
+ * region that started its timer for them (nested regions), and by every `Menu.Popup` for the
+ * presses inside it (a menu inside a region, review M1). As `contextmenu`'s `defaultPrevented`
+ * rule (context-menu.md 2.4).
+ */
+const claimedPresses = new WeakSet<Event>();
+
+export function claimPress(event: Event): void {
+  claimedPresses.add(event);
+}
+
+export function isPressClaimed(event: Event): boolean {
+  return claimedPresses.has(event);
+}
+
 /** The top-level menu's identity: its popup ref object, stable for the Root's lifetime. */
 const menuKey = (menu: MenuContextValue): object => menu.root.popover.popupRef;
 

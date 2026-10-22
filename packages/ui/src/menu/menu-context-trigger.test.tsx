@@ -394,6 +394,19 @@ describe("Menu.ContextTrigger", () => {
       expect(calls[0]!.autofocus).toBe(item("rename"));
     });
 
+    it("a pointerdown a descendant stops still counts (capture phase, review L2)", async () => {
+      const quiet = watchQuietFocus();
+      render(
+        <Harness
+          inside={<span data-testid="handle" onPointerDown={(e) => e.stopPropagation()} />}
+        />,
+      );
+      const handle = screen.getByTestId("handle");
+      fireEvent.keyDown(handle, { key: "a" });
+      await rightClick(handle);
+      expect(quiet).toEqual([item("rename")]);
+    });
+
     it("neither signal (a script, VoiceOver): a pointer open (quiet)", async () => {
       const quiet = watchQuietFocus();
       render(<Harness />);
@@ -775,6 +788,132 @@ describe("Menu.ContextTrigger", () => {
       press(screen.getByTestId("text"));
       await advance(600);
       expect(isOpen()).toBe(false);
+    });
+
+    describe("the click swallow is scoped to the release (review H1)", () => {
+      function withAction() {
+        const activate = vi.fn();
+        render(
+          <Harness
+            content={
+              <>
+                <Menu.Item data-testid="rename" action={activate} closeOnActivate={false}>
+                  Rename
+                </Menu.Item>
+                <Menu.Item data-testid="archive">Archive</Menu.Item>
+              </>
+            }
+          />,
+        );
+        return activate;
+      }
+
+      /** Enter on an item: its `keydown` handler activates through `element.click()`. */
+      function pressEnter(target: HTMLElement) {
+        act(() => {
+          fireEvent.keyDown(target, { key: "Enter" });
+        });
+      }
+
+      const release = () =>
+        act(() => {
+          popup().dispatchEvent(pointerEvent("pointerup", { pointerId: 5, pointerType: "touch" }));
+        });
+
+      it("long-press open + pointerup + Enter gives 1 activation", async () => {
+        vi.useFakeTimers();
+        const activate = withAction();
+        press(region());
+        await advance(510);
+        expect(isOpen()).toBe(true);
+        release();
+        await advance(1);
+        pressEnter(item("rename"));
+        await advance(10);
+        expect(activate).toHaveBeenCalledTimes(1);
+      });
+
+      it("no release at all (iOS: no click after a long-press): Enter on an item activates", async () => {
+        vi.useFakeTimers();
+        const activate = withAction();
+        press(region());
+        await advance(510);
+        pressEnter(item("rename"));
+        await advance(10);
+        expect(activate).toHaveBeenCalledTimes(1);
+      });
+
+      it("a bare click (no keydown) after the release task activates", async () => {
+        vi.useFakeTimers();
+        const activate = withAction();
+        press(region());
+        await advance(510);
+        release();
+        await advance(1);
+        act(() => item("rename").click());
+        await advance(10);
+        expect(activate).toHaveBeenCalledTimes(1);
+      });
+
+      it("the click the release synthesises (same task) is swallowed; a release of another pointer does not count", async () => {
+        vi.useFakeTimers();
+        const activate = withAction();
+        press(region());
+        await advance(510);
+        act(() => {
+          popup().dispatchEvent(pointerEvent("pointerup", { pointerId: 9, pointerType: "touch" }));
+        });
+        await advance(1);
+        release();
+        const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+        act(() => {
+          item("rename").dispatchEvent(click);
+        });
+        expect(click.defaultPrevented).toBe(true);
+        await advance(10);
+        expect(activate).not.toHaveBeenCalled();
+      });
+
+      it("a close disarms it: the next click anywhere is not swallowed", async () => {
+        vi.useFakeTimers();
+        withAction();
+        press(region());
+        await advance(510);
+        expect(isOpen()).toBe(true);
+        await act(async () => popup().hidePopover());
+        await advance(10);
+        expect(isOpen()).toBe(false);
+        const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+        screen.getByTestId("elsewhere").dispatchEvent(click);
+        expect(click.defaultPrevented).toBe(false);
+      });
+    });
+
+    it("a long-press on an item of another menu inside the region does not open the region's menu (review M1)", async () => {
+      const user = setupUser();
+      const outerAction = vi.fn<OpenAction>();
+      render(
+        <Harness
+          root={{ openChangeAction: outerAction }}
+          inside={
+            <Menu.Root>
+              <Menu.Trigger data-testid="inner-trigger">Inner</Menu.Trigger>
+              <Menu.Popup data-testid="inner-popup">
+                <Menu.Item data-testid="inner-item">Inner item</Menu.Item>
+              </Menu.Popup>
+            </Menu.Root>
+          }
+        />,
+      );
+      await user.click(screen.getByTestId("inner-trigger"));
+      await flush();
+      expect(isOpen(screen.getByTestId("inner-popup"))).toBe(true);
+      vi.useFakeTimers();
+      press(item("inner-item"));
+      await advance(600);
+      expect(outerAction).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(false);
+      expect(isOpen(screen.getByTestId("inner-popup"))).toBe(true);
     });
   });
 
@@ -1303,6 +1442,40 @@ describe("Menu.ContextTrigger", () => {
       await flush();
       expect(region()).not.toHaveAttribute("data-open");
       expect(isOpen()).toBe(false);
+    });
+
+    it("a refused point open leaves no point placement; a later open with no dispatch is anchored (review L1)", async () => {
+      const seen: MenuPopupState[] = [];
+      function Refusing() {
+        const [open, setOpen] = useState(false);
+        return (
+          <>
+            <button type="button" data-testid="flip" onClick={() => setOpen(true)} />
+            <Harness
+              withTrigger
+              root={{ open, openChangeAction: async () => {} }}
+              popup={{
+                className: (s: MenuPopupState) => {
+                  seen.push(s);
+                  return undefined;
+                },
+              }}
+            />
+          </>
+        );
+      }
+      render(<Refusing />);
+      await rightClick(region(), 70, 80);
+      await flush();
+      expect(isOpen()).toBe(false);
+      expect(popup()).not.toHaveAttribute("data-context");
+      expect(popup().style.getPropertyValue("--menu-point-x")).toBe("");
+      expect(seen.at(-1)!.context).toBe(false);
+      fireEvent.click(screen.getByTestId("flip"));
+      await flush();
+      expect(isOpen()).toBe(true);
+      expect(popup()).not.toHaveAttribute("data-context");
+      expect(popup()).toHaveAttribute("data-side", "bottom");
     });
   });
 
