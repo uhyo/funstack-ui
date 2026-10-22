@@ -238,3 +238,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Release dceec9a; publish + deploy-docs succeeded. Closed #20 #21 #53 #88. Architect final alignment 4499ff4.
 - Open follow-ups: #89 #91 #92 (upstream human tasks), #90 (device check incl. pen), #93 (tooltip warm-open state), #19 zero-JS, #73 human checks.
 - User: OK to file issues in other FUNSTACK repos ourselves.
+
+## 2026-10-23 — wave 12 started (#93 tooltip warm-open state)
+- npm alpha dist-tag confirmed 0.1.0-alpha.9.
+- User picked #93. Architect design-93 running (no separate research; architect checks native-path timing). Then developer worktree wave12/tooltip-instant → review → fixes → alpha.10.
