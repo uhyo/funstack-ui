@@ -1,0 +1,40 @@
+{
+ "chromium": {
+  "version": "156.0.8078.4",
+  "bottom span-right + {}": 300,
+  "bottom span-left + {}": 380,
+  "bottom + {}": 340,
+  "self-block-end span-self-inline-end + {}": 380,
+  "bottom span-right + {justify-self:start}": 300,
+  "bottom span-right + {justify-self:left}": 300,
+  "bottom span-right + {justify-self:self-start}": 680,
+  "bottom span-left + {justify-self:right}": 380,
+  "bottom + {justify-self:anchor-center}": 340,
+  "bottom span-right + {left:0;right:0}": 300,
+  "bottom span-right + {left:0}": 300,
+  "bottom span-right + {right:0}": 680,
+  "bottom span-left + {right:0}": 380,
+  "self-block-end span-self-inline-end + {left:0}": 0,
+  "bottom span-right + {direction:ltr}": 300,
+  "bottom span-right + {unicode-bidi:isolate;direction:ltr}": 300
+ },
+ "firefox": {
+  "version": "157.0",
+  "bottom span-right + {}": -80,
+  "bottom span-left + {}": 0,
+  "bottom + {}": -340,
+  "self-block-end span-self-inline-end + {}": 0,
+  "bottom span-right + {justify-self:start}": 300,
+  "bottom span-right + {justify-self:left}": -80,
+  "bottom span-right + {justify-self:self-start}": 300,
+  "bottom span-left + {justify-self:right}": 0,
+  "bottom + {justify-self:anchor-center}": -340,
+  "bottom span-right + {left:0;right:0}": -80,
+  "bottom span-right + {left:0}": -80,
+  "bottom span-right + {right:0}": 300,
+  "bottom span-left + {right:0}": 0,
+  "self-block-end span-self-inline-end + {left:0}": -380,
+  "bottom span-right + {direction:ltr}": -80,
+  "bottom span-right + {unicode-bidi:isolate;direction:ltr}": -80
+ }
+}

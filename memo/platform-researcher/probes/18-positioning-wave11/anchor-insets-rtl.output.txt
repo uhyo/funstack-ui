@@ -1,0 +1,30 @@
+== chromium 156.0.8078.4
+area bottom span-right @ mid                                   ltr 300,230  rtl 300,230  same
+area bottom span-right @ bottom-right edge                     ltr 590,500  rtl 590,500  same
+area bottom @ mid                                              ltr 340,230  rtl 340,230  same
+area bottom @ bottom-right edge                                ltr 630,500  rtl 630,500  same
+insets bottom/start @ mid                                      ltr 300,230  rtl 300,230  same
+insets bottom/start @ bottom-right edge                        ltr 590,500  rtl 590,500  same
+insets bottom/end @ mid                                        ltr 380,230  rtl 380,230  same
+insets bottom/end @ bottom-right edge                          ltr 670,500  rtl 670,500  same
+insets bottom/center (anchor-center) @ mid                     ltr 340,230  rtl 340,230  same
+insets bottom/center (anchor-center) @ bottom-right edge       ltr 630,500  rtl 630,500  same
+insets bottom/center (left:anchor(center)-60px) @ mid          ltr 340,230  rtl 340,230  same
+insets bottom/center (left:anchor(center)-60px) @ bottom-right edge ltr 630,500  rtl 630,500  same
+insets right/center (anchor-center) @ mid                      ltr 500,195  rtl 500,195  same
+insets right/center (anchor-center) @ bottom-right edge        ltr 470,535  rtl 470,535  same
+== firefox 157.0
+area bottom span-right @ mid                                   ltr 300,230  rtl -80,230  DIFFERENT
+area bottom span-right @ bottom-right edge                     ltr 590,500  rtl 500,500  DIFFERENT
+area bottom @ mid                                              ltr 340,230  rtl -340,230  DIFFERENT
+area bottom @ bottom-right edge                                ltr 630,500  rtl -630,500  DIFFERENT
+insets bottom/start @ mid                                      ltr 300,230  rtl 300,230  same
+insets bottom/start @ bottom-right edge                        ltr 590,500  rtl 590,500  same
+insets bottom/end @ mid                                        ltr 380,230  rtl 380,230  same
+insets bottom/end @ bottom-right edge                          ltr 670,500  rtl 670,500  same
+insets bottom/center (anchor-center) @ mid                     ltr 340,230  rtl -340,230  DIFFERENT
+insets bottom/center (anchor-center) @ bottom-right edge       ltr 630,500  rtl -630,500  DIFFERENT
+insets bottom/center (left:anchor(center)-60px) @ mid          ltr 340,230  rtl 340,230  same
+insets bottom/center (left:anchor(center)-60px) @ bottom-right edge ltr 630,500  rtl 630,500  same
+insets right/center (anchor-center) @ mid                      ltr 500,195  rtl 500,195  same
+insets right/center (anchor-center) @ bottom-right edge        ltr 470,535  rtl 470,535  same

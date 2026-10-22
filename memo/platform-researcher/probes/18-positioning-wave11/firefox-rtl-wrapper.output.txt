@@ -1,0 +1,19 @@
+== chromium 156.0.8078.4
+rtl div > popup                          bottom span-right=300  bottom=340
+rtl div > ltr block div > popup          bottom span-right=300  bottom=340
+rtl div > ltr contents div > popup       bottom span-right=300  bottom=340
+rtl div > ltr abs span > popup           bottom span-right=300  bottom=340
+rtl div > ltr inline span > popup        bottom span-right=300  bottom=340
+ltr div > rtl inline span > popup        bottom span-right=300  bottom=340
+rtl div > ltr flex div > popup           bottom span-right=300  bottom=340
+html rtl, ltr div > popup                bottom span-right=300  bottom=340
+== firefox 157.0
+rtl div > popup                          bottom span-right=-80  bottom=-340
+rtl div > ltr block div > popup          bottom span-right=300  bottom=340
+rtl div > ltr contents div > popup       bottom span-right=-80  bottom=-340
+rtl div > ltr abs span > popup           bottom span-right=300  bottom=340
+rtl div > ltr inline span > popup        bottom span-right=300  bottom=340
+ltr div > rtl inline span > popup        bottom span-right=-80  bottom=-340
+rtl div > ltr flex div > popup           bottom span-right=300  bottom=340
+html rtl, ltr div > popup                bottom span-right=680  bottom=1020
+expected: bottom span-right=300 bottom=340 (html rtl case: span-right still 300, bottom 340)

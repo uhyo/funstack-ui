@@ -1,0 +1,22 @@
+{
+ "chromium": {
+  "version": "156.0.8078.4",
+  "anchor ltr, popup in rtl div (abs container)": "anchor 300..500, popup left 300 top 50",
+  "anchor+popup in rtl div, static container": "anchor 300..500, popup left 300 top 50",
+  "anchor+popup in rtl div 400px wide, static": "anchor 300..500, popup left 300 top 50",
+  "anchor+popup in rtl span (inline)": "anchor 300..500, popup left 300 top 50",
+  "popup in rtl div, anchor-name instead of source": "anchor 300..500, popup left 300 top 50",
+  "popup in rtl div, anchor() insets instead of position-area": "anchor 300..500, popup left 300 top 50",
+  "popup in rtl div, popover with position:fixed+left:auto only": "anchor 300..500, popup left 0 top 50"
+ },
+ "firefox": {
+  "version": "157.0",
+  "anchor ltr, popup in rtl div (abs container)": "anchor 300..500, popup left -80 top 50",
+  "anchor+popup in rtl div, static container": "anchor 300..500, popup left -80 top 50",
+  "anchor+popup in rtl div 400px wide, static": "anchor 300..500, popup left -80 top 50",
+  "anchor+popup in rtl span (inline)": "anchor 300..500, popup left -80 top 50",
+  "popup in rtl div, anchor-name instead of source": "anchor 300..500, popup left -80 top 50",
+  "popup in rtl div, anchor() insets instead of position-area": "anchor 300..500, popup left 300 top 50",
+  "popup in rtl div, popover with position:fixed+left:auto only": "anchor 300..500, popup left 680 top 50"
+ }
+}

@@ -1,0 +1,32 @@
+== chromium 156.0.8078.4
+ltr | bottom span-right                       normal=300 start=300 end=680! left=300 right=680! self-start=300 center=490! anchor-center=340! stretch=300
+ltr | bottom span-left                        normal=380 start=0! end=380 left=0! right=380 self-start=0! center=190! anchor-center=340! stretch=0!
+ltr | bottom                                  normal=340 start=0! end=680! left=0! right=680! self-start=0! center=340 anchor-center=340 stretch=0!
+ltr | right span-bottom                       normal=500 start=500 end=680! left=500 right=680! self-start=500 center=590! anchor-center=500 stretch=500
+ltr | left span-bottom                        normal=180 start=0! end=180 left=0! right=180 self-start=0! center=90! anchor-center=180 stretch=0!
+rtl | bottom span-right                       normal=300 start=300 end=680! left=300 right=680! self-start=680! center=490! anchor-center=340! stretch=300
+rtl | bottom span-left                        normal=380 start=0! end=380 left=0! right=380 self-start=380 center=190! anchor-center=340! stretch=0!
+rtl | bottom                                  normal=340 start=0! end=680! left=0! right=680! self-start=680! center=340 anchor-center=340 stretch=0!
+rtl | right span-bottom                       normal=500 start=500 end=680! left=500 right=680! self-start=680! center=590! anchor-center=500 stretch=500
+rtl | left span-bottom                        normal=180 start=0! end=180 left=0! right=180 self-start=180 center=90! anchor-center=180 stretch=0!
+rtl + contents ltr wrapper | bottom span-right normal=300 start=300 end=680! left=300 right=680! self-start=300 center=490! anchor-center=340! stretch=300
+rtl + contents ltr wrapper | bottom span-left normal=380 start=0! end=380 left=0! right=380 self-start=0! center=190! anchor-center=340! stretch=0!
+rtl + contents ltr wrapper | bottom           normal=340 start=0! end=680! left=0! right=680! self-start=0! center=340 anchor-center=340 stretch=0!
+rtl + contents ltr wrapper | right span-bottom normal=500 start=500 end=680! left=500 right=680! self-start=500 center=590! anchor-center=500 stretch=500
+rtl + contents ltr wrapper | left span-bottom normal=180 start=0! end=180 left=0! right=180 self-start=0! center=90! anchor-center=180 stretch=0!
+== firefox 157.0
+ltr | bottom span-right                       normal=300 start=300 end=680! left=300 right=680! self-start=300 center=490! anchor-center=340! stretch=300
+ltr | bottom span-left                        normal=380 start=0! end=380 left=0! right=380 self-start=0! center=190! anchor-center=340! stretch=0!
+ltr | bottom                                  normal=340 start=0! end=680! left=0! right=680! self-start=0! center=340 anchor-center=340 stretch=0!
+ltr | right span-bottom                       normal=500 start=500 end=680! left=500 right=680! self-start=500 center=590! anchor-center=500 stretch=500
+ltr | left span-bottom                        normal=180 start=0! end=180 left=0! right=180 self-start=0! center=90! anchor-center=180 stretch=0!
+rtl | bottom span-right                       normal=-80! start=300 end=-80! left=-80! right=300 self-start=300 center=110! anchor-center=260! stretch=300
+rtl | bottom span-left                        normal=0! start=0! end=-380! left=-380! right=0! self-start=0! center=-190! anchor-center=-340! stretch=0!
+rtl | bottom                                  normal=-340! start=0! end=-680! left=-680! right=0! self-start=0! center=-340! anchor-center=-340! stretch=0!
+rtl | right span-bottom                       normal=320! start=500 end=320! left=320! right=500 self-start=500 center=410! anchor-center=500 stretch=500
+rtl | left span-bottom                        normal=0! start=0! end=-180! left=-180! right=0! self-start=0! center=-90! anchor-center=-180! stretch=0!
+rtl + contents ltr wrapper | bottom span-right normal=-80! start=300 end=-80! left=-80! right=300 self-start=-80! center=110! anchor-center=260! stretch=300
+rtl + contents ltr wrapper | bottom span-left normal=0! start=0! end=-380! left=-380! right=0! self-start=-380! center=-190! anchor-center=-340! stretch=0!
+rtl + contents ltr wrapper | bottom           normal=-340! start=0! end=-680! left=-680! right=0! self-start=-680! center=-340! anchor-center=-340! stretch=0!
+rtl + contents ltr wrapper | right span-bottom normal=320! start=500 end=320! left=320! right=500 self-start=320! center=410! anchor-center=500 stretch=500
+rtl + contents ltr wrapper | left span-bottom normal=0! start=0! end=-180! left=-180! right=0! self-start=-180! center=-90! anchor-center=-180! stretch=0!

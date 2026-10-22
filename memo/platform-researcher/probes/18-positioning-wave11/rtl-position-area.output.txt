@@ -1,0 +1,228 @@
+{
+ "chromium": {
+  "version": "156.0.8078.4",
+  "ltr page": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "300 L",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "300 L",
+   "end span-end": "300 L",
+   "self-end span-self-end": "300 L",
+   "bottom span-right": "300 L"
+  },
+  "html dir=rtl": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "380 R",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "380 R",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "380 R",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "html ltr, body style direction:rtl": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "380 R",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "380 R",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "380 R",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "container dir=rtl, popup inside container": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "container dir=rtl, popup outside container (ltr)": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "300 L",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "300 L",
+   "end span-end": "300 L",
+   "self-end span-self-end": "300 L",
+   "bottom span-right": "300 L"
+  },
+  "container dir=rtl, popup inside, popup dir=ltr": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "300 L",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "300 L",
+   "end span-end": "300 L",
+   "self-end span-self-end": "300 L",
+   "bottom span-right": "300 L"
+  },
+  "ltr page, popup dir=rtl only": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "ltr page, popup style direction:rtl": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "html dir=rtl, popup dir=ltr": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "380 R",
+   "self-block-end span-self-inline-end": "300 L",
+   "bottom span-x-end": "380 R",
+   "bottom span-self-x-end": "300 L",
+   "end span-end": "380 R",
+   "self-end span-self-end": "300 L",
+   "bottom span-right": "300 L"
+  },
+  "container dir=rtl, popup inside, UA inset/margin (no inset:auto)": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "ltr page, popup dir=rtl, UA inset/margin": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  }
+ },
+ "firefox": {
+  "version": "157.0",
+  "ltr page": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "300 L",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "300 L",
+   "end span-end": "300 L",
+   "self-end span-self-end": "300 L",
+   "bottom span-right": "300 L"
+  },
+  "html dir=rtl": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "380 R",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "380 R",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "380 R",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "html ltr, body style direction:rtl": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "380 R",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "380 R",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "380 R",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "container dir=rtl, popup inside container": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "-80 ?",
+   "self-block-end span-self-inline-end": "0 ?",
+   "bottom span-x-end": "-80 ?",
+   "bottom span-self-x-end": "0 ?",
+   "end span-end": "-80 ?",
+   "self-end span-self-end": "0 ?",
+   "bottom span-right": "-80 ?"
+  },
+  "container dir=rtl, popup outside container (ltr)": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "300 L",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "300 L",
+   "end span-end": "300 L",
+   "self-end span-self-end": "300 L",
+   "bottom span-right": "300 L"
+  },
+  "container dir=rtl, popup inside, popup dir=ltr": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "-80 ?",
+   "self-block-end span-self-inline-end": "-80 ?",
+   "bottom span-x-end": "-80 ?",
+   "bottom span-self-x-end": "-80 ?",
+   "end span-end": "-80 ?",
+   "self-end span-self-end": "-80 ?",
+   "bottom span-right": "-80 ?"
+  },
+  "ltr page, popup dir=rtl only": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "ltr page, popup style direction:rtl": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  },
+  "html dir=rtl, popup dir=ltr": {
+   "popupDir": "ltr",
+   "block-end span-inline-end": "380 R",
+   "self-block-end span-self-inline-end": "300 L",
+   "bottom span-x-end": "380 R",
+   "bottom span-self-x-end": "300 L",
+   "end span-end": "380 R",
+   "self-end span-self-end": "300 L",
+   "bottom span-right": "300 L"
+  },
+  "container dir=rtl, popup inside, UA inset/margin (no inset:auto)": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "-80 ?",
+   "self-block-end span-self-inline-end": "0 ?",
+   "bottom span-x-end": "-80 ?",
+   "bottom span-self-x-end": "0 ?",
+   "end span-end": "-80 ?",
+   "self-end span-self-end": "0 ?",
+   "bottom span-right": "-80 ?"
+  },
+  "ltr page, popup dir=rtl, UA inset/margin": {
+   "popupDir": "rtl",
+   "block-end span-inline-end": "300 L",
+   "self-block-end span-self-inline-end": "380 R",
+   "bottom span-x-end": "300 L",
+   "bottom span-self-x-end": "380 R",
+   "end span-end": "300 L",
+   "self-end span-self-end": "380 R",
+   "bottom span-right": "300 L"
+  }
+ }
+}

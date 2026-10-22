@@ -1,0 +1,40 @@
+{
+ "chromium": {
+  "version": "156.0.8078.4",
+  "rtl container": {
+   "point 200,200": "80,200",
+   "point 50,200": "50,200",
+   "point 200,580": "80,500",
+   "point 50,580": "50,500",
+   "submenu anchor 300..500": 180,
+   "submenu anchor 20..220": 220
+  },
+  "rtl page": {
+   "point 200,200": "80,200",
+   "point 50,200": "50,200",
+   "point 200,580": "80,500",
+   "point 50,580": "50,500",
+   "submenu anchor 300..500": 180,
+   "submenu anchor 20..220": 220
+  }
+ },
+ "firefox": {
+  "version": "157.0",
+  "rtl container": {
+   "point 200,200": "80,200",
+   "point 50,200": "50,200",
+   "point 200,580": "80,500",
+   "point 50,580": "50,500",
+   "submenu anchor 300..500": 0,
+   "submenu anchor 20..220": -240
+  },
+  "rtl page": {
+   "point 200,200": "80,200",
+   "point 50,200": "50,200",
+   "point 200,580": "80,500",
+   "point 50,580": "50,500",
+   "submenu anchor 300..500": 180,
+   "submenu anchor 20..220": 220
+  }
+ }
+}
