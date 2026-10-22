@@ -91,6 +91,47 @@ describe("Button", () => {
       expect(button("E")).toHaveAttribute("type", "submit");
     });
 
+    it("a component render element gets type=button and does not submit a form (review item 2)", async () => {
+      function MyButton(props: ComponentPropsWithRef<"button">) {
+        return <button {...props} className="my" />;
+      }
+      const action = vi.fn();
+      const onSubmit = vi.fn((event: SubmitEvent) => event.preventDefault());
+      render(
+        <form
+          ref={(form) => {
+            form?.addEventListener("submit", onSubmit);
+          }}
+        >
+          <Button action={action} render={<MyButton />}>
+            Mine
+          </Button>
+        </form>,
+      );
+      expect(button("Mine")).toHaveAttribute("type", "button");
+      await setupUser().click(button("Mine"));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("disabled on a component render element: aria-disabled, no disabled (review fold F1)", async () => {
+      function MyButton(props: ComponentPropsWithRef<"button">) {
+        return <button {...props} />;
+      }
+      const action = vi.fn();
+      render(
+        <Button disabled action={action} render={<MyButton />}>
+          Mine
+        </Button>,
+      );
+      expect(button("Mine")).toHaveAttribute("aria-disabled", "true");
+      expect(button("Mine")).not.toBeDisabled();
+      expect(button("Mine")).toHaveAttribute("data-disabled", "");
+      await setupUser().click(button("Mine"));
+      expect(click(button("Mine")).defaultPrevented).toBe(true);
+      expect(action).not.toHaveBeenCalled();
+    });
+
     it("a link gets no type; a render <button type=submit> is overridden (owned)", () => {
       render(
         <>
@@ -360,29 +401,30 @@ describe("Button", () => {
   });
 
   describe("settled-but-held commit (row 6)", () => {
-    it("ignores clicks while the commit is held by an unrelated pending action", async () => {
+    function Other({ other }: { other: { promise: Promise<void> } }) {
+      const [pending, start] = useTransition();
+      return (
+        <button
+          type="button"
+          data-pending={pending ? "" : undefined}
+          onClick={() =>
+            start(async () => {
+              await other.promise;
+            })
+          }
+        >
+          Other
+        </button>
+      );
+    }
+
+    it("a click in the held window runs the action again (the guard is the in-flight counter)", async () => {
       const other = deferred();
       const mine = deferred();
       const action = vi.fn(() => mine.promise);
-      function Other() {
-        const [pending, start] = useTransition();
-        return (
-          <button
-            type="button"
-            data-pending={pending ? "" : undefined}
-            onClick={() =>
-              start(async () => {
-                await other.promise;
-              })
-            }
-          >
-            Other
-          </button>
-        );
-      }
       render(
         <>
-          <Other />
+          <Other other={other} />
           <Button action={action}>Go</Button>
         </>,
       );
@@ -392,19 +434,52 @@ describe("Button", () => {
       await act(async () => {
         mine.resolve();
       });
-      // React holds the commit that ends the Button's transition until every async action is done.
+      // React holds the commit that ends the Button's transition until every async action is done:
+      // the Button still looks pending, but its own run has settled.
       expectPending(button("Go"));
       expect(button("Go")).toHaveAttribute("aria-disabled", "true");
-      expect(click(button("Go")).defaultPrevented).toBe(true);
-      expect(action).toHaveBeenCalledTimes(1);
+      let event!: MouseEvent;
+      await act(async () => {
+        event = new MouseEvent("click", { bubbles: true, cancelable: true });
+        button("Go").dispatchEvent(event);
+      });
+      expect(event.defaultPrevented).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
       await act(async () => {
         other.resolve();
       });
       expectNotPending(button("Go"));
       expectNotPending(button("Other"));
       expect(button("Go")).not.toHaveAttribute("aria-disabled");
-      expect(click(button("Go")).defaultPrevented).toBe(false);
-      expect(action).toHaveBeenCalledTimes(2);
+    });
+
+    it("a non-awaiting action counts every click under an unrelated pending action", async () => {
+      const other = deferred();
+      const increment = vi.fn();
+      render(
+        <>
+          <Other other={other} />
+          <Button
+            action={() => {
+              increment();
+            }}
+          >
+            +1
+          </Button>
+        </>,
+      );
+      const user = setupUser();
+      await user.click(button("Other"));
+      await user.click(button("+1"));
+      await user.click(button("+1"));
+      await user.click(button("+1"));
+      expect(increment).toHaveBeenCalledTimes(3);
+      // The held commit keeps the attributes until the unrelated action settles.
+      expectPending(button("+1"));
+      await act(async () => {
+        other.resolve();
+      });
+      expectNotPending(button("+1"));
     });
   });
 
@@ -438,7 +513,7 @@ describe("Button", () => {
   });
 
   describe("suspending content (row 8)", () => {
-    it("old content stays, data-pending stays until it resolves, clicks are ignored", async () => {
+    it("old content stays, data-pending stays until it resolves; a click meanwhile runs again", async () => {
       const suspender = createSuspender();
       suspender.resolve("a");
       const action = vi.fn();
@@ -466,8 +541,16 @@ describe("Button", () => {
       expect(screen.getByTestId("suspender")).toHaveTextContent("a");
       expect(screen.queryByTestId("fallback")).toBeNull();
       expectPending(button("Go"));
-      expect(click(button("Go")).defaultPrevented).toBe(true);
-      expect(action).toHaveBeenCalledTimes(1);
+      // The action itself settled; only the render suspends, so the guard (the in-flight counter)
+      // is clear and a click starts a new run (design walkthrough 7).
+      let event!: MouseEvent;
+      await act(async () => {
+        event = new MouseEvent("click", { bubbles: true, cancelable: true });
+        button("Go").dispatchEvent(event);
+      });
+      expect(event.defaultPrevented).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("suspender")).toHaveTextContent("a");
       await act(async () => {
         suspender.resolve("b");
       });
@@ -892,6 +975,32 @@ describe("Button", () => {
         d.resolve();
       });
       await flush();
+      expect((screen.getByTestId("popup") as HTMLDialogElement).open).toBe(true);
+    });
+
+    it("with a non-awaiting action the dialog opens in the same commit", async () => {
+      const a = vi.fn();
+      render(
+        <Dialog.Root defaultOpen={false}>
+          <Dialog.Trigger
+            render={
+              <Button
+                action={() => {
+                  a();
+                }}
+              />
+            }
+          >
+            Edit
+          </Dialog.Trigger>
+          <Dialog.Popup data-testid="popup">
+            <Dialog.Title>Edit</Dialog.Title>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await setupUser().click(button("Edit"));
+      await flush();
+      expect(a).toHaveBeenCalledTimes(1);
       expect((screen.getByTestId("popup") as HTMLDialogElement).open).toBe(true);
     });
 

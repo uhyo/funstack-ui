@@ -1379,7 +1379,9 @@ describe("Tabs", () => {
       expect(b.tagName).toBe("A");
       expect(b).toHaveAttribute("data-my-link", "");
       expect(b).toHaveAttribute("href", "#b");
-      expect(b).not.toHaveAttribute("type");
+      // A component element gets `type="button"` (conventions 1.2: assumed to render a <button>);
+      // on the <a> it renders, the attribute is an ignored hint.
+      expect(b).toHaveAttribute("type", "button");
       expect(b).toHaveAttribute("aria-selected", "false");
       expect(b).toHaveClass("tab", "link");
       expect(tabRef.current).toBe(b);

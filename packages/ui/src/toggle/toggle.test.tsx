@@ -767,6 +767,28 @@ describe("Toggle", () => {
       expect(screen.getByRole("button", { name: "Button" })).toHaveAttribute("type", "button");
     });
 
+    it('a component render element gets type="button" and does not submit a form (conventions 1.2)', async () => {
+      function MyButton(props: ComponentPropsWithRef<"button">) {
+        return <button {...props} className="my" />;
+      }
+      const onSubmit = vi.fn((event: SubmitEvent) => event.preventDefault());
+      render(
+        <form
+          ref={(form) => {
+            form?.addEventListener("submit", onSubmit);
+          }}
+        >
+          <Toggle render={<MyButton />}>Mine</Toggle>
+        </form>,
+      );
+      const el = screen.getByRole("button", { name: "Mine" });
+      expect(el).toHaveClass("my");
+      expect(el).toHaveAttribute("type", "button");
+      await setupUser().click(el);
+      expect(el).toHaveAttribute("aria-pressed", "true");
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
     it("function form receives (props, state) (row 16)", async () => {
       const d = deferred();
       const renderFn = vi.fn((props: ComponentPropsWithRef<"button">, state: ToggleState) => (

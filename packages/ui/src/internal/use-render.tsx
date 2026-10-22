@@ -5,7 +5,7 @@ import { mergeRefs } from "./merge-props.js";
 import { renderElement } from "./render-element.js";
 import type { ElementLikeProps, RenderElementOptions } from "./render-element.js";
 
-export { rendersButton, resolveStateValue } from "./render-element.js";
+export { isHostButton, rendersButton, resolveStateValue } from "./render-element.js";
 export type { DataAttributes } from "./render-element.js";
 
 export interface UseRenderOptions<Props extends ElementLikeProps, State> extends Omit<

@@ -9,10 +9,10 @@ export interface ActionTriggerOptions {
   readonly openGeneration?: (() => number) | undefined;
   /**
    * Ignore `run` while a run is in flight (conventions 2.5): `run` returns `false` and starts
-   * nothing. In flight means the synchronous in-flight counter is non-zero (two activations in
-   * one task, before React re-rendered) **or** the last render's `pending` is true (the
-   * settled-but-held commit under entanglement). Default `false`; on for `Button` (#79) until
-   * #81 makes it the only behaviour.
+   * nothing. In flight means the hook's synchronous in-flight counter is non-zero (it also sees
+   * two activations in one task, before React re-rendered); the last render's `pending` is not
+   * consulted, so a click in a settled-but-held commit window runs. Default `false`; on for
+   * `Button` (#79) until #81 makes it the only behaviour.
    */
   readonly ignoreWhilePending?: boolean | undefined;
 }
@@ -71,7 +71,9 @@ export function useActionTrigger(options?: ActionTriggerOptions | (() => number)
   }, []);
 
   const run = (work: () => unknown, then?: () => void): boolean => {
-    if (ignoreWhilePending && (inFlight.current > 0 || pending)) return false;
+    // The own counter only, not the rendered `pending` (design/components/button.md 5.2): after
+    // the work settled, a commit held by entanglement must not drop a new activation.
+    if (ignoreWhilePending && inFlight.current > 0) return false;
     inFlight.current++;
     const id = ++latest.current;
     // The open this run belongs to (design/components/popover.md, review M2 / PO rule): if the

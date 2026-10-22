@@ -15,7 +15,7 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 
 /** Details passed to `Button`'s `action`. Serialisable; `event` is virtual (conventions 2.2). */
 export interface ButtonActionDetails extends ActionDetails {}
@@ -50,21 +50,24 @@ export interface ButtonProps extends Omit<
    */
   formAction?: ComponentPropsWithRef<"button">["formAction"];
   /**
-   * Default `"button"`, or `"submit"` when `formAction` is given. Owned on a `<button>` (set it
-   * here, not on a `render` element); omitted for other elements. `action` together with
+   * Default `"button"`, or `"submit"` when `formAction` is given. Owned on a `<button>` and on a
+   * component `render` element (set it here, not on the element; a component should spread it);
+   * omitted for a host element of another tag (`<a>`). `action` together with
    * `"submit"` / `"reset"` warns in development: one click would do two things.
    */
   type?: "button" | "submit" | "reset";
   /**
    * Native `disabled` (owned; a `render` element cannot re-enable it) and `data-disabled`.
-   * Never dispatches. With `focusableWhenDisabled`, inside a `Toolbar.Root`, or when `render`
-   * is not a `<button>` (a link), renders `aria-disabled="true"` instead.
+   * Never dispatches. With `focusableWhenDisabled`, inside a `Toolbar.Root`, or when the
+   * rendered element is not a host `<button>` (`render={<a href />}`, a component), renders
+   * `aria-disabled="true"` instead.
    */
   disabled?: boolean;
   /**
    * Keep a disabled Button focusable: `aria-disabled="true"` instead of native `disabled`, so
    * keyboard and screen-reader users still find it and a Tooltip on it still opens. Default
-   * `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar).
+   * `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar) and for a `render` element that
+   * is not a host `<button>`.
    */
   focusableWhenDisabled?: boolean;
   /**
@@ -103,10 +106,9 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const toolbar = useToolbarContext();
-  // Native `disabled` means nothing on a non-<button> element (a `render={<a href>}` link), so
-  // such an element always takes the focusable-disabled branch: `aria-disabled` tells assistive
-  // technology what the cancelled click already does (review finding 1).
-  const focusable = focusableWhenDisabled || toolbar !== null || !rendersButton(render);
+  // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
+  // browser and hide the state from AT, so the focusable-disabled branch (review fold F1).
+  const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
   const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: true });
 
   // Per-submitter pending (design 6.2): React reports the submitter's function as

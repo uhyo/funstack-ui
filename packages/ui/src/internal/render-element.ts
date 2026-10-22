@@ -46,12 +46,26 @@ export function resolveStateValue<T, State>(value: StateValue<T, State>, state: 
 }
 
 /**
- * Whether a part whose default element is a `<button>` should add `type="button"`: no `render`,
- * a `render` element whose type is the intrinsic `"button"`, or the function form (it receives
- * button props and decides itself what to spread). An element of any other type (an `<a>`, a
- * router `Link`) does not get it: `type` means something else, or nothing, there.
+ * Whether a part whose default element is a `<button>` should add `type="button"` (conventions
+ * 1.2): no `render`, the function form (it receives button props and decides itself what to
+ * spread), a host `<button>` element, or a **component** element (assumed to render a
+ * `<button>`; if it renders a link, `type` is a harmless ignored attribute, while a missing
+ * `type` on a `<button>` in a form is a silent submit). Only a host element of another tag (an
+ * `<a>`) does not get it.
  */
 export function rendersButton<Props, State>(render: RenderProp<Props, State> | undefined): boolean {
+  if (render === undefined || typeof render === "function") return true;
+  if (!isValidElement(render)) return false;
+  return typeof render.type !== "string" || render.type === "button";
+}
+
+/**
+ * Whether the rendered element is certainly a host `<button>`: no `render`, the function form, or
+ * a host `"button"` element. The strict predicate for native `disabled`, which means nothing on a
+ * link and would expose it as enabled to assistive technology; anything else (a link, a
+ * component) takes the `aria-disabled` branch (design/components/button.md, review fold F1).
+ */
+export function isHostButton<Props, State>(render: RenderProp<Props, State> | undefined): boolean {
   if (render === undefined || typeof render === "function") return true;
   return isValidElement(render) && render.type === "button";
 }

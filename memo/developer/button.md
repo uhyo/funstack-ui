@@ -10,7 +10,8 @@ Design: design/components/button.md (6cdfc85), conventions 2.5 / 3.4 / 3.6 amend
 - `useActionTrigger(options?: { openGeneration?, ignoreWhilePending? } | (() => number))`: the
   positional form stays for Dialog.Close / Popover.Close / Menu.Item (untouched, #81). `run`
   returns `false` when ignored. In-flight counter in a ref, decremented when `work` settles
-  (both branches); the guard also reads the render's `pending`.
+  (both branches); the guard reads only that counter (review fold F4 dropped the rendered
+  `pending` source).
 - `Toolbar.Button` removed (file, namespace member, types, root exports). Toolbar tests, docs
   examples, example playground switched to `<Button>`. directives.test.ts asserts
   `dist/toolbar/toolbar-button.{mjs,d.mts}` are gone (tsdown `clean: true` removes them).
@@ -51,3 +52,19 @@ property is absent again after settle.
   row once; not reproduced in the browser project alone (x3) nor in two more full runs. That test
   does not exercise the guard (NumberField's `runStep` keeps `ignoreWhilePending` off).
 - WebKit cannot run locally (missing host libraries); CI covers it.
+
+## Review fixes (wave8/button-fixes, review c8e09d1, fold aff64f3)
+
+- F1: `focusable` includes `!isHostButton(render)`; a link or component render is `aria-disabled`,
+  never `disabled=""`.
+- F2 (library-wide): `rendersButton` is true for component elements; new strict `isHostButton` in
+  render-element.ts. Every part emitting `type` through it gains the component case. One existing
+  assertion changed: tabs.test.tsx "Tab as a link" renders a *component* `MyLink`, which now gets
+  `type="button"` on its `<a>` (the fold's "harmless if wrong" rule); the architect's note said all
+  "no type" assertions were host `<a>`, this one was not.
+- F4: guard on the in-flight counter only. Row 6 (held window click runs again, 2 calls), new
+  probe row (+1 non-awaiting, 3 clicks under an unrelated pending action = 3 calls), row 8 (a
+  click during the suspending render starts a new run).
+- Row 11 intermediate assertion; playground toolbar CSS `[data-disabled]`; ButtonInvoker shows a
+  CSS-only pending Button (ButtonCssPending.tsx, a client module only because the static site has
+  no Server Functions); ButtonSave counter uses `useOptimistic`.
