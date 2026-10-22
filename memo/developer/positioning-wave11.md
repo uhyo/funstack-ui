@@ -56,6 +56,12 @@ combobox.md. Engines: Playwright 1.64.1 (Chromium 156.0.8078.4, Firefox 157.0).
    (`self-x-start span-bottom`), so its resolved `data-side` is `right`, not `left`; the
    degraded branch asserts the applied option rather than `left`.
 
+CI run 39810810561 (all four jobs green, WebKit's first real check of the computed-style
+claim): every resolved-side row passed on WebKit. The scroll rows logged: Tooltip (scroll 200 ms
+or so after the show) Chromium `top` (kept), Firefox and WebKit `bottom` (flipped); Popover
+(scroll sooner after the show) flipped to `top` in all three. No new act() warnings (the
+MenuRoot / ToastViewport / ComboboxRoot ones predate this work).
+
 ## Browser rows (tooltip, popover, menu, context menu, combobox)
 
 The scroll rows assert the geometry invariant (data-side equals the side the popup box is on)
