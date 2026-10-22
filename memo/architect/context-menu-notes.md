@@ -89,7 +89,7 @@ Working notes behind `design/components/context-menu.md`. Not a spec; the design
 - Press-drag-release (hit-test the captured `pointerup` with `elementFromPoint`).
 - Touch offset; a `nonce` for the hoisted style under strict CSP; close-on-scroll; RTL
   (`--fsui-menu-left` first); a `nativeMenu` predicate if `editableTargets` proves too coarse.
-- If the user declines the stylesheet: section 4.5 (S2) is the switch; the transformed-ancestor
-  browser row then documents the per-engine error instead of asserting the point.
+- Settled 2026-10-22: the user allowed positioning-only shipped CSS (conventions 12), so S4
+  stands and S2 is a short rejected-alternative note in 4.5.
 - Spec question worth a repo issue (not filed upstream): the "last successful position option"
   surviving a same-task hide + show of a popover.

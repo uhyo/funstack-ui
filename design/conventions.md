@@ -44,9 +44,9 @@ review fold 2026-10-22: the component-`render` `type` rule and the non-host-butt
 in 1.2, the counter-only guard in 2.5, 3.4 and 10.1; wave 9 amendments #81 and #83, 2026-10-22,
 `design/components/button.md` 16 and 17: the guard as the hook's default in 2.5 and 3.4, the
 library-wide `disabled` sweep in 1.2; amended 2026-10-22 with the Context menu design, #45,
-`design/components/context-menu.md`, **proposed**: the `ContextTrigger` row in 1.1, the
-outside right-click example in 2.2, the move note in 3.5, the `context` row in 4.1, and
-section 12, shipped functional CSS, which is pending the user's decision).
+`design/components/context-menu.md`, **accepted 2026-10-22**, see resolved question 35: the
+`ContextTrigger` row in 1.1, the outside right-click example in 2.2, the move note in 3.5, the
+`context` row in 4.1, and section 12, shipped functional CSS, a user decision).
 Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
@@ -1958,8 +1958,10 @@ question 27):
 
 ## 12. Shipped functional CSS
 
-Status: **proposed** with the Context menu design (#45); it becomes binding only if the user
-accepts the design's open question 1. Until then no component ships CSS.
+**User decision, 2026-10-22** (Context menu, #45, resolved question 35): a component may ship a
+**minimal functional stylesheet, positioning only and nothing visual**, through React
+`<style href precedence>`, where inline styles cannot express the rule; it must be documented
+and overridable.
 
 The library ships no visual CSS: no reset, no theme, no colours, sizes or motion (section 11's
 "ships no CSS" stands for everything a stylesheet could do to the look of a part). A component
@@ -2213,6 +2215,18 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `"use client"`. User decisions: **`Toolbar.Button` is removed** (a breaking change; `Button`
     replaces it inside a Toolbar) and `focusableWhenDisabled` ships. The conventions changes
     (decisions row 2, 1.1, 2.3, 2.5, 2.7, 3.4, 3.6, 4.1, 5.3, 9.1, 10.1) are applied.
+35. **Context menu (#45)** accepted 2026-10-22 (`design/components/context-menu.md`), every
+    decision as proposed: `Menu.ContextTrigger` in the Menu namespace (a plain region with no
+    ARIA; a Root may hold a `Trigger` and a `ContextTrigger` sharing one Popup); placement at
+    the point with no anchor (research S4: inline `--menu-point-x` / `-y` and three shipped
+    `@position-try` options, `side={null}` to opt out); a move on a second right-click (no
+    dispatch); the outside right- / middle-click close for **every** menu; editable targets
+    keep the native menu by default (`editableTargets="menu"`); long-press for touch and pen;
+    the names `data-context` / `state.context`, `--menu-point-x` / `-y`, `editableTargets`,
+    `longPressDelay`; press-drag-release, a touch offset, close-on-scroll, RTL placement and a
+    `nonce` deferred. **User decision:** positioning-only shipped CSS is allowed through React
+    `<style href precedence>`, documented and overridable (section 12); the virtual-anchor
+    alternative is rejected. The conventions changes (1.1, 2.2, 3.5, 4.1, 12) are applied.
 
 ## Open questions
 

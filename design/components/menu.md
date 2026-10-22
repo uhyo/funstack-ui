@@ -5,7 +5,7 @@ questions as recommended, see the end of this document). **Implemented** in #41 
 shared `useActionTrigger` in ac7064e) and reviewed the same day: the review corrections and the
 six accepted deviations are folded into the sections below and listed at the end of this
 document. **Amended 2026-10-22 with the context menu** (#45, `design/components/context-menu.md`,
-proposed): `Menu.ContextTrigger` in 1 and 3.9, the outside right- / middle-click close for every
+accepted the same day): `Menu.ContextTrigger` in 1 and 3.9, the outside right- / middle-click close for every
 menu in 2.2, `data-context`, the point placement and the owned `onContextMenu` in 3.3, the
 placement in 14. Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read

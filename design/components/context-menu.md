@@ -1,6 +1,8 @@
 # Context menu (`Menu.ContextTrigger`)
 
-Status: **proposed** (2026-10-22, GitHub issue #45, wave 10 tracker #86). Follows
+Status: **accepted** (2026-10-22, GitHub issue #45, wave 10 tracker #86; the product owner
+accepted every decision as proposed, and the user approved the positioning-only shipped CSS of
+section 4.2, see "Decisions recorded" at the end). Follows
 `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win. **Read `design/components/menu.md` first** (accepted, implemented): a context
 menu is the Menu popup opened from a different trigger. Items, checkbox and radio items, groups,
@@ -32,7 +34,7 @@ runs with `data-pending` on the item and the menu closes in the commit that ends
 | 1 | Anatomy | **One new part, `Menu.ContextTrigger`**, in the Menu namespace: a plain element (default `div`) with no role and no ARIA, whose `contextmenu` opens the Root's `Menu.Popup` at the pointer. No `ContextMenu` namespace: `Menu.Root` + `Menu.ContextTrigger` + `Menu.Popup` + the existing items. A Root may hold a `Menu.Trigger` **and** a `Menu.ContextTrigger` (a "More" button and a right-click region sharing one popup), which is how shared items fall out (research question 4). |
 | 2 | Mode | Library mode only, as Menu. `open` / `defaultOpen` / `openChangeAction` as Menu. Before hydration the browser's native menu shows; nothing is replayed. |
 | 3 | Opening | A `contextmenu` on the region that is not `defaultPrevented`, not on an editable target (section 2.3) and not `disabled` → `preventDefault()`, record the point and the modality, **`popup.setPointerCapture(pointerId)` now** if a button is down, then the library-owned open (`openChangeAction(true, { reason: "activate" })`, apply effect `showPopover({ source: region })`, first item focused: quiet after a pointer, ring after the keyboard). A library long-press (500 ms, touch and pen pointers, 10 px slop) opens the same way on every platform; a `contextmenu` during the gesture wins and cancels the timer. |
-| 4 | Placement | **At the point, with no anchor (research S4)**: the Popup renders inline `--menu-point-x` / `--menu-point-y`, `inset: auto; left: var(--menu-point-x); top: var(--menu-point-y); position-area: none` and `position-try-fallbacks` naming three library `@position-try` rules that mirror the popup around the point (up, left, up-left). The rules are the library's **first shipped CSS**: a React 19 `<style href precedence>` rendered by the Popup on a point open, hoisted, deduplicated, functional only. `side={null}` opts out (no inline placement, no stylesheet; the point is still exposed as the two custom properties). **Open question for the user** (section 4.4; the virtual-anchor alternative S2 is written up in 4.5). |
+| 4 | Placement | **At the point, with no anchor (research S4)**: the Popup renders inline `--menu-point-x` / `--menu-point-y`, `inset: auto; left: var(--menu-point-x); top: var(--menu-point-y); position-area: none` and `position-try-fallbacks` naming three library `@position-try` rules that mirror the popup around the point (up, left, up-left). The rules are the library's **first shipped CSS**: a React 19 `<style href precedence>` rendered by the Popup on a point open, hoisted, deduplicated, functional only. `side={null}` opts out (no inline placement, no stylesheet; the point is still exposed as the two custom properties). **User decision (2026-10-22): positioning-only shipped CSS is allowed** (conventions 12); the virtual-anchor alternative S2 was rejected (4.5). |
 | 5 | Move | A `contextmenu` inside the region **while open** moves the menu: no `openChangeAction`, items keep their state, the first item is focused again. The Popup re-shows itself at the new point with the fallback list respelled, so the remembered flip is cleared (research: a same-task hide + show keeps the stale flip otherwise). |
 | 6 | Closing | Everything in Menu 2.2. Added, for **every** menu (context-opened or not): a `contextmenu` or a middle-button `pointerdown` **outside** the menu tree closes the stack at once (`hidePopover()`, `"dismiss"`), as Tab does, since Chromium's click-based light dismiss ignores those buttons and native menus close on any click. A `contextmenu` inside the popup is `preventDefault()`ed and does nothing else. |
 | 7 | Editable targets | `input` (text-taking types), `textarea` and `contenteditable` targets keep the browser's menu by default (copy and paste); `editableTargets="menu"` overrides. Product-owner decision. |
@@ -473,25 +475,15 @@ the observable behaviour is the same and the browser row in 13.2 pins it.
   @position-try --mine { top: auto; bottom: calc(100% - var(--menu-point-y)); }
   ```
 
-### 4.5 Alternative if no stylesheet may ship: the virtual anchor (S2)
+### 4.5 Rejected alternative: the virtual anchor (S2)
 
-Kept written up so the switch is one section, should the user decline the shipped style:
-
-- At open, the ContextTrigger **creates** a zero-size `position: fixed` `<span>` (a library DOM
-  node, not a React element, as Toast's relocatable host; appended as the last child of the
-  region so that it is inside any open popover the region is in, which `source` nesting
-  needs), positions it at the point, and the Popup calls `showPopover({ source: span })`. The
-  Popup renders the ordinary anchored style for it: `position-area: bottom span-right` and the
-  three-option `flip-*` list, respelled (`flip-block, flip-inline, flip-block flip-inline` ↔
-  `…, flip-inline flip-block`) on every move. The span is removed on close.
-- Costs: a library-created node inside the consumer's region (`:last-child`, `:empty` and grid
-  layouts can see it; a `tr` region cannot legally contain a `span`), `source` is then not the
-  region (focus order and nesting still work), and **a transformed, filtered or contained
-  ancestor misplaces the menu**, in different directions per engine, with no correction that is
-  right in both. The docs would have to say "no `transform` between the region and the
-  viewport", which rules out menus inside a centred dialog.
-- S4 keeps `source: region`, creates no node and is immune to transforms. The only thing S2
-  buys is the absence of a `<style>`.
+A zero-size `position: fixed` `<span>` created by the library inside the region at the point,
+passed as `showPopover({ source: span })`, with the ordinary anchored style (`position-area:
+bottom span-right` and the `flip-*` list, respelled on every move). It ships no CSS, but it
+puts a library-created node inside the consumer's region (`:last-child`, `:empty`, grid layouts
+see it; a `tr` cannot contain a `span`) and **a transformed, filtered or contained ancestor
+misplaces the menu**, in different directions per engine, with no correction right in both
+(research 2). Rejected with the user's decision to allow positioning-only shipped CSS.
 
 ### 4.6 Keyboard, scrolling, RTL
 
@@ -841,7 +833,7 @@ assert the documented degraded behaviour rather than skipping.
 | Open at the pointer | Right-click at (x, y) inside a region in the middle of the viewport: `:popover-open`, `getBoundingClientRect()` left / top equal (x, y) (±1 px), the first item is `document.activeElement` and does not match `:focus-visible`. | none |
 | Survives the pending `pointerup` | `mouse.move`, `mouse.down({ button: "right" })` (Linux CI: `contextmenu` fires here), the menu opens; `mouse.move` 60 px away; `mouse.up()`: the menu is still open. | none: all three must pass; this row is what the pointer capture buys in Firefox and WebKit. A second variant opens the menu near the bottom-right so that it flips away from the pointer, then releases in place. |
 | Flips | Right-click at (viewport.width − 20, 100): the popup's right edge is at x; at (100, viewport.height − 20): its bottom edge at y; at the corner: both. | none |
-| Transformed ancestor | The region inside `transform: translate(50px, 30px)`: the popup's top-left equals the click point (the top layer ignores the transform). | none (this row is why S4 was chosen; under S2 it would document the per-engine error instead) |
+| Transformed ancestor | The region inside `transform: translate(50px, 30px)`: the popup's top-left equals the click point (the top layer ignores the transform). | none (this row is why S4 was chosen over the virtual anchor) |
 | Re-open at a new point | Open at the corner (flipped), then right-click at (300, 250): the popup's top-left is (300, 250), not the stale flipped position. | none |
 | Move keeps state | Open, Space on a `CheckboxItem` (checked), right-click elsewhere in the region: the menu moved, the item is still checked and the first item is focused; `openChangeAction` was not called again. | none |
 | Right-click outside closes | Open, right-click on the page outside: closed in every engine (Chromium would have kept it open), `"dismiss"`. Middle-click outside likewise. | none |
@@ -914,8 +906,7 @@ packages/ui/src/__tests__/popover-shim.ts  # + setPointerCapture stub, PointerEv
 
 ## Conventions feedback
 
-Applied to `design/conventions.md` with this design (the shipped-CSS section is marked pending
-the user's decision):
+Applied to `design/conventions.md` with this design:
 
 1. **1.1 part vocabulary.** Add `ContextTrigger`: a region whose `contextmenu` (right-click,
    Shift+F10, long-press) opens the owner's Popup at the pointer; a plain element with no role
@@ -935,20 +926,22 @@ the user's decision):
    kind of library-driven DOM operation on browser-owned open state: no dispatch, a coalesced
    `toggle`, documented in the component.
 
-## Open question for the user
+## Decisions recorded (2026-10-22)
 
-1. **Ship the functional stylesheet (S4)?** It is the library's first CSS: three `@position-try`
-   rules, no selectors, hoisted by React, deduplicated, opt-out through `side={null}`, rendered
-   only when a context menu is opened with the default placement. The alternative (S2, section
-   4.5) ships no CSS, creates a library DOM node inside the region, and is wrong under a
-   transformed, filtered or contained ancestor in a way that differs per engine. Recommendation:
-   ship it.
+**User decision:** the library may ship a minimal functional stylesheet, positioning only and
+nothing visual, through React `<style href precedence>`, where inline styles cannot express the
+rule; it must be documented and overridable (conventions 12). S4 is the placement; the virtual
+anchor (4.5) is rejected.
 
-## Decisions for the product owner (not escalated)
+**Product owner, all accepted as proposed:**
 
-- `Menu.ContextTrigger` in the Menu namespace rather than a `ContextMenu` namespace (section 1).
-- The outside right- / middle-click close applies to **every** menu, a small behaviour change
-  for Menu (section 5); documented on the Menu page.
-- Names: `data-context` / `state.context`, `--menu-point-x` / `--menu-point-y`,
-  `editableTargets`, `longPressDelay`, the `--fsui-menu-up` / `-left` / `-up-left` options.
-- Deferred list (decision 14).
+1. `Menu.ContextTrigger` in the Menu namespace rather than a `ContextMenu` namespace (section 1).
+2. The outside right- / middle-click close applies to **every** menu, a small behaviour change
+   for Menu (section 5); documented on the Menu page.
+3. Names: `data-context` / `state.context`, `--menu-point-x` / `--menu-point-y`,
+   `editableTargets`, `longPressDelay`, the `--fsui-menu-up` / `-left` / `-up-left` options.
+4. The deferred list (decision 14).
+
+Earlier product-owner decisions on the research's open questions, built into the design:
+editable targets keep the native menu by default with an opt-in; press-drag-release deferred;
+shared items through one Root with two triggers; the research recommendations followed.
