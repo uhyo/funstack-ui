@@ -72,7 +72,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
 | 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 | 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13, wave 11: #20, #53, #88). |
-| 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay, #21; proposed, needs the user's confirmation since section 12 was "positioning only"). A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>` (wave 11, #88). |
+| 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay, #21; **user decision 2026-10-23**: shipped CSS widens from "positioning only" to "placement and interaction timing, never visuals"). A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>` (wave 11, #88). |
 
 ---
 
@@ -1986,14 +1986,15 @@ may ship **functional at-rules** it needs and cannot express inline, under these
   case, `Menu.Popup`'s point placement, `design/components/context-menu.md` 4.2: eight options
   since wave 11, mirrored for a right-to-left menu and offset for a touch open, #88). Nothing
   cascades onto any element; the inline `style` the part renders is what references the rules.
-  **Proposed exception (wave 11, #21, needs the user's confirmation):** a rule whose selector
+  **Exception, user decision 2026-10-23 ("allow it"; wave 11, #21):** a rule whose selector
   matches only elements the library itself marks with a `data-fsui-<component>-<part>`
   attribute, and whose declaration sets only a `--fsui-` registered custom property that the
   part's own inline `style` consumes (`@property` plus `:root:has([role="tooltip"]:popover-open)
   [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1 }`, Tooltip's skip-delay on the native
   `interestfor` path, `design/components/tooltip.md` 6). Still nothing visual and nothing on a
   consumer's element; the selector exists because the inline value it feeds cannot see other
-  elements. "Positioning only" becomes "placement and interaction timing only".
+  elements. The scope of shipped CSS is thereby **"placement and interaction timing, never
+  visuals"** (the user's wording), superseding "positioning only" above.
 - **Rendered by the part that needs them**, as a React 19 hoisted style, never as a stylesheet
   file the consumer imports: `<style href="@funstack/ui/<name>" precedence="fsui">`. React moves
   it into `<head>` in the commit (before layout effects), deduplicates it by `href` across
@@ -2501,7 +2502,15 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     submenu default; no workaround for Mozilla 2019601 (asserted through the probe; human task
     #89); the context-menu direction from the popup's computed `direction`; no `data-side` on
     Combobox (possible follow-up). **User decision:** `Tooltip.Arrow` ships, superseding
-    resolved question 10. Part B (#21, #88 rest) is proposed in the same amendments.
+    resolved question 10. **Part B (#21 skip-delay, #88 press-drag-release, touch offset,
+    close-on-scroll, CSP) accepted 2026-10-23** (`tooltip.md` Part B, `context-menu.md` Part B,
+    `menu.md` note; section 12), as recommended: global provider-less skip-delay with no
+    opt-out and no cooldown; touch press-drag-release ships, with the iOS / Android device
+    check a human task (issue filed by the product owner); the wheel guard on every menu; no
+    scroll lock, close-on-scroll for point opens only; `nativeMenu` rejected; `<CSPProvider
+    nonce>` and `STYLE_SHA256` from `@funstack/ui/csp`. **User decision:** the skip-delay
+    stylesheet's selector rule is allowed; shipped CSS is "placement and interaction timing,
+    never visuals" (section 12).
 
 ## Open questions
 

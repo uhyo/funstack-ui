@@ -1275,5 +1275,5 @@ the wheel's direction, so a wheel over a menu never scrolls the page under it (n
 consume wheel events; a non-overflowing popup chains to the page in both engines today). A
 small behaviour change for Menu, as the outside right-click close was; specified in
 `design/components/context-menu.md` 4.8 and its Part B amendment (product-owner question 3
-there). Close-on-scroll applies to point-placed menus only; a Trigger-opened menu keeps
+there, **confirmed 2026-10-23**). Close-on-scroll applies to point-placed menus only; a Trigger-opened menu keeps
 following its Trigger.

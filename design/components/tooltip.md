@@ -1370,6 +1370,7 @@ it without reopening it.
 
 ### Part B: skip-delay (wave 11, 2026-10-23, issue #21)
 
+Status: **accepted** (product owner and user, 2026-10-23; decisions at the end of this part).
 Edited in place: decision 6, the 2.1 markup, the 2.2 table, section 6 (the whole skip-delay
 entry), 12.4, the 13 rows. Inputs: `docs/research/interaction-wave11.md` 1 (binding).
 
@@ -1406,3 +1407,9 @@ Questions for the product owner (continuing the Part A list):
    "placement and interaction timing". Needs the user. Alternative: JS-path-only skip-delay,
    which makes the flags change UX (against decision 6 of this document).
 8. **No cooldown** beyond the close delay in v1. Recommendation: confirm.
+
+#### Decisions recorded (2026-10-23)
+
+6 confirmed (global, no opt-out, no provider, no prop). 7 **user decision, "allow it"**: the
+selector rule ships; conventions 12 now reads "placement and interaction timing, never
+visuals". 8 confirmed (no cooldown).

@@ -236,7 +236,8 @@ outside-release rule requires movement, 2.6). Where the platform fires its own `
 first (Android), the capture and the gesture are taken for the touch pointer the region was
 timing, even though that event's `buttons` is `0`. Real iOS and Android were not available to
 the research; **a human device pass is required before the touch gesture is called verified**
-(#88 checklist).
+(a repository issue filed by the product owner; the docs page says "verified under Chromium's
+touch emulation; iOS and Android pending" until it closes).
 
 Not done in v1 (recorded as follow-ups; the offset landed in wave 11, 4.7): offsetting the
 point so the menu does not open under the finger, and `user-select`. The region renders inline
@@ -1251,8 +1252,9 @@ All ten accepted as implemented:
 
 ## Amendment: wave 11 follow-ups (issue #88)
 
-Status: **Part A accepted** (product owner, 2026-10-23: the direction comes from the popup's
-computed `direction`); **Part B proposed** (2026-10-23). Part B extends Part A's shapes
+Status: **Part A and Part B accepted** (product owner, 2026-10-23; Part A: the direction comes
+from the popup's computed `direction`; Part B: every recommendation, see its "Decisions
+recorded"). Part B extends Part A's shapes
 without reopening them: the point record gains `offset` next to `direction`, the shipped
 options grow from five to eight, and the fallback lists are keyed by direction and pointer
 kind (`MENU_POINT_FALLBACKS[direction][offset]`); an implementer landing Part A alone ships
@@ -1354,3 +1356,13 @@ Questions for the product owner (continuing the list; Part A's is question 1 of 
 6. **`<CSPProvider nonce>` as the library's only provider** plus `STYLE_SHA256`, from a
    non-component subpath `@funstack/ui/csp`. Recommendation: confirm. Alternative: a `nonce`
    prop on `Menu.Popup` and `Tooltip.Trigger` (Radix's shape), no provider.
+
+#### Decisions recorded (product owner, 2026-10-23)
+
+All as recommended: (2) touch press-drag-release ships; the real-device check on iOS and
+Android is a human task filed as a repository issue by the product owner, and the docs say the
+gesture is verified under Chromium's touch emulation only until it closes; (3) the wheel guard
+applies to every menu; (4) no scroll lock, close-on-scroll for point opens only; (5)
+`nativeMenu` rejected; (6) `<CSPProvider nonce>` and `STYLE_SHA256` from `@funstack/ui/csp`.
+The skip-delay stylesheet that motivates the provider is allowed by the user (Tooltip's Part B,
+conventions 12).
