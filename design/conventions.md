@@ -39,7 +39,9 @@ no-`transition` note in 5.1 and the types in 5.3, the directive-free modules in 
 in 8, the three rows in 10.1, the two static strings in 11; amended 2026-10-18 with the Button design,
 #79, **accepted 2026-10-22**, see resolved question 34: the `Button` row in 1.1, the cancelled-click note and item 9 in 2.3, the
 re-entry rule in 2.5, the own-`formAction` reading in 2.7, the hook option in 3.4, `aria-disabled` while
-pending in 3.6, the `pending` row in 4.1, the row in 5.3, the folder in 9.1, the Re-entry row in 10.1).
+pending in 3.6, the `pending` row in 4.1, the row in 5.3, the folder in 9.1, the Re-entry row in 10.1;
+review fold 2026-10-22: the component-`render` `type` rule and the non-host-button `disabled` rule
+in 1.2, the counter-only guard in 2.5, 3.4 and 10.1).
 Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
@@ -191,7 +193,17 @@ Rules for the element passed to `render` (same as Base UI):
   first, then the library's. v0 provides no way to cancel the library's handler from there.
 - Element-type-specific attributes are set only when they apply to the rendered element:
   `type="button"` is emitted for a `<button>` and omitted for `render={<a href />}` or any other
-  element, rather than landing as a meaningless attribute on an anchor.
+  **host** element, rather than landing as a meaningless attribute on an anchor. A **component**
+  `render` element (`render={<MyButton />}`) receives `type` too (Button review, #79): the part
+  cannot see what it renders, a missing `type` on a component that renders a `<button>` inside a
+  form is a silent submit, and an ignored `type` on one that renders a link is harmless. The
+  shared predicate is `rendersButton(render)` (`internal/render-element.ts`): `true` for no
+  `render`, the function form, a host `"button"` and any component element. The same rule the
+  other way for `disabled`: a part whose rendered element is not a **host** `<button>` (link or
+  component; `isHostButton(render)`) renders `aria-disabled="true"` instead of native `disabled`,
+  which means nothing on a link and would expose an enabled link to assistive technology
+  (`Button`, #79; the other `disabled` parts follow in a separate issue). When the element is
+  unknown, each attribute takes the choice that is harmless if the guess is wrong.
 - Library-controlled attributes (`role`, `aria-*` *state* the part computes such as
   `aria-pressed` / `aria-selected`, `id` wiring, `data-*` state) win over the element's, with one
   carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`, `aria-controls`,
@@ -569,10 +581,15 @@ React neither cancels nor orders overlapping actions. The library's stance:
   `useActionState` for ordering). So a click, Enter or Space on a pure trigger whose own action
   is in flight starts nothing and is `preventDefault()`ed (a `render`ed link does not navigate
   again, a `formAction` does not submit again, a `command` does not run again); other listeners
-  (focus, hover, the consumer's pass-through handlers) are untouched. The guard reads a
-  synchronous in-flight counter in `useActionTrigger` (two activations in one task) **and** the
-  last render's `pending` (the settled-but-held commit under entanglement), and the trigger
-  renders `aria-disabled="true"` meanwhile (section 3.6). A consumer who wants every activation
+  (focus, hover, the consumer's pass-through handlers) are untouched. The guard reads **only** a
+  synchronous in-flight counter in `useActionTrigger` (so two activations in one task are caught),
+  never the last render's `pending`: after the action settled, React may hold the commit that
+  clears `pending` for as long as any other async action is pending (entanglement, 2.3 item 5)
+  or while the resulting render suspends, and a click in that window starts a new run rather
+  than being dropped (the review's probe showed a rendered-`pending` guard losing two of three
+  clicks on a non-awaiting action; `design/components/button.md` 5.2). The trigger renders
+  `aria-disabled="true"` while it is pending (section 3.6), which may outlast the guard by the
+  held window. A consumer who wants every activation
   to count does not await the work (`action={() => { void inc(); }}`, item 5 of 2.3), which ends
   `pending` at once; an ordered sequence is `useActionState`. No opt-out prop. **Rollout**: the
   guard is `useActionTrigger`'s `ignoreWhilePending` option (3.4), on for `Button` in #79;
@@ -897,8 +914,8 @@ if (!started) event.preventDefault();                        // ignored while pe
 
 - `pending` is the part's own transition (`data-pending` on the button or item).
 - `ignoreWhilePending` (#79): `run` returns `false` and starts nothing while a run is in flight,
-  judged by the hook's synchronous in-flight counter **or** the last render's `pending` (section
-  2.5). On for `Button`; off by default until the follow-up #81 (`design/components/button.md`
+  judged by the hook's synchronous in-flight counter alone, not the last render's `pending`
+  (section 2.5). On for `Button`; off by default until the follow-up #81 (`design/components/button.md`
   5.5) makes it the only behaviour.
 - A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
   the part; an older run's rejection (the part was clicked again before the first settled) is
@@ -1018,7 +1035,7 @@ latest-intent rule covers it. No `aria-busy` (its meaning is "my content is bein
 NVDA and VoiceOver ignore it and JAWS may hide the element's content; pass-through for consumers
 who want it) and no built-in announcement of pending (the outcome is the consumer's).
 `focusableWhenDisabled` (`Button`) joins Tabs and the Toolbar as a source of `aria-disabled` for a
-consumer-disabled control.
+consumer-disabled control, as does a `render` element that is not a host `<button>` (section 1.2).
 
 **Computed native validity attributes.** A part may render a native constraint attribute from
 library state when the platform has no constraint for the component's semantic: CheckboxGroup
@@ -1830,7 +1847,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
 | Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled). |
 | Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. |
-| Re-entry (pure trigger) | Required for every pure trigger with the guard on (section 2.5; `Button`, #79): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) is ignored (the rendered `pending`); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. |
+| Re-entry (pure trigger) | Required for every pure trigger with the guard on (section 2.5; `Button`, #79): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) **runs again** while the element still shows `data-pending` (the guard is the counter only; a non-awaiting action clicked three times under that hold is called three times); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. |
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |
