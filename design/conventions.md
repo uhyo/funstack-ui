@@ -2034,8 +2034,10 @@ may ship **functional at-rules** it needs and cannot express inline, under these
   **At most one shipped stylesheet may render during SSR per precedence bucket** (review L2):
   Fizz writes every `<style href precedence="fsui">` of one flush as a single element
   (`data-href="a b"`, texts concatenated), whose hash is in no `STYLE_SHA256` entry; a second
-  server-rendered stylesheet gets its own precedence, and the SSR row asserts exactly one
-  `fsui` `<style>` in the head hashing to its entry. No implicit `<meta property="csp-nonce">`
+  server-rendered stylesheet gets its own precedence, and a guard row (`csp.test.tsx`, landed
+  in a02e316) renders Tooltip and a context menu on the server and asserts exactly one `fsui`
+  `<style>` in the head whose text hashes to its `STYLE_SHA256` entry; the constraint is
+  commented on `FSUI_PRECEDENCE`. No implicit `<meta property="csp-nonce">`
   read. A blocked stylesheet degrades: the point menu opens at the point but never flips; the
   skip-delay inline value carries an explicit `var(--fsui-tooltip-warm, 0)` fallback so it
   computes to the Root's `delay` (without the fallback an unregistered property makes the

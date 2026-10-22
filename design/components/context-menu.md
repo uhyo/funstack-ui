@@ -238,9 +238,11 @@ the `pointerup` when no touch event follows (deviation B1): with the menu above 
 light-dismisses it (Chromium touch emulation: `pointerup` captured by the popup, `touchend`,
 then `beforetoggle(closed)` before any `click`); before wave 11 that click landed on the menu
 under the finger. Cancelling `touchend` suppresses the synthesised click, which is what the
-one-shot swallow of this section existed for on the mouse path. The guard cancels and ends only
-when **no finger is left** (`event.touches.length === 0`), so a second finger's tap while the
-first still holds does not end it and lose the slide (review L4). `pen` pointers get no
+one-shot swallow of this section existed for on the mouse path. Pointer events carry no
+`Touch.identifier`, so the guard pairs by dispatch order: **the first `touchend` after the
+gesture pointer's own `pointerup` is that finger's lift** and ends the guard; any other
+finger's `touchend` (a second finger tapping while the first still holds) is still cancelled
+but does not end it, so the slide is not lost (review L4, as landed in a02e316). `pen` pointers get no
 `touchmove` guard; whether an Apple Pencil long-press drag is taken as a pan on iPadOS is on
 the #90 device checklist (review L7). The region stays scrollable before the open. A lift without a drag never
 closes the menu (the menu sits above the finger, 4.7, so the lift lands outside it; the
@@ -698,11 +700,14 @@ honoured by Chromium 156 only; `docs/research/interaction-wave11.md` 2.3). Three
   lock. As Dialog 10.2, the lock is a documented CSS recipe:
   `html:has([role="menu"][data-context]:popover-open) { overflow: hidden; scrollbar-gutter: stable; }`.
   With it in place the close-on-scroll listener simply never fires. **A scroll already in
-  flight at the open closes the menu too** (review L6): a running smooth scroll (`scroll-behavior:
-  smooth` after a Tab that scrolled, then Shift+F10) or trackpad momentum opens and closes it
-  within a frame or two. Accepted as designed (React Aria's rule has the same edge) and said in
-  the docs' Scrolling list; ignoring scrolls before the first frame after the show is the
-  alternative if it bites.
+  flight at the open is ignored** (review L6, as landed in a02e316): a running smooth scroll
+  (`scroll-behavior: smooth` after a Tab that scrolled, then Shift+F10) or trackpad momentum
+  would otherwise open and close the menu within a frame or two. The listener ignores `scroll`
+  events until the **first animation frame with no scroll event after the open `toggle`**
+  (scroll events run before the frame's `requestAnimationFrame` callbacks, so a frame that saw
+  none means the in-flight scroll has ended); the watch is cancelled on close, and without
+  `requestAnimationFrame` every scroll closes. Rows wait one frame after the toggle before
+  scrolling.
 - **Wheel over the menu never scrolls the page.** Every root `Menu.Popup` (point- or
   Trigger-opened) installs, while shown, a **non-passive `wheel` listener on the popup element**
   that `preventDefault()`s unless **some element from the event's target up to the popup** can
@@ -1427,7 +1432,7 @@ Design-side items, folded in place:
 | --- | --- | --- |
 | M2 | The outside-release clock starts at the first `toggle` that finds the popup shown, not at the press, so an async open does not shorten it; jsdom row with a pending open. | 2.6, 13.1 |
 | L3 | The wheel guard never prevents a `wheel` with `ctrlKey` (trackpad pinch, Ctrl+wheel zoom); jsdom row. | 4.8, 13.1 |
-| L4 | The touch guard cancels and ends only when no finger is left (`touches.length === 0`). | 2.2 |
-| L6 | A scroll already in flight at the open (smooth scroll, momentum) closes the menu; accepted, documented in the Scrolling list. | 4.8 |
+| L4 | The touch guard ends at the first `touchend` after the gesture pointer's own `pointerup` (pairing by dispatch order; pointer events carry no `Touch.identifier`); other fingers' `touchend` events are cancelled but do not end it. | 2.2 |
+| L6 | Close-on-scroll ignores scroll events until the first scroll-free animation frame after the open toggle, so a scroll in flight at the open (smooth scroll, momentum) does not close the menu; the watch is cancelled on close. | 4.8 |
 | L7 | Pen gets no `touchmove` guard; the Apple Pencil case is on the #90 checklist. | 2.2 |
 | L1, L2, M1, M3, L5 | Tooltip's and conventions 12's items (nonce cases, one SSR stylesheet per precedence, the `var()` fallback, the removed recipe, the hoverable trade-off). | tooltip.md, conventions 12 |

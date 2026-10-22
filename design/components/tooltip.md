@@ -563,7 +563,8 @@ reads them in `Root`'s effect.
     being opened itself once it is `:popover-open`, so every cold open loses its entry
     transition too, while on a skip the previous tooltip is already hidden when the next one's
     style changes, so "another tooltip is open" is never observable from CSS at that moment.
-    Instant browsing that keeps cold entry animations needs library state; follow-up if asked.
+    No replacement recipe is possible. Instant browsing that keeps cold entry animations
+    needs library state (`data-instant` / `state.warm`): follow-up **#93**.
   - **Accessibility:** WCAG 1.4.13's dismissible and persistent requirements are unchanged;
     **hoverable has one new trade-off** (review L5): the pointer crossing a neighbouring
     trigger B on its way from trigger A to A's tooltip now opens B at once and hides A, where
@@ -1260,6 +1261,7 @@ first real WebKit check of the computed-style claim, which the research took fro
 | Native path | With `experimental_interestFor` and `experimental_hint`, the row above on open: the observer runs on the native path too (product-owner question 1 of the amendment). | `supportsInterestFor`: native open by real hover; elsewhere the JS path opens, same assertion. |
 | Inline side and RTL | `side="inline-end"`: the popup's left edge meets the trigger's right edge in LTR with `data-side="right"`; under `document.documentElement.dir = "rtl"` the popup's right edge meets the trigger's left edge with `data-side="left"`. `align="start"` on `side="bottom"` under page RTL: the right edges meet (`data-align="start"`). | none |
 | Container RTL | The same two assertions with `dir="rtl"` on a wrapper `div` around the Trigger and Popup and an LTR document. | `anchorPositionHonoursParentDirection` true (Chromium, WebKit): mirrored as above. False (Firefox, Mozilla 2019601): the popup's inline edges meet neither trigger edge (the mirrored offset); assert that and the comment names the bug. Never skipped. |
+| Skip-delay degradation (wave 11, review M1) | On the flagged markup: with the warm `<style>` removed by hand (re-inserted in `finally`; React never re-inserts it), `getComputedStyle(trigger).interestDelayStart` is the Root's `delay` (`0.4s`), not `normal`; the same inside an `iframe` whose `srcdoc` carries `<meta http-equiv="Content-Security-Policy" content="style-src 'none'">` (the blocked `<style>` has `sheet === null`). | Computed values asserted only where `CSS.supports("interest-delay-start", "0s")` (Chromium): Firefox drops the unknown property from the inline style entirely; there the rows assert the markup and the blocked sheet only. |
 | Skip-delay (wave 11) | Two adjacent triggers, `delay={400}`: hover A with the real pointer, wait for it; move straight to B: B is `:popover-open` within 100 ms and A is closed; 800 ms after leaving both, hover B: it waits about 400 ms. On the flagged (native) markup in Chromium, `getComputedStyle(triggerB).interestDelayStart` is `0s` while A is open and `0.4s` otherwise. | `supportsInterestFor` with the flags on: the native path (no library listener runs); elsewhere the JS path under the same markup; both branches assert the same timings. `supportsPopoverHint` false (Safari 27.0): `manual`, the JS path hides A. |
 
 ---
