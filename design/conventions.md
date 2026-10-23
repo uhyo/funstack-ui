@@ -66,7 +66,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
-| 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc, and none of the initial four has one (directive-free variants tracked in #19). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
+| 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc, and none of the initial four has one. **#19 resolved 2026-10-23 (user decision, option A of `docs/research/zero-js-variants.md` 5): no second, directive-free anatomy; "JS-free" means no behaviour JS on the native path and works before and without hydration, never "no client bundle"** (7.3; resolved question 38). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
@@ -1644,10 +1644,43 @@ export function Faq({ items }) {
 What a consumer gets from this: `<details>`/`<summary>` markup in the HTML, native open/close,
 find-in-page reveal and exclusive groups via `name` with no hydration required; the part code is
 in the client bundle and hydrates to add the action props, controlled mode and animation. What
-they do not get: a directive-free module. Truly directive-free variants (parts that take their
-wiring as props instead of context) are tracked in issue #19 and are not part of the initial
-four; action-less Checkbox, Switch and RadioGroup are the strongest candidates there, since a
-native input already works without JS. Passing any action prop to a part from a Server Component is a type error unless the action
+they do not get: a directive-free module.
+
+**Directive-free variants: resolved, none (#19, user decision 2026-10-23, option A of
+`docs/research/zero-js-variants.md` 5, whose measurements are binding).** The guarantee the
+library makes is the one above: **no behaviour JS on the native path, and the markup works
+before and without hydration**. It does not promise "no client bundle", and the docs must not
+either: on FUNSTACK Static a page with no client components still ships about 76 KB gzip of
+runtime and hydrates, and the library parts add 2 to 5 KB gzip per family on top (Accordion
++5.1, Tooltip +5.0, Switch +3.8, Progress +1.9); where a page really ships zero JS (plain SSR or
+`react-dom/static` prerender without hydration) today's parts already render complete, working
+HTML, directive or not. So no second anatomy ships. Per component:
+
+- **Form controls** (Switch, Checkbox, RadioGroup, Slider, NumberField; Select likewise): the
+  JS-free form control from a Server Component is the **native element** (`<input
+  type="checkbox" role="switch">`, same-`name` radios in a `<fieldset>`, `<input type="range">`,
+  `<input type="number">`, a real `<select>`), shown as a **recipe on each component's docs
+  page**, not a part: a directive-free part would add nothing over the element and would lose
+  Field integration, the action and the optimistic attributes.
+- **Tooltip**: not viable natively. `interestfor` exists only in Chromium (Firefox bug 1984699,
+  WebKit bug 297786, no position), so a directive-free Tooltip would show nothing at all in two
+  of three engines; `design/components/tooltip.md` 2.4 and 14 stand (every part is a client
+  module; "zero-JS" there means the native path runs no behaviour JS).
+- **Popover**: possible in principle (`commandfor` + `toggle-popover` in all engines) but a
+  static Trigger could not keep a server-rendered `aria-expanded` current and only Chromium maps
+  the invoker's expanded state natively; that accessibility gap must close first. Not scheduled.
+- **Accordion**: the one real candidate (no behaviour loss in any engine, about 5 KB gzip
+  saved). **Option B, `@funstack/ui/accordion/native`** (Root `div`, Item `details` with a
+  required `name`, Trigger `summary`, Panel `div`; usable from Server and Client Components,
+  function props allowed), is recorded as a **ready plan, not scheduled**; revisit if an RSC host
+  learns to skip the runtime for pages with no client references, or if users ask.
+- **Progress / Meter**: the Root is already directive-free (below); a variant would save
+  +1.9 KB and is not worth a second surface.
+
+Two findings from the same research hold library-wide: a `React.cache()`-scoped mutable "server
+context" is unsafe (an async child resumes after a sibling Root overwrote the value; rejected as a
+way for a Root to pass data to its parts), and server `useId` ids collide across separately
+rendered Flight payloads (#94, below). Passing any action prop to a part from a Server Component is a type error unless the action
 is a Server Function (section 2.2).
 
 Progress and Meter (#68) are the first components whose **Root is itself a Server Component**:
@@ -1655,7 +1688,13 @@ Progress and Meter (#68) are the first components whose **Root is itself a Serve
 client-created context provider (7.1), and their parts are client modules that read it. "JS-free"
 and "a Server Component" coincide at the Root, so function props (`getAriaValueText`,
 `children(state)`, `render`) may be passed from a Server Component and run on the server, next to
-the JS-free Accordion whose parts are all client modules.
+the JS-free Accordion whose parts are all client modules. **Known gap (#94):** a server `useId`
+restarts at `_S_1_` for each Flight render, and FUNSTACK Static's `defer()` renders each deferred
+payload without an `identifierPrefix`, so a `Progress.Root` / `Meter.Root` inside `defer()` can
+get the same `${id}-label` as one in the main payload and `aria-labelledby` breaks (client
+`useId`, `_R_…`, is unaffected). Upstream fix in FUNSTACK Static (uhyo/funstack-static#198);
+until then the Progress / Meter docs note the limitation, and an explicit id override on those
+Roots is the library-side fallback if the upstream fix stalls.
 
 A third configuration, decided with Menu (#39): a component whose baseline **cannot** be JS-free
 (a menu needs arrow keys, typeahead and focus management that only Chromium's flagged
@@ -2355,7 +2394,8 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `"name"` based on whether the trigger already has an accessible name (clarified 2026-10-16
     after the Tooltip implementation; the design wins). The prop name is shared across components.
 12. **All Accordion parts are client modules** (section 7.3). Server Components render them and
-    the native toggle works before hydration; directive-free variants are a later concern (#19).
+    the native toggle works before hydration; directive-free variants were a later concern (#19,
+    resolved as none: question 38).
 
 13. **`details.event` is a virtual Proxy-served property** (raised by the Toggle design, #6;
     resolved by research #17, `docs/research/server-function-action-props.md`, option (e), see
@@ -2581,6 +2621,17 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `data-instant` on `Tooltip.Popup`, attribute only with no `state.instant`, written from the
     popup's synchronous `beforetoggle` on both paths (the native path's one passive listener)
     and cleared at the close's, so exits always animate; no prop, no CSS-only route.
+
+38. **Wave 13, directive-free ("zero-JS") variants (#19)** resolved 2026-10-23, **user
+    decision, option A** of `docs/research/zero-js-variants.md` 5 (section 7.3): no new
+    components; "JS-free" means no behaviour JS on the native path and works before and without
+    hydration, not "no client bundle"; native-HTML recipes on the form-control docs pages
+    (Switch, Checkbox, RadioGroup, Slider, NumberField, Select); Tooltip not viable natively
+    outside Chromium; Popover blocked on the `aria-expanded` gap; option B
+    (`@funstack/ui/accordion/native`) recorded as a ready plan, not scheduled. Supersedes the
+    "tracked in #19" notes in the component documents (Accordion feedback 1, Tooltip 14.1,
+    RadioGroup, CheckboxGroup, Switch, Select, Slider, NumberField). The server `useId`
+    collision found by the research is #94 (upstream uhyo/funstack-static#198).
 
 ## Open questions
 

@@ -18,7 +18,7 @@ find-in-page, `interpolate-size`, `@starting-style`), probes in `memo/architect/
 | 5 | Platform-initiated opens | Find-in-page and text fragments open a closed `<details>` natively in all engines. Library mode listens to `toggle`, dispatches `valueChangeAction` with `reason: "platform"`, and re-applies committed state to the DOM once the action settles. No `hidden="until-found"` needed. |
 | 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item, Trigger and Panel in library mode, animating only the settling commit (layout/cross-fade of the whole list); the optimistic `data-open` flip is a CSS transition; not both on the same change. No `keepMounted`: `<details>` keeps content mounted and auto-opens on find-in-page natively. `experimental_interpolateSize` on Root. |
 | 7 | Keyboard | Enter/Space native on `<summary>`. Up/Down/Home/End between triggers is implemented by Root in both modes (APG: optional; we ship it). No `focusgroup` flag (it would collapse the Tab stops). |
-| 8 | RSC | All four parts are `"use client"` files (Flight cannot read context in a Server Component, see notes). A Server Component renders them freely; JS-free mode needs no interaction JS, works before hydration and with JS off, but the parts' code is in the client bundle. This contradicts the conventions' sketch of a directive-free `accordion-static.tsx`; escalated. |
+| 8 | RSC | All four parts are `"use client"` files (Flight cannot read context in a Server Component, see notes). A Server Component renders them freely; JS-free mode needs no interaction JS, works before hydration and with JS off, but the parts' code is in the client bundle. This contradicts the conventions' sketch of a directive-free `accordion-static.tsx`; escalated, and resolved by #19 (2026-10-23, option A): one anatomy, "JS-free" means no behaviour JS and works without hydration; a directive-free `@funstack/ui/accordion/native` is a recorded, unscheduled plan (conventions 7.3). |
 
 ---
 
@@ -933,6 +933,10 @@ static mode). This is intentional and documented as the library's Disclosure unt
    interaction and the markup is complete and functional before hydration*; whether a part file is
    directive-free is a per-component fact recorded in its design doc. The Directive test row then
    asserts whatever the design doc says. Decision for the product owner (see report).
+   **Resolved:** the rewording is conventions 7.3; the directive-free Accordion itself is #19,
+   decided 2026-10-23 (user, option A): not built, but recorded there as the one ready plan
+   (option B, `@funstack/ui/accordion/native`: Item `details` with a required `name`, no
+   action props, no state attributes) should an RSC host ever skip the runtime.
 2. **4.1 vocabulary.** Both `expanded` ("Accordion trigger/panel") and `open` ("Popup, Trigger:
    platform or library open state") claim the Accordion trigger. This design uses `open` because
    the platform says `open` everywhere (`<details open>`, `:open`, `ToggleEvent.newState`).

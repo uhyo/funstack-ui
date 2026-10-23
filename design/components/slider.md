@@ -46,7 +46,7 @@ pointer is, like focus).
 | 9 | Forms and reset | Each input posts under its Thumb's `name` (or the Root's `name` for all). Reset: the library writes each input's `defaultValue` mirror **in the `reset` event** (react-dom rewrites the attribute after every value change) and dispatches the JS-computed reset target (uncontrolled: the latest `defaultValue`; controlled: the mount-time value) as one `"platform"` step + commit in the microtask. Mount reconciliation covers pre-hydration key presses and Firefox restoration. |
 | 10 | Exposure | `data-pending` on Root and on the Thumb the gesture moved (never during a drag without a `valueChangeAction`; with one, each step is a real transition, so a spinner belongs on `[data-pending]:not([data-dragging])`); `data-dragging` on Root and the captured Thumb; `data-orientation` on every part; `data-disabled`; `data-index` on Thumb. Geometry through CSS custom properties, never positioning: `--slider-value` (Thumb), `--slider-start` / `--slider-end` and `--slider-value-<i>` (Root, inherited). |
 | 11 | ViewTransition | **No `transition` prop on any part** (Select precedent): nothing mounts from library state and every move is urgent or optimistic. Types `fsui-slider`, `fsui-slider-change` (step), `fsui-slider-commit` (gesture) for consumers' own boundaries. Thumb motion and rollback animate with a CSS transition on the registered custom property, disabled under `[data-dragging]`. |
-| 12 | SSR | Every part file is `"use client"`. Server HTML carries the inputs with their values; before hydration keyboard and form submission work natively (the visuals catch up at mount through reconciliation); pointer does nothing. A plain `<input type="range">` from a Server Component remains the JS-free form slider (issue #19). |
+| 12 | SSR | Every part file is `"use client"`. Server HTML carries the inputs with their values; before hydration keyboard and form submission work natively (the visuals catch up at mount through reconciliation); pointer does nothing. A plain `<input type="range">` from a Server Component remains the JS-free form slider (#19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant; a recipe on the docs page, conventions 7.3). |
 | 13 | Not in v1 | `largeStep` / Shift+Arrow, `step="any"`, `list` / tick marks, per-thumb `disabled`, `inverted`, a value tooltip, `<rangegroup>`, `appearance: base` (section 13). |
 | 14 | Inside a Field (#60, **proposed**, needs product-owner acceptance) | `Slider.Root` calls `useFieldControl` with `labelable: count === 1`: one thumb registers its input (the Field's control id becomes `thumbId(0)`, `Field.Label` gets `for`); several register the Root `div` (`aria-labelledby` → `Field.Label`, as CheckboxGroup). `aria-invalid` on every Thumb input, never on the group; `aria-describedby` on the input (one) or the Root (several). `name` / `disabled` from the Field; `required` not applicable (dev warning). The slot and `:user-invalid` live on the first Thumb's input. `useFieldValueChange` keyed on the optimistic values with `edit = true` for `"activate"` commits, because pointer and normalised-key gestures fire no native `input` / `change`. Section 9.4. |
 
@@ -1093,8 +1093,7 @@ has no behaviour yet). At mount the reconciliation of 9.3 adopts the pre-hydrati
 Combobox (conventions 7.3).
 
 The JS-free form slider is a plain `<input type="range">` rendered by a Server Component
-(research §4, structure 2, and §7 item 8); it is not a part of this anatomy and is tracked with
-the directive-free variants in issue #19.
+(research §4, structure 2, and §7 item 8); it is not a part of this anatomy. #19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant; the docs page shows the native recipe (conventions 7.3).
 
 ---
 
@@ -1212,7 +1211,7 @@ Notation: `L` = `live`, `O` = optimistic, `C` = committed, `S` = shown (2.2), `P
   `::slider-*`** (CSS Forms 1, Chromium flag only): both could replace the hidden inputs or the
   styled parts without changing the state API; revisit at Intent to Ship (research §7 item 9).
 - **A directive-free JS-free slider** (a Server Component rendering `<input type="range">`):
-  issue #19.
+  issue #19, resolved 2026-10-23 as a docs recipe, not a part (conventions 7.3).
 
 ---
 

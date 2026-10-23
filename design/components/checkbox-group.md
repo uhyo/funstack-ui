@@ -926,7 +926,7 @@ Both at once is fine ("autosave and also submit"). "Submit on change" is
 `useFormStatus`. React's automatic reset after a successful form action is followed through the
 reset path (10.7). An action-less group is JS-free in behaviour: the boxes, labels, `name` and
 (static) `required` work before hydration; the Parent's cascade and the dynamic `required` need
-hydration. Every part file is `"use client"` (context); directive-free variants are #19.
+hydration. Every part file is `"use client"` (context). #19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant (a parent "select all" needs JS anyway; conventions 7.3).
 
 ---
 

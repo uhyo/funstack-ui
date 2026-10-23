@@ -34,7 +34,7 @@ stays native and the Async React model stays the conventions' model.
 | 9 | Disabled | Native: `disabled` on an Item, `<fieldset disabled>` for the group. Disabled radios are skipped by native arrow navigation and never dispatch. A form reset still resets a disabled group and the group follows it (section 5.3). |
 | 10 | Transition types | `fsui-radio-group` only. Consumers' dependent content elsewhere in the tree can key a `<ViewTransition>` type map on it. |
 | 11 | Forms and Server Functions | Two independent channels: `valueChangeAction` (per-group transition, may be a Server Function passed directly) and `<form action>` with native `name` (no action on the group needed). Both at once is fine. |
-| 12 | Files | Every part file is `"use client"` (context). An action-less group is JS-free in behaviour (works before hydration); directive-free variants are tracked in #19. |
+| 12 | Files | Every part file is `"use client"` (context). An action-less group is JS-free in behaviour (works before hydration). #19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant; the JS-free radio group from a Server Component is the native `<fieldset>` with same-`name` radios, a recipe on the docs page (conventions 7.3). |
 
 ---
 
@@ -1032,7 +1032,8 @@ All nine items were applied to `design/conventions.md`: `RadioGroup.Item` on the
 (4.1); the form-reset path (3.5, 3.8); the already-cancelled click rule (2.3 item 3); "disabled
 never dispatches" scoped to user interaction (2.3 item 7, 3.6); `null` from platform paths (3.1);
 `fsui-radio-group` (5.3); the `render` restriction for inputs and fieldset Roots (1.2); `Label`
-as `<legend>` in the part vocabulary (1.1); and the #19 note (7.3).
+as `<legend>` in the part vocabulary (1.1); and the #19 note (7.3; #19 since resolved as "no
+directive-free variant, native recipe in the docs", conventions resolved question 38).
 
 ## Questions for the product owner
 

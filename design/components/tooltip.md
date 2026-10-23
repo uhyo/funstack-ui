@@ -1323,7 +1323,10 @@ first real WebKit check of the computed-style claim, which the research took fro
 1. **"Zero-JS" reading.** No Tooltip part can be directive-free (section 2.4). Accept "no
    runtime behaviour JS on the native path, client components still hydrate", or ask for the
    `children`-function variant of `Root` that makes `Trigger` and `Popup` directive-free at the
-   cost of a second API shape. Recommendation: accept.
+   cost of a second API shape. Recommendation: accept. **Resolved (#19, 2026-10-23, option A;
+   conventions 7.3 and resolved question 38):** accepted as recommended, and a directive-free
+   Tooltip is ruled out on its own merits: `interestfor` is Chromium-only, so it would show no
+   tooltip at all in Firefox and Safari (`docs/research/zero-js-variants.md` 4).
 2. **Baseline popover type `manual`.** Chosen over `auto` so tooltips never close open menus.
    The price is that the library owns Escape and outside-click in JS until `hint` is universal.
 3. **No `open` / `openChangeAction` / `data-open` in v0** (section 4.1). Confirm that a tooltip

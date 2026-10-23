@@ -44,7 +44,7 @@ locale, overridable per state).
 | 5 | Fill | Custom properties on the Root, inherited: `--progress-value` (a percentage, absent while indeterminate); `--meter-value`, `--meter-low`, `--meter-high`, `--meter-optimum`. The library positions nothing; the consumer's CSS sizes the Indicator from the variable (`inline-size`, `scale`, `conic-gradient`). A registered `@property` lets the variable itself transition, in every engine, which the native fill cannot do in Firefox. |
 | 6 | Async | **No action props, no `pending`, no `useOptimistic`, no transition types.** The component is the display of a value the consumer owns. The one Async React rule is the consumer's and it is the mirror image of the library's usual advice: a value that reports on an in-flight action is written with a plain `setState` (urgent), never inside `startTransition`, because a transition update inside a pending action is held until the action settles (conventions 2.3 item 5). Section 4. |
 | 7 | ViewTransition | No `transition` prop on any part and no boundary (Slider, Select, Toast precedent): values update often and in the consumer's lane, the fill animates with a CSS transition on the registered custom property, and a boundary that mounts with `{pending && <Progress.Root />}` would pay the page cross-fade (`docs/research/view-transition-mount-cost.md`). |
-| 8 | Labelling | `Progress.Label` / `Meter.Label` is a `span` whose id the Root **always** references through `aria-labelledby` (token-merged with the consumer's; a dangling reference is skipped by accname, the `Field.Description` rule), or the consumer's `aria-label`. `Progress.Value` is `aria-hidden` by default (the same text is in `aria-valuetext`). **Not a Field control**: a Progress or Meter inside a `Field.Root` is a sibling of the Field's control and carries its own name (section 6). |
+| 8 | Labelling | `Progress.Label` / `Meter.Label` is a `span` whose id the Root **always** references through `aria-labelledby` (token-merged with the consumer's; a dangling reference is skipped by accname, the `Field.Description` rule), or the consumer's `aria-label`. **Known gap (#94):** the id comes from a server `useId`, which restarts per Flight render, and FUNSTACK Static's `defer()` sets no `identifierPrefix`, so a Root inside `defer()` can share its `${id}-label` with one outside it (upstream uhyo/funstack-static#198; documented on the pages meanwhile; an explicit id override is the fallback). `Progress.Value` is `aria-hidden` by default (the same text is in `aria-valuetext`). **Not a Field control**: a Progress or Meter inside a `Field.Root` is a sibling of the Field's control and carries its own name (section 6). |
 | 9 | Directives | `Progress.Root` and `Meter.Root` are **directive-free** (only `useId`, pure arithmetic, `Intl`; they render a context provider imported from a `"use client"` module, conventions 7.1's second exception, first used here). `Track`, `Indicator`, `Label`, `Value` read the context and are client modules. A Server Component that renders the anatomy runs the Root on the server only: `getAriaValueText`, `children(state)` and `render` functions may be passed from it, and `Intl` runs where the data is (section 8). |
 | 10 | Not in v1 | Circular parts, `Progress.View`, Field registration, a `valueLabel` string prop, `data-value` / typed `attr()`, `aria-busy` automation, a native `<progress>` rendering mode, exit animation of a completed bar (section 11). |
 
@@ -80,7 +80,8 @@ import { Meter } from "@funstack/ui/meter";
 ```
 
 Rendered HTML for the upload (`uploaded` is 3 355 443 of 8 388 608; ids from one `useId` in the
-Root; the locale is the server's or the `locale` prop):
+Root, `_S_…` on the server, which collides across FUNSTACK Static `defer()` payloads until
+uhyo/funstack-static#198 lands, #94; the locale is the server's or the `locale` prop):
 
 ```html
 <div role="progressbar" aria-labelledby="_r_1_-label" aria-valuemin="0" aria-valuemax="8388608"
@@ -770,7 +771,10 @@ rendering `<ProgressContext value={state}>` imported from the `"use client"` con
 which is conventions 7.1's second exception ("a directive-free file *rendering* a context
 provider imported from a client module … because Server Components may render client-created
 contexts"), stated there as allowed and **used here for the first time**. The provider's `value`
-is the state object, plain serialisable data, plus the id.
+is the state object, plain serialisable data, plus the id. The server `useId` has one known
+limitation, #94: separately rendered Flight payloads (FUNSTACK Static's `defer()`) restart the
+counter, so two Roots in different payloads can get the same id and the label link breaks; the
+fix is upstream (uhyo/funstack-static#198, an `identifierPrefix` per deferred render).
 
 The four parts read the context with `use(ProgressContext)` and therefore are client modules
 (a Server Component cannot read a client context, conventions 7.3). This is the same split the

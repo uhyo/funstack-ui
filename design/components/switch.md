@@ -752,7 +752,7 @@ function. "Submit on change" is `checkedChangeAction={() => formRef.current?.req
 
 A **static** Switch (no action props, no `checked`) in a Server Component is a working native
 input before hydration and with JS off; it still hydrates to a client module (the file carries
-the directive). A directive-free variant is a candidate for issue #19 (research section 8 item 7).
+the directive). #19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant: the JS-free switch from a Server Component is `<input type="checkbox" role="switch">` itself, a recipe on the docs page (conventions 7.3).
 
 ---
 

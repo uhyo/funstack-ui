@@ -1079,7 +1079,7 @@ Before hydration: typing works and is adopted at mount (4.5); the buttons do not
 `command`, nothing to invoke); a form submitted before hydration posts the **default** value
 (the typed text lives in a nameless input), the same rule as Combobox. Progressive enhancement,
 not a JS-free mode. The plain `<input type="number">` from a Server Component remains the JS-free
-number field (#19), with the research's caveats.
+number field, with the research's caveats (#19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant; a recipe on the docs page, conventions 7.3).
 
 ---
 
