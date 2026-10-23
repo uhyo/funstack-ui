@@ -90,3 +90,26 @@ All four deviations are justified: `formAction` and the `<dialog>` handlers are 
 (verified above); `Extract<..., fn>` is the right handling of `Form.Root`'s `string | fn` `action`;
 the self-test is a good addition. The `@ts-expect-error` import plus `toBeAny()` in
 `internal/types.test.ts` works (re-adding an alias trips the unused directive).
+
+## Addendum: after rebase (rename now 2f6db8a, `git range-diff` identical to b58249a) and docs commit ec6cb1e
+
+Verdict for ec6cb1e: **acceptable**, one nit.
+
+- Names: no `inputValueChangeAction` / `UrgentChangeAction` left in packages/docs/src except the
+  Roadmap Breaking entry, where they are the old names on purpose. ActionProps, Combobox
+  (prose, sample, Callout, props table, platform note, optimistic summary) and Roadmap all use
+  `onInputValueChange` / `UrgentChangeHandler`; the props-table type matches the declaration.
+- Anchors: `<h3 id="urgent-lane">` at ActionPropsPage.tsx:308; the intro links `#urgent-lane`;
+  ComboboxPage links `/concepts/action-props#urgent-lane` three times; the route
+  `/concepts/action-props` exists (App.tsx:105). The id is unique on the page (the other is
+  `overlapping-actions`).
+- Rule wording vs vision principle 3: it matches. Both say `fooAction` always means a handler run in
+  a transition, the exception is forced by controlled text input, it is named like the plain handler
+  it is, and it is the only `on*` prop. The page says "x / defaultX pair" where the old text said
+  "triple", which agrees with conventions row 11.
+- Roadmap: the Breaking entry follows the `Toolbar.Button` precedent (RoadmapPage.tsx:137) under
+  Done, with the #96 link.
+- Nit (optional): ActionPropsPage.tsx ~324, "Nothing else in the library is an `on*` prop", next to
+  "What about native handlers?", which says DOM `on*` props pass through to parts. Vision says
+  "the only `on*` prop form the library **defines**". "Nothing else the library defines is an `on*`
+  prop" would make the two sections agree.
