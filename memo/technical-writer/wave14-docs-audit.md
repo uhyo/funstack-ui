@@ -436,3 +436,21 @@ are not wanted, at least order the flat list by kind as above instead of by wave
 Read every non-concept page in full on master (commit `0396e48`), skimmed the six concept pages
 for definitions, grepped term usage across `src/pages` (counts in the glossary notes), and checked
 the three accuracy claims against `packages/ui/src` and GitHub issues #33, #35, #95, #96, #97.
+
+## Addendum (2026-10-24): template as implemented on `wave14-writer` (#98)
+
+The section names adopted for every component page, in order, with their ids: Anatomy
+(`anatomy`), How it works (`how-it-works`, optional, h4 per sub-topic), Props (`props`), Data
+attributes (`data-attributes`, pseudo-classes and custom properties included), Keyboard and ARIA
+(`keyboard-and-aria`), Transition types (`transition-types`), Optimistic and pending
+(`optimistic-and-pending`, with a Walkthrough h4 pinned to one example), Suspense (`suspense`),
+Browser-owned state (`browser-owned-state`), Before hydration (`before-hydration`, with a Plain
+HTML h4 where a native element is an alternative), Forms (`forms`), Styling (`styling`), Recipes
+(`recipes`), Browser notes (`browser-notes`). The five behaviour sections are `BehaviourSection`
+(fixed heading, "Concept:" link, summary paragraph, optional longer content); a one-line
+`BehaviourIndex` with `id="async-and-platform"` sits after the hero example. Pre-existing ids that
+other pages link to stay on the demoted h4s (`arrow`, `skip-delay`, `inside-a-field`,
+`plain-html`, `dialog-form`, `server-components`, `two-modes`). Term homes added: settle, adopt,
+veto, form channel (Action props, `#terms`); platform path, notification, a part's close
+(Browser-owned state). Still open from the audit: the "State:" / "Owned:" lines after each props
+table (M4) and replacing hand-written shared prop rows with `shared-props.ts`.
