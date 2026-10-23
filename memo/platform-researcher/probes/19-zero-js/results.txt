@@ -1,0 +1,51 @@
+# Probe results, 2026-10-23. FUNSTACK Static 1.3.3 (ssr: true), @vitejs/plugin-rsc 0.5.38, React 19.3.1, Vite 8.3.4.
+# Run from packages/docs/.probe-19 (copy this folder there): VARIANT=<name> npx vite build
+# JS assets per variant (bytes raw / gzip -9)
+plain index-C0dsHow-.js 243447 75155
+plain rolldown-runtime-WkwZ5CU-.js 599 397
+plain rsc-B5hDshSZ.js 951 564
+plain TOTAL 244997 76116
+accordion entries-DNSAZc9K.js 11630 4578
+accordion index-BTbWix-w.js 235693 72740
+accordion jsx-runtime-DyZJNswf.js 8784 3371
+accordion rsc-BGNTqmRS.js 956 565
+accordion TOTAL 257063 81254
+tooltip entries-Rkeyi3LU.js 11234 4356
+tooltip index-CadIskuD.js 231893 71779
+tooltip react-dom-CfgplUKF.js 12583 4424
+tooltip rsc-DcfDrfqN.js 954 560
+tooltip TOTAL 256664 81119
+progress entries-BYQySAG7.js 3392 1319
+progress index-DjTpK6hm.js 236165 72907
+progress react-DvXU6kJ2.js 8412 3261
+progress rsc-CUhcNOws.js 935 556
+progress TOTAL 248904 78043
+switch entries-Dsld23gt.js 8402 3320
+switch index-wZ8Ba6Ab.js 235348 72673
+switch jsx-runtime-DyZJNswf.js 8784 3371
+switch rsc-C3xRU3oE.js 956 565
+switch TOTAL 253490 79929
+combined entries-BSObTfeR.js 27051 9464
+combined index-Cv7DClY7.js 233026 71966
+combined react-dom-CfgplUKF.js 12583 4424
+combined rsc-EnkWPqH_.js 954 563
+combined TOTAL 273614 86417
+
+# plain/index.html (no client references) bootstrap:
+<script id="_R_">globalThis.FUNSTACK_STATIC_appClientManifest={stream:"/funstack__/fun__rsc-payload/f72388e139aed4b8.txt"};
+import("/assets/index-C0dsHow-.js")</script></body></html>
+
+# app-server.tsx prerendered <main>:
+<main><p data-probe="useid" data-label="a" id="_S_1_">_S_1_</p><p data-probe="useid" data-label="b" id="_S_2_">_S_2_</p><button id="_S_3_t" aria-describedby="_S_3_p" interestfor="_S_3_p">Save</button><div id="_S_3_p" popover="hint" role="tooltip">Saves</div><section data-group="g1"><details name="g1"><summary>1a</summary></details><details name="g2" data-async=""><summary>1b</summary></details><details name="g1"><summary>1c</summary></details></section><section data-group="g2"><details name="g2"><summary>2a</summary></details></section><p data-probe="cache">1<!-- -->,<!-- -->1</p><pre data-probe="log">[&quot;root:g1&quot;,&quot;item:1a:g1&quot;,&quot;item:1c:g1&quot;,&quot;root:g2&quot;,&quot;item:2a:g2&quot;]</pre><pre data-probe="latelog">[&quot;root:g1&quot;,&quot;item:1a:g1&quot;,&quot;item:1c:g1&quot;,&quot;root:g2&quot;,&quot;item:2a:g2&quot;,&quot;async-item:1b:g2&quot;]</pre></main>
+
+# app-defer.tsx prerendered <main> (useId collision across defer payloads):
+<main><p data-label="main-1" id="_S_1_">_S_1_</p><!--$--><section><p data-label="deferred-1" id="_S_1_">_S_1_</p><p data-label="deferred-2" id="_S_2_">_S_2_</p></section><!--/$--><p data-label="main-2" id="_S_2_">_S_2_</p></main>
+
+# app-ctxread.tsx: build fails
+[funstack] Error while rendering RSC payload of "index.html": Error: Cannot use() an already resolved Client Reference.
+
+# static-markup.mjs (react-dom/static prerender, no RSC):
+<style data-precedence="fsui" data-href="@funstack/ui/tooltip-warm">/* @funstack/ui: tooltip skip-delay. Functional only: while a tooltip is showing, the next one opens without its delay. */
+@property --fsui-tooltip-warm { syntax: "<number>"; inherits: false; initial-value: 0; }
+:root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }
+</style><main><div><details open="" name="_R_1_"><summary>One</summary><div>A</div></details><details name="_R_1_"><summary>Two</summary><div>B</div></details></div><button type="button" style="interest-delay-start:calc(250ms * (1 - var(--fsui-tooltip-warm, 0)));interest-delay-end:150ms" aria-describedby="_R_2_" interestfor="_R_2_" data-fsui-tooltip-trigger="">Save</button><div style="position-area:top;position-try-fallbacks:flip-block, flip-inline, flip-block flip-inline" id="_R_2_" popover="hint" role="tooltip" data-side="top" data-align="center">Saves</div><label><input type="checkbox" role="switch" data-checked="" name="wifi" checked=""/> Wi-Fi</label></main>
