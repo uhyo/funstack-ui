@@ -246,7 +246,7 @@ export function CheckboxGroupPage() {
           "`CheckboxGroupItemState` is `{ value, checked, pending, disabled }`; `checked` is optimistic; `pending` is true while an action is in flight and this box's optimistic state differs from the committed one (click a box twice quickly and it is not pending, the Root still is); `disabled` includes `Root disabled`."
         }
         owned={
-          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required` (computed by the Root), `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged."
+          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required` (computed by the Root), `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged. Inside a `Field.Root` also `aria-invalid`."
         }
         note={
           '`id`, `role` and other input props pass through. There is no per-Item `required`: use a plain `Checkbox` for "this box must be checked".'

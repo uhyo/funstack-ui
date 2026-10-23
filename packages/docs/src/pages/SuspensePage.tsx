@@ -61,8 +61,9 @@ export function SuspensePage() {
       <ConceptExample component="Accordion" href="/components/accordion#suspense">
         <p>
           <code>Accordion.Panel</code> is always mounted; its function child receives the committed{" "}
-          <code>open</code> state, which is how content is mounted lazily. If that content suspends,
-          the item stays closed with the trigger pending until the content is ready, then opens.
+          <code>open</code> state, which is how content is mounted lazily. In library mode, if that
+          content suspends, the item stays closed with the trigger pending until the content is
+          ready, then opens.
         </p>
       </ConceptExample>
       <ConceptExample component="Combobox" href="/components/combobox#suspense">

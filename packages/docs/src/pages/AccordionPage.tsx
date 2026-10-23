@@ -190,7 +190,9 @@ export function AccordionPage() {
         state={
           "`AccordionItemState` is `{ value, open, pending, disabled }`; `open` is optimistic, and `undefined` in JS-free mode (the browser owns it)."
         }
-        owned={"`open`, `name`, `onToggle`, `data-open`, `data-pending`, `data-disabled`."}
+        owned={
+          "`open`, `name`, `suppressHydrationWarning`, `data-open`, `data-pending`, `data-disabled`, and `onToggle` in library mode."
+        }
       />
 
       <h4>

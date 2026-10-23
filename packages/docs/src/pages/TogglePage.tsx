@@ -94,9 +94,11 @@ export function TogglePage() {
       <PartFacts
         state={"`ToggleState` is `{ pressed, pending, disabled }`; `pressed` is optimistic."}
         owned={
-          "`type`, `aria-pressed`, `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-pressed`, `data-pending`, `data-disabled`."
+          "`aria-pressed`, `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-pressed`, `data-pending`, `data-disabled`."
         }
-        note={"Every other `<button>` prop passes through."}
+        note={
+          'Every other `<button>` prop passes through; `type` defaults to `"button"` and a `render` element\'s own `type` wins.'
+        }
       />
 
       <h3 id="data-attributes">Data attributes</h3>

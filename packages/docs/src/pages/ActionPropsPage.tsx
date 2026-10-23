@@ -102,10 +102,13 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         component awaits it, return anything else and it is ignored. That means a function that
         returns data (a Server Function, a <code>fetch</code>) type-checks without wrapping.
       </p>
-      <ConceptExample component="Toggle and Tabs" href="/components/toggle">
-        <p>A change action that returns data, and one that returns nothing:</p>
+      <ConceptExample component="Toggle" href="/components/toggle">
+        <p>
+          A change action that returns data, and (on <a href="/components/tabs">Tabs</a>) one that
+          returns nothing:
+        </p>
         <CodeBlock>{`<Toggle pressedChangeAction={(pressed) => api.setFavorite(id, pressed)}>Favorite</Toggle>
-  <Tabs.Root defaultValue="general" valueChangeAction={(tab) => analytics.track(tab)}>...</Tabs.Root>`}</CodeBlock>
+<Tabs.Root defaultValue="general" valueChangeAction={(tab) => analytics.track(tab)}>...</Tabs.Root>`}</CodeBlock>
       </ConceptExample>
 
       <h3>
@@ -203,16 +206,16 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
       </p>
       <ConceptExample component="Tabs" href="/components/tabs">
         <CodeBlock>{`// Controlled, local state: set it in the synchronous part.
-  <Tabs.Root value={tab} valueChangeAction={(next) => { setTab(next); }}>
+<Tabs.Root value={tab} valueChangeAction={(next) => { setTab(next); }}>
 
-  // Controlled, server-backed: adopt the value on success, re-wrapped after the await.
-  <Tabs.Root
-    value={tab}
-    valueChangeAction={async (next) => {
-      await saveTab(next);
-      startTransition(() => setTab(next));
-    }}
-  >`}</CodeBlock>
+// Controlled, server-backed: adopt the value on success, re-wrapped after the await.
+<Tabs.Root
+  value={tab}
+  valueChangeAction={async (next) => {
+    await saveTab(next);
+    startTransition(() => setTab(next));
+  }}
+>`}</CodeBlock>
       </ConceptExample>
 
       <h3 id="await-only">Await only what the UI must wait for</h3>
@@ -224,10 +227,10 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
       </p>
       <ConceptExample component="Tabs" href="/components/tabs">
         <CodeBlock>{`// The panel switches immediately; the save runs in the background.
-  valueChangeAction={(next) => { void saveSelection(next); }}
+valueChangeAction={(next) => { void saveSelection(next); }}
 
-  // The panel switches when the save succeeds; the tab shows pending meanwhile.
-  valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
+// The panel switches when the save succeeds; the tab shows pending meanwhile.
+valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
       </ConceptExample>
 
       <h3>Errors go to Error Boundaries</h3>
@@ -272,11 +275,11 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
         <CodeBlock>{`const [pressed, dispatch] = useActionState(async (_previous: boolean, next: boolean) => {
-    await api.setFavorite(id, next); // runs only after the previous call has finished
-    return next;
-  }, initial);
+  await api.setFavorite(id, next); // runs only after the previous call has finished
+  return next;
+}, initial);
 
-  <Toggle pressed={pressed} pressedChangeAction={(next) => dispatch(next)}>Favorite</Toggle>`}</CodeBlock>
+<Toggle pressed={pressed} pressedChangeAction={(next) => dispatch(next)}>Favorite</Toggle>`}</CodeBlock>
       </ConceptExample>
       <p>
         The component stays pending and keeps showing the latest optimistic value until the queue
@@ -300,12 +303,12 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
         <CodeBlock>{`// app/post.tsx: a Server Component
-  import { Toggle } from "@funstack/ui/toggle";
-  import { setFavorite } from "./actions"; // "use server"
+import { Toggle } from "@funstack/ui/toggle";
+import { setFavorite } from "./actions"; // "use server"
 
-  <Toggle defaultPressed={post.favorited} pressedChangeAction={setFavorite.bind(null, post.id)}>
-    Favorite
-  </Toggle>`}</CodeBlock>
+<Toggle defaultPressed={post.favorited} pressedChangeAction={setFavorite.bind(null, post.id)}>
+  Favorite
+</Toggle>`}</CodeBlock>
       </ConceptExample>
       <Callout title="Costs of the virtual event">
         <p>

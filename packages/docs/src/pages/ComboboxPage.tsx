@@ -311,6 +311,20 @@ export function ComboboxPage() {
       </p>
 
       <h4>
+        <code>Combobox.Label</code>
+      </h4>
+      <PropsTable
+        rows={[...functionProps("ComboboxLabelState"), renderProp("label", "ComboboxLabelState")]}
+      />
+      <PartFacts
+        state={"`ComboboxLabelState` is `{ disabled }`."}
+        owned={"`id`, `htmlFor`."}
+        note={
+          "A `<label for>` of the Input; its id also names the List (`aria-labelledby`), only while a Label is mounted. Inside a `Field.Root`, `Field.Label` takes that role instead."
+        }
+      />
+
+      <h4>
         <code>Combobox.Input</code>
       </h4>
       <PropsTable
@@ -327,7 +341,7 @@ export function ComboboxPage() {
       <PartFacts
         state={"`ComboboxInputState` is `{ value, inputValue, open, pending, stale, disabled }`."}
         owned={
-          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`.'
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
         }
         note={
           "`placeholder`, `name` (a second field with the raw text), `aria-describedby` and other input props pass through. A `render` element must stay an `<input>` of type text or search."
@@ -358,7 +372,7 @@ export function ComboboxPage() {
           "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, inputValue, disabled }`."
         }
         owned={
-          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded`, `aria-controls`, `data-open`, `data-pending`."
+          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `onPointerCancel`, `aria-expanded`, `aria-controls`, `data-open`, `data-pending`."
         }
         note={
           "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox. Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."

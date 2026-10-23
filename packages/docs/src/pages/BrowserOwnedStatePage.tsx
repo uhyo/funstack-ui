@@ -122,7 +122,7 @@ export function BrowserOwnedStatePage() {
         Some components built on a native element that does the whole interaction offer both (their
         pages have a <strong>Two modes</strong> section). Without any controlled value, default
         value or change action it runs in <a href="#js-free-mode">JS-free mode</a>: the browser owns
-        the state and nothing runs when it changes. Add any of them and it switches to{" "}
+        the state and nothing runs when it changes. Add any of them and the component switches to{" "}
         <strong>library mode</strong>: the native interaction is intercepted, the state is React
         state changed in a transition, and triggers get optimistic data attributes and{" "}
         <code>data-pending</code>. The parts and the markup are the same in both. The mode is

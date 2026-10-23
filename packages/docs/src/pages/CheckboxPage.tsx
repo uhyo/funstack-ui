@@ -163,7 +163,7 @@ export function CheckboxPage() {
           "`CheckboxState` is `{ checked, indeterminate, pending, disabled }`; `checked` is optimistic and `indeterminate` is already `indeterminate && !pending`."
         }
         owned={
-          "`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `onChange`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `aria-checked` is removed. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+          "`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
         }
         note={"Other `<input>` props pass through, including `role`."}
       />

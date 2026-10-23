@@ -21,7 +21,7 @@ export function functionProps(state: string, childrenNote?: string): PropRow[] {
   ];
 }
 
-/** The `className` / `style` rows of a part that renders a void element (no `children`). */
+/** The `className` / `style` rows alone, for a part whose `children` row is special or absent. */
 export function stylingProps(state: string): PropRow[] {
   return functionProps(state).slice(0, 2);
 }

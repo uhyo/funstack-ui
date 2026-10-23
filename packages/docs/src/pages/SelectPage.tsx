@@ -257,7 +257,7 @@ export function SelectPage() {
           },
         ]}
       />
-      <PartFacts state={"`SelectRootState`."} owned={"`label`, `disabled`."} />
+      <PartFacts state={"`SelectRootState`."} owned={"`label`."} />
 
       <h4>
         <code>Select.GroupLabel</code>, <code>Select.Separator</code>

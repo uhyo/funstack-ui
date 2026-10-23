@@ -311,10 +311,10 @@ export function TooltipPage() {
           "`TooltipPopupState` is `{ disabled, side, align }`; while the tooltip is shown, `side` and `align` are where the browser placed it (a physical side, after any fallback flip); otherwise they are your props (`side` is `null` with `side={null}`)."
         }
         owned={
-          '`id`, `popover`, `role` (`"tooltip"`), `data-disabled`, `data-instant`, and `data-side` / `data-align` unless `side` is `null`.'
+          '`id`, `popover`, `role` (`"tooltip"`), `data-disabled`, and `data-side` / `data-align` unless `side` is `null`.'
         }
         note={
-          'Your `style` wins over the inline placement, so `style={{ positionArea: "bottom span-right" }}` works for a one-off; `data-side` then reports where that put it.'
+          'Your `style` wins over the inline placement, so `style={{ positionArea: "bottom span-right" }}` works for a one-off; `data-side` then reports where that put it. `data-instant` is not a prop: the Root writes it on the DOM for a warm open (see Skip-delay).'
         }
       />
 

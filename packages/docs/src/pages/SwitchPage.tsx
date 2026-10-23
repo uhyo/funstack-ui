@@ -113,7 +113,7 @@ export function SwitchPage() {
       <PartFacts
         state={"`SwitchState` is `{ checked, pending, disabled }`; `checked` is optimistic."}
         owned={
-          "`type`, `role`, `checked`, `defaultChecked`, `disabled`, `onChange`, `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+          "`type`, `role`, `checked`, `defaultChecked`, `disabled`, `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
         }
         note={
           "Every other `<input>` prop passes through (`name`, `required`, `form`, `id`, `autoFocus`, ...). A `render` element's own `onChange` or `onClick` runs first."

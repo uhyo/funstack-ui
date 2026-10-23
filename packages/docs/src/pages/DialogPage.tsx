@@ -195,7 +195,7 @@ export function DialogPage() {
       />
       <PartFacts
         state={
-          "`DialogRootState` is `{ open, pending, modal }`; `open` is optimistic, and both are `false` in JS-free mode."
+          "`DialogRootState` is `{ open, pending, modal }`; `open` is optimistic, and `open` and `pending` are `false` in JS-free mode."
         }
         owned={"nothing rendered: the Root has no element (no `ref`, `className` or `style`)."}
       />
@@ -293,7 +293,7 @@ export function DialogPage() {
           "`DialogPopupState` is `{ open, modal }`; `open` is committed (`false` in JS-free mode; `:open` is the DOM truth)."
         }
         owned={
-          "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `onToggle`, `onBeforeToggle`, `data-modal`; `aria-labelledby` and `aria-describedby` are merged with yours."
+          "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` are merged with yours. `onToggle` and `onBeforeToggle` are not accepted: use a `ref` for the platform events."
         }
         note={'Other props, such as `role="alertdialog"` or `onCancel`, pass through.'}
       />
