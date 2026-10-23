@@ -269,3 +269,5 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Writer implementing #98 on wave14-writer. Architect TODO at #96 fold: conventions 7.3 still calls #94 a known gap.
 - #96 merged (b81c4f9..692cd73), master CI green, closed. Guard = type-level test action-naming.test.ts. User asked about custom lint rules instead; explained (syntactic lint can't see resolved/inherited types; oxlint JS plugins alpha) → user: skip the lint rule.
 - Remaining for wave 14: writer's #98 on wave14-writer → review → merge → release 0.1.0-alpha.11 (Breaking: onInputValueChange).
+- #98 merged (4a8de65..3d76c0e), master CI green, closed. Follow-ups #99 (props-table State/Owned lines, shared rows, Action props example boxing). Reviews: memo/reviewer/wave14-writer-review.md (e5b580f).
+- 0.1.0-alpha.11 released (Breaking: onInputValueChange). WAVE 14 DONE. Technical writer agent now part of the team (docs IA owner; use for docs audits/edits, reviewer still checks facts).
