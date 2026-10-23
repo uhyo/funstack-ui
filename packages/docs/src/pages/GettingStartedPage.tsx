@@ -55,10 +55,11 @@ import type { ActionDetails, ChangeAction } from "@funstack/ui";`}</CodeBlock>
       <p>
         A <Term id="part">part</Term> is one piece of a component that you render yourself and that
         usually renders one element: <code>Tabs.Tab</code> is a part, and so is a whole{" "}
-        <code>Toggle</code>. The <Term id="root">Root</Term> is the outermost part of a compound
-        component; it usually holds the state and provides it to the other parts through context.
-        Other recurring words (trigger, content region, optimistic and committed value) are defined
-        on <a href="/concepts/pending-and-optimistic#terms">Pending & optimistic state</a>.
+        <code>Toggle</code>. The <Term id="root">Root</Term> is the part of a compound component
+        that holds its state and its transition and provides them to the other parts through
+        context; it is usually, not always, the outermost part. Other recurring words (trigger,
+        content region, optimistic and committed value) are defined on{" "}
+        <a href="/concepts/pending-and-optimistic#terms">Pending & optimistic state</a>.
       </p>
 
       <h3>A first component</h3>
@@ -145,7 +146,7 @@ export function FavoriteButton({ postId, initial }: { postId: string; initial: b
         </li>
       </ul>
 
-      <h3>What every component shares</h3>
+      <h3>What the components share</h3>
       <Table
         head={["Pattern", "Meaning"]}
         rows={[
@@ -156,7 +157,7 @@ export function FavoriteButton({ postId, initial }: { postId: string; initial: b
           ["`data-pending`", "An action dispatched through this component is in flight."],
           [
             "`transition`",
-            'Forwarded to the part\'s `<ViewTransition default>`. Default `"none"`.',
+            "On parts whose content is driven by library state: forwarded to the part's `<ViewTransition default>`. Without it the part renders no `<ViewTransition>`.",
           ],
           ["`render`", "Element polymorphism (no `asChild`, no `as`)."],
           ["`ref`", "An ordinary prop on every part that renders an element."],

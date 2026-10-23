@@ -280,9 +280,10 @@ import { setFavorite } from "./actions"; // "use server"
       </p>
       <ul>
         <li>
-          A Switch, Checkbox or RadioGroup inside <code>&lt;form action={"{serverFn}"}&gt;</code>{" "}
-          needs no change action: with a <code>name</code> it posts its value like any native input,
-          and <code>useFormStatus().pending</code> covers the submit.
+          A native form control (a Switch, for example) inside{" "}
+          <code>&lt;form action={"{serverFn}"}&gt;</code> needs no change action: with a{" "}
+          <code>name</code> it posts its value like any native input, and{" "}
+          <code>useFormStatus().pending</code> covers the submit.
         </li>
         <li>
           A control never folds <code>useFormStatus</code> into its own <code>pending</code>: that

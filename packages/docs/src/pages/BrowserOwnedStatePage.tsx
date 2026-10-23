@@ -24,7 +24,7 @@ export function BrowserOwnedStatePage() {
             id: "library-owned",
             term: "Library-owned state",
             definition:
-              "State held in React and changed only by the library, inside the [state owner](/concepts/pending-and-optimistic#state-owner)'s transition, after the user acts on a [trigger](/concepts/pending-and-optimistic#trigger).",
+              "State held in React and changed only by the library, usually inside the [state owner](/concepts/pending-and-optimistic#state-owner)'s transition after the user acts on a [trigger](/concepts/pending-and-optimistic#trigger). Some library-owned state is urgent instead (typed text, a toast queue): still the library's, but not a transition.",
           },
           {
             id: "browser-owned",
@@ -36,7 +36,7 @@ export function BrowserOwnedStatePage() {
             id: "dismissal",
             term: "Dismissal",
             definition:
-              "Closing something without one of its parts: Escape, the Android back gesture, an assistive-technology dismiss, or a click outside (also called light dismiss).",
+              "Closing something without one of its parts: Escape, the Android back gesture, an assistive-technology dismiss, a click outside, or another top-layer element opening (the Popover API calls the last two light dismiss).",
           },
           {
             id: "invoker-command",
@@ -102,14 +102,15 @@ export function BrowserOwnedStatePage() {
 
       <h3 id="two-modes">Two modes, one anatomy</h3>
       <p>
-        Where a native element can do the whole interaction, a component offers both. Without any
-        controlled value, default value or change action it runs in{" "}
-        <a href="#js-free-mode">JS-free mode</a>: the browser owns the state and nothing runs when
-        it changes. Add any of them and it switches to <strong>library mode</strong>: the native
-        interaction is intercepted, the state is React state changed in a transition, and triggers
-        get optimistic data attributes and <code>data-pending</code>. The parts and the markup are
-        the same in both. The mode is decided on the first render; switching between them later is
-        not supported (development warning).
+        A component built on a native element that can do the whole interaction may offer both
+        (today Accordion, Dialog and Popover do). Without any controlled value, default value or
+        change action it runs in <a href="#js-free-mode">JS-free mode</a>: the browser owns the
+        state and nothing runs when it changes. Add any of them and it switches to{" "}
+        <strong>library mode</strong>: the native interaction is intercepted, the state is React
+        state changed in a transition, and triggers get optimistic data attributes and{" "}
+        <code>data-pending</code>. The parts and the markup are the same in both. The mode is
+        decided on the first render; switching between them later is not supported (development
+        warning).
       </p>
       <p>
         The browser can still change the state in library mode (find-in-page, a text fragment, a

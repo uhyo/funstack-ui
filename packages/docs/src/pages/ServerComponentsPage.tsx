@@ -117,8 +117,9 @@ import { saveOpenSections } from "./actions"; // "use server"
         <li>
           <strong>Behaviour the browser performs</strong> works before hydration and without
           JavaScript: a <code>&lt;details&gt;</code> that opens, a native input that toggles and
-          posts with its form, a dialog opened by an invoker command, a popover shown on interest.
-          Components are built on these elements wherever the platform offers them (see{" "}
+          posts with its form, a dialog opened by an invoker command, a tooltip shown on interest
+          (where the engine implements `interestfor`). Components are built on these elements
+          wherever the platform offers them (see{" "}
           <a href="/concepts/browser-owned-state">Browser-owned state</a>).
         </li>
         <li>
@@ -130,8 +131,8 @@ import { saveOpenSections } from "./actions"; // "use server"
         <li>
           <strong>Changes the browser made before hydration are not lost.</strong> When a native
           element's state differs from the server's at hydration (an item opened, a box checked,
-          text typed), the component reconciles on mount with one call of its change action, with{" "}
-          <code>details.reason === "platform"</code> (see{" "}
+          text typed), the component reconciles on mount with one dispatch (for a continuous
+          control, one step and one commit), with <code>details.reason === "platform"</code> (see{" "}
           <a href="/concepts/action-props">Action props</a>).
         </li>
         <li>

@@ -8,7 +8,7 @@ export function TransitionsPage() {
     <div className="learn-content">
       <PageHead
         title="Transitions & ViewTransition"
-        description="Every state change in FUNSTACK UI is a transition. Parts wrap themselves in <ViewTransition>, take a transition prop, and tag changes with fsui-* transition types."
+        description="Every state change in FUNSTACK UI is a transition. Parts whose content is driven by library state take a transition prop that renders a <ViewTransition>, and changes are tagged with fsui-* transition types."
       />
       <h2>Transitions & ViewTransition</h2>
       <p className="page-intro">

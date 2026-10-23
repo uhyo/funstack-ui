@@ -195,8 +195,8 @@ export function CheckboxPage() {
       <p>
         In the example the parent box derives from the rows' <em>optimistic</em> selection (
         <code>useOptimistic</code>), so it never claims "all" while a row's uncheck is still saving.
-        A <code>CheckboxGroup</code> that packages this pattern is being designed in{" "}
-        <a href="https://github.com/uhyo/funstack-ui/issues/33">issue #33</a>.
+        For a group with a select-all parent, use{" "}
+        <a href="/components/checkbox-group">CheckboxGroup</a>, which packages this pattern.
       </p>
       <p>
         Before hydration the DOM property cannot be set, and <code>aria-checked="mixed"</code> is

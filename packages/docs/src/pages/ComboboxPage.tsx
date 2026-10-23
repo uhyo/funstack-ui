@@ -682,7 +682,7 @@ export function ComboboxPage() {
           "Results render from a deferred copy of the text (`useDeferredValue`), so an async search is `use(search(query))` inside a boundary in the List. The first load shows your fallback; after that every keystroke keeps the previous results on screen, marked `data-stale` and `aria-busy`, until the new ones are ready. Only the latest query is ever rendered. Option content must not suspend."
         }
         browserOwned={
-          'The listbox is a popover: a dismissal (Escape, a click outside, focus leaving) is the browser\'s, and `openChangeAction(false)` is a notification with `reason: "dismiss"`.'
+          'The listbox is a popover: a dismissal (Escape, a click outside, another popover opening) is the browser\'s. Focus leaving the input is closed by the library but reported the same way. Either way `openChangeAction(false)` is a notification with `reason: "dismiss"`.'
         }
         beforeHydration={
           'A plain text field: typing works and the form posts the default selection (and the raw text, if the Input has a `name`). The listbox never opens before hydration. Text typed then is kept and reported once, with `reason: "platform"`.'

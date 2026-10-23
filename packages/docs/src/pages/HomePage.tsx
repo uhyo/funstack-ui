@@ -1,6 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
+import { componentNavItems } from "../navigation.js";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
 import toggleFavoriteSource from "../examples/ToggleFavorite.tsx?raw";
 import toggleCss from "../examples/toggle.css?raw";
@@ -20,7 +21,7 @@ const principles = [
   },
   {
     title: "<ViewTransition> built in",
-    body: "Every part whose content is driven by library state wraps itself in <ViewTransition>. Pass a transition prop and the change animates.",
+    body: "Every part whose content is driven by library state takes a transition prop. Pass it and the part renders a <ViewTransition>, so the change animates.",
   },
   {
     title: "Greedy about the platform",
@@ -124,17 +125,14 @@ export function HomePage() {
 
       <h2>Components</h2>
       <p>
-        The first four primitives settled the API conventions:{" "}
-        <a href="/components/toggle">Toggle</a>, <a href="/components/tabs">Tabs</a>,{" "}
-        <a href="/components/accordion">Accordion</a> and <a href="/components/tooltip">Tooltip</a>.
-        The second wave brings overlays and native form controls:{" "}
-        <a href="/components/dialog">Dialog</a>, <a href="/components/switch">Switch</a>,{" "}
-        <a href="/components/checkbox">Checkbox</a>,{" "}
-        <a href="/components/radio-group">RadioGroup</a>,{" "}
-        <a href="/components/checkbox-group">CheckboxGroup</a>,{" "}
-        <a href="/components/select">Select</a>, <a href="/components/combobox">Combobox</a>,{" "}
-        <a href="/components/toast">Toast</a>, and <a href="/components/field">Field and Form</a> to
-        tie them together. A larger set follows; see the <a href="/roadmap">roadmap</a>.
+        {componentNavItems.length} components so far:{" "}
+        {componentNavItems.map((item, i) => (
+          <span key={item.path}>
+            {i > 0 && (i === componentNavItems.length - 1 ? " and " : ", ")}
+            <a href={item.path}>{item.label}</a>
+          </span>
+        ))}
+        . A larger set follows; see the <a href="/roadmap">roadmap</a>.
       </p>
       <CodeBlock language="bash">{`npm install @funstack/ui@alpha`}</CodeBlock>
     </div>

@@ -198,8 +198,9 @@ export function TabsPage() {
                 <code>false</code>: hidden panels are not rendered. <code>true</code>: rendered
                 inside <code>&lt;Activity mode="hidden"&gt;</code> (DOM and state kept, effects
                 stopped, not in server HTML). <code>"until-found"</code>: rendered with{" "}
-                <code>hidden="until-found"</code> (in server HTML, effects live); find-in-page or a
-                text fragment selects the tab.
+                <code>hidden="until-found"</code> (in the server HTML as plain <code>hidden</code>,
+                upgraded after hydration; effects live); find-in-page or a text fragment selects the
+                tab.
               </>
             ),
           },
@@ -357,7 +358,7 @@ export function TabsPage() {
       <BehaviourSummary
         name="Tabs"
         transitionTypes={
-          "`fsui-tabs` plus `fsui-tabs-next` or `fsui-tabs-prev`: the DOM order of the new tab relative to the committed one. Only `fsui-tabs` when there is no committed tab."
+          "`fsui-tabs` plus `fsui-tabs-next` or `fsui-tabs-prev`: the DOM order of the new tab relative to the committed one. Only `fsui-tabs` when the order cannot be determined (no committed tab, or a value with no rendered Tab)."
         }
         optimistic={
           "Tab and Indicator show the optimistic selection (`aria-selected`, `data-selected`); Panels show the committed one. `data-pending` is on the Root, on the Tab that is the optimistic selection, and mirrored on the Indicator; never on a Panel."
@@ -369,7 +370,7 @@ export function TabsPage() {
           'Selection is library-owned. With `keepMounted="until-found"`, find-in-page or a text fragment can reveal a hidden panel; that is dispatched with `reason: "platform"`, and if a controlled parent refuses, the panel is hidden again once the action settles.'
         }
         beforeHydration={
-          'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML and searchable. Switching tabs needs JavaScript.'
+          'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML (as plain `hidden`; find-in-page reaches them after hydration). Switching tabs needs JavaScript.'
         }
       />
     </div>
