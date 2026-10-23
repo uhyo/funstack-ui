@@ -46,7 +46,10 @@ in 1.2, the counter-only guard in 2.5, 3.4 and 10.1; wave 9 amendments #81 and #
 library-wide `disabled` sweep in 1.2; amended 2026-10-22 with the Context menu design, #45,
 `design/components/context-menu.md`, **accepted 2026-10-22**, see resolved question 35: the
 `ContextTrigger` row in 1.1, the outside right-click example in 2.2, the move note in 3.5, the
-`context` row in 4.1, and section 12, shipped functional CSS, a user decision).
+`context` row in 4.1, and section 12, shipped functional CSS, a user decision; amended 2026-10-23 with
+the urgent-handler rename, #96, **user decision**, see resolved question 39: `fooAction` always means
+a transition, the urgent lane is `on<State>Change: UrgentChangeHandler` in 2.1, 2.6, 3.2, 9.4 and
+10.1, the type guard in 10.1; `docs/vision.md` principle 3 names the exception).
 Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
@@ -61,7 +64,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
-| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. A pure trigger ignores activation while its own action is pending and renders `aria-disabled="true"` meanwhile (#79). No `on*` handlers in the library API. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), never a handler. |
+| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. A pure trigger ignores activation while its own action is pending and renders `aria-disabled="true"` meanwhile (#79). **`fooAction` always means a handler the component runs in a transition**; no `on*` handlers in the library API except the urgent lane's `on<State>Change` (row 11, #96). A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), never a handler. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
@@ -70,7 +73,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
-| 11 | Urgent lane and strings | An urgent state (a controlled text input, virtual focus) keeps the `x` / `defaultX` / `xChangeAction` triple; its action is an `UrgentChangeAction` (sync, outside any transition, not awaited). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
+| 11 | Urgent lane and strings | An urgent state React requires (a controlled text input) keeps `x` / `defaultX` and takes a **handler**, `on<State>Change: UrgentChangeHandler` (sync, outside any transition, not awaited; Combobox's `onInputValueChange`): the one `on*` prop form in the library, named as a handler precisely because it is not an action (#96, **user decision 2026-10-23**; before that `inputValueChangeAction: UrgentChangeAction`). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 | 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13, wave 11: #20, #53, #88). |
 | 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay, #21; **user decision 2026-10-23**: shipped CSS widens from "positioning only" to "placement and interaction timing, never visuals"). A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>` (wave 11, #88). |
 
@@ -321,14 +324,25 @@ section 2.6 for what this means for the "no handlers" rule.
 | Pure trigger (nothing to change) | `action` | `(details)` | `<Button action>`, `<Menu.Item action>` |
 | Commit of a continuous state | `<state>CommitAction` | `(next, details)` | `valueCommitAction` (Slider): once per gesture (pointer release, key press, platform change), awaited in the owner's transition like a change action; the step action `<state>ChangeAction` runs per step. For a continuous control the commit action is the state owner's dispatch (section 3.3). |
 | Other notification | `<event>Action` | `(details)` | reserved; add only when a component needs one |
+| Urgent handler (React forbids a transition) | `on<State>Change` | `(next, details) => void` | `onInputValueChange` (Combobox): a controlled text input's text. **Not an action**: called synchronously in the DOM event, outside any transition, not awaited (section 2.6). The only `on*` form the library defines. |
 
 The state name in `<state>ChangeAction` is exactly the controlled prop's name, so the three props
 of a controllable state always read as a set: `pressed` / `defaultPressed` /
 `pressedChangeAction`. This mirrors the `on<State>Change` convention consumers already know from
 Radix and Base UI, with the React docs' `Action` suffix.
 
-Every component has **no `on*` props of its own**. The library never names a prop `onClick`,
-`onChange`, `onOpenChange`, or any `on*`.
+**The suffix is the contract** (#96): a prop named `action` or `<anything>Action` is **always**
+a handler the component runs in a transition, sync or async, awaited, with pending state. A
+reader who sees `Action` may rely on that without opening the type. The converse holds too:
+the rare handler React requires to be synchronous (a controlled text input's text) is **not**
+an action and is therefore not named like one; it takes the ordinary handler name
+`on<State>Change`, so the name itself says "this runs in the event". `x` / `defaultX` are
+unchanged for such a state, so the triple reads `inputValue` / `defaultInputValue` /
+`onInputValueChange`.
+
+Every component has **no `on*` props of its own** beyond that urgent handler. The library never
+names a prop `onClick`, `onChange`, `onOpenChange`, or any other `on*`; a new `on<State>Change`
+needs a React-imposed urgency the component's design doc cites, and a conventions amendment.
 
 ### 2.2 Signature and shared types
 
@@ -626,7 +640,9 @@ React neither cancels nor orders overlapping actions. The library's stance:
 
 ### 2.6 The "no handlers" rule and urgent updates
 
-The library offers **only action props**. There is no `onClick`, no `onPress`, no `onChange`.
+The library offers **action props**, which are always transitions. There is no `onClick`, no
+`onPress`, no `onChange`; the one handler-shaped prop is the urgent lane's `on<State>Change`
+below, and it is the one *because* it is not a transition.
 
 What is still reachable, and why it is not a contradiction:
 
@@ -636,21 +652,33 @@ What is still reachable, and why it is not a contradiction:
   synthesize (`command`, `beforematch`).
 
 **Urgent (non-transition) updates: the urgent lane** (designed with Combobox, #50, resolved
-question 27; the vision's documented opt-out). A state that React requires to be urgent, which
-today means the text of a controlled text input ("Transition updates can't be used to control
-text inputs"), keeps the ordinary triple, `inputValue` / `defaultInputValue` /
-`inputValueChangeAction`, so the three props read as a set and the no-`on*` rule keeps having no
-exceptions. What makes it urgent is the action's **type**:
+question 27; renamed by the user, #96, resolved question 39; the vision's documented opt-out).
+A state that React requires to be urgent, which today means the text of a controlled text input
+("Transition updates can't be used to control text inputs"), keeps `x` / `defaultX` and takes
+a **handler** instead of an action: `inputValue` / `defaultInputValue` / `onInputValueChange`.
+The handler is named with the ordinary React `on<State>Change` form, and the type says the same
+thing:
 
 ```ts
-/** Called synchronously, outside any Transition, and not awaited: the urgent lane. */
-export type UrgentChangeAction<T, Details extends ActionDetails = ActionDetails> = (next: T, details: Details) => void;
+/** Called synchronously, outside any Transition, and not awaited: the urgent lane. Not an action. */
+export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> = (next: T, details: Details) => void;
 ```
 
-Rules: the library sets its own `useState` for the value and calls the action synchronously
+Why a handler name and not `inputValueChangeAction: UrgentChangeAction` (the v1 shape, #50):
+`Action` is the library's promise that the component wraps the prop in a transition, awaits it
+and exposes pending state. A prop that does none of that and carries the suffix anyway makes
+the suffix mean "some callback", and the one thing the vision's principle 3 cannot afford is a
+reader having to open the type to learn whether an action is a transition. The urgent lane is
+exactly the thing an action is not, so it gets exactly the name an action does not: the `on*`
+form the rest of the library reserves. The cost, one `on*` prop in the whole API that a
+consumer might copy, is bounded by the rule that a new `on<State>Change` needs a React-imposed
+urgency the design doc cites (2.1) and by the type guard (10.1, "Action naming").
+
+Rules: the library sets its own `useState` for the value and calls the handler synchronously
 from the DOM event (and from its own documented writes), never inside `startTransition`, so a
 controlled parent's `setState` in the body is an urgent update; nothing is awaited, pending or
-optimistic for it (the DOM already holds the value; a returned thenable is a dev warning);
+optimistic for it (the DOM already holds the value; a returned thenable is a dev warning,
+because the author probably wanted an action);
 a controlled urgent prop follows the DOM and does not gate it; everything the urgent value
 drives (a deferred query through `useDeferredValue`, an open, a selection) leaves the urgent
 lane at once and is a transition or a deferred render. A library write to an urgent state that
@@ -659,7 +687,7 @@ writing: an action that throws *synchronously* makes the wrapper's `catch` run i
 `startTransition` callback, so the wrapper yields once (`await undefined`) before the write and
 the rethrow (Combobox review, M2). The library uses the lane only where React requires it;
 "transition by default" is unchanged for every other state. Component docs name each urgent
-state. Consumers who need an urgent update from an interaction that has no urgent action still
+state. Consumers who need an urgent update from an interaction that has no urgent handler still
 use pass-through or `ref`, unsupported as before.
 
 **A state that is urgent by design: the Toast queue** (third urgent state, Toast #54). A toast
@@ -669,8 +697,8 @@ update. Its input is not a prop at all: the imperative `toast()` builds a comman
 it from a `queueMicrotask` callback, so a call made inside a `startTransition` scope (an action's
 sync prefix) escapes the scope while order is preserved; the Viewport applies the command with
 `useState`. Everything the toast *drives* (its Action part's action, its `closeAction`) is a
-transition as usual. Such a state has no `UrgentChangeAction` prop and no `x` / `defaultX`
-triple, and its commits never run a view transition (5.1).
+transition as usual. Such a state has no `UrgentChangeHandler` prop and no `x` / `defaultX`
+pair, and its commits never run a view transition (5.1).
 
 The same rule holds for **consumer state that reports on a pending action** (a progress value,
 Progress #68): it is written with a plain `setState`, which after an `await` inside the action is
@@ -689,7 +717,7 @@ focus move, and later still while any async action is pending). No consumer-faci
 action, no `x` / `defaultX` triple, no `transition` prop (`design/components/field-form.md` 2.4).
 
 **The draft text of a NumberField** (fifth urgent state, #67) is internal: written from the
-`input` event with `useState`, with no `UrgentChangeAction` and no `x` / `defaultX` triple,
+`input` event with `useState`, with no `UrgentChangeHandler` and no `x` / `defaultX` pair,
 because the text is not a value until it is parsed at commit (blur, Enter, or before a step).
 The value under a held `Increment` / `Decrement` button follows Slider's `live` rule (3.2).
 
@@ -786,7 +814,7 @@ The state owner (`Root` or the single component) holds:
 | `committed` | `x ?? internal` | transition | content regions (`Panel`, `Popup`), everything that may suspend |
 | `optimistic` | `useOptimistic(committed, reducer)` | sync | trigger parts (`Tab`, `Trigger`, `Toggle`): `aria-pressed`, `aria-selected`, `data-selected`, state passed to their function props |
 | `pending` | `useTransition()` | sync | `data-pending` on the owner and on the trigger that initiated the change |
-| urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
+| urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event; reported through an `on<State>Change` handler, not an action (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
 | urgent, internal (the value a slider gesture has reached, `live`; NumberField's draft text and the value under its held button, #67) | `useState`, written from the pointer or `input` event; no consumer-facing urgent action | sync, urgent | the thumbs, while a pointer is captured or a step or commit is in flight (`held`); otherwise they render `optimistic` (Slider 2.2) |
 
 **Virtual focus is urgent library state.** Where a pattern keeps DOM focus on one element and
@@ -1720,7 +1748,7 @@ notes"):
 | Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). |
 | Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. Mechanism verified by the reviewer: tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
-| Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6). |
+| Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6: `on*` is reserved for the urgent lane, and these are interactions, not an urgent state). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
 | Element whose children the **parser writes before hydration** (`<selectedcontent>`: Chromium and Safari clone the selected option's children into it at parse time, so a plain element fails hydration and client-renders the whole root) | Render it with `suppressHydrationWarning` and `dangerouslySetInnerHTML={{ __html: "" }}`, so React treats the children as opaque and the attribute mismatch is silenced (verified in `docs/research/select-combobox.md` §4: hydrates with no recoverable error, later browser writes keep working); the part has no `children` prop. One such element per component at most, named in its design doc (`Select.Value`). |
 | Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
@@ -1893,8 +1921,11 @@ re-exports them.
 - `<Component><Part>Props`, `<Component><Part>State`; single-part components drop the part:
   `ToggleProps`, `ToggleState`.
 - `<Component><State>ChangeDetails` extends `ActionDetails`; when it exposes `reason`, the
-  member is `readonly reason: ChangeReason` (never a local union).
-- Shared: `Action`, `ActionDetails`, `ChangeAction`, `UrgentChangeAction` (section 2.6),
+  member is `readonly reason: ChangeReason` (never a local union). The urgent handler's details
+  type keeps the same name (`ComboboxInputValueChangeDetails`): it describes the change, not
+  the lane.
+- Shared: `Action`, `ActionDetails`, `ChangeAction`, `UrgentChangeHandler` (section 2.6; was
+  `UrgentChangeAction` before #96),
   `ChangeReason`, `RenderProp<Props, State>`, `StateValue<T, State> = T | ((state: State) => T)`,
   `ViewTransitionClass` (the `transition` prop's type, section 5.2).
 - Props interfaces are `interface`s extending the element props (section 1.5); state objects are
@@ -1934,13 +1965,14 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` works end to end (guards the documented pattern). |
 | Directive | Each built part file starts with `"use client"` or not, exactly as the component's design doc records (script over `dist`, run in `test:run` after `build`). A design may record a **directive-free Root** (Progress, Meter, #68). |
 | Platform path (both) | Required for every component with a residual browser path (section 3.5): mount reconciliation (`renderToString`, change the DOM before `hydrateRoot`, exactly one dispatch with `reason: "platform"` and `event === undefined`, StrictMode still one) and, for native form controls, form reset through `<button type="reset">`, `form.reset()` and React's automatic reset after a successful `<form action>` (one dispatch per state owner with the `reset` event; a cancelled `reset` dispatches nothing; a controlled parent that refuses gets the DOM re-synced after settle); for a control with a hidden native input (NumberField, #67), every path leaves the hidden value equal to the shown value. |
-| Lanes | Required for a state that is urgent by design (section 2.6, Toast): with an unrelated `useTransition` action pending (a deferred), the command called inside that action's sync prefix, inside a consumer `startTransition`, and plainly, all commit before the action settles; several commands in one tick keep their order. The component also lists the rows it declares N/A for lacking an `x` / `defaultX` triple (controlled parity, post-await, optimistic, platform path, urgent action) in its top-of-file comment. |
+| Lanes | Required for a state that is urgent by design (section 2.6, Toast): with an unrelated `useTransition` action pending (a deferred), the command called inside that action's sync prefix, inside a consumer `startTransition`, and plainly, all commit before the action settles; several commands in one tick keep their order. The component also lists the rows it declares N/A for lacking an `x` / `defaultX` triple (controlled parity, post-await, optimistic, platform path, urgent handler) in its top-of-file comment. |
 | Continuous control (both) | Required for a component with a step / commit pair (section 2.1, Slider; NumberField's press-and-hold, #67): between two steps the shown value never reverts to the committed value (with a synchronous step action that has settled); a rejected commit reverts the whole gesture to its start value; a gesture that returns to its start value dispatches steps and no commit; a trailing platform `change` with an unchanged value dispatches nothing. |
 | Form channel | Required for every part that exposes `useFormStatus` as its `pending` (`Field.Root`, `Form.Root`, `Form.Submit`): `data-pending` appears while a deferred form action is unresolved and disappears after it settles (also through a portal); a control inside keeps its own `data-pending` for its own action. |
 | Inside a Field | Required for every form control (Switch, Checkbox, RadioGroup, CheckboxGroup, Select, Combobox, Slider, NumberField): rendered inside a `Field.Root`, the part's element (or group element) receives the Field's `id` (or `aria-labelledby`), `name`, `aria-describedby`, `aria-invalid`, and `disabled` / `required` from the Field; its own `data-pending` is unaffected by the form's. |
 | Validity display | Required for Field: a submission attempt with an invalid control shows the message, cancels the native bubble (the `invalid` event is `defaultPrevented`) and focuses the first invalid control in document order; a `form.reset()` clears it. The `:user-invalid` half (changed-then-blurred, live updates, `checkValidity()` showing nothing) runs in browser mode. |
-| Urgent action (both) | Required for every component with an urgent state (section 2.6): the action is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
+| Urgent handler (both) | Required for every component with an urgent state (section 2.6): the handler is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 | Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
+| Action naming (type, library-wide) | One file, `src/__tests__/action-naming.test.ts` (#96): for **every public `*Props` type** exported from `src/index.ts`, every key ending in `Action` has a function type whose return type is `unknown` (an `Action` / `ChangeAction`, i.e. a transition; `UrgentChangeHandler` returns `void` and fails), and every library-defined `on*` key is on an allow-list that names its type (`ComboboxRootProps.onInputValueChange: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`). Pass-through `on*` props from `ComponentPropsWithRef` cannot be told apart by type and are not checked; the design doc is the guard for those. A new public Props type is added to the list in the same commit that exports it. |
 | Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
 | Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter); a logical `side` costs exactly one render per show and one per hide (render counter, review M1); the scroll path deterministically (review M2): with `requestAnimationFrame` replaced by a manual queue and `document.addEventListener` spied, a show installs the `scroll` / `resize` listeners, a dispatched `scroll` with the stub changed reads the old value at once and in frame 1 and the new one in frame 2, a scroll between the frames re-runs the pair, a scroll **before** the first frame of a pending pair costs at most one extra pair at the end (it sets the same restart flag), and a hide or an unmount removes both listeners, cancels the pending frame and reads nothing after. Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open, back on close; after a scroll that moves the trigger to an edge, `data-side` equals the side the popup box actually sits on (the geometry invariant: Chromium keeps the option chosen at show, #92; Firefox and WebKit re-choose, section 13.2), never "flips to X", with the engine outcome pinned behind a runtime probe so the Chromium row fails the day the bug is fixed (review L5); `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
 
@@ -2364,7 +2396,8 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 2. **Urgent opt-out placeholder**: v0 provides no mechanism. Native `on*` props the library does not
    use pass through to the element as an unsupported escape hatch; library-used handlers are removed
    from part prop types. **Superseded 2026-10-17** by the urgent lane of section 2.6 (resolved
-   question 27); the pass-through escape hatch remains for interactions with no urgent action.
+   question 27; renamed to `on<State>Change: UrgentChangeHandler` 2026-10-23, resolved question
+   39); the pass-through escape hatch remains for interactions with no urgent handler.
 3. **Swallowed errors count as success** in uncontrolled mode. No veto mechanism until a real case
    appears.
 4. **Root entry plus per-component subpaths.**
@@ -2472,7 +2505,8 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 27. **Combobox (#50)** accepted 2026-10-17 (`design/components/combobox.md`), questions 1 to 5
     and 7 to 11 as recommended and question 6 **overridden by the user**: one `Combobox` with
     `allowCustomValue` (no separate Autocomplete); the urgent lane as `inputValueChangeAction:
-    UrgentChangeAction` (section 2.6); two explicit states (`value`, `inputValue`) with no
+    UrgentChangeAction` (section 2.6; **renamed** `onInputValueChange: UrgentChangeHandler` by
+    the user 2026-10-23, #96, resolved question 39); two explicit states (`value`, `inputValue`) with no
     `itemToString`; accepting an option keeps the listbox open with `data-pending` on the
     option and closes on settle (Menu's rule); Tab does not accept; `multiple` deferred; no
     `commandfor` on the Trigger and no JS-free mode; Escape left to the platform; the WebKit
@@ -2632,6 +2666,23 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     "tracked in #19" notes in the component documents (Accordion feedback 1, Tooltip 14.1,
     RadioGroup, CheckboxGroup, Switch, Select, Slider, NumberField). The server `useId`
     collision found by the research is #94 (upstream uhyo/funstack-static#198).
+
+39. **Urgent handler naming (#96, from the docs feedback #95)** decided by the user 2026-10-23:
+    `fooAction` **always** means a handler the component wraps in a transition; the urgent lane
+    is a plain synchronous handler and is named like one. Combobox's `inputValueChangeAction`
+    becomes **`onInputValueChange`** and the type `UrgentChangeAction` becomes
+    **`UrgentChangeHandler`** (same signature, `(next, details) => void`; the details type
+    `ComboboxInputValueChangeDetails` is unchanged). This reverses Combobox question 2 (resolved
+    question 27), which had kept the `Action` suffix so that the no-`on*` rule had no exception;
+    the user judged the suffix's meaning more valuable than the rule's purity. Breaking, with
+    **no deprecated alias** (alpha). Applied: `docs/vision.md` principles 2 and 3; sections 2.1
+    (the new table row and "the suffix is the contract"), 2.6, 3.2, 7.4, 9.4, 10.1 (the renamed
+    row and the new "Action naming" type guard); decisions 2 and 11; resolved question 2;
+    `design/components/combobox.md` (edited in place, plus the amendment with the migration and
+    the implementation checklist); the type-name mentions in `slider.md`, `number-field.md`,
+    `toast.md`. Guard: a type-level test, not a lint rule (oxlint as configured has no custom
+    naming rule and the repo has no ESLint; a lint rule could not see the type anyway, and the
+    rule is about types: "a prop ending in `Action` returns `unknown`").
 
 ## Open questions
 

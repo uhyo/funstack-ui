@@ -24,8 +24,8 @@ for backwards compatibility; if React were designed today, transitions would be 
 urgent updates would be the opt-out. FUNSTACK UI builds this principle in: state updates triggered
 through the library are transitions unless there is a specific reason for urgency.
 
-(The urgent opt-out mechanism is intentionally undesigned until a component genuinely needs it,
-e.g. text input in a Combobox.)
+(The urgent opt-out exists only where React itself requires it, today the text of a controlled
+text input in a Combobox; see the one exception in principle 3.)
 
 ### 3. Action props instead of event handlers
 
@@ -33,6 +33,15 @@ Following the "action props" pattern from the React docs, interactive props are 
 `fooAction` (e.g. `clickAction`, `changeAction`). They behave like event handlers, but the component
 wraps them in a transition. Actions may be async (return a promise). The library's preferred API
 offers action props, **not** traditional `onClick`-style handlers.
+
+The suffix is a contract: a prop named `action` or `fooAction` is **always** a handler the
+component runs inside a transition, never anything else. The **one exception** is forced by React,
+not chosen: the text of a controlled text input must update synchronously, in the same event as
+the keystroke ("Transition updates can't be used to control text inputs"). Such a prop is a plain
+synchronous handler, so it is named like one, `on<State>Change` (`Combobox.Root`'s
+`onInputValueChange`), typed `UrgentChangeHandler`, and it is the only `on*` prop form the
+library defines. Nothing else is an `on*` prop: every other state change, including everything
+the urgent text drives (opening, selecting, the query), is an action.
 
 Consequences:
 

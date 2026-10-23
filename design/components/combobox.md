@@ -6,6 +6,10 @@ announcement ships, see "Decisions recorded" at the end). **Revised after review
 `memo/reviewer/combobox.md` and `memo/developer/combobox.md`; the product owner's decisions are
 in "Review revisions" at the end: the loading state and `aria-busy`, the active option cleared by
 typing, the rollback outside the transition, and the accepted implementation deviations).
+**Amended 2026-10-23 (#96, user decision)**: the urgent lane is a handler, `onInputValueChange:
+UrgentChangeHandler`, no longer `inputValueChangeAction: UrgentChangeAction`; edited in place
+(decision 3, 2.2, 3, 3.1, 3.6, 4, 6.2, 9, 10, 11.2, 12.1, 14), migration and implementation
+checklist in the amendment at the end; the historical sections keep the old names.
 Follows `design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` and `design/components/menu.md` first**: Combobox is built on
@@ -46,7 +50,7 @@ and a hidden input that follows the optimistic value.
 | --- | --- | --- |
 | 1 | One component | **One `Combobox` with `allowCustomValue`**, not a separate Autocomplete (recommendation; question 1). Markup, keyboard, popover, async results and virtual focus are identical; the two differ only in what an unmatched text means on commit (reverted, or dispatched as the value). React Aria and Ark take this shape; Base UI splits. |
 | 2 | Anatomy | `Combobox.Root` (no DOM, except one `<input type="hidden">` when `name` is given), `Combobox.Label` (`label[for]`), `Combobox.Input` (`input[role=combobox]`), `Combobox.Trigger` (`button`, optional), `Combobox.Clear` (`button`, optional), `Combobox.Popup` (`div[popover=auto]`), `Combobox.List` (`div[role=listbox]`), `Combobox.Option` (`div[role=option]`), `Combobox.Group` / `Combobox.GroupLabel`, `Combobox.Empty`, `Combobox.Status` (`div`: `role="status"` in the Popup; inside the List it is the loading fallback and has no role, 6.3). No Portal, Positioner, Arrow, Chips. |
-| 3 | Two library-owned states, two lanes | `value` (`string \| null`): `value` / `defaultValue` / `valueChangeAction`, a transition with `useOptimistic`, as every other value. `inputValue` (`string`): `inputValue` / `defaultInputValue` / `inputValueChangeAction`, the **urgent** state the vision reserved for this component (section 4). Same naming triple, different lane; the type of the urgent action (`UrgentChangeAction`) says it is synchronous and not awaited. No `on*` prop (question 2). |
+| 3 | Two library-owned states, two lanes | `value` (`string \| null`): `value` / `defaultValue` / `valueChangeAction`, a transition with `useOptimistic`, as every other value. `inputValue` (`string`): `inputValue` / `defaultInputValue` / `onInputValueChange`, the **urgent** state the vision reserved for this component (section 4). Same `x` / `defaultX` pair, different lane, and a **handler** instead of an action: `onInputValueChange` is the library's one `on*` prop, named as a handler because it is called synchronously in the event and never wrapped in a transition (conventions 2.1, 2.6; #96, replacing v1's `inputValueChangeAction: UrgentChangeAction`). `fooAction` keeps meaning "a transition" everywhere. |
 | 4 | Results | The library filters nothing. `query` is `useDeferredValue(inputValue)`; `Combobox.List`'s function `children` (and Root's) receive `{ query }` and render the `Option`s for it, under a consumer-owned `<Suspense>` for async search. While `inputValue !== query` the Popup and List carry `data-stale`; the List is `aria-busy="true"` while stale **or loading** (a `Status` mounted inside it, 6.3); the previous results stay visible. No out-of-order results: React renders only the latest deferred value (section 6). |
 | 5 | Active option | `aria-activedescendant` on the input, never DOM focus on options (research). The active option is **urgent library state** (it is focus; focus is never a transition anywhere in the library), exposed as `data-active` on the Option, revalidated whenever the mounted options change; ids are derived from the value so an option keeps its id across result sets. Typing, Home, End, Left and Right clear it (APG: visual focus returns to the textbox), so Enter never accepts an option the user has typed past; `autoHighlight` (default `false`) activates the first option only once results settle (not stale, not loading; 6.5). |
 | 6 | Open | Always library mode (`usePopoverRoot({ mode: "library" })`, Menu's configuration): no JS-free mode. Open by typing, ArrowDown / ArrowUp, Alt+ArrowDown, the Trigger, optionally a click on the input (`openOnClick`); opened with `showPopover({ source: input })` in the apply effect. Closes: an accepted option (library-owned, after the value action settles), Escape, light dismiss and a Clear click while open (browser-owned, notified `"dismiss"`), focus leaving the input and popup (immediate `hidePopover()`, Menu's Tab rule, `"dismiss"`). Keys are judged against `:popover-open`, what the user sees (section 8). |
@@ -193,7 +197,7 @@ the value") sets `allowCustomValue` and reads `value`, which then equals the com
 
 ### 2.2 When the library writes the input text
 
-The library writes `inputValue` (as an urgent update, through `inputValueChangeAction` with the
+The library writes `inputValue` (as an urgent update, through `onInputValueChange` with the
 reason given) in exactly these cases, and nowhere else:
 
 | Moment | New text | `reason` | `details.event` |
@@ -244,11 +248,12 @@ new one for the urgent lane (section 4):
 ```ts
 // packages/ui/src/internal/types.ts
 /**
- * A change action the library calls synchronously, outside any Transition, and does not await:
- * the urgent lane (conventions 2.6; first used by Combobox's `inputValueChangeAction`). The sync
- * body is an urgent update, so `(next) => setText(next)` controls a text input correctly.
+ * A change handler the library calls synchronously, outside any Transition, and does not await:
+ * the urgent lane (conventions 2.6; first used by Combobox's `onInputValueChange`). Not an
+ * action: nothing is pending or optimistic for it. The sync body is an urgent update, so
+ * `(next) => setText(next)` controls a text input correctly.
  */
-export type UrgentChangeAction<T, Details extends ActionDetails = ActionDetails> =
+export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> =
   (next: T, details: Details) => void;
 ```
 
@@ -324,12 +329,13 @@ export interface ComboboxRootProps {
   /** Initial input text. Default `""`. Pass the selected value's label when `defaultValue` is set. */
   defaultInputValue?: string;
   /**
-   * The urgent lane: called synchronously, outside any Transition, on every change of the text
-   * (typing; and the library's own writes, section 2.2). Not awaited; nothing is pending for it.
-   * A controlled parent updates its state in the body (an urgent update, which is what a
-   * controlled text input needs).
+   * The urgent lane, a handler and not an action: called synchronously, outside any Transition,
+   * on every change of the text (typing; and the library's own writes, section 2.2). Not
+   * awaited; nothing is pending for it. A controlled parent updates its state in the body (an
+   * urgent update, which is what a controlled text input needs). A returned promise is ignored
+   * (development warns once: a fetch belongs in a transition, see 6.2).
    */
-  inputValueChangeAction?: UrgentChangeAction<string, ComboboxInputValueChangeDetails>;
+  onInputValueChange?: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>;
 
   open?: boolean;
   defaultOpen?: boolean;
@@ -548,7 +554,7 @@ export const Combobox = {
 ```
 
 Exports: every `Combobox<Part>Props` / `State` above, `ComboboxValueChangeDetails`,
-`ComboboxInputValueChangeDetails`, `ComboboxOpenChangeDetails`; `UrgentChangeAction` from the
+`ComboboxInputValueChangeDetails`, `ComboboxOpenChangeDetails`; `UrgentChangeHandler` from the
 root entry.
 
 ---
@@ -558,13 +564,18 @@ root entry.
 The vision left the urgent opt-out "undesigned until a component genuinely needs it, e.g. text
 input in a Combobox". This is that design, kept as small as possible:
 
-1. **The name is the ordinary triple.** `inputValue` / `defaultInputValue` /
-   `inputValueChangeAction`, so that the three props read as a set like every other state and
-   the "no `on*` props" rule keeps having no exceptions. What makes it urgent is its **type**,
-   `UrgentChangeAction<T, Details>` (returns `void`, documented as synchronous and not
-   awaited), not a different naming scheme. Rejected: `onInputChange` as a one-off handler
-   exception (the first `on*` in the library would be the one consumers copy), and
-   `inputValueAction` (reads as a pure trigger, not a state change).
+1. **The name says it is a handler, not an action.** `inputValue` / `defaultInputValue` /
+   `onInputValueChange`: the `x` / `defaultX` pair as for every other state, and the ordinary
+   React handler form for the callback, typed `UrgentChangeHandler<T, Details>` (returns
+   `void`, documented as synchronous and not awaited). This is the library's **one `on*`
+   prop**, and it is one by the user's decision (#96, conventions 2.1 and resolved question 39):
+   `fooAction` must always mean "the component runs this in a transition", so a callback that
+   the component must *not* run in a transition cannot carry the suffix. v1 had chosen
+   `inputValueChangeAction: UrgentChangeAction` so that the no-`on*` rule had no exception;
+   that bought the rule's purity at the price of the suffix's meaning, and the suffix matters
+   more at the call site. Rejected then and still: `inputValueAction` (reads as a pure
+   trigger); and `onInputChange` without `Value` (the state name must be exactly the controlled
+   prop's name, conventions 2.1).
 2. **The library calls it synchronously, outside any transition**, from the `input` event
    handler and from its own writes (2.2), after it has set its own `useState` for the text.
    The consumer's body runs in the event, so a controlled parent's `setInputValue(next)` is an
@@ -756,8 +767,8 @@ the List as `aria-busy="true"`. Only the latest deferred value is ever rendered,
 response for "ja" can never overwrite the results for "jap": React skipped the "ja" render or
 threw it away, and a cache keyed by query makes the earlier promise harmless (research §6). The
 docs say explicitly what not to do: `await fetch(...)` then `setResults(...)` inside
-`inputValueChangeAction` (completion order, no stale marker, an urgent action that should not
-be async anyway).
+`onInputValueChange` (completion order, no stale marker, an urgent handler that is not awaited
+and should not be async anyway; the name without `Action` is the hint).
 
 `stale` also covers the first keystrokes after a selection: the user types over "Japan", the
 results for "Japan" are shown as stale until the results for the new text land.
@@ -981,7 +992,7 @@ focused. Screen-reader pass (NVDA, JAWS, VoiceOver) in the example app before le
 
 Development warnings: an Option outside a List; a List outside a Popup; a part outside a Root
 (throws, as every component); two Options with one value; `value` / `defaultValue` set with no
-text prop (2.2); a thenable returned from `inputValueChangeAction` (section 4); a Trigger with
+text prop (2.2); a thenable returned from `onInputValueChange` (section 4); a Trigger with
 no accessible name; a List with no `Label` and no `aria-label`; a `render` element of the wrong
 kind (section 1); `transition` toggled between `undefined` and a value (conventions 5.1).
 
@@ -993,7 +1004,7 @@ Notation: `T` = input text (urgent), `Q` = deferred query, `V` = committed value
 optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `defaultValue={null}`,
 `defaultInputValue=""`, async search under a Suspense boundary inside the List.
 
-1. **Type "j", results load.** `input` event → `T="j"` (urgent), `inputValueChangeAction("j",
+1. **Type "j", results load.** `input` event → `T="j"` (urgent), `onInputValueChange("j",
    { reason: "activate" })`, `requestOpen` (transition). Sync flush: the input shows "j",
    `aria-expanded="true"`, `data-open`, `data-pending`. Open commit: children mount, the
    boundary mounts and shows `Status` ("Searching…") at once (a new boundary shows its
@@ -1055,7 +1066,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
 11. **Typed before hydration.** Server HTML: the plain input. The user types "jap" and nothing
     opens. Hydration: react-dom keeps the DOM value of a text input it hydrates and fires no
     `onChange`; the Root's mount layout effect reads `input.value !== defaultInputValue` → `T
-    ="jap"`, `inputValueChangeAction("jap", { reason: "platform", event: undefined })`. The
+    ="jap"`, `onInputValueChange("jap", { reason: "platform", event: undefined })`. The
     listbox does not open by itself (no user gesture after hydration); the next keystroke or
     ArrowDown opens it with results for "jap". `Q` catches up on the first render after mount.
 12. **Controlled `value` changes from outside (a "Use my location" button).** The parent sets
@@ -1083,7 +1094,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
 16. **A synchronously throwing `valueChangeAction`.** A plain function validates and throws.
     The wrapper's `catch` runs inside the `startTransition` callback; it yields (`await
     undefined`), then writes the rollback text (urgent, outside the transition: a controlled
-    `inputValueChangeAction` parent's `setText` stays an urgent update) and rethrows to the
+    `onInputValueChange` parent's `setText` stays an urgent update) and rethrows to the
     boundary (2.2).
 
 ---
@@ -1119,7 +1130,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
 
 Every part file is `"use client"` (context, hooks, DOM listeners); Server Components may render
 every part and pass Server Functions to `valueChangeAction` and `openChangeAction`
-(`inputValueChangeAction` too, but an urgent action that is a network call makes no sense and
+(`onInputValueChange` too, but an urgent handler that is a network call makes no sense and
 is documented against). What the server HTML contains: the hidden input with the default value,
 the Label, the Input with `defaultInputValue` as its `value`, the Trigger and Clear (inert until
 hydration), the empty `<div popover>`. Before hydration the user can type, and the text is
@@ -1188,12 +1199,12 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Area | Tests |
 | --- | --- |
 | Roles and ARIA | The section 1 HTML: Input `role=combobox`, `aria-autocomplete=list`, `aria-expanded`, `aria-controls` = List id, `autocomplete=off`, `id` = Label `for`; List `role=listbox`, `aria-labelledby` = Label id, consumer tokens merged; Option `role=option`, derived `id`, `aria-selected` only on the selected one, `aria-disabled`; Trigger / Clear `tabindex=-1`, `type=button`; Popup `popover=auto`, inline placement string; Status `role=status` in the Popup and `role=none` inside the List; List `aria-labelledby` absent (and a dev warning without `aria-label`) when no Label is rendered; hidden input present only with `name`, value `""` for `null`; `required` lands on the Input; duplicate option values warn. |
-| Urgent text (both for `inputValue`) | `user.type("ja")`: the DOM value is updated per keystroke, `inputValueChangeAction` called synchronously per keystroke with the `input` event and `"activate"`, **not** inside a transition (a `useTransition` spy / `isPending` probe in the parent stays false); a controlled parent that sets state in the body keeps the input in sync; a parent that does not adopt sees the DOM restored; a thenable returned warns once. |
+| Urgent text (both for `inputValue`) | `user.type("ja")`: the DOM value is updated per keystroke, `onInputValueChange` called synchronously per keystroke with the `input` event and `"activate"`, **not** inside a transition (a `useTransition` spy / `isPending` probe in the parent stays false); a controlled parent that sets state in the body keeps the input in sync; a parent that does not adopt sees the DOM restored; a thenable returned warns once. |
 | Deferred query | A List children function receives `query`; a suspending result for the new query keeps the old options mounted with `data-stale` / `aria-busy` on the List; on resolve the new options and no stale; a slow earlier query resolved after a later one never shows (cache keyed by query). |
 | Open | Typing opens (`openChangeAction(true, "activate")` with the `input` event; `showPopover` called once with `{ source: input }` after the open commit); ArrowDown / ArrowUp / Alt+ArrowDown open; focus alone does not; `openOnClick` makes a click open; Trigger click toggles and focuses the input; `disabled` opens nothing. |
 | Keyboard | The section 8 table: ArrowDown / ArrowUp move `aria-activedescendant` and `data-active`, skip disabled, stop or wrap with `loop`; Alt+ArrowUp accepts or closes; Enter accepts the active option (keydown prevented), does nothing with none (prevented while open, not prevented while closed), commits custom text with `allowCustomValue`; typing, Home, End, ArrowLeft and ArrowRight clear `aria-activedescendant` and are not prevented; Enter right after typing (results stale) accepts nothing stale, with or without `autoHighlight`; open-ness judged against `:popover-open` (a hidden popup with a queued `toggle`: Enter is not prevented); Escape is browser-mode. |
 | Accept (both) | Enter / click: the text becomes `label` (or `textContent`) at once; `valueChangeAction(value, { reason: "activate", custom: false })` with the `keydown` / `click`; `data-selected` / `aria-selected` move optimistically; hidden input value follows; with a deferred action `data-pending` on the Option and Input while the listbox stays open, `hidePopover` not yet called; on resolve `hidePopover` once and committed / parent updated; typing while the action is pending keeps the listbox open (`hidePopover` not called on resolve, value committed). Re-accepting the selected option closes without dispatching. Disabled options never accept. |
-| Rejection (both) | The catcher above Root receives it; `O` reverts; the input text reverts to the previous label with `inputValueChangeAction(prev, { reason: "dismiss", event: undefined })`; the listbox still open; hidden input back; a **synchronously throwing** action: the rollback write runs outside any transition (a `useTransition` probe or React's transition slot, review M2). Caught-inside variants commit. Controlled refusal: same revert without the error, and the listbox closes. |
+| Rejection (both) | The catcher above Root receives it; `O` reverts; the input text reverts to the previous label with `onInputValueChange(prev, { reason: "dismiss", event: undefined })`; the listbox still open; hidden input back; a **synchronously throwing** action: the rollback write runs outside any transition (a `useTransition` probe or React's transition slot, review M2). Caught-inside variants commit. Controlled refusal: same revert without the error, and the listbox closes. |
 | Overlap, superseded rejection (both) | Two accepts out of order: text and `data-pending` follow the latest, `hidePopover` once after the latest; the older's rejection reaches the catcher after and while the newer is pending. |
 | Custom value | `allowCustomValue`: Enter with no active option dispatches `{ custom: true }`; `focusout` with changed text dispatches with the `focusout` event; empty text with a value dispatches `null`; without the flag `focusout` reverts the text (`"dismiss"`) and dispatches nothing. |
 | Focus loss | `focusout` with `relatedTarget` outside → `hidePopover` at once, notification `"dismiss"`; `relatedTarget: null` → nothing synchronously, then (fake timers) with `document.hasFocus()` and focus outside → the revert / custom commit, with focus still in the input (window blur) → nothing, while `disabled` → nothing; `pointerdown` and `mousedown` on an Option / the Popup are `defaultPrevented` and the input keeps focus. |
@@ -1202,13 +1213,13 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with the default message (`"No results"` / `"1 result"` / `"3 results"`) or the consumer's `announce(count)`; not while stale; **with a `Status` fallback inside the List: zero calls until the results resolve, then one** (review H1); not for an unchanged count; never when `announce` returns `null`. |
 | Clear | Writes `""`, dispatches `null` (`"activate"`, the `click`), no dispatch when already `null`, input keeps focus; while open, the light dismiss (shim) closes the listbox and it is not re-opened. |
 | Trigger | Toggles against the `pointerdown` snapshot; a `pointerdown` followed by `pointercancel` leaves no stale snapshot (the next `click` toggles correctly); a `click` with `detail === 0` toggles against `intended()`. |
-| Platform path (both) | Mount reconciliation: `renderToString`, set `input.value = "jap"` before `hydrateRoot` → one `inputValueChangeAction("jap", { reason: "platform", event: undefined })`, no open, StrictMode still one; no `valueChangeAction`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → one `valueChangeAction(resetTarget, "platform")` with the `reset` event and one text write; the reset target is the JS-computed one (uncontrolled: latest `defaultValue`; controlled: mount-time); the visible input's `defaultValue` attribute is the mirror at the time of the `reset` event (uncontrolled: latest `defaultInputValue`; controlled: mount-time); the hidden input carries no `defaultValue`. |
+| Platform path (both) | Mount reconciliation: `renderToString`, set `input.value = "jap"` before `hydrateRoot` → one `onInputValueChange("jap", { reason: "platform", event: undefined })`, no open, StrictMode still one; no `valueChangeAction`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → one `valueChangeAction(resetTarget, "platform")` with the `reset` event and one text write; the reset target is the JS-computed one (uncontrolled: latest `defaultValue`; controlled: mount-time); the visible input's `defaultValue` attribute is the mirror at the time of the `reset` event (uncontrolled: latest `defaultInputValue`; controlled: mount-time); the hidden input carries no `defaultValue`. |
 | Suspending content (both) | Dependent content keyed on `value` suspends on accept: old content stays, Input `data-pending`, no fallback above; then new content. Results boundary outside the List: the open waits with `data-pending` on Input and Trigger, `showPopover` not called until resolve. |
 | Function props / `render` | Every part's documented state; `render={<input type="search" />}` keeps the role and handlers; a `render={<button />}` Input warns; Popup `render={<div className />}` merges. |
 | Post-await rule | Controlled `value` parent updating after `await` inside `startTransition`; controlled `inputValue` parent with a plain `setState`. |
 | `transition` smoke | Popup renders with and without; a close after accept unmounts children in the close commit with `transition`, holds without. |
 | Directive | Every file under `src/combobox/` except `index.ts` begins with `"use client"`. |
-| Types | `UrgentChangeAction` is exported; `inputValueChangeAction` accepts any `(next, details) => void` (the thenable check is a runtime warning); `multiple` is not a prop (type test). |
+| Types | `UrgentChangeHandler` is exported (and `UrgentChangeAction` is not: no alias, #96); `onInputValueChange` accepts any `(next, details) => void` (the thenable check is a runtime warning); `inputValueChangeAction` is not a prop; `multiple` is not a prop (type test). The library-wide "Action naming" guard (conventions 10.1, `src/__tests__/action-naming.test.ts`) lists `onInputValueChange` as the one allowed `on*` key. |
 
 ### 12.2 Browser mode (`combobox.browser.test.tsx`)
 
@@ -1279,7 +1290,7 @@ packages/ui/src/combobox/
   combobox-group.tsx        # "use client": Group, GroupLabel, Empty, Status
   combobox.test.tsx, combobox.browser.test.tsx
 packages/ui/src/internal/
-  types.ts                  # + UrgentChangeAction
+  types.ts                  # + UrgentChangeHandler
   use-form-reset.ts         # widen FormAssociatedElement with HTMLInputElement (already) — the hidden input is the subscription element
 ```
 
@@ -1294,7 +1305,7 @@ packages/ui/src/internal/
   throw's rollback outside the transition (2.2). Text: `const [internalText, setInternalText] =
   useState(defaultInputValue ?? "")`, `text = inputValue ?? internalText`, `query =
   useDeferredValue(text)`; `writeText(next, reason, event)` sets internal state (uncontrolled)
-  and calls `inputValueChangeAction` synchronously; never inside `startTransition`. Active:
+  and calls `onInputValueChange` synchronously; never inside `startTransition`. Active:
   `useState<string | null>(null)`. Registry: `Map<value, { element, label }>` in a ref plus a
   `useState` count for `Empty` / `data-empty` (updated in Option layout effects, batched by
   React). Status registry: `Combobox.Status` registers from a layout effect when rendered under
@@ -1514,3 +1525,166 @@ else changes.
 Questions for the product owner: none beyond Tooltip's amendment question 5 (Firefox
 unworked-around). The absence of `data-side` on `Combobox.Popup` is a choice (7.2), not an
 omission; say so if a `data-side` for the flipped listbox is wanted now.
+
+---
+
+## Amendment: the urgent lane is a handler (#96, 2026-10-23)
+
+Status: **user decision** (2026-10-23, from the docs feedback in #95: "`action` should always
+mean a handler automatically wrapped with a transition"). Cross-component rules: `docs/vision.md`
+principle 3 and conventions 2.1, 2.6, 10.1, resolved question 39. Edited in place above:
+decision 3, 2.2, 3, 3.1, 3.6, 4, 6.2, 9, 10, 11.2, 12.1, 14. The historical sections ("Conventions
+feedback", "Questions for the product owner", "Decisions recorded", "Review revisions") keep the
+v1 names: they record what was decided on 2026-10-17, and question 2 there is the decision this
+amendment reverses.
+
+| | v1 (as accepted, #50) | #96 |
+| --- | --- | --- |
+| Urgent prop on `Combobox.Root` | `inputValueChangeAction` | **`onInputValueChange`** |
+| Its type (root entry export) | `UrgentChangeAction<T, Details>` | **`UrgentChangeHandler<T, Details>`**, same signature `(next: T, details: Details) => void` |
+| Details type | `ComboboxInputValueChangeDetails` | unchanged (it describes the change, not the lane; conventions 9.4) |
+| `inputValue` / `defaultInputValue` | unchanged | unchanged |
+| Behaviour | sync, in the event, outside any transition, not awaited, thenable warns once | unchanged, warning text names the new prop |
+| Deprecated alias | | **none** (alpha); passing `inputValueChangeAction` is a type error and, at runtime, an unknown prop on `Root` (no DOM element receives it, so no React warning either: the type is the guard) |
+| What `fooAction` means | a transition, except this one prop | **a transition, always** |
+| `on*` props the library defines | none | **exactly one**, this one; any other needs a React-imposed urgency and a conventions amendment (2.1) |
+
+Call site, after:
+
+```tsx
+const [text, setText] = useState("");
+<Combobox.Root
+  value={country}
+  valueChangeAction={async (next) => { await save(next); setCountry(next); }}
+  inputValue={text}
+  onInputValueChange={(next) => setText(next)}
+>
+```
+
+Read aloud, the two props now say what they do: `valueChangeAction` is awaited inside the
+Root's transition and the chosen option is `data-pending` until it settles; `onInputValueChange`
+is a React handler, called per keystroke, and the text is in the DOM before it runs.
+
+Why not keep the suffix and rely on the type (v1's argument): a consumer reads
+`inputValueChangeAction={async (q) => setResults(await search(q))}` and, trusting the suffix,
+expects a pending state and an awaited promise; both are wrong, and the type comment is the
+only thing that says so. With `onInputValueChange` the line looks like what it is, a plain
+handler that happens to receive `(next, details)`, and the `async` reads as the mistake it is.
+
+### Migration (0.1.0-alpha.11)
+
+Rename the prop and, where imported, the type. Nothing else changes.
+
+```diff
+-<Combobox.Root inputValue={text} inputValueChangeAction={(next) => setText(next)}>
++<Combobox.Root inputValue={text} onInputValueChange={(next) => setText(next)}>
+
+-import type { UrgentChangeAction } from "@funstack/ui";
++import type { UrgentChangeHandler } from "@funstack/ui";
+```
+
+### Implementation checklist (for the developer)
+
+Grep for both `inputValueChangeAction` and `UrgentChangeAction` after the change; the only
+hits left must be in `design/` and `memo/` history. Occurrence counts are as of this amendment.
+
+**`packages/ui`**
+
+- `src/internal/types.ts` (2): rename the type to `UrgentChangeHandler`; doc comment: "A change
+  **handler** the library calls synchronously, outside any Transition, and does not await: the
+  urgent lane (conventions 2.6; first used by Combobox's `onInputValueChange`). Not an action:
+  nothing is pending or optimistic for it."
+- `src/internal/types.test.ts` (5): rename the import and the `it` title ("UrgentChangeHandler is
+  synchronous: (next, details) => void"); add `// @ts-expect-error` on a `UrgentChangeAction`
+  import from `../index.js` so the alias cannot come back.
+- `src/index.ts` (1, line ~336): export `UrgentChangeHandler` instead of `UrgentChangeAction`.
+- `src/combobox/combobox-root.tsx` (8): the prop (line ~116) and its JSDoc (section 3.1 above),
+  the `ComboboxInputValueChangeDetails` comment (~48), the module doc (~215), `writeText`
+  (~293 to 305: `latest.onInputValueChange`; warning text
+  "Combobox.Root: `onInputValueChange` returned a promise. It is the urgent lane: it is not
+  awaited. Fetch in a transition instead (`valueChangeAction`, or `useDeferredValue` of
+  `inputValue`)."), the comment at ~344.
+- `src/combobox/index.ts` (1, line ~23): the doc comment.
+- `src/combobox/combobox.test.tsx` (21): the type import (line 26), the two `it` titles (~493,
+  ~558), the type test at ~2383 ("types: UrgentChangeHandler is exported, UrgentChangeAction and
+  inputValueChangeAction are not, multiple is not a prop"), every `inputValueChangeAction:` /
+  `inputValueChangeAction=` in wrappers and assertions. The top-of-file row list: "Urgent
+  handler".
+- `src/combobox/combobox.browser.test.tsx` (2, lines ~356 and ~546).
+- `src/toast/toast.test.tsx` (line 10), `src/field/field.test.tsx` (line 13),
+  `src/form/form.test.tsx` (line 9): the N/A row is now called "Urgent handler"
+  (`UrgentChangeHandler` in the Toast comment).
+- **New** `src/__tests__/action-naming.test.ts` (conventions 10.1 "Action naming"), jsdom
+  project, type-level with `expectTypeOf` plus one runtime completeness check. The load-bearing
+  types:
+
+  ```ts
+  import type { DOMAttributes } from "react";
+  import type * as UI from "../index.js";
+
+  /** Keys named `action` or `…Action` whose value is not a transition action: a transition action returns `unknown`. */
+  type NonTransitionActionKeys<P> = {
+    [K in Extract<keyof P, "action" | `${string}Action`>]-?: NonNullable<P[K]> extends (...args: never[]) => infer R
+      ? unknown extends R ? never : K
+      : K;
+  }[Extract<keyof P, "action" | `${string}Action`>];
+
+  /** `on*` keys that are not DOM handlers, i.e. the library's own. */
+  type OwnHandlerKeys<P> = Exclude<Extract<keyof P, `on${string}`>, keyof DOMAttributes<Element>>;
+
+  type PublicProps = {
+    ToggleProps: UI.ToggleProps;
+    ComboboxRootProps: UI.ComboboxRootProps;
+    // … every `*Props` exported from src/index.ts, one line each
+  };
+
+  type Offenders = { [K in keyof PublicProps]: NonTransitionActionKeys<PublicProps[K]> }[keyof PublicProps];
+  type OwnHandlers = { [K in keyof PublicProps]: OwnHandlerKeys<PublicProps[K]> }[keyof PublicProps];
+
+  expectTypeOf<Offenders>().toEqualTypeOf<never>();
+  expectTypeOf<OwnHandlers>().toEqualTypeOf<"onInputValueChange">(); // the allow-list
+  expectTypeOf<UI.ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
+    UI.UrgentChangeHandler<string, UI.ComboboxInputValueChangeDetails> | undefined
+  >();
+  ```
+
+  Completeness: keep `const listed = [...] as const` of the `PublicProps` keys, assert
+  `Exclude<keyof PublicProps, (typeof listed)[number]>` is `never`, and at runtime read
+  `src/index.ts` (`readFileSync`, as `directives.test.ts` reads `dist`) and `expect` the set of
+  `/\b\w+Props\b/g` matches to equal `listed` (as sets), so a newly exported Props type fails the
+  test until it is listed. Note `Form.Root`'s `action` is React's form-channel action (a Server
+  Function or `(formData) => unknown`), which returns `unknown` and passes, as it should.
+  `Omit<ComponentPropsWithRef<...>, "onClick" | ...>` pass-throughs are DOM handlers and are
+  excluded by `DOMAttributes`.
+
+**`packages/example`**
+
+- `src/combobox-demo.tsx` (2, lines ~176 and ~182): the prose ("`setState` in
+  `onInputValueChange`, the urgent lane") and the prop.
+
+**`packages/docs`** (props tables are written by hand; update them with the types)
+
+- `src/pages/ActionPropsPage.tsx` (3): the intro (line ~17, "has no `onClick`, `onChange` or
+  `onValueChange`": add "with one exception, below"), the triple table's Combobox row (~53 to 54:
+  "`valueChangeAction`; `onInputValueChange` (a handler, not an action: the urgent lane);
+  `openChangeAction`"), and "The urgent lane" (~290 to 307): rename, retitle the type, and replace
+  the closing sentence "It is still not an `on*` handler: there are none" with the rule: "It is
+  the library's one `on*` prop, and it is one on purpose: `fooAction` always means a handler the
+  component runs in a transition, so a callback that must not run in one is named like the
+  plain React handler it is. Nothing else in the library is an `on*` prop."
+- `src/pages/ComboboxPage.tsx` (8): "Typing is urgent" (~38 to 49, the sample
+  `<Combobox.Root inputValue={text} onInputValueChange={(next) => setText(next)}>`), the Callout
+  (~67 to 71, "Do not fetch in onInputValueChange"), the props table row (~207 to 210, type
+  `UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`, description starting "A
+  handler, not an action: the urgent lane, called synchronously…"), ~532, ~636.
+- `src/pages/RoadmapPage.tsx` (2, lines ~83 to 84) and a new release entry, following the
+  `Toolbar.Button` precedent at ~137: "**Breaking:** `Combobox.Root`'s `inputValueChangeAction`
+  is renamed `onInputValueChange` and the type `UrgentChangeAction` is renamed
+  `UrgentChangeHandler`; an action prop always means a transition (#96)".
+- `src/pages/ServerComponentsPage.tsx` (1, line ~148): "reported once through
+  `onInputValueChange`".
+- `src/examples/ComboboxDrink.tsx` (2, lines ~9 and ~25).
+- `src/pages/HomePage.tsx` ~68 needs no change (it describes other libraries).
+
+**Release**: alpha, breaking, no alias; the Roadmap entry is the changelog. Version bump is the
+release skill's job, not this change's.

@@ -129,3 +129,22 @@ scheduled flush, hence `flushSync` for the closed-Enter commit), the hydration p
   (`autoArmed` ref in the Root), so an active option unmounting from an outside result change
   is cleared but not re-highlighted until the next open or edit. Deliberate: re-arming on every
   unmount would undo the caret keys' clearing on any unrelated re-render.
+
+## 2026-10-23: the urgent lane is a handler (#96)
+
+The user reversed my 2026-10-17 call above ("urgent action naming", third candidate). Reading the
+docs, they objected that `action` must always mean "wrapped in a transition". They are right
+about what the suffix is for: v1 protected the no-`on*` rule and spent the suffix's meaning to do
+it, and at the call site (`inputValueChangeAction={async (q) => ...}`) the suffix misleads where
+the type comment is not visible. New rule (vision 3, conventions 2.1 and 2.6): `fooAction` is
+always a transition; `on<State>Change` is reserved for a React-imposed urgent handler, today one
+prop, `onInputValueChange: UrgentChangeHandler`. No alias (alpha).
+
+Guard: a type-level test, `src/__tests__/action-naming.test.ts` (conventions 10.1), because the
+rule is about a type ("a key ending in `Action` returns `unknown`"), oxlint as configured has no
+custom rule authoring and the repo has no ESLint. Pass-through DOM `on*` props are excluded by
+`keyof DOMAttributes<Element>`; a listed registry of every public `*Props` type with a runtime
+completeness check against `src/index.ts`. Checklist is in the combobox design amendment.
+
+Noted but not done: the Roadmap release entry and the version bump belong to the developer and
+the release skill. `ComboboxInputValueChangeDetails` keeps its name on purpose (9.4).

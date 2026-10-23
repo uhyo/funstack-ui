@@ -1116,8 +1116,9 @@ await screen.findByRole("dialog", { name: "Hello" });
 
 N/A rows (comment at the top of the file): controlled / uncontrolled parity and the post-await
 rule (no controlled state; the queue is not an `x` / `defaultX` triple), optimistic + rollback
-(nothing optimistic, section 3.6), platform path (no residual browser path), urgent action
-(the queue is urgent but has no `UrgentChangeAction` prop; the urgency is tested under "Lanes").
+(nothing optimistic, section 3.6), platform path (no residual browser path), urgent handler
+(the queue is urgent but has no `on<State>Change: UrgentChangeHandler` prop, #96; the urgency is
+tested under "Lanes").
 
 | Area | What the test proves |
 | --- | --- |

@@ -46,7 +46,7 @@ in Slider.
 | --- | --- | --- |
 | 1 | Anatomy | `NumberField.Root` (`div[role=group]`, owns state), `NumberField.Label` (`label[for]`), `NumberField.Input` (the visible `input[type=text]` **plus** the hidden native `input[type=number]` right after it), `NumberField.Increment` / `NumberField.Decrement` (`button[type=button][tabindex=-1]`). No `Group`, `ScrubArea`, `Clear`, `Value` or `HiddenInput` parts (section 1). |
 | 2 | Two actions (Slider's pair) | `valueChangeAction(next, details)` on every **step** (each key press, each tick of a hold, each wheel event, and the parse of typed text at commit) and `valueCommitAction(next, details)` once per **gesture** (a typed text's blur or Enter, a hold's release, each key press, each wheel event, a platform reset). Both are `ChangeAction<number \| null, NumberFieldValueChangeDetails>`: awaited in the Root's transitions, `data-pending` while in flight, errors to the boundary. The save belongs in `valueCommitAction` (2.1). |
-| 3 | Lanes | The **draft text** is urgent, internal library state (`useState`, written from the `input` event; no `inputValue` triple, no `UrgentChangeAction`): a controlled text input cannot follow a transition. The **value under a held button** (`live`) is urgent too (Slider 2.2, the same `held` derivation). Steps are transitions (`useActionTrigger`); the gesture's commit is the state owner's dispatch (`useControllableAction`: optimistic, latest wins). |
+| 3 | Lanes | The **draft text** is urgent, internal library state (`useState`, written from the `input` event; no `inputValue` pair, no `onInputValueChange` handler (`UrgentChangeHandler`, #96)): a controlled text input cannot follow a transition. The **value under a held button** (`live`) is urgent too (Slider 2.2, the same `held` derivation). Steps are transitions (`useActionTrigger`); the gesture's commit is the state owner's dispatch (`useControllableAction`: optimistic, latest wins). |
 | 4 | When typed text becomes a value | On **blur**, on **Enter**, and before a step (a button press or a key with an open draft parses it first). Never per keystroke: a partial text (`-`, `1,`) is not a number. Unparsable text reverts to the committed value's text at commit, with no dispatch (React Aria's rule; 4.1). |
 | 5 | Uncontrolled commit | Uncontrolled state is written when the **commit** action resolves (Slider 2.3): a rejected save rolls the text and the hidden input back to the value before the gesture, and a `valueChangeAction` consumer hears one `"dismiss"` step. |
 | 6 | Value shape | `value: number \| null` (`null` is empty; `undefined` is uncontrolled). Typed values are **neither clamped nor snapped** (the platform's rule for `type=number`): `min` / `max` / `step` are native constraints on the hidden input (`rangeUnderflow`, `rangeOverflow`, `stepMismatch`, the browser's message). **Stepping** clamps and snaps with the spec's `stepUp()` semantics (5.5). Every value the field commits or steps to is rounded to the format's `maximumFractionDigits`, so the text, the value and `FormData` agree (5.4; review N1 extended it to stepped values). |
@@ -235,7 +235,7 @@ const text = draft ?? format(shown);                                     // the 
   visible after the next commit (which may replace it with the user's number, as the user is
   editing). Documented on the component page; React Aria behaves the same.
 
-This is **not** the urgent lane of conventions 2.6 (`UrgentChangeAction`): no consumer-facing
+This is **not** the urgent lane of conventions 2.6 (an `on<State>Change: UrgentChangeHandler` prop, #96): no consumer-facing
 action is urgent and a controlled `value` still gates committed state. The draft is the fourth
 urgent library state the conventions list (Combobox's text and active option, Slider's `live`,
 Field's mirror), used where React requires it.
@@ -1138,8 +1138,8 @@ step transition) can key a type map on them. A rollback carries no types.
 
 ## 13. Not in v1
 
-- **An `inputValue` triple** (`inputValue` / `defaultInputValue` / `inputValueChangeAction:
-  UrgentChangeAction`) exposing the draft, Combobox's shape. Nothing needs the raw text today;
+- **An `inputValue` pair with its urgent handler** (`inputValue` / `defaultInputValue` /
+  `onInputValueChange: UrgentChangeHandler`, #96) exposing the draft, Combobox's shape. Nothing needs the raw text today;
   adding it later is additive (the draft already exists internally).
 - **`smallStep` and Alt+Arrow** (Base UI), **`step="any"`** (keys would need their own step),
   a **scrub area** (Base UI's drag-on-label), **Escape reverting the draft**, a **`Clear`**
