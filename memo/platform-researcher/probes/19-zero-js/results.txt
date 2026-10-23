@@ -49,3 +49,16 @@ import("/assets/index-C0dsHow-.js")</script></body></html>
 @property --fsui-tooltip-warm { syntax: "<number>"; inherits: false; initial-value: 0; }
 :root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }
 </style><main><div><details open="" name="_R_1_"><summary>One</summary><div>A</div></details><details name="_R_1_"><summary>Two</summary><div>B</div></details></div><button type="button" style="interest-delay-start:calc(250ms * (1 - var(--fsui-tooltip-warm, 0)));interest-delay-end:150ms" aria-describedby="_R_2_" interestfor="_R_2_" data-fsui-tooltip-trigger="">Save</button><div style="position-area:top;position-try-fallbacks:flip-block, flip-inline, flip-block flip-inline" id="_R_2_" popover="hint" role="tooltip" data-side="top" data-align="center">Saves</div><label><input type="checkbox" role="switch" data-checked="" name="wifi" checked=""/> Wi-Fi</label></main>
+
+# #94 re-check, 2026-10-23. Standalone copy of this folder (npm, not inside packages/docs) with
+# @funstack/static 1.3.4 (and 1.3.3 for contrast), @vitejs/plugin-rsc 0.5.38, React 19.3.1,
+# Vite 8.3.5, @funstack/ui 0.1.0-alpha.10 packed from packages/ui. ssr: true.
+# Build: VARIANT=defer|defer-progress npx vite build; serve dist/public; then
+# PLAYWRIGHT=<path to playwright> node check-ids.mjs http://localhost:<port>/ <label>
+# app-defer.tsx, 1.3.4 <main>:
+<main><p data-label="main-1" id="_S_1_">_S_1_</p><!--$--><section><p data-label="deferred-1" id="_Deferred_0S_1_">_Deferred_0S_1_</p><p data-label="deferred-2" id="_Deferred_0S_2_">_Deferred_0S_2_</p></section><!--/$--><p data-label="main-2" id="_S_2_">_S_2_</p></main>
+# app-defer-progress.tsx ids in SSR HTML: 1.3.3 -> _S_1_-label x3 (all three); 1.3.4 -> _S_1_-label, _Deferred_0S_1_-label, _d0S_1_-label
+# After hydration (check-ids.mjs), 1.3.4, Chromium and Firefox: no duplicate ids, no console/page errors,
+#   accessible names: "Main upload", "Named deferred upload", "Unnamed deferred upload"
+# Same, 1.3.3: duplicates [_S_1_-label x2 extra]; names "Main upload" x3 (deferred bars named by the main Label)
+# WebKit not installed on this machine; id resolution is plain DOM getElementById, not engine-specific.

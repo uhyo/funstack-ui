@@ -49,14 +49,20 @@ candidate either loses behaviour in some engine (Tooltip) or adds almost nothing
 
 Findings that matter beyond this issue:
 
-- **Server Component `useId` ids collide across separately rendered Flight payloads.** This
-  includes FUNSTACK Static's `defer()`. The main payload and a deferred payload both start at
-  `_S_1_`, so the document ends up with two `id="_S_1_"` (probe `app-defer.tsx`). Flight has an
-  `identifierPrefix` option, but `defer()` does not set one. **`Progress.Root` and `Meter.Root`
-  are affected today**: they derive the Label id from a server `useId`. A Progress inside a
-  `defer()` chunk and another outside it can collide, which breaks `aria-labelledby`. Client
-  `useId` (`_R_…`) is unaffected. Filed as #94 here and uhyo/funstack-static#198 upstream (set a
-  distinct `identifierPrefix` per deferred payload).
+- **Server Component `useId` ids collided across separately rendered Flight payloads; fixed in
+  FUNSTACK Static 1.3.4.** Each Flight render numbers ids from `_S_1_`, and `defer()` renders every
+  deferred element with its own Flight render. Up to 1.3.3 `defer()` set no `identifierPrefix`, so
+  the main payload and each deferred payload all started at `_S_1_` and the document held
+  duplicate ids (probe `app-defer.tsx`). This hit **`Progress.Root` and `Meter.Root`**, which
+  derive the Label id from a server `useId`: a bar inside a `defer()` chunk was named by the main
+  payload's Label. 1.3.4 (uhyo/funstack-static#199, fixing #198) gives every deferred payload its
+  own React `identifierPrefix`: `<name>_<n>` for named payloads (`_Deferred_0S_1_`), `d<n>` for
+  unnamed ones (`_d0S_1_`); the main payload keeps `_S_1_`. The prefix is stored on the registry
+  entry, so SSR HTML and the client fetch agree, and it is numbered per `name`, so a named payload's
+  ids and file hash do not move when other `defer()` calls change. With `ssr: false` the Root
+  shell gets a fixed `shell` prefix (`_shellS_1_`) for the same reason. No consumer opt-in.
+  Re-checked 2026-10-23 (section "#94 re-check" below). Client `useId` (`_R_…`) was never affected.
+  Tracked as #94 here.
 - **A `React.cache()`-scoped mutable "server context" is unsafe.** It works only while rendering
   stays synchronous and depth-first. An async child resumes after a sibling Root has overwritten
   the shared value. In the probe, item `1b` of group `g1` rendered `name="g2"`. Reject it as a way
@@ -118,7 +124,7 @@ useCallback useDebugValue useId useMemo`. There is no `createContext`, `useConte
 | --- | --- | --- |
 | Render a context provider created in a `"use client"` module | **Yes, new in 19.3** | React CHANGELOG 19.3.0, "Allow Server Components to render context providers from client modules" (#35675). The library already uses it in `Progress.Root` (conventions 7.1). |
 | Read a context (`use(Ctx)`) | **No** | Probe `app-ctxread.tsx`: the production build fails with "Cannot use() an already resolved Client Reference". The dev build fails with "Cannot read a Client Context from a Server Component" (the string exists in the vendored `react-server-dom-webpack` 19.3.1). The context object is a client reference on the server. |
-| `useId` | **Yes, with a caveat** | Ids are `_S_1_`, `_S_2_`, … per Flight render, so they never collide with client `_R_…` ids. They **do** collide between two Flight renders shown in one document (`defer()` probe above). |
+| `useId` | **Yes, with a caveat** | Ids are `_S_1_`, `_S_2_`, … per Flight render, so they never collide with client `_R_…` ids. Two Flight renders shown in one document collide unless the host gives each its own `identifierPrefix`; FUNSTACK Static does so for `defer()` from 1.3.4 (see "#94 re-check"). |
 | `cache()` | Yes, per request | `perRequest()` returned the same value twice in one render (`1,1`). FUNSTACK Static's prerender gives each entry its own request scope. |
 | `cache()` as mutable "server context" | **Unsafe** | Root writes `scope().name`, parts read it. Synchronous siblings read the right value. An async part resumed after the next Root had run and read `g2` (`async-item:1b:g2`). |
 | Children-function / render-prop Root | **Yes** | A directive-free Root that calls `children({ trigger, popup })` with ids derived from `useId` produced `<button id="_S_3_t" aria-describedby="_S_3_p" interestfor="_S_3_p">` and `<div id="_S_3_p" popover="hint">`. The Root must itself be directive-free: a function cannot be passed from a Server Component to a client Root. |
@@ -132,8 +138,9 @@ directive-free anatomy:
    (Tooltip, Popover, Dialog). This is honest and stable, but the consumer owns uniqueness. It is
    what the issue proposed.
 2. **Children-function Root.** Root calls `useId` and hands ids to the consumer, who spreads them
-   onto directive-free parts. It removes the uniqueness burden but inherits the `defer()` collision
-   above, and the API is clumsy.
+   onto directive-free parts. It removes the uniqueness burden but inherited the `defer()` collision
+   above (fixed in FUNSTACK Static 1.3.4, but a concern on other multi-payload hosts), and the API
+   is clumsy.
 3. **Do not use** a `cache()`-scoped store (unsafe with async children) or `cloneElement`
    injection (fragile).
 
@@ -192,19 +199,59 @@ WebKit `standards-positions` `summary.json` and Bugzilla, checked on 2026-10-23.
 | Cost | None | A second props surface, docs page and test matrix for one component. Two Accordions to explain. | Repeats B per component, and the Popover `aria-expanded` gap must be solved first. Tooltip offers nothing visible in 2 of 3 engines. |
 | API impact | None | None on the existing Accordion | Explicit-id parts across three components |
 
-Recommendation: **A now**, and record B as a ready plan. Track the `useId` collision as its own
-issue regardless of the option chosen.
+Recommendation: **A now**, and record B as a ready plan. The `useId` collision was tracked as its
+own issue (#94) and is fixed upstream in FUNSTACK Static 1.3.4.
 
 ## Filed
 
 1. `Progress.Root` / `Meter.Root` server `useId` ids collide across `defer()` payloads: **#94**.
    Reproduction: `memo/platform-researcher/probes/19-zero-js/src/app-defer.tsx`. Upstream:
-   **uhyo/funstack-static#198** (give each deferred Flight render a distinct `identifierPrefix`).
+   **uhyo/funstack-static#198**, fixed by #199 in **@funstack/static 1.3.4** (see below).
+
+## #94 re-check against FUNSTACK Static 1.3.4 (2026-10-23)
+
+Verdict: **fixed in 1.3.4, no consumer opt-in.** Require `@funstack/static >= 1.3.4` when a
+Server-rendered `Progress.Root` / `Meter.Root` (or any server `useId`) can sit inside `defer()`.
+
+Setup: a standalone copy of the probe folder (outside `packages/docs`) with React 19.3.1,
+`@vitejs/plugin-rsc` 0.5.38, Vite 8.3.5, `ssr: true`, and `@funstack/ui` 0.1.0-alpha.10 packed from
+`packages/ui`; built once with `@funstack/static` 1.3.3 and once with 1.3.4. New probe
+`app-defer-progress.tsx` renders a `Progress.Root` + `Progress.Label` in the main payload, one in
+a named `defer()` chunk and one in an unnamed one; `check-ids.mjs` loads the built page in
+Playwright, waits for hydration and reads ids, `aria-labelledby` targets, console errors and the
+accessibility tree. Raw output: `memo/platform-researcher/probes/19-zero-js/results.txt`.
+
+| | 1.3.3 | 1.3.4 |
+|---|---|---|
+| `app-defer.tsx` ids | `_S_1_`, `_S_1_`, `_S_2_`, `_S_2_` (main and deferred) | `_S_1_`, `_S_2_` (main), `_Deferred_0S_1_`, `_Deferred_0S_2_` (deferred) |
+| Label ids, `app-defer-progress.tsx` | `_S_1_-label` three times | `_S_1_-label`, `_Deferred_0S_1_-label`, `_d0S_1_-label` |
+| Duplicate ids after hydration | yes | none |
+| Accessible names (Chromium, Firefox) | "Main upload" for all three bars | "Main upload", "Named deferred upload", "Unnamed deferred upload" |
+| Hydration / console errors | none | none |
+
+WebKit was not installed on the probe machine; resolving `aria-labelledby` is plain id lookup in
+the DOM, so the result does not depend on the engine.
+
+Remaining caveats:
+
+- **Minimum version.** `packages/docs` declares `@funstack/static ^1.3.3` and the lockfile still
+  resolves 1.3.3, so the docs site has the bug until the dependency is bumped to `^1.3.4`.
+- **Other RSC hosts.** The fix is FUNSTACK Static's. Any host that renders more than one Flight
+  payload into one document (its own deferred or island payloads) without a distinct
+  `identifierPrefix` per payload repeats the collision. Hosts that render one Flight payload per
+  page are unaffected. FUNSTACK UI cannot detect this; the honest note is a one-liner pointing at
+  the host.
+- **Deduplication.** The same element deferred twice with identical output used to share one
+  payload file; from 1.3.4 each copy gets its own prefix and its own file (upstream PR note).
+  Harmless for FUNSTACK UI.
+- Ids now contain the sanitized `defer()` `name`. Nothing in FUNSTACK UI parses ids, so no API
+  impact.
 
 ## References
 
 - React CHANGELOG 19.3.0 (#35675, Server Components render client context providers): https://github.com/facebook/react/blob/main/CHANGELOG.md
 - FUNSTACK Static `defer()`: `node_modules/@funstack/static/dist/docs/api/Defer.md` (1.3.3); https://static.funstack.work/
+- FUNSTACK Static #199 (per-payload `identifierPrefix`, fixes #198): https://github.com/uhyo/funstack-static/pull/199 ; release 1.3.4: https://github.com/uhyo/funstack-static/releases/tag/1.3.4
 - MDN BCD 8.1.7: https://unpkg.com/@mdn/browser-compat-data@8.1.7/data.json (`html.elements.details.name`, `html.elements.button.interestfor`, `html.global_attributes.popover.hint`, `html.elements.button.commandfor.implicit_anchor_reference`, `html.elements.dialog.closedby`, `css.properties.appearance.base-select`, `html.elements.details.search_match_opens`)
 - WebKit standards position #464 (`interestfor`): https://github.com/WebKit/standards-positions/issues/464
 - Mozilla standards position #1181 (`interestfor`, neutral): https://github.com/mozilla/standards-positions/issues/1181
