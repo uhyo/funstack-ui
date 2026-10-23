@@ -271,3 +271,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Remaining for wave 14: writer's #98 on wave14-writer → review → merge → release 0.1.0-alpha.11 (Breaking: onInputValueChange).
 - #98 merged (4a8de65..3d76c0e), master CI green, closed. Follow-ups #99 (props-table State/Owned lines, shared rows, Action props example boxing). Reviews: memo/reviewer/wave14-writer-review.md (e5b580f).
 - 0.1.0-alpha.11 released (Breaking: onInputValueChange). WAVE 14 DONE. Technical writer agent now part of the team (docs IA owner; use for docs audits/edits, reviewer still checks facts).
+
+## WAVE 15 (#99 docs polish) — IN PROGRESS
+- User refined concept rule: several components on a concept page are fine; naming components that don't help understand the concept is bad. Updated technical-writer.md rule 1, commented on #99.
+- Writer implementing #99 on wave15-docs (worktree ../funstack-ui-wave15-docs): M4 State/Owned lines + shared rows, multi-part tables, Action props example convention, concept-page sweep under refined rule. Then reviewer → merge → docs deploy (docs-only: workflow_dispatch deploy-docs, no release needed).
