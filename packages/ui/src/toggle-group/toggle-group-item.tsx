@@ -56,7 +56,7 @@ export interface ToggleGroupItemProps extends Omit<
  * pressed state is the Root's (design/components/toggle-group.md 16.3). Its `tabindex` is written
  * by the roving engine (the group's, or the enclosing Toolbar's).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `aria-pressed`, `disabled`,
+ * Owned keys (conventions 1.2): `aria-pressed`, `disabled`,
  * `aria-disabled` (link or component `render`), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, `onClick`, and
  * `focusgroupstart` while the Root renders `focusgroup`.
  */
