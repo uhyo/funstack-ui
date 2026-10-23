@@ -55,63 +55,82 @@ export function Terms({ items }: { items: { id: string; term: string; definition
   );
 }
 
-type Cell = ReactNode;
+/** The five behaviour sections every component page has, in page order. */
+export const behaviourSections = [
+  {
+    id: "transition-types",
+    title: "Transition types",
+    concept: "Transitions & ViewTransition",
+    href: "/concepts/transitions#transition-types",
+  },
+  {
+    id: "optimistic-and-pending",
+    title: "Optimistic and pending",
+    concept: "Pending & optimistic state",
+    href: "/concepts/pending-and-optimistic",
+  },
+  { id: "suspense", title: "Suspense", concept: "Suspense", href: "/concepts/suspense" },
+  {
+    id: "browser-owned-state",
+    title: "Browser-owned state",
+    concept: "Browser-owned state",
+    href: "/concepts/browser-owned-state",
+  },
+  {
+    id: "before-hydration",
+    title: "Before hydration",
+    concept: "Server Components",
+    href: "/concepts/server-components#before-hydration",
+  },
+] as const;
+
+export type BehaviourId = (typeof behaviourSections)[number]["id"];
 
 /**
- * The "Async and platform behaviour" section every component page has, with the same rows in the
- * same order, each linking to the concept page that explains it. Strings are rendered with
- * {@link inline}.
+ * The compact index of the five behaviour sections, rendered once near the top of every
+ * component page so that a reader (and the concept pages) can jump to them.
  */
-export function BehaviourSummary({
-  name,
-  transitionTypes,
-  optimistic,
-  suspense,
-  browserOwned,
-  beforeHydration,
+export function BehaviourIndex() {
+  return (
+    <nav
+      id="async-and-platform"
+      className="behaviour-index"
+      aria-label="Async and platform behaviour"
+    >
+      <span className="behaviour-index-label">Async and platform behaviour:</span>{" "}
+      {behaviourSections.map((section, i) => (
+        <span key={section.id}>
+          {i > 0 && <span aria-hidden="true"> · </span>}
+          <a href={`#${section.id}`}>{section.title}</a>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * One of the five behaviour sections: a fixed heading and id, a link to the concept page that
+ * explains the idea, a summary paragraph (rendered with {@link inline}) and any longer content.
+ */
+export function BehaviourSection({
+  id,
+  summary,
+  children,
 }: {
-  /** The component's name, for the heading's accessible description. */
-  name: string;
-  transitionTypes: Cell;
-  optimistic: Cell;
-  suspense: Cell;
-  browserOwned: Cell;
-  beforeHydration: Cell;
+  id: BehaviourId;
+  /** How this component applies the concept, in one short paragraph. */
+  summary: string;
+  children?: ReactNode;
 }) {
-  const rows: [string, string, Cell][] = [
-    ["Transition types", "/concepts/transitions#transition-types", transitionTypes],
-    ["Optimistic and pending", "/concepts/pending-and-optimistic", optimistic],
-    ["Suspense", "/concepts/suspense", suspense],
-    ["Browser-owned state", "/concepts/browser-owned-state", browserOwned],
-    ["Before hydration", "/concepts/server-components#before-hydration", beforeHydration],
-  ];
+  const section = behaviourSections.find((s) => s.id === id)!;
   return (
     <>
-      <h3 id="async-and-platform">Async and platform behaviour</h3>
-      <p>
-        How {name} applies each concept. The first column links to the concept page that explains
-        it.
+      <h3 id={id}>{section.title}</h3>
+      <p className="concept-ref">
+        Concept: <a href={section.href}>{section.concept}</a>
       </p>
-      <div className="table-scroll">
-        <table className="props-table behaviour-summary">
-          <thead>
-            <tr>
-              <th>Concept</th>
-              <th>{name}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([label, href, cell]) => (
-              <tr key={label}>
-                <th scope="row">
-                  <a href={href}>{label}</a>
-                </th>
-                <td>{typeof cell === "string" ? inline(cell) : cell}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <p>{inline(summary)}</p>
+      {children}
     </>
   );
 }

@@ -142,9 +142,8 @@ import { saveOpenSections } from "./actions"; // "use server"
         </li>
       </ul>
       <p>
-        Each component page says exactly what works before hydration in the{" "}
-        <strong>Before hydration</strong> row of its <strong>Async and platform behaviour</strong>{" "}
-        section.
+        Each component page says exactly what works before hydration in its{" "}
+        <strong>Before hydration</strong> section.
       </p>
       <ConceptExample component="Accordion" href="/components/accordion">
         <p>

@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { TooltipArrow } from "../examples/TooltipArrow.js";
@@ -38,7 +38,9 @@ export function TooltipPage() {
         tooltip. This example is a Server Component.
       </p>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Tooltip } from "@funstack/ui/tooltip";
 
 <Tooltip.Root>                              {/* no DOM: id, options, interaction */}
@@ -73,7 +75,96 @@ export function TooltipPage() {
         </li>
       </ul>
 
-      <h3>Props</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4 id="skip-delay">Skip-delay</h4>
+      <p>
+        Once one tooltip is showing, the next one appears at once, as on every desktop platform:
+        moving the pointer along a toolbar, or arrowing through it, shows each tooltip without
+        waiting. The rule is global to the page, and there is nothing to set up:
+      </p>
+      <p>
+        <strong>
+          A tooltip opens with no delay while any <code>[role="tooltip"]:popover-open</code> exists
+          in the document, and the tooltip that was showing is hidden at once.
+        </strong>
+      </p>
+      <ul>
+        <li>
+          <strong>No provider, no prop.</strong> The condition is read from the page when a hover or
+          focus starts, so it works across React roots, in Server Components with nothing around
+          them, and with tooltips that are not FUNSTACK's (any popover with{" "}
+          <code>role="tooltip"</code> counts). There is no opt-out.
+        </li>
+        <li>
+          <strong>The window is "while the previous tooltip is still showing"</strong>, its{" "}
+          <code>closeDelay</code> included (150 ms by default), which covers moving between adjacent
+          controls. After both have closed, the next tooltip waits its <code>delay</code> again;
+          there is no longer cooldown.
+        </li>
+        <li>
+          <strong>On the native path</strong> (<code>experimental_interestFor</code> in Chromium)
+          the browser reads the delay from the trigger's computed style, so the Trigger renders{" "}
+          <code>interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))</code> and a
+          small stylesheet that sets <code>--fsui-tooltip-warm</code> to 1 on marked triggers while
+          a tooltip is showing. React hoists it into <code>&lt;head&gt;</code> (during server
+          rendering too); it works before hydration. Nothing visual: it times the interaction only.
+          Under a strict <code>style-src</code> it needs its hash or a nonce (
+          <a href="/concepts/content-security-policy">Content Security Policy</a>). Without it
+          (blocked, or React dropped it), the <code>var()</code> falls back to <code>0</code>: each
+          tooltip opens after its own <code>delay</code>, and only skip-delay is lost.
+        </li>
+        <li>
+          <strong>Skip the entry animation of an open like that</strong> with{" "}
+          <code>data-instant</code>: the Popup carries it while it is shown by an open that began
+          while another <code>[role="tooltip"]:popover-open</code> existed, so{" "}
+          <code>.tip[data-instant] {"{ transition: none; }"}</code> (or <code>animation: none</code>{" "}
+          for a keyframe entry) makes browsing a toolbar instant while the first tooltip still fades
+          in. The library writes it from the popup's <code>beforetoggle</code> event, on both paths,
+          before the open's first frame, so no transition starts; it is removed when the tooltip
+          closes, so every exit animates as usual. It is a DOM attribute only (no <code>state</code>{" "}
+          field), and like the skip itself it counts any <code>role="tooltip"</code> popover. Before
+          hydration, on the native path, a warm open still opens at once but has no{" "}
+          <code>data-instant</code>, so its animation plays. CSS alone cannot express it: by the
+          time the new tooltip is <code>:popover-open</code> the previous one is already hidden, and
+          a <code>:has(:popover-open)</code> condition matches the opening tooltip itself.
+        </li>
+      </ul>
+      <CodeBlock language="css">{`/* The library's rule (rendered by a Trigger with experimental_interestFor): */
+@property --fsui-tooltip-warm { syntax: "<number>"; inherits: false; initial-value: 0; }
+:root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }`}</CodeBlock>
+
+      <h4>Two mechanisms</h4>
+      <Table
+        head={["Flags", "Chromium", "Firefox", "Safari"]}
+        rows={[
+          ["none", "`manual` popover + JS", "same", "same"],
+          [
+            "`experimental_hint`",
+            "`hint` popover: native light dismiss, JS still attached",
+            "same as Chromium",
+            "`hint` unknown: behaves as `manual` + JS",
+          ],
+          [
+            "`experimental_interestFor`",
+            "native trigger, no JS interaction listeners",
+            "attribute ignored, JS path",
+            "attribute ignored, JS path",
+          ],
+          ["both", "fully native, works before hydration", "as `experimental_hint`", "as no flags"],
+        ]}
+      />
+      <CodeBlock>{`<Tooltip.Root provides="name">
+  <Tooltip.Trigger experimental_interestFor className="icon-button">
+    <SaveIcon />
+  </Tooltip.Trigger>
+  <Tooltip.Popup experimental_hint className="tip">Save</Tooltip.Popup>
+</Tooltip.Root>`}</CodeBlock>
+      <p>
+        The baseline popover type is <code>manual</code>, not <code>auto</code>, so that opening a
+        tooltip never closes an open menu or listbox.
+      </p>
+
+      <h3 id="props">Props</h3>
       <h4>
         <code>Tooltip.Root</code>
       </h4>
@@ -237,39 +328,7 @@ export function TooltipPage() {
         inside <code>Tooltip.Popup</code>.
       </p>
 
-      <h3 id="open-state-belongs-to-the-browser">Open state belongs to the browser</h3>
-      <p>
-        There is no <code>open</code> prop, no <code>openChangeAction</code> and no{" "}
-        <code>data-open</code>. The popup is a popover in the top layer, opened and closed by the
-        browser (or by the library's listeners calling <code>showPopover</code> /{" "}
-        <code>hidePopover</code>), never through React state. Style it with{" "}
-        <code>:popover-open</code>, and the trigger of an open tooltip with{" "}
-        <code>:has(+ :popover-open)</code>. Tooltip is therefore the one component with no
-        transitions, no <code>data-pending</code> and no <code>transition</code> prop; animate it in
-        CSS:
-      </p>
-      <CodeBlock language="css">{`.tip {
-  opacity: 0;
-  translate: 0 4px;
-  transition: opacity 120ms, translate 120ms, display 120ms allow-discrete, overlay 120ms allow-discrete;
-}
-.tip:popover-open {
-  opacity: 1;
-  translate: 0 0;
-  @starting-style { opacity: 0; translate: 0 4px; }
-}
-.tip[data-instant] {
-  transition: none; /* a warm open (another tooltip was showing): no entry animation */
-}
-@media (prefers-reduced-motion: reduce) {
-  .tip { transition: none; }
-}`}</CodeBlock>
-      <p>
-        To observe opens (for analytics), listen to the popup's native <code>toggle</code> event
-        through a <code>ref</code>.
-      </p>
-
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Hook", "On", "Meaning"]}
         rows={[
@@ -314,7 +373,7 @@ export function TooltipPage() {
         <code>inline-start</code> / <code>inline-end</code> values so the first layout has it.
       </p>
 
-      <h3>Keyboard, pointer and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Interaction", "Behaviour"]}
         rows={[
@@ -362,95 +421,72 @@ export function TooltipPage() {
         focusable content.
       </p>
 
-      <h3 id="skip-delay">Skip-delay</h3>
-      <p>
-        Once one tooltip is showing, the next one appears at once, as on every desktop platform:
-        moving the pointer along a toolbar, or arrowing through it, shows each tooltip without
-        waiting. The rule is global to the page, and there is nothing to set up:
-      </p>
-      <p>
-        <strong>
-          A tooltip opens with no delay while any <code>[role="tooltip"]:popover-open</code> exists
-          in the document, and the tooltip that was showing is hidden at once.
-        </strong>
-      </p>
-      <ul>
-        <li>
-          <strong>No provider, no prop.</strong> The condition is read from the page when a hover or
-          focus starts, so it works across React roots, in Server Components with nothing around
-          them, and with tooltips that are not FUNSTACK's (any popover with{" "}
-          <code>role="tooltip"</code> counts). There is no opt-out.
-        </li>
-        <li>
-          <strong>The window is "while the previous tooltip is still showing"</strong>, its{" "}
-          <code>closeDelay</code> included (150 ms by default), which covers moving between adjacent
-          controls. After both have closed, the next tooltip waits its <code>delay</code> again;
-          there is no longer cooldown.
-        </li>
-        <li>
-          <strong>On the native path</strong> (<code>experimental_interestFor</code> in Chromium)
-          the browser reads the delay from the trigger's computed style, so the Trigger renders{" "}
-          <code>interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))</code> and a
-          small stylesheet that sets <code>--fsui-tooltip-warm</code> to 1 on marked triggers while
-          a tooltip is showing. React hoists it into <code>&lt;head&gt;</code> (during server
-          rendering too); it works before hydration. Nothing visual: it times the interaction only.
-          Under a strict <code>style-src</code> it needs its hash or a nonce (
-          <a href="/concepts/content-security-policy">Content Security Policy</a>). Without it
-          (blocked, or React dropped it), the <code>var()</code> falls back to <code>0</code>: each
-          tooltip opens after its own <code>delay</code>, and only skip-delay is lost.
-        </li>
-        <li>
-          <strong>Skip the entry animation of an open like that</strong> with{" "}
-          <code>data-instant</code>: the Popup carries it while it is shown by an open that began
-          while another <code>[role="tooltip"]:popover-open</code> existed, so{" "}
-          <code>.tip[data-instant] {"{ transition: none; }"}</code> (or <code>animation: none</code>{" "}
-          for a keyframe entry) makes browsing a toolbar instant while the first tooltip still fades
-          in. The library writes it from the popup's <code>beforetoggle</code> event, on both paths,
-          before the open's first frame, so no transition starts; it is removed when the tooltip
-          closes, so every exit animates as usual. It is a DOM attribute only (no <code>state</code>{" "}
-          field), and like the skip itself it counts any <code>role="tooltip"</code> popover. Before
-          hydration, on the native path, a warm open still opens at once but has no{" "}
-          <code>data-instant</code>, so its animation plays. CSS alone cannot express it: by the
-          time the new tooltip is <code>:popover-open</code> the previous one is already hidden, and
-          a <code>:has(:popover-open)</code> condition matches the opening tooltip itself.
-        </li>
-      </ul>
-      <CodeBlock language="css">{`/* The library's rule (rendered by a Trigger with experimental_interestFor): */
-@property --fsui-tooltip-warm { syntax: "<number>"; inherits: false; initial-value: 0; }
-:root:has([role="tooltip"]:popover-open) [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1; }`}</CodeBlock>
-
-      <h3>Two mechanisms</h3>
-      <Table
-        head={["Flags", "Chromium", "Firefox", "Safari"]}
-        rows={[
-          ["none", "`manual` popover + JS", "same", "same"],
-          [
-            "`experimental_hint`",
-            "`hint` popover: native light dismiss, JS still attached",
-            "same as Chromium",
-            "`hint` unknown: behaves as `manual` + JS",
-          ],
-          [
-            "`experimental_interestFor`",
-            "native trigger, no JS interaction listeners",
-            "attribute ignored, JS path",
-            "attribute ignored, JS path",
-          ],
-          ["both", "fully native, works before hydration", "as `experimental_hint`", "as no flags"],
-        ]}
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "None: Tooltip makes no transitions and has no `transition` prop. Animate the popup in CSS on `:popover-open`."
+        }
       />
-      <CodeBlock>{`<Tooltip.Root provides="name">
-  <Tooltip.Trigger experimental_interestFor className="icon-button">
-    <SaveIcon />
-  </Tooltip.Trigger>
-  <Tooltip.Popup experimental_hint className="tip">Save</Tooltip.Popup>
-</Tooltip.Root>`}</CodeBlock>
-      <p>
-        The baseline popover type is <code>manual</code>, not <code>auto</code>, so that opening a
-        tooltip never closes an open menu or listbox.
-      </p>
 
-      <h3 id="arrow">Arrow</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={"None: no optimistic state and no `data-pending`."}
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "The popup's content renders when the tooltip mounts, not when it opens. If it must suspend, put the `<Suspense>` boundary inside `Tooltip.Popup`."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          "All of it: a tooltip's visibility is not application state, so the browser owns it."
+        }
+      >
+        <p>
+          There is no <code>open</code> prop, no <code>openChangeAction</code> and no{" "}
+          <code>data-open</code>. The popup is a popover in the top layer, opened and closed by the
+          browser (or by the library's listeners calling <code>showPopover</code> /{" "}
+          <code>hidePopover</code>), never through React state. Style it with{" "}
+          <code>:popover-open</code>, and the trigger of an open tooltip with{" "}
+          <code>:has(+ :popover-open)</code>. Tooltip is therefore the one component with no
+          transitions, no <code>data-pending</code> and no <code>transition</code> prop; animate it
+          in CSS:
+        </p>
+        <CodeBlock language="css">{`.tip {
+  opacity: 0;
+  translate: 0 4px;
+  transition: opacity 120ms, translate 120ms, display 120ms allow-discrete, overlay 120ms allow-discrete;
+}
+.tip:popover-open {
+  opacity: 1;
+  translate: 0 0;
+  @starting-style { opacity: 0; translate: 0 4px; }
+}
+.tip[data-instant] {
+  transition: none; /* a warm open (another tooltip was showing): no entry animation */
+}
+@media (prefers-reduced-motion: reduce) {
+  .tip { transition: none; }
+}`}</CodeBlock>
+        <p>
+          To observe opens (for analytics), listen to the popup's native <code>toggle</code> event
+          through a <code>ref</code>.
+        </p>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          "With `experimental_interestFor` and `experimental_hint` in Chromium, the whole tooltip (it is plain HTML). Elsewhere the JS path attaches at hydration. The ARIA relation is in the HTML either way."
+        }
+      />
+
+      <h3 id="recipes">Recipes</h3>
+      <h4 id="arrow">Arrow</h4>
       <Example
         source={tooltipArrowSource}
         fileName="TooltipArrow.tsx"
@@ -469,28 +505,6 @@ export function TooltipPage() {
 .tip[data-side="top"]::after { bottom: -4px; inset-inline-start: calc(50% - 4px); }
 .tip[data-side="bottom"]::after { top: -4px; inset-inline-start: calc(50% - 4px); }`}</CodeBlock>
 
-      <h3>Right-to-left</h3>
-      <p>
-        Nothing reads <code>direction</code> in JavaScript. <code>side="inline-start"</code> /{" "}
-        <code>"inline-end"</code> and <code>align="start"</code> / <code>"end"</code> on a top or
-        bottom side use the <code>self-*</code> <code>position-area</code> keywords, which follow
-        the popup's own direction, inherited from where you render it: an RTL page and an RTL
-        container (<code>dir="rtl"</code> on any ancestor) both mirror them, before hydration too.{" "}
-        <code>top</code> / <code>bottom</code> / <code>left</code> / <code>right</code> stay
-        physical. While shown, <code>data-side</code> is physical (<code>inline-end</code> reads{" "}
-        <code>left</code> in RTL).
-      </p>
-      <Callout title="Firefox and RTL containers">
-        <p>
-          Firefox misplaces any anchored popover along the inline axis when its parent box has a
-          different direction from the page (an RTL island in an LTR page, or the reverse), with
-          physical keywords too (Mozilla bug 2019601, tracked in{" "}
-          <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>). Page-level RTL is fine.
-          The library ships no workaround.
-        </p>
-      </Callout>
-
-      <h3>Recipes</h3>
       <h4>A link trigger</h4>
       <CodeBlock>{`<Tooltip.Root>
   <Tooltip.Trigger render={<a href="/pricing" />}>Pricing</Tooltip.Trigger>
@@ -521,22 +535,27 @@ export function TooltipPage() {
         </p>
       </Callout>
 
-      <BehaviourSummary
-        name="Tooltip"
-        transitionTypes={
-          "None: Tooltip makes no transitions and has no `transition` prop. Animate the popup in CSS on `:popover-open`."
-        }
-        optimistic={"None: no optimistic state and no `data-pending`."}
-        suspense={
-          "The popup's content renders when the tooltip mounts, not when it opens. If it must suspend, put the `<Suspense>` boundary inside `Tooltip.Popup`."
-        }
-        browserOwned={
-          "All of it: the popup is a popover in the top layer, opened and closed by the browser (or by the library's listeners), never through React state. There is no `open` prop, no action and no `data-open`; style with `:popover-open` ([Open state belongs to the browser](#open-state-belongs-to-the-browser))."
-        }
-        beforeHydration={
-          "With `experimental_interestFor` and `experimental_hint` in Chromium, the whole tooltip (it is plain HTML). Elsewhere the JS path attaches at hydration. The ARIA relation is in the HTML either way."
-        }
-      />
+      <h3 id="browser-notes">Browser notes</h3>
+      <h4>Right-to-left</h4>
+      <p>
+        Nothing reads <code>direction</code> in JavaScript. <code>side="inline-start"</code> /{" "}
+        <code>"inline-end"</code> and <code>align="start"</code> / <code>"end"</code> on a top or
+        bottom side use the <code>self-*</code> <code>position-area</code> keywords, which follow
+        the popup's own direction, inherited from where you render it: an RTL page and an RTL
+        container (<code>dir="rtl"</code> on any ancestor) both mirror them, before hydration too.{" "}
+        <code>top</code> / <code>bottom</code> / <code>left</code> / <code>right</code> stay
+        physical. While shown, <code>data-side</code> is physical (<code>inline-end</code> reads{" "}
+        <code>left</code> in RTL).
+      </p>
+      <Callout title="Firefox and RTL containers">
+        <p>
+          Firefox misplaces any anchored popover along the inline axis when its parent box has a
+          different direction from the page (an RTL island in an LTR page, or the reverse), with
+          physical keywords too (Mozilla bug 2019601, tracked in{" "}
+          <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>). Page-level RTL is fine.
+          The library ships no workaround.
+        </p>
+      </Callout>
     </div>
   );
 }

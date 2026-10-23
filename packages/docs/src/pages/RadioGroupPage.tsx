@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { RadioGroupForm } from "../examples/RadioGroupForm.js";
@@ -38,7 +38,9 @@ export function RadioGroupPage() {
         <RadioGroupTheme />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { RadioGroup } from "@funstack/ui/radio-group";
 
 <RadioGroup.Root name="plan" defaultValue="free" valueChangeAction={savePlan}> {/* fieldset */}
@@ -73,7 +75,7 @@ export function RadioGroupPage() {
         </li>
       </ul>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>RadioGroup.Root</code>
       </h4>
@@ -205,7 +207,7 @@ export function RadioGroupPage() {
         and <code>onChange</code>; <code>id</code> and other input props pass through.
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
@@ -247,7 +249,7 @@ export function RadioGroupPage() {
 .option:has(.radio:checked) { font-weight: 600; }
 .group[data-pending] { cursor: progress; }`}</CodeBlock>
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <p>Everything here is the browser's; the library installs no key handler.</p>
       <Table
         head={["Key", "Behaviour", "Dispatches"]}
@@ -305,35 +307,93 @@ export function RadioGroupPage() {
         <RadioGroupRtl />
       </Example>
 
-      <h3>Async walkthrough</h3>
-      <ol>
-        <li>
-          Click Dark (or arrow to it): the browser checks it and unchecks the old radio; the group
-          dispatches <code>valueChangeAction("dark", {'{ reason: "activate" }'})</code> in the
-          Root's transition. The Root and the Dark radio get <code>data-pending</code>.
-        </li>
-        <li>Resolve: the value is committed (uncontrolled) and the attributes go.</li>
-        <li>
-          Reject: the optimistic value reverts, React writes <code>checked</code> back to the old
-          radio, and the error reaches the nearest Error Boundary.
-        </li>
-        <li>
-          Arrow keys pressed quickly dispatch once per press; only the latest dispatch commits. For
-          a preference that needs no wait, do not return the promise (
-          <code>{"(next) => { void save(next); }"}</code>), or leave the value to the form submit.
-        </li>
-      </ol>
-      <Callout title="Why the DOM shows the optimistic value">
-        <p>
-          After every event react-dom restores controlled radios to their props. Only the
-          synchronous optimistic state has rendered by then, so radios driven by committed state
-          would snap back right after the click. Rendering the optimistic value is a correctness
-          requirement for native inputs. <code>details.event.preventDefault()</code> is therefore
-          not a veto; a controlled parent vetoes by not adopting the value.
-        </p>
-      </Callout>
+      <BehaviourSection
+        id="transition-types"
+        summary={"`fsui-radio-group` (no kind: every change checks one radio)."}
+      />
 
-      <h3>Forms</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "The checked radio is the optimistic value, rendered into the native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on the Item being checked. An Item's `transition` animates the commit that settles an action or rolls it back, not the check."
+        }
+      >
+        <h4>Walkthrough</h4>
+        <ol>
+          <li>
+            Click Dark (or arrow to it): the browser checks it and unchecks the old radio; the group
+            dispatches <code>valueChangeAction("dark", {'{ reason: "activate" }'})</code> in the
+            Root's transition. The Root and the Dark radio get <code>data-pending</code>.
+          </li>
+          <li>Resolve: the value is committed (uncontrolled) and the attributes go.</li>
+          <li>
+            Reject: the optimistic value reverts, React writes <code>checked</code> back to the old
+            radio, and the error reaches the nearest Error Boundary.
+          </li>
+          <li>
+            Arrow keys pressed quickly dispatch once per press; only the latest dispatch commits.
+            For a preference that needs no wait, do not return the promise (
+            <code>{"(next) => { void save(next); }"}</code>), or leave the value to the form submit.
+          </li>
+        </ol>
+        <Callout title="Why the DOM shows the optimistic value">
+          <p>
+            After every event react-dom restores controlled radios to their props. Only the
+            synchronous optimistic state has rendered by then, so radios driven by committed state
+            would snap back right after the click. Rendering the optimistic value is a correctness
+            requirement for native inputs. <code>details.event.preventDefault()</code> is therefore
+            not a veto; a controlled parent vetoes by not adopting the value.
+          </p>
+        </Callout>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={"No content region; nothing the RadioGroup renders suspends."}
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'Native radios: the browser checks one before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`, once per group.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'Native radios: clicking, Space, arrow keys between radios, labels, `required` and form submission work. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).'
+        }
+      >
+        <h4>Plain HTML</h4>
+        <p>
+          If a group only posts with its form, a Server Component can render the same native markup
+          itself, with no library code for it:
+        </p>
+        <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<fieldset role="radiogroup" aria-required="true">
+  <legend>Size</legend>
+  <label>
+    <input type="radio" name="size" value="s" defaultChecked={order.size === "s"} required /> Small
+  </label>
+  <label>
+    <input type="radio" name="size" value="m" defaultChecked={order.size === "m"} required /> Medium
+  </label>
+</fieldset>`}</CodeBlock>
+        <p>
+          The browser still provides the single tab stop, the arrow keys, <code>required</code> and
+          submission. For a required group, do what the Root does: put <code>required</code> on
+          every radio and <code>aria-required="true"</code> on the fieldset, so the radiogroup
+          itself is announced as required. Compared with <code>RadioGroup</code>, every radio needs
+          the shared <code>name</code> written out, and there is no <code>valueChangeAction</code>,
+          so no transition, <code>data-pending</code> or rollback on rejection; no{" "}
+          <code>data-checked</code> / <code>data-disabled</code> (use <code>:checked</code> and{" "}
+          <code>:disabled</code>); no React state that tracks it (clicks before hydration and form
+          resets live only in the DOM); and no <a href="/components/field">Field</a> integration.
+        </p>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <Example
         source={radioGroupFormSource}
         fileName="RadioGroupForm.tsx"
@@ -364,7 +424,7 @@ export function RadioGroupPage() {
         </li>
       </ul>
 
-      <h3>Server Functions and forms</h3>
+      <h4>Server Functions and forms</h4>
       <CodeBlock>{`// Autosave: a per-group action with data-pending, passed directly from a Server Component.
 <RadioGroup.Root defaultValue={user.plan} valueChangeAction={setPlan}>...</RadioGroup.Root>
 
@@ -378,48 +438,6 @@ export function RadioGroupPage() {
         <code>useFormStatus</code>. An action-less group is a working native radio group before
         hydration and with JavaScript off.
       </p>
-
-      <h3>Plain HTML</h3>
-      <p>
-        If a group only posts with its form, a Server Component can render the same native markup
-        itself, with no library code for it:
-      </p>
-      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
-<fieldset role="radiogroup" aria-required="true">
-  <legend>Size</legend>
-  <label>
-    <input type="radio" name="size" value="s" defaultChecked={order.size === "s"} required /> Small
-  </label>
-  <label>
-    <input type="radio" name="size" value="m" defaultChecked={order.size === "m"} required /> Medium
-  </label>
-</fieldset>`}</CodeBlock>
-      <p>
-        The browser still provides the single tab stop, the arrow keys, <code>required</code> and
-        submission. For a required group, do what the Root does: put <code>required</code> on every
-        radio and <code>aria-required="true"</code> on the fieldset, so the radiogroup itself is
-        announced as required. Compared with <code>RadioGroup</code>, every radio needs the shared{" "}
-        <code>name</code> written out, and there is no <code>valueChangeAction</code>, so no
-        transition, <code>data-pending</code> or rollback on rejection; no <code>data-checked</code>{" "}
-        / <code>data-disabled</code> (use <code>:checked</code> and <code>:disabled</code>); no
-        React state that tracks it (clicks before hydration and form resets live only in the DOM);
-        and no <a href="/components/field">Field</a> integration.
-      </p>
-
-      <BehaviourSummary
-        name="RadioGroup"
-        transitionTypes={"`fsui-radio-group` (no kind: every change checks one radio)."}
-        optimistic={
-          "The checked radio is the optimistic value, rendered into the native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on the Item being checked. An Item's `transition` animates the commit that settles an action or rolls it back, not the check."
-        }
-        suspense={"No content region; nothing the RadioGroup renders suspends."}
-        browserOwned={
-          'Native radios: the browser checks one before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`, once per group.'
-        }
-        beforeHydration={
-          'Native radios: clicking, Space, arrow keys between radios, labels, `required` and form submission work. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).'
-        }
-      />
     </div>
   );
 }

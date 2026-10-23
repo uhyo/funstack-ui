@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ComboboxCountry } from "../examples/ComboboxCountry.js";
@@ -36,54 +36,9 @@ export function ComboboxPage() {
         <ComboboxCountry />
       </Example>
 
-      <h3>Typing is urgent; everything it causes is not</h3>
-      <p>
-        "Everything is a transition" has one exception, and this is it: React requires a controlled
-        text input to update urgently, in the same event as the keystroke. So the text is the
-        library's first <strong>urgent state</strong>. It keeps the usual pair,{" "}
-        <code>inputValue</code> / <code>defaultInputValue</code>, but its callback is a handler, not
-        an action: <code>onInputValueChange</code> (
-        <a href="/concepts/action-props#urgent-lane">the urgent lane</a>) is called synchronously,
-        outside any transition, and never awaited. A controlled parent simply sets its state in the
-        body:
-      </p>
-      <CodeBlock>{`const [text, setText] = useState("");
-<Combobox.Root inputValue={text} onInputValueChange={(next) => setText(next)}>`}</CodeBlock>
-      <p>Everything downstream of the text leaves the urgent lane at once:</p>
-      <ul>
-        <li>
-          <strong>The results</strong> render from <code>query</code>, which is{" "}
-          <code>useDeferredValue(inputValue)</code>. A slow search never blocks a keystroke; the
-          previous results stay on screen (no fallback flash) with <code>data-stale</code> and{" "}
-          <code>aria-busy="true"</code> until the new ones are ready; and only the latest query is
-          ever rendered, so a slow response for "ja" cannot overwrite the results for "jap".
-        </li>
-        <li>
-          <strong>Opening</strong> is a transition (<code>openChangeAction</code>).
-        </li>
-        <li>
-          <strong>Choosing</strong> an option is a transition (<code>valueChangeAction</code>) with
-          an optimistic selection, exactly as every other value in the library.
-        </li>
-      </ul>
-      <Callout title="Do not fetch in onInputValueChange">
-        <p>
-          <code>{"onInputValueChange={async (q) => setResults(await search(q))}"}</code> brings back
-          every problem the deferred query solves: responses land in completion order, nothing marks
-          the results stale, and the urgent handler is not awaited anyway (development warns when it
-          returns a promise). Read a query-keyed cache with <code>use()</code> inside the List
-          instead.
-        </p>
-      </Callout>
-      <p>
-        While any async action is pending in the app (this combobox's own slow save included), React
-        holds every transition. Typing is unaffected (urgent), and so are the results: a deferred
-        render is not held by a pending action (verified in Chromium and Firefox). Opening the
-        listbox while a save is pending is a transition, so it waits for the save: the input shows{" "}
-        <code>aria-expanded="true"</code> and <code>data-pending</code> meanwhile.
-      </p>
+      <BehaviourIndex />
 
-      <h3>Anatomy</h3>
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Combobox } from "@funstack/ui/combobox";
 
 <Combobox.Root name="country" valueChangeAction={saveCountry}>   {/* no DOM; a hidden input with name */}
@@ -134,7 +89,55 @@ export function ComboboxPage() {
         </li>
       </ul>
 
-      <h3>Accepting an option</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Typing is urgent; everything it causes is not</h4>
+      <p>
+        "Everything is a transition" has one exception, and this is it: React requires a controlled
+        text input to update urgently, in the same event as the keystroke. So the text is the
+        library's first <strong>urgent state</strong>. It keeps the usual pair,{" "}
+        <code>inputValue</code> / <code>defaultInputValue</code>, but its callback is a handler, not
+        an action: <code>onInputValueChange</code> (
+        <a href="/concepts/action-props#urgent-lane">the urgent lane</a>) is called synchronously,
+        outside any transition, and never awaited. A controlled parent simply sets its state in the
+        body:
+      </p>
+      <CodeBlock>{`const [text, setText] = useState("");
+<Combobox.Root inputValue={text} onInputValueChange={(next) => setText(next)}>`}</CodeBlock>
+      <p>Everything downstream of the text leaves the urgent lane at once:</p>
+      <ul>
+        <li>
+          <strong>The results</strong> render from <code>query</code>, which is{" "}
+          <code>useDeferredValue(inputValue)</code>. A slow search never blocks a keystroke; the
+          previous results stay on screen (no fallback flash) with <code>data-stale</code> and{" "}
+          <code>aria-busy="true"</code> until the new ones are ready; and only the latest query is
+          ever rendered, so a slow response for "ja" cannot overwrite the results for "jap".
+        </li>
+        <li>
+          <strong>Opening</strong> is a transition (<code>openChangeAction</code>).
+        </li>
+        <li>
+          <strong>Choosing</strong> an option is a transition (<code>valueChangeAction</code>) with
+          an optimistic selection, exactly as every other value in the library.
+        </li>
+      </ul>
+      <Callout title="Do not fetch in onInputValueChange">
+        <p>
+          <code>{"onInputValueChange={async (q) => setResults(await search(q))}"}</code> brings back
+          every problem the deferred query solves: responses land in completion order, nothing marks
+          the results stale, and the urgent handler is not awaited anyway (development warns when it
+          returns a promise). Read a query-keyed cache with <code>use()</code> inside the List
+          instead.
+        </p>
+      </Callout>
+      <p>
+        While any async action is pending in the app (this combobox's own slow save included), React
+        holds every transition. Typing is unaffected (urgent), and so are the results: a deferred
+        render is not held by a pending action (verified in Chromium and Firefox). Opening the
+        listbox while a save is pending is a transition, so it waits for the save: the input shows{" "}
+        <code>aria-expanded="true"</code> and <code>data-pending</code> meanwhile.
+      </p>
+
+      <h4>Accepting an option</h4>
       <p>
         Enter on the active option, or a click: the input text becomes the option's label at once,
         the option gets <code>data-selected</code> and <code>data-pending</code>, and{" "}
@@ -151,7 +154,7 @@ export function ComboboxPage() {
         listbox closes anyway, because the close is part of the action's commit.
       </p>
 
-      <h3>Free text</h3>
+      <h4>Free text</h4>
       <Example
         source={comboboxDrinkSource}
         fileName="ComboboxDrink.tsx"
@@ -169,7 +172,7 @@ export function ComboboxPage() {
         leaves (<code>reason: "dismiss"</code>), so the field never shows a value it does not have.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Combobox.Root</code>
       </h4>
@@ -498,7 +501,7 @@ export function ComboboxPage() {
         "No results" never flashes during a search.
       </p>
 
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
@@ -524,7 +527,7 @@ export function ComboboxPage() {
         ]}
       />
 
-      <h3>Keyboard</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Listbox", "Behaviour"]}
         rows={[
@@ -573,7 +576,7 @@ export function ComboboxPage() {
         and Meta combinations are left alone.
       </p>
 
-      <h3>Accessibility and announcements</h3>
+      <h4>Accessibility and announcements</h4>
       <ul>
         <li>
           The Input is <code>role="combobox"</code> with <code>aria-autocomplete="list"</code>,{" "}
@@ -591,7 +594,62 @@ export function ComboboxPage() {
       </ul>
       <CodeBlock>{`<Combobox.Root announce={(n) => (n === 0 ? "該当なし" : \`\${n}件\`)}>`}</CodeBlock>
 
-      <h3>Styling and ViewTransition</h3>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          'Every value dispatch: `fsui-combobox` and `fsui-combobox-select`. Opens and closes: `fsui-combobox` plus `fsui-combobox-open` or `fsui-combobox-close`. A deferred results render carries no `fsui-*` type, so give the Popup\'s `transition` a map with `default: "none"`.'
+        }
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. The typed text is urgent, not optimistic (see [the urgent lane](/concepts/action-props#urgent-lane))."
+        }
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "Results render from a deferred copy of the text (`useDeferredValue`), so an async search is `use(search(query))` inside a boundary in the List. The first load shows your fallback; after that every keystroke keeps the previous results on screen, marked `data-stale` and `aria-busy`, until the new ones are ready. Only the latest query is ever rendered. Option content must not suspend."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'The listbox is a popover: a dismissal (Escape, a click outside, another popover opening) is the browser\'s. Focus leaving the input is closed by the library but reported the same way. Either way `openChangeAction(false)` is a notification with `reason: "dismiss"`.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'A plain text field: typing works and the form posts the default selection (and the raw text, if the Input has a `name`). The listbox never opens before hydration. Text typed then is kept and reported once, with `reason: "platform"`.'
+        }
+      />
+
+      <h3 id="forms">Forms</h3>
+      <ul>
+        <li>
+          <code>name</code> on the Root posts the value through a hidden input (<code>""</code> for{" "}
+          <code>null</code>); a <code>name</code> on the Input posts the raw text as well.{" "}
+          <code>required</code> on the Input is native.
+        </li>
+        <li>
+          A form reset (the Reset button, <code>form.reset()</code>, or React's automatic reset
+          after a form action) dispatches <code>valueChangeAction</code> with{" "}
+          <code>reason: "platform"</code> and writes the text: uncontrolled, back to the latest{" "}
+          <code>defaultValue</code> / <code>defaultInputValue</code>; controlled, to the mount-time
+          values.
+        </li>
+        <li>
+          Text typed before hydration (and Firefox's form restoration) is kept and reported once
+          through <code>onInputValueChange</code> with <code>reason: "platform"</code>.
+        </li>
+      </ul>
+
+      <h3 id="styling">Styling</h3>
       <CodeBlock language="css">{`.listbox { margin: 0; inset: auto; max-block-size: 20rem; overflow: auto; }
 .listbox [role="listbox"][data-stale] { opacity: .6; }          /* old results while searching */
 .listbox [role="option"][data-active] { background: var(--accent-weak); }
@@ -619,27 +677,7 @@ export function ComboboxPage() {
         <code>fsui-combobox-close</code>.
       </p>
 
-      <h3>Forms</h3>
-      <ul>
-        <li>
-          <code>name</code> on the Root posts the value through a hidden input (<code>""</code> for{" "}
-          <code>null</code>); a <code>name</code> on the Input posts the raw text as well.{" "}
-          <code>required</code> on the Input is native.
-        </li>
-        <li>
-          A form reset (the Reset button, <code>form.reset()</code>, or React's automatic reset
-          after a form action) dispatches <code>valueChangeAction</code> with{" "}
-          <code>reason: "platform"</code> and writes the text: uncontrolled, back to the latest{" "}
-          <code>defaultValue</code> / <code>defaultInputValue</code>; controlled, to the mount-time
-          values.
-        </li>
-        <li>
-          Text typed before hydration (and Firefox's form restoration) is kept and reported once
-          through <code>onInputValueChange</code> with <code>reason: "platform"</code>.
-        </li>
-      </ul>
-
-      <h3>Placement, nesting and browser notes</h3>
+      <h3 id="browser-notes">Browser notes</h3>
       <ul>
         <li>
           <strong>Right-to-left:</strong> the listbox lines up with the input's inline-start edge
@@ -669,25 +707,6 @@ export function ComboboxPage() {
           <code>minWidth: "anchor-size(--group width)"</code> through <code>style</code>.
         </li>
       </ul>
-
-      <BehaviourSummary
-        name="Combobox"
-        transitionTypes={
-          'Every value dispatch: `fsui-combobox` and `fsui-combobox-select`. Opens and closes: `fsui-combobox` plus `fsui-combobox-open` or `fsui-combobox-close`. A deferred results render carries no `fsui-*` type, so give the Popup\'s `transition` a map with `default: "none"`.'
-        }
-        optimistic={
-          "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. The typed text is urgent, not optimistic (see [the urgent lane](/concepts/action-props#urgent-lane))."
-        }
-        suspense={
-          "Results render from a deferred copy of the text (`useDeferredValue`), so an async search is `use(search(query))` inside a boundary in the List. The first load shows your fallback; after that every keystroke keeps the previous results on screen, marked `data-stale` and `aria-busy`, until the new ones are ready. Only the latest query is ever rendered. Option content must not suspend."
-        }
-        browserOwned={
-          'The listbox is a popover: a dismissal (Escape, a click outside, another popover opening) is the browser\'s. Focus leaving the input is closed by the library but reported the same way. Either way `openChangeAction(false)` is a notification with `reason: "dismiss"`.'
-        }
-        beforeHydration={
-          'A plain text field: typing works and the form posts the default selection (and the raw text, if the Input has a `name`). The listbox never opens before hydration. Text typed then is kept and reported once, with `reason: "platform"`.'
-        }
-      />
     </div>
   );
 }

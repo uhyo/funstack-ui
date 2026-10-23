@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ProgressForm } from "../examples/ProgressForm.js";
@@ -64,7 +64,9 @@ export function ProgressPage() {
         </p>
       </Callout>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Progress } from "@funstack/ui/progress";
 
 <Progress.Root value={uploaded} max={file.size} format={{ style: "unit", unit: "megabyte" }}>
@@ -106,41 +108,7 @@ export function ProgressPage() {
         </li>
       </ul>
 
-      <h3>Busy while a form submits</h3>
-      <p>
-        An indeterminate bar from <code>Form.Root</code>'s <code>children(state)</code>. The
-        progressbar never sets <code>aria-busy</code>: the region being replaced does, and points at
-        the bar with <code>aria-describedby</code> (the APG's advice). Progress does not read the
-        form status by itself, so a Progress inside a form is not tied to it by accident.
-      </p>
-      <Example
-        source={progressFormSource}
-        fileName="ProgressForm.tsx"
-        css={progressCss}
-        cssFileName="progress.css"
-      >
-        <ProgressForm />
-      </Example>
-
-      <h3>From a Server Component</h3>
-      <p>
-        This example has no <code>"use client"</code>. <code>Progress.Root</code> has none either,
-        so it ran on the server, once: the <code>getAriaValueText</code> function was passed from a
-        Server Component (it never crosses to the browser), <code>Intl</code> formatted the numbers
-        where the data is, and the arithmetic is not in the client bundle. The parts read the Root
-        through a context, so they are small client modules; which of them reach the browser depends
-        on how your bundler emits client references.
-      </p>
-      <Example
-        source={progressJobsSource}
-        fileName="ProgressJobs.tsx"
-        css={progressCss}
-        cssFileName="progress.css"
-      >
-        <ProgressJobs />
-      </Example>
-
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Progress.Root</code>
       </h4>
@@ -221,7 +189,7 @@ export function ProgressPage() {
         ]}
       />
 
-      <h3>State</h3>
+      <h4>State</h4>
       <Table
         head={["Field", "Type", "Meaning"]}
         rows={[
@@ -244,7 +212,7 @@ export function ProgressPage() {
       />
       <p>Every part receives the same state object.</p>
 
-      <h3>Data attributes and custom properties</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Name", "On", "Meaning"]}
         rows={[
@@ -265,7 +233,8 @@ export function ProgressPage() {
         <code>prefers-reduced-motion</code> block with a static indeterminate rendering.
       </p>
 
-      <h3>Labelling</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
+      <h4>Labelling</h4>
       <p>
         A progressbar needs an accessible name. Render a <code>Progress.Label</code>, or pass{" "}
         <code>aria-label</code> / <code>aria-labelledby</code> to the Root. The Root{" "}
@@ -282,7 +251,7 @@ export function ProgressPage() {
         <a href="/components/meter">Meter</a> for the password-strength pattern.
       </p>
 
-      <h3>What assistive technology hears</h3>
+      <h4>What assistive technology hears</h4>
       <ul>
         <li>The upload above: "Uploading report.pdf, progress bar, 3.2 megabytes".</li>
         <li>
@@ -296,25 +265,84 @@ export function ProgressPage() {
         </li>
       </ul>
 
-      <h3 id="server-components">Server Components</h3>
-      <p>
-        <code>Progress.Root</code> has no <code>"use client"</code>: it uses only <code>useId</code>
-        , arithmetic and <code>Intl</code>, and renders a context provider created in a client
-        module. <code>Progress.Track</code>, <code>Indicator</code>, <code>Label</code> and{" "}
-        <code>Value</code> read that context and are client modules. A Server Component may render
-        all of them, and may pass <code>getAriaValueText</code>, <code>children(state)</code> and{" "}
-        <code>render</code> functions to the Root, but not to the parts (they are client components:
-        format a part's content in the Root's <code>children(state)</code> instead). Rendered from a
-        client component, the Root is an ordinary component; under SSR of that client tree pass{" "}
-        <code>locale</code>.
-      </p>
-      <p>
-        There is no behaviour to hydrate: the server HTML carries the role, the values, the text,
-        the data attributes and the custom property, and your CSS draws the bar and its animation
-        from the first paint. A Progress also works as a Suspense fallback.
-      </p>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "None: values change in your own lane, usually urgently, and no part takes a `transition` prop."
+        }
+      />
 
-      <h3>Not in this version</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={"None: a Progress displays a value; it has no optimistic or pending state."}
+      />
+
+      <BehaviourSection id="suspense" summary={"A Progress works as a Suspense fallback."} />
+
+      <BehaviourSection id="browser-owned-state" summary={"None."} />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          "Everything: there is no behaviour. The HTML carries the role, the values, `aria-valuetext`, the data attributes and the custom property, and your CSS draws the bar from the first paint. The Root is itself a Server Component."
+        }
+      >
+        <h4 id="server-components">Server Components</h4>
+        <p>
+          <code>Progress.Root</code> has no <code>"use client"</code>: it uses only{" "}
+          <code>useId</code>, arithmetic and <code>Intl</code>, and renders a context provider
+          created in a client module. <code>Progress.Track</code>, <code>Indicator</code>,{" "}
+          <code>Label</code> and <code>Value</code> read that context and are client modules. A
+          Server Component may render all of them, and may pass <code>getAriaValueText</code>,{" "}
+          <code>children(state)</code> and <code>render</code> functions to the Root, but not to the
+          parts (they are client components: format a part's content in the Root's{" "}
+          <code>children(state)</code> instead). Rendered from a client component, the Root is an
+          ordinary component; under SSR of that client tree pass <code>locale</code>.
+        </p>
+        <p>
+          There is no behaviour to hydrate: the server HTML carries the role, the values, the text,
+          the data attributes and the custom property, and your CSS draws the bar and its animation
+          from the first paint. A Progress also works as a Suspense fallback.
+        </p>
+
+        <h4>From a Server Component</h4>
+        <p>
+          This example has no <code>"use client"</code>. <code>Progress.Root</code> has none either,
+          so it ran on the server, once: the <code>getAriaValueText</code> function was passed from
+          a Server Component (it never crosses to the browser), <code>Intl</code> formatted the
+          numbers where the data is, and the arithmetic is not in the client bundle. The parts read
+          the Root through a context, so they are small client modules; which of them reach the
+          browser depends on how your bundler emits client references.
+        </p>
+        <Example
+          source={progressJobsSource}
+          fileName="ProgressJobs.tsx"
+          css={progressCss}
+          cssFileName="progress.css"
+        >
+          <ProgressJobs />
+        </Example>
+      </BehaviourSection>
+
+      <h3 id="recipes">Recipes</h3>
+      <h4>Busy while a form submits</h4>
+      <p>
+        An indeterminate bar from <code>Form.Root</code>'s <code>children(state)</code>. The
+        progressbar never sets <code>aria-busy</code>: the region being replaced does, and points at
+        the bar with <code>aria-describedby</code> (the APG's advice). Progress does not read the
+        form status by itself, so a Progress inside a form is not tied to it by accident.
+      </p>
+      <Example
+        source={progressFormSource}
+        fileName="ProgressForm.tsx"
+        css={progressCss}
+        cssFileName="progress.css"
+      >
+        <ProgressForm />
+      </Example>
+
+      <h3 id="browser-notes">Browser notes</h3>
+      <h4>Not in this version</h4>
       <ul>
         <li>
           A <code>transition</code> prop: values change in your lane, usually urgently, and the fill
@@ -327,19 +355,6 @@ export function ProgressPage() {
           attributes, and Field registration.
         </li>
       </ul>
-
-      <BehaviourSummary
-        name="Progress"
-        transitionTypes={
-          "None: values change in your own lane, usually urgently, and no part takes a `transition` prop."
-        }
-        optimistic={"None: a Progress displays a value; it has no optimistic or pending state."}
-        suspense={"A Progress works as a Suspense fallback."}
-        browserOwned={"None."}
-        beforeHydration={
-          "Everything: there is no behaviour. The HTML carries the role, the values, `aria-valuetext`, the data attributes and the custom property, and your CSS draws the bar from the first paint. The Root is itself a Server Component."
-        }
-      />
     </div>
   );
 }

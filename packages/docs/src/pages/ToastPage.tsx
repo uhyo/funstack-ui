@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToastArchive } from "../examples/ToastArchive.js";
@@ -46,7 +46,9 @@ export function ToastPage() {
         <ToastArchive />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Toast, toast } from "@funstack/ui/toast";
 
 // Once, near the root of the app (from a Client Component: children is a function).
@@ -93,7 +95,8 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </li>
       </ul>
 
-      <h3>The urgent queue</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>The urgent queue</h4>
       <p>
         Every queue change (add, update, dismiss, the drop after an exit animation) is a normal,
         urgent update. <code>toast()</code> dispatches from a microtask, so a call inside a{" "}
@@ -111,7 +114,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <code>id</code> updates that toast in place ("one toast per key").
       </p>
 
-      <h3>Promise toasts</h3>
+      <h4>Promise toasts</h4>
       <p>
         <code>toast.promise(promise, {"{ pending, success, error }"})</code> shows{" "}
         <code>pending</code> at once with <code>data-pending</code> and no timer, and replaces it
@@ -144,7 +147,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         ]}
       />
 
-      <h3>Undo and closeAction</h3>
+      <h4>Undo and closeAction</h4>
       <p>
         <code>Toast.Action</code> is a pure-trigger action part, like <code>Menu.Item</code>. While
         its action runs the Action and the Root carry <code>data-pending</code> and the toast's
@@ -172,7 +175,18 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <ToastUndoWindow />
       </Example>
 
-      <h3>Props</h3>
+      <h4>Timers</h4>
+      <p>
+        A toast's timer starts once it is visible (within <code>limit</code>), its content has
+        rendered and it is not pending, and resumes with the remaining time after a pause. Timers
+        pause while the pointer is over the region, focus is inside it, the document is hidden or
+        the window is blurred (<code>data-paused</code>), and per toast while it is pending.
+        Elapsing closes the toast with <code>reason: "timeout"</code>. Pausing helps sighted users;
+        the persistent default for action toasts and the hotkey are what give screen-reader users
+        time to reach an Undo.
+      </p>
+
+      <h3 id="props">Props</h3>
       <h4>
         <code>toast(options)</code> and the manager
       </h4>
@@ -411,7 +425,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <code>{"{ toast }"}</code>.
       </p>
 
-      <h4>Data attributes</h4>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "Part", "Meaning"]}
         rows={[
@@ -436,18 +450,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         ]}
       />
 
-      <h3>Timers</h3>
-      <p>
-        A toast's timer starts once it is visible (within <code>limit</code>), its content has
-        rendered and it is not pending, and resumes with the remaining time after a pause. Timers
-        pause while the pointer is over the region, focus is inside it, the document is hidden or
-        the window is blurred (<code>data-paused</code>), and per toast while it is pending.
-        Elapsing closes the toast with <code>reason: "timeout"</code>. Pausing helps sighted users;
-        the persistent default for action toasts and the hotkey are what give screen-reader users
-        time to reach an Undo.
-      </p>
-
-      <h3>Keyboard, focus and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Where", "Behaviour"]}
         rows={[
@@ -483,19 +486,76 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </li>
       </ul>
 
-      <h3>Top layer and modal dialogs</h3>
-      <p>
-        The region is <code>popover="manual"</code>: shown while it has toasts, it neither closes an
-        open menu or popover nor is closed by one, and it has no light dismiss. A toast added while
-        a later menu or popover covers the region raises it to the top again. A top-layer element
-        outside an open modal <code>&lt;dialog&gt;</code> is inert, so while a{" "}
-        <a href="/components/dialog">Dialog</a> is open as a modal the region moves into it (and
-        back when it closes): an Undo stays clickable. The move keeps the toasts' React state (an
-        Undo in flight stays pending), but it is a DOM move: the toasts' enter animation plays again
-        and focus inside a toast is lost. Dialogs the library did not open are not detected.
-      </p>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "None. Every Toast commit is urgent (so a toast shows even while an async action holds every transition), no part takes a `transition` prop, and React starts view transitions for transition commits only. Animate with CSS (`@starting-style`, `[data-ending]`)."
+        }
+      />
 
-      <h3>Styling and animation</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "No optimistic state. `data-pending` is on the Root while the toast's promise is unsettled or its Action's action runs, and on that Action, which is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+        }
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={"Toast content may suspend; each Root has its own boundary and a `fallback` prop."}
+      >
+        <p>
+          Toast content may suspend (<code>{"title: <UserName id={id} />"}</code>). Each Root wraps
+          its children in its own Suspense boundary, so a suspending toast does not pull the
+          Viewport into the nearest boundary above it (a toast mounts urgently, where that boundary
+          would show its fallback). While the content suspends the Root shows its{" "}
+          <code>fallback</code> prop (nothing by default), in the same frame as the{" "}
+          <code>toast()</code> call; the timer does not run and nothing is announced. On the reveal
+          the toast announces its Title and Description and its timer starts. An update whose new
+          content suspends shows the <code>fallback</code> again and pauses the timer until the next
+          reveal.
+        </p>
+        <CodeBlock>{`<Toast.Root key={t.id} toast={t} fallback={<ToastSkeleton />}>
+  <Toast.Title />
+  <Toast.Description />
+</Toast.Root>`}</CodeBlock>
+        <p>
+          Use <code>fallback</code> rather than your own <code>&lt;Suspense&gt;</code> inside the
+          Root: the toast is still announced when your boundary reveals its Title and Description,
+          but its timer starts at once, because the library cannot see your boundary's fallback.
+        </p>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'The region is a `popover="manual"` in the top layer, shown while it has toasts and never light-dismissed. Its stack is library-owned.'
+        }
+      >
+        <h4>Top layer and modal dialogs</h4>
+        <p>
+          The region is <code>popover="manual"</code>: shown while it has toasts, it neither closes
+          an open menu or popover nor is closed by one, and it has no light dismiss. A toast added
+          while a later menu or popover covers the region raises it to the top again. A top-layer
+          element outside an open modal <code>&lt;dialog&gt;</code> is inert, so while a{" "}
+          <a href="/components/dialog">Dialog</a> is open as a modal the region moves into it (and
+          back when it closes): an Undo stays clickable. The move keeps the toasts' React state (an
+          Undo in flight stays pending), but it is a DOM move: the toasts' enter animation plays
+          again and focus inside a toast is lost. Dialogs the library did not open are not detected.
+        </p>
+      </BehaviourSection>
+
+      <BehaviourSection id="before-hydration" summary={"Toasts appear only after hydration."}>
+        <p>
+          <code>{"<Toast.Viewport>"}</code> takes a function child, so render it from a Client
+          Component file that a Server Component layout includes. On the server it renders the empty
+          region. <code>toast()</code> is client code: a Server Function returns data and the client
+          calls <code>toast()</code> with it (in the action that called it, or in an effect on{" "}
+          <code>useActionState</code>'s result).
+        </p>
+      </BehaviourSection>
+
+      <h3 id="styling">Styling</h3>
       <p>
         Enter with <code>@starting-style</code>, exit on <code>[data-ending]</code>: the library
         keeps a closed toast mounted until the animations (transitions included) that{" "}
@@ -508,37 +568,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <code>:nth-last-child()</code>.
       </p>
 
-      <h3 id="suspense">Suspense</h3>
-      <p>
-        Toast content may suspend (<code>{"title: <UserName id={id} />"}</code>). Each Root wraps
-        its children in its own Suspense boundary, so a suspending toast does not pull the Viewport
-        into the nearest boundary above it (a toast mounts urgently, where that boundary would show
-        its fallback). While the content suspends the Root shows its <code>fallback</code> prop
-        (nothing by default), in the same frame as the <code>toast()</code> call; the timer does not
-        run and nothing is announced. On the reveal the toast announces its Title and Description
-        and its timer starts. An update whose new content suspends shows the <code>fallback</code>{" "}
-        again and pauses the timer until the next reveal.
-      </p>
-      <CodeBlock>{`<Toast.Root key={t.id} toast={t} fallback={<ToastSkeleton />}>
-  <Toast.Title />
-  <Toast.Description />
-</Toast.Root>`}</CodeBlock>
-      <p>
-        Use <code>fallback</code> rather than your own <code>&lt;Suspense&gt;</code> inside the
-        Root: the toast is still announced when your boundary reveals its Title and Description, but
-        its timer starts at once, because the library cannot see your boundary's fallback.
-      </p>
-
-      <h3>Server Components</h3>
-      <p>
-        <code>{"<Toast.Viewport>"}</code> takes a function child, so render it from a Client
-        Component file that a Server Component layout includes. On the server it renders the empty
-        region. <code>toast()</code> is client code: a Server Function returns data and the client
-        calls <code>toast()</code> with it (in the action that called it, or in an effect on{" "}
-        <code>useActionState</code>'s result).
-      </p>
-
-      <h3>Browser notes</h3>
+      <h3 id="browser-notes">Browser notes</h3>
       <ul>
         <li>
           <code>ariaNotify</code> is in Chrome 141, Firefox 150 and Safari 27; where it is missing
@@ -546,25 +576,6 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </li>
         <li>No swipe to dismiss yet: Close, Escape and the timer cover WCAG 2.5.1.</li>
       </ul>
-
-      <BehaviourSummary
-        name="Toast"
-        transitionTypes={
-          "None. Every Toast commit is urgent (so a toast shows even while an async action holds every transition), no part takes a `transition` prop, and React starts view transitions for transition commits only. Animate with CSS (`@starting-style`, `[data-ending]`)."
-        }
-        optimistic={
-          "No optimistic state. `data-pending` is on the Root while the toast's promise is unsettled or its Action's action runs, and on that Action, which is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
-        }
-        suspense={
-          "Each Root wraps its content in its own Suspense boundary and shows its `fallback` prop while the content suspends; the timer and the announcement wait for the reveal ([Suspense](#suspense))."
-        }
-        browserOwned={
-          'The region is a `popover="manual"` in the top layer, shown while it has toasts and never light-dismissed. Its stack is library-owned.'
-        }
-        beforeHydration={
-          "The Viewport renders the empty region on the server. `toast()` is client code, so toasts appear only after hydration."
-        }
-      />
     </div>
   );
 }

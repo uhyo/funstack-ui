@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { PopoverActions } from "../examples/PopoverActions.js";
@@ -43,7 +43,9 @@ export function PopoverPage() {
         focusing steps put focus on the input, the first focusable element.
       </p>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Popover } from "@funstack/ui/popover";
 
 <Popover.Root>                                       {/* no DOM: ids, mode, state */}
@@ -85,7 +87,8 @@ export function PopoverPage() {
         </li>
       </ul>
 
-      <h3 id="two-modes">Two modes</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4 id="two-modes">Two modes</h4>
       <Table
         head={["", "JS-free mode", "Library mode"]}
         rows={[
@@ -141,7 +144,7 @@ export function PopoverPage() {
         first render; switching later is not supported (development warning).
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Popover.Root</code>
       </h4>
@@ -361,7 +364,7 @@ export function PopoverPage() {
         shown.
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Hook", "On", "Meaning"]}
         rows={[
@@ -436,48 +439,7 @@ export function PopoverPage() {
         hang (WebKit bug 317926).
       </p>
 
-      <h3>ViewTransition: an exit in every engine</h3>
-      <p>
-        With <code>transition</code>, the Popup renders <code>&lt;ViewTransition&gt;</code> around
-        the popover element itself. A library-driven open shows the popover in the layout effect of
-        its commit and a library-driven close hides it in the layout effect of its commit, so the
-        view transition captures the popup's box as <code>::view-transition-new</code> on open and{" "}
-        <code>::view-transition-old</code> (with its content) on close. That is the only way a
-        popover's exit can animate in Firefox.
-      </p>
-      <CodeBlock>{`<Popover.Popup transition={{ "fsui-popover-open": "pop-in", "fsui-popover-close": "pop-out", default: "none" }}>`}</CodeBlock>
-      <CodeBlock language="css">{`::view-transition-new(.pop-in) { animation: 160ms ease-out both pop-in; }
-::view-transition-old(.pop-out) { animation: 120ms ease-in both pop-out; }
-/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
-html:active-view-transition .popover { transition: none; }
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
-}`}</CodeBlock>
-      <ul>
-        <li>
-          Transition types: <code>fsui-popover</code> plus <code>fsui-popover-open</code> or{" "}
-          <code>fsui-popover-close</code>. A controlled close carries none.
-        </li>
-        <li>
-          Dismissals (Escape, a click outside) happen in the browser before React hears about them,
-          so they animate with the CSS exit only: keep it. Cut it while a view transition runs (
-          <code>html:active-view-transition .popover {"{ transition: none; }"}</code>): otherwise a
-          popover hidden by the library stays rendered through its fade, and Chromium captures it in
-          the close's new snapshot as well, a double image. The untyped selector is deliberate: a
-          controlled close carries no transition types. The cost: an unrelated view transition of
-          the page also cuts a fade in progress.
-        </li>
-        <li>
-          With <code>transition="none"</code>, a plain open starts no document view transition: the
-          content mounts under the already-mounted popover element. A Popover Root inserted by a
-          transition with <code>transition</code> set on its Popup, or a nested Popup with{" "}
-          <code>transition</code> that mounts with the outer content, runs the page cross-fade (
-          <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>). The page receives
-          no pointer events while a view transition runs: keep them short.
-        </li>
-      </ul>
-
-      <h3>Keyboard, focus and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Behaviour", "Who"]}
         rows={[
@@ -529,80 +491,156 @@ html:active-view-transition .popover { transition: none; }
         </li>
       </ul>
 
-      <h3>Async walkthrough (library mode)</h3>
-      <Example
-        source={popoverActionsSource}
-        fileName="PopoverActions.tsx"
-        css={popoverCss}
-        cssFileName="popover.css"
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "Library mode: `fsui-popover` plus `fsui-popover-open` or `fsui-popover-close`; a controlled close carries none. JS-free mode starts no transitions."
+        }
       >
-        <PopoverActions />
-      </Example>
-      <ol>
-        <li>
-          Click ⋯: the click is cancelled (so the native command does not run), the Trigger gets{" "}
-          <code>aria-expanded="true"</code>, <code>data-open</code> and <code>data-pending</code>,
-          and <code>openChangeAction(true, {'{ reason: "activate" }'})</code> runs.
-        </li>
-        <li>
-          The commit that sets committed <code>open</code> renders the Popup's children;{" "}
-          <code>RowActions</code> suspends, so React holds the commit. The popup stays hidden; the
-          Trigger keeps spinning.
-        </li>
-        <li>
-          The data arrives: the content commits and{" "}
-          <code>showPopover({"{ source: trigger }"})</code> runs in the same commit, so the popup is
-          anchored below the Trigger and the platform focuses fully rendered content. With{" "}
-          <code>transition="pop"</code> it animates in.
-        </li>
-        <li>
-          Click Archive: the button shows its own pending label while its action runs; then the
-          Close dispatches <code>openChangeAction(false, {'{ reason: "activate" }'})</code> and the
-          commit that ends it hides the popup inside a view transition: the exit animates in every
-          engine.
-        </li>
-        <li>
-          Press Escape or click outside instead: the browser hides the popover at once (CSS fade),
-          and the Root receives <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>.
-        </li>
-      </ol>
-      <Callout kind="warning" title="Refusing a close">
+        <h4>ViewTransition: an exit in every engine</h4>
         <p>
-          A controlled parent that keeps <code>open</code> after a <strong>part-initiated</strong>{" "}
-          close vetoes it: nothing was hidden, the Trigger's <code>data-open</code> snaps back.
-          After a <strong>dismissal</strong> the popover is already hidden; a parent that keeps{" "}
-          <code>open</code> gets it re-opened once the action settles, which the user sees as a
-          blink. Adopt <code>false</code> for dismissals.
+          With <code>transition</code>, the Popup renders <code>&lt;ViewTransition&gt;</code> around
+          the popover element itself. A library-driven open shows the popover in the layout effect
+          of its commit and a library-driven close hides it in the layout effect of its commit, so
+          the view transition captures the popup's box as <code>::view-transition-new</code> on open
+          and <code>::view-transition-old</code> (with its content) on close. That is the only way a
+          popover's exit can animate in Firefox.
         </p>
-      </Callout>
+        <CodeBlock>{`<Popover.Popup transition={{ "fsui-popover-open": "pop-in", "fsui-popover-close": "pop-out", default: "none" }}>`}</CodeBlock>
+        <CodeBlock language="css">{`::view-transition-new(.pop-in) { animation: 160ms ease-out both pop-in; }
+::view-transition-old(.pop-out) { animation: 120ms ease-in both pop-out; }
+/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
+html:active-view-transition .popover { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}`}</CodeBlock>
+        <ul>
+          <li>
+            Transition types: <code>fsui-popover</code> plus <code>fsui-popover-open</code> or{" "}
+            <code>fsui-popover-close</code>. A controlled close carries none.
+          </li>
+          <li>
+            Dismissals (Escape, a click outside) happen in the browser before React hears about
+            them, so they animate with the CSS exit only: keep it. Cut it while a view transition
+            runs (<code>html:active-view-transition .popover {"{ transition: none; }"}</code>):
+            otherwise a popover hidden by the library stays rendered through its fade, and Chromium
+            captures it in the close's new snapshot as well, a double image. The untyped selector is
+            deliberate: a controlled close carries no transition types. The cost: an unrelated view
+            transition of the page also cuts a fade in progress.
+          </li>
+          <li>
+            With <code>transition="none"</code>, a plain open starts no document view transition:
+            the content mounts under the already-mounted popover element. A Popover Root inserted by
+            a transition with <code>transition</code> set on its Popup, or a nested Popup with{" "}
+            <code>transition</code> that mounts with the outer content, runs the page cross-fade (
+            <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>). The page
+            receives no pointer events while a view transition runs: keep them short.
+          </li>
+        </ul>
+      </BehaviourSection>
 
-      <h3 id="the-platform-paths">The platform paths</h3>
-      <ul>
-        <li>
-          <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
-          <code>autoFocus</code> in server-rendered markup. After hydration, and for content React
-          renders on the client, use <code>initialFocus</code>: React does not write{" "}
-          <code>autofocus</code> on client-rendered elements.
-        </li>
-        <li>
-          <strong>Before hydration, library mode:</strong> the Trigger already carries the command,
-          so a click opens the popover natively, but the content is not in the HTML yet (with{" "}
-          <code>defaultOpen</code> it is, and the Trigger already says it is expanded; only the
-          showing waits for hydration). On hydration the Popup finds it open and dispatches{" "}
-          <code>openChangeAction(true, {'{ reason: "platform" }'})</code> with no event; the content
-          mounts into the open popover. If the action rejects or a controlled parent refuses, the
-          popover closes again.
-        </li>
-        <li>
-          <strong>Foreign invokers and scripts:</strong> in library mode any open that the library
-          did not start (a <code>&lt;button commandfor command="show-popover"&gt;</code>, a script{" "}
-          <code>showPopover()</code>) is cancelled at <code>beforetoggle</code> and dispatched with
-          that <code>ToggleEvent</code>. A foreign <code>hide-popover</code> closes it natively and
-          is reported as <code>"activate"</code>.
-        </li>
-      </ul>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "Library mode: the Trigger shows the optimistic open state (`aria-expanded`, `data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+        }
+      >
+        <h4>Walkthrough (library mode)</h4>
+        <Example
+          source={popoverActionsSource}
+          fileName="PopoverActions.tsx"
+          css={popoverCss}
+          cssFileName="popover.css"
+        >
+          <PopoverActions />
+        </Example>
+        <ol>
+          <li>
+            Click ⋯: the click is cancelled (so the native command does not run), the Trigger gets{" "}
+            <code>aria-expanded="true"</code>, <code>data-open</code> and <code>data-pending</code>,
+            and <code>openChangeAction(true, {'{ reason: "activate" }'})</code> runs.
+          </li>
+          <li>
+            The commit that sets committed <code>open</code> renders the Popup's children;{" "}
+            <code>RowActions</code> suspends, so React holds the commit. The popup stays hidden; the
+            Trigger keeps spinning.
+          </li>
+          <li>
+            The data arrives: the content commits and{" "}
+            <code>showPopover({"{ source: trigger }"})</code> runs in the same commit, so the popup
+            is anchored below the Trigger and the platform focuses fully rendered content. With{" "}
+            <code>transition="pop"</code> it animates in.
+          </li>
+          <li>
+            Click Archive: the button shows its own pending label while its action runs; then the
+            Close dispatches <code>openChangeAction(false, {'{ reason: "activate" }'})</code> and
+            the commit that ends it hides the popup inside a view transition: the exit animates in
+            every engine.
+          </li>
+          <li>
+            Press Escape or click outside instead: the browser hides the popover at once (CSS fade),
+            and the Root receives <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>.
+          </li>
+        </ol>
+        <Callout kind="warning" title="Refusing a close">
+          <p>
+            A controlled parent that keeps <code>open</code> after a <strong>part-initiated</strong>{" "}
+            close vetoes it: nothing was hidden, the Trigger's <code>data-open</code> snaps back.
+            After a <strong>dismissal</strong> the popover is already hidden; a parent that keeps{" "}
+            <code>open</code> gets it re-opened once the action settles, which the user sees as a
+            blink. Adopt <code>false</code> for dismissals.
+          </p>
+        </Callout>
+      </BehaviourSection>
 
-      <h3>Recipes</h3>
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "Content that suspends holds the open: the popup stays hidden with the Trigger pending, then shows once, complete. A `<Suspense>` inside the Popup opens at once with a skeleton instead."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, a click outside, another popover opening) is the browser\'s: the popover closes at once and `openChangeAction(false)` is a notification with `reason: "dismiss"`. Dismissals animate with CSS only.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'JS-free mode: everything, including `autoFocus` in server-rendered markup. Library mode: the Trigger opens the popover natively, but the content is not in the HTML yet; on hydration the Popup finds it open, dispatches `openChangeAction(true)` with `reason: "platform"` and the content mounts.'
+        }
+      >
+        <h4 id="the-platform-paths">The platform paths</h4>
+        <ul>
+          <li>
+            <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
+            <code>autoFocus</code> in server-rendered markup. After hydration, and for content React
+            renders on the client, use <code>initialFocus</code>: React does not write{" "}
+            <code>autofocus</code> on client-rendered elements.
+          </li>
+          <li>
+            <strong>Before hydration, library mode:</strong> the Trigger already carries the
+            command, so a click opens the popover natively, but the content is not in the HTML yet
+            (with <code>defaultOpen</code> it is, and the Trigger already says it is expanded; only
+            the showing waits for hydration). On hydration the Popup finds it open and dispatches{" "}
+            <code>openChangeAction(true, {'{ reason: "platform" }'})</code> with no event; the
+            content mounts into the open popover. If the action rejects or a controlled parent
+            refuses, the popover closes again.
+          </li>
+          <li>
+            <strong>Foreign invokers and scripts:</strong> in library mode any open that the library
+            did not start (a <code>&lt;button commandfor command="show-popover"&gt;</code>, a script{" "}
+            <code>showPopover()</code>) is cancelled at <code>beforetoggle</code> and dispatched
+            with that <code>ToggleEvent</code>. A foreign <code>hide-popover</code> closes it
+            natively and is reported as <code>"activate"</code>.
+          </li>
+        </ul>
+      </BehaviourSection>
+
+      <h3 id="recipes">Recipes</h3>
       <h4>Submit, then close (controlled)</h4>
       <CodeBlock>{`const [open, setOpen] = useState(false);
 
@@ -649,25 +687,6 @@ html:active-view-transition .popover { transition: none; }
         <code>position-try-fallbacks</code> can hang (WebKit bug 302008): give the inner Popup{" "}
         <code>side={"{null}"}</code> and place it in CSS if you hit it.
       </p>
-
-      <BehaviourSummary
-        name="Popover"
-        transitionTypes={
-          "Library mode: `fsui-popover` plus `fsui-popover-open` or `fsui-popover-close`; a controlled close carries none. JS-free mode starts no transitions."
-        }
-        optimistic={
-          "Library mode: the Trigger shows the optimistic open state (`aria-expanded`, `data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
-        }
-        suspense={
-          "Content that suspends holds the open: the popup stays hidden with the Trigger pending, then shows once, complete. A `<Suspense>` inside the Popup opens at once with a skeleton instead."
-        }
-        browserOwned={
-          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, a click outside, another popover opening) is the browser\'s: the popover closes at once and `openChangeAction(false)` is a notification with `reason: "dismiss"`. Dismissals animate with CSS only ([Two modes](#two-modes)).'
-        }
-        beforeHydration={
-          'JS-free mode: everything, including `autoFocus` in server-rendered markup. Library mode: the Trigger opens the popover natively, but the content is not in the HTML yet; on hydration the Popup finds it open, dispatches `openChangeAction(true)` with `reason: "platform"` and the content mounts ([The platform paths](#the-platform-paths)).'
-        }
-      />
     </div>
   );
 }

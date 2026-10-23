@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToggleGroupAlignment } from "../examples/ToggleGroupAlignment.js";
@@ -42,56 +42,9 @@ export function ToggleGroupPage() {
         together.
       </p>
 
-      <h3>Exclusive mode</h3>
-      <Example source={toggleGroupAlignmentSource} fileName="ToggleGroupAlignment.tsx">
-        <ToggleGroupAlignment />
-      </Example>
-      <p>
-        With <code>exclusive</code>, <code>value</code> is <code>string | null</code>. Pressing the
-        pressed Item releases it (<code>next === null</code>); a view switcher that must always show
-        one value passes <code>deselectable={"{false}"}</code>, and pressing the pressed Item then
-        dispatches nothing.
-      </p>
-      <Callout title="When to use RadioGroup instead">
-        <p>
-          The Items stay <code>aria-pressed</code> buttons in both modes, so a screen reader does
-          not announce "1 of 3" or mutual exclusivity. If the choice is a form value, must always
-          have a value, or should be announced as one choice among several, use a{" "}
-          <a href="/components/radio-group">RadioGroup</a> styled as a segmented control: native
-          radios, arrows that select, <code>name</code> and <code>required</code>.
-        </p>
-      </Callout>
+      <BehaviourIndex />
 
-      <h3>Controlled, saved on the server</h3>
-      <p>
-        <code>next</code> is the whole set; <code>details.added</code> and{" "}
-        <code>details.removed</code> say what changed. When you update after your own{" "}
-        <code>await</code>, apply the diff with a functional update: two overlapping saves that
-        settle out of order then cannot lose a change.
-      </p>
-      <CodeBlock>{`const [styles, setStyles] = useState<string[]>(doc.styles);
-
-<ToggleGroup.Root
-  aria-label="Text style"
-  value={styles}
-  valueChangeAction={async (_next, { added, removed }) => {
-    await api.patchStyles(doc.id, { added, removed });
-    startTransition(() =>
-      setStyles((prev) => [
-        ...prev.filter((v) => !removed.includes(v)),
-        ...added.filter((v) => !prev.includes(v)),
-      ]),
-    );
-  }}
->
-  …
-</ToggleGroup.Root>`}</CodeBlock>
-      <p>
-        A slow <code>valueChangeAction</code> holds every other transition in the app until it
-        settles; for a fire-and-forget save, call <code>void save(next)</code> without awaiting it.
-      </p>
-
-      <h3>Anatomy</h3>
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { ToggleGroup } from "@funstack/ui/toggle-group";
 
 <ToggleGroup.Root aria-label="Text style" defaultValue={["bold"]} valueChangeAction={save}>
@@ -114,7 +67,28 @@ export function ToggleGroupPage() {
         ]}
       />
 
-      <h3>Props</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Exclusive mode</h4>
+      <Example source={toggleGroupAlignmentSource} fileName="ToggleGroupAlignment.tsx">
+        <ToggleGroupAlignment />
+      </Example>
+      <p>
+        With <code>exclusive</code>, <code>value</code> is <code>string | null</code>. Pressing the
+        pressed Item releases it (<code>next === null</code>); a view switcher that must always show
+        one value passes <code>deselectable={"{false}"}</code>, and pressing the pressed Item then
+        dispatches nothing.
+      </p>
+      <Callout title="When to use RadioGroup instead">
+        <p>
+          The Items stay <code>aria-pressed</code> buttons in both modes, so a screen reader does
+          not announce "1 of 3" or mutual exclusivity. If the choice is a form value, must always
+          have a value, or should be announced as one choice among several, use a{" "}
+          <a href="/components/radio-group">RadioGroup</a> styled as a segmented control: native
+          radios, arrows that select, <code>name</code> and <code>required</code>.
+        </p>
+      </Callout>
+
+      <h3 id="props">Props</h3>
       <h4>ToggleGroup.Root</h4>
       <p>
         The props are discriminated on <code>exclusive</code>: without it (or with{" "}
@@ -236,7 +210,7 @@ export function ToggleGroupPage() {
         the roving focus writes <code>tabindex</code> itself.
       </p>
 
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
@@ -256,7 +230,7 @@ export function ToggleGroupPage() {
         ]}
       />
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Horizontal", "Vertical", "Effect"]}
         rows={[
@@ -298,7 +272,38 @@ export function ToggleGroupPage() {
         </li>
       </ul>
 
-      <h3>Styling</h3>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "`fsui-toggle-group`, plus `fsui-toggle-group-press` and / or `fsui-toggle-group-release`."
+        }
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "Items show the optimistic set (`aria-pressed`, `data-pressed`). `data-pending` is on the Root while an action is in flight, and on each Item whose optimistic state differs from its committed one. An Item's `transition` animates the commit that ends the action, not the flip."
+        }
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={"No content region. Item content renders optimistic state and must not suspend."}
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={"None: the pressed set is library-owned."}
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          "Markup and ARIA; every Item is its own Tab stop until the first effect sets up the single Tab stop. Pressing needs JavaScript."
+        }
+      />
+
+      <h3 id="styling">Styling</h3>
       <CodeBlock language="css">{`.group[data-pending] { cursor: progress; }
 .item[data-pressed] { background: var(--accent); color: white; }
 .item[data-pending]::after { content: ""; /* spinner */ }
@@ -316,20 +321,35 @@ export function ToggleGroupPage() {
         <code>fsui-toggle-group-press</code> and / or <code>fsui-toggle-group-release</code>.
       </p>
 
-      <BehaviourSummary
-        name="ToggleGroup"
-        transitionTypes={
-          "`fsui-toggle-group`, plus `fsui-toggle-group-press` and / or `fsui-toggle-group-release`."
-        }
-        optimistic={
-          "Items show the optimistic set (`aria-pressed`, `data-pressed`). `data-pending` is on the Root while an action is in flight, and on each Item whose optimistic state differs from its committed one. An Item's `transition` animates the commit that ends the action, not the flip."
-        }
-        suspense={"No content region. Item content renders optimistic state and must not suspend."}
-        browserOwned={"None: the pressed set is library-owned."}
-        beforeHydration={
-          "Markup and ARIA; every Item is its own Tab stop until the first effect sets up the single Tab stop. Pressing needs JavaScript."
-        }
-      />
+      <h3 id="recipes">Recipes</h3>
+      <h4>Controlled, saved on the server</h4>
+      <p>
+        <code>next</code> is the whole set; <code>details.added</code> and{" "}
+        <code>details.removed</code> say what changed. When you update after your own{" "}
+        <code>await</code>, apply the diff with a functional update: two overlapping saves that
+        settle out of order then cannot lose a change.
+      </p>
+      <CodeBlock>{`const [styles, setStyles] = useState<string[]>(doc.styles);
+
+<ToggleGroup.Root
+  aria-label="Text style"
+  value={styles}
+  valueChangeAction={async (_next, { added, removed }) => {
+    await api.patchStyles(doc.id, { added, removed });
+    startTransition(() =>
+      setStyles((prev) => [
+        ...prev.filter((v) => !removed.includes(v)),
+        ...added.filter((v) => !prev.includes(v)),
+      ]),
+    );
+  }}
+>
+  …
+</ToggleGroup.Root>`}</CodeBlock>
+      <p>
+        A slow <code>valueChangeAction</code> holds every other transition in the app until it
+        settles; for a fire-and-forget save, call <code>void save(next)</code> without awaiting it.
+      </p>
     </div>
   );
 }

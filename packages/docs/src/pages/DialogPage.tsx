@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { DialogConfirm } from "../examples/DialogConfirm.js";
@@ -43,7 +43,9 @@ export function DialogPage() {
         disabled.
       </p>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Dialog } from "@funstack/ui/dialog";
 
 <Dialog.Root>                                   {/* no DOM: ids, mode, state */}
@@ -79,7 +81,8 @@ export function DialogPage() {
         </li>
       </ul>
 
-      <h3 id="two-modes">Two modes</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4 id="two-modes">Two modes</h4>
       <Table
         head={["", "JS-free mode", "Library mode"]}
         rows={[
@@ -135,7 +138,7 @@ export function DialogPage() {
         first render; switching later is not supported (development warning).
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Dialog.Root</code>
       </h4>
@@ -440,7 +443,7 @@ export function DialogPage() {
         and <code>DialogDescriptionState</code> are <code>DialogPopupState</code>).
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Hook", "On", "Meaning"]}
         rows={[
@@ -483,57 +486,7 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         and a controlled close keeps it through the fade as well.
       </p>
 
-      <h3>ViewTransition: an exit in every engine</h3>
-      <p>
-        With <code>transition</code>, the Popup renders <code>&lt;ViewTransition&gt;</code> around
-        the <code>&lt;dialog&gt;</code>. A library-driven open calls <code>showModal()</code> in the
-        layout effect of its commit and a library-driven close calls <code>close(returnValue)</code>{" "}
-        in the layout effect of its commit, so the view transition captures the dialog's box as{" "}
-        <code>::view-transition-new</code> on open and <code>::view-transition-old</code> (with its
-        content) on close. That is the only way a dialog's exit can animate in Firefox. The order
-        example below uses it.
-      </p>
-      <CodeBlock>{`<Dialog.Popup transition={{ "fsui-dialog-open": "pop", "fsui-dialog-close": "pop", default: "none" }}>`}</CodeBlock>
-      <CodeBlock language="css">{`::view-transition-new(.pop) { animation: 180ms ease-out both pop-in; }
-::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }
-/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
-html:active-view-transition .dialog { transition: none; }
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
-}`}</CodeBlock>
-      <ul>
-        <li>
-          Library-driven closes: a <code>Dialog.Close</code>, a <code>Dialog.Form</code> submit or
-          settled action, a foreign <code>request-close</code> / <code>close</code> command, a
-          controlled <code>open={"{false}"}</code>. Transition types: <code>fsui-dialog</code> plus{" "}
-          <code>fsui-dialog-open</code> or <code>fsui-dialog-close</code>; a controlled close
-          carries none.
-        </li>
-        <li>
-          Dismissals (Escape, a click outside) happen in the browser before React hears about them,
-          so they animate with the CSS exit only: keep it. Cut it while a view transition runs (
-          <code>html:active-view-transition .dialog {"{ transition: none; }"}</code>): otherwise a
-          dialog closed by the library stays rendered through its fade, and Chromium captures it in
-          the close's new snapshot as well, a double image. The untyped selector is deliberate: a
-          controlled close carries no transition types. The cost: an unrelated view transition of
-          the page also cuts a fade in progress.
-        </li>
-        <li>
-          The <code>::backdrop</code> is not captured on its own: it is part of the page snapshot
-          and leaves with the root cross-fade. A backdrop that should animate with the dialog is an
-          element rendered as the Popup's first child (<code>position: fixed; inset: 0</code>;
-          clicks on it are not light dismiss).
-        </li>
-        <li>
-          A plain open with <code>transition="none"</code> starts no document view transition (the
-          content mounts under the already-mounted <code>&lt;dialog&gt;</code>). A Root inserted by
-          a transition with <code>transition</code> on its Popup, or a nested Popup with{" "}
-          <code>transition</code> that mounts with the outer content, runs the page cross-fade (
-          <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>).
-        </li>
-      </ul>
-
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Behaviour", "Who"]}
         rows={[
@@ -598,67 +551,179 @@ html:active-view-transition .dialog { transition: none; }
         </p>
       </Callout>
 
-      <h3>Async walkthrough (library mode)</h3>
-      <Example
-        source={dialogOrdersSource}
-        fileName="DialogOrders.tsx"
-        css={dialogCss}
-        cssFileName="dialog.css"
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "Library mode: `fsui-dialog` plus `fsui-dialog-open` or `fsui-dialog-close`; a controlled close carries none. JS-free mode starts no transitions."
+        }
       >
-        <DialogOrders />
-      </Example>
-      <ol>
-        <li>
-          Click Details: the click is cancelled (so the native command does not run), the Trigger
-          gets <code>data-open</code> and <code>data-pending</code>, and{" "}
-          <code>openChangeAction(true, {'{ reason: "activate", returnValue: undefined }'})</code>{" "}
-          runs.
-        </li>
-        <li>
-          The commit that sets committed <code>open</code> renders the Popup's children;{" "}
-          <code>OrderDetails</code> suspends, so React holds the commit. The dialog stays closed;
-          the Trigger keeps spinning.
-        </li>
-        <li>
-          The data arrives: the content commits and <code>showModal()</code> runs in the same
-          commit's layout effect, so the platform focuses fully rendered content (here the Close
-          button, through <code>initialFocus</code>).
-        </li>
-        <li>
-          Close it with the Close button: the click is cancelled, the Trigger shows{" "}
-          <code>data-pending</code> while{" "}
-          <code>openChangeAction(false, {'{ reason: "activate", returnValue: "done" }'})</code>{" "}
-          runs, then the dialog closes in a view transition (the <code>transition</code> prop), in
-          Firefox too. Escape or a click on the backdrop (<code>lightDismiss</code>) are dismissals:
-          the browser closes the dialog at once and the Root then receives{" "}
-          <code>reason: "dismiss"</code>. The second open is instant (the data is cached).
-        </li>
-        <li>
-          If the opening action rejects, the error reaches the Error Boundary above the Root and the
-          dialog never opens.
-        </li>
-      </ol>
-      <p>
-        To open now and show a skeleton instead, put a <code>&lt;Suspense&gt;</code> boundary inside
-        the Popup: a newly mounted boundary shows its fallback immediately.
-      </p>
-      <Callout kind="warning" title="A part's close is yours to refuse; a dismissal's is not">
+        <h4>ViewTransition: an exit in every engine</h4>
         <p>
-          A close a part asks for waits for <code>openChangeAction(false)</code>: a controlled
-          parent that keeps <code>open</code> gets a plain snap-back, and the dialog never blinks
-          (for example "the save failed, keep editing", checked through{" "}
-          <code>details.returnValue</code>). A dismissal is already done when the action runs: a
-          parent that does not adopt <code>false</code> gets the dialog re-opened once the action
-          settles, and the user sees it close and come back. Adopt a dismissal's <code>false</code>{" "}
-          unconditionally. If the user dismisses the dialog while a part's close is still running
-          and you then veto that close, the dialog stays closed and you receive the dismissal (
-          <code>reason: "dismiss"</code>) right after. Neither is a way to ask the user first: an
-          action must never await input, so build confirmation inside the dialog (see the callout
-          above).
+          With <code>transition</code>, the Popup renders <code>&lt;ViewTransition&gt;</code> around
+          the <code>&lt;dialog&gt;</code>. A library-driven open calls <code>showModal()</code> in
+          the layout effect of its commit and a library-driven close calls{" "}
+          <code>close(returnValue)</code> in the layout effect of its commit, so the view transition
+          captures the dialog's box as <code>::view-transition-new</code> on open and{" "}
+          <code>::view-transition-old</code> (with its content) on close. That is the only way a
+          dialog's exit can animate in Firefox. The order example below uses it.
         </p>
-      </Callout>
+        <CodeBlock>{`<Dialog.Popup transition={{ "fsui-dialog-open": "pop", "fsui-dialog-close": "pop", default: "none" }}>`}</CodeBlock>
+        <CodeBlock language="css">{`::view-transition-new(.pop) { animation: 180ms ease-out both pop-in; }
+::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }
+/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
+html:active-view-transition .dialog { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}`}</CodeBlock>
+        <ul>
+          <li>
+            Library-driven closes: a <code>Dialog.Close</code>, a <code>Dialog.Form</code> submit or
+            settled action, a foreign <code>request-close</code> / <code>close</code> command, a
+            controlled <code>open={"{false}"}</code>. Transition types: <code>fsui-dialog</code>{" "}
+            plus <code>fsui-dialog-open</code> or <code>fsui-dialog-close</code>; a controlled close
+            carries none.
+          </li>
+          <li>
+            Dismissals (Escape, a click outside) happen in the browser before React hears about
+            them, so they animate with the CSS exit only: keep it. Cut it while a view transition
+            runs (<code>html:active-view-transition .dialog {"{ transition: none; }"}</code>):
+            otherwise a dialog closed by the library stays rendered through its fade, and Chromium
+            captures it in the close's new snapshot as well, a double image. The untyped selector is
+            deliberate: a controlled close carries no transition types. The cost: an unrelated view
+            transition of the page also cuts a fade in progress.
+          </li>
+          <li>
+            The <code>::backdrop</code> is not captured on its own: it is part of the page snapshot
+            and leaves with the root cross-fade. A backdrop that should animate with the dialog is
+            an element rendered as the Popup's first child (<code>position: fixed; inset: 0</code>;
+            clicks on it are not light dismiss).
+          </li>
+          <li>
+            A plain open with <code>transition="none"</code> starts no document view transition (the
+            content mounts under the already-mounted <code>&lt;dialog&gt;</code>). A Root inserted
+            by a transition with <code>transition</code> on its Popup, or a nested Popup with{" "}
+            <code>transition</code> that mounts with the outer content, runs the page cross-fade (
+            <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>).
+          </li>
+        </ul>
+      </BehaviourSection>
 
-      <h3>Forms: action, then close</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a close notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger) (`data-pending`, `aria-disabled`)."
+        }
+      >
+        <h4>Walkthrough (library mode)</h4>
+        <Example
+          source={dialogOrdersSource}
+          fileName="DialogOrders.tsx"
+          css={dialogCss}
+          cssFileName="dialog.css"
+        >
+          <DialogOrders />
+        </Example>
+        <ol>
+          <li>
+            Click Details: the click is cancelled (so the native command does not run), the Trigger
+            gets <code>data-open</code> and <code>data-pending</code>, and{" "}
+            <code>openChangeAction(true, {'{ reason: "activate", returnValue: undefined }'})</code>{" "}
+            runs.
+          </li>
+          <li>
+            The commit that sets committed <code>open</code> renders the Popup's children;{" "}
+            <code>OrderDetails</code> suspends, so React holds the commit. The dialog stays closed;
+            the Trigger keeps spinning.
+          </li>
+          <li>
+            The data arrives: the content commits and <code>showModal()</code> runs in the same
+            commit's layout effect, so the platform focuses fully rendered content (here the Close
+            button, through <code>initialFocus</code>).
+          </li>
+          <li>
+            Close it with the Close button: the click is cancelled, the Trigger shows{" "}
+            <code>data-pending</code> while{" "}
+            <code>openChangeAction(false, {'{ reason: "activate", returnValue: "done" }'})</code>{" "}
+            runs, then the dialog closes in a view transition (the <code>transition</code> prop), in
+            Firefox too. Escape or a click on the backdrop (<code>lightDismiss</code>) are
+            dismissals: the browser closes the dialog at once and the Root then receives{" "}
+            <code>reason: "dismiss"</code>. The second open is instant (the data is cached).
+          </li>
+          <li>
+            If the opening action rejects, the error reaches the Error Boundary above the Root and
+            the dialog never opens.
+          </li>
+        </ol>
+        <p>
+          To open now and show a skeleton instead, put a <code>&lt;Suspense&gt;</code> boundary
+          inside the Popup: a newly mounted boundary shows its fallback immediately.
+        </p>
+        <Callout kind="warning" title="A part's close is yours to refuse; a dismissal's is not">
+          <p>
+            A close a part asks for waits for <code>openChangeAction(false)</code>: a controlled
+            parent that keeps <code>open</code> gets a plain snap-back, and the dialog never blinks
+            (for example "the save failed, keep editing", checked through{" "}
+            <code>details.returnValue</code>). A dismissal is already done when the action runs: a
+            parent that does not adopt <code>false</code> gets the dialog re-opened once the action
+            settles, and the user sees it close and come back. Adopt a dismissal's{" "}
+            <code>false</code> unconditionally. If the user dismisses the dialog while a part's
+            close is still running and you then veto that close, the dialog stays closed and you
+            receive the dismissal (<code>reason: "dismiss"</code>) right after. Neither is a way to
+            ask the user first: an action must never await input, so build confirmation inside the
+            dialog (see the callout above).
+          </p>
+        </Callout>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "Content that suspends holds the open: the dialog stays closed with the Trigger pending, then opens once, complete. A `<Suspense>` inside the Popup opens at once with a skeleton instead."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, Android back, a click outside) is the browser\'s: the dialog closes at once, `openChangeAction(false)` is a notification with `reason: "dismiss"`, and a controlled parent that keeps `open` gets it re-opened once the action settles. Dismissals animate with CSS only.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'JS-free mode: everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup, CSS animation; a `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open. Library mode: the Trigger opens the dialog natively, but its content is not in the HTML; on hydration it is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.'
+        }
+      >
+        <h4>The platform paths</h4>
+        <ul>
+          <li>
+            <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
+            <code>autoFocus</code> in server-rendered markup and <code>Dialog.Form</code> with a
+            Server Function action (React's progressive enhancement). After hydration, and for
+            content React renders on the client, use <code>initialFocus</code>: React does not write{" "}
+            <code>autofocus</code> on client-rendered elements.
+          </li>
+          <li>
+            <strong>Before hydration, library mode:</strong> the Trigger already carries the
+            command, so a click opens the dialog natively, but the content is not in the HTML yet.
+            On hydration the Popup finds the dialog open and dispatches{" "}
+            <code>openChangeAction(true, {'{ reason: "platform" }'})</code> with no event; the
+            content mounts into the open dialog. If the action rejects or a controlled parent
+            refuses, the dialog closes again. A dialog whose pre-hydration experience matters
+            belongs in JS-free mode.
+          </li>
+          <li>
+            <strong>Foreign invokers:</strong> in library mode, any{" "}
+            <code>&lt;button commandfor command="show-modal"&gt;</code> (or{" "}
+            <code>"request-close"</code> / <code>"close"</code>) pointing at the dialog goes through
+            the library too, as the Trigger and Close parts do; a close command's <code>value</code>{" "}
+            becomes the <code>returnValue</code>.
+          </li>
+        </ul>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <Example
         source={dialogProfileSource}
         fileName="DialogProfile.tsx"
@@ -696,34 +761,7 @@ html:active-view-transition .dialog { transition: none; }
         .
       </p>
 
-      <h3>The platform paths</h3>
-      <ul>
-        <li>
-          <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
-          <code>autoFocus</code> in server-rendered markup and <code>Dialog.Form</code> with a
-          Server Function action (React's progressive enhancement). After hydration, and for content
-          React renders on the client, use <code>initialFocus</code>: React does not write{" "}
-          <code>autofocus</code> on client-rendered elements.
-        </li>
-        <li>
-          <strong>Before hydration, library mode:</strong> the Trigger already carries the command,
-          so a click opens the dialog natively, but the content is not in the HTML yet. On hydration
-          the Popup finds the dialog open and dispatches{" "}
-          <code>openChangeAction(true, {'{ reason: "platform" }'})</code> with no event; the content
-          mounts into the open dialog. If the action rejects or a controlled parent refuses, the
-          dialog closes again. A dialog whose pre-hydration experience matters belongs in JS-free
-          mode.
-        </li>
-        <li>
-          <strong>Foreign invokers:</strong> in library mode, any{" "}
-          <code>&lt;button commandfor command="show-modal"&gt;</code> (or{" "}
-          <code>"request-close"</code> / <code>"close"</code>) pointing at the dialog goes through
-          the library too, as the Trigger and Close parts do; a close command's <code>value</code>{" "}
-          becomes the <code>returnValue</code>.
-        </li>
-      </ul>
-
-      <h3>Server Functions</h3>
+      <h4>Server Functions</h4>
       <p>Two independent channels, both usable from a Server Component:</p>
       <CodeBlock>{`// Persist "seen" when the user dismisses an announcement.
 <Dialog.Root defaultOpen={!user.seenAnnouncement} openChangeAction={markAnnouncementSeen}>
@@ -739,7 +777,7 @@ html:active-view-transition .dialog { transition: none; }
         afterwards; it never wraps your function and never reports form pending as the dialog's.
       </p>
 
-      <h3>Recipes</h3>
+      <h3 id="recipes">Recipes</h3>
       <h4>Controlled, opened without a Trigger</h4>
       <CodeBlock>{`const [open, setOpen] = useState(false);
 
@@ -763,25 +801,6 @@ html:active-view-transition .dialog { transition: none; }
           <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>.
         </p>
       </Callout>
-
-      <BehaviourSummary
-        name="Dialog"
-        transitionTypes={
-          "Library mode: `fsui-dialog` plus `fsui-dialog-open` or `fsui-dialog-close`; a controlled close carries none. JS-free mode starts no transitions."
-        }
-        optimistic={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a close notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger) (`data-pending`, `aria-disabled`)."
-        }
-        suspense={
-          "Content that suspends holds the open: the dialog stays closed with the Trigger pending, then opens once, complete. A `<Suspense>` inside the Popup opens at once with a skeleton instead."
-        }
-        browserOwned={
-          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, Android back, a click outside) is the browser\'s: the dialog closes at once, `openChangeAction(false)` is a notification with `reason: "dismiss"`, and a controlled parent that keeps `open` gets it re-opened once the action settles. Dismissals animate with CSS only ([Two modes](#two-modes)).'
-        }
-        beforeHydration={
-          'JS-free mode: everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup, CSS animation; a `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open. Library mode: the Trigger opens the dialog natively, but its content is not in the HTML; on hydration it is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.'
-        }
-      />
     </div>
   );
 }

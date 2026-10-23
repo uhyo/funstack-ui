@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ContextMenuCanvas } from "../examples/ContextMenuCanvas.js";
@@ -30,29 +30,6 @@ export function ContextMenuPage() {
         and Safari.
       </p>
 
-      <Callout kind="warning" title="Three rules for an accessible context menu">
-        <ol>
-          <li>
-            <strong>A context menu is a shortcut, never the only path to an action.</strong> iOS
-            (with or without VoiceOver) may never open it, nothing announces it, and users do not
-            discover it. Every item must also be reachable through a visible control: a{" "}
-            <code>Menu.Trigger</code> in the same Root (the first example), a toolbar (the second),
-            or a keyboard shortcut.
-          </li>
-          <li>
-            <strong>Targets must be focusable</strong> for keyboard and screen-reader users: the
-            browser fires <code>contextmenu</code> at the focused element, so a region with no
-            focusable content cannot be opened from the keyboard. Windows screen readers pass the
-            Applications key and Shift+F10 through to the page.
-          </li>
-          <li>
-            <strong>Name the menu</strong> with <code>aria-label</code> on the Popup when the Root
-            has no <code>Menu.Trigger</code> (the Popup's <code>aria-labelledby</code> points at the
-            Trigger's id).
-          </li>
-        </ol>
-      </Callout>
-
       <Example
         source={contextMenuFilesSource}
         fileName="ContextMenuFiles.tsx"
@@ -61,6 +38,11 @@ export function ContextMenuPage() {
       >
         <ContextMenuFiles />
       </Example>
+      <p>
+        A file list: each row is a region with a ⋯ button in the same Root, so a right-click, a
+        long-press and the button open one menu. Archive is a slow action: the item shows{" "}
+        <code>data-pending</code> and the menu closes when it settles.
+      </p>
 
       <Example
         source={contextMenuCanvasSource}
@@ -70,8 +52,14 @@ export function ContextMenuPage() {
       >
         <ContextMenuCanvas />
       </Example>
+      <p>
+        A focusable canvas as the region: right-click, long-press, or Tab to it and press Shift+F10.
+        The checkbox and radio items keep the menu open; a second right-click moves the open menu.
+      </p>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Menu } from "@funstack/ui/menu";
 
 <Menu.Root>                                                  {/* no DOM; as Menu */}
@@ -123,7 +111,8 @@ export function ContextMenuPage() {
         </li>
       </ul>
 
-      <h3>Opening</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Opening</h4>
       <Table
         head={["Input", "Where", "What opens"]}
         rows={[
@@ -165,7 +154,7 @@ export function ContextMenuPage() {
         </li>
       </ul>
 
-      <h3>Placement</h3>
+      <h4>Placement</h4>
       <p>
         A mouse or keyboard open puts the menu's top-left corner at the point; a touch or pen open
         puts the menu <strong>above</strong> the point with a 16 px gap, so the finger does not
@@ -246,7 +235,7 @@ export function ContextMenuPage() {
 .menu:not([data-context]) { position-area: bottom span-self-x-end; }
 /* An RTL menu at a point: right: calc(100% - var(--menu-point-x)) instead of left. */`}</CodeBlock>
 
-      <h3>Moving and closing</h3>
+      <h4>Moving and closing</h4>
       <Table
         head={["Input", "What happens", "reason"]}
         rows={[
@@ -294,7 +283,7 @@ export function ContextMenuPage() {
         <code>Menu.Trigger</code> in the same Root, focus goes to that button instead.
       </p>
 
-      <h3>Press-drag-release</h3>
+      <h4>Press-drag-release</h4>
       <p>
         On Linux and macOS the browser fires <code>contextmenu</code> on the button press, and
         native menus let you keep the button down, slide onto an item and release to choose it. The
@@ -346,7 +335,7 @@ export function ContextMenuPage() {
         </li>
       </ul>
 
-      <h3>Scrolling</h3>
+      <h4>Scrolling</h4>
       <ul>
         <li>
           <strong>A menu at a point closes when the page scrolls</strong> (<code>"dismiss"</code>):
@@ -376,7 +365,7 @@ export function ContextMenuPage() {
   scrollbar-gutter: stable;
 }`}</CodeBlock>
 
-      <h3>Nested regions and editable targets</h3>
+      <h4>Nested regions and editable targets</h4>
       <ul>
         <li>
           <strong>The innermost region wins.</strong> A region opens only when the{" "}
@@ -400,7 +389,7 @@ export function ContextMenuPage() {
       </ul>
       <CodeBlock>{`<Menu.ContextTrigger editableTargets="menu" render={<div contentEditable />} />`}</CodeBlock>
 
-      <h3>Sharing items with a Menu button</h3>
+      <h4>Sharing items with a Menu button</h4>
       <p>
         One Root may hold a <code>Menu.Trigger</code> and a <code>Menu.ContextTrigger</code>: the
         button opens the menu anchored below it (<code>side</code> / <code>align</code>), a
@@ -412,7 +401,7 @@ export function ContextMenuPage() {
         together.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Menu.ContextTrigger</code>
       </h4>
@@ -454,9 +443,7 @@ export function ContextMenuPage() {
         prop is serialisable, so a Server Component can render the region.
       </p>
 
-      <h4>
-        Additions to <code>Menu.Popup</code> and <code>Menu.Root</code>
-      </h4>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Where", "What", "Meaning"]}
         rows={[
@@ -493,7 +480,70 @@ export function ContextMenuPage() {
         ]}
       />
 
-      <h3>Styling</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
+      <Callout kind="warning" title="Three rules for an accessible context menu">
+        <ol>
+          <li>
+            <strong>A context menu is a shortcut, never the only path to an action.</strong> iOS
+            (with or without VoiceOver) may never open it, nothing announces it, and users do not
+            discover it. Every item must also be reachable through a visible control: a{" "}
+            <code>Menu.Trigger</code> in the same Root (the first example), a toolbar (the second),
+            or a keyboard shortcut.
+          </li>
+          <li>
+            <strong>Targets must be focusable</strong> for keyboard and screen-reader users: the
+            browser fires <code>contextmenu</code> at the focused element, so a region with no
+            focusable content cannot be opened from the keyboard. Windows screen readers pass the
+            Applications key and Shift+F10 through to the page.
+          </li>
+          <li>
+            <strong>Name the menu</strong> with <code>aria-label</code> on the Popup when the Root
+            has no <code>Menu.Trigger</code> (the Popup's <code>aria-labelledby</code> points at the
+            Trigger's id).
+          </li>
+        </ol>
+      </Callout>
+      <p>
+        The <a href="#how-it-works">Opening</a> table above lists every input that opens the menu;
+        once it is open, the keys are <a href="/components/menu#keyboard-and-aria">Menu</a>'s.
+      </p>
+
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "Those of the [Menu](/components/menu) it opens: `fsui-menu` plus `fsui-menu-open` or `fsui-menu-close`, and the item types."
+        }
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "As in Menu: the open state is optimistic (`data-open` on the region), and a rejection rolls it back. Items render from the committed open state."
+        }
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "Items that suspend hold the open, with `data-pending` on the region (and on a Trigger in the same Root)."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'As in Menu: light dismiss and Escape are the browser\'s; a dismissal is notified with `reason: "dismiss"`.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          "The browser's own context menu shows. Nothing is half-open and nothing is replayed after hydration; the custom menu works from then on."
+        }
+      />
+
+      <h3 id="styling">Styling</h3>
       <CodeBlock language="css">{`.row[data-open] { background: var(--accent-weak); }   /* the region of the open menu */
 .row[data-pending] { cursor: progress; }
 .row { -webkit-user-select: none; user-select: none; } /* touch: optional, see below */
@@ -513,18 +563,7 @@ export function ContextMenuPage() {
         </li>
       </ul>
 
-      <h3 id="content-security-policy">Content Security Policy</h3>
-      <p>
-        The point rules are a <code>&lt;style&gt;</code> element inserted by script, which a{" "}
-        <code>style-src</code> with nonces or hashes blocks (unlike the inline <code>style</code>{" "}
-        attributes the library sets from the client, which it allows). Either allow its hash,{" "}
-        <code>STYLE_SHA256["@funstack/ui/menu-point"]</code> from <code>@funstack/ui/csp</code>, or
-        wrap the app in <code>{"<CSPProvider nonce>"}</code>, which puts your nonce on the element.
-        Details and the hash values:{" "}
-        <a href="/concepts/content-security-policy">Content Security Policy</a>.
-      </p>
-
-      <h3>Browser notes</h3>
+      <h3 id="browser-notes">Browser notes</h3>
       <ul>
         <li>
           <strong>iOS Safari</strong> never fires <code>contextmenu</code> for touch; the library's
@@ -547,24 +586,16 @@ export function ContextMenuPage() {
         </li>
       </ul>
 
-      <BehaviourSummary
-        name="a context menu"
-        transitionTypes={
-          "Those of the [Menu](/components/menu) it opens: `fsui-menu` plus `fsui-menu-open` or `fsui-menu-close`, and the item types."
-        }
-        optimistic={
-          "As in Menu: the open state is optimistic (`data-open` on the region), and a rejection rolls it back. Items render from the committed open state."
-        }
-        suspense={
-          "Items that suspend hold the open, with `data-pending` on the region (and on a Trigger in the same Root)."
-        }
-        browserOwned={
-          'As in Menu: light dismiss and Escape are the browser\'s; a dismissal is notified with `reason: "dismiss"`.'
-        }
-        beforeHydration={
-          "The browser's own context menu shows. Nothing is half-open and nothing is replayed after hydration; the custom menu works from then on."
-        }
-      />
+      <h4 id="content-security-policy">Content Security Policy</h4>
+      <p>
+        The point rules are a <code>&lt;style&gt;</code> element inserted by script, which a{" "}
+        <code>style-src</code> with nonces or hashes blocks (unlike the inline <code>style</code>{" "}
+        attributes the library sets from the client, which it allows). Either allow its hash,{" "}
+        <code>STYLE_SHA256["@funstack/ui/menu-point"]</code> from <code>@funstack/ui/csp</code>, or
+        wrap the app in <code>{"<CSPProvider nonce>"}</code>, which puts your nonce on the element.
+        Details and the hash values:{" "}
+        <a href="/concepts/content-security-policy">Content Security Policy</a>.
+      </p>
     </div>
   );
 }

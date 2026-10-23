@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { CheckboxForm } from "../examples/CheckboxForm.js";
@@ -34,7 +34,9 @@ export function CheckboxPage() {
         <CheckboxSelectAll />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Checkbox } from "@funstack/ui/checkbox";
 
 <label>
@@ -49,7 +51,44 @@ export function CheckboxPage() {
         <code>label:has(:checked)</code>. The label is your own <code>&lt;label&gt;</code>.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4 id="indeterminate">Indeterminate</h4>
+      <p>
+        Mixed is derived state: a "select all" parent computes it from its rows, which is why it is
+        controlled-only and has no action. Clicking a mixed box dispatches <code>!checked</code>, so
+        the usual unchecked + mixed box becomes checked (the APG's mixed to checked), exactly what
+        the browser does to the DOM.
+      </p>
+      <ol>
+        <li>
+          Click the mixed "Select all": the browser checks the box and clears its{" "}
+          <code>indeterminate</code> property. The Checkbox dispatches <code>true</code> and, while
+          pending, renders <code>indeterminate && !pending</code>: the attribute, the property and{" "}
+          <code>:indeterminate</code> all agree that the dash is gone.
+        </li>
+        <li>
+          Resolve: the parent adopts the selection, so <code>checked</code> is <code>true</code> and{" "}
+          <code>indeterminate</code> <code>false</code>.
+        </li>
+        <li>
+          Reject (tick "Make the next save fail"): the optimistic value reverts and, since the
+          parent still says mixed, the dash comes back on settle.
+        </li>
+      </ol>
+      <p>
+        In the example the parent box derives from the rows' <em>optimistic</em> selection (
+        <code>useOptimistic</code>), so it never claims "all" while a row's uncheck is still saving.
+        For a group with a select-all parent, use{" "}
+        <a href="/components/checkbox-group">CheckboxGroup</a>, which packages this pattern.
+      </p>
+      <p>
+        Before hydration the DOM property cannot be set, and <code>aria-checked="mixed"</code> is
+        forbidden on native inputs, so a mixed box is announced as unchecked until hydration.{" "}
+        <code>data-indeterminate</code> is in the server HTML, so CSS can draw the dash from the
+        start.
+      </p>
+
+      <h3 id="props">Props</h3>
       <PropsTable
         rows={[
           {
@@ -136,7 +175,7 @@ export function CheckboxPage() {
         <code>aria-checked</code>.
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "Pseudo-class", "Meaning"]}
         rows={[
@@ -169,43 +208,7 @@ export function CheckboxPage() {
         </p>
       </Callout>
 
-      <h3 id="indeterminate">Indeterminate</h3>
-      <p>
-        Mixed is derived state: a "select all" parent computes it from its rows, which is why it is
-        controlled-only and has no action. Clicking a mixed box dispatches <code>!checked</code>, so
-        the usual unchecked + mixed box becomes checked (the APG's mixed to checked), exactly what
-        the browser does to the DOM.
-      </p>
-      <ol>
-        <li>
-          Click the mixed "Select all": the browser checks the box and clears its{" "}
-          <code>indeterminate</code> property. The Checkbox dispatches <code>true</code> and, while
-          pending, renders <code>indeterminate && !pending</code>: the attribute, the property and{" "}
-          <code>:indeterminate</code> all agree that the dash is gone.
-        </li>
-        <li>
-          Resolve: the parent adopts the selection, so <code>checked</code> is <code>true</code> and{" "}
-          <code>indeterminate</code> <code>false</code>.
-        </li>
-        <li>
-          Reject (tick "Make the next save fail"): the optimistic value reverts and, since the
-          parent still says mixed, the dash comes back on settle.
-        </li>
-      </ol>
-      <p>
-        In the example the parent box derives from the rows' <em>optimistic</em> selection (
-        <code>useOptimistic</code>), so it never claims "all" while a row's uncheck is still saving.
-        For a group with a select-all parent, use{" "}
-        <a href="/components/checkbox-group">CheckboxGroup</a>, which packages this pattern.
-      </p>
-      <p>
-        Before hydration the DOM property cannot be set, and <code>aria-checked="mixed"</code> is
-        forbidden on native inputs, so a mixed box is announced as unchecked until hydration.{" "}
-        <code>data-indeterminate</code> is in the server HTML, so CSS can draw the dash from the
-        start.
-      </p>
-
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Interaction", "Behaviour"]}
         rows={[
@@ -231,22 +234,72 @@ export function CheckboxPage() {
         </li>
       </ul>
 
-      <h3>Async behaviour</h3>
-      <p>
-        Exactly as <a href="/components/switch">Switch</a>: the DOM shows the optimistic value (a
-        correctness requirement for native inputs), a rejection writes the old value back and
-        reaches the Error Boundary, the latest of overlapping clicks wins, the box is never disabled
-        while pending, and <code>details.event.preventDefault()</code> is not a veto (use controlled
-        mode).
-      </p>
-      <CodeBlock>{`// Autosave with a Server Function, from a Server Component
+      <BehaviourSection
+        id="transition-types"
+        summary={"`fsui-checkbox` plus `fsui-checkbox-check` or `fsui-checkbox-uncheck`."}
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Checkbox while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the check."
+        }
+      >
+        <p>
+          Exactly as <a href="/components/switch">Switch</a>: the DOM shows the optimistic value (a
+          correctness requirement for native inputs), a rejection writes the old value back and
+          reaches the Error Boundary, the latest of overlapping clicks wins, the box is never
+          disabled while pending, and <code>details.event.preventDefault()</code> is not a veto (use
+          controlled mode).
+        </p>
+        <CodeBlock>{`// Autosave with a Server Function, from a Server Component
 <Checkbox
   defaultChecked={task.done}
   checkedChangeAction={setDone.bind(null, task.id)}
   aria-label={\`Done: \${task.title}\`}
 />`}</CodeBlock>
+      </BehaviourSection>
 
-      <h3>Forms</h3>
+      <BehaviourSection
+        id="suspense"
+        summary={"No content region; nothing the Checkbox renders suspends."}
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'A native `<input>`: the browser flips it before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`. `indeterminate` is consumer-owned and mirrored: the library writes the DOM property after every commit and stops while an action is pending, because the browser clears it on the click.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'A native checkbox: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `checkedChangeAction` call (`reason: "platform"`). An `indeterminate` box is drawn from `data-indeterminate` but announced as unchecked until hydration.'
+        }
+      >
+        <h4>Plain HTML</h4>
+        <p>
+          If a checkbox only posts with its form, a Server Component can render the native input
+          itself, with no library code for it:
+        </p>
+        <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  <input type="checkbox" name="terms" value="accepted" required />
+  I accept the terms
+</label>`}</CodeBlock>
+        <p>
+          Compared with <code>&lt;Checkbox&gt;</code>, it has no <code>checkedChangeAction</code>,
+          so no transition, <code>data-pending</code> or rollback on rejection; no{" "}
+          <code>data-checked</code> / <code>data-disabled</code> (use <code>:checked</code> and{" "}
+          <code>:disabled</code>); no React state that tracks it (clicks before hydration and form
+          resets live only in the DOM); and no <a href="/components/field">Field</a> integration. It
+          cannot be mixed: <code>indeterminate</code> is a DOM property with no HTML attribute, so
+          only script can set it.
+        </p>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <Example
         source={checkboxFormSource}
         fileName="CheckboxForm.tsx"
@@ -274,41 +327,6 @@ export function CheckboxPage() {
           never reads <code>useFormStatus</code>. A mixed box still posts its value when checked.
         </li>
       </ul>
-
-      <h3>Plain HTML</h3>
-      <p>
-        If a checkbox only posts with its form, a Server Component can render the native input
-        itself, with no library code for it:
-      </p>
-      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
-<label>
-  <input type="checkbox" name="terms" value="accepted" required />
-  I accept the terms
-</label>`}</CodeBlock>
-      <p>
-        Compared with <code>&lt;Checkbox&gt;</code>, it has no <code>checkedChangeAction</code>, so
-        no transition, <code>data-pending</code> or rollback on rejection; no{" "}
-        <code>data-checked</code> / <code>data-disabled</code> (use <code>:checked</code> and{" "}
-        <code>:disabled</code>); no React state that tracks it (clicks before hydration and form
-        resets live only in the DOM); and no <a href="/components/field">Field</a> integration. It
-        cannot be mixed: <code>indeterminate</code> is a DOM property with no HTML attribute, so
-        only script can set it.
-      </p>
-
-      <BehaviourSummary
-        name="Checkbox"
-        transitionTypes={"`fsui-checkbox` plus `fsui-checkbox-check` or `fsui-checkbox-uncheck`."}
-        optimistic={
-          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Checkbox while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the check."
-        }
-        suspense={"No content region; nothing the Checkbox renders suspends."}
-        browserOwned={
-          'A native `<input>`: the browser flips it before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`. `indeterminate` is consumer-owned and mirrored: the library writes the DOM property after every commit and stops while an action is pending, because the browser clears it on the click ([Indeterminate](#indeterminate)).'
-        }
-        beforeHydration={
-          'A native checkbox: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `checkedChangeAction` call (`reason: "platform"`). An `indeterminate` box is drawn from `data-indeterminate` but announced as unchecked until hydration.'
-        }
-      />
     </div>
   );
 }

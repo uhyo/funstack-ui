@@ -209,8 +209,24 @@
   margin: 4px 0 0 20px;
 }
 
-/* The "Async and platform behaviour" table on component pages. */
-.behaviour-summary th[scope="row"] {
-  width: 12rem;
-  vertical-align: top;
+/* The index of the five behaviour sections near the top of a component page. */
+.behaviour-index {
+  margin: 20px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.8;
+}
+
+.behaviour-index-label {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* The "Concept: …" line under a behaviour section's heading. */
+.concept-ref {
+  margin: -8px 0 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
 }

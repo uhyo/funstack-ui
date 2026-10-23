@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToolbarEditor } from "../examples/ToolbarEditor.js";
@@ -28,17 +28,6 @@ export function ToolbarPage() {
         focusable when disabled inside a toolbar.
       </p>
 
-      <Callout title="Toolbar.Button was removed" kind="warning">
-        <p>
-          <code>Toolbar.Button</code> was removed in this release (a breaking change). Use{" "}
-          <a href="/components/button">Button</a> from <code>@funstack/ui/button</code>: it behaves
-          the same inside a toolbar (a disabled Button is <code>aria-disabled</code> and stays in
-          the arrow-key sequence; props and <code>data-*</code> attributes are the same), and also
-          ignores a second click while its action is pending, with <code>aria-disabled</code>{" "}
-          meanwhile.
-        </p>
-      </Callout>
-
       <Example
         source={toolbarEditorSource}
         fileName="ToolbarEditor.tsx"
@@ -54,55 +43,10 @@ export function ToolbarPage() {
         announced. In the input, Left / Right move the caret and Tab leaves the toolbar (it is
         last).
       </p>
-      <Callout title="Label the toolbar">
-        <p>
-          A toolbar must have a name: pass <code>aria-label</code> or <code>aria-labelledby</code>.
-          Name each ToggleGroup inside it too.
-        </p>
-      </Callout>
-      <Callout title="One text-entry control, last">
-        <p>
-          An input, textarea, select, contenteditable or a control with role <code>textbox</code>,{" "}
-          <code>combobox</code>, <code>spinbutton</code> or <code>slider</code> keeps its arrow
-          keys, Home and End. From it, Tab and Shift+Tab move to the next and previous toolbar item
-          while one exists (as Chromium's native <code>focusgroup</code> does). Following the APG,
-          put at most one such control in a toolbar, and put it last.
-        </p>
-      </Callout>
-      <Callout title="Radios inside a toolbar trap the arrow keys">
-        <p>
-          A group of native radios with one <code>name</code> (a{" "}
-          <a href="/components/radio-group">RadioGroup</a> too) is one toolbar item. The toolbar's
-          arrows land on its checked radio, or on its first radio when none is checked. On a radio,
-          every arrow key is the radio group's: it checks as it moves and stays within the group
-          (wrapping, except in Safari), so in a horizontal toolbar ArrowLeft / ArrowRight never
-          leave the group (ArrowUp / ArrowDown in a vertical one). Leave it with Tab or Shift+Tab,
-          which move to the next or previous toolbar item; from an unchecked radio they visit the
-          checked one first. Both the JS path and Chromium's native <code>focusgroup</code> behave
-          this way. Radios that share a <code>name</code> but belong to different forms (
-          <code>form=</code>) are not told apart.
-        </p>
-        <p>
-          For a one-of-several choice that is transparent to the toolbar's arrows (text alignment),
-          use an <code>exclusive</code> <a href="/components/toggle-group">ToggleGroup</a>. For Up /
-          Down within the group and Left / Right through the toolbar, as in the APG Toolbar example,
-          build the group from <code>button[role="radio"]</code> elements with your own key
-          handlers: custom radios are ordinary toolbar items.
-        </p>
-      </Callout>
 
-      <h3>Vertical toolbar</h3>
-      <Example source={toolbarVerticalSource} fileName="ToolbarVertical.tsx">
-        <ToolbarVertical />
-      </Example>
-      <p>
-        Up / Down walk the tools. A <code>Menu.Trigger</code> in a vertical toolbar opens on the
-        inline-end arrow: ArrowRight, or ArrowLeft under <code>direction: rtl</code>. Put its popup
-        on that side: <code>side="inline-end"</code>, the right in LTR and the left in a
-        right-to-left page or container. ArrowDown moves on to the next tool.
-      </p>
+      <BehaviourIndex />
 
-      <h3>Anatomy</h3>
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Button } from "@funstack/ui/button";
 import { Toolbar } from "@funstack/ui/toolbar";
 
@@ -137,7 +81,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
         <code>tabIndex={"{-1}"}</code> stays out of the sequence.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>Toolbar.Root</h4>
       <PropsTable
         rows={[
@@ -198,7 +142,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
         orientation, <code>"vertical"</code> in a horizontal toolbar.
       </p>
 
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
@@ -207,7 +151,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
         ]}
       />
 
-      <h3>Keyboard</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Horizontal", "Vertical", "Effect"]}
         rows={[
@@ -297,14 +241,68 @@ import { Toolbar } from "@funstack/ui/toolbar";
         ]}
       />
 
-      <h3 id="before-hydration">Before hydration</h3>
-      <p>
-        The toolbar writes <code>tabindex</code> from an effect, so the server HTML has none: before
-        hydration every control is its own Tab stop, reachable and working with its native
-        behaviour. After hydration there is one Tab stop.
-      </p>
+      <Callout title="Label the toolbar">
+        <p>
+          A toolbar must have a name: pass <code>aria-label</code> or <code>aria-labelledby</code>.
+          Name each ToggleGroup inside it too.
+        </p>
+      </Callout>
+      <Callout title="One text-entry control, last">
+        <p>
+          An input, textarea, select, contenteditable or a control with role <code>textbox</code>,{" "}
+          <code>combobox</code>, <code>spinbutton</code> or <code>slider</code> keeps its arrow
+          keys, Home and End. From it, Tab and Shift+Tab move to the next and previous toolbar item
+          while one exists (as Chromium's native <code>focusgroup</code> does). Following the APG,
+          put at most one such control in a toolbar, and put it last.
+        </p>
+      </Callout>
+      <Callout title="Radios inside a toolbar trap the arrow keys">
+        <p>
+          A group of native radios with one <code>name</code> (a{" "}
+          <a href="/components/radio-group">RadioGroup</a> too) is one toolbar item. The toolbar's
+          arrows land on its checked radio, or on its first radio when none is checked. On a radio,
+          every arrow key is the radio group's: it checks as it moves and stays within the group
+          (wrapping, except in Safari), so in a horizontal toolbar ArrowLeft / ArrowRight never
+          leave the group (ArrowUp / ArrowDown in a vertical one). Leave it with Tab or Shift+Tab,
+          which move to the next or previous toolbar item; from an unchecked radio they visit the
+          checked one first. Both the JS path and Chromium's native <code>focusgroup</code> behave
+          this way. Radios that share a <code>name</code> but belong to different forms (
+          <code>form=</code>) are not told apart.
+        </p>
+        <p>
+          For a one-of-several choice that is transparent to the toolbar's arrows (text alignment),
+          use an <code>exclusive</code> <a href="/components/toggle-group">ToggleGroup</a>. For Up /
+          Down within the group and Left / Right through the toolbar, as in the APG Toolbar example,
+          build the group from <code>button[role="radio"]</code> elements with your own key
+          handlers: custom radios are ordinary toolbar items.
+        </p>
+      </Callout>
 
-      <h3>Styling</h3>
+      <BehaviourSection
+        id="transition-types"
+        summary={"None: the Toolbar has no state of its own."}
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={"None of its own: controls inside keep their own optimistic and pending state."}
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={"Nothing specific: the Toolbar renders no content region."}
+      />
+
+      <BehaviourSection id="browser-owned-state" summary={"None."} />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          "The toolbar writes `tabindex` from an effect, so the server HTML has none: before hydration every control is its own Tab stop, reachable and working with its native behaviour. After hydration there is one Tab stop."
+        }
+      />
+
+      <h3 id="styling">Styling</h3>
       <CodeBlock language="css">{`.toolbar { display: flex; gap: .25rem; }
 .toolbar[data-orientation="vertical"] { flex-direction: column; }
 /* <hr> is a block; in a horizontal toolbar it is a vertical rule. */
@@ -327,16 +325,17 @@ import { Toolbar } from "@funstack/ui/toolbar";
         adds no view transition types of its own.
       </p>
 
-      <BehaviourSummary
-        name="Toolbar"
-        transitionTypes={"None: the Toolbar has no state of its own."}
-        optimistic={"None of its own: controls inside keep their own optimistic and pending state."}
-        suspense={"Nothing specific: the Toolbar renders no content region."}
-        browserOwned={"None."}
-        beforeHydration={
-          "No `tabindex` in the server HTML: every control is its own Tab stop and works natively. After hydration there is one Tab stop ([Before hydration](#before-hydration))."
-        }
-      />
+      <h3 id="recipes">Recipes</h3>
+      <h4>Vertical toolbar</h4>
+      <Example source={toolbarVerticalSource} fileName="ToolbarVertical.tsx">
+        <ToolbarVertical />
+      </Example>
+      <p>
+        Up / Down walk the tools. A <code>Menu.Trigger</code> in a vertical toolbar opens on the
+        inline-end arrow: ArrowRight, or ArrowLeft under <code>direction: rtl</code>. Put its popup
+        on that side: <code>side="inline-end"</code>, the right in LTR and the left in a
+        right-to-left page or container. ArrowDown moves on to the next tool.
+      </p>
     </div>
   );
 }

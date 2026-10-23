@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { SwitchForm } from "../examples/SwitchForm.js";
@@ -33,7 +33,9 @@ export function SwitchPage() {
         <SwitchSettings />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Switch } from "@funstack/ui/switch";
 
 <label>
@@ -49,7 +51,7 @@ export function SwitchPage() {
         too.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <PropsTable
         rows={[
           {
@@ -126,7 +128,7 @@ export function SwitchPage() {
         element's own <code>onChange</code> or <code>onClick</code> runs first.
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "Pseudo-class", "Meaning"]}
         rows={[
@@ -149,7 +151,7 @@ export function SwitchPage() {
         <code>:has(:checked)</code> works without JavaScript.
       </p>
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Interaction", "Behaviour"]}
         rows={[
@@ -177,41 +179,121 @@ export function SwitchPage() {
         </li>
       </ul>
 
-      <h3>Async walkthrough</h3>
-      <ol>
-        <li>
-          Click: the browser flips the input; the Switch dispatches{" "}
-          <code>checkedChangeAction(next, {'{ reason: "activate" }'})</code> in its transition;{" "}
-          <code>data-checked</code> and <code>data-pending</code> update in the same frame.
-        </li>
-        <li>
-          Resolve: uncontrolled, the value is committed; controlled, the parent's{" "}
-          <code>checked</code> decides. <code>data-pending</code> goes.
-        </li>
-        <li>
-          Reject: the optimistic value reverts, React writes the old <code>checked</code> back to
-          the input, and the error reaches the nearest Error Boundary (the "Beta features" row
-          above).
-        </li>
-      </ol>
-      <Callout title="Why the DOM shows the optimistic value">
-        <p>
-          This is a correctness requirement, not a style choice. After every event react-dom
-          restores a controlled input to its current props. Only the synchronous optimistic state
-          has rendered by then, so an input driven by committed (transition) state would snap back
-          right after the click and stay wrong until the action finished.
-        </p>
-      </Callout>
-      <Callout kind="warning" title="preventDefault() is not a veto">
-        <p>
-          Calling <code>details.event.preventDefault()</code> inside the action makes the browser
-          undo the click after React has rendered it, so the input disagrees with{" "}
-          <code>data-checked</code> while the action is pending (development warning). To veto, use
-          controlled mode and do not adopt the value.
-        </p>
-      </Callout>
+      <BehaviourSection
+        id="transition-types"
+        summary={"`fsui-switch` plus `fsui-switch-on` or `fsui-switch-off`."}
+      />
 
-      <h3>Forms</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Switch while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the flip."
+        }
+      >
+        <h4>Walkthrough</h4>
+        <ol>
+          <li>
+            Click: the browser flips the input; the Switch dispatches{" "}
+            <code>checkedChangeAction(next, {'{ reason: "activate" }'})</code> in its transition;{" "}
+            <code>data-checked</code> and <code>data-pending</code> update in the same frame.
+          </li>
+          <li>
+            Resolve: uncontrolled, the value is committed; controlled, the parent's{" "}
+            <code>checked</code> decides. <code>data-pending</code> goes.
+          </li>
+          <li>
+            Reject: the optimistic value reverts, React writes the old <code>checked</code> back to
+            the input, and the error reaches the nearest Error Boundary (the "Beta features" row
+            above).
+          </li>
+        </ol>
+        <Callout title="Why the DOM shows the optimistic value">
+          <p>
+            This is a correctness requirement, not a style choice. After every event react-dom
+            restores a controlled input to its current props. Only the synchronous optimistic state
+            has rendered by then, so an input driven by committed (transition) state would snap back
+            right after the click and stay wrong until the action finished.
+          </p>
+        </Callout>
+        <Callout kind="warning" title="preventDefault() is not a veto">
+          <p>
+            Calling <code>details.event.preventDefault()</code> inside the action makes the browser
+            undo the click after React has rendered it, so the input disagrees with{" "}
+            <code>data-checked</code> while the action is pending (development warning). To veto,
+            use controlled mode and do not adopt the value.
+          </p>
+        </Callout>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={"No content region; nothing the Switch renders suspends."}
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'A native `<input>`: the browser flips it before any JavaScript runs. A form reset and clicks before hydration reach `checkedChangeAction` with `reason: "platform"`.'
+        }
+      >
+        <h4 id="the-platform-paths">The platform paths</h4>
+        <p>
+          The library owns <code>checked</code>, but the browser can still change it on its own.
+          Both cases reach <code>checkedChangeAction</code> with <code>reason: "platform"</code>:
+        </p>
+        <ul>
+          <li>
+            <strong>Form reset:</strong> a reset button, <code>form.reset()</code>, or React's
+            automatic reset after a successful <code>&lt;form action&gt;</code>. Uncontrolled, the
+            reset target is the latest <code>defaultChecked</code> (so a form re-rendered with saved
+            data resets to it, as in the example). Controlled, the browser resets to the mount-time
+            value and the change is offered to the parent, which adopts it or not; the input then
+            follows the parent.
+          </li>
+          <li>
+            <strong>Clicks before hydration</strong> (and Firefox restoring form state on reload):
+            the server-rendered input works natively; on hydration the Switch finds the DOM differs
+            from its state and dispatches once, with no event.
+          </li>
+        </ul>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'A native checkbox: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `checkedChangeAction` call (`reason: "platform"`).'
+        }
+      >
+        <h4>Plain HTML</h4>
+        <p>
+          If a switch only posts with its form, a Server Component can render the native input
+          itself, with no library code for it:
+        </p>
+        <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  <input type="checkbox" role="switch" name="notifications" defaultChecked={user.notifications} />
+  Email notifications
+</label>`}</CodeBlock>
+        <p>
+          <code>role="switch"</code> gives switch semantics in every engine. To draw it as a switch,
+          set <code>appearance: none</code> and style it on <code>:checked</code>,{" "}
+          <code>:disabled</code> and <code>:focus-visible</code>. The HTML <code>switch</code>{" "}
+          attribute only changes the look: it draws a native switch in Safari 17.4+ and nowhere else
+          (not in Chrome or Firefox, and not yet in the HTML standard). If you add it, write{" "}
+          <code>switch=""</code>: react-dom drops <code>true</code> for an attribute it does not
+          know, and <code>@types/react</code> does not type it.
+        </p>
+        <p>
+          Compared with <code>&lt;Switch&gt;</code>, the plain input has no{" "}
+          <code>checkedChangeAction</code>, so no transition, <code>data-pending</code> or rollback
+          on rejection; no <code>data-checked</code> / <code>data-disabled</code>; no React state
+          that tracks it (clicks before hydration and form resets live only in the DOM); and no{" "}
+          <a href="/components/field">Field</a> integration (the Field's id, label, description,
+          invalid and required state must be wired by hand).
+        </p>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <Example
         source={switchFormSource}
         fileName="SwitchForm.tsx"
@@ -225,28 +307,7 @@ export function SwitchPage() {
         checkbox. No change action is needed for that.
       </p>
 
-      <h3 id="the-platform-paths">The platform paths</h3>
-      <p>
-        The library owns <code>checked</code>, but the browser can still change it on its own. Both
-        cases reach <code>checkedChangeAction</code> with <code>reason: "platform"</code>:
-      </p>
-      <ul>
-        <li>
-          <strong>Form reset:</strong> a reset button, <code>form.reset()</code>, or React's
-          automatic reset after a successful <code>&lt;form action&gt;</code>. Uncontrolled, the
-          reset target is the latest <code>defaultChecked</code> (so a form re-rendered with saved
-          data resets to it, as in the example). Controlled, the browser resets to the mount-time
-          value and the change is offered to the parent, which adopts it or not; the input then
-          follows the parent.
-        </li>
-        <li>
-          <strong>Clicks before hydration</strong> (and Firefox restoring form state on reload): the
-          server-rendered input works natively; on hydration the Switch finds the DOM differs from
-          its state and dispatches once, with no event.
-        </li>
-      </ul>
-
-      <h3>Server Functions and forms</h3>
+      <h4>Server Functions and forms</h4>
       <p>
         Two independent channels. A Server Component can use either, or both on the same Switch:
       </p>
@@ -281,49 +342,6 @@ export function SwitchPage() {
         A Switch with no action and no <code>checked</code> is a working native input before
         hydration and with JavaScript off.
       </p>
-
-      <h3>Plain HTML</h3>
-      <p>
-        If a switch only posts with its form, a Server Component can render the native input itself,
-        with no library code for it:
-      </p>
-      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
-<label>
-  <input type="checkbox" role="switch" name="notifications" defaultChecked={user.notifications} />
-  Email notifications
-</label>`}</CodeBlock>
-      <p>
-        <code>role="switch"</code> gives switch semantics in every engine. To draw it as a switch,
-        set <code>appearance: none</code> and style it on <code>:checked</code>,{" "}
-        <code>:disabled</code> and <code>:focus-visible</code>. The HTML <code>switch</code>{" "}
-        attribute only changes the look: it draws a native switch in Safari 17.4+ and nowhere else
-        (not in Chrome or Firefox, and not yet in the HTML standard). If you add it, write{" "}
-        <code>switch=""</code>: react-dom drops <code>true</code> for an attribute it does not know,
-        and <code>@types/react</code> does not type it.
-      </p>
-      <p>
-        Compared with <code>&lt;Switch&gt;</code>, the plain input has no{" "}
-        <code>checkedChangeAction</code>, so no transition, <code>data-pending</code> or rollback on
-        rejection; no <code>data-checked</code> / <code>data-disabled</code>; no React state that
-        tracks it (clicks before hydration and form resets live only in the DOM); and no{" "}
-        <a href="/components/field">Field</a> integration (the Field's id, label, description,
-        invalid and required state must be wired by hand).
-      </p>
-
-      <BehaviourSummary
-        name="Switch"
-        transitionTypes={"`fsui-switch` plus `fsui-switch-on` or `fsui-switch-off`."}
-        optimistic={
-          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Switch while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the flip."
-        }
-        suspense={"No content region; nothing the Switch renders suspends."}
-        browserOwned={
-          'A native `<input>`: the browser flips it before any JavaScript runs. A form reset and clicks before hydration reach `checkedChangeAction` with `reason: "platform"` ([The platform paths](#the-platform-paths)).'
-        }
-        beforeHydration={
-          'A native checkbox: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `checkedChangeAction` call (`reason: "platform"`).'
-        }
-      />
     </div>
   );
 }

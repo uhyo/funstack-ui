@@ -54,8 +54,7 @@ export function SuspensePage() {
       <p>
         Components apply the same rule to their own content: an item that waits for its content
         before it opens, or results that stay on screen, marked stale, while the next ones load.
-        Each component page describes its case in the <strong>Suspense</strong> row of its{" "}
-        <strong>Async and platform behaviour</strong> section.
+        Each component page describes its case in its <strong>Suspense</strong> section.
       </p>
 
       <h3>Opting into a fallback</h3>

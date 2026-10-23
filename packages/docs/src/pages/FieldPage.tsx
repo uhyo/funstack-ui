@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { FieldControls } from "../examples/FieldControls.js";
@@ -41,7 +41,9 @@ export function FieldPage() {
         <FieldSignUp />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Field } from "@funstack/ui/field";
 import { Form } from "@funstack/ui/form";
 
@@ -100,7 +102,8 @@ import { Form } from "@funstack/ui/form";
         </li>
       </ul>
 
-      <h3>When an error is shown</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>When an error is shown</h4>
       <p>
         A field shows an error when its control matches <code>:user-invalid</code> or the Form has a
         server error for it:
@@ -134,7 +137,7 @@ import { Form } from "@funstack/ui/form";
         </li>
       </ul>
 
-      <h3>Custom rules: validate</h3>
+      <h4>Custom rules: validate</h4>
       <CodeBlock>{`<Field.Root
   name="confirm"
   required
@@ -154,7 +157,7 @@ import { Form } from "@funstack/ui/form";
         <code>validate</code> is rendered from a client component (a function is not serialisable).
       </p>
 
-      <h3>Submission and server errors</h3>
+      <h4>Submission and server errors</h4>
       <p>
         With a function <code>action</code> (a Server Function, a <code>useActionState</code>{" "}
         dispatch, or a client function), <code>Form.Root</code> renders it on the{" "}
@@ -202,9 +205,9 @@ import { Form } from "@funstack/ui/form";
           if you need to; the button is never disabled.
         </li>
       </ul>
-      <h4 id="dialog-form">
+      <h5 id="dialog-form">
         In a Dialog: <code>Dialog.Form</code> rendered as <code>Form.Root</code>
-      </h4>
+      </h5>
       <CodeBlock>{`const [state, dispatch] = useActionState(saveProfile, {});
 
 <Dialog.Popup>
@@ -259,105 +262,7 @@ import { Form } from "@funstack/ui/form";
         </p>
       </Callout>
 
-      <h3>FUNSTACK controls in a Field</h3>
-      <Example
-        source={fieldControlsSource}
-        fileName="FieldControls.tsx"
-        css={fieldCss}
-        cssFileName="field.css"
-      >
-        <FieldControls />
-      </Example>
-      <ul>
-        <li>
-          Inside a <code>Field.Root</code> the control's <code>id</code> belongs to the Field (so{" "}
-          <code>Field.Label</code> can point at it); <code>name</code>, <code>required</code> and{" "}
-          <code>disabled</code> default from the Field.
-        </li>
-        <li>
-          The two channels stay separate: a control's own action (the Switch above saves on its own)
-          gives <em>it</em> <code>data-pending</code>; the form's submission gives the Field{" "}
-          <code>data-pending</code>, never the control.
-        </li>
-        <li>
-          Combobox: the <code>Combobox.Input</code> is the control, the hidden input takes the
-          Field's <code>name</code>, and the listbox is named by <code>Field.Label</code> when no{" "}
-          <code>Combobox.Label</code> is rendered. <code>validate</code> reads the selection (the
-          hidden input), and picking an option counts as an edit: it re-runs <code>validate</code>{" "}
-          and dismisses a server error, like typing.
-        </li>
-        <li>
-          NumberField: the visible text input is the control (labelled, described, focused), while
-          its validity is the hidden <code>&lt;input type="number"&gt;</code>'s, so{" "}
-          <code>Field.Error</code>'s function <code>children</code> can branch on{" "}
-          <code>validity.stepMismatch</code>, <code>rangeUnderflow</code> or{" "}
-          <code>rangeOverflow</code>:{" "}
-          <code>
-            {
-              '{({ validity, messages }) => validity.stepMismatch ? "Enter a multiple of six." : messages.join(" ")}'
-            }
-          </code>
-          . <code>validate</code> reads the committed number, never a half-typed draft.
-        </li>
-        <li>
-          "Submit on change":{" "}
-          <code>{"checkedChangeAction={() => formRef.current?.requestSubmit()}"}</code> goes through
-          the Form like a click. Never call <code>form.submit()</code>, which skips validation and
-          the Form.
-        </li>
-      </ul>
-
-      <h3>From a Server Component</h3>
-      <CodeBlock>{`// app/subscribe.tsx: a Server Component, no client code of yours.
-import { Field } from "@funstack/ui/field";
-import { Form } from "@funstack/ui/form";
-import { subscribe } from "./actions"; // "use server"
-
-export function Subscribe() {
-  return (
-    <Form.Root action={subscribe}>
-      <Field.Root name="email" required>
-        <Field.Label>Email</Field.Label>
-        <Field.Control type="email" autoComplete="email" />
-        <Field.Error />
-      </Field.Root>
-      <Field.Root name="body" required>
-        <Field.Label>Comment</Field.Label>
-        <Field.Control render={<textarea rows={2} maxLength={2000} />} className="comment" />
-        <Field.Error />
-      </Field.Root>
-      <Form.Submit>Subscribe</Form.Submit>
-    </Form.Root>
-  );
-}`}</CodeBlock>
-      <p>
-        Every part may be rendered from a Server Component with serialisable props. Before hydration
-        the browser validates and shows its bubble, and the form posts to the Server Function; the
-        ids, <code>aria-describedby</code> and <code>aria-invalid="false"</code> are in the server
-        HTML. A group control's label carries <code>for</code> until hydration replaces it with the
-        group's <code>aria-labelledby</code>.
-      </p>
-
-      <h3>Styling</h3>
-      <CodeBlock language="css">{`.field[data-invalid] .control            { border-color: var(--danger); }
-.field:has(.control:user-valid) .control { border-color: var(--ok); }      /* no JS needed */
-.field[data-disabled]                    { opacity: .5; }
-.field[data-required] .label::after      { content: " *"; }
-.error { color: var(--danger); opacity: 1; transition: opacity 150ms; @starting-style { opacity: 0; } }
-
-/* The control grows with its content: no auto-resize hook. */
-textarea.control { field-sizing: content; min-height: 3lh; max-height: 12lh; }
-select.control   { field-sizing: content; }
-
-form[data-pending]           { cursor: progress; }
-.submit[data-pending]        { pointer-events: none; }   /* your "no double submit" */`}</CodeBlock>
-      <p>
-        <code>field-sizing: content</code> (Chrome 123, Safari 26.2, Firefox 152) makes a textarea
-        or a text input size to its content. Tailwind:{" "}
-        <code>data-invalid:border-red-500 data-pending:opacity-70 field-sizing-content</code>.
-      </p>
-
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Field.Root</code>
       </h4>
@@ -562,7 +467,7 @@ form[data-pending]           { cursor: progress; }
         and <code>formAction</code> pass through.
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
@@ -586,7 +491,7 @@ form[data-pending]           { cursor: progress; }
         ]}
       />
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <p>
         Nothing beyond the platform: Tab order is the DOM's, Enter in a text field submits, a click
         on the label focuses or activates the control. After a failed attempt, assistive technology
@@ -595,22 +500,137 @@ form[data-pending]           { cursor: progress; }
         <code>aria-describedby</code> works in every screen reader.
       </p>
 
-      <BehaviourSummary
-        name="Field and Form"
-        transitionTypes={"None: no part adds transition types or takes a `transition` prop."}
-        optimistic={
+      <BehaviourSection
+        id="transition-types"
+        summary={"None: no part adds transition types or takes a `transition` prop."}
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
           "A Form with a function `action` runs it in its own transition: `data-pending` is on the form, on `Form.Submit` and on every Field part while the submission is in flight. A Field's display state (whether its error shows) is updated synchronously from the DOM event, not in a transition."
         }
-        suspense={
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={
           "The submission's pending state includes the Suspense wait of what the result re-renders. Content inside `Field.Error` must not suspend."
         }
-        browserOwned={
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
           "Validity is the browser's: native constraint validation, `:user-invalid` and the browser's validation message; `data-invalid` adds server errors."
         }
-        beforeHydration={
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
           "The browser validates and shows its bubble, and the form posts to the Server Function (React's progressive enhancement). A group control's label carries `for` until hydration."
         }
-      />
+      >
+        <h4>From a Server Component</h4>
+        <CodeBlock>{`// app/subscribe.tsx: a Server Component, no client code of yours.
+import { Field } from "@funstack/ui/field";
+import { Form } from "@funstack/ui/form";
+import { subscribe } from "./actions"; // "use server"
+
+export function Subscribe() {
+  return (
+    <Form.Root action={subscribe}>
+      <Field.Root name="email" required>
+        <Field.Label>Email</Field.Label>
+        <Field.Control type="email" autoComplete="email" />
+        <Field.Error />
+      </Field.Root>
+      <Field.Root name="body" required>
+        <Field.Label>Comment</Field.Label>
+        <Field.Control render={<textarea rows={2} maxLength={2000} />} className="comment" />
+        <Field.Error />
+      </Field.Root>
+      <Form.Submit>Subscribe</Form.Submit>
+    </Form.Root>
+  );
+}`}</CodeBlock>
+        <p>
+          Every part may be rendered from a Server Component with serialisable props. Before
+          hydration the browser validates and shows its bubble, and the form posts to the Server
+          Function; the ids, <code>aria-describedby</code> and <code>aria-invalid="false"</code> are
+          in the server HTML. A group control's label carries <code>for</code> until hydration
+          replaces it with the group's <code>aria-labelledby</code>.
+        </p>
+      </BehaviourSection>
+
+      <h3 id="styling">Styling</h3>
+      <CodeBlock language="css">{`.field[data-invalid] .control            { border-color: var(--danger); }
+.field:has(.control:user-valid) .control { border-color: var(--ok); }      /* no JS needed */
+.field[data-disabled]                    { opacity: .5; }
+.field[data-required] .label::after      { content: " *"; }
+.error { color: var(--danger); opacity: 1; transition: opacity 150ms; @starting-style { opacity: 0; } }
+
+/* The control grows with its content: no auto-resize hook. */
+textarea.control { field-sizing: content; min-height: 3lh; max-height: 12lh; }
+select.control   { field-sizing: content; }
+
+form[data-pending]           { cursor: progress; }
+.submit[data-pending]        { pointer-events: none; }   /* your "no double submit" */`}</CodeBlock>
+      <p>
+        <code>field-sizing: content</code> (Chrome 123, Safari 26.2, Firefox 152) makes a textarea
+        or a text input size to its content. Tailwind:{" "}
+        <code>data-invalid:border-red-500 data-pending:opacity-70 field-sizing-content</code>.
+      </p>
+
+      <h3 id="recipes">Recipes</h3>
+      <h4>FUNSTACK controls in a Field</h4>
+      <Example
+        source={fieldControlsSource}
+        fileName="FieldControls.tsx"
+        css={fieldCss}
+        cssFileName="field.css"
+      >
+        <FieldControls />
+      </Example>
+      <ul>
+        <li>
+          Inside a <code>Field.Root</code> the control's <code>id</code> belongs to the Field (so{" "}
+          <code>Field.Label</code> can point at it); <code>name</code>, <code>required</code> and{" "}
+          <code>disabled</code> default from the Field.
+        </li>
+        <li>
+          The two channels stay separate: a control's own action (the Switch above saves on its own)
+          gives <em>it</em> <code>data-pending</code>; the form's submission gives the Field{" "}
+          <code>data-pending</code>, never the control.
+        </li>
+        <li>
+          Combobox: the <code>Combobox.Input</code> is the control, the hidden input takes the
+          Field's <code>name</code>, and the listbox is named by <code>Field.Label</code> when no{" "}
+          <code>Combobox.Label</code> is rendered. <code>validate</code> reads the selection (the
+          hidden input), and picking an option counts as an edit: it re-runs <code>validate</code>{" "}
+          and dismisses a server error, like typing.
+        </li>
+        <li>
+          NumberField: the visible text input is the control (labelled, described, focused), while
+          its validity is the hidden <code>&lt;input type="number"&gt;</code>'s, so{" "}
+          <code>Field.Error</code>'s function <code>children</code> can branch on{" "}
+          <code>validity.stepMismatch</code>, <code>rangeUnderflow</code> or{" "}
+          <code>rangeOverflow</code>:{" "}
+          <code>
+            {
+              '{({ validity, messages }) => validity.stepMismatch ? "Enter a multiple of six." : messages.join(" ")}'
+            }
+          </code>
+          . <code>validate</code> reads the committed number, never a half-typed draft.
+        </li>
+        <li>
+          "Submit on change":{" "}
+          <code>{"checkedChangeAction={() => formRef.current?.requestSubmit()}"}</code> goes through
+          the Form like a click. Never call <code>form.submit()</code>, which skips validation and
+          the Form.
+        </li>
+      </ul>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { TabsSaved } from "../examples/TabsSaved.js";
@@ -33,7 +33,9 @@ export function TabsPage() {
         <TabsSuspending />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Tabs } from "@funstack/ui/tabs";
 
 <Tabs.Root defaultValue="general">          {/* div: state, transition, ids */}
@@ -51,7 +53,7 @@ export function TabsPage() {
         Give the List an accessible name (<code>aria-label</code> or <code>aria-labelledby</code>).
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Tabs.Root</code>
       </h4>
@@ -233,7 +235,7 @@ export function TabsPage() {
         the List.
       </p>
 
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
@@ -257,7 +259,7 @@ export function TabsPage() {
 .tabs[data-pending] .panel { opacity: 0.6; transition: opacity 150ms 150ms; }
 .indicator { position: absolute; left: anchor(left); width: anchor-size(width); transition: left 200ms, width 200ms; }`}</CodeBlock>
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Behaviour"]}
         rows={[
@@ -297,42 +299,77 @@ export function TabsPage() {
         <li>Key presses with Alt, Ctrl or Meta are left to the browser.</li>
       </ul>
 
-      <h3>Async walkthrough</h3>
-      <Example
-        source={tabsSavedSource}
-        fileName="TabsSaved.tsx"
-        css={tabsCss}
-        cssFileName="tabs.css"
-      >
-        <TabsSaved />
-      </Example>
-      <ol>
-        <li>
-          Select Billing: the tab and indicator move immediately, the Root and the Billing tab get{" "}
-          <code>data-pending</code>, the Profile panel stays.
-        </li>
-        <li>
-          The save resolves: the Billing panel replaces Profile in one commit, sliding by the{" "}
-          <code>fsui-tabs-next</code> type.
-        </li>
-        <li>
-          The save rejects: the selection rolls back to the committed tab and the error reaches the
-          Error Boundary.
-        </li>
-        <li>
-          Selecting another tab while one is pending replaces the intent; clicking the committed tab
-          again is a real dispatch that cancels the pending switch.
-        </li>
-      </ol>
-      <Callout title="Automatic activation and slow actions">
-        <p>
-          With <code>activationMode="automatic"</code>, every arrow key press dispatches. Prefer{" "}
-          <code>"manual"</code> when the action awaits a server round trip, or do not return the
-          promise (<code>{"(next) => { void save(next); }"}</code>).
-        </p>
-      </Callout>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "`fsui-tabs` plus `fsui-tabs-next` or `fsui-tabs-prev`: the DOM order of the new tab relative to the committed one. Only `fsui-tabs` when the order cannot be determined (no committed tab, or a value with no rendered Tab)."
+        }
+      />
 
-      <h3>Recipes</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "Tab and Indicator show the optimistic selection (`aria-selected`, `data-selected`); Panels show the committed one. `data-pending` is on the Root, on the Tab that is the optimistic selection, and mirrored on the Indicator; never on a Panel."
+        }
+      >
+        <h4>Walkthrough</h4>
+        <Example
+          source={tabsSavedSource}
+          fileName="TabsSaved.tsx"
+          css={tabsCss}
+          cssFileName="tabs.css"
+        >
+          <TabsSaved />
+        </Example>
+        <ol>
+          <li>
+            Select Billing: the tab and indicator move immediately, the Root and the Billing tab get{" "}
+            <code>data-pending</code>, the Profile panel stays.
+          </li>
+          <li>
+            The save resolves: the Billing panel replaces Profile in one commit, sliding by the{" "}
+            <code>fsui-tabs-next</code> type.
+          </li>
+          <li>
+            The save rejects: the selection rolls back to the committed tab and the error reaches
+            the Error Boundary.
+          </li>
+          <li>
+            Selecting another tab while one is pending replaces the intent; clicking the committed
+            tab again is a real dispatch that cancels the pending switch.
+          </li>
+        </ol>
+        <Callout title="Automatic activation and slow actions">
+          <p>
+            With <code>activationMode="automatic"</code>, every arrow key press dispatches. Prefer{" "}
+            <code>"manual"</code> when the action awaits a server round trip, or do not return the
+            promise (<code>{"(next) => { void save(next); }"}</code>).
+          </p>
+        </Callout>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "A newly selected Panel that suspends keeps the current Panel on screen until it is ready, while the new Tab is already selected and pending. A `<Suspense>` inside the Panel shows its fallback instead. Tab content must not suspend."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'Selection is library-owned. With `keepMounted="until-found"`, find-in-page or a text fragment can reveal a hidden panel; that is dispatched with `reason: "platform"`, and if a controlled parent refuses, the panel is hidden again once the action settles.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML (as plain `hidden`; find-in-page reaches them after hydration). Switching tabs needs JavaScript.'
+        }
+      />
+
+      <h3 id="recipes">Recipes</h3>
       <h4>Controlled by a router</h4>
       <CodeBlock>{`// \`section\` comes from the URL; navigating is the state update.
 <Tabs.Root value={section} valueChangeAction={(next) => navigate(\`/settings/\${next}\`)}>
@@ -354,25 +391,6 @@ export function TabsPage() {
 <Tabs.Panel value="changelog" keepMounted="until-found">
   <Changelog />
 </Tabs.Panel>`}</CodeBlock>
-
-      <BehaviourSummary
-        name="Tabs"
-        transitionTypes={
-          "`fsui-tabs` plus `fsui-tabs-next` or `fsui-tabs-prev`: the DOM order of the new tab relative to the committed one. Only `fsui-tabs` when the order cannot be determined (no committed tab, or a value with no rendered Tab)."
-        }
-        optimistic={
-          "Tab and Indicator show the optimistic selection (`aria-selected`, `data-selected`); Panels show the committed one. `data-pending` is on the Root, on the Tab that is the optimistic selection, and mirrored on the Indicator; never on a Panel."
-        }
-        suspense={
-          "A newly selected Panel that suspends keeps the current Panel on screen until it is ready, while the new Tab is already selected and pending. A `<Suspense>` inside the Panel shows its fallback instead. Tab content must not suspend."
-        }
-        browserOwned={
-          'Selection is library-owned. With `keepMounted="until-found"`, find-in-page or a text fragment can reveal a hidden panel; that is dispatched with `reason: "platform"`, and if a controlled parent refuses, the panel is hidden again once the action settles.'
-        }
-        beforeHydration={
-          'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML (as plain `hidden`; find-in-page reaches them after hydration). Switching tabs needs JavaScript.'
-        }
-      />
     </div>
   );
 }

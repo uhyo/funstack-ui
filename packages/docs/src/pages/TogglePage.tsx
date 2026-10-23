@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
@@ -33,7 +33,9 @@ export function TogglePage() {
         <ToggleFavorite />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Toggle } from "@funstack/ui/toggle";
 
 <Toggle pressedChangeAction={setFavorite}>Favorite</Toggle>`}</CodeBlock>
@@ -42,7 +44,7 @@ export function TogglePage() {
         <code>&lt;button type="button" aria-pressed&gt;</code>.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <PropsTable
         rows={[
           {
@@ -95,7 +97,7 @@ export function TogglePage() {
         <code>ToggleState</code> is <code>{"{ pressed, pending, disabled }"}</code>.
       </p>
 
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "Meaning"]}
         rows={[
@@ -106,7 +108,7 @@ export function TogglePage() {
         ]}
       />
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Interaction", "Behaviour"]}
         rows={[
@@ -129,30 +131,59 @@ export function TogglePage() {
         </li>
       </ul>
 
-      <h3>Async walkthrough</h3>
-      <ol>
-        <li>
-          Click: <code>aria-pressed</code> and <code>data-pressed</code> flip at once,{" "}
-          <code>data-pending</code> appears, <code>pressedChangeAction(true, details)</code> runs.
-        </li>
-        <li>
-          Resolve: in uncontrolled mode the value is committed; <code>data-pending</code> goes. In
-          controlled mode the parent's <code>pressed</code> decides.
-        </li>
-        <li>
-          Reject: the pressed state rolls back and the error reaches the nearest Error Boundary.
-        </li>
-        <li>
-          Click again while pending: the next value is the opposite of the <em>optimistic</em>{" "}
-          value, so the second click undoes the first. Only the latest dispatch commits.
-        </li>
-      </ol>
-      <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
-        <ToggleErrors />
-      </Example>
-      <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
+      <BehaviourSection
+        id="transition-types"
+        summary={"`fsui-toggle` plus `fsui-toggle-press` or `fsui-toggle-release`."}
+      />
 
-      <h3>Recipes</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "`aria-pressed` and `data-pressed` follow the optimistic state; `data-pending` is on the Toggle while `pressedChangeAction` is in flight. The `transition` prop animates the commit that ends the action (for example a spinner turning back into an icon), not the pressed flip: animate that with a CSS transition on `[data-pressed]`."
+        }
+      >
+        <h4>Walkthrough</h4>
+        <ol>
+          <li>
+            Click: <code>aria-pressed</code> and <code>data-pressed</code> flip at once,{" "}
+            <code>data-pending</code> appears, <code>pressedChangeAction(true, details)</code> runs.
+          </li>
+          <li>
+            Resolve: in uncontrolled mode the value is committed; <code>data-pending</code> goes. In
+            controlled mode the parent's <code>pressed</code> decides.
+          </li>
+          <li>
+            Reject: the pressed state rolls back and the error reaches the nearest Error Boundary.
+          </li>
+          <li>
+            Click again while pending: the next value is the opposite of the <em>optimistic</em>{" "}
+            value, so the second click undoes the first. Only the latest dispatch commits.
+          </li>
+        </ol>
+        <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
+          <ToggleErrors />
+        </Example>
+        <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "No content region. The `children` function renders optimistic state and must not suspend."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={"None: the pressed state is library-owned."}
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={"Markup and ARIA. Pressing needs JavaScript."}
+      />
+
+      <h3 id="recipes">Recipes</h3>
       <p>
         Several toggles that share one value (text styles, an alignment choice) are a{" "}
         <a href="/components/toggle-group">ToggleGroup</a>: one Tab stop, arrow keys between the
@@ -176,19 +207,6 @@ export function TogglePage() {
           <code>aria-busy</code> yourself.
         </p>
       </Callout>
-
-      <BehaviourSummary
-        name="Toggle"
-        transitionTypes={"`fsui-toggle` plus `fsui-toggle-press` or `fsui-toggle-release`."}
-        optimistic={
-          "`aria-pressed` and `data-pressed` follow the optimistic state; `data-pending` is on the Toggle while `pressedChangeAction` is in flight. The `transition` prop animates the commit that ends the action (for example a spinner turning back into an icon), not the pressed flip: animate that with a CSS transition on `[data-pressed]`."
-        }
-        suspense={
-          "No content region. The `children` function renders optimistic state and must not suspend."
-        }
-        browserOwned={"None: the pressed state is library-owned."}
-        beforeHydration={"Markup and ARIA. Pressing needs JavaScript."}
-      />
     </div>
   );
 }

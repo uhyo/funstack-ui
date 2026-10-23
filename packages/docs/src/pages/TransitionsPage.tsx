@@ -118,10 +118,9 @@ export function TransitionsPage() {
         ]}
       />
       <p>
-        Every component page lists its own types, or says that it has none, in the{" "}
-        <strong>Transition types</strong> row of its <strong>Async and platform behaviour</strong>{" "}
-        section. Components whose state never changes in a transition add none: their commits are
-        urgent, or their state belongs to the browser.
+        Every component page lists its own types, or says that it has none, in its{" "}
+        <strong>Transition types</strong> section. Components whose state never changes in a
+        transition add none: their commits are urgent, or their state belongs to the browser.
       </p>
       <p>
         Use them in a <code>transition</code> map, or in CSS with{" "}

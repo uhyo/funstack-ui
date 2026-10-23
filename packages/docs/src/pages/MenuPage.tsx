@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { MenuRowActions } from "../examples/MenuRowActions.js";
@@ -62,7 +62,9 @@ export function MenuPage() {
         <MenuRowActions />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Menu } from "@funstack/ui/menu";
 
 <Menu.Root>                                                {/* no DOM: ids, open state */}
@@ -109,7 +111,8 @@ export function MenuPage() {
         </li>
       </ul>
 
-      <h3>Items, actions and closing</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Items, actions and closing</h4>
       <p>
         Click, Enter or Space on an <code>Item</code> runs its <code>action</code> in the item's own
         transition. The menu <strong>stays open while the action runs</strong>, with{" "}
@@ -155,7 +158,7 @@ export function MenuPage() {
         </li>
       </ul>
 
-      <h3>Checkbox and radio items</h3>
+      <h4>Checkbox and radio items</h4>
       <Example
         source={menuViewOptionsSource}
         fileName="MenuViewOptions.tsx"
@@ -182,7 +185,19 @@ export function MenuPage() {
         </p>
       </Callout>
 
-      <h3>Props</h3>
+      <h4>Context menus</h4>
+      <p>
+        A <code>Menu.ContextTrigger</code> in the Root opens the same Popup at the pointer from a
+        right-click, Shift+F10 or a touch long-press, next to (or instead of) the Trigger: see{" "}
+        <a href="/components/context-menu">Context menu</a>. Two behaviours apply to every menu,
+        context-opened or not: a right- or middle-click outside closes it at once (
+        <code>"dismiss"</code>), as native menus do; Chromium's light dismiss alone would leave it
+        open under the browser's own menu. And a wheel over the menu never scrolls the page under
+        it: the library prevents it unless the menu itself can scroll that way (Ctrl+wheel and a
+        trackpad pinch still zoom).
+      </p>
+
+      <h3 id="props">Props</h3>
       <h4>
         <code>Menu.Root</code>
       </h4>
@@ -488,7 +503,60 @@ export function MenuPage() {
         <code>data-pending</code> while items that suspend load). Use it in a submenu Root only.
       </p>
 
-      <h3>Keyboard, focus and ARIA</h3>
+      <h3 id="data-attributes">Data attributes</h3>
+      <Table
+        head={["Hook", "On", "Meaning"]}
+        rows={[
+          [
+            "`aria-expanded`, `data-open`",
+            "Trigger, SubmenuTrigger, ContextTrigger",
+            "Optimistic open state of the Root.",
+          ],
+          [
+            "`data-pending`",
+            "Trigger, SubmenuTrigger, ContextTrigger",
+            "An open or close of the Root is in flight (items that suspend hold the open).",
+          ],
+          [
+            "`data-pending`",
+            "Item, CheckboxItem, RadioItem, RadioGroup",
+            "The item's `action` or change action is in flight; on the RadioGroup while a selection is.",
+          ],
+          [
+            "`aria-disabled`",
+            "Item, CheckboxItem, RadioItem, SubmenuTrigger",
+            '`"true"` for the `disabled` prop (items are never natively disabled), and on an Item while its `action` is pending.',
+          ],
+          ["`data-disabled`", "Trigger, items, ContextTrigger", "The `disabled` prop."],
+          [
+            "`aria-checked`, `data-checked`",
+            "CheckboxItem, RadioItem",
+            "Optimistic checked state.",
+          ],
+          [
+            "`data-typeahead`",
+            "Item, SubmenuTrigger",
+            "The `label` prop: the text typeahead matches.",
+          ],
+          [
+            "`:popover-open`",
+            "Popup",
+            "The menu is shown. Browser-owned: the Popup emits no `data-open`.",
+          ],
+          [
+            "`data-side`, `data-align`",
+            "Popup",
+            "While shown, where the browser placed the popup (after any flip); otherwise the requested placement. Absent for an open from a `Menu.ContextTrigger`.",
+          ],
+          [
+            "`data-context`",
+            "Popup",
+            "The current open came from a `Menu.ContextTrigger` and is placed at a point (see [Context menu](/components/context-menu)).",
+          ],
+        ]}
+      />
+
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Where", "Behaviour"]}
         rows={[
@@ -588,7 +656,52 @@ export function MenuPage() {
         ]}
       />
 
-      <h3>Styling and animation</h3>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "Opens and closes: `fsui-menu` plus `fsui-menu-open` or `fsui-menu-close`. A CheckboxItem: `fsui-menu` plus `fsui-menu-check` or `fsui-menu-uncheck`. A RadioGroup: `fsui-menu` plus `fsui-menu-select`."
+        }
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "The Trigger's `aria-expanded` and `data-open`, and CheckboxItem and RadioItem `data-checked`, are optimistic. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
+        }
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "Items that suspend hold the open: the menu (or submenu) stays closed with `data-pending` on its trigger, then opens once, complete, with the first item focused."
+        }
+      >
+        <p>
+          The items render from committed state, so a submenu read with <code>use()</code>:
+        </p>
+        <CodeBlock>{`<Menu.Root>
+  <Menu.SubmenuTrigger>Open recent</Menu.SubmenuTrigger>
+  <Menu.Popup>
+    <RecentFiles />   {/* use(recentFiles): the submenu opens when ready */}
+  </Menu.Popup>
+</Menu.Root>`}</CodeBlock>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'The popup is a `popover="auto"`: the top layer, light dismiss and Escape are the browser\'s. A dismissal closes the menu at once; `openChangeAction(false)` is a notification with `reason: "dismiss"`, and it animates with CSS only.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'The Trigger carries `command="toggle-popover"`: a click before hydration opens the (still empty) menu natively, and the items fill in on hydration (`reason: "platform"`).'
+        }
+      />
+
+      <h3 id="styling">Styling</h3>
       <p>
         Style the popup with <code>:popover-open</code> and the items with{" "}
         <code>[role^="menuitem"]</code>, <code>:focus</code>, <code>[aria-disabled="true"]</code>,{" "}
@@ -601,21 +714,7 @@ export function MenuPage() {
       </p>
       <CodeBlock>{`<Menu.Popup transition={{ "fsui-menu-open": "menu-in", "fsui-menu-close": "menu-out", default: "none" }}>`}</CodeBlock>
 
-      <h3 id="suspense">Suspense</h3>
-      <p>
-        The items render from committed state, so items that suspend (a submenu of recent files read
-        with <code>use()</code>) hold the open: the menu (or submenu) stays closed with{" "}
-        <code>data-pending</code> on its trigger, then opens once, complete, with the first item
-        focused.
-      </p>
-      <CodeBlock>{`<Menu.Root>
-  <Menu.SubmenuTrigger>Open recent</Menu.SubmenuTrigger>
-  <Menu.Popup>
-    <RecentFiles />   {/* use(recentFiles): the submenu opens when ready */}
-  </Menu.Popup>
-</Menu.Root>`}</CodeBlock>
-
-      <h3>Browser notes</h3>
+      <h3 id="browser-notes">Browser notes</h3>
       <ul>
         <li>
           <code>experimental_focusgroup</code> takes the native path in Chromium only; other engines
@@ -628,37 +727,6 @@ export function MenuPage() {
         </li>
         <li>Menubars are not part of Menu.</li>
       </ul>
-
-      <h3>Context menus</h3>
-      <p>
-        A <code>Menu.ContextTrigger</code> in the Root opens the same Popup at the pointer from a
-        right-click, Shift+F10 or a touch long-press, next to (or instead of) the Trigger: see{" "}
-        <a href="/components/context-menu">Context menu</a>. Two behaviours apply to every menu,
-        context-opened or not: a right- or middle-click outside closes it at once (
-        <code>"dismiss"</code>), as native menus do; Chromium's light dismiss alone would leave it
-        open under the browser's own menu. And a wheel over the menu never scrolls the page under
-        it: the library prevents it unless the menu itself can scroll that way (Ctrl+wheel and a
-        trackpad pinch still zoom).
-      </p>
-
-      <BehaviourSummary
-        name="Menu"
-        transitionTypes={
-          "Opens and closes: `fsui-menu` plus `fsui-menu-open` or `fsui-menu-close`. A CheckboxItem: `fsui-menu` plus `fsui-menu-check` or `fsui-menu-uncheck`. A RadioGroup: `fsui-menu` plus `fsui-menu-select`."
-        }
-        optimistic={
-          "The Trigger's `aria-expanded` and `data-open`, and CheckboxItem and RadioItem `data-checked`, are optimistic. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
-        }
-        suspense={
-          "Items that suspend hold the open: the menu (or submenu) stays closed with `data-pending` on its trigger, then opens once, complete, with the first item focused ([Suspense](#suspense))."
-        }
-        browserOwned={
-          'The popup is a `popover="auto"`: the top layer, light dismiss and Escape are the browser\'s. A dismissal closes the menu at once; `openChangeAction(false)` is a notification with `reason: "dismiss"`, and it animates with CSS only.'
-        }
-        beforeHydration={
-          'The Trigger carries `command="toggle-popover"`: a click before hydration opens the (still empty) menu natively, and the items fill in on hydration (`reason: "platform"`).'
-        }
-      />
     </div>
   );
 }

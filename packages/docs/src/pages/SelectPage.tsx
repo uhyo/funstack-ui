@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { SelectCountry } from "../examples/SelectCountry.js";
@@ -40,7 +40,9 @@ export function SelectPage() {
         <SelectFruit />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Select } from "@funstack/ui/select";
 
 <Select.Root name="fruit" defaultValue="" required valueChangeAction={saveFruit}> {/* select */}
@@ -93,65 +95,7 @@ export function SelectPage() {
         </li>
       </ul>
 
-      <h3>Styling the picker</h3>
-      <p>
-        The library ships no CSS. These recipes cover the opt-in, the button, the picker, its
-        options and an open/close animation. Engines without customizable select ignore all of it
-        except the plain properties on the select.
-      </p>
-      <CodeBlock language="css">{`/* 1. Opt in to the customizable picker. Two rules: an engine that does not know
-      ::picker(select) drops any rule naming it. */
-.select { appearance: base-select; }
-.select::picker(select) { appearance: base-select; }
-
-/* 2. The button, its content, the arrow. */
-.select { border: 1px solid GrayText; border-radius: 6px; padding: 0.4em 0.6em; }
-.select::picker-icon { content: "▾"; transition: rotate 120ms; }
-.select:open::picker-icon { rotate: 180deg; }
-.select[data-pending] { cursor: progress; }
-.select[data-pending] selectedcontent { opacity: 0.6; }
-.select:user-invalid { border-color: var(--danger); }
-selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option */
-
-/* 3. The picker and its options. */
-.select::picker(select) { border: 1px solid GrayText; border-radius: 8px; padding: 4px; }
-.select option { padding: 0.4em 0.6em; border-radius: 4px; }
-.select option:hover, .select option:focus-visible { background: Highlight; color: HighlightText; }
-.select option:checked { font-weight: 600; }          /* optimistic: flips on pick, reverts on rejection */
-.select option::checkmark { content: "✓"; order: 1; margin-inline-start: auto; }
-.select option[data-pending]::after { content: "…"; }
-.select option:disabled { opacity: 0.4; }
-.select optgroup legend { font-size: 0.85em; color: GrayText; }
-
-/* 4. Open/close animation (Chromium; Safari 27.0 does not animate the picker yet). */
-.select::picker(select) {
-  opacity: 0;
-  transition: opacity 120ms, overlay 120ms allow-discrete, display 120ms allow-discrete;
-}
-.select:open::picker(select) { opacity: 1; @starting-style { opacity: 0; } }
-
-/* 5. Placement: the browser anchors the picker to the select; override its position. The self-*
-   keywords follow the select's own direction (an RTL container too); plain logical ones would
-   follow the root's, since the picker is in the top layer. */
-.select::picker(select) { position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; }
-
-@media (prefers-reduced-motion: reduce) {
-  .select::picker(select), .select::picker-icon { transition: none; }
-}`}</CodeBlock>
-      <p>
-        Tailwind: <code>data-pending:cursor-progress open:ring-2</code> on the Root,{" "}
-        <code>checked:font-semibold data-pending:animate-pulse</code> on an Option.
-      </p>
-      <Callout title="Safari: a Select inside a Popover or Menu">
-        <p>
-          The browser positions the picker with anchor positioning and fallbacks. A WebKit bug
-          (302008) can hang a page that opens a popover with position fallbacks inside another
-          popover. If a Select inside a Popover or Menu misbehaves in Safari, turn the fallbacks
-          off: <code>{".select::picker(select) { position-try-fallbacks: none; }"}</code>.
-        </p>
-      </Callout>
-
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Select.Root</code>
       </h4>
@@ -320,7 +264,7 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         ]}
       />
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
@@ -348,7 +292,7 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         ]}
       />
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <p>
         Everything is the browser's; the library installs no key handler. The engines differ, and
         the Select's contract does not depend on them: one <code>valueChangeAction</code> per
@@ -403,53 +347,120 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         </li>
       </ul>
 
-      <h3>Async walkthrough</h3>
-      <ol>
-        <li>
-          Pick Banana: the browser selects it, copies it into the button and fires{" "}
-          <code>change</code>. The Root dispatches{" "}
-          <code>valueChangeAction("banana", {'{ reason: "activate" }'})</code> in its transition.
-          The Root, the Trigger and the Banana option get <code>data-pending</code>.
-        </li>
-        <li>Resolve: the value is committed (uncontrolled) and the attributes go.</li>
-        <li>
-          Reject: the optimistic value reverts, React selects the old option again (the button
-          follows), and the error reaches the nearest Error Boundary.
-        </li>
-        <li>
-          A controlled parent vetoes by not adopting the value: the button shows Banana for the
-          action's duration, then the old option again.
-        </li>
-      </ol>
-      <Callout title="Why the select shows the optimistic value">
-        <p>
-          After every event react-dom restores a controlled select's options to its{" "}
-          <code>value</code> prop. Only the synchronous optimistic state has rendered by then, so a
-          select driven by committed state would snap back (button included) for the whole pending
-          time. Rendering the optimistic value is a correctness requirement.
-        </p>
-      </Callout>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "`fsui-select`. No part takes a `transition` prop: the picker and the button's copy are drawn by the browser."
+        }
+      />
 
-      <h3 id="options-that-load-later">Options that load later</h3>
-      <Example
-        source={selectCountrySource}
-        fileName="SelectCountry.tsx"
-        css={selectCss}
-        cssFileName="select.css"
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "The `<select>` renders the optimistic value (a correctness requirement), so `option:checked` and `data-selected` agree. `data-pending` is on the Root and Trigger while `valueChangeAction` is in flight, and on the Option being selected."
+        }
       >
-        <SelectCountry />
-      </Example>
-      <p>
-        React selects options only in the select's own commit, so options revealed later by a
-        Suspense boundary or <code>use()</code> inside the select would leave the browser's first
-        option selected. The library re-applies the value when they arrive, without a dispatch.
-        Until then nothing (or the fallback) is selected and the button is empty. Use a disabled
-        fallback option, or put the whole Select inside the boundary for a skeleton. There is no
-        "load on open": a native select has no open event (use a{" "}
-        <a href="/components/combobox">Combobox</a> for that).
-      </p>
+        <h4>Walkthrough</h4>
+        <ol>
+          <li>
+            Pick Banana: the browser selects it, copies it into the button and fires{" "}
+            <code>change</code>. The Root dispatches{" "}
+            <code>valueChangeAction("banana", {'{ reason: "activate" }'})</code> in its transition.
+            The Root, the Trigger and the Banana option get <code>data-pending</code>.
+          </li>
+          <li>Resolve: the value is committed (uncontrolled) and the attributes go.</li>
+          <li>
+            Reject: the optimistic value reverts, React selects the old option again (the button
+            follows), and the error reaches the nearest Error Boundary.
+          </li>
+          <li>
+            A controlled parent vetoes by not adopting the value: the button shows Banana for the
+            action's duration, then the old option again.
+          </li>
+        </ol>
+        <Callout title="Why the select shows the optimistic value">
+          <p>
+            After every event react-dom restores a controlled select's options to its{" "}
+            <code>value</code> prop. Only the synchronous optimistic state has rendered by then, so
+            a select driven by committed state would snap back (button included) for the whole
+            pending time. Rendering the optimistic value is a correctness requirement.
+          </p>
+        </Callout>
+      </BehaviourSection>
 
-      <h3>Forms</h3>
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "Options revealed later by a Suspense boundary or `use()` inside the Select get the value re-applied when they arrive, without a dispatch. There is no load-on-open."
+        }
+      >
+        <h4 id="options-that-load-later">Options that load later</h4>
+        <Example
+          source={selectCountrySource}
+          fileName="SelectCountry.tsx"
+          css={selectCss}
+          cssFileName="select.css"
+        >
+          <SelectCountry />
+        </Example>
+        <p>
+          React selects options only in the select's own commit, so options revealed later by a
+          Suspense boundary or <code>use()</code> inside the select would leave the browser's first
+          option selected. The library re-applies the value when they arrive, without a dispatch.
+          Until then nothing (or the fallback) is selected and the button is empty. Use a disabled
+          fallback option, or put the whole Select inside the boundary for a skeleton. There is no
+          "load on open": a native select has no open event (use a{" "}
+          <a href="/components/combobox">Combobox</a> for that).
+        </p>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          "The picker's open state (`:open`) is the browser's, with no attribute and no action. The browser selects an option before any JavaScript runs; a form reset and picks before hydration are dispatched with `reason: \"platform\"`."
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'A native select: picking, the keyboard, typeahead, `required` and form submission work, and with `appearance: base-select` the browser copies the selected option into `Select.Value`. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).'
+        }
+      >
+        <h4>Plain HTML</h4>
+        <p>
+          If a select only posts with its form, a Server Component can render the native element
+          itself, with no library code for it:
+        </p>
+        <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  Size
+  <select name="size" defaultValue={order.size ?? ""} required>
+    <option value="">Choose a size</option>
+    <option value="s">Small</option>
+    <option value="m">Medium</option>
+  </select>
+</label>`}</CodeBlock>
+        <p>
+          Picking, the keyboard, typeahead, <code>required</code> and submission are the browser's.
+          The <code>appearance: base-select</code> recipes above apply to it too: a styled picker in
+          Chromium 135+ and Safari 27, the native select in Firefox. Keep the options' content plain
+          text there. Rich button content needs a <code>&lt;selectedcontent&gt;</code>, which the
+          parser fills before hydration, so a plain one in a hydrated React tree causes a hydration
+          mismatch (and <code>@types/react</code> does not type it); <code>Select.Value</code> is
+          the part that handles this.
+        </p>
+        <p>
+          Compared with <code>Select</code>, it has no <code>valueChangeAction</code>, so no
+          transition, <code>data-pending</code> or rollback on rejection; no data attributes (use{" "}
+          <code>:checked</code> on options, <code>:open</code>, <code>:disabled</code>); no React
+          state that tracks it, and none of the library's fixes for React's form reset and
+          re-applying the selection; no options that load later behind Suspense; and no{" "}
+          <a href="/components/field">Field</a> integration.
+        </p>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <Example
         source={selectFormSource}
         fileName="SelectForm.tsx"
@@ -480,7 +491,81 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         </li>
       </ul>
 
-      <h3>Browser support</h3>
+      <h4>Server Functions and forms</h4>
+      <CodeBlock>{`// Autosave: an action with data-pending, passed directly from a Server Component.
+<Select.Root defaultValue={user.country} valueChangeAction={setCountry}>...</Select.Root>
+
+// Native submission: no action on the Select; pending is the form's.
+<form action={placeOrder}>
+  <Select.Root name="size" defaultValue="" required>...</Select.Root>
+  <SubmitButton />
+</form>`}</CodeBlock>
+      <p>
+        The two channels are independent and may be combined. Every dispatch adds the view
+        transition type <code>fsui-select</code>; no part takes a <code>transition</code> prop,
+        since the picker and the button's copy are drawn by the browser. An action-less Select is a
+        working native select before hydration, including the copy into the button.
+      </p>
+
+      <h3 id="styling">Styling</h3>
+      <p>
+        The library ships no CSS. These recipes cover the opt-in, the button, the picker, its
+        options and an open/close animation. Engines without customizable select ignore all of it
+        except the plain properties on the select.
+      </p>
+      <CodeBlock language="css">{`/* 1. Opt in to the customizable picker. Two rules: an engine that does not know
+      ::picker(select) drops any rule naming it. */
+.select { appearance: base-select; }
+.select::picker(select) { appearance: base-select; }
+
+/* 2. The button, its content, the arrow. */
+.select { border: 1px solid GrayText; border-radius: 6px; padding: 0.4em 0.6em; }
+.select::picker-icon { content: "▾"; transition: rotate 120ms; }
+.select:open::picker-icon { rotate: 180deg; }
+.select[data-pending] { cursor: progress; }
+.select[data-pending] selectedcontent { opacity: 0.6; }
+.select:user-invalid { border-color: var(--danger); }
+selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option */
+
+/* 3. The picker and its options. */
+.select::picker(select) { border: 1px solid GrayText; border-radius: 8px; padding: 4px; }
+.select option { padding: 0.4em 0.6em; border-radius: 4px; }
+.select option:hover, .select option:focus-visible { background: Highlight; color: HighlightText; }
+.select option:checked { font-weight: 600; }          /* optimistic: flips on pick, reverts on rejection */
+.select option::checkmark { content: "✓"; order: 1; margin-inline-start: auto; }
+.select option[data-pending]::after { content: "…"; }
+.select option:disabled { opacity: 0.4; }
+.select optgroup legend { font-size: 0.85em; color: GrayText; }
+
+/* 4. Open/close animation (Chromium; Safari 27.0 does not animate the picker yet). */
+.select::picker(select) {
+  opacity: 0;
+  transition: opacity 120ms, overlay 120ms allow-discrete, display 120ms allow-discrete;
+}
+.select:open::picker(select) { opacity: 1; @starting-style { opacity: 0; } }
+
+/* 5. Placement: the browser anchors the picker to the select; override its position. The self-*
+   keywords follow the select's own direction (an RTL container too); plain logical ones would
+   follow the root's, since the picker is in the top layer. */
+.select::picker(select) { position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .select::picker(select), .select::picker-icon { transition: none; }
+}`}</CodeBlock>
+      <p>
+        Tailwind: <code>data-pending:cursor-progress open:ring-2</code> on the Root,{" "}
+        <code>checked:font-semibold data-pending:animate-pulse</code> on an Option.
+      </p>
+      <Callout title="Safari: a Select inside a Popover or Menu">
+        <p>
+          The browser positions the picker with anchor positioning and fallbacks. A WebKit bug
+          (302008) can hang a page that opens a popover with position fallbacks inside another
+          popover. If a Select inside a Popover or Menu misbehaves in Safari, turn the fallbacks
+          off: <code>{".select::picker(select) { position-try-fallbacks: none; }"}</code>.
+        </p>
+      </Callout>
+
+      <h3 id="browser-notes">Browser notes</h3>
       <Table
         head={["", "Chromium 135+", "Safari 27", "Firefox (default settings)"]}
         rows={[
@@ -508,73 +593,6 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         <code>@media (pointer: fine)</code> if you need the wheel). Search, free text and async
         loading on open are <a href="/components/combobox">Combobox</a>'s job.
       </p>
-
-      <h3>Server Functions and forms</h3>
-      <CodeBlock>{`// Autosave: an action with data-pending, passed directly from a Server Component.
-<Select.Root defaultValue={user.country} valueChangeAction={setCountry}>...</Select.Root>
-
-// Native submission: no action on the Select; pending is the form's.
-<form action={placeOrder}>
-  <Select.Root name="size" defaultValue="" required>...</Select.Root>
-  <SubmitButton />
-</form>`}</CodeBlock>
-      <p>
-        The two channels are independent and may be combined. Every dispatch adds the view
-        transition type <code>fsui-select</code>; no part takes a <code>transition</code> prop,
-        since the picker and the button's copy are drawn by the browser. An action-less Select is a
-        working native select before hydration, including the copy into the button.
-      </p>
-
-      <h3>Plain HTML</h3>
-      <p>
-        If a select only posts with its form, a Server Component can render the native element
-        itself, with no library code for it:
-      </p>
-      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
-<label>
-  Size
-  <select name="size" defaultValue={order.size ?? ""} required>
-    <option value="">Choose a size</option>
-    <option value="s">Small</option>
-    <option value="m">Medium</option>
-  </select>
-</label>`}</CodeBlock>
-      <p>
-        Picking, the keyboard, typeahead, <code>required</code> and submission are the browser's.
-        The <code>appearance: base-select</code> recipes above apply to it too: a styled picker in
-        Chromium 135+ and Safari 27, the native select in Firefox. Keep the options' content plain
-        text there. Rich button content needs a <code>&lt;selectedcontent&gt;</code>, which the
-        parser fills before hydration, so a plain one in a hydrated React tree causes a hydration
-        mismatch (and <code>@types/react</code> does not type it); <code>Select.Value</code> is the
-        part that handles this.
-      </p>
-      <p>
-        Compared with <code>Select</code>, it has no <code>valueChangeAction</code>, so no
-        transition, <code>data-pending</code> or rollback on rejection; no data attributes (use{" "}
-        <code>:checked</code> on options, <code>:open</code>, <code>:disabled</code>); no React
-        state that tracks it, and none of the library's fixes for React's form reset and re-applying
-        the selection; no options that load later behind Suspense; and no{" "}
-        <a href="/components/field">Field</a> integration.
-      </p>
-
-      <BehaviourSummary
-        name="Select"
-        transitionTypes={
-          "`fsui-select`. No part takes a `transition` prop: the picker and the button's copy are drawn by the browser."
-        }
-        optimistic={
-          "The `<select>` renders the optimistic value (a correctness requirement), so `option:checked` and `data-selected` agree. `data-pending` is on the Root and Trigger while `valueChangeAction` is in flight, and on the Option being selected."
-        }
-        suspense={
-          "Options revealed later by a Suspense boundary or `use()` inside the Select get the value re-applied when they arrive, without a dispatch ([Options that load later](#options-that-load-later)). There is no load-on-open."
-        }
-        browserOwned={
-          "The picker's open state (`:open`) is the browser's, with no attribute and no action. The browser selects an option before any JavaScript runs; a form reset and picks before hydration are dispatched with `reason: \"platform\"`."
-        }
-        beforeHydration={
-          'A native select: picking, the keyboard, typeahead, `required` and form submission work, and with `appearance: base-select` the browser copies the selected option into `Select.Value`. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).'
-        }
-      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { MeterStorage } from "../examples/MeterStorage.js";
@@ -41,7 +41,9 @@ export function MeterPage() {
         all ran on the server.
       </p>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Meter } from "@funstack/ui/meter";
 
 <Meter.Root value={used} max={quota} low={quota * 0.7} high={quota * 0.9} optimum={0}
@@ -63,7 +65,8 @@ export function MeterPage() {
         <a href="/components/progress">Progress, Server Components</a>).
       </p>
 
-      <h3>Regions</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Regions</h4>
       <p>
         HTML's defaults and clamping, in order: <code>low</code> (default <code>min</code>) is
         clamped to <code>[min, max]</code>, <code>high</code> (default <code>max</code>) to{" "}
@@ -92,24 +95,7 @@ export function MeterPage() {
         <code>getAriaValueText</code> as the storage example does ("4.6 GB, almost full").
       </p>
 
-      <h3>Next to a Field's control</h3>
-      <p>
-        A Meter is not a form control and does not register with a Field. Put it next to the control
-        with its own <code>Meter.Label</code>, and describe the control with the meter's text by
-        giving <code>Meter.Value</code> an <code>id</code> and adding it to the control's{" "}
-        <code>aria-describedby</code>. A <code>Field.Root</code> whose only content is a Meter is
-        not supported: use a plain element with the Meter's own label.
-      </p>
-      <Example
-        source={meterStrengthSource}
-        fileName="MeterStrength.tsx"
-        css={meterCss}
-        cssFileName="meter.css"
-      >
-        <MeterStrength />
-      </Example>
-
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Meter.Root</code>
       </h4>
@@ -190,7 +176,7 @@ export function MeterPage() {
       </p>
       <PropsTable rows={[...functionProps("MeterState"), renderProp("div | span", "MeterState")]} />
 
-      <h3>State</h3>
+      <h4>State</h4>
       <Table
         head={["Field", "Type", "Meaning"]}
         rows={[
@@ -204,7 +190,7 @@ export function MeterPage() {
         ]}
       />
 
-      <h3>Data attributes and custom properties</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Name", "On", "Meaning"]}
         rows={[
@@ -218,7 +204,7 @@ export function MeterPage() {
         ]}
       />
 
-      <h3>Accessibility</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <p>
         Screen-reader support for the <code>meter</code> role is older and less even than for{" "}
         <code>progressbar</code>, so the Root always renders <code>aria-valuenow</code> and{" "}
@@ -226,18 +212,47 @@ export function MeterPage() {
         or <code>aria-label</code>). Updates are not announced.
       </p>
 
-      <BehaviourSummary
-        name="Meter"
-        transitionTypes={
-          "None: values change in your own lane, and no part takes a `transition` prop."
-        }
-        optimistic={"None: a Meter displays a value; it has no optimistic or pending state."}
-        suspense={"Nothing specific: the Meter renders no content region."}
-        browserOwned={"None."}
-        beforeHydration={
+      <BehaviourSection
+        id="transition-types"
+        summary={"None: values change in your own lane, and no part takes a `transition` prop."}
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={"None: a Meter displays a value; it has no optimistic or pending state."}
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={"Nothing specific: the Meter renders no content region."}
+      />
+
+      <BehaviourSection id="browser-owned-state" summary={"None."} />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
           "Everything: there is no behaviour. The HTML carries the role, the values, `aria-valuetext`, the data attributes and the custom property, and your CSS draws the bar from the first paint. The Root is itself a Server Component."
         }
       />
+
+      <h3 id="recipes">Recipes</h3>
+      <h4>Next to a Field's control</h4>
+      <p>
+        A Meter is not a form control and does not register with a Field. Put it next to the control
+        with its own <code>Meter.Label</code>, and describe the control with the meter's text by
+        giving <code>Meter.Value</code> an <code>id</code> and adding it to the control's{" "}
+        <code>aria-describedby</code>. A <code>Field.Root</code> whose only content is a Meter is
+        not supported: use a plain element with the Meter's own label.
+      </p>
+      <Example
+        source={meterStrengthSource}
+        fileName="MeterStrength.tsx"
+        css={meterCss}
+        cssFileName="meter.css"
+      >
+        <MeterStrength />
+      </Example>
     </div>
   );
 }

@@ -121,7 +121,7 @@ export function PendingOptimisticPage() {
       </ul>
       <p>
         Each component page lists which of its parts show which value in its{" "}
-        <strong>Async and platform behaviour</strong> section and its data attributes table.
+        <strong>Optimistic and pending</strong> section and its data attributes table.
       </p>
 
       <h3>

@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { NumberFieldField } from "../examples/NumberFieldField.js";
@@ -44,7 +44,21 @@ export function NumberFieldPage() {
         <NumberFieldQuantity />
       </Example>
 
-      <h3>Two actions: steps and commits</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
+      <CodeBlock>{`import { NumberField } from "@funstack/ui/number-field";
+
+<NumberField.Root name="quantity" defaultValue={1} min={1} max={99} locale="en-US"
+  valueCommitAction={saveQuantity}>             {/* div role=group, named by the Label */}
+  <NumberField.Label>Quantity</NumberField.Label> {/* label for= the visible input */}
+  <NumberField.Decrement>−</NumberField.Decrement> {/* button tabindex=-1 aria-label="Decrease" */}
+  <NumberField.Input />                         {/* input type=text + hidden input type=number */}
+  <NumberField.Increment>+</NumberField.Increment> {/* button tabindex=-1 aria-label="Increase" */}
+</NumberField.Root>`}</CodeBlock>
+
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Two actions: steps and commits</h4>
       <Table
         head={["", "valueChangeAction", "valueCommitAction"]}
         rows={[
@@ -107,7 +121,7 @@ export function NumberFieldPage() {
         </li>
       </ul>
 
-      <h3>Locales and formats</h3>
+      <h4>Locales and formats</h4>
       <Example
         source={numberFieldFormatsSource}
         fileName="NumberFieldFormats.tsx"
@@ -151,7 +165,7 @@ export function NumberFieldPage() {
         </li>
       </ul>
 
-      <h3>Constraints: not clamped, reported</h3>
+      <h4>Constraints: not clamped, reported</h4>
       <p>
         Like a native number input, a <strong>typed</strong> value is neither clamped to{" "}
         <code>min</code> / <code>max</code> nor snapped to <code>step</code>: it stays as typed, the
@@ -167,18 +181,7 @@ export function NumberFieldPage() {
         <code>valueChangeAction</code>.
       </p>
 
-      <h3>Anatomy</h3>
-      <CodeBlock>{`import { NumberField } from "@funstack/ui/number-field";
-
-<NumberField.Root name="quantity" defaultValue={1} min={1} max={99} locale="en-US"
-  valueCommitAction={saveQuantity}>             {/* div role=group, named by the Label */}
-  <NumberField.Label>Quantity</NumberField.Label> {/* label for= the visible input */}
-  <NumberField.Decrement>−</NumberField.Decrement> {/* button tabindex=-1 aria-label="Decrease" */}
-  <NumberField.Input />                         {/* input type=text + hidden input type=number */}
-  <NumberField.Increment>+</NumberField.Increment> {/* button tabindex=-1 aria-label="Increase" */}
-</NumberField.Root>`}</CodeBlock>
-
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>NumberField.Root</code>
       </h4>
@@ -377,7 +380,49 @@ export function NumberFieldPage() {
         and, through its id, the Root group.
       </p>
 
-      <h3>Keyboard, buttons and wheel</h3>
+      <h3 id="data-attributes">Data attributes</h3>
+      <Table
+        head={["Attribute", "On", "Meaning"]}
+        rows={[
+          [
+            "`data-pending`",
+            "Root, Label, Input",
+            "A step (with a `valueChangeAction`) or commit is in flight.",
+          ],
+          [
+            "`data-pending`",
+            "Increment / Decrement",
+            "The latest step or commit came from this button and is in flight.",
+          ],
+          [
+            "`data-disabled`",
+            "every part",
+            "Disabled (the buttons also at their bound and when read-only).",
+          ],
+          ["`data-invalid`", "Root, Input", "Inside a Field that shows an error."],
+          [
+            "`:user-invalid`, `:read-only`, `:disabled`, `:placeholder-shown`",
+            "the visible input",
+            "The platform's own states.",
+          ],
+          ["`:active`", "a held button", "No `data-holding`: the platform has it."],
+        ]}
+      />
+      <CodeBlock language="css">{`.number-field { display: inline-grid; grid-template-columns: auto 1fr auto; }
+.number-field .input { min-width: 6ch; text-align: end; font-variant-numeric: tabular-nums; }
+.number-field .step { inline-size: 2.25rem; }
+.number-field .step:disabled { opacity: .4; }
+.number-field .input[data-pending] { background-image: var(--spinner); background-repeat: no-repeat; }
+.number-field .step[data-pending] { cursor: progress; }
+.number-field .input:user-invalid { border-color: var(--danger); }
+.number-field[data-invalid] .step { border-color: var(--danger); }
+.number-field:has(.input:focus-visible) { outline: 2px solid var(--accent); }`}</CodeBlock>
+      <p>
+        The buttons' order is your markup's: an RTL page places <code>Decrement</code> first in
+        source if it wants it at the inline start.
+      </p>
+
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Input", "Effect"]}
         rows={[
@@ -423,7 +468,7 @@ export function NumberFieldPage() {
         </li>
       </ul>
 
-      <h3>Accessibility</h3>
+      <h4>Accessibility</h4>
       <ul>
         <li>
           <strong>
@@ -454,49 +499,61 @@ export function NumberFieldPage() {
         </li>
       </ul>
 
-      <h3>Data attributes and CSS</h3>
-      <Table
-        head={["Attribute", "On", "Meaning"]}
-        rows={[
-          [
-            "`data-pending`",
-            "Root, Label, Input",
-            "A step (with a `valueChangeAction`) or commit is in flight.",
-          ],
-          [
-            "`data-pending`",
-            "Increment / Decrement",
-            "The latest step or commit came from this button and is in flight.",
-          ],
-          [
-            "`data-disabled`",
-            "every part",
-            "Disabled (the buttons also at their bound and when read-only).",
-          ],
-          ["`data-invalid`", "Root, Input", "Inside a Field that shows an error."],
-          [
-            "`:user-invalid`, `:read-only`, `:disabled`, `:placeholder-shown`",
-            "the visible input",
-            "The platform's own states.",
-          ],
-          ["`:active`", "a held button", "No `data-holding`: the platform has it."],
-        ]}
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "A step: `fsui-number-field` plus `fsui-number-field-change`. A commit: `fsui-number-field` plus `fsui-number-field-commit`. No part takes a `transition` prop; use the types in your own boundaries."
+        }
       />
-      <CodeBlock language="css">{`.number-field { display: inline-grid; grid-template-columns: auto 1fr auto; }
-.number-field .input { min-width: 6ch; text-align: end; font-variant-numeric: tabular-nums; }
-.number-field .step { inline-size: 2.25rem; }
-.number-field .step:disabled { opacity: .4; }
-.number-field .input[data-pending] { background-image: var(--spinner); background-repeat: no-repeat; }
-.number-field .step[data-pending] { cursor: progress; }
-.number-field .input:user-invalid { border-color: var(--danger); }
-.number-field[data-invalid] .step { border-color: var(--danger); }
-.number-field:has(.input:focus-visible) { outline: 2px solid var(--accent); }`}</CodeBlock>
-      <p>
-        The buttons' order is your markup's: an RTL page places <code>Decrement</code> first in
-        source if it wants it at the inline start.
-      </p>
 
-      <h3>Forms and hydration</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "Typed text is an internal urgent draft, committed on blur and Enter. The input shows the value the gesture reached while a button is held, a step waits for its commit, or anything is in flight. `data-pending` is on the Root, Label and Input while a step (with a `valueChangeAction`) or commit is in flight, and on the Increment or Decrement button it came from."
+        }
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={"Nothing specific: the NumberField renders no content region."}
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          "The hidden input's form reset is the browser's; the library then dispatches one step and one commit with `reason: \"platform\"`."
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'The text can be typed; at hydration a parsable change is adopted with one `"platform"` step and commit. A form submitted before hydration posts the default value; the buttons do nothing yet. For a number field that needs no JavaScript, see [Plain HTML](#plain-html).'
+        }
+      >
+        <h4 id="plain-html">Plain HTML</h4>
+        <p>
+          A native number input is the JS-free number field. A Server Component can render it with
+          no library code, and it works before hydration and without it:
+        </p>
+        <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  Quantity
+  <input type="number" name="quantity" min={1} max={99} step={1} defaultValue={cart.quantity} />
+</label>`}</CodeBlock>
+        <p>
+          The browser steps it with ArrowUp / ArrowDown, validates <code>min</code>,{" "}
+          <code>max</code> and <code>step</code> (<code>:user-invalid</code>) and posts the number.
+          Compared with <code>NumberField</code>, it gives up what the component is for: no{" "}
+          <code>format</code> (currency, percent, units, grouping), no parsing of the user's locale,
+          no Increment / Decrement parts with press-and-hold, and no announcement of each step. It
+          also has no <code>valueChangeAction</code> / <code>valueCommitAction</code> (no single
+          save per gesture with rollback, no <code>data-pending</code>), no data attributes, and no{" "}
+          <a href="#inside-a-field">Field</a> integration.
+        </p>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <ul>
         <li>
           The hidden input posts <code>String(value)</code> (<code>quantity=12</code>,{" "}
@@ -522,28 +579,8 @@ export function NumberFieldPage() {
         </li>
       </ul>
 
-      <h3 id="plain-html">Plain HTML</h3>
-      <p>
-        A native number input is the JS-free number field. A Server Component can render it with no
-        library code, and it works before hydration and without it:
-      </p>
-      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
-<label>
-  Quantity
-  <input type="number" name="quantity" min={1} max={99} step={1} defaultValue={cart.quantity} />
-</label>`}</CodeBlock>
-      <p>
-        The browser steps it with ArrowUp / ArrowDown, validates <code>min</code>, <code>max</code>{" "}
-        and <code>step</code> (<code>:user-invalid</code>) and posts the number. Compared with{" "}
-        <code>NumberField</code>, it gives up what the component is for: no <code>format</code>{" "}
-        (currency, percent, units, grouping), no parsing of the user's locale, no Increment /
-        Decrement parts with press-and-hold, and no announcement of each step. It also has no{" "}
-        <code>valueChangeAction</code> / <code>valueCommitAction</code> (no single save per gesture
-        with rollback, no <code>data-pending</code>), no data attributes, and no{" "}
-        <a href="#inside-a-field">Field</a> integration.
-      </p>
-
-      <h3 id="inside-a-field">Inside a Field</h3>
+      <h3 id="recipes">Recipes</h3>
+      <h4 id="inside-a-field">Inside a Field</h4>
       <Example
         source={numberFieldFieldSource}
         fileName="NumberFieldField.tsx"
@@ -580,23 +617,6 @@ export function NumberFieldPage() {
       </ul>
       <CodeBlock>{`// A Server Function as the save, straight from a Server Component:
 <NumberField.Root defaultValue={line.quantity} min={1} locale="en-US" valueCommitAction={saveQuantity}>…</NumberField.Root>`}</CodeBlock>
-
-      <BehaviourSummary
-        name="NumberField"
-        transitionTypes={
-          "A step: `fsui-number-field` plus `fsui-number-field-change`. A commit: `fsui-number-field` plus `fsui-number-field-commit`. No part takes a `transition` prop; use the types in your own boundaries."
-        }
-        optimistic={
-          "Typed text is an internal urgent draft, committed on blur and Enter. The input shows the value the gesture reached while a button is held, a step waits for its commit, or anything is in flight. `data-pending` is on the Root, Label and Input while a step (with a `valueChangeAction`) or commit is in flight, and on the Increment or Decrement button it came from."
-        }
-        suspense={"Nothing specific: the NumberField renders no content region."}
-        browserOwned={
-          "The hidden input's form reset is the browser's; the library then dispatches one step and one commit with `reason: \"platform\"`."
-        }
-        beforeHydration={
-          'The text can be typed; at hydration a parsable change is adopted with one `"platform"` step and commit. A form submitted before hydration posts the default value; the buttons do nothing yet. For a number field that needs no JavaScript, see [Plain HTML](#plain-html).'
-        }
-      />
     </div>
   );
 }

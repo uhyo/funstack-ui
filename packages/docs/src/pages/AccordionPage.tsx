@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
@@ -35,7 +35,9 @@ export function AccordionPage() {
         <AccordionFaq />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Accordion } from "@funstack/ui/accordion";
 
 <Accordion.Root>                     {/* div: state, keyboard navigation */}
@@ -55,7 +57,8 @@ export function AccordionPage() {
         <code>&lt;summary&gt;</code> (development warning otherwise).
       </p>
 
-      <h3>Two modes</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Two modes</h4>
       <Table
         head={["", "JS-free mode", "Library mode"]}
         rows={[
@@ -85,7 +88,7 @@ export function AccordionPage() {
         Switching modes after mount is not supported.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Accordion.Root</code>
       </h4>
@@ -238,7 +241,7 @@ export function AccordionPage() {
         <code>keepMounted</code>: closed content is always in the DOM, which keeps it searchable.
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Hook", "On", "Meaning"]}
         rows={[
@@ -270,7 +273,7 @@ export function AccordionPage() {
   .item::details-content { transition: none; }
 }`}</CodeBlock>
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Behaviour"]}
         rows={[
@@ -296,44 +299,79 @@ export function AccordionPage() {
         <li>Disabled triggers stay focusable. Focus never moves on open or close.</li>
       </ul>
 
-      <h3 id="async-walkthrough">Async walkthrough (library mode)</h3>
-      <Example
-        source={accordionThreadsSource}
-        fileName="AccordionThreads.tsx"
-        css={accordionCss}
-        cssFileName="accordion.css"
-      >
-        <AccordionThreads />
-      </Example>
-      <ol>
-        <li>
-          Click a trigger: the click is intercepted, the chevron flips (<code>data-open</code>), the
-          item and trigger get <code>data-pending</code>, and{" "}
-          <code>valueChangeAction(next, {'{ reason: "activate", item, open: true }'})</code> runs.
-        </li>
-        <li>
-          The commit renders the Panel's function child with <code>open: true</code>; the replies
-          suspend, so React holds the commit. The <code>&lt;details&gt;</code> stays closed.
-        </li>
-        <li>
-          The data arrives: the item opens with its content in one commit, and{" "}
-          <code>data-pending</code> goes.
-        </li>
-        <li>
-          If the action rejects, <code>data-open</code> reverts, the item never opens, and the error
-          goes to the nearest Error Boundary.
-        </li>
-      </ol>
-      <Callout title="Find-in-page in library mode">
-        <p>
-          The browser opens a closed item when find-in-page or a text fragment matches its content.
-          The Accordion dispatches that as <code>reason: "platform"</code> with the{" "}
-          <code>toggle</code> event. If a controlled parent does not adopt the change, the item is
-          closed again when the action settles. Disabled items are re-closed without dispatching.
-        </p>
-      </Callout>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "Library mode: `fsui-accordion` plus `fsui-accordion-expand` or `fsui-accordion-collapse`. JS-free mode starts no transitions."
+        }
+      />
 
-      <h3>Recipes</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "Library mode: the Item and Trigger show the optimistic open state (`data-open`) and `data-pending` while their open state is changing; the Root carries `data-pending` while an action is in flight. The `<details>` element (`:open`, and what assistive technology hears) and the Panel's function child follow the committed state. JS-free mode has no optimistic or pending state."
+        }
+      >
+        <h4 id="async-walkthrough">Walkthrough (library mode)</h4>
+        <Example
+          source={accordionThreadsSource}
+          fileName="AccordionThreads.tsx"
+          css={accordionCss}
+          cssFileName="accordion.css"
+        >
+          <AccordionThreads />
+        </Example>
+        <ol>
+          <li>
+            Click a trigger: the click is intercepted, the chevron flips (<code>data-open</code>),
+            the item and trigger get <code>data-pending</code>, and{" "}
+            <code>valueChangeAction(next, {'{ reason: "activate", item, open: true }'})</code> runs.
+          </li>
+          <li>
+            The commit renders the Panel's function child with <code>open: true</code>; the replies
+            suspend, so React holds the commit. The <code>&lt;details&gt;</code> stays closed.
+          </li>
+          <li>
+            The data arrives: the item opens with its content in one commit, and{" "}
+            <code>data-pending</code> goes.
+          </li>
+          <li>
+            If the action rejects, <code>data-open</code> reverts, the item never opens, and the
+            error goes to the nearest Error Boundary.
+          </li>
+        </ol>
+        <Callout title="Find-in-page in library mode">
+          <p>
+            The browser opens a closed item when find-in-page or a text fragment matches its
+            content. The Accordion dispatches that as <code>reason: "platform"</code> with the{" "}
+            <code>toggle</code> event. If a controlled parent does not adopt the change, the item is
+            closed again when the action settles. Disabled items are re-closed without dispatching.
+          </p>
+        </Callout>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "The Panel is always mounted; its function child receives the committed `open`, which is how you mount content lazily. If that content suspends, the item stays closed with the trigger pending until the content is ready, then opens. Trigger content must not suspend."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'JS-free mode: the browser owns every `<details open>`, and `exclusive` is the native `name` group; style with `:open` and animate with `::details-content`. Library mode: open state is library-owned, but the browser can still open a closed item (find-in-page, a text fragment, a click before hydration). That is dispatched with `reason: "platform"`, and the committed state is re-applied once the action settles.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'JS-free mode: everything: open and close, Enter and Space, the `exclusive` group (`<details name>`), find-in-page, CSS animation. Hydration only adds arrow-key navigation and `disabled`. Library mode: the native toggle; items opened before hydration are reconciled on mount with one `valueChangeAction` call (`reason: "platform"`).'
+        }
+      />
+
+      <h3 id="recipes">Recipes</h3>
       <h4>Persist open sections with a Server Function</h4>
       <CodeBlock>{`// Server Component
 <Accordion.Root defaultValue={user.openSections} valueChangeAction={saveOpenSections}>
@@ -347,25 +385,6 @@ export function AccordionPage() {
         Use either the <code>transition</code> prop or a <code>::details-content</code> CSS
         transition for a given change, not both.
       </p>
-
-      <BehaviourSummary
-        name="Accordion"
-        transitionTypes={
-          "Library mode: `fsui-accordion` plus `fsui-accordion-expand` or `fsui-accordion-collapse`. JS-free mode starts no transitions."
-        }
-        optimistic={
-          "Library mode: the Item and Trigger show the optimistic open state (`data-open`) and `data-pending` while their open state is changing; the Root carries `data-pending` while an action is in flight. The `<details>` element (`:open`, and what assistive technology hears) and the Panel's function child follow the committed state. JS-free mode has no optimistic or pending state."
-        }
-        suspense={
-          "The Panel is always mounted; its function child receives the committed `open`, which is how you mount content lazily. If that content suspends, the item stays closed with the trigger pending until the content is ready, then opens ([Async walkthrough](#async-walkthrough)). Trigger content must not suspend."
-        }
-        browserOwned={
-          'JS-free mode: the browser owns every `<details open>`, and `exclusive` is the native `name` group; style with `:open` and animate with `::details-content`. Library mode: open state is library-owned, but the browser can still open a closed item (find-in-page, a text fragment, a click before hydration). That is dispatched with `reason: "platform"`, and the committed state is re-applied once the action settles.'
-        }
-        beforeHydration={
-          'JS-free mode: everything: open and close, Enter and Space, the `exclusive` group (`<details name>`), find-in-page, CSS animation. Hydration only adds arrow-key navigation and `disabled`. Library mode: the native toggle; items opened before hydration are reconciled on mount with one `valueChangeAction` call (`reason: "platform"`).'
-        }
-      />
     </div>
   );
 }

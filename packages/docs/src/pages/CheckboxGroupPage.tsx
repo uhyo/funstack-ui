@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { CheckboxGroupForm } from "../examples/CheckboxGroupForm.js";
@@ -43,7 +43,9 @@ export function CheckboxGroupPage() {
         <CheckboxGroupToppings />
       </Example>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { CheckboxGroup } from "@funstack/ui/checkbox-group";
 
 <CheckboxGroup.Root name="toppings" defaultValue={["cheese"]} valueChangeAction={saveToppings}> {/* fieldset */}
@@ -90,7 +92,8 @@ export function CheckboxGroupPage() {
         </li>
       </ul>
 
-      <h3>The value is a set</h3>
+      <h3 id="how-it-works">How it works</h3>
+      <h4>The value is a set</h4>
       <p>
         <code>value</code> and <code>defaultValue</code> are <code>string[]</code>, so a{" "}
         <code>useState&lt;string[]&gt;</code> setter plugs in. Order does not matter and duplicates
@@ -121,7 +124,7 @@ export function CheckboxGroupPage() {
         </p>
       </Callout>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>CheckboxGroup.Root</code>
       </h4>
@@ -340,7 +343,7 @@ export function CheckboxGroupPage() {
         are disabled, so the server-rendered Parent counts them until the Items hydrate.
       </p>
 
-      <h3>Data attributes and pseudo-classes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
@@ -383,7 +386,7 @@ export function CheckboxGroupPage() {
 .group[data-pending] { cursor: progress; }
 .group:has(.box:user-invalid) legend { color: red; }  /* empty required group after a submit */`}</CodeBlock>
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <p>Everything here is the browser's; the library installs no key handler.</p>
       <Table
         head={["Key", "Behaviour", "Dispatches"]}
@@ -420,29 +423,62 @@ export function CheckboxGroupPage() {
         </li>
       </ul>
 
-      <h3>Async walkthrough</h3>
-      <ol>
-        <li>
-          Click Ham: the browser checks it; the group dispatches{" "}
-          <code>
-            valueChangeAction(["cheese", "ham"],{" "}
-            {'{ reason: "activate", added: ["ham"], removed: [] }'})
-          </code>{" "}
-          in the Root's transition. The Root and the Ham box get <code>data-pending</code>; a Parent
-          over both values shows checked at once.
-        </li>
-        <li>Resolve: the set is committed (uncontrolled) and the attributes go.</li>
-        <li>
-          Reject: the optimistic set reverts, React writes <code>checked</code> back, the Parent
-          returns to mixed, and the error reaches the nearest Error Boundary.
-        </li>
-        <li>
-          Clicks while a save is pending stack: each dispatch is computed from what the user sees,
-          and only the latest commits.
-        </li>
-      </ol>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "`fsui-checkbox-group`, plus `fsui-checkbox-group-check` when a dispatch checks something and `fsui-checkbox-group-uncheck` when it unchecks something (a reset can carry both)."
+        }
+      />
 
-      <h3>Forms</h3>
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "Items and the Parent render the optimistic set into their native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on each Item (or Parent) whose state is changing."
+        }
+      >
+        <h4>Walkthrough</h4>
+        <ol>
+          <li>
+            Click Ham: the browser checks it; the group dispatches{" "}
+            <code>
+              valueChangeAction(["cheese", "ham"],{" "}
+              {'{ reason: "activate", added: ["ham"], removed: [] }'})
+            </code>{" "}
+            in the Root's transition. The Root and the Ham box get <code>data-pending</code>; a
+            Parent over both values shows checked at once.
+          </li>
+          <li>Resolve: the set is committed (uncontrolled) and the attributes go.</li>
+          <li>
+            Reject: the optimistic set reverts, React writes <code>checked</code> back, the Parent
+            returns to mixed, and the error reaches the nearest Error Boundary.
+          </li>
+          <li>
+            Clicks while a save is pending stack: each dispatch is computed from what the user sees,
+            and only the latest commits.
+          </li>
+        </ol>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={"No content region; nothing the group renders suspends."}
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'Native checkboxes: the browser flips them before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`, once per group. The Parent\'s mixed state is derived and mirrored to the DOM property.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'Native checkboxes: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`). A mixed Parent is drawn from `data-indeterminate` but announced as unchecked until hydration; a Parent clicked before hydration counts as "check all" of its values. A required group keeps the server\'s `required` attributes until hydration.'
+        }
+      />
+
+      <h3 id="forms">Forms</h3>
       <Example
         source={checkboxGroupFormSource}
         fileName="CheckboxGroupForm.tsx"
@@ -497,7 +533,7 @@ export function CheckboxGroupPage() {
         </li>
       </ul>
 
-      <h3>Server Functions and forms</h3>
+      <h4>Server Functions and forms</h4>
       <CodeBlock>{`// Autosave: a per-group action with data-pending, passed directly from a Server Component.
 // details ({ reason, added, removed }) is serialisable.
 <CheckboxGroup.Root defaultValue={order.toppings} valueChangeAction={saveToppings}>...</CheckboxGroup.Root>
@@ -519,23 +555,6 @@ export function CheckboxGroupPage() {
         <code>fsui-checkbox-group-uncheck</code> when it unchecks something (a reset can carry
         both).
       </p>
-
-      <BehaviourSummary
-        name="CheckboxGroup"
-        transitionTypes={
-          "`fsui-checkbox-group`, plus `fsui-checkbox-group-check` when a dispatch checks something and `fsui-checkbox-group-uncheck` when it unchecks something (a reset can carry both)."
-        }
-        optimistic={
-          "Items and the Parent render the optimistic set into their native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on each Item (or Parent) whose state is changing."
-        }
-        suspense={"No content region; nothing the group renders suspends."}
-        browserOwned={
-          'Native checkboxes: the browser flips them before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`, once per group. The Parent\'s mixed state is derived and mirrored to the DOM property.'
-        }
-        beforeHydration={
-          'Native checkboxes: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`). A mixed Parent is drawn from `data-indeterminate` but announced as unchecked until hydration; a Parent clicked before hydration counts as "check all" of its values. A required group keeps the server\'s `required` attributes until hydration.'
-        }
-      />
     </div>
   );
 }

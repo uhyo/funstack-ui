@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ButtonCompose } from "../examples/ButtonCompose.js";
@@ -50,7 +50,9 @@ export function ButtonPage() {
         the library counts as success, and reports it with a toast.
       </p>
 
-      <h3>Anatomy</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
       <CodeBlock>{`import { Button } from "@funstack/ui/button";
 
 <Button action={save}>Save</Button>   {/* <button type="button"> */}`}</CodeBlock>
@@ -61,7 +63,7 @@ export function ButtonPage() {
         assistive technology.
       </p>
 
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <PropsTable
         rows={[
           {
@@ -138,7 +140,7 @@ export function ButtonPage() {
         <code>{"{ event }"}</code>.
       </p>
 
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "Meaning"]}
         rows={[
@@ -161,40 +163,133 @@ export function ButtonPage() {
         <code>onClick</code>, <code>data-pending</code>, <code>data-disabled</code>.
       </p>
 
-      <h3 id="pending-and-re-entry">Pending and re-entry</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
+      <Table
+        head={["Key", "Native <button>", "render={<a href>}"]}
+        rows={[
+          [
+            "Enter",
+            "Click: runs `action` (unless pending or disabled)",
+            "Click: `action` and navigation; while pending, neither",
+          ],
+          [
+            "Space",
+            "Click on keyup: runs `action`",
+            'Nothing (a link); add `role="button"` and a key handler if a link must act on Space',
+          ],
+          ["Tab", "Sequential, or the Toolbar's single Tab stop inside one", "Same"],
+        ]}
+      />
       <p>
-        While the Button's own action is in flight, a click, Enter or Space (also a programmatic{" "}
-        <code>click()</code> and the click an implicit form submission sends) starts no second run
-        and is <code>preventDefault()</code>ed, so a link does not navigate again, a form does not
-        submit again and a <code>command</code> does not run again. Nothing else is blocked: focus,
-        hover and your own event handlers work as usual, and ancestors still see the click.
+        Focus never moves because of pending. The library announces nothing when an action starts or
+        ends; the outcome is yours, and that is where status messages belong: a{" "}
+        <a href="/components/toast">toast</a> (announced by its Viewport), a field error, content
+        that replaces the button, or <code>ariaNotify</code> from the action. <code>aria-busy</code>{" "}
+        is not set by default (screen readers either ignore it or may hide the button's name); pass
+        it yourself if you want it. A label that changes with <code>pending</code> ("Saving…") is
+        your choice, and like any name change on the focused element it is not reliably spoken.
       </p>
-      <ul>
-        <li>
-          The Button is <code>aria-disabled="true"</code> meanwhile, so a screen-reader user who
-          presses again, or comes back to it, hears that it is unavailable. It is never natively{" "}
-          <code>disabled</code>: Chromium and Firefox move focus to the page when a focused button
-          becomes disabled.
-        </li>
-        <li>
-          The guard is the Button's own run, not its look. React may hold the commit that ends the
-          action while another async action elsewhere is pending (or while the result suspends): the
-          button keeps <code>data-pending</code> and <code>aria-disabled</code> in that window, but
-          its own work has settled, so a click there starts a new run rather than being dropped. A{" "}
-          <code>formAction</code> Button follows React's form status instead and stays guarded until
-          its submission commits.
-        </li>
-        <li>
-          Want every click to count (a "+1" button)? Do not await the work:{" "}
-          <code>{"action={() => { void increment(); }}"}</code>. The run is over a moment after the
-          click, so every click runs the action, even while an unrelated action elsewhere holds the
-          Button's commit (then only the pending look lingers until that commit lands). An ordered
-          sequence whose steps see each other's results is <code>useActionState</code> (pass its
-          dispatch as <code>formAction</code>, or call it from the action).
-        </li>
-      </ul>
 
-      <h3>Forms</h3>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "None: the Button adds no transition types. Its `transition` prop animates the commit that ends its action."
+        }
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          'A [pure trigger](/concepts/pending-and-optimistic#pure-trigger): no optimistic state. `data-pending` and `aria-disabled="true"` while its own action (or a submission started by its own function `formAction`) is in flight; a second click, Enter or Space is ignored meanwhile.'
+        }
+      >
+        <h4 id="pending-and-re-entry">Re-entry while pending</h4>
+        <p>
+          While the Button's own action is in flight, a click, Enter or Space (also a programmatic{" "}
+          <code>click()</code> and the click an implicit form submission sends) starts no second run
+          and is <code>preventDefault()</code>ed, so a link does not navigate again, a form does not
+          submit again and a <code>command</code> does not run again. Nothing else is blocked:
+          focus, hover and your own event handlers work as usual, and ancestors still see the click.
+        </p>
+        <ul>
+          <li>
+            The Button is <code>aria-disabled="true"</code> meanwhile, so a screen-reader user who
+            presses again, or comes back to it, hears that it is unavailable. It is never natively{" "}
+            <code>disabled</code>: Chromium and Firefox move focus to the page when a focused button
+            becomes disabled.
+          </li>
+          <li>
+            The guard is the Button's own run, not its look. React may hold the commit that ends the
+            action while another async action elsewhere is pending (or while the result suspends):
+            the button keeps <code>data-pending</code> and <code>aria-disabled</code> in that
+            window, but its own work has settled, so a click there starts a new run rather than
+            being dropped. A <code>formAction</code> Button follows React's form status instead and
+            stays guarded until its submission commits.
+          </li>
+          <li>
+            Want every click to count (a "+1" button)? Do not await the work:{" "}
+            <code>{"action={() => { void increment(); }}"}</code>. The run is over a moment after
+            the click, so every click runs the action, even while an unrelated action elsewhere
+            holds the Button's commit (then only the pending look lingers until that commit lands).
+            An ordered sequence whose steps see each other's results is <code>useActionState</code>{" "}
+            (pass its dispatch as <code>formAction</code>, or call it from the action).
+          </li>
+        </ul>
+      </BehaviourSection>
+
+      <BehaviourSection
+        id="suspense"
+        summary={
+          "`data-pending` lasts until the commit that ends the action, including a Suspense wait of what that commit renders."
+        }
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          "A `commandfor` / `command` Button's command and a link's navigation are performed by the browser."
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          "A `commandfor` / `command` Button runs its command, a Server Function `formAction` submits (React's progressive enhancement) and a `render={<a href>}` link navigates. An `action` Button does nothing until hydration; a Server Function is a valid `action` once hydrated. The server HTML carries no `aria-disabled` and no `data-pending`."
+        }
+      >
+        <h4>From a Server Component</h4>
+        <Example source={buttonInvokerSource} fileName="ButtonInvoker.tsx">
+          <ButtonInvoker />
+        </Example>
+        <p>
+          <code>ButtonInvoker.tsx</code> has no <code>"use client"</code>: it is a Server Component
+          that renders Button (a client module) with serialisable props. The Preview button opens
+          the dialog through the browser's Invoker Commands, before hydration and without
+          JavaScript. Sync shows a pending look made by <code>[data-pending]</code> CSS alone (
+          <code>ButtonCssPending.tsx</code> below; its fake action is the only reason it is a client
+          module on this static site). A Server Component can also pass a Server Function as{" "}
+          <code>action</code> (it receives <code>details</code> with <code>event</code> undefined)
+          or as <code>formAction</code> (progressively enhanced: the button submits before
+          hydration), and style pending with <code>[data-pending]</code> CSS. It cannot pass
+          function <code>children</code>, <code>className</code>, <code>style</code> or{" "}
+          <code>render</code>, nor a plain client function as <code>action</code>: the
+          spinner-in-children pattern needs a Client Component.
+        </p>
+        <CodeBlock title="ButtonCssPending.tsx">{buttonCssPendingSource}</CodeBlock>
+        <CodeBlock>{`// A Server Component
+import { Button } from "@funstack/ui/button";
+import { archive } from "./actions"; // "use server"
+
+<Button action={archive.bind(null, post.id)} className="row-action">Archive</Button>`}</CodeBlock>
+        <p>
+          Before hydration an <code>action</code> Button does nothing on click; a Server Function{" "}
+          <code>formAction</code> submits natively, a command Button runs its command and a link
+          navigates. The server HTML carries no <code>aria-disabled</code> and no{" "}
+          <code>data-pending</code>.
+        </p>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <Example source={buttonFormActionsSource} fileName="ButtonFormActions.tsx">
         <ButtonFormActions />
       </Example>
@@ -263,7 +358,27 @@ export function ButtonPage() {
         </ul>
       </Callout>
 
-      <h3>Composition</h3>
+      <h3 id="styling">Styling</h3>
+      <CodeBlock language="css">{`.btn[data-pending] { cursor: progress; }
+.btn[data-pending] .label { visibility: hidden; }
+.btn[data-pending]::after { content: ""; /* spinner */ }
+.btn[data-disabled], .btn[aria-disabled="true"]:not([data-pending]) { opacity: .5; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}`}</CodeBlock>
+      <p>
+        Tailwind: <code>data-pending:cursor-progress data-disabled:opacity-50</code>. With{" "}
+        <code>transition</code>, keep the reduced-motion block in your stylesheet; the Button adds
+        no view transition types.
+      </p>
+
+      <h3 id="recipes">Recipes</h3>
+      <h4>Composition</h4>
       <Example source={buttonComposeSource} fileName="ButtonCompose.tsx">
         <ButtonCompose />
       </Example>
@@ -287,102 +402,6 @@ export function ButtonPage() {
         <a href="/components/toolbar">Toolbar</a> a disabled Button stays focusable and in the
         arrow-key sequence (<code>aria-disabled</code>, the APG Toolbar rule).
       </p>
-
-      <h3>Keyboard and ARIA</h3>
-      <Table
-        head={["Key", "Native <button>", "render={<a href>}"]}
-        rows={[
-          [
-            "Enter",
-            "Click: runs `action` (unless pending or disabled)",
-            "Click: `action` and navigation; while pending, neither",
-          ],
-          [
-            "Space",
-            "Click on keyup: runs `action`",
-            'Nothing (a link); add `role="button"` and a key handler if a link must act on Space',
-          ],
-          ["Tab", "Sequential, or the Toolbar's single Tab stop inside one", "Same"],
-        ]}
-      />
-      <p>
-        Focus never moves because of pending. The library announces nothing when an action starts or
-        ends; the outcome is yours, and that is where status messages belong: a{" "}
-        <a href="/components/toast">toast</a> (announced by its Viewport), a field error, content
-        that replaces the button, or <code>ariaNotify</code> from the action. <code>aria-busy</code>{" "}
-        is not set by default (screen readers either ignore it or may hide the button's name); pass
-        it yourself if you want it. A label that changes with <code>pending</code> ("Saving…") is
-        your choice, and like any name change on the focused element it is not reliably spoken.
-      </p>
-
-      <h3>Server Components</h3>
-      <Example source={buttonInvokerSource} fileName="ButtonInvoker.tsx">
-        <ButtonInvoker />
-      </Example>
-      <p>
-        <code>ButtonInvoker.tsx</code> has no <code>"use client"</code>: it is a Server Component
-        that renders Button (a client module) with serialisable props. The Preview button opens the
-        dialog through the browser's Invoker Commands, before hydration and without JavaScript. Sync
-        shows a pending look made by <code>[data-pending]</code> CSS alone (
-        <code>ButtonCssPending.tsx</code> below; its fake action is the only reason it is a client
-        module on this static site). A Server Component can also pass a Server Function as{" "}
-        <code>action</code> (it receives <code>details</code> with <code>event</code> undefined) or
-        as <code>formAction</code> (progressively enhanced: the button submits before hydration),
-        and style pending with <code>[data-pending]</code> CSS. It cannot pass function{" "}
-        <code>children</code>, <code>className</code>, <code>style</code> or <code>render</code>,
-        nor a plain client function as <code>action</code>: the spinner-in-children pattern needs a
-        Client Component.
-      </p>
-      <CodeBlock title="ButtonCssPending.tsx">{buttonCssPendingSource}</CodeBlock>
-      <CodeBlock>{`// A Server Component
-import { Button } from "@funstack/ui/button";
-import { archive } from "./actions"; // "use server"
-
-<Button action={archive.bind(null, post.id)} className="row-action">Archive</Button>`}</CodeBlock>
-      <p>
-        Before hydration an <code>action</code> Button does nothing on click; a Server Function{" "}
-        <code>formAction</code> submits natively, a command Button runs its command and a link
-        navigates. The server HTML carries no <code>aria-disabled</code> and no{" "}
-        <code>data-pending</code>.
-      </p>
-
-      <h3>Styling</h3>
-      <CodeBlock language="css">{`.btn[data-pending] { cursor: progress; }
-.btn[data-pending] .label { visibility: hidden; }
-.btn[data-pending]::after { content: ""; /* spinner */ }
-.btn[data-disabled], .btn[aria-disabled="true"]:not([data-pending]) { opacity: .5; }
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
-  }
-}`}</CodeBlock>
-      <p>
-        Tailwind: <code>data-pending:cursor-progress data-disabled:opacity-50</code>. With{" "}
-        <code>transition</code>, keep the reduced-motion block in your stylesheet; the Button adds
-        no view transition types.
-      </p>
-
-      <BehaviourSummary
-        name="Button"
-        transitionTypes={
-          "None: the Button adds no transition types. Its `transition` prop animates the commit that ends its action."
-        }
-        optimistic={
-          'A [pure trigger](/concepts/pending-and-optimistic#pure-trigger): no optimistic state. `data-pending` and `aria-disabled="true"` while its own action (or a submission started by its own function `formAction`) is in flight; a second click, Enter or Space is ignored meanwhile ([Pending and re-entry](#pending-and-re-entry)).'
-        }
-        suspense={
-          "`data-pending` lasts until the commit that ends the action, including a Suspense wait of what that commit renders."
-        }
-        browserOwned={
-          "A `commandfor` / `command` Button's command and a link's navigation are performed by the browser."
-        }
-        beforeHydration={
-          "A `commandfor` / `command` Button runs its command, a Server Function `formAction` submits (React's progressive enhancement) and a `render={<a href>}` link navigates. An `action` Button does nothing until hydration; a Server Function is a valid `action` once hydrated. The server HTML carries no `aria-disabled` and no `data-pending`."
-        }
-      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
-import { BehaviourSummary } from "../components/Concept.js";
+import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { SliderField } from "../examples/SliderField.js";
@@ -39,7 +39,54 @@ export function SliderPage() {
         <SliderVolume />
       </Example>
 
-      <h3>Two actions: steps and commits</h3>
+      <BehaviourIndex />
+
+      <h3 id="anatomy">Anatomy</h3>
+      <CodeBlock>{`import { Slider } from "@funstack/ui/slider";
+
+<Slider.Root name="volume" defaultValue={40} valueCommitAction={saveVolume}>  {/* div */}
+  <Slider.Label>Volume</Slider.Label>      {/* label: for= the input (one thumb), id (several) */}
+  <Slider.Value />                         {/* span: the shown value */}
+  <Slider.Track>                           {/* div: owns the pointer */}
+    <Slider.Indicator />                   {/* span: the fill */}
+    <Slider.Thumb />                       {/* span + visually hidden input type=range */}
+  </Slider.Track>
+</Slider.Root>`}</CodeBlock>
+      <ul>
+        <li>
+          <strong>One Thumb per value</strong>, chosen by an explicit <code>index</code> (default{" "}
+          <code>0</code>). <code>value</code> / <code>defaultValue</code> is a number for one thumb
+          or an array (ascending) for several; the shape is fixed at mount.
+        </li>
+        <li>
+          <strong>Thumb renders two elements</strong>: the styled <code>span</code> (
+          <code>ref</code>, <code>className</code>, <code>render</code>) and, inside it, the native
+          input (<code>inputRef</code>), which is the focusable element with role{" "}
+          <code>slider</code>. <code>aria-label</code>, <code>aria-labelledby</code>,{" "}
+          <code>aria-describedby</code>, <code>name</code>, <code>form</code> and{" "}
+          <code>autoFocus</code> are forwarded to the input.
+        </li>
+        <li>
+          <strong>Several thumbs</strong> make the Root a <code>role="group"</code> named by the
+          Label; each thumb needs its own name (<code>aria-label="Minimum price"</code>). A thumb's
+          native <code>min</code> / <code>max</code> are its neighbours' values (plus{" "}
+          <code>minStepsBetweenThumbs × step</code>), so thumbs cannot cross with the pointer, the
+          keys or Home / End.
+        </li>
+        <li>
+          <strong>Nothing is positioned by the library.</strong> It publishes{" "}
+          <code>--slider-value</code> on each Thumb and <code>--slider-start</code>,{" "}
+          <code>--slider-end</code>, <code>--slider-value-&lt;i&gt;</code> on the Root (inherited);
+          your CSS places the fill and the thumbs (see <code>slider.css</code> above).
+        </li>
+        <li>
+          The default value is the platform's: the midpoint, snapped to <code>step</code> (Base UI
+          and Radix default to <code>min</code>).
+        </li>
+      </ul>
+
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Two actions: steps and commits</h4>
       <Table
         head={["", "valueChangeAction", "valueCommitAction"]}
         rows={[
@@ -85,61 +132,7 @@ export function SliderPage() {
         only when a save fails or a controlled parent does not adopt the value.
       </p>
 
-      <h3>A live filter</h3>
-      <Example
-        source={sliderPriceSource}
-        fileName="SliderPrice.tsx"
-        css={sliderCss}
-        cssFileName="slider.css"
-      >
-        <SliderPrice />
-      </Example>
-
-      <h3>Anatomy</h3>
-      <CodeBlock>{`import { Slider } from "@funstack/ui/slider";
-
-<Slider.Root name="volume" defaultValue={40} valueCommitAction={saveVolume}>  {/* div */}
-  <Slider.Label>Volume</Slider.Label>      {/* label: for= the input (one thumb), id (several) */}
-  <Slider.Value />                         {/* span: the shown value */}
-  <Slider.Track>                           {/* div: owns the pointer */}
-    <Slider.Indicator />                   {/* span: the fill */}
-    <Slider.Thumb />                       {/* span + visually hidden input type=range */}
-  </Slider.Track>
-</Slider.Root>`}</CodeBlock>
-      <ul>
-        <li>
-          <strong>One Thumb per value</strong>, chosen by an explicit <code>index</code> (default{" "}
-          <code>0</code>). <code>value</code> / <code>defaultValue</code> is a number for one thumb
-          or an array (ascending) for several; the shape is fixed at mount.
-        </li>
-        <li>
-          <strong>Thumb renders two elements</strong>: the styled <code>span</code> (
-          <code>ref</code>, <code>className</code>, <code>render</code>) and, inside it, the native
-          input (<code>inputRef</code>), which is the focusable element with role{" "}
-          <code>slider</code>. <code>aria-label</code>, <code>aria-labelledby</code>,{" "}
-          <code>aria-describedby</code>, <code>name</code>, <code>form</code> and{" "}
-          <code>autoFocus</code> are forwarded to the input.
-        </li>
-        <li>
-          <strong>Several thumbs</strong> make the Root a <code>role="group"</code> named by the
-          Label; each thumb needs its own name (<code>aria-label="Minimum price"</code>). A thumb's
-          native <code>min</code> / <code>max</code> are its neighbours' values (plus{" "}
-          <code>minStepsBetweenThumbs × step</code>), so thumbs cannot cross with the pointer, the
-          keys or Home / End.
-        </li>
-        <li>
-          <strong>Nothing is positioned by the library.</strong> It publishes{" "}
-          <code>--slider-value</code> on each Thumb and <code>--slider-start</code>,{" "}
-          <code>--slider-end</code>, <code>--slider-value-&lt;i&gt;</code> on the Root (inherited);
-          your CSS places the fill and the thumbs (see <code>slider.css</code> above).
-        </li>
-        <li>
-          The default value is the platform's: the midpoint, snapped to <code>step</code> (Base UI
-          and Radix default to <code>min</code>).
-        </li>
-      </ul>
-
-      <h3>Props</h3>
+      <h3 id="props">Props</h3>
       <h4>
         <code>Slider.Root</code>
       </h4>
@@ -330,7 +323,7 @@ export function SliderPage() {
         <code>&lt;Slider.Value&lt;number&gt;&gt;</code> or read <code>values</code>.
       </p>
 
-      <h3>Data attributes</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
@@ -354,7 +347,7 @@ export function SliderPage() {
 .thumb { transition: --slider-value 120ms ease-out; }
 [data-dragging] .thumb { transition: none; }`}</CodeBlock>
 
-      <h3>Keyboard and ARIA</h3>
+      <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <p>
         Every key is the browser's, except ArrowLeft / ArrowRight on vertical and on RTL sliders,
         which the library normalises.
@@ -397,7 +390,62 @@ export function SliderPage() {
         </li>
       </ul>
 
-      <h3>Forms and hydration</h3>
+      <BehaviourSection
+        id="transition-types"
+        summary={
+          "A step: `fsui-slider` plus `fsui-slider-change`. A commit: `fsui-slider` plus `fsui-slider-commit`. No part takes a `transition` prop; use the types in your own boundaries."
+        }
+      />
+
+      <BehaviourSection
+        id="optimistic-and-pending"
+        summary={
+          "The thumb under the pointer is urgent. The thumbs show the value the gesture reached while a pointer is captured or anything is in flight, and the optimistic value otherwise. `data-pending` is on the Root while a step (with a `valueChangeAction`) or commit is in flight, and on the thumb that moved."
+        }
+      />
+
+      <BehaviourSection
+        id="suspense"
+        summary={"A step's pending state includes the Suspense wait of what it renders."}
+      />
+
+      <BehaviourSection
+        id="browser-owned-state"
+        summary={
+          'Native range inputs: keyboard changes and a form reset are the browser\'s; a reset is dispatched as one step and one commit with `reason: "platform"`.'
+        }
+      />
+
+      <BehaviourSection
+        id="before-hydration"
+        summary={
+          'The inputs are focusable and the keys change them; the visible thumb catches up at hydration, with one `"platform"` step and commit. The pointer does nothing yet. For a slider that needs no JavaScript, see [Plain HTML](#plain-html).'
+        }
+      >
+        <h4 id="plain-html">Plain HTML</h4>
+        <p>
+          A native range input is the JS-free slider. A Server Component can render it with no
+          library code, and it works before hydration and without it, pointer included:
+        </p>
+        <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  Volume
+  <input type="range" name="volume" min={0} max={100} step={1} defaultValue={settings.volume} />
+</label>`}</CodeBlock>
+        <p>
+          Compared with <code>Slider</code>, it has one thumb and no Track, Range, Thumb or Value
+          parts: its track and thumb are styled only through engine-specific pseudo-elements (
+          <code>::-webkit-slider-thumb</code>, <code>::-moz-range-thumb</code>, ...), and only
+          Firefox has one for the filled range (<code>::-moz-range-progress</code>). It also has no{" "}
+          <code>valueChangeAction</code> / <code>valueCommitAction</code> (no transition per step,
+          no single save per gesture with rollback, no <code>data-pending</code>), no{" "}
+          <code>data-dragging</code>, other data attributes or <code>--slider-value</code>, no
+          library handling of vertical and RTL arrow keys, and no{" "}
+          <a href="#inside-a-field">Field</a> integration.
+        </p>
+      </BehaviourSection>
+
+      <h3 id="forms">Forms</h3>
       <ul>
         <li>
           Each thumb posts its value: <code>volume=73</code>, or{" "}
@@ -431,29 +479,18 @@ export function SliderPage() {
 // A Server Function as the save, straight from a Server Component:
 <Slider.Root defaultValue={settings.volume} valueCommitAction={saveVolume}>…</Slider.Root>`}</CodeBlock>
 
-      <h3 id="plain-html">Plain HTML</h3>
-      <p>
-        A native range input is the JS-free slider. A Server Component can render it with no library
-        code, and it works before hydration and without it, pointer included:
-      </p>
-      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
-<label>
-  Volume
-  <input type="range" name="volume" min={0} max={100} step={1} defaultValue={settings.volume} />
-</label>`}</CodeBlock>
-      <p>
-        Compared with <code>Slider</code>, it has one thumb and no Track, Range, Thumb or Value
-        parts: its track and thumb are styled only through engine-specific pseudo-elements (
-        <code>::-webkit-slider-thumb</code>, <code>::-moz-range-thumb</code>, ...), and only Firefox
-        has one for the filled range (<code>::-moz-range-progress</code>). It also has no{" "}
-        <code>valueChangeAction</code> / <code>valueCommitAction</code> (no transition per step, no
-        single save per gesture with rollback, no <code>data-pending</code>), no{" "}
-        <code>data-dragging</code>, other data attributes or <code>--slider-value</code>, no library
-        handling of vertical and RTL arrow keys, and no <a href="#inside-a-field">Field</a>{" "}
-        integration.
-      </p>
+      <h3 id="recipes">Recipes</h3>
+      <h4>A live filter</h4>
+      <Example
+        source={sliderPriceSource}
+        fileName="SliderPrice.tsx"
+        css={sliderCss}
+        cssFileName="slider.css"
+      >
+        <SliderPrice />
+      </Example>
 
-      <h3 id="inside-a-field">Inside a Field</h3>
+      <h4 id="inside-a-field">Inside a Field</h4>
       <Example
         source={sliderFieldSource}
         fileName="SliderField.tsx"
@@ -493,23 +530,6 @@ export function SliderPage() {
           the form's submission is the Field's.
         </li>
       </ul>
-
-      <BehaviourSummary
-        name="Slider"
-        transitionTypes={
-          "A step: `fsui-slider` plus `fsui-slider-change`. A commit: `fsui-slider` plus `fsui-slider-commit`. No part takes a `transition` prop; use the types in your own boundaries."
-        }
-        optimistic={
-          "The thumb under the pointer is urgent. The thumbs show the value the gesture reached while a pointer is captured or anything is in flight, and the optimistic value otherwise. `data-pending` is on the Root while a step (with a `valueChangeAction`) or commit is in flight, and on the thumb that moved."
-        }
-        suspense={"A step's pending state includes the Suspense wait of what it renders."}
-        browserOwned={
-          'Native range inputs: keyboard changes and a form reset are the browser\'s; a reset is dispatched as one step and one commit with `reason: "platform"`.'
-        }
-        beforeHydration={
-          'The inputs are focusable and the keys change them; the visible thumb catches up at hydration, with one `"platform"` step and commit. The pointer does nothing yet. For a slider that needs no JavaScript, see [Plain HTML](#plain-html).'
-        }
-      />
     </div>
   );
 }
