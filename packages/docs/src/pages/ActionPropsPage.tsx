@@ -323,7 +323,8 @@ type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> =
         A returned promise is ignored and warned about in development. It is the library's one{" "}
         <code>on*</code> prop, and it is one on purpose: <code>fooAction</code> always means a
         handler the component runs in a transition, so a callback that must not run in one is named
-        like the plain React handler it is. Nothing else in the library is an <code>on*</code> prop.
+        like the plain React handler it is. Nothing else the library defines is an <code>on*</code>
+        prop.
       </p>
 
       <h3>What about native handlers?</h3>
