@@ -1596,7 +1596,8 @@ hits left must be in `design/` and `memo/` history. Occurrence counts are as of 
   nothing is pending or optimistic for it."
 - `src/internal/types.test.ts` (5): rename the import and the `it` title ("UrgentChangeHandler is
   synchronous: (next, details) => void"); add `// @ts-expect-error` on a `UrgentChangeAction`
-  import from `../index.js` so the alias cannot come back.
+  import from `../index.js` so the alias cannot come back (plus
+  `expectTypeOf<UrgentChangeAction>().toBeAny()` so the import is used).
 - `src/index.ts` (1, line ~336): export `UrgentChangeHandler` instead of `UrgentChangeAction`.
 - `src/combobox/combobox-root.tsx` (8): the prop (line ~116) and its JSDoc (section 3.1 above),
   the `ComboboxInputValueChangeDetails` comment (~48), the module doc (~215), `writeText`
@@ -1608,29 +1609,54 @@ hits left must be in `design/` and `memo/` history. Occurrence counts are as of 
 - `src/combobox/combobox.test.tsx` (21): the type import (line 26), the two `it` titles (~493,
   ~558), the type test at ~2383 ("types: UrgentChangeHandler is exported, UrgentChangeAction and
   inputValueChangeAction are not, multiple is not a prop"), every `inputValueChangeAction:` /
-  `inputValueChangeAction=` in wrappers and assertions. The top-of-file row list: "Urgent
-  handler".
+  `inputValueChangeAction=` in wrappers and assertions. (The file has no top-of-file row list;
+  the urgent rows are the `renderBoth("urgent text")` describe, which keeps its name.)
 - `src/combobox/combobox.browser.test.tsx` (2, lines ~356 and ~546).
 - `src/toast/toast.test.tsx` (line 10), `src/field/field.test.tsx` (line 13),
   `src/form/form.test.tsx` (line 9): the N/A row is now called "Urgent handler"
   (`UrgentChangeHandler` in the Toast comment).
 - **New** `src/__tests__/action-naming.test.ts` (conventions 10.1 "Action naming"), jsdom
   project, type-level with `expectTypeOf` plus one runtime completeness check. The load-bearing
-  types:
+  types, as implemented (two corrections to the first draft of this checklist are marked):
 
   ```ts
-  import type { DOMAttributes } from "react";
+  import type {
+    ButtonHTMLAttributes,
+    DialogHTMLAttributes,
+    DOMAttributes,
+    InputHTMLAttributes,
+  } from "react";
   import type * as UI from "../index.js";
 
-  /** Keys named `action` or `…Action` whose value is not a transition action: a transition action returns `unknown`. */
-  type NonTransitionActionKeys<P> = {
-    [K in Extract<keyof P, "action" | `${string}Action`>]-?: NonNullable<P[K]> extends (...args: never[]) => infer R
-      ? unknown extends R ? never : K
-      : K;
-  }[Extract<keyof P, "action" | `${string}Action`>];
+  /**
+   * Keys a part passes through from `ComponentPropsWithRef<...>` to its DOM element. React's
+   * names, not the library's; they cannot be told apart from library props by type, so they
+   * are excluded by name from both checks. (Correction 1: `DOMAttributes` alone misses
+   * `<dialog>`'s `onCancel` / `onClose`, passed through by Dialog.Popup and Popover.Popup, and
+   * `<button>` / `<input>`'s `formAction`, whose function member returns `void`.)
+   */
+  type DomPassThroughKeys =
+    | keyof DOMAttributes<Element>
+    | keyof DialogHTMLAttributes<HTMLDialogElement>
+    | keyof ButtonHTMLAttributes<HTMLButtonElement>
+    | keyof InputHTMLAttributes<HTMLInputElement>;
 
-  /** `on*` keys that are not DOM handlers, i.e. the library's own. */
-  type OwnHandlerKeys<P> = Exclude<Extract<keyof P, `on${string}`>, keyof DOMAttributes<Element>>;
+  /** The function members of a prop's type. (Correction 2: `Form.Root`'s `action` is `string | fn`.) */
+  type FunctionPart<T> = Extract<NonNullable<T>, (...args: never[]) => unknown>;
+
+  type ActionKeys<P> = Exclude<Extract<keyof P, "action" | `${string}Action`>, DomPassThroughKeys>;
+
+  /** Action-named keys whose function part is missing or does not return `unknown`. */
+  type NonTransitionActionKeys<P> = {
+    [K in ActionKeys<P>]-?: [FunctionPart<P[K]>] extends [never]
+      ? K
+      : FunctionPart<P[K]> extends (...args: never[]) => infer R
+        ? unknown extends R ? never : K
+        : K;
+  }[ActionKeys<P>];
+
+  /** `on*` keys that are not DOM pass-throughs, i.e. the library's own. */
+  type OwnHandlerKeys<P> = Exclude<Extract<keyof P, `on${string}`>, DomPassThroughKeys>;
 
   type PublicProps = {
     ToggleProps: UI.ToggleProps;
@@ -1640,6 +1666,18 @@ hits left must be in `design/` and `memo/` history. Occurrence counts are as of 
 
   type Offenders = { [K in keyof PublicProps]: NonTransitionActionKeys<PublicProps[K]> }[keyof PublicProps];
   type OwnHandlers = { [K in keyof PublicProps]: OwnHandlerKeys<PublicProps[K]> }[keyof PublicProps];
+
+  // Self-test of the helpers: a planted urgent handler with the suffix, and a string, are caught;
+  // the form channel and the DOM pass-throughs are not.
+  expectTypeOf<NonTransitionActionKeys<{
+    inputValueChangeAction?: UI.UrgentChangeHandler<string>;
+    valueChangeAction?: UI.ChangeAction<string>;
+    action?: string | ((formData: FormData) => unknown);
+    formAction?: string | ((formData: FormData) => void);
+    labelAction?: string;
+  }>>().toEqualTypeOf<"inputValueChangeAction" | "labelAction">();
+  expectTypeOf<OwnHandlerKeys<{ onValueChange?: () => void; onClick?: () => void; onClose?: () => void }>>()
+    .toEqualTypeOf<"onValueChange">();
 
   expectTypeOf<Offenders>().toEqualTypeOf<never>();
   expectTypeOf<OwnHandlers>().toEqualTypeOf<"onInputValueChange">(); // the allow-list
@@ -1652,10 +1690,13 @@ hits left must be in `design/` and `memo/` history. Occurrence counts are as of 
   `Exclude<keyof PublicProps, (typeof listed)[number]>` is `never`, and at runtime read
   `src/index.ts` (`readFileSync`, as `directives.test.ts` reads `dist`) and `expect` the set of
   `/\b\w+Props\b/g` matches to equal `listed` (as sets), so a newly exported Props type fails the
-  test until it is listed. Note `Form.Root`'s `action` is React's form-channel action (a Server
-  Function or `(formData) => unknown`), which returns `unknown` and passes, as it should.
-  `Omit<ComponentPropsWithRef<...>, "onClick" | ...>` pass-throughs are DOM handlers and are
-  excluded by `DOMAttributes`.
+  test until it is listed. `Form.Root`'s `action` is React's form channel, a URL string or
+  `(formData) => unknown`: the check is on the function member only, which returns `unknown` and
+  passes, as it should (the first draft checked the whole type with `NonNullable<P[K]> extends
+  fn`, which the `string` member fails; the claim that it "passes" was wrong until the check was
+  narrowed). Why exclude by name rather than by type: `formAction`'s function member is
+  `(formData: FormData) => void | Promise<void>`, indistinguishable from an urgent handler
+  mis-named as an action, so only the fact that React owns the name tells them apart.
 
 **`packages/example`**
 

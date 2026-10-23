@@ -1708,21 +1708,30 @@ HTML, directive or not. So no second anatomy ships. Per component:
 Two findings from the same research hold library-wide: a `React.cache()`-scoped mutable "server
 context" is unsafe (an async child resumes after a sibling Root overwrote the value; rejected as a
 way for a Root to pass data to its parts), and server `useId` ids collide across separately
-rendered Flight payloads (#94, below). Passing any action prop to a part from a Server Component is a type error unless the action
-is a Server Function (section 2.2).
+rendered Flight payloads unless the host gives each payload its own `identifierPrefix` (#94,
+below; FUNSTACK Static does from 1.3.4). Passing any action prop to a part from a Server
+Component is a type error unless the action is a Server Function (section 2.2).
 
 Progress and Meter (#68) are the first components whose **Root is itself a Server Component**:
 `Progress.Root` / `Meter.Root` are directive-free (only `useId`, arithmetic and `Intl`), render the
 client-created context provider (7.1), and their parts are client modules that read it. "JS-free"
 and "a Server Component" coincide at the Root, so function props (`getAriaValueText`,
 `children(state)`, `render`) may be passed from a Server Component and run on the server, next to
-the JS-free Accordion whose parts are all client modules. **Known gap (#94):** a server `useId`
-restarts at `_S_1_` for each Flight render, and FUNSTACK Static's `defer()` renders each deferred
-payload without an `identifierPrefix`, so a `Progress.Root` / `Meter.Root` inside `defer()` can
-get the same `${id}-label` as one in the main payload and `aria-labelledby` breaks (client
-`useId`, `_R_…`, is unaffected). Upstream fix in FUNSTACK Static (uhyo/funstack-static#198);
-until then the Progress / Meter docs note the limitation, and an explicit id override on those
-Roots is the library-side fallback if the upstream fix stalls.
+the JS-free Accordion whose parts are all client modules. **Host requirement (#94, resolved):**
+a server `useId` restarts at `_S_1_` for each Flight render, so a host that renders more than one
+Flight payload into one document must give each payload its own `identifierPrefix`, or a
+`Progress.Root` / `Meter.Root` in one payload gets the same `${id}-label` as one in another and
+`aria-labelledby` breaks (client `useId`, `_R_…`, is unaffected). FUNSTACK Static's `defer()`
+used to render deferred payloads without a prefix; **fixed in `@funstack/static` 1.3.4**
+(uhyo/funstack-static#198 / #199, prefix `_Deferred_<n>` or `_d<n>` per payload), verified by
+`docs/research/zero-js-variants.md` ("#94 re-check"): no duplicate ids, three distinct accessible
+names, no hydration errors. Consequences: a Server-rendered Progress / Meter Root inside
+`defer()` requires `@funstack/static >= 1.3.4` (the docs site is on it; the per-page notes that
+flagged the gap were removed), the library adds no id override for this (the fallback the gap
+had reserved; `id` stays an owned key of `Progress.Label` / `Meter.Label`, and nothing in the
+library parses ids, so the prefixed form has no API impact), and the one-line host note lives on
+the Server Components docs page rather than on each component. Any other RSC host with
+multi-payload pages has the same requirement; the library cannot detect it.
 
 A third configuration, decided with Menu (#39): a component whose baseline **cannot** be JS-free
 (a menu needs arrow keys, typeahead and focus management that only Chromium's flagged
@@ -1972,7 +1981,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Validity display | Required for Field: a submission attempt with an invalid control shows the message, cancels the native bubble (the `invalid` event is `defaultPrevented`) and focuses the first invalid control in document order; a `form.reset()` clears it. The `:user-invalid` half (changed-then-blurred, live updates, `checkValidity()` showing nothing) runs in browser mode. |
 | Urgent handler (both) | Required for every component with an urgent state (section 2.6): the handler is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 | Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
-| Action naming (type, library-wide) | One file, `src/__tests__/action-naming.test.ts` (#96): for **every public `*Props` type** exported from `src/index.ts`, every key ending in `Action` has a function type whose return type is `unknown` (an `Action` / `ChangeAction`, i.e. a transition; `UrgentChangeHandler` returns `void` and fails), and every library-defined `on*` key is on an allow-list that names its type (`ComboboxRootProps.onInputValueChange: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`). Pass-through `on*` props from `ComponentPropsWithRef` cannot be told apart by type and are not checked; the design doc is the guard for those. A new public Props type is added to the list in the same commit that exports it. |
+| Action naming (type, library-wide) | One file, `src/__tests__/action-naming.test.ts` (#96): for **every public `*Props` type** exported from `src/index.ts`, every key named `action` or ending in `Action` is a transition action, and every library-defined `on*` key is on an allow-list that names its type (`ComboboxRootProps.onInputValueChange: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`). "Is a transition action" is checked on the **function members** of the prop's type (`Extract<NonNullable<P[K]>, (...args: never[]) => unknown>`): that part must exist and return `unknown` (an `Action` / `ChangeAction`; `UrgentChangeHandler` returns `void` and fails; a key with no function member, say a `string`, fails too). Checking the function part rather than the whole type is what lets `Form.Root`'s `action: string \| ((formData) => unknown)`, React's form channel, pass on its function member instead of failing on the URL string. **DOM pass-through keys are excluded from both checks**, by name, as the union `keyof DOMAttributes<Element> \| keyof DialogHTMLAttributes<HTMLDialogElement> \| keyof ButtonHTMLAttributes<HTMLButtonElement> \| keyof InputHTMLAttributes<HTMLInputElement>`: `DOMAttributes` alone is not enough, because `<dialog>`'s `onCancel` / `onClose` (passed through by `Dialog.Popup` and `Popover.Popup`) live in `DialogHTMLAttributes`, and `<button>` / `<input>`'s `formAction` (`string \| (formData) => void \| Promise<void>`) would otherwise be flagged as a non-transition action. These are React's names, not the library's, and cannot be told apart from library props by type, so the design doc is the guard for them. The helper types have a self-test (a planted `inputValueChangeAction?: UrgentChangeHandler<string>` and a `labelAction?: string` are caught, `action` and `formAction` are not; `onClick` / `onClose` are excluded, `onValueChange` is not). A new public Props type is added to the list in the same commit that exports it (a type-level and a runtime completeness check against `src/index.ts` fail until it is). |
 | Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
 | Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter); a logical `side` costs exactly one render per show and one per hide (render counter, review M1); the scroll path deterministically (review M2): with `requestAnimationFrame` replaced by a manual queue and `document.addEventListener` spied, a show installs the `scroll` / `resize` listeners, a dispatched `scroll` with the stub changed reads the old value at once and in frame 1 and the new one in frame 2, a scroll between the frames re-runs the pair, a scroll **before** the first frame of a pending pair costs at most one extra pair at the end (it sets the same restart flag), and a hide or an unmount removes both listeners, cancels the pending frame and reads nothing after. Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open, back on close; after a scroll that moves the trigger to an edge, `data-side` equals the side the popup box actually sits on (the geometry invariant: Chromium keeps the option chosen at show, #92; Firefox and WebKit re-choose, section 13.2), never "flips to X", with the engine outcome pinned behind a runtime probe so the Chromium row fails the day the bug is fixed (review L5); `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
 
@@ -2665,7 +2674,8 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     (`@funstack/ui/accordion/native`) recorded as a ready plan, not scheduled. Supersedes the
     "tracked in #19" notes in the component documents (Accordion feedback 1, Tooltip 14.1,
     RadioGroup, CheckboxGroup, Switch, Select, Slider, NumberField). The server `useId`
-    collision found by the research is #94 (upstream uhyo/funstack-static#198).
+    collision found by the research is #94 (upstream uhyo/funstack-static#198, fixed in
+    `@funstack/static` 1.3.4 and re-verified; section 7.3 records the host requirement).
 
 39. **Urgent handler naming (#96, from the docs feedback #95)** decided by the user 2026-10-23:
     `fooAction` **always** means a handler the component wraps in a transition; the urgent lane
@@ -2682,7 +2692,14 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     the implementation checklist); the type-name mentions in `slider.md`, `number-field.md`,
     `toast.md`. Guard: a type-level test, not a lint rule (oxlint as configured has no custom
     naming rule and the repo has no ESLint; a lint rule could not see the type anyway, and the
-    rule is about types: "a prop ending in `Action` returns `unknown`").
+    rule is about types: "a prop ending in `Action` returns `unknown`"). **Implemented** on
+    `wave14-rename` (`feat(ui)!: rename Combobox inputValueChangeAction to onInputValueChange`);
+    two deviations from the design's guard snippet were folded back into 10.1 and the Combobox
+    checklist: the DOM pass-through exclusion needs `DialogHTMLAttributes` / `ButtonHTMLAttributes`
+    / `InputHTMLAttributes` besides `DOMAttributes` (`onCancel` / `onClose`, `formAction`), and
+    the transition check applies to the function members of the prop type only, since
+    `Form.Root`'s `action` is `string | fn` and the snippet's `NonNullable<P[K]> extends fn`
+    failed it (the design's claim that it "passes" was wrong as written).
 
 ## Open questions
 

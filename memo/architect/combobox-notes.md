@@ -148,3 +148,23 @@ completeness check against `src/index.ts`. Checklist is in the combobox design a
 
 Noted but not done: the Roadmap release entry and the version bump belong to the developer and
 the release skill. `ComboboxInputValueChangeDetails` keeps its name on purpose (9.4).
+
+### Implementation deviations folded back (2026-10-23, after `wave14-rename`)
+
+The developer's `action-naming.test.ts` differs from my snippet in two places, both my errors:
+
+- `keyof DOMAttributes<Element>` does not cover `<dialog>`'s `onCancel` / `onClose`
+  (Dialog.Popup, Popover.Popup pass-throughs) nor `formAction` on `<button>` / `<input>`, whose
+  function member returns `void` and would be flagged as a non-transition action. The guard
+  excludes pass-throughs by name as `DOMAttributes | DialogHTMLAttributes | ButtonHTMLAttributes
+  | InputHTMLAttributes`. Lesson: when a type guard must distinguish "React's name" from "ours",
+  enumerate React's attribute interfaces per element the library passes through, not just
+  `DOMAttributes`.
+- `Form.Root`'s `action` is `string | fn`; `NonNullable<P[K]> extends fn` fails on the string
+  member, so my claim that it "passes" was wrong. The guard checks the function members only
+  (`Extract<NonNullable<T>, fn>`) and treats a key with no function member as an offender. I
+  should have type-checked the snippet against the real exports before claiming a result.
+
+Conventions 10.1 and the Combobox checklist now describe the implemented guard. Also corrected
+the checklist's "top-of-file row list" item (`combobox.test.tsx` has none; the urgent rows are
+the `renderBoth("urgent text")` describe).
