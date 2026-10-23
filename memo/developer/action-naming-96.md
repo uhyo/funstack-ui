@@ -18,3 +18,10 @@
   `expectTypeOf<UrgentChangeAction>().toBeAny()` so the import is used.
 - Docs pages (ActionProps, Combobox, Roadmap, ServerComponents) deferred until `wave14-docs` merges; only
   `examples/ComboboxDrink.tsx` changed so docs typecheck/build.
+
+## For the later docs step (PO, after wave14-docs merges)
+
+- Action props page: the urgent-lane heading gets `id="urgent-lane"`; Combobox page links point at
+  `/concepts/action-props#urgent-lane`.
+- wave14-docs deletes the Action props naming table: keep the deletion when rebasing (do not re-add
+  the Combobox row from the checklist).
