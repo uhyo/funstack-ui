@@ -226,13 +226,6 @@ export function RoadmapPage() {
           indeterminate; jsdom toggles instead of restoring a checkbox after a cancelled click (
           <a href={issue(34)}>#34</a>).
         </li>
-        <li>
-          FUNSTACK Static <code>defer()</code> renders each deferred payload without its own{" "}
-          <code>useId</code> prefix, so a server-rendered Progress or Meter label id can collide (
-          <a href={issue(94)}>#94</a>,{" "}
-          <a href="https://github.com/uhyo/funstack-static/issues/198">uhyo/funstack-static#198</a>
-          ).
-        </li>
       </ul>
       <p>
         Ideas and bug reports are welcome as <a href={`${ISSUES_URL}/new`}>new issues</a>.

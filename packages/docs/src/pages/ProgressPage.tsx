@@ -312,17 +312,6 @@ export function ProgressPage() {
         the data attributes and the custom property, and your CSS draws the bar and its animation
         from the first paint. A Progress also works as a Suspense fallback.
       </p>
-      <p>
-        <strong>Known limitation:</strong> a <code>Progress.Root</code> rendered by a Server
-        Component inside a FUNSTACK Static <code>defer()</code> chunk gets a server{" "}
-        <code>useId</code> that restarts per payload, so its label id can collide with an id from
-        the main payload or from another deferred payload. The Root always references that id, so{" "}
-        <code>aria-labelledby</code> can name the wrong element, and <code>aria-label</code> does
-        not help (an existing <code>aria-labelledby</code> target wins). Rendering the Root from a
-        client component there avoids it, since client ids are unaffected (
-        <a href="https://github.com/uhyo/funstack-ui/issues/94">#94</a>, upstream{" "}
-        <a href="https://github.com/uhyo/funstack-static/issues/198">uhyo/funstack-static#198</a>).
-      </p>
 
       <h3>Not in this version</h3>
       <ul>

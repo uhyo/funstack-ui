@@ -52,6 +52,12 @@ export function Settings() {
         created in a client module), so a Server Component renders the Root on the server, may pass
         it function props, and only the small context module and the parts reach the browser.
       </p>
+      <p>
+        Server-rendered ids inside FUNSTACK Static <code>defer()</code> need{" "}
+        <code>@funstack/static</code> 1.3.4 or later; other frameworks that render several server
+        payloads into one page must give each its own <code>identifierPrefix</code>, or ids from
+        different payloads can collide.
+      </p>
 
       <h3>What "JS-free" means</h3>
       <p>
