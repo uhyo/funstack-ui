@@ -255,3 +255,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Running: architect (design-93) records decision in design/; developer impl-19 docs on wave13/zero-js-docs. Then review → merge → alpha.11? (docs-only; deploy-docs needs a release or workflow_dispatch). Then user does a human review.
 - Docs d83c4ba..5908286 (review fd875e4 incl. Select recipe, roadmap). Closed #19. No library change → no npm release; docs deployed via deploy-docs workflow_dispatch.
 - WAVE 13 DONE. Next: user's human review of everything built. Open: #94 (waits on funstack-static#198) + human/upstream tasks #16 #34 #44 #51 #52 #58 #70 #73 #89 #90 #91 #92.
+
+## WAVE 14 (from human review #95, docs-focused) — IN PROGRESS
+- #96 rename Combobox `inputValueChangeAction` → `onInputValueChange`, `UrgentChangeAction` → `UrgentChangeHandler` (user chose; rule: `*Action` always = transition-wrapped, `on*` only for sync urgent callbacks). Architect amending vision §3 + conventions 2.6; developer implements after.
+- #97 concept pages conceptual: one example per concept, define terms (panel…), component specifics moved to reference pages, useActionState in Overlapping actions. Developer on branch wave14-docs (worktree ../funstack-ui-wave14-docs).
+- Then: reviewer pass, merge, release alpha.11 (breaking rename → call out in notes).
