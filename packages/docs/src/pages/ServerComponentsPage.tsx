@@ -55,10 +55,10 @@ export function Settings() {
 
       <h3>What "JS-free" means</h3>
       <p>
-        "JS-free" on this site (the JS-free modes of Accordion and Dialog, the native Tooltip path)
-        means two things: no behaviour JavaScript runs on the native path, because the browser does
-        the interaction, and the server HTML works before hydration and without it. It does{" "}
-        <strong>not</strong> mean "no client bundle". The parts are <code>"use client"</code>{" "}
+        "JS-free" on this site (the JS-free modes of Accordion and Dialog, the native Tooltip path
+        in Chromium) means two things: no behaviour JavaScript runs on the native path, because the
+        browser does the interaction, and the server HTML works before hydration and without it. It
+        does <strong>not</strong> mean "no client bundle". The parts are <code>"use client"</code>{" "}
         modules, so in a Server Components app they are shipped and hydrated with the page like any
         client component, whatever props they receive.
       </p>
@@ -79,8 +79,9 @@ export function Settings() {
         considered in <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a> and not
         built, since it would save those few KB but not the runtime. For a single form control, the{" "}
         <a href="/components/switch">Switch</a>, <a href="/components/checkbox">Checkbox</a>,{" "}
-        <a href="/components/radio-group">RadioGroup</a>, <a href="/components/slider">Slider</a>{" "}
-        and <a href="/components/number-field">NumberField</a> pages show the plain HTML a Server
+        <a href="/components/radio-group">RadioGroup</a>, <a href="/components/select">Select</a>,{" "}
+        <a href="/components/slider">Slider</a> and{" "}
+        <a href="/components/number-field">NumberField</a> pages show the plain HTML a Server
         Component can render instead, and what it gives up.
       </p>
 

@@ -28,8 +28,9 @@ export function ProgressPage() {
         A progress bar (WAI-ARIA <code>progressbar</code>) and the library's first{" "}
         <strong>output-only</strong> component: nothing is pressed or typed, so there is no action,
         no pending state and no optimistic state. A Progress is the display of{" "}
-        <em>someone else's</em> action. It needs no JavaScript at all: <code>Progress.Root</code>{" "}
-        has no <code>"use client"</code>, so a Server Component renders it on the server.
+        <em>someone else's</em> action. It has no behaviour JavaScript: <code>Progress.Root</code>{" "}
+        has no <code>"use client"</code>, so a Server Component renders it on the server (the small
+        client parts still ship; see <a href="#server-components">Server Components</a>).
       </p>
 
       <Example
@@ -294,7 +295,7 @@ export function ProgressPage() {
         </li>
       </ul>
 
-      <h3>Server Components</h3>
+      <h3 id="server-components">Server Components</h3>
       <p>
         <code>Progress.Root</code> has no <code>"use client"</code>: it uses only <code>useId</code>
         , arithmetic and <code>Intl</code>, and renders a context provider created in a client
@@ -312,9 +313,13 @@ export function ProgressPage() {
         from the first paint. A Progress also works as a Suspense fallback.
       </p>
       <p>
-        <strong>Known limitation:</strong> inside a FUNSTACK Static <code>defer()</code> chunk, the
-        Root's server-generated label id can collide with an id from the main payload, which breaks{" "}
-        <code>aria-labelledby</code> (
+        <strong>Known limitation:</strong> a <code>Progress.Root</code> rendered by a Server
+        Component inside a FUNSTACK Static <code>defer()</code> chunk gets a server{" "}
+        <code>useId</code> that restarts per payload, so its label id can collide with an id from
+        the main payload or from another deferred payload. The Root always references that id, so{" "}
+        <code>aria-labelledby</code> can name the wrong element, and <code>aria-label</code> does
+        not help (an existing <code>aria-labelledby</code> target wins). Rendering the Root from a
+        client component there avoids it, since client ids are unaffected (
         <a href="https://github.com/uhyo/funstack-ui/issues/94">#94</a>, upstream{" "}
         <a href="https://github.com/uhyo/funstack-static/issues/198">uhyo/funstack-static#198</a>).
       </p>

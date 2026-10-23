@@ -191,6 +191,15 @@ export function RoadmapPage() {
           shipped stylesheets, and <code>{"<CSPProvider nonce>"}</code> (<a href={issue(88)}>#88</a>
           ).
         </li>
+        <li>
+          Directive-free variants of platform-native parts: considered and not built (
+          <a href={issue(19)}>#19</a>). A Server Components app ships its framework runtime anyway,
+          so a variant would save only a few KB. Instead,{" "}
+          <a href="/concepts/server-components">Server Components</a> defines "JS-free" (no
+          behaviour JavaScript, works without hydration, not "no client bundle"), and the Switch,
+          Checkbox, RadioGroup, Select, Slider and NumberField pages show the plain HTML a Server
+          Component can render.
+        </li>
       </ul>
 
       <h3>Next</h3>
@@ -201,8 +210,8 @@ export function RoadmapPage() {
       <h3>Deferred</h3>
       <ul>
         <li>
-          Directive-free (truly zero-JS) variants of platform-native parts (
-          <a href={issue(19)}>#19</a>).
+          A directive-free Accordion (<code>@funstack/ui/accordion/native</code>): a ready plan, not
+          scheduled (<a href={issue(19)}>#19</a>).
         </li>
       </ul>
 
@@ -216,6 +225,13 @@ export function RoadmapPage() {
           Chromium does not match <code>:checked</code> on a checkbox that is both checked and
           indeterminate; jsdom toggles instead of restoring a checkbox after a cancelled click (
           <a href={issue(34)}>#34</a>).
+        </li>
+        <li>
+          FUNSTACK Static <code>defer()</code> renders each deferred payload without its own{" "}
+          <code>useId</code> prefix, so a server-rendered Progress or Meter label id can collide (
+          <a href={issue(94)}>#94</a>,{" "}
+          <a href="https://github.com/uhyo/funstack-static/issues/198">uhyo/funstack-static#198</a>
+          ).
         </li>
       </ul>
       <p>

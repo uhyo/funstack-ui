@@ -292,18 +292,19 @@ export function SwitchPage() {
   Email notifications
 </label>`}</CodeBlock>
       <p>
-        <code>role="switch"</code> gives switch semantics in every engine; style it on{" "}
-        <code>:checked</code>, <code>:disabled</code> and <code>:focus-visible</code>. The HTML{" "}
-        <code>switch</code> attribute, which draws a native switch, is Safari only (17.4+; not in
-        Chrome or Firefox, and not yet in the HTML standard), so it is not needed here. If you add
-        it, write <code>switch=""</code>: react-dom drops <code>true</code> for an attribute it does
-        not know, and <code>@types/react</code> does not type it.
+        <code>role="switch"</code> gives switch semantics in every engine. To draw it as a switch,
+        set <code>appearance: none</code> and style it on <code>:checked</code>,{" "}
+        <code>:disabled</code> and <code>:focus-visible</code>. The HTML <code>switch</code>{" "}
+        attribute only changes the look: it draws a native switch in Safari 17.4+ and nowhere else
+        (not in Chrome or Firefox, and not yet in the HTML standard). If you add it, write{" "}
+        <code>switch=""</code>: react-dom drops <code>true</code> for an attribute it does not know,
+        and <code>@types/react</code> does not type it.
       </p>
       <p>
         Compared with <code>&lt;Switch&gt;</code>, the plain input has no{" "}
         <code>checkedChangeAction</code>, so no transition, <code>data-pending</code> or rollback on
-        rejection; no <code>data-checked</code> / <code>data-disabled</code>; no reconciliation of
-        clicks before hydration or of a form reset with your state; and no{" "}
+        rejection; no <code>data-checked</code> / <code>data-disabled</code>; no React state that
+        tracks it (clicks before hydration and form resets live only in the DOM); and no{" "}
         <a href="/components/field">Field</a> integration (the Field's id, label, description,
         invalid and required state must be wired by hand).
       </p>

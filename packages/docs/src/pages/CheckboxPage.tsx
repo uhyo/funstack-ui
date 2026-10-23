@@ -288,10 +288,10 @@ export function CheckboxPage() {
         Compared with <code>&lt;Checkbox&gt;</code>, it has no <code>checkedChangeAction</code>, so
         no transition, <code>data-pending</code> or rollback on rejection; no{" "}
         <code>data-checked</code> / <code>data-disabled</code> (use <code>:checked</code> and{" "}
-        <code>:disabled</code>); no reconciliation of clicks before hydration or of a form reset
-        with your state; and no <a href="/components/field">Field</a> integration. It cannot be
-        mixed: <code>indeterminate</code> is a DOM property with no HTML attribute, so only script
-        can set it.
+        <code>:disabled</code>); no React state that tracks it (clicks before hydration and form
+        resets live only in the DOM); and no <a href="/components/field">Field</a> integration. It
+        cannot be mixed: <code>indeterminate</code> is a DOM property with no HTML attribute, so
+        only script can set it.
       </p>
     </div>
   );

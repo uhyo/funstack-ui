@@ -523,6 +523,38 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         since the picker and the button's copy are drawn by the browser. An action-less Select is a
         working native select before hydration, including the copy into the button.
       </p>
+
+      <h3>Plain HTML</h3>
+      <p>
+        If a select only posts with its form, a Server Component can render the native element
+        itself, with no library code for it:
+      </p>
+      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  Size
+  <select name="size" defaultValue={order.size ?? ""} required>
+    <option value="">Choose a size</option>
+    <option value="s">Small</option>
+    <option value="m">Medium</option>
+  </select>
+</label>`}</CodeBlock>
+      <p>
+        Picking, the keyboard, typeahead, <code>required</code> and submission are the browser's.
+        The <code>appearance: base-select</code> recipes above apply to it too: a styled picker in
+        Chromium 135+ and Safari 27, the native select in Firefox. Keep the options' content plain
+        text there. Rich button content needs a <code>&lt;selectedcontent&gt;</code>, which the
+        parser fills before hydration, so a plain one in a hydrated React tree causes a hydration
+        mismatch (and <code>@types/react</code> does not type it); <code>Select.Value</code> is the
+        part that handles this.
+      </p>
+      <p>
+        Compared with <code>Select</code>, it has no <code>valueChangeAction</code>, so no
+        transition, <code>data-pending</code> or rollback on rejection; no data attributes (use{" "}
+        <code>:checked</code> on options, <code>:open</code>, <code>:disabled</code>); no React
+        state that tracks it, and none of the library's fixes for React's form reset and re-applying
+        the selection; no options that load later behind Suspense; and no{" "}
+        <a href="/components/field">Field</a> integration.
+      </p>
     </div>
   );
 }

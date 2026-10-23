@@ -384,23 +384,25 @@ export function RadioGroupPage() {
         itself, with no library code for it:
       </p>
       <CodeBlock>{`// A Server Component: no import from @funstack/ui.
-<fieldset role="radiogroup">
+<fieldset role="radiogroup" aria-required="true">
   <legend>Size</legend>
   <label>
     <input type="radio" name="size" value="s" defaultChecked={order.size === "s"} required /> Small
   </label>
   <label>
-    <input type="radio" name="size" value="m" defaultChecked={order.size === "m"} /> Medium
+    <input type="radio" name="size" value="m" defaultChecked={order.size === "m"} required /> Medium
   </label>
 </fieldset>`}</CodeBlock>
       <p>
         The browser still provides the single tab stop, the arrow keys, <code>required</code> and
-        submission. Compared with <code>RadioGroup</code>, every radio needs the shared{" "}
+        submission. For a required group, do what the Root does: put <code>required</code> on every
+        radio and <code>aria-required="true"</code> on the fieldset, so the radiogroup itself is
+        announced as required. Compared with <code>RadioGroup</code>, every radio needs the shared{" "}
         <code>name</code> written out, and there is no <code>valueChangeAction</code>, so no
         transition, <code>data-pending</code> or rollback on rejection; no <code>data-checked</code>{" "}
         / <code>data-disabled</code> (use <code>:checked</code> and <code>:disabled</code>); no
-        reconciliation of clicks before hydration or of a form reset with your state; and no{" "}
-        <a href="/components/field">Field</a> integration.
+        React state that tracks it (clicks before hydration and form resets live only in the DOM);
+        and no <a href="/components/field">Field</a> integration.
       </p>
     </div>
   );

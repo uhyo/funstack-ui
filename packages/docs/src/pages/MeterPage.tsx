@@ -225,9 +225,13 @@ export function MeterPage() {
         or <code>aria-label</code>). Updates are not announced.
       </p>
       <p>
-        <strong>Known limitation:</strong> inside a FUNSTACK Static <code>defer()</code> chunk, the
-        Root's server-generated label id can collide with an id from the main payload, which breaks{" "}
-        <code>aria-labelledby</code> (
+        <strong>Known limitation:</strong> a <code>Meter.Root</code> rendered by a Server Component
+        inside a FUNSTACK Static <code>defer()</code> chunk gets a server <code>useId</code> that
+        restarts per payload, so its label id can collide with an id from the main payload or from
+        another deferred payload. The Root always references that id, so{" "}
+        <code>aria-labelledby</code> can name the wrong element, and <code>aria-label</code> does
+        not help (an existing <code>aria-labelledby</code> target wins). Rendering the Root from a
+        client component there avoids it, since client ids are unaffected (
         <a href="https://github.com/uhyo/funstack-ui/issues/94">#94</a>, upstream{" "}
         <a href="https://github.com/uhyo/funstack-static/issues/198">uhyo/funstack-static#198</a>).
       </p>
