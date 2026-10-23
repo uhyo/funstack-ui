@@ -28,3 +28,17 @@
 - Done after rebasing onto a290d4a: ActionProps urgent-lane section (`id="urgent-lane"`, intro "with one
   exception, below"), Combobox prose/Callout/props row/platform list/behaviour row link, Roadmap entry +
   "Breaking" item. ServerComponentsPage no longer mentions the prop after wave14-docs: nothing to change.
+
+## Review fixes (memo/reviewer/wave14-rename-review.md)
+
+- M1: `listedKeys` object `satisfies Record<keyof PublicProps, true>`, `listed = Object.keys(...)`: both
+  directions fail at the type level; runtime set check against index.ts unchanged.
+- L2: `ReturnsUnknown<F>` distributes over function members; `false extends ...` flags a mixed union.
+- N1: `Offenders` is a mapped object of Props type -> keys, asserted `{}`; the error reads
+  `{ ToggleProps: "Expected: never, Actual: literal string: fooAction" }`.
+- L1: a key is a pass-through only when named like a React DOM prop and mutually assignable with React's
+  type (`DOMAttributes<any> & DialogHTMLAttributes<any> & Button.. & Input..`). Residual: a library prop
+  declared with exactly React's DOM type under a DOM name still passes (cannot be told apart).
+- Mutations verified in a scratch copy (tsc): listed-only type, missing listed type, union return on
+  Toggle, `onClose(reason)`, `formAction: () => void`, `onToggle: () => void` on DialogRoot: all caught.
+- N2/N3/L3 noted in the test header.
