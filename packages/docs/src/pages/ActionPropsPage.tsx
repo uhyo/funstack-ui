@@ -102,8 +102,11 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         component awaits it, return anything else and it is ignored. That means a function that
         returns data (a Server Function, a <code>fetch</code>) type-checks without wrapping.
       </p>
-      <CodeBlock>{`<Toggle pressedChangeAction={(pressed) => api.setFavorite(id, pressed)}>Favorite</Toggle>
-<Tabs.Root defaultValue="general" valueChangeAction={(tab) => analytics.track(tab)}>...</Tabs.Root>`}</CodeBlock>
+      <ConceptExample component="Toggle and Tabs" href="/components/toggle">
+        <p>A change action that returns data, and one that returns nothing:</p>
+        <CodeBlock>{`<Toggle pressedChangeAction={(pressed) => api.setFavorite(id, pressed)}>Favorite</Toggle>
+  <Tabs.Root defaultValue="general" valueChangeAction={(tab) => analytics.track(tab)}>...</Tabs.Root>`}</CodeBlock>
+      </ConceptExample>
 
       <h3>
         <code>details.reason</code>
@@ -198,17 +201,19 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         after your own <code>await</code> is no longer part of the transition. Wrap it in{" "}
         <code>startTransition</code>.
       </p>
-      <CodeBlock>{`// Controlled, local state: set it in the synchronous part.
-<Tabs.Root value={tab} valueChangeAction={(next) => { setTab(next); }}>
+      <ConceptExample component="Tabs" href="/components/tabs">
+        <CodeBlock>{`// Controlled, local state: set it in the synchronous part.
+  <Tabs.Root value={tab} valueChangeAction={(next) => { setTab(next); }}>
 
-// Controlled, server-backed: adopt the value on success, re-wrapped after the await.
-<Tabs.Root
-  value={tab}
-  valueChangeAction={async (next) => {
-    await saveTab(next);
-    startTransition(() => setTab(next));
-  }}
->`}</CodeBlock>
+  // Controlled, server-backed: adopt the value on success, re-wrapped after the await.
+  <Tabs.Root
+    value={tab}
+    valueChangeAction={async (next) => {
+      await saveTab(next);
+      startTransition(() => setTab(next));
+    }}
+  >`}</CodeBlock>
+      </ConceptExample>
 
       <h3 id="await-only">Await only what the UI must wait for</h3>
       <p>
@@ -217,11 +222,13 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         delays a router navigation. Background work that the UI need not wait for should not be
         returned:
       </p>
-      <CodeBlock>{`// The panel switches immediately; the save runs in the background.
-valueChangeAction={(next) => { void saveSelection(next); }}
+      <ConceptExample component="Tabs" href="/components/tabs">
+        <CodeBlock>{`// The panel switches immediately; the save runs in the background.
+  valueChangeAction={(next) => { void saveSelection(next); }}
 
-// The panel switches when the save succeeds; the tab shows pending meanwhile.
-valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
+  // The panel switches when the save succeeds; the tab shows pending meanwhile.
+  valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
+      </ConceptExample>
 
       <h3>Errors go to Error Boundaries</h3>
       <p>
@@ -237,9 +244,12 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         resolve, which counts as success: in uncontrolled mode the new value is committed. Use
         controlled mode when the parent must be able to veto.
       </p>
-      <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
-        <ToggleErrors />
-      </Example>
+      <ConceptExample component="Toggle" href="/components/toggle">
+        <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
+        <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
+          <ToggleErrors />
+        </Example>
+      </ConceptExample>
 
       <h3 id="overlapping-actions">Overlapping actions: the latest intent wins</h3>
       <p>
@@ -260,12 +270,14 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         runs them sequentially, passing each the state the previous one returned. Drive the
         component in controlled mode from that state:
       </p>
-      <CodeBlock>{`const [pressed, dispatch] = useActionState(async (_previous: boolean, next: boolean) => {
-  await api.setFavorite(id, next); // runs only after the previous call has finished
-  return next;
-}, initial);
+      <ConceptExample component="Toggle" href="/components/toggle">
+        <CodeBlock>{`const [pressed, dispatch] = useActionState(async (_previous: boolean, next: boolean) => {
+    await api.setFavorite(id, next); // runs only after the previous call has finished
+    return next;
+  }, initial);
 
-<Toggle pressed={pressed} pressedChangeAction={(next) => dispatch(next)}>Favorite</Toggle>`}</CodeBlock>
+  <Toggle pressed={pressed} pressedChangeAction={(next) => dispatch(next)}>Favorite</Toggle>`}</CodeBlock>
+      </ConceptExample>
       <p>
         The component stays pending and keeps showing the latest optimistic value until the queue
         has drained. React's rules for the queue apply: when one call throws, React skips the calls
@@ -286,13 +298,15 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         React's serialiser never sees it. The server receives <code>(next, details)</code> with{" "}
         <code>details.event</code> undefined and every other field intact.
       </p>
-      <CodeBlock>{`// app/post.tsx: a Server Component
-import { Toggle } from "@funstack/ui/toggle";
-import { setFavorite } from "./actions"; // "use server"
+      <ConceptExample component="Toggle" href="/components/toggle">
+        <CodeBlock>{`// app/post.tsx: a Server Component
+  import { Toggle } from "@funstack/ui/toggle";
+  import { setFavorite } from "./actions"; // "use server"
 
-<Toggle defaultPressed={post.favorited} pressedChangeAction={setFavorite.bind(null, post.id)}>
-  Favorite
-</Toggle>`}</CodeBlock>
+  <Toggle defaultPressed={post.favorited} pressedChangeAction={setFavorite.bind(null, post.id)}>
+    Favorite
+  </Toggle>`}</CodeBlock>
+      </ConceptExample>
       <Callout title="Costs of the virtual event">
         <p>
           <code>Object.keys(details)</code>, spreading and <code>JSON.stringify</code> do not
