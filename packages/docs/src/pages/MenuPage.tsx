@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { MenuRowActions } from "../examples/MenuRowActions.js";
@@ -600,7 +601,7 @@ export function MenuPage() {
       </p>
       <CodeBlock>{`<Menu.Popup transition={{ "fsui-menu-open": "menu-in", "fsui-menu-close": "menu-out", default: "none" }}>`}</CodeBlock>
 
-      <h3>Suspense</h3>
+      <h3 id="suspense">Suspense</h3>
       <p>
         The items render from committed state, so items that suspend (a submenu of recent files read
         with <code>use()</code>) hold the open: the menu (or submenu) stays closed with{" "}
@@ -639,6 +640,25 @@ export function MenuPage() {
         it: the library prevents it unless the menu itself can scroll that way (Ctrl+wheel and a
         trackpad pinch still zoom).
       </p>
+
+      <BehaviourSummary
+        name="Menu"
+        transitionTypes={
+          "Opens and closes: `fsui-menu` plus `fsui-menu-open` or `fsui-menu-close`. A CheckboxItem: `fsui-menu` plus `fsui-menu-check` or `fsui-menu-uncheck`. A RadioGroup: `fsui-menu` plus `fsui-menu-select`."
+        }
+        optimistic={
+          "The Trigger's `aria-expanded` and `data-open`, and CheckboxItem and RadioItem `data-checked`, are optimistic. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
+        }
+        suspense={
+          "Items that suspend hold the open: the menu (or submenu) stays closed with `data-pending` on its trigger, then opens once, complete, with the first item focused ([Suspense](#suspense))."
+        }
+        browserOwned={
+          'The popup is a `popover="auto"`: the top layer, light dismiss and Escape are the browser\'s. A dismissal closes the menu at once; `openChangeAction(false)` is a notification with `reason: "dismiss"`, and it animates with CSS only.'
+        }
+        beforeHydration={
+          'The Trigger carries `command="toggle-popover"`: a click before hydration opens the (still empty) menu natively, and the items fill in on hydration (`reason: "platform"`).'
+        }
+      />
     </div>
   );
 }

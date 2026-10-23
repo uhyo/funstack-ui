@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToolbarEditor } from "../examples/ToolbarEditor.js";
@@ -296,7 +297,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
         ]}
       />
 
-      <h3>Before hydration</h3>
+      <h3 id="before-hydration">Before hydration</h3>
       <p>
         The toolbar writes <code>tabindex</code> from an effect, so the server HTML has none: before
         hydration every control is its own Tab stop, reachable and working with its native
@@ -325,6 +326,17 @@ import { Toolbar } from "@funstack/ui/toolbar";
         with a view transition; keep the reduced-motion block above in your stylesheet. The Toolbar
         adds no view transition types of its own.
       </p>
+
+      <BehaviourSummary
+        name="Toolbar"
+        transitionTypes={"None: the Toolbar has no state of its own."}
+        optimistic={"None of its own: controls inside keep their own optimistic and pending state."}
+        suspense={"Nothing specific: the Toolbar renders no content region."}
+        browserOwned={"None."}
+        beforeHydration={
+          "No `tabindex` in the server HTML: every control is its own Tab stop and works natively. After hydration there is one Tab stop ([Before hydration](#before-hydration))."
+        }
+      />
     </div>
   );
 }

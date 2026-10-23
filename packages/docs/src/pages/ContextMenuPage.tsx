@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ContextMenuCanvas } from "../examples/ContextMenuCanvas.js";
@@ -545,6 +546,25 @@ export function ContextMenuPage() {
           Menu button.
         </li>
       </ul>
+
+      <BehaviourSummary
+        name="a context menu"
+        transitionTypes={
+          "Those of the [Menu](/components/menu) it opens: `fsui-menu` plus `fsui-menu-open` or `fsui-menu-close`, and the item types."
+        }
+        optimistic={
+          "As in Menu: the open state is optimistic (`data-open` on the region), and a rejection rolls it back. Items render from the committed open state."
+        }
+        suspense={
+          "Items that suspend hold the open, with `data-pending` on the region (and on a Trigger in the same Root)."
+        }
+        browserOwned={
+          'As in Menu: light dismiss and Escape are the browser\'s; a dismissal is notified with `reason: "dismiss"`.'
+        }
+        beforeHydration={
+          "The browser's own context menu shows. Nothing is half-open and nothing is replayed after hydration; the custom menu works from then on."
+        }
+      />
     </div>
   );
 }

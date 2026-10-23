@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
@@ -175,6 +176,19 @@ export function TogglePage() {
           <code>aria-busy</code> yourself.
         </p>
       </Callout>
+
+      <BehaviourSummary
+        name="Toggle"
+        transitionTypes={"`fsui-toggle` plus `fsui-toggle-press` or `fsui-toggle-release`."}
+        optimistic={
+          "`aria-pressed` and `data-pressed` follow the optimistic state; `data-pending` is on the Toggle while `pressedChangeAction` is in flight. The `transition` prop animates the commit that ends the action (for example a spinner turning back into an icon), not the pressed flip: animate that with a CSS transition on `[data-pressed]`."
+        }
+        suspense={
+          "No content region. The `children` function renders optimistic state and must not suspend."
+        }
+        browserOwned={"None: the pressed state is library-owned."}
+        beforeHydration={"Markup and ARIA. Pressing needs JavaScript."}
+      />
     </div>
   );
 }

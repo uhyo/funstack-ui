@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { CheckboxGroupForm } from "../examples/CheckboxGroupForm.js";
@@ -518,6 +519,23 @@ export function CheckboxGroupPage() {
         <code>fsui-checkbox-group-uncheck</code> when it unchecks something (a reset can carry
         both).
       </p>
+
+      <BehaviourSummary
+        name="CheckboxGroup"
+        transitionTypes={
+          "`fsui-checkbox-group`, plus `fsui-checkbox-group-check` when a dispatch checks something and `fsui-checkbox-group-uncheck` when it unchecks something (a reset can carry both)."
+        }
+        optimistic={
+          "Items and the Parent render the optimistic set into their native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on each Item (or Parent) whose state is changing."
+        }
+        suspense={"No content region; nothing the group renders suspends."}
+        browserOwned={
+          'Native checkboxes: the browser flips them before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`, once per group. The Parent\'s mixed state is derived and mirrored to the DOM property.'
+        }
+        beforeHydration={
+          'Native checkboxes: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`). A mixed Parent is drawn from `data-indeterminate` but announced as unchecked until hydration; a Parent clicked before hydration counts as "check all" of its values. A required group keeps the server\'s `required` attributes until hydration.'
+        }
+      />
     </div>
   );
 }

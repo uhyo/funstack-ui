@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { FieldControls } from "../examples/FieldControls.js";
@@ -593,6 +594,23 @@ form[data-pending]           { cursor: progress; }
         <code>aria-errormessage</code> is not used: VoiceOver does not announce it, and{" "}
         <code>aria-describedby</code> works in every screen reader.
       </p>
+
+      <BehaviourSummary
+        name="Field and Form"
+        transitionTypes={"None: no part adds transition types or takes a `transition` prop."}
+        optimistic={
+          "A Form with a function `action` runs it in its own transition: `data-pending` is on the form, on `Form.Submit` and on every Field part while the submission is in flight. A Field's display state (whether its error shows) is updated synchronously from the DOM event, not in a transition."
+        }
+        suspense={
+          "The submission's pending state includes the Suspense wait of what the result re-renders. Content inside `Field.Error` must not suspend."
+        }
+        browserOwned={
+          "Validity is the browser's: native constraint validation, `:user-invalid` and the browser's validation message; `data-invalid` adds server errors."
+        }
+        beforeHydration={
+          "The browser validates and shows its bubble, and the form posts to the Server Function (React's progressive enhancement). A group control's label carries `for` until hydration."
+        }
+      />
     </div>
   );
 }

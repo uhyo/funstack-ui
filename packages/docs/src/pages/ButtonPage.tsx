@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ButtonCompose } from "../examples/ButtonCompose.js";
@@ -160,7 +161,7 @@ export function ButtonPage() {
         <code>onClick</code>, <code>data-pending</code>, <code>data-disabled</code>.
       </p>
 
-      <h3>Pending and re-entry</h3>
+      <h3 id="pending-and-re-entry">Pending and re-entry</h3>
       <p>
         While the Button's own action is in flight, a click, Enter or Space (also a programmatic{" "}
         <code>click()</code> and the click an implicit form submission sends) starts no second run
@@ -363,6 +364,25 @@ import { archive } from "./actions"; // "use server"
         <code>transition</code>, keep the reduced-motion block in your stylesheet; the Button adds
         no view transition types.
       </p>
+
+      <BehaviourSummary
+        name="Button"
+        transitionTypes={
+          "None: the Button adds no transition types. Its `transition` prop animates the commit that ends its action."
+        }
+        optimistic={
+          'A [pure trigger](/concepts/pending-and-optimistic#pure-trigger): no optimistic state. `data-pending` and `aria-disabled="true"` while its own action (or a submission started by its own function `formAction`) is in flight; a second click, Enter or Space is ignored meanwhile ([Pending and re-entry](#pending-and-re-entry)).'
+        }
+        suspense={
+          "`data-pending` lasts until the commit that ends the action, including a Suspense wait of what that commit renders."
+        }
+        browserOwned={
+          "A `commandfor` / `command` Button's command and a link's navigation are performed by the browser."
+        }
+        beforeHydration={
+          "A `commandfor` / `command` Button runs its command, a Server Function `formAction` submits (React's progressive enhancement) and a `render={<a href>}` link navigates. An `action` Button does nothing until hydration; a Server Function is a valid `action` once hydrated. The server HTML carries no `aria-disabled` and no `data-pending`."
+        }
+      />
     </div>
   );
 }

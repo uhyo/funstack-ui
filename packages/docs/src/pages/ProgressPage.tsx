@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ProgressForm } from "../examples/ProgressForm.js";
@@ -326,6 +327,19 @@ export function ProgressPage() {
           attributes, and Field registration.
         </li>
       </ul>
+
+      <BehaviourSummary
+        name="Progress"
+        transitionTypes={
+          "None: values change in your own lane, usually urgently, and no part takes a `transition` prop."
+        }
+        optimistic={"None: a Progress displays a value; it has no optimistic or pending state."}
+        suspense={"A Progress works as a Suspense fallback."}
+        browserOwned={"None."}
+        beforeHydration={
+          "Everything: there is no behaviour. The HTML carries the role, the values, `aria-valuetext`, the data attributes and the custom property, and your CSS draws the bar from the first paint. The Root is itself a Server Component."
+        }
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { TabsSaved } from "../examples/TabsSaved.js";
@@ -352,6 +353,25 @@ export function TabsPage() {
 <Tabs.Panel value="changelog" keepMounted="until-found">
   <Changelog />
 </Tabs.Panel>`}</CodeBlock>
+
+      <BehaviourSummary
+        name="Tabs"
+        transitionTypes={
+          "`fsui-tabs` plus `fsui-tabs-next` or `fsui-tabs-prev`: the DOM order of the new tab relative to the committed one. Only `fsui-tabs` when there is no committed tab."
+        }
+        optimistic={
+          "Tab and Indicator show the optimistic selection (`aria-selected`, `data-selected`); Panels show the committed one. `data-pending` is on the Root, on the Tab that is the optimistic selection, and mirrored on the Indicator; never on a Panel."
+        }
+        suspense={
+          "A newly selected Panel that suspends keeps the current Panel on screen until it is ready, while the new Tab is already selected and pending. A `<Suspense>` inside the Panel shows its fallback instead. Tab content must not suspend."
+        }
+        browserOwned={
+          'Selection is library-owned. With `keepMounted="until-found"`, find-in-page or a text fragment can reveal a hidden panel; that is dispatched with `reason: "platform"`, and if a controlled parent refuses, the panel is hidden again once the action settles.'
+        }
+        beforeHydration={
+          'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML and searchable. Switching tabs needs JavaScript.'
+        }
+      />
     </div>
   );
 }

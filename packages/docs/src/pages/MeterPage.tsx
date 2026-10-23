@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { MeterStorage } from "../examples/MeterStorage.js";
@@ -224,6 +225,19 @@ export function MeterPage() {
         <code>aria-valuetext</code>, and a meter must always have a name (a <code>Meter.Label</code>{" "}
         or <code>aria-label</code>). Updates are not announced.
       </p>
+
+      <BehaviourSummary
+        name="Meter"
+        transitionTypes={
+          "None: values change in your own lane, and no part takes a `transition` prop."
+        }
+        optimistic={"None: a Meter displays a value; it has no optimistic or pending state."}
+        suspense={"Nothing specific: the Meter renders no content region."}
+        browserOwned={"None."}
+        beforeHydration={
+          "Everything: there is no behaviour. The HTML carries the role, the values, `aria-valuetext`, the data attributes and the custom property, and your CSS draws the bar from the first paint. The Root is itself a Server Component."
+        }
+      />
     </div>
   );
 }

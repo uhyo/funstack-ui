@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToastArchive } from "../examples/ToastArchive.js";
@@ -507,7 +508,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <code>:nth-last-child()</code>.
       </p>
 
-      <h3>Suspense</h3>
+      <h3 id="suspense">Suspense</h3>
       <p>
         Toast content may suspend (<code>{"title: <UserName id={id} />"}</code>). Each Root wraps
         its children in its own Suspense boundary, so a suspending toast does not pull the Viewport
@@ -545,6 +546,25 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </li>
         <li>No swipe to dismiss yet: Close, Escape and the timer cover WCAG 2.5.1.</li>
       </ul>
+
+      <BehaviourSummary
+        name="Toast"
+        transitionTypes={
+          "None. Every Toast commit is urgent (so a toast shows even while an async action holds every transition), no part takes a `transition` prop, and React starts view transitions for transition commits only. Animate with CSS (`@starting-style`, `[data-ending]`)."
+        }
+        optimistic={
+          "No optimistic state. `data-pending` is on the Root while the toast's promise is unsettled or its Action's action runs, and on that Action, which is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+        }
+        suspense={
+          "Each Root wraps its content in its own Suspense boundary and shows its `fallback` prop while the content suspends; the timer and the announcement wait for the reveal ([Suspense](#suspense))."
+        }
+        browserOwned={
+          'The region is a `popover="manual"` in the top layer, shown while it has toasts and never light-dismissed. Its stack is library-owned.'
+        }
+        beforeHydration={
+          "The Viewport renders the empty region on the server. `toast()` is client code, so toasts appear only after hydration."
+        }
+      />
     </div>
   );
 }

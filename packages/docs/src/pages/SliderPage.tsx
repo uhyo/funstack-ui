@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { SliderField } from "../examples/SliderField.js";
@@ -492,6 +493,23 @@ export function SliderPage() {
           the form's submission is the Field's.
         </li>
       </ul>
+
+      <BehaviourSummary
+        name="Slider"
+        transitionTypes={
+          "A step: `fsui-slider` plus `fsui-slider-change`. A commit: `fsui-slider` plus `fsui-slider-commit`. No part takes a `transition` prop; use the types in your own boundaries."
+        }
+        optimistic={
+          "The thumb under the pointer is urgent. The thumbs show the value the gesture reached while a pointer is captured or anything is in flight, and the optimistic value otherwise. `data-pending` is on the Root while a step (with a `valueChangeAction`) or commit is in flight, and on the thumb that moved."
+        }
+        suspense={"A step's pending state includes the Suspense wait of what it renders."}
+        browserOwned={
+          'Native range inputs: keyboard changes and a form reset are the browser\'s; a reset is dispatched as one step and one commit with `reason: "platform"`.'
+        }
+        beforeHydration={
+          'The inputs are focusable and the keys change them; the visible thumb catches up at hydration, with one `"platform"` step and commit. The pointer does nothing yet. For a slider that needs no JavaScript, see [Plain HTML](#plain-html).'
+        }
+      />
     </div>
   );
 }

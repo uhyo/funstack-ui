@@ -1,4 +1,5 @@
 import { CodeBlock } from "../components/CodeBlock.js";
+import { Term } from "../components/Concept.js";
 import { Callout } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { Table } from "../components/Tables.js";
@@ -51,6 +52,14 @@ import type { ActionDetails, ChangeAction } from "@funstack/ui";`}</CodeBlock>
         are a namespace of parts (<code>Tabs.Root</code>, <code>Tabs.Tab</code>, ...). The namespace
         itself is not a component.
       </p>
+      <p>
+        A <Term id="part">part</Term> is one piece of a component that you render yourself and that
+        usually renders one element: <code>Tabs.Tab</code> is a part, and so is a whole{" "}
+        <code>Toggle</code>. The <Term id="root">Root</Term> is the outermost part of a compound
+        component; it usually holds the state and provides it to the other parts through context.
+        Other recurring words (trigger, content region, optimistic and committed value) are defined
+        on <a href="/concepts/pending-and-optimistic#terms">Pending & optimistic state</a>.
+      </p>
 
       <h3>A first component</h3>
       <CodeBlock>{`"use client";
@@ -69,11 +78,12 @@ export function FavoriteButton({ postId, initial }: { postId: string; initial: b
   );
 }`}</CodeBlock>
       <p>
-        <code>pressedChangeAction</code> runs inside a transition. While the returned promise is
-        pending, the button already shows the new pressed state (optimistic) and carries{" "}
-        <code>data-pending</code>. If it rejects, the pressed state rolls back and the error goes to
-        the nearest Error Boundary. The <a href="/concepts/action-props">Action props</a> page
-        explains the details.
+        <code>pressedChangeAction</code> is an <a href="/concepts/action-props#action">action</a>:
+        it runs inside a transition. While the returned promise is pending, the button already shows
+        the new pressed state (<a href="/concepts/pending-and-optimistic#optimistic">optimistic</a>)
+        and carries <code>data-pending</code>. If it rejects, the pressed state rolls back and the
+        error goes to the nearest Error Boundary. The{" "}
+        <a href="/concepts/action-props">Action props</a> page explains the details.
       </p>
 
       <h3>Styling: data attributes and CSS</h3>

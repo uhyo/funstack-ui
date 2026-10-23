@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { NumberFieldField } from "../examples/NumberFieldField.js";
@@ -579,6 +580,23 @@ export function NumberFieldPage() {
       </ul>
       <CodeBlock>{`// A Server Function as the save, straight from a Server Component:
 <NumberField.Root defaultValue={line.quantity} min={1} locale="en-US" valueCommitAction={saveQuantity}>…</NumberField.Root>`}</CodeBlock>
+
+      <BehaviourSummary
+        name="NumberField"
+        transitionTypes={
+          "A step: `fsui-number-field` plus `fsui-number-field-change`. A commit: `fsui-number-field` plus `fsui-number-field-commit`. No part takes a `transition` prop; use the types in your own boundaries."
+        }
+        optimistic={
+          "Typed text is an internal urgent draft, committed on blur and Enter. The input shows the value the gesture reached while a button is held, a step waits for its commit, or anything is in flight. `data-pending` is on the Root, Label and Input while a step (with a `valueChangeAction`) or commit is in flight, and on the Increment or Decrement button it came from."
+        }
+        suspense={"Nothing specific: the NumberField renders no content region."}
+        browserOwned={
+          "The hidden input's form reset is the browser's; the library then dispatches one step and one commit with `reason: \"platform\"`."
+        }
+        beforeHydration={
+          'The text can be typed; at hydration a parsable change is adopted with one `"platform"` step and commit. A form submitted before hydration posts the default value; the buttons do nothing yet. For a number field that needs no JavaScript, see [Plain HTML](#plain-html).'
+        }
+      />
     </div>
   );
 }

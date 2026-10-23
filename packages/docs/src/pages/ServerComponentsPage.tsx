@@ -1,11 +1,9 @@
 import { CodeBlock } from "../components/CodeBlock.js";
+import { ConceptExample, Term } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
-import { Table } from "../components/Tables.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
 import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
-import { DialogConfirm } from "../examples/DialogConfirm.js";
-import dialogConfirmSource from "../examples/DialogConfirm.tsx?raw";
 
 export function ServerComponentsPage() {
   return (
@@ -16,8 +14,14 @@ export function ServerComponentsPage() {
       />
       <h2>Server Components</h2>
       <p className="page-intro">
-        A Server Component can render every FUNSTACK UI part directly. Which behaviour works before
-        hydration depends on how much of it the platform does.
+        A Server Component can render every FUNSTACK UI <a href="/getting-started#part">part</a>{" "}
+        directly. Which behaviour works before hydration depends on how much of it the platform
+        does.
+      </p>
+      <p>
+        <Term id="hydration">Hydration</Term> is the moment React attaches to server-rendered HTML
+        in the browser: until then the page is plain HTML that the browser alone drives, and
+        afterwards React's event handlers and state are live.
       </p>
 
       <h3>
@@ -46,11 +50,11 @@ export function Settings() {
 }`}</CodeBlock>
       <p>
         Compound parts find their Root through context, and a Server Component cannot read context,
-        so parts are client modules, including the Accordion and Dialog parts. The exceptions are{" "}
-        <a href="/components/progress">Progress</a> and <a href="/components/meter">Meter</a>: their
-        Roots have no <code>"use client"</code> (they only compute, then render a context provider
-        created in a client module), so a Server Component renders the Root on the server, may pass
-        it function props, and only the small context module and the parts reach the browser.
+        so parts are client modules. The exceptions are <a href="/components/progress">Progress</a>{" "}
+        and <a href="/components/meter">Meter</a>: their Roots have no <code>"use client"</code>{" "}
+        (they only compute, then render a context provider created in a client module), so a Server
+        Component renders the Root on the server, may pass it function props, and only the small
+        context module and the parts reach the browser.
       </p>
       <p>
         Server-rendered ids inside FUNSTACK Static <code>defer()</code> need{" "}
@@ -59,14 +63,15 @@ export function Settings() {
         different payloads can collide.
       </p>
 
-      <h3>What "JS-free" means</h3>
+      <h3 id="js-free">What "JS-free" means</h3>
       <p>
-        "JS-free" on this site (the JS-free modes of Accordion and Dialog, the native Tooltip path
-        in Chromium) means two things: no behaviour JavaScript runs on the native path, because the
-        browser does the interaction, and the server HTML works before hydration and without it. It
-        does <strong>not</strong> mean "no client bundle". The parts are <code>"use client"</code>{" "}
-        modules, so in a Server Components app they are shipped and hydrated with the page like any
-        client component, whatever props they receive.
+        "JS-free" on this site (the{" "}
+        <a href="/concepts/browser-owned-state#js-free-mode">JS-free mode</a> of a component, the
+        native Tooltip path in Chromium) means two things: no behaviour JavaScript runs on the
+        native path, because the browser does the interaction, and the server HTML works before
+        hydration and without it. It does <strong>not</strong> mean "no client bundle". The parts
+        are <code>"use client"</code> modules, so in a Server Components app they are shipped and
+        hydrated with the page like any client component, whatever props they receive.
       </p>
       <p>
         For scale, measured on FUNSTACK Static (the stack this site is built with): a page whose
@@ -80,15 +85,13 @@ export function Settings() {
         Where a page really ships no JavaScript, such as server rendering or a static prerender that
         is never hydrated (<code>react-dom/static</code> <code>prerender</code>,{" "}
         <code>renderToString</code>), <code>"use client"</code> has no effect and the parts' HTML
-        works as is: a JS-free Accordion opens and closes, and a Switch is a native checkbox that
-        posts with its form. There is no separate directive-free variant of the parts: it was
-        considered in <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a> and not
-        built, since it would save those few KB but not the runtime. For a single form control, the{" "}
-        <a href="/components/switch">Switch</a>, <a href="/components/checkbox">Checkbox</a>,{" "}
-        <a href="/components/radio-group">RadioGroup</a>, <a href="/components/select">Select</a>,{" "}
-        <a href="/components/slider">Slider</a> and{" "}
-        <a href="/components/number-field">NumberField</a> pages show the plain HTML a Server
-        Component can render instead, and what it gives up.
+        works as is, to the extent described under <a href="#before-hydration">Before hydration</a>
+        below. There is no separate directive-free variant of the parts: it was considered in{" "}
+        <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a> and not built, since
+        it would save those few KB but not the runtime. For a single form control, the component
+        page has a <strong>Plain HTML</strong> section where that is an option: the HTML a Server
+        Component can render instead, and what it gives up (for example{" "}
+        <a href="/components/switch">Switch</a>).
       </p>
 
       <h3>Actions from the server</h3>
@@ -104,72 +107,63 @@ import { saveOpenSections } from "./actions"; // "use server"
   ...
 </Accordion.Root>`}</CodeBlock>
 
-      <h3>Before hydration</h3>
-      <Table
-        head={["Component", "Works before hydration"]}
-        rows={[
-          [
-            "Accordion, JS-free mode",
-            "Everything: open and close, Enter and Space, the `exclusive` group (`<details name>`), find-in-page, CSS animation. Hydration only adds arrow-key navigation and `disabled`.",
-          ],
-          [
-            "Accordion, library mode",
-            'The native toggle. Items opened before hydration are reconciled on mount with one `valueChangeAction` call (`reason: "platform"`).',
-          ],
-          [
-            "Tooltip",
-            "With `experimental_interestFor` and `experimental_hint` in Chromium: the whole tooltip (it is plain HTML). Elsewhere the JS path attaches at hydration. The ARIA relation is in the HTML either way.",
-          ],
-          [
-            "Tabs",
-            'Markup and ARIA. With `keepMounted="until-found"`, hidden panels are in the HTML and searchable. Switching tabs needs JavaScript.',
-          ],
-          [
-            "Button",
-            "A `commandfor` / `command` Button runs its command, a Server Function `formAction` submits (React's progressive enhancement) and a `render={<a href>}` link navigates. An `action` Button needs JavaScript; a Server Function is a valid `action` once hydrated.",
-          ],
-          ["Toggle", "Markup and ARIA. Pressing needs JavaScript."],
-          [
-            "Dialog, JS-free mode",
-            'Everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup (`initialFocus` after hydration), CSS animation. A `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open.',
-          ],
-          [
-            "Dialog, library mode",
-            'The Trigger opens the dialog natively, but its content is not in the HTML. On hydration the dialog is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.',
-          ],
-          [
-            "Switch, Checkbox, RadioGroup, CheckboxGroup",
-            'They are native inputs: clicking, Space, arrow keys between radios, labels, `required` and form submission all work. On hydration a changed value is reconciled with one action call (`reason: "platform"`, one per group). `Checkbox indeterminate` and a mixed `CheckboxGroup.Parent` are drawn from `data-indeterminate` but announced as unchecked until hydration; a Parent clicked before hydration counts as "check all" of its values. A required CheckboxGroup keeps the server\'s `required` attributes until hydration.',
-          ],
-          [
-            "Select",
-            'A native select: picking, the keyboard, typeahead, `required` and form submission all work, and with `appearance: base-select` the browser copies the selected option into `Select.Value` before hydration. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).',
-          ],
-          [
-            "Progress, Meter",
-            "Everything: there is no behaviour. The HTML carries the role, the values, `aria-valuetext`, the data attributes and the custom property, and your CSS draws the bar from the first paint. The Root is itself a Server Component.",
-          ],
-          [
-            "Combobox",
-            'A plain text field: typing works and the form posts the default selection (and the raw text, if the Input has a `name`). The listbox never opens before hydration. Text typed then is kept and reported once through `inputValueChangeAction` (`reason: "platform"`).',
-          ],
-        ]}
-      />
+      <h3 id="before-hydration">Before hydration</h3>
       <p>
-        This FAQ is rendered by a Server Component in JS-free mode. It opens and closes before the
-        page has hydrated, and in any page that works without JavaScript. (This site streams each
-        page behind a Suspense boundary, which needs a small inline script to reveal it, so here it
-        needs JavaScript enabled, but not the library's.)
+        The server HTML of every part carries its markup, its ARIA attributes and its data
+        attributes, so it is accessible and styled from the first paint. What the user can{" "}
+        <em>do</em> before hydration depends on who performs the interaction:
       </p>
-      <Example source={accordionFaqSource} fileName="AccordionFaq.tsx">
-        <AccordionFaq />
-      </Example>
+      <ul>
+        <li>
+          <strong>Behaviour the browser performs</strong> works before hydration and without
+          JavaScript: a <code>&lt;details&gt;</code> that opens, a native input that toggles and
+          posts with its form, a dialog opened by an invoker command, a popover shown on interest.
+          Components are built on these elements wherever the platform offers them (see{" "}
+          <a href="/concepts/browser-owned-state">Browser-owned state</a>).
+        </li>
+        <li>
+          <strong>Behaviour the library performs</strong> (a transition, an action, keyboard
+          navigation the platform lacks, content rendered on demand) starts at hydration. Until then
+          the part shows its server state and does nothing on interaction, or falls back to what the
+          native element does.
+        </li>
+        <li>
+          <strong>Changes the browser made before hydration are not lost.</strong> When a native
+          element's state differs from the server's at hydration (an item opened, a box checked,
+          text typed), the component reconciles on mount with one call of its change action, with{" "}
+          <code>details.reason === "platform"</code> (see{" "}
+          <a href="/concepts/action-props">Action props</a>).
+        </li>
+        <li>
+          <strong>Server Function actions</strong> on native form paths (a <code>formAction</code>,
+          a form's <code>action</code>) submit before hydration through React's progressive
+          enhancement.
+        </li>
+      </ul>
       <p>
-        So is this confirmation dialog. Every button in it is a native invoker or a form submit:
+        Each component page says exactly what works before hydration in the{" "}
+        <strong>Before hydration</strong> row of its <strong>Async and platform behaviour</strong>{" "}
+        section.
       </p>
-      <Example source={dialogConfirmSource} fileName="DialogConfirm.tsx">
-        <DialogConfirm />
-      </Example>
+      <ConceptExample component="Accordion" href="/components/accordion">
+        <p>
+          An Accordion without value props runs in JS-free mode: the browser owns every{" "}
+          <code>&lt;details open&gt;</code>, so opening and closing, the exclusive group and
+          find-in-page all work before hydration; hydration only adds arrow-key navigation and{" "}
+          <code>disabled</code>. With value props (library mode) the native toggle still works
+          before hydration, and items opened then are reconciled on mount with one{" "}
+          <code>valueChangeAction</code> call.
+        </p>
+        <p>
+          This FAQ is rendered by a Server Component in JS-free mode. It opens and closes before the
+          page has hydrated, and in any page that works without JavaScript. (This site streams each
+          page behind a Suspense boundary, which needs a small inline script to reveal it, so here
+          it needs JavaScript enabled, but not the library's.)
+        </p>
+        <Example source={accordionFaqSource} fileName="AccordionFaq.tsx">
+          <AccordionFaq />
+        </Example>
+      </ConceptExample>
     </div>
   );
 }

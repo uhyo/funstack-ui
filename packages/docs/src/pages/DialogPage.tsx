@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { DialogConfirm } from "../examples/DialogConfirm.js";
@@ -78,7 +79,7 @@ export function DialogPage() {
         </li>
       </ul>
 
-      <h3>Two modes</h3>
+      <h3 id="two-modes">Two modes</h3>
       <Table
         head={["", "JS-free mode", "Library mode"]}
         rows={[
@@ -762,6 +763,25 @@ html:active-view-transition .dialog { transition: none; }
           <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>.
         </p>
       </Callout>
+
+      <BehaviourSummary
+        name="Dialog"
+        transitionTypes={
+          "Library mode: `fsui-dialog` plus `fsui-dialog-open` or `fsui-dialog-close`; a controlled close carries none. JS-free mode starts no transitions."
+        }
+        optimistic={
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a close notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger) (`data-pending`, `aria-disabled`)."
+        }
+        suspense={
+          "Content that suspends holds the open: the dialog stays closed with the Trigger pending, then opens once, complete. A `<Suspense>` inside the Popup opens at once with a skeleton instead."
+        }
+        browserOwned={
+          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, Android back, a click outside) is the browser\'s: the dialog closes at once, `openChangeAction(false)` is a notification with `reason: "dismiss"`, and a controlled parent that keeps `open` gets it re-opened once the action settles. Dismissals animate with CSS only ([Two modes](#two-modes)).'
+        }
+        beforeHydration={
+          'JS-free mode: everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup, CSS animation; a `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open. Library mode: the Trigger opens the dialog natively, but its content is not in the HTML; on hydration it is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.'
+        }
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { TooltipArrow } from "../examples/TooltipArrow.js";
@@ -236,7 +237,7 @@ export function TooltipPage() {
         inside <code>Tooltip.Popup</code>.
       </p>
 
-      <h3>Open state belongs to the browser</h3>
+      <h3 id="open-state-belongs-to-the-browser">Open state belongs to the browser</h3>
       <p>
         There is no <code>open</code> prop, no <code>openChangeAction</code> and no{" "}
         <code>data-open</code>. The popup is a popover in the top layer, opened and closed by the
@@ -519,6 +520,23 @@ export function TooltipPage() {
           a boundary above the Root would hide the trigger too.
         </p>
       </Callout>
+
+      <BehaviourSummary
+        name="Tooltip"
+        transitionTypes={
+          "None: Tooltip makes no transitions and has no `transition` prop. Animate the popup in CSS on `:popover-open`."
+        }
+        optimistic={"None: no optimistic state and no `data-pending`."}
+        suspense={
+          "The popup's content renders when the tooltip mounts, not when it opens. If it must suspend, put the `<Suspense>` boundary inside `Tooltip.Popup`."
+        }
+        browserOwned={
+          "All of it: the popup is a popover in the top layer, opened and closed by the browser (or by the library's listeners), never through React state. There is no `open` prop, no action and no `data-open`; style with `:popover-open` ([Open state belongs to the browser](#open-state-belongs-to-the-browser))."
+        }
+        beforeHydration={
+          "With `experimental_interestFor` and `experimental_hint` in Chromium, the whole tooltip (it is plain HTML). Elsewhere the JS path attaches at hydration. The ARIA relation is in the HTML either way."
+        }
+      />
     </div>
   );
 }

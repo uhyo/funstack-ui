@@ -1,4 +1,5 @@
 import { CodeBlock } from "../components/CodeBlock.js";
+import { ConceptExample, Term } from "../components/Concept.js";
 import { Callout, Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { Table } from "../components/Tables.js";
@@ -18,48 +19,34 @@ export function ActionPropsPage() {
         . Interactive props are <em>actions</em>: callbacks that the component runs inside its own
         transition and awaits.
       </p>
+      <p>
+        An <Term id="action">action</Term> is a function prop that the component calls when the user
+        (or the browser) asks for something, inside a React transition the component starts for it.
+        To <Term id="dispatch">dispatch</Term> is to start that transition and call the action once;
+        every click, key press or platform change that asks for a change is one dispatch. A
+        transition is React's way to mark an update as non-urgent, so it can keep the current UI on
+        screen while the update is prepared (see{" "}
+        <a href="/concepts/transitions">Transitions & ViewTransition</a>).
+      </p>
 
       <h3>Naming</h3>
       <p>
         A controllable state <code>x</code> always comes as a triple: <code>x</code> (controlled),{" "}
         <code>defaultX</code> (uncontrolled initial value) and <code>xChangeAction</code>.
       </p>
-      <Table
-        head={["Component", "State", "Action"]}
-        rows={[
-          ["Toggle", "`pressed` / `defaultPressed`", "`pressedChangeAction`"],
-          ["Tabs", "`value` / `defaultValue`", "`valueChangeAction`"],
-          ["Accordion", "`value` / `defaultValue`", "`valueChangeAction`"],
-          ["Tooltip", "open state is browser-owned", "none"],
-          [
-            "Dialog",
-            "`open` / `defaultOpen`",
-            "`openChangeAction` (awaited on open, a notification on close)",
-          ],
-          ["Switch, Checkbox", "`checked` / `defaultChecked`", "`checkedChangeAction`"],
-          ["RadioGroup", "`value` / `defaultValue`", "`valueChangeAction`"],
-          [
-            "Select",
-            '`value` / `defaultValue` (a string; `""` is the placeholder)',
-            "`valueChangeAction`",
-          ],
-          [
-            "CheckboxGroup",
-            "`value` / `defaultValue` (a set as `string[]`)",
-            "`valueChangeAction`",
-          ],
-          [
-            "Combobox",
-            "`value` / `defaultValue` (`string | null`); `inputValue` / `defaultInputValue` (urgent); `open` / `defaultOpen`",
-            "`valueChangeAction`; `inputValueChangeAction` (an `UrgentChangeAction`); `openChangeAction`",
-          ],
-        ]}
-      />
+      <ConceptExample component="Toggle" href="/components/toggle">
+        <p>
+          A Toggle's state is <code>pressed</code>, so its props are <code>pressed</code>,{" "}
+          <code>defaultPressed</code> and <code>pressedChangeAction</code>. Each component page
+          lists its own triple in its props table.
+        </p>
+      </ConceptExample>
       <p>
-        A part that performs one task rather than changing a state takes a plain <code>action</code>{" "}
-        (<code>Dialog.Close action</code>: run this, then close). A state that the consumer derives
-        and the library only mirrors is a controlled-only prop with no default and no action (
-        <code>Checkbox indeterminate</code>).
+        A part that performs one task rather than changing a state (a{" "}
+        <a href="/concepts/pending-and-optimistic#pure-trigger">pure trigger</a>) takes a plain{" "}
+        <code>action</code> (<code>Dialog.Close action</code>: run this, then close). A state that
+        the consumer derives and the library only mirrors is a controlled-only prop with no default
+        and no action (<code>Checkbox indeterminate</code>).
       </p>
       <p>
         <code>undefined</code> always means "uncontrolled"; "nothing selected" is <code>null</code>.
@@ -105,7 +92,7 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
           ],
           [
             '`"platform"`',
-            "The browser changed the state by itself: find-in-page, a form reset, or an interaction before hydration found on mount. Never a user gesture.",
+            "The browser changed the state by itself: find-in-page, a form reset, or an interaction before hydration found on mount. Never a direct user interaction (a click, key press or touch).",
             "The platform event (`beforematch`, `toggle`, `reset`), or `undefined` on mount.",
           ],
           [
@@ -115,28 +102,34 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
           ],
           [
             '`"timeout"`',
-            "The library's own timer closed the component: a [Toast](/components/toast) whose `duration` elapsed. No user gesture, no platform event.",
+            "The library's own timer closed the component: a [Toast](/components/toast) whose `duration` elapsed. No user interaction, no platform event.",
             "`undefined`",
           ],
         ]}
       />
       <p>
-        Tabs, Accordion, Switch, Checkbox and RadioGroup dispatch <code>"activate"</code> and{" "}
-        <code>"platform"</code>; Dialog uses the first three; a toast's <code>closeAction</code>{" "}
-        gets <code>"activate"</code>, <code>"dismiss"</code> or <code>"timeout"</code>. A{" "}
-        <code>"platform"</code> dispatch goes through the same action as a user one, so a controlled
-        parent hears about a form reset and decides whether to adopt it. See{" "}
-        <a href="/concepts/browser-owned-state">Browser-owned state</a>.
+        A component uses only the reasons that can happen to it; its page lists them in the
+        description of its change action. A <code>"platform"</code> dispatch goes through the same
+        action as a user one, so a controlled parent hears about a form reset and decides whether to
+        adopt it. See <a href="/concepts/browser-owned-state">Browser-owned state</a>.
       </p>
 
       <h3>What happens on a click</h3>
-      <p>The component does, in one transition of its own:</p>
-      <CodeBlock language="typescript">{`startTransition(async () => {
+      <p>
+        In one transition of its own, the component tags the transition with its{" "}
+        <a href="/concepts/transitions#transition-types">transition types</a>, sets the{" "}
+        <a href="/concepts/pending-and-optimistic#optimistic">optimistic value</a>, awaits your
+        action, and, when it is uncontrolled and this is still the latest dispatch, commits the new
+        value.
+      </p>
+      <ConceptExample component="Toggle" href="/components/toggle">
+        <CodeBlock language="typescript">{`startTransition(async () => {
   addTransitionType("fsui-toggle");     // plus fsui-toggle-press / -release
   setOptimistic(next);                  // the button flips immediately
   await pressedChangeAction?.(next, details);
   // uncontrolled: commit \`next\` now, if this is still the latest dispatch
 });`}</CodeBlock>
+      </ConceptExample>
       <p>What you can rely on:</p>
       <ul>
         <li>
@@ -152,18 +145,18 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         <li>
           <strong>Disabled parts never dispatch</strong> for user interaction, and no-op
           interactions (clicking the tab that is already selected) do not dispatch either. (A form
-          reset still reaches a disabled Switch, Checkbox or RadioGroup: the browser resets disabled
-          inputs too, and the form's author asked for it.)
+          reset still reaches a disabled native input: the browser resets disabled inputs too, and
+          the form's author asked for it.)
         </li>
         <li>
-          <strong>Parts are never natively disabled while pending.</strong> A part that owns state
-          (Toggle, Tabs, Checkbox, a menu's checkbox item) sets <code>data-pending</code> and takes
-          every click: a second click is a new intent (below). A <em>pure trigger</em>, a button
-          whose action has no state of its own (<a href="/components/button">Button</a>,{" "}
-          <code>Dialog.Close</code>, <code>Popover.Close</code>, <code>Menu.Item</code>,{" "}
-          <code>Toast.Action</code>), ignores a second activation while its own action is pending
-          and is <code>aria-disabled="true"</code> meanwhile, so a double click never runs a save
-          twice.
+          <strong>Parts are never natively disabled while pending.</strong> A trigger that changes
+          state sets <code>data-pending</code> and takes every click: a second click is a new intent
+          (below). A <a href="/concepts/pending-and-optimistic#pure-trigger">pure trigger</a>{" "}
+          ignores a second activation while its own action is pending and is{" "}
+          <code>aria-disabled="true"</code> meanwhile, so a double click never runs a save twice
+          (see{" "}
+          <a href="/concepts/pending-and-optimistic#second-click">A second click while pending</a>
+          ).
         </li>
       </ul>
 
@@ -203,7 +196,9 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
       <h3>Errors go to Error Boundaries</h3>
       <p>
         An action that throws or rejects reaches the nearest Error Boundary above the component that
-        owns the transition (the <code>Root</code>, or the Toggle itself). The library never
+        owns the transition (the{" "}
+        <a href="/concepts/pending-and-optimistic#state-owner">state owner</a>: usually the{" "}
+        <code>Root</code>, or a single-element component such as a Toggle). The library never
         swallows an error. The optimistic state reverts automatically, and uncontrolled state is
         only written after success, so a failed action leaves it untouched.
       </p>
@@ -216,13 +211,36 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         <ToggleErrors />
       </Example>
 
-      <h3>Overlapping actions: the latest intent wins</h3>
+      <h3 id="overlapping-actions">Overlapping actions: the latest intent wins</h3>
       <p>
-        React neither cancels nor orders overlapping actions. The components do this: the optimistic
-        state always shows the most recent click, and uncontrolled state is committed only for the
-        most recently dispatched action, even if an older one resolves later. There is no queue and
-        no abort signal; if you need to cancel a request, keep an <code>AbortController</code> in a
-        ref inside your action.
+        React neither cancels nor orders overlapping transitions: two actions started one after the
+        other run at the same time, and either may finish first. The components handle this: the
+        optimistic state always shows the most recent click, and uncontrolled state is committed
+        only for the most recently dispatched action, even if an older one resolves later. The
+        components have no queue and no abort signal; if you need to cancel a request, keep an{" "}
+        <code>AbortController</code> in a ref inside your action.
+      </p>
+      <p>
+        If your actions must run in order, one after another, or each must build on the result of
+        the one before (reducer-style accumulation), use React's{" "}
+        <a href="https://react.dev/reference/react/useActionState">
+          <code>useActionState</code>
+        </a>{" "}
+        and call its dispatch function from the component's action. React queues those calls and
+        runs them sequentially, passing each the state the previous one returned. Drive the
+        component in controlled mode from that state:
+      </p>
+      <CodeBlock>{`const [pressed, dispatch] = useActionState(async (_previous: boolean, next: boolean) => {
+  await api.setFavorite(id, next); // runs only after the previous call has finished
+  return next;
+}, initial);
+
+<Toggle pressed={pressed} pressedChangeAction={(next) => dispatch(next)}>Favorite</Toggle>`}</CodeBlock>
+      <p>
+        The component stays pending and keeps showing the latest optimistic value until the queue
+        has drained. React's rules for the queue apply: when one call throws, React skips the calls
+        still queued behind it and the error goes to the nearest Error Boundary above the component
+        that called <code>useActionState</code>.
       </p>
       <p>
         React would silently drop the rejection of a superseded (older) action. The library catches

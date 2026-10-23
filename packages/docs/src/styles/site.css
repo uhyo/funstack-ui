@@ -169,3 +169,48 @@
 .props-table td:nth-child(2) code {
   white-space: pre-wrap;
 }
+
+/* Concept pages: one component illustrating the idea, set apart from the conceptual text. */
+.concept-example {
+  margin: 20px 0;
+  padding: 4px 20px 8px;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+}
+
+.concept-example-label {
+  margin: 12px 0 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Terms defined on a concept page; other pages link to their ids. */
+.learn-content dfn.term {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--color-text);
+  scroll-margin-top: 80px;
+}
+
+.terms {
+  margin: 16px 0;
+}
+
+.terms > div {
+  margin-bottom: 12px;
+}
+
+.terms dd {
+  margin: 4px 0 0 20px;
+}
+
+/* The "Async and platform behaviour" table on component pages. */
+.behaviour-summary th[scope="row"] {
+  width: 12rem;
+  vertical-align: top;
+}

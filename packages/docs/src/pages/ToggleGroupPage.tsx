@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { ToggleGroupAlignment } from "../examples/ToggleGroupAlignment.js";
@@ -314,6 +315,21 @@ export function ToggleGroupPage() {
         <code>[data-pressed]</code>. View transition types are <code>fsui-toggle-group</code>, plus{" "}
         <code>fsui-toggle-group-press</code> and / or <code>fsui-toggle-group-release</code>.
       </p>
+
+      <BehaviourSummary
+        name="ToggleGroup"
+        transitionTypes={
+          "`fsui-toggle-group`, plus `fsui-toggle-group-press` and / or `fsui-toggle-group-release`."
+        }
+        optimistic={
+          "Items show the optimistic set (`aria-pressed`, `data-pressed`). `data-pending` is on the Root while an action is in flight, and on each Item whose optimistic state differs from its committed one. An Item's `transition` animates the commit that ends the action, not the flip."
+        }
+        suspense={"No content region. Item content renders optimistic state and must not suspend."}
+        browserOwned={"None: the pressed set is library-owned."}
+        beforeHydration={
+          "Markup and ARIA; every Item is its own Tab stop until the first effect sets up the single Tab stop. Pressing needs JavaScript."
+        }
+      />
     </div>
   );
 }

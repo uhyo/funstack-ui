@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
@@ -295,7 +296,7 @@ export function AccordionPage() {
         <li>Disabled triggers stay focusable. Focus never moves on open or close.</li>
       </ul>
 
-      <h3>Async walkthrough (library mode)</h3>
+      <h3 id="async-walkthrough">Async walkthrough (library mode)</h3>
       <Example
         source={accordionThreadsSource}
         fileName="AccordionThreads.tsx"
@@ -346,6 +347,25 @@ export function AccordionPage() {
         Use either the <code>transition</code> prop or a <code>::details-content</code> CSS
         transition for a given change, not both.
       </p>
+
+      <BehaviourSummary
+        name="Accordion"
+        transitionTypes={
+          "Library mode: `fsui-accordion` plus `fsui-accordion-expand` or `fsui-accordion-collapse`. JS-free mode starts no transitions."
+        }
+        optimistic={
+          "Library mode: the Item and Trigger show the optimistic open state (`data-open`) and `data-pending` while their open state is changing; the Root carries `data-pending` while an action is in flight. The `<details>` element (`:open`, and what assistive technology hears) and the Panel's function child follow the committed state. JS-free mode has no optimistic or pending state."
+        }
+        suspense={
+          "The Panel is always mounted; its function child receives the committed `open`, which is how you mount content lazily. If that content suspends, the item stays closed with the trigger pending until the content is ready, then opens ([Async walkthrough](#async-walkthrough)). Trigger content must not suspend."
+        }
+        browserOwned={
+          'JS-free mode: the browser owns every `<details open>`, and `exclusive` is the native `name` group; style with `:open` and animate with `::details-content`. Library mode: open state is library-owned, but the browser can still open a closed item (find-in-page, a text fragment, a click before hydration). That is dispatched with `reason: "platform"`, and the committed state is re-applied once the action settles.'
+        }
+        beforeHydration={
+          'JS-free mode: everything: open and close, Enter and Space, the `exclusive` group (`<details name>`), find-in-page, CSS animation. Hydration only adds arrow-key navigation and `disabled`. Library mode: the native toggle; items opened before hydration are reconciled on mount with one `valueChangeAction` call (`reason: "platform"`).'
+        }
+      />
     </div>
   );
 }

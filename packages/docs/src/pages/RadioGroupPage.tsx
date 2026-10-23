@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { RadioGroupForm } from "../examples/RadioGroupForm.js";
@@ -404,6 +405,21 @@ export function RadioGroupPage() {
         React state that tracks it (clicks before hydration and form resets live only in the DOM);
         and no <a href="/components/field">Field</a> integration.
       </p>
+
+      <BehaviourSummary
+        name="RadioGroup"
+        transitionTypes={"`fsui-radio-group` (no kind: every change checks one radio)."}
+        optimistic={
+          "The checked radio is the optimistic value, rendered into the native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on the Item being checked. An Item's `transition` animates the commit that settles an action or rolls it back, not the check."
+        }
+        suspense={"No content region; nothing the RadioGroup renders suspends."}
+        browserOwned={
+          'Native radios: the browser checks one before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`, once per group.'
+        }
+        beforeHydration={
+          'Native radios: clicking, Space, arrow keys between radios, labels, `required` and form submission work. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).'
+        }
+      />
     </div>
   );
 }

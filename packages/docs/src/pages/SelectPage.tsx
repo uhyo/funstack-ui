@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { SelectCountry } from "../examples/SelectCountry.js";
@@ -429,7 +430,7 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         </p>
       </Callout>
 
-      <h3>Options that load later</h3>
+      <h3 id="options-that-load-later">Options that load later</h3>
       <Example
         source={selectCountrySource}
         fileName="SelectCountry.tsx"
@@ -555,6 +556,25 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         the selection; no options that load later behind Suspense; and no{" "}
         <a href="/components/field">Field</a> integration.
       </p>
+
+      <BehaviourSummary
+        name="Select"
+        transitionTypes={
+          "`fsui-select`. No part takes a `transition` prop: the picker and the button's copy are drawn by the browser."
+        }
+        optimistic={
+          "The `<select>` renders the optimistic value (a correctness requirement), so `option:checked` and `data-selected` agree. `data-pending` is on the Root and Trigger while `valueChangeAction` is in flight, and on the Option being selected."
+        }
+        suspense={
+          "Options revealed later by a Suspense boundary or `use()` inside the Select get the value re-applied when they arrive, without a dispatch ([Options that load later](#options-that-load-later)). There is no load-on-open."
+        }
+        browserOwned={
+          "The picker's open state (`:open`) is the browser's, with no attribute and no action. The browser selects an option before any JavaScript runs; a form reset and picks before hydration are dispatched with `reason: \"platform\"`."
+        }
+        beforeHydration={
+          'A native select: picking, the keyboard, typeahead, `required` and form submission work, and with `appearance: base-select` the browser copies the selected option into `Select.Value`. On hydration a changed value is reconciled with one `valueChangeAction` call (`reason: "platform"`).'
+        }
+      />
     </div>
   );
 }

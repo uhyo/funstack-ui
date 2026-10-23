@@ -145,10 +145,11 @@ renderToReadableStream(<App nonce={nonce} />, { nonce: { script: nonce, style: n
           flips at the viewport edges.
         </li>
         <li>
-          <strong>Tooltip skip-delay rule</strong>: on Chromium's native path the next tooltip waits
-          its <code>delay</code> instead of opening at once (the Trigger's{" "}
-          <code>var(--fsui-tooltip-warm, 0)</code> falls back to <code>0</code>, not to the
-          browser's own delay). The JS path does not use the stylesheet.
+          <strong>Tooltip skip-delay rule</strong>: on Chromium's native path (
+          <code>experimental_interestFor</code>) the next tooltip waits its <code>delay</code>{" "}
+          instead of opening at once (the Trigger's <code>var(--fsui-tooltip-warm, 0)</code> falls
+          back to <code>0</code>, not to the browser's own delay). The JS path does not use the
+          stylesheet.
         </li>
       </ul>
     </div>

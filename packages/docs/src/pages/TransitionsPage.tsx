@@ -1,5 +1,5 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout } from "../components/Example.js";
+import { ConceptExample, Terms } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { Table } from "../components/Tables.js";
 
@@ -16,6 +16,30 @@ export function TransitionsPage() {
         content on screen, and it is also what lets <code>&lt;ViewTransition&gt;</code> animate the
         change.
       </p>
+
+      <h3 id="terms">Terms</h3>
+      <Terms
+        items={[
+          {
+            id: "commit",
+            term: "Commit",
+            definition:
+              "The moment React applies a finished render to the DOM. One user interaction can lead to several commits: the synchronous one that shows the [optimistic value](/concepts/pending-and-optimistic#optimistic), and the transition commit that ends the action.",
+          },
+          {
+            id: "view-transition",
+            term: "View transition",
+            definition:
+              "The browser's View Transition API: it snapshots the page before and after a DOM change and animates between the two. React starts one for a transition commit when a `<ViewTransition>` boundary in the tree is affected.",
+          },
+          {
+            id: "transition-type",
+            term: "Transition type",
+            definition:
+              "A string attached to a transition with React's `addTransitionType`. A `<ViewTransition>` can pick its animation by type, and CSS can match it with `:active-view-transition-type()`.",
+          },
+        ]}
+      />
 
       <h3>
         The <code>transition</code> prop
@@ -37,7 +61,13 @@ export function TransitionsPage() {
         that opens), React starts a document view transition. The browser then cross-fades the whole
         page for 250 ms, and the next transition commit waits for it.
       </p>
-      <CodeBlock>{`<Tabs.Panel value="billing" transition="fade">...</Tabs.Panel>
+      <ConceptExample component="Tabs" href="/components/tabs">
+        <p>
+          <code>Tabs.Panel</code> takes <code>transition</code>, which animates the swap from one
+          panel to the next. A class animates every swap; a type map picks a slide direction from
+          the Tabs transition types:
+        </p>
+        <CodeBlock>{`<Tabs.Panel value="billing" transition="fade">...</Tabs.Panel>
 
 <Tabs.Panel
   value="billing"
@@ -45,7 +75,7 @@ export function TransitionsPage() {
 >
   ...
 </Tabs.Panel>`}</CodeBlock>
-      <CodeBlock language="css">{`::view-transition-old(.slide-left) { animation: 160ms ease-in both slide-out-left; }
+        <CodeBlock language="css">{`::view-transition-old(.slide-left) { animation: 160ms ease-in both slide-out-left; }
 ::view-transition-new(.slide-left) { animation: 160ms ease-out both slide-in-right; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -53,6 +83,7 @@ export function TransitionsPage() {
   ::view-transition-old(*),
   ::view-transition-new(*) { animation: none !important; }
 }`}</CodeBlock>
+      </ConceptExample>
       <p>
         The library ships no animation, so there is nothing to turn off for reduced motion; keep the
         media query above in your own stylesheet.
@@ -69,11 +100,11 @@ export function TransitionsPage() {
 
 ::view-transition { pointer-events: none; }`}</CodeBlock>
 
-      <h3>Transition types</h3>
+      <h3 id="transition-types">Transition types</h3>
       <p>
         Each dispatch adds <code>fsui-&lt;component&gt;</code> and, where the change has a direction
         or kind, <code>fsui-&lt;component&gt;-&lt;change&gt;</code> through{" "}
-        <code>addTransitionType</code>:
+        <code>addTransitionType</code>. A few examples:
       </p>
       <Table
         head={["Component", "Types"]}
@@ -83,24 +114,15 @@ export function TransitionsPage() {
             "Tabs",
             "`fsui-tabs`, `fsui-tabs-next`, `fsui-tabs-prev` (DOM order of the new tab relative to the committed one)",
           ],
-          ["Accordion", "`fsui-accordion`, `fsui-accordion-expand`, `fsui-accordion-collapse`"],
-          ["Tooltip", "none (no transitions; see below)"],
           ["Dialog", "`fsui-dialog`, `fsui-dialog-open`, `fsui-dialog-close`"],
-          ["Switch", "`fsui-switch`, `fsui-switch-on`, `fsui-switch-off`"],
-          ["Checkbox", "`fsui-checkbox`, `fsui-checkbox-check`, `fsui-checkbox-uncheck`"],
-          ["RadioGroup", "`fsui-radio-group`"],
-          ["Select", "`fsui-select` (no part takes `transition`)"],
-          [
-            "CheckboxGroup",
-            "`fsui-checkbox-group`, `fsui-checkbox-group-check`, `fsui-checkbox-group-uncheck` (a reset can carry both)",
-          ],
-          [
-            "Combobox",
-            '`fsui-combobox`, `fsui-combobox-select`, `fsui-combobox-open`, `fsui-combobox-close` (a deferred results render carries none: use `default: "none"`)',
-          ],
-          ["Toast", "none (no part takes `transition`: every Toast commit is urgent)"],
         ]}
       />
+      <p>
+        Every component page lists its own types, or says that it has none, in the{" "}
+        <strong>Transition types</strong> row of its <strong>Async and platform behaviour</strong>{" "}
+        section. Components whose state never changes in a transition add none: their commits are
+        urgent, or their state belongs to the browser.
+      </p>
       <p>
         Use them in a <code>transition</code> map, or in CSS with{" "}
         <code>:active-view-transition-type(fsui-tabs-next)</code>. Types you add yourself with{" "}
@@ -113,47 +135,37 @@ export function TransitionsPage() {
         type: a type map needs a <code>default</code> entry if rollbacks should animate.
       </p>
 
-      <h3>What animates when</h3>
+      <h3 id="what-animates-when">What animates when</h3>
       <p>
-        React starts a view transition only for commits made entirely of transition lanes. The
-        optimistic flip is a synchronous commit, so it never animates through{" "}
-        <code>&lt;ViewTransition&gt;</code>:
+        React starts a view transition only for commits made entirely of transition lanes (a lane is
+        React's priority class for an update; transitions have their own). The optimistic flip is a
+        synchronous commit, so it never animates through <code>&lt;ViewTransition&gt;</code>. What
+        to animate with depends on which value the part renders (see{" "}
+        <a href="/concepts/pending-and-optimistic#terms">the three values</a>):
       </p>
       <Table
-        head={["The part renders", "Animate with", "Examples"]}
+        head={["The part renders", "Animate with"]}
         rows={[
+          ["optimistic state (a trigger)", "a CSS `transition` on the data attribute"],
+          ["committed state (a content region)", "the `transition` prop"],
+          ["the end of pending, or a rollback", "the `transition` prop"],
           [
-            "optimistic state",
-            "a CSS `transition` on the data attribute",
-            "`Toggle` `[data-pressed]`, `Tabs.Tab` `[data-selected]`, `Accordion.Trigger` `[data-open]`, `Tabs.Indicator` (anchor insets)",
-          ],
-          [
-            "committed state",
-            "the `transition` prop",
-            "`Tabs.Panel` swaps, `Accordion.Item` / `Panel` in library mode, `Dialog.Popup` / `Popover.Popup` opens and the closes their parts ask for (library mode)",
-          ],
-          [
-            "pending ending, a snap-back",
-            "the `transition` prop",
-            "a spinner rendered from `pending` disappearing",
-          ],
-          [
-            "browser-owned state",
+            "[browser-owned state](/concepts/browser-owned-state)",
             "CSS: `@starting-style`, `transition-behavior: allow-discrete`",
-            "Tooltip popup, Accordion in JS-free mode (`::details-content`), a Dialog or Popover dismissed with Escape or a click outside",
           ],
         ]}
       />
-      <Callout title="Toggle has a transition prop too">
+      <ConceptExample component="Tabs" href="/components/tabs">
         <p>
-          It animates the commit that ends the action (for example a spinner turning back into an
-          icon), not the pressed flip itself. Use CSS on <code>[data-pressed]</code> for that.
+          <code>Tabs.Tab</code> renders the optimistic selection: animate its colour with a CSS
+          transition on <code>[data-selected]</code>. <code>Tabs.Indicator</code> follows the
+          optimistic tab with CSS Anchor Positioning, so a plain CSS transition on its inset
+          properties makes it slide on click and slide back on rollback. <code>Tabs.Panel</code>{" "}
+          renders the committed selection: animate the swap with its <code>transition</code> prop. A
+          spinner rendered from the Tab's <code>pending</code> state disappears in the commit that
+          ends the action, which the Tab's own <code>transition</code> prop can animate.
         </p>
-      </Callout>
-      <p>
-        <code>Tabs.Indicator</code> follows the optimistic tab with CSS Anchor Positioning; a plain
-        CSS transition on its inset properties makes it slide on click and slide back on rollback.
-      </p>
+      </ConceptExample>
 
       <h3>Rules the library follows for you</h3>
       <ul>
@@ -166,7 +178,8 @@ export function TransitionsPage() {
           hydration is not a transition, so nothing animates on first paint.
         </li>
         <li>
-          Kept-mounted panels (<code>keepMounted</code>) switch their <code>&lt;Activity&gt;</code>{" "}
+          <a href="/concepts/pending-and-optimistic#content-region">Content regions</a> kept mounted
+          while hidden (Tabs <code>keepMounted</code>) switch their <code>&lt;Activity&gt;</code>{" "}
           mode inside the library's transition, so nested <code>&lt;ViewTransition&gt;</code>{" "}
           boundaries get enter and exit animations.
         </li>

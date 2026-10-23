@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { PopoverActions } from "../examples/PopoverActions.js";
@@ -84,7 +85,7 @@ export function PopoverPage() {
         </li>
       </ul>
 
-      <h3>Two modes</h3>
+      <h3 id="two-modes">Two modes</h3>
       <Table
         head={["", "JS-free mode", "Library mode"]}
         rows={[
@@ -575,7 +576,7 @@ html:active-view-transition .popover { transition: none; }
         </p>
       </Callout>
 
-      <h3>The platform paths</h3>
+      <h3 id="the-platform-paths">The platform paths</h3>
       <ul>
         <li>
           <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
@@ -648,6 +649,25 @@ html:active-view-transition .popover { transition: none; }
         <code>position-try-fallbacks</code> can hang (WebKit bug 302008): give the inner Popup{" "}
         <code>side={"{null}"}</code> and place it in CSS if you hit it.
       </p>
+
+      <BehaviourSummary
+        name="Popover"
+        transitionTypes={
+          "Library mode: `fsui-popover` plus `fsui-popover-open` or `fsui-popover-close`; a controlled close carries none. JS-free mode starts no transitions."
+        }
+        optimistic={
+          "Library mode: the Trigger shows the optimistic open state (`aria-expanded`, `data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+        }
+        suspense={
+          "Content that suspends holds the open: the popup stays hidden with the Trigger pending, then shows once, complete. A `<Suspense>` inside the Popup opens at once with a skeleton instead."
+        }
+        browserOwned={
+          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, a click outside, another popover opening) is the browser\'s: the popover closes at once and `openChangeAction(false)` is a notification with `reason: "dismiss"`. Dismissals animate with CSS only ([Two modes](#two-modes)).'
+        }
+        beforeHydration={
+          'JS-free mode: everything, including `autoFocus` in server-rendered markup. Library mode: the Trigger opens the popover natively, but the content is not in the HTML yet; on hydration the Popup finds it open, dispatches `openChangeAction(true)` with `reason: "platform"` and the content mounts ([The platform paths](#the-platform-paths)).'
+        }
+      />
     </div>
   );
 }

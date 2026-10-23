@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { CheckboxForm } from "../examples/CheckboxForm.js";
@@ -168,7 +169,7 @@ export function CheckboxPage() {
         </p>
       </Callout>
 
-      <h3>Indeterminate</h3>
+      <h3 id="indeterminate">Indeterminate</h3>
       <p>
         Mixed is derived state: a "select all" parent computes it from its rows, which is why it is
         controlled-only and has no action. Clicking a mixed box dispatches <code>!checked</code>, so
@@ -293,6 +294,21 @@ export function CheckboxPage() {
         cannot be mixed: <code>indeterminate</code> is a DOM property with no HTML attribute, so
         only script can set it.
       </p>
+
+      <BehaviourSummary
+        name="Checkbox"
+        transitionTypes={"`fsui-checkbox` plus `fsui-checkbox-check` or `fsui-checkbox-uncheck`."}
+        optimistic={
+          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Checkbox while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the check."
+        }
+        suspense={"No content region; nothing the Checkbox renders suspends."}
+        browserOwned={
+          'A native `<input>`: the browser flips it before any JavaScript runs. A form reset and clicks before hydration are dispatched with `reason: "platform"`. `indeterminate` is consumer-owned and mirrored: the library writes the DOM property after every commit and stops while an action is pending, because the browser clears it on the click ([Indeterminate](#indeterminate)).'
+        }
+        beforeHydration={
+          'A native checkbox: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `checkedChangeAction` call (`reason: "platform"`). An `indeterminate` box is drawn from `data-indeterminate` but announced as unchecked until hydration.'
+        }
+      />
     </div>
   );
 }

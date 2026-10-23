@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
+import { BehaviourSummary } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
 import { SwitchForm } from "../examples/SwitchForm.js";
@@ -224,7 +225,7 @@ export function SwitchPage() {
         checkbox. No change action is needed for that.
       </p>
 
-      <h3>The platform paths</h3>
+      <h3 id="the-platform-paths">The platform paths</h3>
       <p>
         The library owns <code>checked</code>, but the browser can still change it on its own. Both
         cases reach <code>checkedChangeAction</code> with <code>reason: "platform"</code>:
@@ -308,6 +309,21 @@ export function SwitchPage() {
         <a href="/components/field">Field</a> integration (the Field's id, label, description,
         invalid and required state must be wired by hand).
       </p>
+
+      <BehaviourSummary
+        name="Switch"
+        transitionTypes={"`fsui-switch` plus `fsui-switch-on` or `fsui-switch-off`."}
+        optimistic={
+          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Switch while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the flip."
+        }
+        suspense={"No content region; nothing the Switch renders suspends."}
+        browserOwned={
+          'A native `<input>`: the browser flips it before any JavaScript runs. A form reset and clicks before hydration reach `checkedChangeAction` with `reason: "platform"` ([The platform paths](#the-platform-paths)).'
+        }
+        beforeHydration={
+          'A native checkbox: clicking, Space, labels, `required` and form submission work. On hydration a changed value is reconciled with one `checkedChangeAction` call (`reason: "platform"`).'
+        }
+      />
     </div>
   );
 }
