@@ -51,12 +51,37 @@ export function Settings() {
         Roots have no <code>"use client"</code> (they only compute, then render a context provider
         created in a client module), so a Server Component renders the Root on the server, may pass
         it function props, and only the small context module and the parts reach the browser.
-        "JS-free" on this site is a statement about behaviour (no JavaScript runs for the
-        interaction, and it works before hydration), not about module boundaries. Directive-free
-        variants are tracked in{" "}
-        <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a>; action-less Switch,
-        Checkbox and RadioGroup are strong candidates, since a native input already works without
-        JavaScript.
+      </p>
+
+      <h3>What "JS-free" means</h3>
+      <p>
+        "JS-free" on this site (the JS-free modes of Accordion and Dialog, the native Tooltip path)
+        means two things: no behaviour JavaScript runs on the native path, because the browser does
+        the interaction, and the server HTML works before hydration and without it. It does{" "}
+        <strong>not</strong> mean "no client bundle". The parts are <code>"use client"</code>{" "}
+        modules, so in a Server Components app they are shipped and hydrated with the page like any
+        client component, whatever props they receive.
+      </p>
+      <p>
+        For scale, measured on FUNSTACK Static (the stack this site is built with): a page whose
+        Server Components render no client component at all still loads about 76 KB gzip of
+        framework runtime (React, react-dom and the RSC client) and hydrates the document. The parts
+        add a few KB on top: about 5 KB gzip for Accordion or Tooltip, 4 KB for Switch and 2 KB for
+        Progress, and less each when several share internals. Other RSC hosts were not measured;
+        Next.js App Router and Waku also boot a client runtime on every page.
+      </p>
+      <p>
+        Where a page really ships no JavaScript, such as server rendering or a static prerender that
+        is never hydrated (<code>react-dom/static</code> <code>prerender</code>,{" "}
+        <code>renderToString</code>), <code>"use client"</code> has no effect and the parts' HTML
+        works as is: a JS-free Accordion opens and closes, and a Switch is a native checkbox that
+        posts with its form. There is no separate directive-free variant of the parts: it was
+        considered in <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a> and not
+        built, since it would save those few KB but not the runtime. For a single form control, the{" "}
+        <a href="/components/switch">Switch</a>, <a href="/components/checkbox">Checkbox</a>,{" "}
+        <a href="/components/radio-group">RadioGroup</a>, <a href="/components/slider">Slider</a>{" "}
+        and <a href="/components/number-field">NumberField</a> pages show the plain HTML a Server
+        Component can render instead, and what it gives up.
       </p>
 
       <h3>Actions from the server</h3>

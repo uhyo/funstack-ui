@@ -377,6 +377,31 @@ export function RadioGroupPage() {
         <code>useFormStatus</code>. An action-less group is a working native radio group before
         hydration and with JavaScript off.
       </p>
+
+      <h3>Plain HTML</h3>
+      <p>
+        If a group only posts with its form, a Server Component can render the same native markup
+        itself, with no library code for it:
+      </p>
+      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<fieldset role="radiogroup">
+  <legend>Size</legend>
+  <label>
+    <input type="radio" name="size" value="s" defaultChecked={order.size === "s"} required /> Small
+  </label>
+  <label>
+    <input type="radio" name="size" value="m" defaultChecked={order.size === "m"} /> Medium
+  </label>
+</fieldset>`}</CodeBlock>
+      <p>
+        The browser still provides the single tab stop, the arrow keys, <code>required</code> and
+        submission. Compared with <code>RadioGroup</code>, every radio needs the shared{" "}
+        <code>name</code> written out, and there is no <code>valueChangeAction</code>, so no
+        transition, <code>data-pending</code> or rollback on rejection; no <code>data-checked</code>{" "}
+        / <code>data-disabled</code> (use <code>:checked</code> and <code>:disabled</code>); no
+        reconciliation of clicks before hydration or of a form reset with your state; and no{" "}
+        <a href="/components/field">Field</a> integration.
+      </p>
     </div>
   );
 }

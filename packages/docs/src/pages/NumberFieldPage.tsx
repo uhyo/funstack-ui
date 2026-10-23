@@ -512,14 +512,35 @@ export function NumberFieldPage() {
           <strong>Before hydration</strong> the text can be typed; at hydration a parsable change is
           adopted with one <code>"platform"</code> step and commit (or kept as the draft while the
           input is still focused). A form submitted before hydration posts the default value; the
-          buttons do nothing yet. A plain <code>&lt;input type="number"&gt;</code> from a Server
-          Component remains the JS-free number field.
+          buttons do nothing yet. For a number field that needs no JavaScript at all, see{" "}
+          <a href="#plain-html">Plain HTML</a>.
         </li>
         <li>
           A step writes the hidden input by script, so a <code>&lt;form onChange&gt;</code> listener
           hears typed edits only.
         </li>
       </ul>
+
+      <h3 id="plain-html">Plain HTML</h3>
+      <p>
+        A native number input is the JS-free number field. A Server Component can render it with no
+        library code, and it works before hydration and without it:
+      </p>
+      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  Quantity
+  <input type="number" name="quantity" min={1} max={99} step={1} defaultValue={cart.quantity} />
+</label>`}</CodeBlock>
+      <p>
+        The browser steps it with ArrowUp / ArrowDown, validates <code>min</code>, <code>max</code>{" "}
+        and <code>step</code> (<code>:user-invalid</code>) and posts the number. Compared with{" "}
+        <code>NumberField</code>, it gives up what the component is for: no <code>format</code>{" "}
+        (currency, percent, units, grouping), no parsing of the user's locale, no Increment /
+        Decrement parts with press-and-hold, and no announcement of each step. It also has no{" "}
+        <code>valueChangeAction</code> / <code>valueCommitAction</code> (no single save per gesture
+        with rollback, no <code>data-pending</code>), no data attributes, and no{" "}
+        <a href="#inside-a-field">Field</a> integration.
+      </p>
 
       <h3 id="inside-a-field">Inside a Field</h3>
       <Example

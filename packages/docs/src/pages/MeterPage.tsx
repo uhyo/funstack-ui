@@ -224,6 +224,13 @@ export function MeterPage() {
         <code>aria-valuetext</code>, and a meter must always have a name (a <code>Meter.Label</code>{" "}
         or <code>aria-label</code>). Updates are not announced.
       </p>
+      <p>
+        <strong>Known limitation:</strong> inside a FUNSTACK Static <code>defer()</code> chunk, the
+        Root's server-generated label id can collide with an id from the main payload, which breaks{" "}
+        <code>aria-labelledby</code> (
+        <a href="https://github.com/uhyo/funstack-ui/issues/94">#94</a>, upstream{" "}
+        <a href="https://github.com/uhyo/funstack-static/issues/198">uhyo/funstack-static#198</a>).
+      </p>
     </div>
   );
 }

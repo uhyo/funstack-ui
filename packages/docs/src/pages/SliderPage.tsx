@@ -415,8 +415,8 @@ export function SliderPage() {
         <li>
           <strong>Before hydration</strong> the inputs are focusable and the keys change them (the
           visible thumb catches up at hydration, with one <code>"platform"</code> step and commit);
-          the pointer does nothing yet. A plain <code>&lt;input type="range"&gt;</code> from a
-          Server Component is the JS-free slider.
+          the pointer does nothing yet. For a slider that needs no JavaScript at all, see{" "}
+          <a href="#plain-html">Plain HTML</a>.
         </li>
         <li>
           Pointer gestures fire no native <code>input</code> / <code>change</code> events, so a{" "}
@@ -429,6 +429,28 @@ export function SliderPage() {
 
 // A Server Function as the save, straight from a Server Component:
 <Slider.Root defaultValue={settings.volume} valueCommitAction={saveVolume}>…</Slider.Root>`}</CodeBlock>
+
+      <h3 id="plain-html">Plain HTML</h3>
+      <p>
+        A native range input is the JS-free slider. A Server Component can render it with no library
+        code, and it works before hydration and without it, pointer included:
+      </p>
+      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  Volume
+  <input type="range" name="volume" min={0} max={100} step={1} defaultValue={settings.volume} />
+</label>`}</CodeBlock>
+      <p>
+        Compared with <code>Slider</code>, it has one thumb and no Track, Range, Thumb or Value
+        parts: its track and thumb are styled only through engine-specific pseudo-elements (
+        <code>::-webkit-slider-thumb</code>, <code>::-moz-range-thumb</code>, ...), and only Firefox
+        has one for the filled range (<code>::-moz-range-progress</code>). It also has no{" "}
+        <code>valueChangeAction</code> / <code>valueCommitAction</code> (no transition per step, no
+        single save per gesture with rollback, no <code>data-pending</code>), no{" "}
+        <code>data-dragging</code>, other data attributes or <code>--slider-value</code>, no library
+        handling of vertical and RTL arrow keys, and no <a href="#inside-a-field">Field</a>{" "}
+        integration.
+      </p>
 
       <h3 id="inside-a-field">Inside a Field</h3>
       <Example

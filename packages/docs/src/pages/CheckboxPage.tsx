@@ -273,6 +273,26 @@ export function CheckboxPage() {
           never reads <code>useFormStatus</code>. A mixed box still posts its value when checked.
         </li>
       </ul>
+
+      <h3>Plain HTML</h3>
+      <p>
+        If a checkbox only posts with its form, a Server Component can render the native input
+        itself, with no library code for it:
+      </p>
+      <CodeBlock>{`// A Server Component: no import from @funstack/ui.
+<label>
+  <input type="checkbox" name="terms" value="accepted" required />
+  I accept the terms
+</label>`}</CodeBlock>
+      <p>
+        Compared with <code>&lt;Checkbox&gt;</code>, it has no <code>checkedChangeAction</code>, so
+        no transition, <code>data-pending</code> or rollback on rejection; no{" "}
+        <code>data-checked</code> / <code>data-disabled</code> (use <code>:checked</code> and{" "}
+        <code>:disabled</code>); no reconciliation of clicks before hydration or of a form reset
+        with your state; and no <a href="/components/field">Field</a> integration. It cannot be
+        mixed: <code>indeterminate</code> is a DOM property with no HTML attribute, so only script
+        can set it.
+      </p>
     </div>
   );
 }
