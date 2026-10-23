@@ -219,7 +219,7 @@ export function NumberFieldPage() {
               "Runs in the Root's commit transition once per gesture. Awaited; the field keeps the gesture's value with `data-pending` until it settles. Uncontrolled, the value is committed when it resolves and reverts when it rejects. May be a Server Function.",
           },
           {
-            name: "min / max",
+            name: "min, max",
             type: "number",
             description:
               "Native constraints on the hidden input, and the bounds of stepping. Home / End go to them when set.",
@@ -257,7 +257,7 @@ export function NumberFieldPage() {
               "Step with the mouse wheel while the input is focused (a native non-passive listener; the page does not scroll then).",
           },
           {
-            name: "name / form",
+            name: "name, form",
             type: "string",
             description:
               'On the hidden number input, which posts `String(value)` (`""` when empty). `name` defaults to the Field\'s.',
@@ -322,8 +322,8 @@ export function NumberFieldPage() {
               'The hidden native `<input type="number">` rendered after the visible input (`ref` is the visible one).',
           },
           {
-            name: "inputMode / autoComplete / autoCorrect / spellCheck",
-            type: "string / boolean",
+            name: "inputMode, autoComplete, autoCorrect, spellCheck",
+            type: "string, string, string, boolean",
             default: '"numeric" or "decimal", "off", "off", false',
             description:
               '`inputMode` is `"decimal"` when fractions are allowed, else `"numeric"`. Defaults your own prop replaces.',

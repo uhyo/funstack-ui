@@ -419,47 +419,59 @@ export function MenuPage() {
       </p>
 
       <h4>
-        <code>Menu.RadioGroup</code> and <code>Menu.RadioItem</code>
+        <code>Menu.RadioGroup</code>
       </h4>
       <PropsTable
         rows={[
           {
             name: "value",
             type: "string | null",
-            description:
-              "RadioGroup. Controlled value; null selects nothing, undefined means uncontrolled.",
+            description: "Controlled value; null selects nothing, undefined means uncontrolled.",
           },
           {
             name: "defaultValue",
             type: "string | null",
             default: "null",
-            description: "RadioGroup. Initial value when uncontrolled.",
+            description: "Initial value when uncontrolled.",
           },
           {
             name: "valueChangeAction",
             type: "ChangeAction<string>",
             description:
-              "RadioGroup. Receives the chosen item's value, awaited in the group's transition. May be a Server Function.",
+              "Receives the chosen item's value, awaited in the group's transition. May be a Server Function.",
           },
-          {
-            name: "value",
-            type: "string",
-            description: "RadioItem (required). The value this item selects.",
-          },
-          ...itemRows(
-            "MenuRadioItemState",
-            "false",
-            "RadioItem. Close the whole menu once the change settles (also when the item was already selected).",
-          ),
+          ...functionProps("MenuRadioGroupState", "The RadioItems and a GroupLabel."),
+          renderProp("div", "MenuRadioGroupState"),
         ]}
       />
       <p>
         <code>MenuRadioGroupState</code>: <code>{"{ value, pending }"}</code>; the group renders{" "}
         <code>{'<div role="group">'}</code> named by a <code>GroupLabel</code> inside it, with{" "}
-        <code>data-pending</code>. <code>MenuRadioItemState</code>:{" "}
-        <code>{"{ checked, pending, disabled }"}</code>; <code>pending</code> is true on the item
-        being selected. A <code>RadioItem</code> outside a <code>RadioGroup</code> throws.
-        Transition types <code>fsui-menu</code>, <code>fsui-menu-select</code>.
+        <code>data-pending</code>. Transition types <code>fsui-menu</code>,{" "}
+        <code>fsui-menu-select</code>.
+      </p>
+
+      <h4>
+        <code>Menu.RadioItem</code>
+      </h4>
+      <PropsTable
+        rows={[
+          {
+            name: "value",
+            type: "string",
+            description: "Required. The value this item selects.",
+          },
+          ...itemRows(
+            "MenuRadioItemState",
+            "false",
+            "Close the whole menu once the change settles (also when the item was already selected).",
+          ),
+        ]}
+      />
+      <p>
+        <code>MenuRadioItemState</code>: <code>{"{ checked, pending, disabled }"}</code>;{" "}
+        <code>pending</code> is true on the item being selected. A <code>RadioItem</code> outside a{" "}
+        <code>RadioGroup</code> throws.
       </p>
 
       <h4>

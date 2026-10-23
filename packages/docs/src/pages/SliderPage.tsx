@@ -252,13 +252,19 @@ export function SliderPage() {
             description: "Which value this thumb edits.",
           },
           {
-            name: "name / form",
+            name: "name",
             type: "string",
-            description:
-              "This thumb input's form field name and `form` attribute; override the Root's.",
+            default: "the Root's",
+            description: "This thumb input's form field name.",
           },
           {
-            name: "aria-label / aria-labelledby / aria-describedby",
+            name: "form",
+            type: "string",
+            default: "the Root's",
+            description: "This thumb input's `form` attribute.",
+          },
+          {
+            name: "aria-label, aria-labelledby, aria-describedby",
             type: "string",
             description:
               "Forwarded to the input. Every thumb of a multi-thumb slider needs a name (development warning).",
@@ -305,28 +311,39 @@ export function SliderPage() {
       </p>
 
       <h4>
-        <code>Slider.Label</code>, <code>Slider.Value</code>
+        <code>Slider.Label</code>
+      </h4>
+      <PropsTable
+        rows={[...functionProps("SliderRootState"), renderProp("label", "SliderRootState")]}
+      />
+      <p>
+        The Label must stay a <code>&lt;label&gt;</code> with one thumb (it names the input through{" "}
+        <code>for</code>); with several thumbs the Root is named by its id. Its state is not tied to
+        the Root's value type: <code>value</code> is typed <code>number | readonly number[]</code>;
+        narrow it with <code>&lt;Slider.Label&lt;number&gt;&gt;</code> or read <code>values</code>.
+      </p>
+
+      <h4>
+        <code>Slider.Value</code>
       </h4>
       <PropsTable
         rows={[
           {
-            name: "index (Value)",
+            name: "index",
             type: "number",
             description:
               "Show one thumb's value. Without it a single-thumb slider shows its value; several thumbs need `children`.",
           },
-          ...functionProps("SliderRootState / SliderValueState"),
-          renderProp("label / span", "SliderRootState / SliderValueState"),
+          ...functionProps("SliderValueState"),
+          renderProp("span", "SliderValueState"),
         ]}
       />
       <p>
-        The Label must stay a <code>&lt;label&gt;</code> with one thumb (it names the input through{" "}
-        <code>for</code>). The Value is a plain <code>span</code>, not <code>&lt;output&gt;</code>:
-        a live region that updates on every step would chatter, and the slider already exposes its
-        value. <code>SliderValueState</code> is the Root's state plus <code>index</code>. Their
-        state is not tied to the Root's value type: <code>value</code> is typed{" "}
-        <code>number | readonly number[]</code>; narrow it with{" "}
-        <code>&lt;Slider.Value&lt;number&gt;&gt;</code> or read <code>values</code>.
+        The Value is a plain <code>span</code>, not <code>&lt;output&gt;</code>: a live region that
+        updates on every step would chatter, and the slider already exposes its value.{" "}
+        <code>SliderValueState</code> is the Root's state plus <code>index</code>; narrow{" "}
+        <code>value</code> with <code>&lt;Slider.Value&lt;number&gt;&gt;</code> or read{" "}
+        <code>values</code>.
       </p>
 
       <h3 id="data-attributes">Data attributes</h3>

@@ -238,28 +238,44 @@ export function SelectPage() {
       </p>
 
       <h4>
-        <code>Select.Group</code>, <code>Select.GroupLabel</code>, <code>Select.Separator</code>
+        <code>Select.Group</code>
       </h4>
       <PropsTable
         rows={[
           {
-            name: "label (Group)",
+            name: "label",
             type: "string",
             description:
               "Required. The `<optgroup label>`, shown by native pickers and read by assistive technology.",
           },
           {
-            name: "disabled (Group)",
+            name: "disabled",
             type: "boolean",
             default: "false",
             description: "Native: disables every option in the group.",
           },
-          ...functionProps("SelectRootState", "Group and GroupLabel: content."),
+          ...functionProps("SelectRootState", "The GroupLabel and the group's Options."),
           {
             name: "render",
             type: "ReactElement | ((props, state: SelectRootState) => ReactNode)",
-            description:
-              "Replace the default <optgroup> (must stay one), <legend> or <hr>. Separator takes no children.",
+            description: "Replace the default <optgroup>; it must stay an <optgroup>.",
+          },
+        ]}
+      />
+
+      <h4>
+        <code>Select.GroupLabel</code>, <code>Select.Separator</code>
+      </h4>
+      <PropsTable
+        rows={[
+          ...functionProps(
+            "SelectRootState",
+            "GroupLabel: the rich label. Separator takes no children.",
+          ),
+          {
+            name: "render",
+            type: "ReactElement | ((props, state: SelectRootState) => ReactNode)",
+            description: "Replace the default <legend> (GroupLabel) or <hr> (Separator).",
           },
         ]}
       />
