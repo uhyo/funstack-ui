@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { DialogConfirm } from "../examples/DialogConfirm.js";
 import dialogConfirmSource from "../examples/DialogConfirm.tsx?raw";
 import { DialogOrders } from "../examples/DialogOrders.js";
@@ -193,11 +193,12 @@ export function DialogPage() {
           },
         ]}
       />
-      <p>
-        <code>DialogRootState</code>: <code>{"{ open, pending, modal }"}</code>, where{" "}
-        <code>open</code> is optimistic and both are <code>false</code> in JS-free mode. The Root
-        has no <code>ref</code>, <code>className</code> or <code>style</code>.
-      </p>
+      <PartFacts
+        state={
+          "`DialogRootState` is `{ open, pending, modal }`; `open` is optimistic, and both are `false` in JS-free mode."
+        }
+        owned={"nothing rendered: the Root has no element (no `ref`, `className` or `style`)."}
+      />
 
       <h4>
         <code>Dialog.Trigger</code>
@@ -218,14 +219,14 @@ export function DialogPage() {
           renderProp("button", "DialogTriggerState"),
         ]}
       />
-      <p>
-        <code>DialogTriggerState</code>: <code>{"{ open, pending, disabled }"}</code>.{" "}
-        <code>pending</code> is true while the Root is pending: an open in flight, a part's close
-        waiting for <code>openChangeAction(false)</code>, a close notification in flight, or a
-        re-open requested while a close notification is still settling. The Trigger owns{" "}
-        <code>type</code>, <code>disabled</code>, <code>commandfor</code>, <code>command</code> and,
-        when it installs one, <code>onClick</code>.
-      </p>
+      <PartFacts
+        state={
+          "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, a part's close waiting for `openChangeAction(false)`, a close notification in flight, or a re-open requested while a close notification is still settling."
+        }
+        owned={
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command`, `onClick` (when it installs one), `data-open`, `data-pending`, `data-disabled`."
+        }
+      />
 
       <h4>
         <code>Dialog.Popup</code>
@@ -287,15 +288,15 @@ export function DialogPage() {
           renderProp("dialog", "DialogPopupState"),
         ]}
       />
-      <p>
-        <code>DialogPopupState</code>: <code>{"{ open, modal }"}</code>, with <code>open</code>{" "}
-        committed (<code>false</code> in JS-free mode; <code>:open</code> is the DOM truth). The
-        Popup owns <code>id</code>, <code>open</code> (never rendered: opening goes through{" "}
-        <code>showModal()</code> only), <code>closedby</code>, <code>onToggle</code> and{" "}
-        <code>onBeforeToggle</code>; its <code>aria-labelledby</code> and{" "}
-        <code>aria-describedby</code> are merged with yours. Other props, such as{" "}
-        <code>role="alertdialog"</code> or <code>onCancel</code>, pass through.
-      </p>
+      <PartFacts
+        state={
+          "`DialogPopupState` is `{ open, modal }`; `open` is committed (`false` in JS-free mode; `:open` is the DOM truth)."
+        }
+        owned={
+          "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `onToggle`, `onBeforeToggle`, `data-modal`; `aria-labelledby` and `aria-describedby` are merged with yours."
+        }
+        note={'Other props, such as `role="alertdialog"` or `onCancel`, pass through.'}
+      />
 
       <h4>
         <code>Dialog.Close</code>
@@ -339,15 +340,15 @@ export function DialogPage() {
           renderProp("button", "DialogCloseState"),
         ]}
       />
-      <p>
-        <code>DialogCloseState</code>: <code>{"{ pending, disabled }"}</code>. A second click, Enter
-        or Space while the action is pending is ignored (and cancelled), and the button is{" "}
-        <code>aria-disabled="true"</code> for as long as it shows <code>data-pending</code>, which
-        spans the action and the close; it is never natively disabled, so it keeps focus. To close
-        at once and finish the work in the background, do not return the promise:{" "}
-        <code>{"action={() => { void save(); }}"}</code>. The Close owns <code>disabled</code> and{" "}
-        <code>aria-disabled</code>, so a <code>render</code> element cannot re-enable it.
-      </p>
+      <PartFacts
+        state={"`DialogCloseState` is `{ pending, disabled }`."}
+        owned={
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+        }
+        note={
+          'A second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'
+        }
+      />
 
       <h4>
         <code>Dialog.Form</code>
@@ -404,12 +405,12 @@ export function DialogPage() {
           renderProp("form", "DialogFormState"),
         ]}
       />
-      <p>
-        <code>DialogFormState</code>: <code>{"{ pending }"}</code>, this form's{" "}
-        <code>useFormStatus().pending</code>. It is not emitted as <code>data-pending</code> and not
-        folded into any other part's state. The Form owns <code>action</code>, and{" "}
-        <code>method</code> unless <code>action</code> is a string.
-      </p>
+      <PartFacts
+        state={
+          "`DialogFormState` is `{ pending }`, this form's `useFormStatus().pending`; it is not emitted as `data-pending` and not folded into any other part's state."
+        }
+        owned={"`action`, and `method` unless `action` is a string."}
+      />
       <p>
         With field errors from <code>useActionState</code>, render it as a <code>Form.Root</code>:{" "}
         <code>
@@ -439,10 +440,12 @@ export function DialogPage() {
           },
         ]}
       />
-      <p>
-        Both own their <code>id</code>. Their state is the Popup's (<code>DialogTitleState</code>{" "}
-        and <code>DialogDescriptionState</code> are <code>DialogPopupState</code>).
-      </p>
+      <PartFacts
+        state={
+          "the Popup's (`DialogTitleState` and `DialogDescriptionState` are `DialogPopupState`)."
+        }
+        owned={"`id`."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

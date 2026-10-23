@@ -2,7 +2,8 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { stylingProps } from "./shared-props.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SwitchForm } from "../examples/SwitchForm.js";
 import switchFormSource from "../examples/SwitchForm.tsx?raw";
 import { SwitchSettings } from "../examples/SwitchSettings.js";
@@ -100,16 +101,7 @@ export function SwitchPage() {
             description:
               "Forwarded to the Switch's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the flip; animate the flip with CSS on `:checked`.",
           },
-          {
-            name: "className",
-            type: "string | ((state: SwitchState) => string | undefined)",
-            description: "A class name, or a function of the state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: SwitchState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the state.",
-          },
+          ...stylingProps("SwitchState"),
           {
             name: "render",
             type: "ReactElement | ((props, state: SwitchState) => ReactNode)",
@@ -118,15 +110,15 @@ export function SwitchPage() {
           },
         ]}
       />
-      <p>
-        <code>SwitchState</code> is <code>{"{ checked, pending, disabled }"}</code>, with{" "}
-        <code>checked</code> optimistic. Every other <code>&lt;input&gt;</code> prop passes through
-        (<code>name</code>, <code>required</code>, <code>form</code>, <code>id</code>,{" "}
-        <code>autoFocus</code>, ...). The Switch owns <code>type</code>, <code>role</code>,{" "}
-        <code>checked</code>, <code>defaultChecked</code>, <code>disabled</code> and{" "}
-        <code>onChange</code>, and removes <code>aria-checked</code>. A <code>render</code>{" "}
-        element's own <code>onChange</code> or <code>onClick</code> runs first.
-      </p>
+      <PartFacts
+        state={"`SwitchState` is `{ checked, pending, disabled }`; `checked` is optimistic."}
+        owned={
+          "`type`, `role`, `checked`, `defaultChecked`, `disabled`, `onChange`, `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+        }
+        note={
+          "Every other `<input>` prop passes through (`name`, `required`, `form`, `id`, `autoFocus`, ...). A `render` element's own `onChange` or `onClick` runs first."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

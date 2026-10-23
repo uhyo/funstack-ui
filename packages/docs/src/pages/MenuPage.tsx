@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MenuRowActions } from "../examples/MenuRowActions.js";
 import menuRowActionsSource from "../examples/MenuRowActions.tsx?raw";
 import { MenuViewOptions } from "../examples/MenuViewOptions.js";
@@ -260,15 +260,12 @@ export function MenuPage() {
           },
         ]}
       />
-      <p>
-        <code>MenuRootState</code>: <code>{"{ open, pending, submenu, context }"}</code>.{" "}
-        <code>open</code> is optimistic; <code>submenu</code> is true for a Root rendered inside a{" "}
-        <code>Menu.Popup</code>; <code>context</code> is true while the open came from a{" "}
-        <a href="/components/context-menu">
-          <code>Menu.ContextTrigger</code>
-        </a>
-        .
-      </p>
+      <PartFacts
+        state={
+          "`MenuRootState` is `{ open, pending, submenu, context }`; `open` is optimistic; `submenu` is true for a Root rendered inside a `Menu.Popup`; `context` is true while the open came from a [`Menu.ContextTrigger`](/components/context-menu)."
+        }
+        owned={"nothing rendered: the Root has no element."}
+      />
 
       <h4>
         <code>Menu.Trigger</code>
@@ -286,15 +283,13 @@ export function MenuPage() {
           renderProp("button", "MenuTriggerState"),
         ]}
       />
-      <p>
-        <code>MenuTriggerState</code>: <code>{"{ open, pending, disabled }"}</code>. Emits{" "}
-        <code>aria-expanded</code> and <code>data-open</code> (optimistic),{" "}
-        <code>data-pending</code> (an open or close of the Root in flight) and{" "}
-        <code>data-disabled</code>. Owns <code>type</code>, <code>id</code>, <code>disabled</code>,{" "}
-        <code>aria-disabled</code> (link or component <code>render</code>), <code>commandfor</code>,{" "}
-        <code>command</code>, <code>aria-haspopup</code>, <code>aria-expanded</code>,{" "}
-        <code>onClick</code> and <code>onKeyDown</code>. Use it in a top-level Root only.
-      </p>
+      <PartFacts
+        state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
+        owned={
+          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `data-open`, `data-pending`, `data-disabled`."
+        }
+        note={"Use it in a top-level Root only."}
+      />
 
       <h4>
         <code>Menu.Popup</code>
@@ -339,26 +334,17 @@ export function MenuPage() {
           renderProp("div", "MenuPopupState"),
         ]}
       />
-      <p>
-        <code>MenuPopupState</code>: <code>{"{ open, side, align, submenu, context }"}</code>{" "}
-        (committed <code>open</code>; <code>context</code> and <code>side: null</code> for an open
-        from a <code>Menu.ContextTrigger</code>). While the menu is shown, <code>side</code> /{" "}
-        <code>align</code> and <code>data-side</code> / <code>data-align</code> are where the
-        browser placed it (a physical side, after any flip: a submenu reads <code>right</code> in
-        LTR and <code>left</code> in RTL); otherwise your props. A menu shown on the physical side
-        you asked for costs no render for this; a logical side (every submenu, by default{" "}
-        <code>inline-end</code>) costs one render on show and one on hide, since{" "}
-        <code>data-side</code> turns physical while shown. Owns <code>id</code>,{" "}
-        <code>popover</code>, <code>role="menu"</code>, <code>aria-labelledby</code> (merged),{" "}
-        <code>tabIndex={"{-1}"}</code>, <code>focusgroup</code> (with the flag),{" "}
-        <code>onKeyDown</code>, <code>onBlur</code>, <code>onMouseDown</code> (a press outside the
-        items keeps focus on the current item), <code>onContextMenu</code> (no browser menu over
-        this one), <code>onPointerEnter</code>, <code>onPointerLeave</code>, <code>data-side</code>{" "}
-        / <code>data-align</code>, and <code>data-context</code> with the inline{" "}
-        <code>--menu-point-x</code> / <code>--menu-point-y</code> for a context open. Style it with{" "}
-        <code>:popover-open</code>; it emits no <code>data-open</code>. Render a{" "}
-        <code>&lt;div&gt;</code>, not a <code>&lt;dialog&gt;</code>.
-      </p>
+      <PartFacts
+        state={
+          "`MenuPopupState` is `{ open, side, align, submenu, context }`; `open` is committed; `context` is true and `side` is `null` for an open from a `Menu.ContextTrigger`. While the menu is shown, `side` / `align` are where the browser placed it (a physical side, after any flip: a submenu reads `right` in LTR and `left` in RTL); otherwise your props."
+        }
+        owned={
+          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged), `tabIndex` (`-1`), `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, and the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap` of a context open.'
+        }
+        note={
+          "A menu shown on the physical side you asked for costs no render for the placement; a logical side (every submenu, by default `inline-end`) costs one render on show and one on hide, since `data-side` turns physical while shown. Style it with `:popover-open`; it emits no `data-open`. Render a `<div>`, not a `<dialog>`."
+        }
+      />
 
       <h4>
         <code>Menu.Item</code>
@@ -374,13 +360,12 @@ export function MenuPage() {
           ...itemRows("MenuItemState", "true", "Close the whole menu once `action` settles."),
         ]}
       />
-      <p>
-        <code>MenuItemState</code>: <code>{"{ pending, disabled }"}</code>. Owns <code>type</code>{" "}
-        (on a button), <code>role</code>, <code>tabIndex</code>, <code>disabled</code> (always
-        absent), <code>aria-disabled</code> (the <code>disabled</code> prop, or while pending),{" "}
-        <code>onClick</code>, <code>onKeyDown</code>, <code>onPointerMove</code>,{" "}
-        <code>data-pending</code>, <code>data-disabled</code> and <code>data-typeahead</code>.
-      </p>
+      <PartFacts
+        state={"`MenuItemState` is `{ pending, disabled }`."}
+        owned={
+          "`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-typeahead`."
+        }
+      />
 
       <h4>
         <code>Menu.CheckboxItem</code>
@@ -411,12 +396,15 @@ export function MenuPage() {
           ),
         ]}
       />
-      <p>
-        <code>MenuCheckboxItemState</code>: <code>{"{ checked, pending, disabled }"}</code>. Emits{" "}
-        <code>role="menuitemcheckbox"</code>, <code>aria-checked</code> and{" "}
-        <code>data-checked</code> (optimistic). Transition types <code>fsui-menu</code> with{" "}
-        <code>fsui-menu-check</code> or <code>fsui-menu-uncheck</code>.
-      </p>
+      <PartFacts
+        state={
+          "`MenuCheckboxItemState` is `{ checked, pending, disabled }`; `checked` is optimistic."
+        }
+        owned={
+          'those of `Menu.Item`, plus `role` (`"menuitemcheckbox"`), `aria-checked`, `data-checked`.'
+        }
+        note={"Transition types `fsui-menu` with `fsui-menu-check` or `fsui-menu-uncheck`."}
+      />
 
       <h4>
         <code>Menu.RadioGroup</code>
@@ -444,12 +432,13 @@ export function MenuPage() {
           renderProp("div", "MenuRadioGroupState"),
         ]}
       />
-      <p>
-        <code>MenuRadioGroupState</code>: <code>{"{ value, pending }"}</code>; the group renders{" "}
-        <code>{'<div role="group">'}</code> named by a <code>GroupLabel</code> inside it, with{" "}
-        <code>data-pending</code>. Transition types <code>fsui-menu</code>,{" "}
-        <code>fsui-menu-select</code>.
-      </p>
+      <PartFacts
+        state={"`MenuRadioGroupState` is `{ value, pending }`."}
+        owned={
+          '`role` (`"group"`), `aria-labelledby` (token-merged: a `GroupLabel` inside it), `data-pending`.'
+        }
+        note={"Transition types `fsui-menu`, `fsui-menu-select`."}
+      />
 
       <h4>
         <code>Menu.RadioItem</code>
@@ -468,11 +457,15 @@ export function MenuPage() {
           ),
         ]}
       />
-      <p>
-        <code>MenuRadioItemState</code>: <code>{"{ checked, pending, disabled }"}</code>;{" "}
-        <code>pending</code> is true on the item being selected. A <code>RadioItem</code> outside a{" "}
-        <code>RadioGroup</code> throws.
-      </p>
+      <PartFacts
+        state={
+          "`MenuRadioItemState` is `{ checked, pending, disabled }`; `pending` is true on the item being selected."
+        }
+        owned={
+          'those of `Menu.Item`, plus `role` (`"menuitemradio"`), `aria-checked`, `data-checked`, and `value` (not rendered: a menu item is not a form control).'
+        }
+        note={"A `RadioItem` outside a `RadioGroup` throws."}
+      />
 
       <h4>
         <code>Menu.Group</code>, <code>Menu.GroupLabel</code>, <code>Menu.Separator</code>
@@ -511,13 +504,15 @@ export function MenuPage() {
           renderProp("button", "MenuSubmenuTriggerState"),
         ]}
       />
-      <p>
-        <code>MenuSubmenuTriggerState</code>: <code>{"{ open, pending, disabled }"}</code>, as the
-        Trigger. Both an item of the parent menu (<code>role="menuitem"</code>, roving{" "}
-        <code>tabindex</code>, typeahead) and the trigger of its Root (<code>commandfor</code>,{" "}
-        <code>aria-haspopup="menu"</code>, <code>aria-expanded</code>, <code>data-open</code>,{" "}
-        <code>data-pending</code> while items that suspend load). Use it in a submenu Root only.
-      </p>
+      <PartFacts
+        state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
+        owned={
+          "the Trigger's (`type`, `id`, `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `data-open`, `data-pending`) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+        }
+        note={
+          "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. Use it in a submenu Root only."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

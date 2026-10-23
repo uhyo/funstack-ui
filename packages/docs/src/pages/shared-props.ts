@@ -21,6 +21,11 @@ export function functionProps(state: string, childrenNote?: string): PropRow[] {
   ];
 }
 
+/** The `className` / `style` rows of a part that renders a void element (no `children`). */
+export function stylingProps(state: string): PropRow[] {
+  return functionProps(state).slice(0, 2);
+}
+
 /** The `render` row. */
 export function renderProp(element: string, state: string): PropRow {
   return {

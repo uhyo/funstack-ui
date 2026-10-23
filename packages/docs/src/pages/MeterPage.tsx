@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MeterStorage } from "../examples/MeterStorage.js";
 import meterStorageSource from "../examples/MeterStorage.tsx?raw";
 import { MeterStrength } from "../examples/MeterStrength.js";
@@ -158,13 +158,12 @@ export function MeterPage() {
           renderProp("div", "MeterState"),
         ]}
       />
-      <p>
-        Owned: <code>role</code>, <code>aria-valuemin</code>, <code>aria-valuemax</code> and{" "}
-        <code>aria-valuenow</code> (always), <code>aria-valuetext</code> (unless{" "}
-        <code>getAriaValueText</code> returns <code>null</code> or <code>undefined</code>),{" "}
-        <code>data-region</code>, and <code>aria-labelledby</code> (your tokens, then the Label's
-        id). Your <code>style</code> wins over the custom properties per property.
-      </p>
+      <PartFacts
+        state={"`MeterState`, shared by every part; its fields are listed under State below."}
+        owned={
+          "`role`, `aria-valuemin`, `aria-valuemax`, `aria-valuenow` (always), `aria-valuetext` (unless `getAriaValueText` returns `null` or `undefined`), `aria-labelledby` (your tokens, then the Label's id, always), `data-region`, and the `--meter-*` custom properties in `style` (your entries win)."
+        }
+      />
       <h4>
         <code>Meter.Track</code>, <code>Meter.Indicator</code>, <code>Meter.Label</code>,{" "}
         <code>Meter.Value</code>
@@ -175,6 +174,12 @@ export function MeterPage() {
         <code>aria-hidden={"{false}"}</code>.
       </p>
       <PropsTable rows={[...functionProps("MeterState"), renderProp("div | span", "MeterState")]} />
+      <PartFacts
+        state={"`MeterState`."}
+        owned={
+          '`data-region` on each; the Label also `id` (the Root always references it). `aria-hidden="true"` on the Value is a default, not owned.'
+        }
+      />
 
       <h4>State</h4>
       <Table

@@ -129,6 +129,12 @@ export function FavoriteButton({ postId, initial }: { postId: string; initial: b
 
 // Function form: full control.
 <Toggle render={(props, state) => <button {...props}>{state.pressed ? "On" : "Off"}</button>} />`}</CodeBlock>
+      <p>
+        On every component page, each part's props table is followed by two fixed lines:{" "}
+        <strong>State</strong>, the object the function props and <code>render</code> receive, and{" "}
+        <strong>Owned</strong>, the props the part sets itself, which a <code>render</code> element
+        cannot override. Everything not listed passes through to the element.
+      </p>
       <p>Merge rules for the element form:</p>
       <ul>
         <li>

@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
 import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
 import { AccordionThreads } from "../examples/AccordionThreads.js";
@@ -147,10 +147,10 @@ export function AccordionPage() {
           renderProp("div", "AccordionRootState"),
         ]}
       />
-      <p>
-        <code>AccordionRootState</code>: <code>{"{ pending, disabled }"}</code>. The Root owns{" "}
-        <code>onKeyDown</code>.
-      </p>
+      <PartFacts
+        state={"`AccordionRootState` is `{ pending, disabled }`."}
+        owned={"`onKeyDown`, `data-pending`, `data-disabled`."}
+      />
 
       <h4>
         <code>Accordion.Item</code>
@@ -186,12 +186,12 @@ export function AccordionPage() {
           renderProp("details", "AccordionItemState"),
         ]}
       />
-      <p>
-        <code>AccordionItemState</code>: <code>{"{ value, open, pending, disabled }"}</code>.{" "}
-        <code>open</code> is optimistic, and <code>undefined</code> in JS-free mode (the browser
-        owns it). <code>open</code>, <code>name</code> and <code>onToggle</code> are owned by the
-        library.
-      </p>
+      <PartFacts
+        state={
+          "`AccordionItemState` is `{ value, open, pending, disabled }`; `open` is optimistic, and `undefined` in JS-free mode (the browser owns it)."
+        }
+        owned={"`open`, `name`, `onToggle`, `data-open`, `data-pending`, `data-disabled`."}
+      />
 
       <h4>
         <code>Accordion.Trigger</code>
@@ -211,11 +211,15 @@ export function AccordionPage() {
           renderProp("summary", "AccordionTriggerState"),
         ]}
       />
-      <p>
-        <code>AccordionTriggerState</code> is the Item's state. The Trigger owns{" "}
-        <code>onClick</code> in library mode (and on disabled items). There, links and form controls
-        inside the summary keep their own behaviour and do not toggle the item.
-      </p>
+      <PartFacts
+        state={"`AccordionTriggerState` is the Item's state."}
+        owned={
+          "`aria-disabled`, `data-open`, `data-pending`, `data-disabled`, and `onClick` in library mode (and on disabled items)."
+        }
+        note={
+          "Links and form controls inside the summary keep their own behaviour and do not toggle the item."
+        }
+      />
 
       <h4>
         <code>Accordion.Panel</code>
@@ -235,11 +239,15 @@ export function AccordionPage() {
           renderProp("div", "AccordionPanelState"),
         ]}
       />
-      <p>
-        <code>AccordionPanelState</code>: <code>{"{ value, open, disabled }"}</code>, where{" "}
-        <code>open</code> is committed (<code>undefined</code> in JS-free mode). Panels have no{" "}
-        <code>keepMounted</code>: closed content is always in the DOM, which keeps it searchable.
-      </p>
+      <PartFacts
+        state={
+          "`AccordionPanelState` is `{ value, open, disabled }`; `open` is committed (`undefined` in JS-free mode)."
+        }
+        owned={"`data-disabled`."}
+        note={
+          "Panels have no `keepMounted`: closed content is always in the DOM, which keeps it searchable."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

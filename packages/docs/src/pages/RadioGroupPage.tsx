@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { RadioGroupForm } from "../examples/RadioGroupForm.js";
 import radioGroupFormSource from "../examples/RadioGroupForm.tsx?raw";
 import { RadioGroupRtl } from "../examples/RadioGroupRtl.js";
@@ -10,7 +10,7 @@ import radioGroupRtlSource from "../examples/RadioGroupRtl.tsx?raw";
 import { RadioGroupTheme } from "../examples/RadioGroupTheme.js";
 import radioGroupThemeSource from "../examples/RadioGroupTheme.tsx?raw";
 import radioGroupCss from "../examples/radio-group.css?raw";
-import { functionProps, renderProp } from "./shared-props.js";
+import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function RadioGroupPage() {
   return (
@@ -140,11 +140,15 @@ export function RadioGroupPage() {
           renderProp("fieldset", "RadioGroupRootState"),
         ]}
       />
-      <p>
-        <code>RadioGroupRootState</code>: <code>{"{ value, pending, disabled }"}</code>, with{" "}
-        <code>value</code> optimistic. The Root owns <code>role</code>. Other fieldset props pass
-        through (<code>aria-label</code> for a group without a Label, for example).
-      </p>
+      <PartFacts
+        state={"`RadioGroupRootState` is `{ value, pending, disabled }`; `value` is optimistic."}
+        owned={
+          '`role` (`"radiogroup"`), `aria-required`, `disabled`, `form`, `data-pending`, `data-disabled`. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`.'
+        }
+        note={
+          "Other fieldset props pass through (`aria-label` for a group without a Label, for example)."
+        }
+      />
 
       <h4>
         <code>RadioGroup.Label</code>
@@ -155,6 +159,7 @@ export function RadioGroupPage() {
           renderProp("legend", "RadioGroupRootState"),
         ]}
       />
+      <PartFacts state={"the Root's."} owned={"none."} />
 
       <h4>
         <code>RadioGroup.Item</code>
@@ -180,16 +185,7 @@ export function RadioGroupPage() {
             description:
               "Forwarded to the Item's `<ViewTransition default>`; without it no boundary is rendered. Fires only on the commit that settles an action or rolls it back, never on the check itself.",
           },
-          {
-            name: "className",
-            type: "string | ((state: RadioGroupItemState) => string | undefined)",
-            description: "A class name, or a function of the Item's state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: RadioGroupItemState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the Item's state.",
-          },
+          ...stylingProps("RadioGroupItemState"),
           {
             name: "render",
             type: "ReactElement | ((props, state: RadioGroupItemState) => ReactNode)",
@@ -198,14 +194,15 @@ export function RadioGroupPage() {
           },
         ]}
       />
-      <p>
-        <code>RadioGroupItemState</code>: <code>{"{ value, checked, pending, disabled }"}</code>.{" "}
-        <code>checked</code> is optimistic, <code>pending</code> is true on the radio the user is
-        waiting on, and <code>disabled</code> includes <code>Root disabled</code>. The Item owns{" "}
-        <code>type</code>, <code>name</code>, <code>value</code>, <code>checked</code>,{" "}
-        <code>defaultChecked</code>, <code>disabled</code>, <code>form</code>, <code>required</code>{" "}
-        and <code>onChange</code>; <code>id</code> and other input props pass through.
-      </p>
+      <PartFacts
+        state={
+          "`RadioGroupItemState` is `{ value, checked, pending, disabled }`; `checked` is optimistic, `pending` is true on the radio the user is waiting on, and `disabled` includes `Root disabled`."
+        }
+        owned={
+          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`, `data-checked`, `data-pending`, `data-disabled`; `onChange` is merged (a `render` element's own handler runs first)."
+        }
+        note={"`id` and other input props pass through."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { TooltipArrow } from "../examples/TooltipArrow.js";
 import tooltipArrowSource from "../examples/TooltipArrow.tsx?raw";
 import { TooltipToolbar } from "../examples/TooltipToolbar.js";
@@ -210,11 +210,12 @@ export function TooltipPage() {
           },
         ]}
       />
-      <p>
-        <code>TooltipRootState</code>: <code>{"{ disabled }"}</code>. No <code>ref</code>,{" "}
-        <code>className</code> or <code>style</code> (no DOM), and no <code>open</code>,{" "}
-        <code>defaultOpen</code> or action (see below).
-      </p>
+      <PartFacts
+        state={"`TooltipRootState` is `{ disabled }`."}
+        owned={
+          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), and no `open`, `defaultOpen` or action (see [Browser-owned state](#browser-owned-state))."
+        }
+      />
 
       <h4>
         <code>Tooltip.Trigger</code>
@@ -242,13 +243,15 @@ export function TooltipPage() {
           renderProp("button", "TooltipTriggerState"),
         ]}
       />
-      <p>
-        <code>TooltipTriggerState</code>: <code>{"{ disabled }"}</code>. Every{" "}
-        <code>&lt;button&gt;</code> prop passes through, including <code>onClick</code> and{" "}
-        <code>type</code> (default <code>"button"</code>): the library attaches its listeners with{" "}
-        <code>addEventListener</code>. Your own <code>aria-describedby</code> /{" "}
-        <code>aria-labelledby</code> ids are merged with the tooltip's.
-      </p>
+      <PartFacts
+        state={"`TooltipTriggerState` is `{ disabled }`."}
+        owned={
+          '`aria-describedby` (with `provides="description"`) or `aria-labelledby` (with `provides="name"`), both token-merged with your ids; `data-disabled`; and `interestfor`, the `interest-delay-*` style and `data-fsui-tooltip-trigger` with `experimental_interestFor`.'
+        }
+        note={
+          'Every `<button>` prop passes through, including `onClick` and `type` (default `"button"`): the library attaches its listeners with `addEventListener`.'
+        }
+      />
 
       <h4>
         <code>Tooltip.Popup</code>
@@ -303,16 +306,17 @@ export function TooltipPage() {
           renderProp("div", "TooltipPopupState"),
         ]}
       />
-      <p>
-        <code>TooltipPopupState</code>: <code>{"{ disabled, side, align }"}</code>. While the
-        tooltip is shown, <code>side</code> and <code>align</code> are where the browser placed it
-        (a physical side, after any fallback flip); otherwise they are your props (<code>side</code>{" "}
-        is <code>null</code> with <code>side={"{null}"}</code>). <code>id</code>,{" "}
-        <code>popover</code> and <code>role</code> are owned by the library. Your <code>style</code>{" "}
-        wins over the inline placement, so{" "}
-        <code>style={'{{ positionArea: "bottom span-right" }}'}</code> works for a one-off;{" "}
-        <code>data-side</code> then reports where that put it.
-      </p>
+      <PartFacts
+        state={
+          "`TooltipPopupState` is `{ disabled, side, align }`; while the tooltip is shown, `side` and `align` are where the browser placed it (a physical side, after any fallback flip); otherwise they are your props (`side` is `null` with `side={null}`)."
+        }
+        owned={
+          '`id`, `popover`, `role` (`"tooltip"`), `data-disabled`, `data-instant`, and `data-side` / `data-align` unless `side` is `null`.'
+        }
+        note={
+          'Your `style` wins over the inline placement, so `style={{ positionArea: "bottom span-right" }}` works for a one-off; `data-side` then reports where that put it.'
+        }
+      />
 
       <h4>
         <code>Tooltip.Arrow</code>
@@ -320,13 +324,13 @@ export function TooltipPage() {
       <PropsTable
         rows={[...functionProps("TooltipArrowState"), renderProp("span", "TooltipArrowState")]}
       />
-      <p>
-        <code>TooltipArrowState</code>: <code>{"{ side, align }"}</code>, the Popup's values
-        (resolved while shown). Renders a <code>&lt;span aria-hidden="true"&gt;</code> with{" "}
-        <code>data-side</code> / <code>data-align</code> (absent with the Popup's{" "}
-        <code>side={"{null}"}</code>); <code>aria-hidden</code> is owned by the library. Render it
-        inside <code>Tooltip.Popup</code>.
-      </p>
+      <PartFacts
+        state={
+          "`TooltipArrowState` is `{ side, align }`, the Popup's values (resolved while shown)."
+        }
+        owned={"`aria-hidden`, and `data-side` / `data-align` unless the Popup's `side` is `null`."}
+        note={"Render it inside `Tooltip.Popup`."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

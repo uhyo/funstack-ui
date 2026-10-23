@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ButtonCompose } from "../examples/ButtonCompose.js";
 import buttonComposeSource from "../examples/ButtonCompose.tsx?raw";
 import { ButtonFormActions } from "../examples/ButtonFormActions.js";
@@ -130,15 +130,15 @@ export function ButtonPage() {
           renderProp("button", "ButtonState"),
         ]}
       />
-      <p>
-        Every other <code>&lt;button&gt;</code> prop passes through, including <code>name</code>,{" "}
-        <code>value</code>, <code>form</code>, <code>commandfor</code>, <code>command</code>,{" "}
-        <code>aria-busy</code> and every event handler but <code>onClick</code> (pass-through
-        handlers keep firing while pending). <code>onClick</code> and <code>aria-disabled</code> are
-        the Button's and are not props. <code>ButtonState</code> is{" "}
-        <code>{"{ pending, disabled }"}</code>; <code>ButtonActionDetails</code> is{" "}
-        <code>{"{ event }"}</code>.
-      </p>
+      <PartFacts
+        state={"`ButtonState` is `{ pending, disabled }`; `ButtonActionDetails` is `{ event }`."}
+        owned={
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `onClick`, `data-pending`, `data-disabled`."
+        }
+        note={
+          "Every other `<button>` prop passes through, including `name`, `value`, `form`, `commandfor`, `command`, `aria-busy` and every event handler but `onClick` (pass-through handlers keep firing while pending)."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
@@ -157,10 +157,7 @@ export function ButtonPage() {
       />
       <p>
         Pending is not disabled: <code>[data-disabled]</code> and <code>state.disabled</code> are
-        your <code>disabled</code> only, so the two states never have to look alike. Owned keys (a{" "}
-        <code>render</code> element cannot override them): <code>type</code> (on a{" "}
-        <code>&lt;button&gt;</code>), <code>disabled</code>, <code>aria-disabled</code>,{" "}
-        <code>onClick</code>, <code>data-pending</code>, <code>data-disabled</code>.
+        your <code>disabled</code> only, so the two states never have to look alike.
       </p>
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>

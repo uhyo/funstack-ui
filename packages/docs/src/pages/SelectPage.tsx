@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SelectCountry } from "../examples/SelectCountry.js";
 import selectCountrySource from "../examples/SelectCountry.tsx?raw";
 import { SelectForm } from "../examples/SelectForm.js";
@@ -10,7 +10,7 @@ import selectFormSource from "../examples/SelectForm.tsx?raw";
 import { SelectFruit } from "../examples/SelectFruit.js";
 import selectFruitSource from "../examples/SelectFruit.tsx?raw";
 import selectCss from "../examples/select.css?raw";
-import { functionProps, renderProp } from "./shared-props.js";
+import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function SelectPage() {
   return (
@@ -146,13 +146,15 @@ export function SelectPage() {
           renderProp("select", "SelectRootState"),
         ]}
       />
-      <p>
-        <code>SelectRootState</code>: <code>{"{ value, pending, disabled }"}</code>, with{" "}
-        <code>value</code> optimistic. The Root owns <code>value</code>, <code>disabled</code> and{" "}
-        <code>onChange</code>. <code>multiple</code> and <code>size</code> are not accepted:
-        multi-select is not part of this version. <code>id</code>, <code>aria-*</code>,{" "}
-        <code>onFocus</code> and other select props pass through.
-      </p>
+      <PartFacts
+        state={"`SelectRootState` is `{ value, pending, disabled }`; `value` is optimistic."}
+        owned={
+          "`value`, `disabled`, `onChange`, `data-pending`, `data-disabled`. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+        }
+        note={
+          "`multiple` and `size` are not accepted: multi-select is not part of this version. `id`, `aria-*`, `onFocus` and other select props pass through."
+        }
+      />
       <p>
         <code>SelectValueChangeDetails</code>: <code>{"{ reason, event }"}</code>.{" "}
         <code>reason</code> is <code>"activate"</code> for a pick (pointer, keyboard, typeahead or
@@ -173,40 +175,32 @@ export function SelectPage() {
           renderProp("button", "SelectRootState"),
         ]}
       />
-      <p>
-        Renders <code>&lt;button type="button"&gt;</code> with <code>data-pending</code> and{" "}
-        <code>data-disabled</code>; owns <code>type</code>. Must be the select's first child.
-        Engines without customizable select do not render it, so a spinner inside it also needs a{" "}
-        <code>select[data-pending]</code> style.
-      </p>
+      <PartFacts
+        state={"`SelectRootState`."}
+        owned={'`type` (always `"button"`), `data-pending`, `data-disabled`.'}
+        note={
+          "Must be the select's first child. Engines without customizable select do not render it, so a spinner inside it also needs a `select[data-pending]` style."
+        }
+      />
 
       <h4>
         <code>Select.Value</code>
       </h4>
       <PropsTable
         rows={[
-          {
-            name: "className",
-            type: "string | ((state: SelectRootState) => string | undefined)",
-            description: "A class name, or a function of the Root's state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: SelectRootState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the Root's state.",
-          },
+          ...stylingProps("SelectRootState"),
           renderProp("selectedcontent", "SelectRootState"),
         ]}
       />
-      <p>
-        No <code>children</code>: the browser copies the selected option's content in on every
-        selection change, and the parser does so before hydration (the element is rendered so that
-        hydration accepts that content). The library keeps the copy fresh: when the selected
-        option's content changes through React (a translated label, a count, the option's own
-        function children, a Suspense boundary resolving inside it) or a form reset changes the
-        selection, it asks the browser to copy again. The copy is a snapshot: style it as{" "}
-        <code>selectedcontent .icon</code>, not <code>option:checked .icon</code>.
-      </p>
+      <PartFacts
+        state={"`SelectRootState`."}
+        owned={
+          "`children` (none: the browser fills the element), and the hydration-related props of that content."
+        }
+        note={
+          "The browser copies the selected option's content in on every selection change, and the parser does so before hydration (the element is rendered so that hydration accepts that content). The library keeps the copy fresh: when the selected option's content changes through React (a translated label, a count, the option's own function children, a Suspense boundary resolving inside it) or a form reset changes the selection, it asks the browser to copy again. The copy is a snapshot: style it as `selectedcontent .icon`, not `option:checked .icon`."
+        }
+      />
 
       <h4>
         <code>Select.Option</code>
@@ -229,13 +223,14 @@ export function SelectPage() {
           renderProp("option", "SelectOptionState"),
         ]}
       />
-      <p>
-        <code>SelectOptionState</code>: <code>{"{ value, selected, pending, disabled }"}</code>.{" "}
-        <code>selected</code> is optimistic, <code>pending</code> is true on the option the user is
-        waiting on, <code>disabled</code> includes a disabled <code>Select.Group</code> and{" "}
-        <code>Root disabled</code>. The Option owns <code>value</code>, <code>selected</code> (never
-        rendered) and <code>disabled</code>.
-      </p>
+      <PartFacts
+        state={
+          "`SelectOptionState` is `{ value, selected, pending, disabled }`; `selected` is optimistic, `pending` is true on the option the user is waiting on, `disabled` includes a disabled `Select.Group` and `Root disabled`."
+        }
+        owned={
+          "`value`, `selected` (never rendered), `disabled`, `data-selected`, `data-pending`, `data-disabled`."
+        }
+      />
 
       <h4>
         <code>Select.Group</code>
@@ -262,6 +257,7 @@ export function SelectPage() {
           },
         ]}
       />
+      <PartFacts state={"`SelectRootState`."} owned={"`label`, `disabled`."} />
 
       <h4>
         <code>Select.GroupLabel</code>, <code>Select.Separator</code>
@@ -279,6 +275,7 @@ export function SelectPage() {
           },
         ]}
       />
+      <PartFacts state={"`SelectRootState`."} owned={"none."} />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

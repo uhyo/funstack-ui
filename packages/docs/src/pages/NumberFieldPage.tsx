@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { NumberFieldField } from "../examples/NumberFieldField.js";
 import numberFieldFieldSource from "../examples/NumberFieldField.tsx?raw";
 import { NumberFieldFormats } from "../examples/NumberFieldFormats.js";
@@ -291,24 +291,17 @@ export function NumberFieldPage() {
           renderProp("div", "NumberFieldState"),
         ]}
       />
-      <p>
-        <code>NumberFieldState</code> (every part but the buttons):{" "}
-        <code>{"{ value, text, pending, disabled, readOnly, required }"}</code>, where{" "}
-        <code>value</code> is the shown value (the gesture's while one is open or in flight) and{" "}
-        <code>text</code> the shown text (the draft while editing). Details:{" "}
-        <code>{"{ reason, source, event }"}</code>, <code>reason</code> being{" "}
-        <code>"activate"</code>, <code>"platform"</code> (a form reset, text found at hydration) or{" "}
-        <code>"dismiss"</code> (the revert after a failed save, steps only), and <code>source</code>{" "}
-        one of <code>"input"</code>, <code>"increment"</code>, <code>"decrement"</code>,{" "}
-        <code>"keyboard"</code>, <code>"wheel"</code>, or <code>null</code> on platform paths and
-        the revert. <code>event</code> is the DOM event, and <code>undefined</code> for the repeats
-        of a held button, a hold that ended at its bound, hydration and the revert. The Root owns{" "}
-        <code>role="group"</code> and <code>aria-labelledby</code> (your tokens, then the Label's
-        id, then a Field label's). There is no <code>transition</code> prop on any part; the
-        dispatches carry the types <code>fsui-number-field</code> plus{" "}
-        <code>fsui-number-field-change</code> (step) or <code>fsui-number-field-commit</code>{" "}
-        (gesture) for your own boundaries.
-      </p>
+      <PartFacts
+        state={
+          "`NumberFieldState` (every part but the buttons) is `{ value, text, pending, disabled, readOnly, required }`; `value` is the shown value (the gesture's while one is open or in flight) and `text` the shown text (the draft while editing)."
+        }
+        owned={
+          "`role` (`\"group\"`), `aria-labelledby` (your tokens, then the Label's id while one is mounted, then a Field label's), `data-pending`, `data-disabled`, `data-invalid` (inside a Field)."
+        }
+        note={
+          'Details are `{ reason, source, event }`: `reason` is `"activate"`, `"platform"` (a form reset, text found at hydration) or `"dismiss"` (the revert after a failed save, steps only); `source` is one of `"input"`, `"increment"`, `"decrement"`, `"keyboard"`, `"wheel"`, or `null` on platform paths and the revert; `event` is the DOM event, and `undefined` for the repeats of a held button, a hold that ended at its bound, hydration and the revert. There is no `transition` prop on any part; the dispatches carry the types `fsui-number-field` plus `fsui-number-field-change` (step) or `fsui-number-field-commit` (gesture) for your own boundaries.'
+        }
+      />
 
       <h4>
         <code>NumberField.Input</code>
@@ -332,17 +325,15 @@ export function NumberFieldPage() {
           renderProp("input", "NumberFieldState"),
         ]}
       />
-      <p>
-        The visible input owns <code>id</code>, <code>type</code> (<code>text</code>, or{" "}
-        <code>search</code> / <code>tel</code> from a <code>render</code> element; a{" "}
-        <code>number</code> element logs a warning), <code>value</code>, <code>disabled</code>,{" "}
-        <code>readOnly</code> and its handlers. <code>name</code>, <code>min</code>,{" "}
-        <code>max</code>, <code>step</code>, <code>required</code> and <code>pattern</code> are not
-        props: constraints live on the hidden input, and a constraint on the visible one would make
-        it invalid for a reason nobody reports. <code>placeholder</code>, <code>aria-*</code>,{" "}
-        <code>onFocus</code>, <code>onPaste</code>, <code>onCompositionStart</code> /{" "}
-        <code>onCompositionEnd</code> and the rest pass through.
-      </p>
+      <PartFacts
+        state={"`NumberFieldState`."}
+        owned={
+          "on the visible input: `id`, `type` (`text`, or `search` / `tel` from a `render` element; a `number` element logs a warning), `value`, `disabled`, `readOnly`, `onChange`, `onKeyDown`, `onBlur`, `aria-invalid` and `aria-describedby` (inside a Field), `data-pending`, `data-disabled`, `data-invalid`. `name`, `min`, `max`, `step`, `required` and `pattern` are not props: constraints live on the hidden input."
+        }
+        note={
+          "`placeholder`, `aria-*`, `onFocus`, `onPaste`, `onCompositionStart` / `onCompositionEnd` and the rest pass through. A constraint on the visible input would make it invalid for a reason nobody reports."
+        }
+      />
 
       <h4>
         <code>NumberField.Increment</code>, <code>NumberField.Decrement</code>
@@ -367,13 +358,14 @@ export function NumberFieldPage() {
           renderProp("button", "NumberFieldButtonState"),
         ]}
       />
-      <p>
-        <code>NumberFieldButtonState</code>: <code>{"{ pending, disabled }"}</code>, where{" "}
-        <code>pending</code> is true while the latest step or commit came from this button and is in
-        flight. The buttons own <code>type="button"</code> (on a <code>&lt;button&gt;</code> only),{" "}
-        <code>tabIndex={"{-1}"}</code>, <code>aria-controls</code>, <code>disabled</code> and{" "}
-        <code>aria-disabled</code> (link or component <code>render</code>).
-      </p>
+      <PartFacts
+        state={
+          "`NumberFieldButtonState` is `{ pending, disabled }`; `pending` is true while the latest step or commit came from this button and is in flight."
+        }
+        owned={
+          '`type` (`"button"`, on a `<button>` only), `tabIndex` (`-1`), `aria-controls`, `disabled`, `aria-disabled` (link or component `render`), `onPointerDown`, `onClick`, `onContextMenu`, `data-pending`, `data-disabled`.'
+        }
+      />
 
       <h4>
         <code>NumberField.Label</code>
@@ -381,10 +373,13 @@ export function NumberFieldPage() {
       <PropsTable
         rows={[...functionProps("NumberFieldState"), renderProp("label", "NumberFieldState")]}
       />
-      <p>
-        Must stay a <code>&lt;label&gt;</code>: it names the visible input through <code>for</code>{" "}
-        and, through its id, the Root group.
-      </p>
+      <PartFacts
+        state={"`NumberFieldState`."}
+        owned={"`id`, `htmlFor`, `data-pending`, `data-disabled`."}
+        note={
+          "Must stay a `<label>`: it names the visible input through `for` and, through its id, the Root group."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

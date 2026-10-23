@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { TabsSaved } from "../examples/TabsSaved.js";
 import tabsSavedSource from "../examples/TabsSaved.tsx?raw";
 import { TabsSuspending } from "../examples/TabsSuspending.js";
@@ -115,10 +115,12 @@ export function TabsPage() {
           renderProp("div", "TabsRootState"),
         ]}
       />
-      <p>
-        <code>TabsRootState</code>: <code>{"{ value, pending, orientation, disabled }"}</code>,
-        where <code>value</code> is the optimistic selection.
-      </p>
+      <PartFacts
+        state={
+          "`TabsRootState` is `{ value, pending, orientation, disabled }`; `value` is the optimistic selection."
+        }
+        owned={"`data-pending`, `data-orientation`, `data-disabled`."}
+      />
 
       <h4>
         <code>Tabs.List</code>
@@ -143,10 +145,12 @@ export function TabsPage() {
           renderProp("div", "TabsListState"),
         ]}
       />
-      <p>
-        <code>TabsListState</code>: <code>{"{ orientation, disabled }"}</code>. The List owns{" "}
-        <code>onKeyDown</code> and <code>onFocus</code>.
-      </p>
+      <PartFacts
+        state={"`TabsListState` is `{ orientation, disabled }`."}
+        owned={
+          '`role` (`"tablist"`), `aria-orientation`, `tabIndex`, `onKeyDown`, `onFocus`, `focusgroup` (with the flag), `data-orientation`, `data-disabled`.'
+        }
+      />
 
       <h4>
         <code>Tabs.Tab</code>
@@ -174,12 +178,12 @@ export function TabsPage() {
           renderProp("button", "TabsTabState"),
         ]}
       />
-      <p>
-        <code>TabsTabState</code>:{" "}
-        <code>{"{ value, selected, pending, disabled, orientation }"}</code>. The Tab owns{" "}
-        <code>onClick</code>, <code>onKeyDown</code>, <code>onFocus</code> and <code>id</code>. It
-        sets <code>anchor-name</code> in its style for the Indicator (your <code>style</code> wins).
-      </p>
+      <PartFacts
+        state={"`TabsTabState` is `{ value, selected, pending, disabled, orientation }`."}
+        owned={
+          '`role` (`"tab"`), `id`, `aria-selected`, `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (with the flag), `onClick`, `onKeyDown`, `onFocus`, `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, and `anchor-name` in `style` for the Indicator (your `style` wins).'
+        }
+      />
 
       <h4>
         <code>Tabs.Panel</code>
@@ -215,11 +219,15 @@ export function TabsPage() {
           renderProp("div", "TabsPanelState"),
         ]}
       />
-      <p>
-        <code>TabsPanelState</code>: <code>{"{ value, selected, orientation }"}</code>, where{" "}
-        <code>selected</code> is committed. Panels get <code>tabIndex={"{0}"}</code> by default
-        (APG); pass <code>tabIndex={"{-1}"}</code> when the panel starts with focusable content.
-      </p>
+      <PartFacts
+        state={"`TabsPanelState` is `{ value, selected, orientation }`; `selected` is committed."}
+        owned={
+          '`role` (`"tabpanel"`), `id`, `aria-labelledby` (token-merged), `hidden`, `data-selected`.'
+        }
+        note={
+          "Panels get `tabIndex={0}` by default (APG); pass `tabIndex={-1}` when the panel starts with focusable content."
+        }
+      />
 
       <h4>
         <code>Tabs.Indicator</code>
@@ -227,13 +235,15 @@ export function TabsPage() {
       <PropsTable
         rows={[...functionProps("TabsIndicatorState"), renderProp("span", "TabsIndicatorState")]}
       />
-      <p>
-        <code>TabsIndicatorState</code>: <code>{"{ value, pending, orientation }"}</code>. A
-        decorative <code>aria-hidden</code> span that sets <code>position-anchor</code> to the
-        optimistic tab. Give it <code>position: absolute</code> and <code>anchor()</code> insets in
-        CSS, and a CSS <code>transition</code> on them to slide. It must come after the Tabs inside
-        the List.
-      </p>
+      <PartFacts
+        state={"`TabsIndicatorState` is `{ value, pending, orientation }`."}
+        owned={
+          "`aria-hidden`, `hidden`, `data-selected`, `data-pending`, and `position-anchor` in `style`."
+        }
+        note={
+          "A decorative span that follows the optimistic tab. Give it `position: absolute` and `anchor()` insets in CSS, and a CSS `transition` on them to slide. It must come after the Tabs inside the List."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

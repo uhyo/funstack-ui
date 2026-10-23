@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToastArchive } from "../examples/ToastArchive.js";
 import toastArchiveSource from "../examples/ToastArchive.tsx?raw";
 import { ToastNotifications } from "../examples/ToastNotifications.js";
@@ -349,11 +349,14 @@ toast({ title: "Link copied" });`}</CodeBlock>
           renderProp("section", "ToastViewportState"),
         ]}
       />
-      <p>
-        <code>ToastViewportState</code>: <code>{"{ toasts, queued, paused }"}</code>.{" "}
-        <code>toasts</code> is chronological (oldest first) and includes the ones animating out;{" "}
-        <code>paused</code> is true while a viewport-wide pause holds.
-      </p>
+      <PartFacts
+        state={
+          "`ToastViewportState` is `{ toasts, queued, paused }`; `toasts` is chronological (oldest first) and includes the ones animating out; `paused` is true while a viewport-wide pause holds."
+        }
+        owned={
+          '`popover` (`"manual"`), `aria-label` (your own wins verbatim), `data-paused`, `data-empty`, and the pointer and focus handlers.'
+        }
+      />
 
       <h4>
         <code>Toast.Root</code>
@@ -377,13 +380,15 @@ toast({ title: "Link copied" });`}</CodeBlock>
           renderProp("div", "ToastRootState"),
         ]}
       />
-      <p>
-        <code>ToastRootState</code>: <code>{"{ toast, pending, ending, type, priority }"}</code>.{" "}
-        <code>Toast.Title</code> (<code>div</code>) and <code>Toast.Description</code> (
-        <code>p</code>) take the same function props against the Root's state; their{" "}
-        <code>children</code> default to <code>toast.title</code> / <code>toast.description</code>,
-        and the Description renders nothing when it has neither.
-      </p>
+      <PartFacts
+        state={"`ToastRootState` is `{ toast, pending, ending, type, priority }`."}
+        owned={
+          '`role` (`dialog`, or `alertdialog` for `priority: "high"`), `tabIndex`, `aria-labelledby`, `aria-describedby`, `inert` (while ending), `onKeyDown`, `data-type`, `data-pending`, `data-ending`.'
+        }
+        note={
+          "`Toast.Title` (`div`) and `Toast.Description` (`p`) take the same function props against the Root's state; their `children` default to `toast.title` / `toast.description`, and the Description renders nothing when it has neither."
+        }
+      />
 
       <h4>
         <code>Toast.Action</code>
@@ -407,13 +412,13 @@ toast({ title: "Link copied" });`}</CodeBlock>
           renderProp("button", "ToastActionState"),
         ]}
       />
-      <p>
-        <code>ToastActionState</code>: <code>{"{ pending, toast }"}</code>. A second click while the
-        action is pending is ignored (and cancelled): one Undo, one Retry. The Action is{" "}
-        <code>aria-disabled="true"</code> while it shows <code>data-pending</code>, never natively
-        disabled, so it keeps focus. Owns <code>type</code> (on a button), <code>onClick</code>,{" "}
-        <code>aria-disabled</code> and <code>data-pending</code>.
-      </p>
+      <PartFacts
+        state={"`ToastActionState` is `{ pending, toast }`."}
+        owned={"`type` (on a `<button>` only), `onClick`, `aria-disabled`, `data-pending`."}
+        note={
+          'A second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is `aria-disabled="true"` while it shows `data-pending`, never natively disabled, so it keeps focus.'
+        }
+      />
 
       <h4>
         <code>Toast.Close</code>
@@ -421,11 +426,13 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <PropsTable
         rows={[...functionProps("ToastCloseState"), renderProp("button", "ToastCloseState")]}
       />
-      <p>
-        Closes the toast with <code>reason: "dismiss"</code>, like Escape. Give it a name (text or{" "}
-        <code>aria-label</code>); development warns otherwise. <code>ToastCloseState</code>:{" "}
-        <code>{"{ toast }"}</code>.
-      </p>
+      <PartFacts
+        state={"`ToastCloseState` is `{ toast }`."}
+        owned={"`type` (on a `<button>` only), `onClick`."}
+        note={
+          'Closes the toast with `reason: "dismiss"`, like Escape. Give it a name (text or `aria-label`); development warns otherwise.'
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

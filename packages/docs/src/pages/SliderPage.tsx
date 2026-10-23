@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SliderField } from "../examples/SliderField.js";
 import sliderFieldSource from "../examples/SliderField.tsx?raw";
 import { SliderPrice } from "../examples/SliderPrice.js";
@@ -226,19 +226,17 @@ export function SliderPage() {
           renderProp("div", "SliderRootState<T>"),
         ]}
       />
-      <p>
-        <code>T</code> is <code>number</code> or <code>readonly number[]</code>, inferred from{" "}
-        <code>value</code> / <code>defaultValue</code>. <code>SliderRootState&lt;T&gt;</code>:{" "}
-        <code>{"{ value, values, pending, dragging, orientation, disabled, min, max, step }"}</code>
-        , where <code>value</code> is the shown value and <code>values</code> the same as an array.
-        Details: <code>{"{ reason, thumb, event }"}</code>, <code>reason</code> being{" "}
-        <code>"activate"</code>, <code>"platform"</code> (a form reset, a value found at hydration)
-        or <code>"dismiss"</code> (the revert after a failed save, steps only), and{" "}
-        <code>thumb</code> the index that moved (<code>null</code> on platform paths and the
-        revert). The Root owns <code>role</code> and, while a Label is mounted and there are several
-        thumbs, <code>aria-labelledby</code> (merged with yours). There is no{" "}
-        <code>transition</code> prop on any part.
-      </p>
+      <PartFacts
+        state={
+          "`SliderRootState<T>` is `{ value, values, pending, dragging, orientation, disabled, min, max, step }`; `T` is `number` or `readonly number[]`, inferred from `value` / `defaultValue`; `value` is the shown value and `values` the same as an array."
+        }
+        owned={
+          '`role` (`"group"` with several thumbs), `aria-labelledby` (the Label\'s id while a Label is mounted and there are several thumbs; merged with yours), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`, and the `--slider-*` custom properties in `style` (your entries win).'
+        }
+        note={
+          'Details are `{ reason, thumb, event }`: `reason` is `"activate"`, `"platform"` (a form reset, a value found at hydration) or `"dismiss"` (the revert after a failed save, steps only), and `thumb` the index that moved (`null` on platform paths and the revert). There is no `transition` prop on any part.'
+        }
+      />
 
       <h4>
         <code>Slider.Thumb</code>
@@ -286,13 +284,15 @@ export function SliderPage() {
           renderProp("span", "SliderThumbState"),
         ]}
       />
-      <p>
-        <code>SliderThumbState</code>:{" "}
-        <code>{"{ index, value, pending, dragging, orientation, disabled }"}</code>. The input's
-        attributes (<code>min</code>, <code>max</code>, <code>step</code>, <code>value</code>,{" "}
-        <code>aria-valuetext</code>, …) are all the library's; a <code>render</code> element never
-        touches the input.
-      </p>
+      <PartFacts
+        state={
+          "`SliderThumbState` is `{ index, value, pending, dragging, orientation, disabled }`."
+        }
+        owned={
+          "on the styled element: `onPointerDown`, `data-index`, `data-orientation`, `data-dragging`, `data-pending`, `data-disabled`, and `--slider-value` / `touch-action` in `style` (your entries win). On the input: every attribute (`type`, `min`, `max`, `step`, `value`, `aria-valuetext`, …) except `aria-label`, `aria-labelledby`, `aria-describedby`, `name`, `form` and `autoFocus`, which are yours."
+        }
+        note={"A `render` element never touches the input."}
+      />
 
       <h4>
         <code>Slider.Track</code>, <code>Slider.Indicator</code>
@@ -300,15 +300,17 @@ export function SliderPage() {
       <PropsTable
         rows={[...functionProps("SliderTrackState"), renderProp("div / span", "SliderTrackState")]}
       />
-      <p>
-        <code>SliderTrackState</code> (and <code>SliderIndicatorState</code>):{" "}
-        <code>{"{ orientation, dragging, disabled }"}</code>. A press on the Track moves the nearest
-        thumb, focuses its input and starts dragging it; its box is the reference for the pointer
-        maths. When two thumbs share a value (stacked), the one that can move toward the pointer
-        moves, whichever of them was pressed; a press exactly on the value lets the first move
-        decide. The commit uses the release position. The Indicator renders no position: place it
-        from <code>--slider-start</code> / <code>--slider-end</code>.
-      </p>
+      <PartFacts
+        state={
+          "`SliderTrackState` and `SliderIndicatorState` are `{ orientation, dragging, disabled }`."
+        }
+        owned={
+          "Track: `onPointerDown`, `data-orientation`, `data-disabled`, and `touch-action` in `style` (your entry wins); Indicator: `data-orientation`, `data-disabled`."
+        }
+        note={
+          "A press on the Track moves the nearest thumb, focuses its input and starts dragging it; its box is the reference for the pointer maths. When two thumbs share a value (stacked), the one that can move toward the pointer moves, whichever of them was pressed; a press exactly on the value lets the first move decide. The commit uses the release position. The Indicator renders no position: place it from `--slider-start` / `--slider-end`."
+        }
+      />
 
       <h4>
         <code>Slider.Label</code>
@@ -316,12 +318,13 @@ export function SliderPage() {
       <PropsTable
         rows={[...functionProps("SliderRootState"), renderProp("label", "SliderRootState")]}
       />
-      <p>
-        The Label must stay a <code>&lt;label&gt;</code> with one thumb (it names the input through{" "}
-        <code>for</code>); with several thumbs the Root is named by its id. Its state is not tied to
-        the Root's value type: <code>value</code> is typed <code>number | readonly number[]</code>;
-        narrow it with <code>&lt;Slider.Label&lt;number&gt;&gt;</code> or read <code>values</code>.
-      </p>
+      <PartFacts
+        state={"`SliderRootState`."}
+        owned={"`id`, `htmlFor`."}
+        note={
+          "The Label must stay a `<label>` with one thumb (it names the input through `for`); with several thumbs the Root is named by the Label's id. Its state is not tied to the Root's value type: `value` is typed `number | readonly number[]`; narrow it with `<Slider.Label<number>>` or read `values`."
+        }
+      />
 
       <h4>
         <code>Slider.Value</code>
@@ -338,13 +341,13 @@ export function SliderPage() {
           renderProp("span", "SliderValueState"),
         ]}
       />
-      <p>
-        The Value is a plain <code>span</code>, not <code>&lt;output&gt;</code>: a live region that
-        updates on every step would chatter, and the slider already exposes its value.{" "}
-        <code>SliderValueState</code> is the Root's state plus <code>index</code>; narrow{" "}
-        <code>value</code> with <code>&lt;Slider.Value&lt;number&gt;&gt;</code> or read{" "}
-        <code>values</code>.
-      </p>
+      <PartFacts
+        state={"`SliderValueState` is the Root's state plus `index`."}
+        owned={"none."}
+        note={
+          "The Value is a plain `span`, not `<output>`: a live region that updates on every step would chatter, and the slider already exposes its value. Narrow `value` with `<Slider.Value<number>>` or read `values`."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

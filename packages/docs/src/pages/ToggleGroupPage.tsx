@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleGroupAlignment } from "../examples/ToggleGroupAlignment.js";
 import toggleGroupAlignmentSource from "../examples/ToggleGroupAlignment.tsx?raw";
 import { ToggleGroupStyles } from "../examples/ToggleGroupStyles.js";
@@ -167,14 +167,15 @@ export function ToggleGroupPage() {
           renderProp("div", "ToggleGroupRootState"),
         ]}
       />
-      <p>
-        <code>ToggleGroupRootState</code> is{" "}
-        <code>{"{ value, pending, disabled, orientation }"}</code>; <code>value</code> is the
-        optimistic set as an array in document order (exclusive mode: <code>[value]</code> or{" "}
-        <code>[]</code>). Every other <code>&lt;div&gt;</code> prop passes through, except{" "}
-        <code>role</code> and the handlers of the roving focus (<code>onKeyDown</code>,{" "}
-        <code>onFocus</code>, <code>onBlur</code>, <code>onPointerDown</code>), which are not props.
-      </p>
+      <PartFacts
+        state={
+          "`ToggleGroupRootState` is `{ value, pending, disabled, orientation }`; `value` is the optimistic set as an array in document order (exclusive mode: `[value]` or `[]`)."
+        }
+        owned={
+          '`role` (`"group"`), `data-orientation`, `data-pending`, `data-disabled`; standalone (outside a Toolbar) also the roving-focus handlers `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` and, with the flag, `focusgroup`.'
+        }
+        note={"Every other `<div>` prop passes through."}
+      />
 
       <h4>ToggleGroup.Item</h4>
       <PropsTable
@@ -204,12 +205,12 @@ export function ToggleGroupPage() {
           renderProp("button", "ToggleGroupItemState"),
         ]}
       />
-      <p>
-        <code>ToggleGroupItemState</code> is{" "}
-        <code>{"{ pressed, pending, disabled, orientation }"}</code>. <code>onClick</code>,{" "}
-        <code>type</code>, <code>aria-pressed</code> and <code>tabIndex</code> are the library's:
-        the roving focus writes <code>tabindex</code> itself.
-      </p>
+      <PartFacts
+        state={"`ToggleGroupItemState` is `{ pressed, pending, disabled, orientation }`."}
+        owned={
+          "`type` (on a `<button>` only), `aria-pressed`, `disabled`, `aria-disabled` (link or component `render`), `onClick`, `tabIndex` (the roving focus writes it), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, and `focusgroupstart` while the Root renders `focusgroup`."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

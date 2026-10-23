@@ -224,6 +224,31 @@
   color: var(--color-text-secondary);
 }
 
+/* The State / Owned lines after a part's props table. */
+.part-facts {
+  margin: 12px 0 16px;
+  padding: 0 0 0 12px;
+  border-left: 3px solid var(--color-border);
+}
+
+.part-facts > div {
+  margin: 4px 0;
+}
+
+.part-facts dt {
+  display: inline;
+  font-weight: 600;
+}
+
+.part-facts dt::after {
+  content: ": ";
+}
+
+.part-facts dd {
+  display: inline;
+  margin: 0;
+}
+
 /* The "Concept: …" line under a behaviour section's heading. */
 .concept-ref {
   margin: -8px 0 12px;

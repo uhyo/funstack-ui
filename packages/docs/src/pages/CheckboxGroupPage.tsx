@@ -2,13 +2,13 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxGroupForm } from "../examples/CheckboxGroupForm.js";
 import checkboxGroupFormSource from "../examples/CheckboxGroupForm.tsx?raw";
 import { CheckboxGroupToppings } from "../examples/CheckboxGroupToppings.js";
 import checkboxGroupToppingsSource from "../examples/CheckboxGroupToppings.tsx?raw";
 import checkboxGroupCss from "../examples/checkbox-group.css?raw";
-import { functionProps, renderProp } from "./shared-props.js";
+import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 const transitionRow = (part: string) => ({
   name: "transition",
@@ -190,15 +190,17 @@ export function CheckboxGroupPage() {
           renderProp("fieldset", "CheckboxGroupRootState"),
         ]}
       />
-      <p>
-        <code>CheckboxGroupRootState</code>: <code>{"{ value, pending, disabled }"}</code>, with{" "}
-        <code>value</code> the optimistic set as an array in the Items' document order as of the
-        Root's last render (Items reordered by a component that re-renders without the Root are
-        picked up at its next render; <code>next</code> always reads the current order). The Root
-        owns <code>disabled</code> and <code>form</code> and writes no <code>role</code>; other
-        fieldset props pass through (<code>aria-label</code> for a group without a Label, for
-        example).
-      </p>
+      <PartFacts
+        state={
+          "`CheckboxGroupRootState` is `{ value, pending, disabled }`; `value` is the optimistic set as an array in the Items' document order as of the Root's last render (Items reordered by a component that re-renders without the Root are picked up at its next render; `next` always reads the current order)."
+        }
+        owned={
+          "`disabled`, `form`, `data-pending`, `data-disabled`; no `role` is written. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`."
+        }
+        note={
+          "Other fieldset props pass through (`aria-label` for a group without a Label, for example)."
+        }
+      />
 
       <h4>
         <code>CheckboxGroup.Label</code>
@@ -209,6 +211,7 @@ export function CheckboxGroupPage() {
           renderProp("legend", "CheckboxGroupRootState"),
         ]}
       />
+      <PartFacts state={"the Root's."} owned={"none."} />
 
       <h4>
         <code>CheckboxGroup.Item</code>
@@ -229,16 +232,7 @@ export function CheckboxGroupPage() {
               "Native `disabled`: unfocusable, never dispatches, not validated. A Parent leaves it alone, and checked it does not satisfy `required`.",
           },
           transitionRow("Item"),
-          {
-            name: "className",
-            type: "string | ((state: CheckboxGroupItemState) => string | undefined)",
-            description: "A class name, or a function of the Item's state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: CheckboxGroupItemState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the Item's state.",
-          },
+          ...stylingProps("CheckboxGroupItemState"),
           {
             name: "render",
             type: "ReactElement | ((props, state: CheckboxGroupItemState) => ReactNode)",
@@ -247,18 +241,17 @@ export function CheckboxGroupPage() {
           },
         ]}
       />
-      <p>
-        <code>CheckboxGroupItemState</code>: <code>{"{ value, checked, pending, disabled }"}</code>.{" "}
-        <code>checked</code> is optimistic; <code>pending</code> is true while an action is in
-        flight and this box's optimistic state differs from the committed one (click a box twice
-        quickly and it is not pending, the Root still is); <code>disabled</code> includes{" "}
-        <code>Root disabled</code>. The Item owns <code>type</code>, <code>name</code>,{" "}
-        <code>value</code>, <code>checked</code>, <code>defaultChecked</code>, <code>disabled</code>
-        , <code>form</code>, <code>required</code> (computed by the Root) and{" "}
-        <code>aria-checked</code> (removed); <code>onChange</code> is merged; <code>id</code>,{" "}
-        <code>role</code> and other input props pass through. There is no per-Item{" "}
-        <code>required</code>: use a plain <code>Checkbox</code> for "this box must be checked".
-      </p>
+      <PartFacts
+        state={
+          "`CheckboxGroupItemState` is `{ value, checked, pending, disabled }`; `checked` is optimistic; `pending` is true while an action is in flight and this box's optimistic state differs from the committed one (click a box twice quickly and it is not pending, the Root still is); `disabled` includes `Root disabled`."
+        }
+        owned={
+          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required` (computed by the Root), `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged."
+        }
+        note={
+          '`id`, `role` and other input props pass through. There is no per-Item `required`: use a plain `Checkbox` for "this box must be checked".'
+        }
+      />
 
       <h4>
         <code>CheckboxGroup.Parent</code>
@@ -278,16 +271,7 @@ export function CheckboxGroupPage() {
             description: "Native `disabled`: unfocusable, never dispatches.",
           },
           transitionRow("Parent"),
-          {
-            name: "className",
-            type: "string | ((state: CheckboxGroupParentState) => string | undefined)",
-            description: "A class name, or a function of the Parent's state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: CheckboxGroupParentState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the Parent's state.",
-          },
+          ...stylingProps("CheckboxGroupParentState"),
           {
             name: "render",
             type: "ReactElement | ((props, state: CheckboxGroupParentState) => ReactNode)",
@@ -296,21 +280,17 @@ export function CheckboxGroupPage() {
           },
         ]}
       />
-      <p>
-        <code>CheckboxGroupParentState</code>:{" "}
-        <code>{"{ values, checked, indeterminate, pending, disabled }"}</code>. <code>checked</code>
-        : every value is in the optimistic set (false for empty <code>values</code>);{" "}
-        <code>indeterminate</code>: some but not all, never together with <code>checked</code>, and,
-        unlike a plain Checkbox, not hidden while pending (it is derived from the optimistic set, so
-        the DOM property, the attribute and <code>:indeterminate</code> always agree);{" "}
-        <code>pending</code>: an action is in flight and one of its values is changing. The Parent
-        owns <code>type</code>, <code>checked</code>, <code>defaultChecked</code>,{" "}
-        <code>indeterminate</code>, <code>disabled</code> and <code>aria-checked</code>, always
-        removes <code>name</code>, <code>value</code>, <code>form</code> and <code>required</code>,
-        and renders <code>autocomplete="off"</code> (it is not a value, so a browser restoring form
-        state on reload must not restore it). Other props pass through, such as{" "}
-        <code>aria-controls</code> with the ids of the boxes it controls (as in the example above).
-      </p>
+      <PartFacts
+        state={
+          "`CheckboxGroupParentState` is `{ values, checked, indeterminate, pending, disabled }`; `checked`: every value is in the optimistic set (false for empty `values`); `indeterminate`: some but not all, never together with `checked`, and, unlike a plain Checkbox, not hidden while pending (it is derived from the optimistic set, so the DOM property, the attribute and `:indeterminate` always agree); `pending`: an action is in flight and one of its values is changing."
+        }
+        owned={
+          '`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `autoComplete` (`"off"`: it is not a value, so a browser restoring form state on reload must not restore it), `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `name`, `value`, `form`, `required` and `aria-checked` are removed; `onChange` is merged.'
+        }
+        note={
+          "Other props pass through, such as `aria-controls` with the ids of the boxes it controls (as in the example above)."
+        }
+      />
 
       <h4>Click cycle</h4>
       <p>The Parent follows the WAI-ARIA APG mixed-state checkbox example:</p>

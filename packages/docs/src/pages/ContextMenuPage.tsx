@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ContextMenuCanvas } from "../examples/ContextMenuCanvas.js";
 import contextMenuCanvasSource from "../examples/ContextMenuCanvas.tsx?raw";
 import { ContextMenuFiles } from "../examples/ContextMenuFiles.js";
@@ -432,16 +432,17 @@ export function ContextMenuPage() {
           renderProp("div", "MenuContextTriggerState"),
         ]}
       />
-      <p>
-        <code>MenuContextTriggerState</code>: <code>{"{ open, pending, disabled }"}</code> (
-        <code>open</code> optimistic, the Root's). Emits <code>data-open</code>,{" "}
-        <code>data-pending</code>, <code>data-disabled</code> and inline{" "}
-        <code>-webkit-touch-callout: none</code> (your <code>style</code> wins). Owns{" "}
-        <code>onContextMenu</code>, <code>onPointerDown</code>, <code>onPointerMove</code>,{" "}
-        <code>onPointerUp</code> and <code>onPointerCancel</code>; <code>onKeyDown</code> and{" "}
-        <code>onClick</code> pass through. No <code>id</code>, <code>tabIndex</code> or ARIA. Every
-        prop is serialisable, so a Server Component can render the region.
-      </p>
+      <PartFacts
+        state={
+          "`MenuContextTriggerState` is `{ open, pending, disabled }`; `open` is optimistic, the Root's."
+        }
+        owned={
+          "`onContextMenu`, `onPointerDown`, `onPointerMove`, `onPointerUp`, `onPointerCancel`, `data-open`, `data-pending`, `data-disabled`, and `-webkit-touch-callout: none` in `style` (your `style` wins)."
+        }
+        note={
+          "`onKeyDown` and `onClick` pass through. No `id`, `tabIndex` or ARIA. Every prop is serialisable, so a Server Component can render the region."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

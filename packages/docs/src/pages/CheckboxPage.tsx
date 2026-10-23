@@ -2,7 +2,8 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { stylingProps } from "./shared-props.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxForm } from "../examples/CheckboxForm.js";
 import checkboxFormSource from "../examples/CheckboxForm.tsx?raw";
 import { CheckboxSelectAll } from "../examples/CheckboxSelectAll.js";
@@ -148,16 +149,7 @@ export function CheckboxPage() {
             description:
               "Forwarded to the Checkbox's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the check itself.",
           },
-          {
-            name: "className",
-            type: "string | ((state: CheckboxState) => string | undefined)",
-            description: "A class name, or a function of the state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: CheckboxState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the state.",
-          },
+          ...stylingProps("CheckboxState"),
           {
             name: "render",
             type: "ReactElement | ((props, state: CheckboxState) => ReactNode)",
@@ -166,14 +158,15 @@ export function CheckboxPage() {
           },
         ]}
       />
-      <p>
-        <code>CheckboxState</code> is <code>{"{ checked, indeterminate, pending, disabled }"}</code>
-        , with <code>checked</code> optimistic and <code>indeterminate</code> already{" "}
-        <code>indeterminate && !pending</code>. Other <code>&lt;input&gt;</code> props pass through,
-        including <code>role</code>. The Checkbox owns <code>type</code>, <code>checked</code>,{" "}
-        <code>defaultChecked</code>, <code>disabled</code> and <code>onChange</code>, and removes{" "}
-        <code>aria-checked</code>.
-      </p>
+      <PartFacts
+        state={
+          "`CheckboxState` is `{ checked, indeterminate, pending, disabled }`; `checked` is optimistic and `indeterminate` is already `indeterminate && !pending`."
+        }
+        owned={
+          "`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `onChange`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `aria-checked` is removed. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+        }
+        note={"Other `<input>` props pass through, including `role`."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

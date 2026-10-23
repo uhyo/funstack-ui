@@ -69,6 +69,29 @@ export function PropsTable({ rows }: { rows: PropRow[] }) {
 }
 
 /**
+ * The two fixed lines after every part's props table: the part's state object and the props the
+ * part sets itself (a `render` element cannot override them). An optional note carries what else
+ * the table does not say. Strings are rendered with {@link inline}.
+ */
+export function PartFacts({ state, owned, note }: { state: string; owned: string; note?: string }) {
+  return (
+    <>
+      <dl className="part-facts">
+        <div>
+          <dt>State</dt>
+          <dd>{inline(state)}</dd>
+        </div>
+        <div>
+          <dt>Owned</dt>
+          <dd>{inline(owned)}</dd>
+        </div>
+      </dl>
+      {note !== undefined && <p>{inline(note)}</p>}
+    </>
+  );
+}
+
+/**
  * A plain table for data attributes, keyboard interactions and similar reference lists. Cells
  * are strings rendered with {@link inline}.
  */

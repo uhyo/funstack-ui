@@ -2,13 +2,13 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToolbarEditor } from "../examples/ToolbarEditor.js";
 import toolbarEditorSource from "../examples/ToolbarEditor.tsx?raw";
 import { ToolbarVertical } from "../examples/ToolbarVertical.js";
 import toolbarVerticalSource from "../examples/ToolbarVertical.tsx?raw";
 import toolbarCss from "../examples/toolbar.css?raw";
-import { functionProps, renderProp } from "./shared-props.js";
+import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ToolbarPage() {
   return (
@@ -115,34 +115,26 @@ import { Toolbar } from "@funstack/ui/toolbar";
           renderProp("div", "ToolbarRootState"),
         ]}
       />
-      <p>
-        <code>ToolbarRootState</code> is <code>{"{ orientation }"}</code>. There is no{" "}
-        <code>disabled</code>: disable items individually, or wrap the toolbar in a{" "}
-        <code>&lt;fieldset disabled&gt;</code>. <code>role</code>, <code>aria-orientation</code>,{" "}
-        <code>onKeyDown</code>, <code>onFocus</code>, <code>onBlur</code> and{" "}
-        <code>onPointerDown</code> are the library's and are not props.
-      </p>
+      <PartFacts
+        state={"`ToolbarRootState` is `{ orientation }`."}
+        owned={
+          '`role` (`"toolbar"`), `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`, `focusgroup` (with the flag), and the `tabindex` of its items.'
+        }
+        note={
+          "There is no `disabled`: disable items individually, or wrap the toolbar in a `<fieldset disabled>`."
+        }
+      />
 
       <h4>Toolbar.Separator</h4>
       <PropsTable
-        rows={[
-          {
-            name: "className",
-            type: "string | ((state: ToolbarSeparatorState) => string | undefined)",
-            description: "A class name, or a function of the separator's state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: ToolbarSeparatorState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the separator's state.",
-          },
-          renderProp("hr", "ToolbarSeparatorState"),
-        ]}
+        rows={[...stylingProps("ToolbarSeparatorState"), renderProp("hr", "ToolbarSeparatorState")]}
       />
-      <p>
-        <code>ToolbarSeparatorState</code> is <code>{"{ orientation }"}</code>: the separator's own
-        orientation, <code>"vertical"</code> in a horizontal toolbar.
-      </p>
+      <PartFacts
+        state={
+          '`ToolbarSeparatorState` is `{ orientation }`: the separator\'s own orientation, `"vertical"` in a horizontal toolbar.'
+        }
+        owned={"`aria-orientation`, `data-orientation`."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

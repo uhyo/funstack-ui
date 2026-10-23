@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ProgressForm } from "../examples/ProgressForm.js";
 import progressFormSource from "../examples/ProgressForm.tsx?raw";
 import { ProgressJobs } from "../examples/ProgressJobs.js";
@@ -153,13 +153,13 @@ export function ProgressPage() {
           renderProp("div", "ProgressState"),
         ]}
       />
-      <p>
-        Owned: <code>role</code>, <code>aria-valuemin</code>, <code>aria-valuemax</code>,{" "}
-        <code>aria-valuenow</code>, <code>aria-valuetext</code>, <code>data-indeterminate</code>,{" "}
-        <code>data-complete</code>, and <code>aria-labelledby</code> (your tokens first, then the
-        Label's id). Your <code>style</code> wins over <code>--progress-value</code> per property.
-        Everything else passes through to the <code>div</code>.
-      </p>
+      <PartFacts
+        state={"`ProgressState`, shared by every part; its fields are listed under State below."}
+        owned={
+          "`role`, `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, `aria-valuetext`, `aria-labelledby` (your tokens first, then the Label's id), `data-indeterminate`, `data-complete`, and `--progress-value` in `style` (your entries win)."
+        }
+        note={"Everything else passes through to the `div`."}
+      />
       <h4>
         <code>Progress.Track</code>, <code>Progress.Indicator</code>, <code>Progress.Label</code>
       </h4>
@@ -169,6 +169,12 @@ export function ProgressPage() {
         Root always references it.
       </p>
       <PropsTable rows={partProps("div | span")} />
+      <PartFacts
+        state={"`ProgressState`."}
+        owned={
+          "`data-indeterminate` and `data-complete` on each; the Label also `id` (the Root always references it)."
+        }
+      />
       <h4>
         <code>Progress.Value</code>
       </h4>
@@ -187,6 +193,12 @@ export function ProgressPage() {
               "Hidden by default because the same text is in the Root's `aria-valuetext`. Pass `false` when you render something the attribute does not say.",
           },
         ]}
+      />
+      <PartFacts
+        state={"`ProgressState`."}
+        owned={
+          '`data-indeterminate`, `data-complete`. `aria-hidden="true"` is a default, not owned.'
+        }
       />
 
       <h4>State</h4>

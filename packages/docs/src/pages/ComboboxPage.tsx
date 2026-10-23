@@ -2,13 +2,13 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ComboboxCountry } from "../examples/ComboboxCountry.js";
 import comboboxCountrySource from "../examples/ComboboxCountry.tsx?raw";
 import { ComboboxDrink } from "../examples/ComboboxDrink.js";
 import comboboxDrinkSource from "../examples/ComboboxDrink.tsx?raw";
 import comboboxCss from "../examples/combobox.css?raw";
-import { functionProps, renderProp } from "./shared-props.js";
+import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ComboboxPage() {
   return (
@@ -289,14 +289,15 @@ export function ComboboxPage() {
           },
         ]}
       />
-      <p>
-        <code>ComboboxRootState</code>:{" "}
-        <code>{"{ value, inputValue, query, stale, activeValue, open, pending, disabled }"}</code>.{" "}
-        <code>value</code> and <code>open</code> are optimistic; <code>stale</code> is{" "}
-        <code>inputValue !== query</code>; <code>pending</code> covers the value and the open
-        transitions. No <code>ref</code>, <code>className</code> or <code>style</code>: the Root has
-        no element. <code>multiple</code> is not part of this version.
-      </p>
+      <PartFacts
+        state={
+          "`ComboboxRootState` is `{ value, inputValue, query, stale, activeValue, open, pending, disabled }`; `value` and `open` are optimistic; `stale` is `inputValue !== query`; `pending` covers the value and the open transitions."
+        }
+        owned={
+          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden input when `name` is given."
+        }
+        note={"`multiple` is not part of this version."}
+      />
       <p>
         <code>ComboboxValueChangeDetails</code>: <code>{"{ reason, custom, event }"}</code>.{" "}
         <code>reason</code> is <code>"activate"</code> (an accepted option: the <code>keydown</code>{" "}
@@ -319,32 +320,19 @@ export function ComboboxPage() {
             type: "boolean",
             description: "Native: an empty text is `valueMissing`, with the browser's message.",
           },
-          {
-            name: "className",
-            type: "string | ((state: ComboboxInputState) => string | undefined)",
-            description: "A class name, or a function of the input's state.",
-          },
-          {
-            name: "style",
-            type: "CSSProperties | ((state: ComboboxInputState) => CSSProperties | undefined)",
-            description: "Inline style, or a function of the input's state.",
-          },
+          ...stylingProps("ComboboxInputState"),
           renderProp("input", "ComboboxInputState"),
         ]}
       />
-      <p>
-        <code>ComboboxInputState</code>:{" "}
-        <code>{"{ value, inputValue, open, pending, stale, disabled }"}</code>. Owns <code>id</code>
-        , <code>type</code> (<code>"text"</code>, or <code>"search"</code> when a{" "}
-        <code>render</code> element says so), <code>role</code>, <code>value</code>,{" "}
-        <code>autoComplete="off"</code>, the <code>aria-autocomplete</code> /{" "}
-        <code>aria-expanded</code> / <code>aria-controls</code> / <code>aria-activedescendant</code>{" "}
-        wiring, <code>disabled</code> and its <code>onChange</code>, <code>onKeyDown</code>,{" "}
-        <code>onBlur</code>, <code>onClick</code>. <code>placeholder</code>, <code>name</code> (a
-        second field with the raw text), <code>aria-describedby</code> and other input props pass
-        through. A <code>render</code> element must stay an <code>&lt;input&gt;</code> of type text
-        or search.
-      </p>
+      <PartFacts
+        state={"`ComboboxInputState` is `{ value, inputValue, open, pending, stale, disabled }`."}
+        owned={
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`.'
+        }
+        note={
+          "`placeholder`, `name` (a second field with the raw text), `aria-describedby` and other input props pass through. A `render` element must stay an `<input>` of type text or search."
+        }
+      />
 
       <h4>
         <code>Combobox.Trigger</code>, <code>Combobox.Clear</code>
@@ -365,17 +353,17 @@ export function ComboboxPage() {
           renderProp("button", "ComboboxTriggerState | ComboboxClearState"),
         ]}
       />
-      <p>
-        Both are <code>&lt;button type="button" tabindex="-1"&gt;</code> (the input is the one Tab
-        stop), keep focus in the input when pressed and focus it when clicked.{" "}
-        <code>ComboboxTriggerState</code>: <code>{"{ open, pending, disabled }"}</code>; the Trigger
-        toggles the listbox and carries <code>aria-expanded</code>, <code>aria-controls</code>.{" "}
-        <code>ComboboxClearState</code>: <code>{"{ value, inputValue, disabled }"}</code>; Clear
-        empties the text and dispatches <code>null</code> unless nothing is selected. It is always
-        rendered: hide it with CSS (<code>:has(input:placeholder-shown)</code>) or its state. A
-        click on Clear while the listbox is open closes it (light dismiss: the button is outside the
-        popup).
-      </p>
+      <PartFacts
+        state={
+          "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, inputValue, disabled }`."
+        }
+        owned={
+          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded`, `aria-controls`, `data-open`, `data-pending`."
+        }
+        note={
+          "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox. Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
+        }
+      />
 
       <h4>
         <code>Combobox.Popup</code>
@@ -399,19 +387,15 @@ export function ComboboxPage() {
           renderProp("div", "ComboboxPopupState"),
         ]}
       />
-      <p>
-        <code>ComboboxPopupState</code>: <code>{"{ open, stale, query }"}</code> (<code>open</code>{" "}
-        committed). Renders <code>&lt;div popover="auto"&gt;</code> with <code>data-stale</code> and
-        no role, and owns <code>id</code>, <code>popover</code>, <code>onPointerDown</code> and{" "}
-        <code>onMouseDown</code> (a press anywhere in it keeps focus in the input). Inline style{" "}
-        <code>
-          position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block;
-          min-width: anchor-size(width)
-        </code>{" "}
-        places it below the input (above when it does not fit), at least as wide; your{" "}
-        <code>style</code> wins per property. A <code>render</code> element must stay a{" "}
-        <code>&lt;div&gt;</code>.
-      </p>
+      <PartFacts
+        state={"`ComboboxPopupState` is `{ open, stale, query }`; `open` is committed."}
+        owned={
+          '`id`, `popover` (`"auto"`), `onPointerDown` and `onMouseDown` (a press anywhere in it keeps focus in the input), `data-stale`; no role.'
+        }
+        note={
+          "Inline style `position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)` places it below the input (above when it does not fit), at least as wide; your `style` wins per property. A `render` element must stay a `<div>`."
+        }
+      />
 
       <h4>
         <code>Combobox.List</code>
@@ -425,15 +409,15 @@ export function ComboboxPage() {
           renderProp("div", "ComboboxListState"),
         ]}
       />
-      <p>
-        <code>ComboboxListState</code>: <code>{"{ query, stale, empty }"}</code>. Renders{" "}
-        <code>&lt;div role="listbox"&gt;</code>, named by the Label (<code>aria-labelledby</code>,
-        token-merged with yours, only when a <code>Combobox.Label</code> is rendered; without a
-        Label give the List an <code>aria-label</code>, development warns otherwise), with{" "}
-        <code>aria-busy="true"</code> while stale (with <code>data-stale</code>) or loading (a{" "}
-        <code>Status</code> fallback inside it), and <code>data-empty</code> when settled with no
-        options.
-      </p>
+      <PartFacts
+        state={"`ComboboxListState` is `{ query, stale, empty }`."}
+        owned={
+          '`id`, `role` (`"listbox"`), `aria-labelledby` (token-merged with yours; only while a `Combobox.Label` is rendered), `aria-busy`, `data-stale`, `data-empty`.'
+        }
+        note={
+          'Without a Label give the List an `aria-label` (development warns otherwise). `aria-busy="true"` is set while the results are stale or loading (a `Status` fallback inside it); `data-empty` when settled with no options.'
+        }
+      />
 
       <h4>
         <code>Combobox.Option</code>
@@ -465,14 +449,15 @@ export function ComboboxPage() {
           renderProp("div", "ComboboxOptionState"),
         ]}
       />
-      <p>
-        <code>ComboboxOptionState</code>:{" "}
-        <code>{"{ value, selected, active, pending, disabled }"}</code>. <code>selected</code> is
-        optimistic, <code>active</code> is virtual focus, <code>pending</code> is true on the option
-        being saved. Renders <code>&lt;div role="option" aria-selected&gt;</code>; never focused, no{" "}
-        <code>tabindex</code>. Hovering makes it active. Owns <code>id</code>, <code>role</code>,{" "}
-        <code>aria-selected</code>, <code>aria-disabled</code> and its pointer and click handlers.
-      </p>
+      <PartFacts
+        state={
+          "`ComboboxOptionState` is `{ value, selected, active, pending, disabled }`; `selected` is optimistic, `active` is virtual focus, `pending` is true on the option being saved."
+        }
+        owned={
+          "`id` (derived from `value`), `role`, `aria-selected`, `aria-disabled`, `onClick`, `onPointerDown`, `onMouseDown`, `onPointerMove`, `data-selected`, `data-active`, `data-pending`, `data-disabled`."
+        }
+        note={"Never focused, no `tabindex`; hovering makes it active."}
+      />
 
       <h4>
         <code>Combobox.Group</code>, <code>Combobox.GroupLabel</code>, <code>Combobox.Empty</code>,{" "}
@@ -491,15 +476,15 @@ export function ComboboxPage() {
           },
         ]}
       />
-      <p>
-        <code>Group</code> is <code>&lt;div role="group" aria-labelledby&gt;</code> named by the{" "}
-        <code>GroupLabel</code> inside it. <code>Status</code> inside the List (as a Suspense
-        fallback) is <code>&lt;div role="none"&gt;</code> and marks the results as loading (the List
-        is <code>aria-busy</code>); in the Popup it is a plain hint,{" "}
-        <code>&lt;div role="status"&gt;</code>. <code>Empty</code> is a plain{" "}
-        <code>&lt;div&gt;</code> that renders nothing unless the results are settled and empty, so
-        "No results" never flashes during a search.
-      </p>
+      <PartFacts
+        state={"none (Empty: `ComboboxListState`)."}
+        owned={
+          'Group: `role` (`"group"`), `aria-labelledby`; GroupLabel: `id`; Status: `role` (`"none"` inside the List, `"status"` in the Popup).'
+        }
+        note={
+          '`Group` is named by the `GroupLabel` inside it. `Status` inside the List (as a Suspense fallback) marks the results as loading (the List is `aria-busy`); in the Popup it is a plain hint. `Empty` is a plain `<div>` that renders nothing unless the results are settled and empty, so "No results" never flashes during a search.'
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

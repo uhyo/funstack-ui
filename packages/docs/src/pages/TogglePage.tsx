@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
 import toggleErrorsSource from "../examples/ToggleErrors.tsx?raw";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
@@ -91,11 +91,13 @@ export function TogglePage() {
           renderProp("button", "ToggleState"),
         ]}
       />
-      <p>
-        Every other <code>&lt;button&gt;</code> prop passes through, except <code>onClick</code>,{" "}
-        <code>type</code> and <code>aria-pressed</code>, which the Toggle owns.{" "}
-        <code>ToggleState</code> is <code>{"{ pressed, pending, disabled }"}</code>.
-      </p>
+      <PartFacts
+        state={"`ToggleState` is `{ pressed, pending, disabled }`; `pressed` is optimistic."}
+        owned={
+          "`type`, `aria-pressed`, `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-pressed`, `data-pending`, `data-disabled`."
+        }
+        note={"Every other `<button>` prop passes through."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { PopoverActions } from "../examples/PopoverActions.js";
 import popoverActionsSource from "../examples/PopoverActions.tsx?raw";
 import { PopoverShare } from "../examples/PopoverShare.js";
@@ -190,12 +190,14 @@ export function PopoverPage() {
           },
         ]}
       />
-      <p>
-        <code>PopoverRootState</code>: <code>{"{ open, pending }"}</code>, where <code>open</code>{" "}
-        is optimistic and both are <code>false</code> in JS-free mode. The Root has no{" "}
-        <code>ref</code>, <code>className</code> or <code>style</code>, and no <code>disabled</code>{" "}
-        (the Trigger has it).
-      </p>
+      <PartFacts
+        state={
+          "`PopoverRootState` is `{ open, pending }`; `open` is optimistic, and both are `false` in JS-free mode."
+        }
+        owned={
+          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), and no `disabled` (the Trigger has it)."
+        }
+      />
 
       <h4>
         <code>Popover.Trigger</code>
@@ -216,15 +218,17 @@ export function PopoverPage() {
           renderProp("button", "PopoverTriggerState"),
         ]}
       />
-      <p>
-        <code>PopoverTriggerState</code>: <code>{"{ open, pending, disabled }"}</code>.{" "}
-        <code>pending</code> is true while the Root is pending: an open, a part-initiated close or a
-        dismissal notification. A click while open is a library-owned close; a second click during a
-        pending open cancels it (the latest intent wins). The Trigger owns <code>type</code>,{" "}
-        <code>disabled</code>, <code>commandfor</code>, <code>command</code>,{" "}
-        <code>aria-expanded</code> and, in library mode, <code>onClick</code>.{" "}
-        <code>aria-haspopup</code> and <code>aria-controls</code> pass through.
-      </p>
+      <PartFacts
+        state={
+          "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open, a part's close or a dismissal notification."
+        }
+        owned={
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `commandfor`, `command`, `aria-expanded`, `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`."
+        }
+        note={
+          "A click while open is a part's close; a second click during a pending open cancels it (the latest intent wins). `aria-haspopup` and `aria-controls` pass through."
+        }
+      />
 
       <h4>
         <code>Popover.Popup</code>
@@ -286,21 +290,17 @@ export function PopoverPage() {
           renderProp("dialog", "PopoverPopupState"),
         ]}
       />
-      <p>
-        <code>PopoverPopupState</code>: <code>{"{ open, side, align }"}</code>, with{" "}
-        <code>open</code> committed (<code>false</code> in JS-free mode; <code>:popover-open</code>{" "}
-        is the DOM truth) and <code>side</code> / <code>align</code> where the browser placed the
-        popup while it is shown (a physical side, after any fallback flip, in both modes), your
-        props otherwise. The Popup owns <code>id</code>, <code>popover</code> (<code>"auto"</code>
-        ), <code>open</code> (never rendered), <code>aria-modal</code> (<code>"false"</code>:
-        Chromium exposes a <code>&lt;dialog popover&gt;</code> as modal otherwise) and{" "}
-        <code>data-side</code> / <code>data-align</code>; its <code>aria-labelledby</code> and{" "}
-        <code>aria-describedby</code> are merged with yours. <code>role="dialog"</code> is a default
-        you can override (<code>"region"</code> or <code>"group"</code> for a non-interactive card).{" "}
-        <code>onToggle</code> and <code>onBeforeToggle</code> are not accepted; use a{" "}
-        <code>ref</code> for the platform events. Your <code>style</code> wins over the inline
-        placement.
-      </p>
+      <PartFacts
+        state={
+          "`PopoverPopupState` is `{ open, side, align }`; `open` is committed (`false` in JS-free mode; `:popover-open` is the DOM truth); `side` / `align` are where the browser placed the popup while it is shown (a physical side, after any fallback flip, in both modes), your props otherwise."
+        }
+        owned={
+          '`id`, `popover` (`"auto"`), `open` (never rendered), `aria-modal` (`"false"`: Chromium exposes a `<dialog popover>` as modal otherwise), `data-side` / `data-align` (unless `side` is `null`); `aria-labelledby` and `aria-describedby` are merged with yours.'
+        }
+        note={
+          '`role="dialog"` is a default you can override (`"region"` or `"group"` for a non-interactive card). `onToggle` and `onBeforeToggle` are not accepted; use a `ref` for the platform events. Your `style` wins over the inline placement.'
+        }
+      />
 
       <h4>
         <code>Popover.Close</code>
@@ -333,18 +333,15 @@ export function PopoverPage() {
           renderProp("button", "PopoverCloseState"),
         ]}
       />
-      <p>
-        <code>PopoverCloseState</code>: <code>{"{ pending, disabled }"}</code>. In library mode the
-        click is always intercepted, so every Close goes through the Root. A second click while the
-        action is pending is ignored (and cancelled), and the button is{" "}
-        <code>aria-disabled="true"</code> for as long as it shows <code>data-pending</code> (the
-        action and the hide); never natively disabled, so it keeps focus. To hide at once and finish
-        the work in the background, do not return the promise:{" "}
-        <code>{"action={() => { void apply(); }}"}</code>. If the user dismisses the popover and
-        opens it again while the action runs, the action's close is dropped: it belonged to the
-        earlier open. Popovers have no return value. The Close owns <code>disabled</code> and{" "}
-        <code>aria-disabled</code>.
-      </p>
+      <PartFacts
+        state={"`PopoverCloseState` is `{ pending, disabled }`."}
+        owned={
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+        }
+        note={
+          'In library mode the click is always intercepted, so every Close goes through the Root. A second click while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending` (the action and the hide); never natively disabled, so it keeps focus. To hide at once and finish the work in the background, do not return the promise: `action={() => { void apply(); }}`. If the user dismisses the popover and opens it again while the action runs, the action\'s close is dropped: it belonged to the earlier open. Popovers have no return value.'
+        }
+      />
 
       <h4>
         <code>Popover.Title</code>, <code>Popover.Description</code>
@@ -360,12 +357,15 @@ export function PopoverPage() {
           },
         ]}
       />
-      <p>
-        Both own their <code>id</code>. Their state is the Popup's (<code>PopoverTitleState</code>{" "}
-        and <code>PopoverDescriptionState</code> are <code>PopoverPopupState</code>). A dialog-role
-        Popup with neither a Title nor an <code>aria-label</code> is a development warning once
-        shown.
-      </p>
+      <PartFacts
+        state={
+          "the Popup's (`PopoverTitleState` and `PopoverDescriptionState` are `PopoverPopupState`)."
+        }
+        owned={"`id`."}
+        note={
+          "A dialog-role Popup with neither a Title nor an `aria-label` is a development warning once shown."
+        }
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table

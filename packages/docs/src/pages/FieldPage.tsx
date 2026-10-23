@@ -2,13 +2,13 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
-import { PropsTable, Table } from "../components/Tables.js";
+import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { FieldControls } from "../examples/FieldControls.js";
 import fieldControlsSource from "../examples/FieldControls.tsx?raw";
 import { FieldSignUp } from "../examples/FieldSignUp.js";
 import fieldSignUpSource from "../examples/FieldSignUp.tsx?raw";
 import fieldCss from "../examples/field.css?raw";
-import { functionProps, renderProp } from "./shared-props.js";
+import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function FieldPage() {
   return (
@@ -297,18 +297,12 @@ import { Form } from "@funstack/ui/form";
           renderProp("div", "FieldState"),
         ]}
       />
-      <p>
-        <code>FieldState</code>, shared by every Field part:{" "}
-        <code>{"{ invalid, messages, validity, disabled, required, pending }"}</code>.{" "}
-        <code>invalid</code>: an error is shown. <code>messages</code>: the shown messages (the
-        browser's <code>validationMessage</code>, <code>validate</code>'s strings, or the server's),{" "}
-        <code>[]</code> while valid. <code>validity</code>: a <code>FieldValidity</code> snapshot of
-        the control's <code>ValidityState</code> (<code>valueMissing</code>,{" "}
-        <code>typeMismatch</code>, <code>tooShort</code>, …, <code>customError</code>,{" "}
-        <code>valid</code>). <code>disabled</code> / <code>required</code>: the Field's or the
-        control's own. <code>pending</code>: the enclosing form's submission is in flight. The Root
-        owns its four <code>data-*</code> attributes.
-      </p>
+      <PartFacts
+        state={
+          "`FieldState`, shared by every Field part, is `{ invalid, messages, validity, disabled, required, pending }`; `invalid`: an error is shown; `messages`: the shown messages (the browser's `validationMessage`, `validate`'s strings, or the server's), `[]` while valid; `validity`: a `FieldValidity` snapshot of the control's `ValidityState` (`valueMissing`, `typeMismatch`, `tooShort`, …, `customError`, `valid`); `disabled` / `required`: the Field's or the control's own; `pending`: the enclosing form's submission is in flight."
+        }
+        owned={"`data-invalid`, `data-disabled`, `data-required`, `data-pending`."}
+      />
 
       <h4>
         <code>Field.Label</code>, <code>Field.Description</code>
@@ -323,11 +317,12 @@ import { Form } from "@funstack/ui/form";
           },
         ]}
       />
-      <p>
-        The Label owns <code>id</code> and <code>htmlFor</code> (absent for a group control); the
-        Description owns <code>id</code>. Both carry the Field's four <code>data-*</code>{" "}
-        attributes.
-      </p>
+      <PartFacts
+        state={"the Field's."}
+        owned={
+          "Label: `id`, `htmlFor` (absent for a group control); Description: `id`; both also the Field's four `data-*` attributes."
+        }
+      />
 
       <h4>
         <code>Field.Control</code>
@@ -346,12 +341,7 @@ import { Form } from "@funstack/ui/form";
             default: "the Field's",
             description: "Native; the Field's value also applies (either one is enough).",
           },
-          {
-            name: "className, style",
-            type: "string | CSSProperties | ((state: FieldState) => …)",
-            description:
-              "A value, or a function of the Field's state. No `children` (void element).",
-          },
+          ...stylingProps("FieldState"),
           {
             name: "render",
             type: "ReactElement | ((props, state: FieldState) => ReactNode)",
@@ -366,13 +356,12 @@ import { Form } from "@funstack/ui/form";
           },
         ]}
       />
-      <p>
-        Owns <code>id</code>, <code>name</code>, <code>required</code>, <code>disabled</code>,{" "}
-        <code>aria-invalid</code> (always <code>"true"</code> or <code>"false"</code>: it stops
-        Chromium announcing a <code>typeMismatch</code> before it is shown, and exposes{" "}
-        <code>valueMissing</code>, which it otherwise never does), and <code>aria-describedby</code>{" "}
-        (your tokens first, then the description, then the error while shown).
-      </p>
+      <PartFacts
+        state={"the Field's."}
+        owned={
+          '`id`, `name`, `required`, `disabled`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description, then the error while shown), and the Field\'s four `data-*` attributes.'
+        }
+      />
 
       <h4>
         <code>Field.Error</code>
@@ -386,20 +375,17 @@ import { Form } from "@funstack/ui/form";
             description:
               'Rendered only while `invalid`. A function for per-constraint wording: `({ validity, messages }) => validity.valueMissing ? "Enter your email" : messages.join(" ")`. Must not suspend.',
           },
-          {
-            name: "className, style",
-            type: "string | CSSProperties | ((state: FieldState) => …)",
-            description: "A value, or a function of the Field's state.",
-          },
+          ...stylingProps("FieldState"),
           renderProp("div", "FieldState"),
         ]}
       />
-      <p>
-        Owns <code>id</code>. No <code>role</code> and no live region: after a submission focus
-        moves to the field and reads the error with the description (a live region would read it
-        twice). Add <code>aria-live="polite"</code> yourself if you want blur-time errors announced.
-        One per Field.
-      </p>
+      <PartFacts
+        state={"the Field's."}
+        owned={"`id` and the Field's four `data-*` attributes."}
+        note={
+          'No `role` and no live region: after a submission focus moves to the field and reads the error with the description (a live region would read it twice). Add `aria-live="polite"` yourself if you want blur-time errors announced. One per Field.'
+        }
+      />
 
       <h4>
         <code>Form.Root</code>
@@ -434,13 +420,13 @@ import { Form } from "@funstack/ui/form";
           renderProp("form", "FormRootState"),
         ]}
       />
-      <p>
-        <code>FormRootState</code>: <code>{"{ pending }"}</code>. Owns <code>action</code>,{" "}
-        <code>method</code>, <code>onSubmit</code> and <code>data-pending</code>.{" "}
-        <code>noValidate</code> and <code>onReset</code> pass through. A <code>render</code>{" "}
-        element's own <code>onSubmit</code> runs first; calling <code>preventDefault()</code> in it
-        cancels the submission.
-      </p>
+      <PartFacts
+        state={"`FormRootState` is `{ pending }`."}
+        owned={"`action`, `method` (except with a string `action`), `onSubmit`, `data-pending`."}
+        note={
+          "`noValidate` and `onReset` pass through. A `render` element's own `onSubmit` runs first; calling `preventDefault()` in it cancels the submission."
+        }
+      />
 
       <h4>
         <code>Form.Submit</code>
@@ -458,14 +444,13 @@ import { Form } from "@funstack/ui/form";
           renderProp("button", "FormSubmitState"),
         ]}
       />
-      <p>
-        <code>FormSubmitState</code>: <code>{"{ pending, disabled }"}</code>, where{" "}
-        <code>pending</code> is <code>useFormStatus().pending</code> of the enclosing form; it works
-        in any React form (<code>Dialog.Form</code>, a plain <code>&lt;form action&gt;</code>). Owns{" "}
-        <code>type="submit"</code> (on a <code>&lt;button&gt;</code>), <code>disabled</code>,{" "}
-        <code>data-pending</code>, <code>data-disabled</code>; <code>name</code>, <code>value</code>{" "}
-        and <code>formAction</code> pass through.
-      </p>
+      <PartFacts
+        state={
+          "`FormSubmitState` is `{ pending, disabled }`; `pending` is `useFormStatus().pending` of the enclosing form, so it works in any React form (`Dialog.Form`, a plain `<form action>`)."
+        }
+        owned={'`type` (`"submit"`, on a `<button>`), `disabled`, `data-pending`, `data-disabled`.'}
+        note={"`name`, `value` and `formAction` pass through."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
