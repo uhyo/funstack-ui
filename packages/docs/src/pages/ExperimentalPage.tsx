@@ -26,43 +26,42 @@ export function ExperimentalPage() {
         and when the feature reaches every engine the prop is removed: the type error tells you
         exactly where to delete it.
       </p>
+      <p>
+        The flags today. What each one does is documented in the props table of the part that takes
+        it; this is the index.
+      </p>
       <Table
-        head={["Prop", "Platform feature", "Effect when on"]}
+        head={["Prop", "Platform feature", "Native path today", "Documented on"]}
         rows={[
           [
-            "`Tabs.List experimental_focusgroup`",
+            "`experimental_focusgroup`",
             "`focusgroup`",
-            "Renders `focusgroup`; where the browser implements it, the browser moves focus with arrow keys, Home and End and the JS handler steps aside.",
+            "Chromium 150+",
+            "[Tabs.List](/components/tabs#props), [Toolbar.Root](/components/toolbar#props), [ToggleGroup.Root](/components/toggle-group#props)",
           ],
           [
-            "`Toolbar.Root experimental_focusgroup`",
-            "`focusgroup`",
-            'Renders `focusgroup="toolbar inline|block wrap|nowrap"`; where the browser implements it, the browser owns the single Tab stop (with memory), arrow keys, Home and End, and the library writes no `tabindex`.',
-          ],
-          [
-            "`ToggleGroup.Root experimental_focusgroup`",
-            "`focusgroup`",
-            'Standalone groups only: renders `focusgroup="toolbar … nomemory"` and `focusgroupstart` on the first pressed Item, so Tab enters on the pressed Item. Ignored (with a development warning) on a group inside a Toolbar, where a nested focusgroup would add Tab stops.',
-          ],
-          [
-            "`Accordion.Root experimental_interpolateSize`",
+            "`experimental_interpolateSize`",
             "`interpolate-size`",
-            "Sets `interpolate-size: allow-keywords` on the root, so `::details-content` can transition `height` to `auto`. Elsewhere the height jumps.",
+            "Chromium",
+            "[Accordion.Root](/components/accordion#props)",
           ],
           [
-            "`Tooltip.Trigger experimental_interestFor`",
+            "`experimental_interestFor`",
             "`interestfor`",
-            "Renders `interestfor` and `interest-delay-*` (plus the skip-delay stylesheet, see [Tooltip](/components/tooltip#skip-delay)); where supported, the browser owns hover, focus, Escape and long-press and the library attaches no listeners.",
+            "Chromium",
+            "[Tooltip.Trigger](/components/tooltip#props), [Tooltip skip-delay](/components/tooltip#skip-delay)",
           ],
           [
-            "`Tooltip.Popup experimental_hint`",
+            "`experimental_hint`",
             '`popover="hint"`',
-            "Native light dismiss; a tooltip can open over an open menu without closing it. Engines that do not know `hint` treat it as `manual` and the JS handling stays.",
+            "Chromium, Firefox (Safari 27.0 treats it as `manual`)",
+            "[Tooltip.Popup](/components/tooltip#props)",
           ],
           [
-            "`Dialog.Popup experimental_closedBy`",
+            "`experimental_closedBy`",
             "`closedby`",
-            'Renders `closedby="any"` (with `lightDismiss`) or `"closerequest"`; where the browser implements it (Chromium, Firefox), the platform handles Escape and outside clicks and the JS listeners are skipped. Safari keeps the JS.',
+            "Chromium, Firefox",
+            "[Dialog.Popup](/components/dialog#props)",
           ],
         ]}
       />

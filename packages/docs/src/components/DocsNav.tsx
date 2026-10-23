@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocation } from "@funstack/router";
+import { Fragment } from "react";
 import { docsNavSections, type NavItem } from "../navigation.js";
 
 function DocsNavLink({
@@ -53,13 +54,15 @@ export function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
         <div key={section.label} className="docs-nav-section">
           <p className="docs-nav-section-label">{section.label}</p>
           <ul className="docs-nav-list">
-            {section.items.map((item) => (
-              <DocsNavLink
-                key={item.path}
-                item={item}
-                currentPath={currentPath}
-                onNavigate={onNavigate}
-              />
+            {section.items.map((item, i) => (
+              <Fragment key={item.path}>
+                {item.group !== undefined && item.group !== section.items[i - 1]?.group && (
+                  <li className="docs-nav-group-label" aria-hidden="true">
+                    {item.group}
+                  </li>
+                )}
+                <DocsNavLink item={item} currentPath={currentPath} onNavigate={onNavigate} />
+              </Fragment>
             ))}
           </ul>
         </div>

@@ -24,6 +24,55 @@ export function RoadmapPage() {
         <a href={`${GITHUB_URL}/commits/master`}>commit history</a> is the changelog.
       </p>
 
+      <h3>Behaviour changes</h3>
+      <p>
+        Changes an upgrade may notice, newest first. Each component page documents the current
+        behaviour.
+      </p>
+      <ul>
+        <li>
+          <strong>Breaking:</strong> <code>Combobox.Root</code>'s{" "}
+          <code>inputValueChangeAction</code> is renamed <code>onInputValueChange</code> and the
+          type <code>UrgentChangeAction</code> is renamed <code>UrgentChangeHandler</code>; an
+          action prop always means a transition (<a href={issue(96)}>#96</a>).
+        </li>
+        <li>
+          Every Menu closes on a right- or middle-click outside; a wheel over a menu never scrolls
+          the page (<a href={issue(45)}>#45</a>, <a href={issue(88)}>#88</a>).
+        </li>
+        <li>
+          <code>data-side</code> / <code>data-align</code> on Tooltip, Popover and Menu report the
+          side the browser chose while shown, and <code>align</code> start / end mirror under RTL (
+          <a href={issue(20)}>#20</a>, <a href={issue(53)}>#53</a>).
+        </li>
+        <li>
+          While a tooltip is showing, the next one opens at once (<a href={issue(21)}>#21</a>).
+        </li>
+        <li>
+          <code>disabled</code> on a link or component <code>render</code> renders{" "}
+          <code>aria-disabled="true"</code> instead of native <code>disabled</code> on Toggle,
+          ToggleGroup.Item, Menu.Trigger, Combobox.Trigger and Clear, NumberField.Increment and
+          Decrement, and the Dialog and Popover Trigger and Close parts where they handle the click;
+          a disabled link ToggleGroup.Item is reached by the arrow keys. Form.Submit keeps native{" "}
+          <code>disabled</code> (<a href={issue(83)}>#83</a>).
+        </li>
+        <li>
+          <code>Dialog.Close</code>, <code>Popover.Close</code>, <code>Menu.Item</code> and{" "}
+          <code>Toast.Action</code> ignore a second click while their own action is pending, with{" "}
+          <code>aria-disabled</code> meanwhile; before, a second click ran the action again (
+          <a href={issue(81)}>#81</a>).
+        </li>
+        <li>
+          <strong>Breaking:</strong> <code>Toolbar.Button</code> is removed; use{" "}
+          <a href="/components/button">Button</a>, which behaves the same inside a toolbar (
+          <a href={issue(79)}>#79</a>).
+        </li>
+        <li>
+          A <code>&lt;ViewTransition&gt;</code> is rendered only when the <code>transition</code>{" "}
+          prop is given (<a href={issue(35)}>#35</a>).
+        </li>
+      </ul>
+
       <h3>Done</h3>
       <ul>
         <li>
@@ -31,14 +80,13 @@ export function RoadmapPage() {
           ViewTransition, composition.
         </li>
         <li>
-          The first four primitives: <a href="/components/toggle">Toggle</a>,{" "}
-          <a href="/components/tabs">Tabs</a>, <a href="/components/accordion">Accordion</a>,{" "}
-          <a href="/components/tooltip">Tooltip</a>.
+          <a href="/components/toggle">Toggle</a>, <a href="/components/tabs">Tabs</a>,{" "}
+          <a href="/components/accordion">Accordion</a> and{" "}
+          <a href="/components/tooltip">Tooltip</a>: the first four primitives.
         </li>
         <li>
-          The second wave: <a href="/components/dialog">Dialog</a> (on <code>&lt;dialog&gt;</code>{" "}
-          and Invoker Commands), and the native form controls{" "}
-          <a href="/components/switch">Switch</a>, <a href="/components/checkbox">Checkbox</a> and{" "}
+          <a href="/components/dialog">Dialog</a>, <a href="/components/switch">Switch</a>,{" "}
+          <a href="/components/checkbox">Checkbox</a> and{" "}
           <a href="/components/radio-group">RadioGroup</a>, with the shared form-reset and hydration
           handling.
         </li>
@@ -47,164 +95,73 @@ export function RoadmapPage() {
           positioning, <code>&lt;dialog&gt;</code>, native inputs and ViewTransition.
         </li>
         <li>
-          A conditional <code>&lt;ViewTransition&gt;</code> boundary: components render one only
-          when the <code>transition</code> prop is given, so a component mounting inside a
-          transition no longer starts a document view transition (<a href={issue(35)}>#35</a>).
+          A conditional <code>&lt;ViewTransition&gt;</code> boundary (<a href={issue(35)}>#35</a>).
         </li>
         <li>
           The first npm release, <code>0.1.0-alpha.0</code> (dist-tag <code>alpha</code>).
         </li>
         <li>
-          <a href="/components/checkbox-group">CheckboxGroup</a>: a <code>&lt;fieldset&gt;</code>{" "}
-          with a shared <code>name</code> and a set value, a Parent box with mixed state, and a
-          group-level <code>required</code> (<a href={issue(33)}>#33</a>).
+          <a href="/components/checkbox-group">CheckboxGroup</a> (<a href={issue(33)}>#33</a>).
         </li>
         <li>
-          <a href="/components/popover">Popover</a>: a non-modal overlay on{" "}
-          <code>popover="auto"</code> and Invoker Commands, with library-owned closes that animate
-          with a view transition in every engine (<a href={issue(38)}>#38</a>,{" "}
+          <a href="/components/popover">Popover</a> (<a href={issue(38)}>#38</a>,{" "}
           <a href={issue(40)}>#40</a>).
         </li>
         <li>
-          <a href="/components/menu">Menu</a>: a menu button whose items run their actions with
-          pending state and close the menu when they settle, optimistic checkbox and radio items,
-          typeahead and submenus (<a href={issue(39)}>#39</a>, <a href={issue(41)}>#41</a>). Close
-          parts and menu items now share one action hook that never drops a rejection (
-          <a href={issue(47)}>#47</a>).
+          <a href="/components/menu">Menu</a> (<a href={issue(39)}>#39</a>,{" "}
+          <a href={issue(41)}>#41</a>, <a href={issue(47)}>#47</a>).
         </li>
         <li>
-          <a href="/components/select">Select</a>: a real <code>&lt;select&gt;</code> progressively
-          enhanced with customizable select (<code>appearance: base-select</code>), with optimistic
-          selection, options that load late, and a button that stays in sync with the selected
-          option (<a href={issue(50)}>#50</a>).
+          <a href="/components/select">Select</a> and <a href="/components/combobox">Combobox</a>,
+          the library's first urgent state, <code>onInputValueChange</code> (
+          <a href={issue(50)}>#50</a>).
         </li>
         <li>
-          <a href="/components/combobox">Combobox</a>: an editable combobox whose typing is the
-          library's first urgent state (<code>onInputValueChange</code>, typed{" "}
-          <code>UrgentChangeHandler</code>), with results from a deferred query inside Suspense,{" "}
-          <code>aria-activedescendant</code>, an option that stays pending until its save settles,
-          free text, forms, and a default result-count announcement through <code>ariaNotify</code>{" "}
-          (<a href={issue(50)}>#50</a>).
+          <a href="/components/toast">Toast</a>, <a href="/components/slider">Slider</a> and{" "}
+          <a href="/components/field">Field and Form</a> (<a href={issue(54)}>#54</a>).
         </li>
         <li>
-          <a href="/components/toast">Toast</a>: a <code>toast()</code> function feeding an urgent
-          queue (a toast shows while the action it reports on is still pending), promise toasts, an
-          Undo action prop, <code>closeAction</code> for the Undo window, announcements through{" "}
-          <code>ariaNotify</code>, and a region that moves into an open modal Dialog so it stays
-          interactive (<a href={issue(54)}>#54</a>).
-        </li>
-        <li>
-          <a href="/components/slider">Slider</a>: the first continuous control, on a visually
-          hidden native range per thumb. Every step is a transition (<code>valueChangeAction</code>
-          ), each gesture is saved once (<code>valueCommitAction</code>) and rolls back if the save
-          fails, and the thumb under the pointer is urgent library state; multi-thumb, vertical and
-          RTL (<a href={issue(54)}>#54</a>).
-        </li>
-        <li>
-          <a href="/components/field">Field and Form</a>: labelled, described fields on native
-          constraint validation and <code>:user-invalid</code>, a styleable error instead of the
-          bubble with first-invalid focus, and a Form that runs its action in a transition, routes
-          server errors to fields and resets only on success (<a href={issue(54)}>#54</a>).
-        </li>
-        <li>
-          <a href="/components/progress">Progress</a> and <a href="/components/meter">Meter</a>: the
-          first output-only components and the first whose Root is itself a Server Component (no{" "}
-          <code>"use client"</code>). ARIA divs with a fill sized by your CSS from a registered
-          custom property, localised <code>aria-valuetext</code>, an indeterminate state, the
-          platform's meter regions, and the one place the transition advice inverts: a value that
-          reports on a pending action is written with a plain <code>setState</code> (
-          <a href={issue(68)}>#68</a>).
+          <a href="/components/progress">Progress</a> and <a href="/components/meter">Meter</a>, the
+          first output-only components (<a href={issue(68)}>#68</a>).
         </li>
         <li>
           <a href="/components/toggle-group">ToggleGroup</a> and{" "}
-          <a href="/components/toolbar">Toolbar</a>: a set of <code>aria-pressed</code> toggles with
-          an optimistic set value (exclusive mode included), and a toolbar whose roving focus finds
-          its items in the DOM, so menu buttons, toggles, links and inputs join one Tab stop without
-          wrapper parts (<a href={issue(66)}>#66</a>).
+          <a href="/components/toolbar">Toolbar</a> (<a href={issue(66)}>#66</a>).
         </li>
         <li>
-          <a href="/components/number-field">NumberField</a>: a text field that holds a number,
-          formatted and parsed in the field's locale with <code>Intl.NumberFormat</code> (strict
-          grouping), a visually hidden native number input for the form value and the browser's
-          constraint messages, press-and-hold buttons, and Slider's step / commit pair with rollback
-          (<a href={issue(67)}>#67</a>).
+          <a href="/components/number-field">NumberField</a> (<a href={issue(67)}>#67</a>).
         </li>
         <li>
-          <a href="/components/button">Button</a>: a button whose click is a transition, with{" "}
-          <code>data-pending</code>, a second click ignored while the action is pending (
-          <code>aria-disabled</code> meanwhile, never native <code>disabled</code>), per-submitter
-          pending for <code>formAction</code>, and <code>focusableWhenDisabled</code> (
-          <a href={issue(79)}>#79</a>). <strong>Breaking:</strong> <code>Toolbar.Button</code> is
-          removed; use <code>Button</code> from <code>@funstack/ui/button</code>, which behaves the
-          same inside a toolbar.
-        </li>
-        <li>
-          Every pure trigger ignores re-entry: <code>Dialog.Close</code>, <code>Popover.Close</code>
-          , <code>Menu.Item</code> and <code>Toast.Action</code> now behave like Button, ignoring a
-          second click while their own action is pending, with <code>aria-disabled</code> meanwhile
-          (<a href={issue(81)}>#81</a>). Behaviour change: before, a second click ran the action
-          again.
-        </li>
-        <li>
-          <code>disabled</code> on a link or component <code>render</code>: Toggle,
-          ToggleGroup.Item, Menu.Trigger, Combobox.Trigger and Clear, NumberField.Increment and
-          Decrement, and the Dialog and Popover Trigger and Close parts (where they handle the
-          click) render <code>aria-disabled="true"</code> instead of native <code>disabled</code>,
-          which means nothing on a link, as Button does (<a href={issue(83)}>#83</a>). Behaviour
-          change for link and component renders only; a disabled link ToggleGroup.Item is now
-          reached by the arrow keys. Form.Submit keeps native <code>disabled</code>.
-        </li>
-        <li>
-          <a href="/components/context-menu">Context menu</a>: <code>Menu.ContextTrigger</code>, a
-          region whose right-click, Shift+F10 or touch long-press opens a Menu at the pointer,
-          placed with the library's first (positioning-only) shipped CSS; a Root may hold a Menu
-          button and a context region sharing one menu (<a href={issue(45)}>#45</a>). Behaviour
-          change for every Menu: a right- or middle-click outside now closes it.
-        </li>
-        <li>
-          Placement where the popup is: <code>data-side</code> / <code>data-align</code> on Tooltip,
-          Popover and Menu are the side the browser chose after a fallback flip while shown, and the
-          new <a href="/components/tooltip#arrow">Tooltip.Arrow</a> follows it (
-          <a href={issue(20)}>#20</a>). <code>align</code> start / end and the new{" "}
-          <code>side="inline-start"</code> / <code>"inline-end"</code> follow the direction of an
-          RTL page or container; submenus open on the inline-end side; Combobox follows an RTL
-          container (<a href={issue(53)}>#53</a>); a context menu in RTL opens to the left of the
-          pointer (<a href={issue(88)}>#88</a>). Behaviour changes: the attributes report the
-          resolved side, and start / end mirror under RTL. Firefox misplaces anchored popups in a
-          direction island (<a href={issue(89)}>#89</a>).
-        </li>
-        <li>
-          <a href="/components/tooltip#skip-delay">Tooltip skip-delay</a>: while a tooltip is
-          showing, the next one opens at once, page-wide, with no provider (
-          <a href={issue(21)}>#21</a>). Behaviour change: moving between tooltips no longer waits.
-        </li>
-        <li>
-          Context menu follow-ups (<a href={issue(88)}>#88</a>): press-drag-release (hold the button
-          or finger, slide onto an item, release), a touch menu placed above the finger, a point
-          menu closes when the page scrolls, and a wheel over any menu never scrolls the page. Touch
-          is verified under Chromium's touch emulation; iOS and Android pending (
-          <a href={issue(90)}>#90</a>).
-        </li>
-        <li>
-          <a href="/concepts/content-security-policy">Content Security Policy</a>:{" "}
-          <code>@funstack/ui/csp</code> exports <code>STYLE_SHA256</code>, the hashes of the two
-          shipped stylesheets, and <code>{"<CSPProvider nonce>"}</code> (<a href={issue(88)}>#88</a>
+          <a href="/components/button">Button</a> (<a href={issue(79)}>#79</a>), and re-entry
+          handling for every pure trigger (<a href={issue(81)}>#81</a>, <a href={issue(83)}>#83</a>
           ).
         </li>
         <li>
-          Directive-free variants of platform-native parts: considered and not built (
-          <a href={issue(19)}>#19</a>). A Server Components app ships its framework runtime anyway,
-          so a variant would save only a few KB. Instead,{" "}
-          <a href="/concepts/server-components">Server Components</a> defines "JS-free" (no
-          behaviour JavaScript, works without hydration, not "no client bundle"), and the Switch,
-          Checkbox, RadioGroup, Select, Slider and NumberField pages show the plain HTML a Server
-          Component can render.
+          <a href="/components/context-menu">Context menu</a>: <code>Menu.ContextTrigger</code>,
+          press-drag-release, touch long-press and the library's first shipped (positioning-only)
+          CSS (<a href={issue(45)}>#45</a>, <a href={issue(88)}>#88</a>). Touch is verified under
+          Chromium's emulation; iOS and Android pending (<a href={issue(90)}>#90</a>).
         </li>
         <li>
-          <strong>Breaking:</strong> <code>Combobox.Root</code>'s{" "}
-          <code>inputValueChangeAction</code> is renamed <code>onInputValueChange</code> and the
-          type <code>UrgentChangeAction</code> is renamed <code>UrgentChangeHandler</code>; an
-          action prop always means a transition (<a href={issue(96)}>#96</a>).
+          Resolved placement (<code>data-side</code> is where the popup is),{" "}
+          <a href="/components/tooltip#arrow">Tooltip.Arrow</a>, logical sides and RTL (
+          <a href={issue(20)}>#20</a>, <a href={issue(53)}>#53</a>, <a href={issue(88)}>#88</a>).
+          Firefox misplaces anchored popups in a direction island (<a href={issue(89)}>#89</a>).
+        </li>
+        <li>
+          <a href="/components/tooltip#skip-delay">Tooltip skip-delay</a> (
+          <a href={issue(21)}>#21</a>).
+        </li>
+        <li>
+          <a href="/concepts/content-security-policy">Content Security Policy</a>:{" "}
+          <code>STYLE_SHA256</code> and <code>{"<CSPProvider nonce>"}</code> (
+          <a href={issue(88)}>#88</a>).
+        </li>
+        <li>
+          Directive-free variants of platform-native parts: considered and not built (
+          <a href={issue(19)}>#19</a>);{" "}
+          <a href="/concepts/server-components#js-free">Server Components</a> defines "JS-free" and
+          the form-control pages show the plain HTML alternative.
         </li>
       </ul>
 
