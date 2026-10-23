@@ -12,13 +12,13 @@ export function RoadmapPage() {
       />
       <h2>Roadmap & changelog</h2>
       <p className="page-intro">
-        FUNSTACK UI is experimental; its first alpha is on npm. Planning happens in{" "}
+        FUNSTACK UI is experimental; alpha releases are on npm. Planning happens in{" "}
         <a href={ISSUES_URL}>GitHub issues</a>; this page is a short summary.
       </p>
 
       <h3>Changelog</h3>
       <p>
-        The first alpha, <code>0.1.0-alpha.0</code>, is published on npm under the{" "}
+        Alpha releases (<code>0.1.0-alpha.N</code>) are published on npm under the{" "}
         <code>alpha</code> dist-tag: <code>npm install @funstack/ui@alpha</code>. Each release is
         listed on <a href={`${GITHUB_URL}/releases`}>GitHub Releases</a>; between releases, the{" "}
         <a href={`${GITHUB_URL}/commits/master`}>commit history</a> is the changelog.
@@ -37,16 +37,18 @@ export function RoadmapPage() {
           action prop always means a transition (<a href={issue(96)}>#96</a>).
         </li>
         <li>
+          While a tooltip is showing, the next one opens at once (<a href={issue(21)}>#21</a>).
+        </li>
+        <li>
+          <strong>Breaking:</strong> <code>data-side</code> / <code>data-align</code> on Tooltip,
+          Popover and Menu report the side the browser chose while shown, not the requested one; the{" "}
+          <code>side</code> type gains <code>"inline-start"</code> / <code>"inline-end"</code> and{" "}
+          <code>align</code> start / end mirror under RTL; a submenu opens on the inline-end side
+          (the left in RTL) (<a href={issue(20)}>#20</a>, <a href={issue(53)}>#53</a>).
+        </li>
+        <li>
           Every Menu closes on a right- or middle-click outside; a wheel over a menu never scrolls
           the page (<a href={issue(45)}>#45</a>, <a href={issue(88)}>#88</a>).
-        </li>
-        <li>
-          <code>data-side</code> / <code>data-align</code> on Tooltip, Popover and Menu report the
-          side the browser chose while shown, and <code>align</code> start / end mirror under RTL (
-          <a href={issue(20)}>#20</a>, <a href={issue(53)}>#53</a>).
-        </li>
-        <li>
-          While a tooltip is showing, the next one opens at once (<a href={issue(21)}>#21</a>).
         </li>
         <li>
           <code>disabled</code> on a link or component <code>render</code> renders{" "}
@@ -66,10 +68,6 @@ export function RoadmapPage() {
           <strong>Breaking:</strong> <code>Toolbar.Button</code> is removed; use{" "}
           <a href="/components/button">Button</a>, which behaves the same inside a toolbar (
           <a href={issue(79)}>#79</a>).
-        </li>
-        <li>
-          A <code>&lt;ViewTransition&gt;</code> is rendered only when the <code>transition</code>{" "}
-          prop is given (<a href={issue(35)}>#35</a>).
         </li>
       </ul>
 

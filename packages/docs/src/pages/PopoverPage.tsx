@@ -63,7 +63,9 @@ export function PopoverPage() {
           <code>commandfor</code>. Render the Popup <strong>right after the Trigger</strong> where
           the layout allows: Safari 27.0 does not put a far-away popover next in the Tab order after
           its trigger. A <code>&lt;button commandfor command&gt;</code> of your own that targets the
-          popover is a <em>foreign invoker</em>; in library mode it goes through the library too.
+          popover is a <em>foreign invoker</em>; in library mode an open through it is routed
+          through the library, while a foreign <code>hide-popover</code> closes natively and is
+          reported as <code>"activate"</code>.
         </li>
         <li>
           <strong>

@@ -52,7 +52,7 @@ export function ContentSecurityPolicyPage() {
         recomputes it from the CSS, so it cannot drift from what the parts render.
       </p>
       <Table
-        head={["`href`", "Rendered by", "When", "`style-src` source"]}
+        head={["href", "Rendered by", "When", "style-src source"]}
         rows={[
           [
             "`@funstack/ui/menu-point`",

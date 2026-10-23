@@ -513,8 +513,13 @@ export function MenuPage() {
         rows={[
           [
             "`aria-expanded`, `data-open`",
-            "Trigger, SubmenuTrigger, ContextTrigger",
+            "Trigger, SubmenuTrigger",
             "Optimistic open state of the Root.",
+          ],
+          [
+            "`data-open`",
+            "ContextTrigger",
+            "Optimistic open state of the Root (no `aria-expanded`: the region has no role).",
           ],
           [
             "`data-pending`",
@@ -539,7 +544,7 @@ export function MenuPage() {
           ],
           [
             "`data-typeahead`",
-            "Item, SubmenuTrigger",
+            "Item, CheckboxItem, RadioItem, SubmenuTrigger",
             "The `label` prop: the text typeahead matches.",
           ],
           [

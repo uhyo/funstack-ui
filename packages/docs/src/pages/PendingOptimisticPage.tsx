@@ -67,7 +67,7 @@ export function PendingOptimisticPage() {
             id: "pending",
             term: "Pending",
             definition:
-              "True while an action dispatched through a component is in flight, from the user's interaction until the render that ends it has committed (including a Suspense wait). It is the pending flag of the transition that runs the action: the state owner's, or a pure trigger's own.",
+              "True while an action dispatched through a component is in flight, from the user's interaction until the render that ends it has committed (including a Suspense wait). It is the pending flag of the transition that runs the action: the state owner's, or a pure trigger's own. Field and Form read the form channel (`useFormStatus`) instead.",
           },
           {
             id: "rollback",

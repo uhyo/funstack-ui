@@ -125,7 +125,7 @@ export function HomePage() {
 
       <h2>Components</h2>
       <p>
-        {componentNavItems.length} components so far:{" "}
+        The component pages so far:{" "}
         {componentNavItems.map((item, i) => (
           <span key={item.path}>
             {i > 0 && (i === componentNavItems.length - 1 ? " and " : ", ")}

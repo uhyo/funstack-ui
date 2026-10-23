@@ -157,8 +157,9 @@ export function ToggleGroupPage() {
               <>
                 Renders <code>focusgroup="toolbar … nomemory"</code> and{" "}
                 <code>focusgroupstart</code> on the first pressed Item; where the browser implements
-                it (Chromium 150+) the browser moves focus. Ignored inside a Toolbar. See{" "}
-                <a href="/concepts/experimental">Experimental features</a>.
+                it (Chromium 150+) the browser moves focus, and Tab enters on the pressed Item.
+                Ignored inside a Toolbar, with a development warning: a nested focusgroup would add
+                Tab stops. See <a href="/concepts/experimental">Experimental features</a>.
               </>
             ),
           },

@@ -104,8 +104,10 @@ import { Toolbar } from "@funstack/ui/toolbar";
             description: (
               <>
                 Renders <code>focusgroup="toolbar inline|block wrap|nowrap"</code>; where the
-                browser implements it (Chromium 150+), the browser owns the Tab stop, the arrows,
-                Home and End. See <a href="/concepts/experimental">Experimental features</a>.
+                browser implements it (Chromium 150+), the browser owns the single Tab stop (with
+                memory of the last focused item), the arrows, Home and End, and the library writes
+                no <code>tabindex</code>. See{" "}
+                <a href="/concepts/experimental">Experimental features</a>.
               </>
             ),
           },

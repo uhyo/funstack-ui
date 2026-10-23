@@ -118,8 +118,8 @@ import { saveOpenSections } from "./actions"; // "use server"
           <strong>Behaviour the browser performs</strong> works before hydration and without
           JavaScript: a <code>&lt;details&gt;</code> that opens, a native input that toggles and
           posts with its form, a dialog opened by an invoker command, a tooltip shown on interest
-          (where the engine implements `interestfor`). Components are built on these elements
-          wherever the platform offers them (see{" "}
+          (where the engine implements <code>interestfor</code>). Components are built on these
+          elements wherever the platform offers them (see{" "}
           <a href="/concepts/browser-owned-state">Browser-owned state</a>).
         </li>
         <li>

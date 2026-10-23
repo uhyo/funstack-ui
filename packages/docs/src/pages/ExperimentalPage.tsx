@@ -37,7 +37,7 @@ export function ExperimentalPage() {
             "`experimental_focusgroup`",
             "`focusgroup`",
             "Chromium 150+",
-            "[Tabs.List](/components/tabs#props), [Toolbar.Root](/components/toolbar#props), [ToggleGroup.Root](/components/toggle-group#props)",
+            "[Tabs.List](/components/tabs#props), [Toolbar.Root](/components/toolbar#props), [ToggleGroup.Root](/components/toggle-group#props), [Menu.Popup](/components/menu#props)",
           ],
           [
             "`experimental_interpolateSize`",

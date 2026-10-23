@@ -82,7 +82,7 @@ export function BrowserOwnedStatePage() {
           ],
           [
             "Optimistic state",
-            "[`useOptimistic`](/concepts/pending-and-optimistic#optimistic)",
+            "React state ([optimistic](/concepts/pending-and-optimistic#optimistic), `useOptimistic`)",
             "the DOM itself",
           ],
           ["Action prop", "awaited; the UI waits for it", "a notification after the fact, or none"],

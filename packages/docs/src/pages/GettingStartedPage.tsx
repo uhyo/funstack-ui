@@ -56,9 +56,9 @@ import type { ActionDetails, ChangeAction } from "@funstack/ui";`}</CodeBlock>
         A <Term id="part">part</Term> is one piece of a component that you render yourself and that
         usually renders one element: <code>Tabs.Tab</code> is a part, and so is a whole{" "}
         <code>Toggle</code>. The <Term id="root">Root</Term> is the part of a compound component
-        that holds its state and its transition and provides them to the other parts through
-        context; it is usually, not always, the outermost part. Other recurring words (trigger,
-        content region, optimistic and committed value) are defined on{" "}
+        that holds its state (and its transition, when it has one) and provides them to the other
+        parts through context; it is usually, not always, the outermost part. Other recurring words
+        (trigger, content region, optimistic and committed value) are defined on{" "}
         <a href="/concepts/pending-and-optimistic#terms">Pending & optimistic state</a>.
       </p>
 
