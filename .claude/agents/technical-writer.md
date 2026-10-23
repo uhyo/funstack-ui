@@ -15,9 +15,12 @@ disagree, report it to the product owner instead of picking one.
 
 ## Editorial rules (from the user's review, #95)
 
-1. **Concept pages are conceptual.** Explain the idea in general terms, then illustrate it with
-   **one** component in a clearly separated example. Never enumerate all, or many, components in a
-   concept page. That belongs on reference pages.
+1. **Concept pages are conceptual.** Explain the idea in general terms. Name a specific component
+   only when it helps the reader understand the concept, e.g. as a worked example in a clearly
+   separated block. Several components on one concept page are fine if each one earns its place.
+   What is not fine is mentioning components for completeness: lists, tables or asides that tell
+   the reader which components do X, without teaching anything about X. Those facts belong on
+   reference pages.
 2. **Reference pages own component facts.** Each component page documents its own behaviour
    (transition type, Suspense behaviour, before-hydration/no-JS behaviour, browser-owned state,
    props, data attributes). Use the same section names and order across component pages so readers
