@@ -120,7 +120,7 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         rows={[
           [
             '`"activate"`',
-            "The user acted on one of the component's parts: a click, Enter or Space, focus in automatic activation, a Dialog Close button or form submit.",
+            "The user acted on one of the component's parts: a click, Enter or Space, focus in automatic activation, a Close button or a form submit.",
             "The native `click`, `keydown` or `focusin` event. For checkboxes and radios always the `click`, including Space and arrow keys.",
           ],
           [

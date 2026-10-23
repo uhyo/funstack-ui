@@ -52,10 +52,29 @@ export function SuspensePage() {
         </Example>
       </ConceptExample>
       <p>
-        Components apply the same rule to their own content: an item that waits for its content
-        before it opens, or results that stay on screen, marked stale, while the next ones load.
-        Each component page describes its case in its <strong>Suspense</strong> section.
+        The same rule has two more shapes. Content that is hidden until a state opens it waits in
+        the closed state: the trigger is pending, and the open happens once, complete. Content that
+        is re-rendered for a new input (a search) keeps the previous result on screen, marked stale,
+        until the next one is ready. Each component page describes its case in its{" "}
+        <strong>Suspense</strong> section.
       </p>
+      <ConceptExample component="Accordion" href="/components/accordion#suspense">
+        <p>
+          <code>Accordion.Panel</code> is always mounted; its function child receives the committed{" "}
+          <code>open</code> state, which is how content is mounted lazily. If that content suspends,
+          the item stays closed with the trigger pending until the content is ready, then opens.
+        </p>
+      </ConceptExample>
+      <ConceptExample component="Combobox" href="/components/combobox#suspense">
+        <p>
+          A Combobox renders its results from <code>useDeferredValue</code> of the typed text, so an
+          async search is <code>use(search(query))</code> inside a boundary in the List. The first
+          load shows the fallback (a new boundary); after that, every keystroke keeps the previous
+          results on screen, marked <code>data-stale</code> and <code>aria-busy</code>, until the
+          new ones are ready. Only the latest query is ever rendered, so responses cannot arrive out
+          of order.
+        </p>
+      </ConceptExample>
 
       <h3>Opting into a fallback</h3>
       <p>

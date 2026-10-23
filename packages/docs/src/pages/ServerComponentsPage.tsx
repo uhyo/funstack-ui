@@ -77,9 +77,9 @@ export function Settings() {
         For scale, measured on FUNSTACK Static (the stack this site is built with): a page whose
         Server Components render no client component at all still loads about 76 KB gzip of
         framework runtime (React, react-dom and the RSC client) and hydrates the document. The parts
-        add a few KB on top: about 5 KB gzip for Accordion or Tooltip, 4 KB for Switch and 2 KB for
-        Progress, and less each when several share internals. Other RSC hosts were not measured;
-        Next.js App Router and Waku also boot a client runtime on every page.
+        add a few KB on top: between 2 and 5 KB gzip per component in the ones measured, and less
+        each when several share internals. Other RSC hosts were not measured; Next.js App Router and
+        Waku also boot a client runtime on every page.
       </p>
       <p>
         Where a page really ships no JavaScript, such as server rendering or a static prerender that
