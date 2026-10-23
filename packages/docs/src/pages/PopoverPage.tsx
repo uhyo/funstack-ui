@@ -22,7 +22,7 @@ export function PopoverPage() {
         Built on <code>popover="auto"</code>, a <code>&lt;dialog&gt;</code> element and Invoker
         Commands. The platform supplies the top layer, light dismiss, Escape, one-at-a-time stacking
         with nesting, placement next to the trigger, a declarative trigger that works before
-        hydration, and focus return. The library adds the Async React half: opening a popover whose
+        hydration, and focus return. The library adds the asynchronous half: opening a popover whose
         content loads is a transition, so the trigger shows <code>data-pending</code> and the
         popover opens once its content is ready; and the closes the user asks a part for run through
         the library too, so <code>&lt;ViewTransition&gt;</code> can animate the exit, in Firefox as
@@ -62,7 +62,8 @@ export function PopoverPage() {
           <strong>Root renders no DOM.</strong> Trigger and Popup are linked by id through{" "}
           <code>commandfor</code>. Render the Popup <strong>right after the Trigger</strong> where
           the layout allows: Safari 27.0 does not put a far-away popover next in the Tab order after
-          its trigger.
+          its trigger. A <code>&lt;button commandfor command&gt;</code> of your own that targets the
+          popover is a <em>foreign invoker</em>; in library mode it goes through the library too.
         </li>
         <li>
           <strong>
@@ -136,12 +137,12 @@ export function PopoverPage() {
         ]}
       />
       <p>
-        In library mode the line is drawn between <strong>parts and dismissals</strong>. A close the
-        user asks a part for is library-owned: it waits for your action, a controlled parent can
-        refuse it, and it can animate with a view transition. Escape and a click outside are the
-        browser's: the popover goes away at once and the Root hears about it afterwards. See{" "}
-        <a href="/concepts/browser-owned-state">Browser-owned state</a>. The mode is decided on the
-        first render; switching later is not supported (development warning).
+        In library mode, opening and{" "}
+        <a href="/concepts/browser-owned-state#parts-close">a part's close</a> are the library's; a{" "}
+        <a href="/concepts/browser-owned-state#dismissal">dismissal</a> (Escape, a click outside,
+        another popover opening) is the browser's, and the Root is notified afterwards (
+        <a href="/concepts/browser-owned-state#parts-vs-dismissals">Parts vs dismissals</a>). The
+        mode is decided on the first render; switching later is not supported (development warning).
       </p>
 
       <h3 id="props">Props</h3>
@@ -414,23 +415,21 @@ export function PopoverPage() {
 .popover-any[data-side="inline-start"], .popover-any[data-side="inline-end"] { margin-inline: 6px; }
 @media (prefers-reduced-motion: reduce) { .popover { transition: none; } }`}</CodeBlock>
       <p>
-        <code>data-side</code> is where the popup <strong>is</strong>: the library reads which{" "}
-        <code>position-try-fallbacks</code> option the browser applied from the popup's computed{" "}
-        <code>position-area</code> when it opens, on scroll and on resize; the browser still does
-        the placing. With a physical <code>side</code>, an open where you asked costs no render; a
-        logical one (<code>inline-start</code> / <code>inline-end</code>) costs one render on show
-        and one on hide, since <code>data-side</code> turns physical while shown. Popover has no
-        Arrow part; an arrow drawn with a pseudo-element on <code>[data-side]</code> follows a flip
-        (see the <a href="/components/tooltip#arrow">Tooltip arrow</a>).
+        <code>data-side</code> is where the popup <strong>is</strong>, read from the computed{" "}
+        <code>position-area</code> while it is shown; the{" "}
+        <a href="/components/tooltip#data-attributes">Tooltip page</a> explains the mechanism, its
+        render cost and the margin and animation caveats, which apply here as they are. Popover has
+        no Arrow part; an arrow drawn with a pseudo-element on <code>[data-side]</code> follows a
+        flip (see the <a href="/components/tooltip#arrow">Tooltip arrow</a>).
       </p>
       <h4>Right-to-left</h4>
       <p>
         <code>side="inline-start"</code> / <code>"inline-end"</code> and <code>align</code> on a top
         or bottom side use the <code>self-*</code> keywords, which follow the popup's inherited
-        direction: an RTL page and an RTL container both mirror them, with no JavaScript. In
-        Firefox, a popover inside a container whose direction differs from the page's is misplaced
-        along the inline axis (Mozilla bug 2019601,{" "}
-        <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>); page-level RTL is fine.
+        direction: an RTL page and an RTL container both mirror them, with no JavaScript. Firefox
+        misplaces a popover inside a direction island (
+        <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>; see{" "}
+        <a href="/components/tooltip#browser-notes">Tooltip</a>).
       </p>
       <p>
         The exit animates in Chromium and Safari; Firefox hides a popover instantly. The library
@@ -529,12 +528,13 @@ html:active-view-transition .popover { transition: none; }
             transition of the page also cuts a fade in progress.
           </li>
           <li>
-            With <code>transition="none"</code>, a plain open starts no document view transition:
-            the content mounts under the already-mounted popover element. A Popover Root inserted by
-            a transition with <code>transition</code> set on its Popup, or a nested Popup with{" "}
-            <code>transition</code> that mounts with the outer content, runs the page cross-fade (
-            <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>). The page
-            receives no pointer events while a view transition runs: keep them short.
+            A plain open starts no document view transition: the content mounts under the
+            already-mounted popover element. A Popup with <code>transition</code> that itself mounts
+            inside a transition (a Root inserted by one, a nested Popup mounting with the outer
+            content) runs the page cross-fade (
+            <a href="/concepts/transitions#transition-prop">the transition prop</a>, issue{" "}
+            <a href="https://github.com/uhyo/funstack-ui/issues/35">#35</a>). The page receives no
+            pointer events while a view transition runs: keep them short.
           </li>
         </ul>
       </BehaviourSection>
@@ -613,7 +613,9 @@ html:active-view-transition .popover { transition: none; }
           'JS-free mode: everything, including `autoFocus` in server-rendered markup. Library mode: the Trigger opens the popover natively, but the content is not in the HTML yet; on hydration the Popup finds it open, dispatches `openChangeAction(true)` with `reason: "platform"` and the content mounts.'
         }
       >
-        <h4 id="the-platform-paths">The platform paths</h4>
+        <h4 id="the-platform-paths">
+          The <a href="/concepts/browser-owned-state#platform-path">platform paths</a>
+        </h4>
         <ul>
           <li>
             <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}

@@ -149,11 +149,13 @@ toast({ title: "Link copied" });`}</CodeBlock>
 
       <h4>Undo and closeAction</h4>
       <p>
-        <code>Toast.Action</code> is a pure-trigger action part, like <code>Menu.Item</code>. While
-        its action runs the Action and the Root carry <code>data-pending</code> and the toast's
-        timer is paused; when it resolves the toast closes with <code>reason: "activate"</code>{" "}
-        (unless <code>closeOnSettle={"{false}"}</code>). A rejection keeps the toast and reaches the
-        nearest Error Boundary <strong>above the Viewport</strong>: put one around the list.
+        <code>Toast.Action</code> is a{" "}
+        <a href="/concepts/pending-and-optimistic#pure-trigger">pure trigger</a>, like{" "}
+        <code>Menu.Item</code>. While its action runs the Action and the Root carry{" "}
+        <code>data-pending</code> and the toast's timer is paused; when it resolves the toast closes
+        with <code>reason: "activate"</code> (unless <code>closeOnSettle={"{false}"}</code>). A
+        rejection keeps the toast and reaches the nearest Error Boundary{" "}
+        <strong>above the Viewport</strong>: put one around the list.
       </p>
       <Callout kind="warning" title="A caught error closes the toast">
         <p>

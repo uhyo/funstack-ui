@@ -23,10 +23,10 @@ export function DialogPage() {
       <p className="page-intro">
         Built on <code>&lt;dialog&gt;</code>, <code>showModal()</code> and Invoker Commands. The
         platform supplies the top layer, the backdrop, the inert page, Escape, initial focus and
-        focus return. The library adds the Async React half: opening a dialog whose content loads is
-        a transition, so the trigger shows <code>data-pending</code> and the dialog opens once its
-        content is ready, and closing it with one of its parts waits for your action and can animate
-        with a view transition.
+        focus return. The library adds the asynchronous half: opening a dialog whose content loads
+        is a transition, so the trigger shows <code>data-pending</code> and the dialog opens once
+        its content is ready, and closing it with one of its parts waits for your action and can
+        animate with a view transition.
       </p>
 
       <Example
@@ -64,7 +64,9 @@ export function DialogPage() {
         <li>
           <strong>Root renders no DOM.</strong> Trigger and Popup need not be siblings:{" "}
           <code>commandfor</code> links them by id. A Popup without a Trigger is fine (controlled{" "}
-          <code>open</code>); a Trigger without a Popup is a development warning.
+          <code>open</code>); a Trigger without a Popup is a development warning. A{" "}
+          <code>&lt;button commandfor command&gt;</code> of your own that targets the dialog is a{" "}
+          <em>foreign invoker</em>; in library mode it goes through the library too.
         </li>
         <li>
           <strong>
@@ -129,13 +131,12 @@ export function DialogPage() {
         ]}
       />
       <p>
-        In library mode the line is drawn between <strong>parts and dismissals</strong>, as in
-        Popover. Opening, and a close the user asks a part for, are transitions the library drives:
-        they wait for your action, a controlled parent can refuse them, and they can animate with a
-        view transition. Escape, Android back and a click outside are the browser's: the dialog goes
-        away at once and the Root hears about it afterwards. See{" "}
-        <a href="/concepts/browser-owned-state">Browser-owned state</a>. The mode is decided on the
-        first render; switching later is not supported (development warning).
+        In library mode, opening and{" "}
+        <a href="/concepts/browser-owned-state#parts-close">a part's close</a> are the library's; a{" "}
+        <a href="/concepts/browser-owned-state#dismissal">dismissal</a> (Escape, Android back, a
+        click outside) is the browser's, and the Root is notified afterwards (
+        <a href="/concepts/browser-owned-state#parts-vs-dismissals">Parts vs dismissals</a>). The
+        mode is decided on the first render; switching later is not supported (development warning).
       </p>
 
       <h3 id="props">Props</h3>
@@ -695,7 +696,9 @@ html:active-view-transition .dialog { transition: none; }
           'JS-free mode: everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup, CSS animation; a `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open. Library mode: the Trigger opens the dialog natively, but its content is not in the HTML; on hydration it is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.'
         }
       >
-        <h4>The platform paths</h4>
+        <h4>
+          The <a href="/concepts/browser-owned-state#platform-path">platform paths</a>
+        </h4>
         <ul>
           <li>
             <strong>Before hydration, JS-free mode:</strong> everything works, including{" "}
@@ -762,7 +765,10 @@ html:active-view-transition .dialog { transition: none; }
       </p>
 
       <h4>Server Functions</h4>
-      <p>Two independent channels, both usable from a Server Component:</p>
+      <p>
+        The dialog's action and the <a href="/concepts/action-props#form-channel">form channel</a>{" "}
+        are independent, and both usable from a Server Component:
+      </p>
       <CodeBlock>{`// Persist "seen" when the user dismisses an announcement.
 <Dialog.Root defaultOpen={!user.seenAnnouncement} openChangeAction={markAnnouncementSeen}>
   ...
@@ -791,16 +797,13 @@ html:active-view-transition .dialog { transition: none; }
     if (!open && reason === "activate" && returnValue === "delete") deleteDraft();
   }}
 >`}</CodeBlock>
-      <Callout title="ViewTransition cost on open">
-        <p>
-          A <code>&lt;ViewTransition&gt;</code> that mounts inside a transition makes React start a
-          document view transition even with <code>default="none"</code>, which runs the browser's
-          root cross-fade and delays the next commit by about 250 ms. In a library-mode dialog that
-          happens when the content mounts parts that render one (a nested Dialog, a Switch, a
-          Checkbox, a RadioGroup item). Tracked in{" "}
-          <a href="https://github.com/uhyo/funstack-ui/issues/35">issue #35</a>.
-        </p>
-      </Callout>
+      <p>
+        A <code>&lt;ViewTransition&gt;</code> that mounts inside a transition runs the page
+        cross-fade (<a href="/concepts/transitions#transition-prop">the transition prop</a>, issue{" "}
+        <a href="https://github.com/uhyo/funstack-ui/issues/35">#35</a>). In a library-mode dialog
+        that happens when the content mounts parts that render one, such as a nested Dialog or a
+        control with <code>transition</code> set.
+      </p>
     </div>
   );
 }

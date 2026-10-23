@@ -47,7 +47,7 @@ export function MenuPage() {
         half (<code>popover="auto"</code>: the top layer, light dismiss, Escape, nesting for
         submenus, placement next to the trigger, focus return) and the library gives the menu half:
         the current item, arrow keys, Home and End, typeahead, submenu keys and closing the menu
-        when focus leaves it. And the Async React half: an item's <code>action</code> runs in a
+        when focus leaves it. And the asynchronous half: an item's <code>action</code> runs in a
         transition with <code>data-pending</code> on the item, and the menu closes in the commit
         that ends it, so a slow Server Function behind "Archive" shows its progress where the user
         clicked and the menu leaves with a view transition in every engine.
@@ -88,10 +88,13 @@ export function MenuPage() {
 </Menu.Root>`}</CodeBlock>
       <ul>
         <li>
-          <strong>Always library mode.</strong> A menu cannot follow the APG without JavaScript, so
-          there is no JS-free mode. The Trigger still renders <code>commandfor</code> +{" "}
-          <code>command="toggle-popover"</code>: a click before hydration opens the (still empty)
-          menu natively and the items fill in on hydration (<code>reason: "platform"</code>).
+          <strong>
+            Always <a href="/concepts/browser-owned-state#js-free-mode">library mode</a>.
+          </strong>{" "}
+          A menu cannot follow the APG without JavaScript, so there is no JS-free mode. The Trigger
+          still renders <code>commandfor</code> + <code>command="toggle-popover"</code>: a click
+          before hydration opens the (still empty) menu natively and the items fill in on hydration
+          (<code>reason: "platform"</code>).
         </li>
         <li>
           <strong>Items are buttons</strong> with explicit roles, <code>tabindex="-1"</code> and{" "}
@@ -168,7 +171,8 @@ export function MenuPage() {
         <MenuViewOptions />
       </Example>
       <p>
-        <code>CheckboxItem</code> and <code>RadioGroup</code> are state owners like{" "}
+        <code>CheckboxItem</code> and <code>RadioGroup</code> are{" "}
+        <a href="/concepts/pending-and-optimistic#state-owner">state owners</a> like{" "}
         <a href="/components/checkbox">Checkbox</a> and{" "}
         <a href="/components/radio-group">RadioGroup</a>: <code>aria-checked</code> and{" "}
         <code>data-checked</code> flip at once, <code>data-pending</code> shows while the change
@@ -599,8 +603,8 @@ export function MenuPage() {
           top-level menu's <code>align="start"</code> lines up the right edges. Both follow the
           popup's inherited direction through <code>self-*</code> <code>position-area</code>{" "}
           keywords, so an RTL container works as well as an RTL page. Firefox misplaces popups
-          inside a container whose direction differs from the page's (Mozilla bug 2019601,{" "}
-          <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>).
+          inside a direction island (<a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>
+          ; see <a href="/components/tooltip#browser-notes">Tooltip</a>).
         </li>
         <li>
           <strong>Focus is real DOM focus</strong> on items (no <code>aria-activedescendant</code>).

@@ -1,5 +1,5 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
@@ -336,15 +336,12 @@ export function RadioGroupPage() {
             <code>{"(next) => { void save(next); }"}</code>), or leave the value to the form submit.
           </li>
         </ol>
-        <Callout title="Why the DOM shows the optimistic value">
-          <p>
-            After every event react-dom restores controlled radios to their props. Only the
-            synchronous optimistic state has rendered by then, so radios driven by committed state
-            would snap back right after the click. Rendering the optimistic value is a correctness
-            requirement for native inputs. <code>details.event.preventDefault()</code> is therefore
-            not a veto; a controlled parent vetoes by not adopting the value.
-          </p>
-        </Callout>
+        <p>
+          The radios show the optimistic value because react-dom restores controlled inputs after
+          every event (<a href="/concepts/browser-owned-state#native-inputs">Native inputs</a>), so{" "}
+          <code>details.event.preventDefault()</code> is not a veto; a controlled parent vetoes by
+          not adopting the value.
+        </p>
       </BehaviourSection>
 
       <BehaviourSection
@@ -434,9 +431,9 @@ export function RadioGroupPage() {
   <SubmitButton />
 </form>`}</CodeBlock>
       <p>
-        The two channels are independent and may be combined. The group never reads{" "}
-        <code>useFormStatus</code>. An action-less group is a working native radio group before
-        hydration and with JavaScript off.
+        The <a href="/concepts/action-props#form-channel">two channels</a> are independent and may
+        be combined. An action-less group is a working native radio group before hydration and with
+        JavaScript off.
       </p>
     </div>
   );

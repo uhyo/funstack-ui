@@ -246,11 +246,11 @@ export function CheckboxPage() {
         }
       >
         <p>
-          Exactly as <a href="/components/switch">Switch</a>: the DOM shows the optimistic value (a
-          correctness requirement for native inputs), a rejection writes the old value back and
-          reaches the Error Boundary, the latest of overlapping clicks wins, the box is never
-          disabled while pending, and <code>details.event.preventDefault()</code> is not a veto (use
-          controlled mode).
+          Exactly as <a href="/components/switch">Switch</a>: the DOM shows the optimistic value (
+          <a href="/concepts/browser-owned-state#native-inputs">Native inputs</a>), a rejection
+          writes the old value back and reaches the Error Boundary, the latest of overlapping clicks
+          wins, the box is never disabled while pending, and{" "}
+          <code>details.event.preventDefault()</code> is not a veto (use controlled mode).
         </p>
         <CodeBlock>{`// Autosave with a Server Function, from a Server Component
 <Checkbox
@@ -317,14 +317,16 @@ export function CheckboxPage() {
       <ul>
         <li>
           <strong>Form reset</strong> and <strong>clicks before hydration</strong> are the two
-          platform paths. Both call <code>checkedChangeAction</code> with{" "}
-          <code>reason: "platform"</code>; a controlled parent is offered the reset value and
-          decides. Details on the <a href="/components/switch">Switch</a> page.
+          <a href="/concepts/browser-owned-state#platform-path">platform paths</a>. Both call{" "}
+          <code>checkedChangeAction</code> with <code>reason: "platform"</code>; a controlled parent
+          is offered the reset value and decides. Details on the{" "}
+          <a href="/components/switch">Switch</a> page.
         </li>
         <li>
           <code>checkedChangeAction={"{serverFn}"}</code> and{" "}
-          <code>&lt;form action={"{serverFn}"}&gt;</code> are independent channels. The Checkbox
-          never reads <code>useFormStatus</code>. A mixed box still posts its value when checked.
+          <code>&lt;form action={"{serverFn}"}&gt;</code> are{" "}
+          <a href="/concepts/action-props#form-channel">independent channels</a>. A mixed box still
+          posts its value when checked.
         </li>
       </ul>
     </div>

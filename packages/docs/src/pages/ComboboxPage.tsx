@@ -684,10 +684,10 @@ export function ComboboxPage() {
           (the right edge in RTL) under a <code>dir="rtl"</code> page or container. The{" "}
           <code>self-*</code> <code>position-area</code> keywords follow the popup's own inherited
           direction, with no JavaScript; plain logical keywords would follow the root's only,
-          because the listbox is in the top layer. Firefox misplaces a popover inside a container
-          whose direction differs from the page's (Mozilla bug 2019601,{" "}
-          <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>); page-level RTL is fine.
-          The Popup emits no <code>data-side</code>.
+          because the listbox is in the top layer. Firefox misplaces a popover inside a direction
+          island (<a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>; see{" "}
+          <a href="/components/tooltip#browser-notes">Tooltip</a>). The Popup emits no{" "}
+          <code>data-side</code>.
         </li>
         <li>
           Inside a Dialog or a Popover the listbox nests in the top layer: the first Escape closes

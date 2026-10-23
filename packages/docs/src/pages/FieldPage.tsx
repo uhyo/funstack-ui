@@ -26,10 +26,10 @@ export function FieldPage() {
         decides when an error is shown, and the browser's localised message is the default text.
         What the library adds is the wiring the platform does not do (ids,{" "}
         <code>aria-describedby</code>, an explicit <code>aria-invalid</code>), a styleable error
-        element instead of the native bubble, the first-invalid focus, and the Async React half: the
-        submission runs in a transition with <code>data-pending</code>, server errors land on their
-        fields and go away on the next edit, and the form is reset only when the action reported no
-        errors.
+        element instead of the native bubble, the first-invalid focus, and the asynchronous half:
+        the submission runs in a transition with <code>data-pending</code>, server errors land on
+        their fields and go away on the next edit, and the form is reset only when the action
+        reported no errors.
       </p>
 
       <Example
@@ -600,9 +600,10 @@ form[data-pending]           { cursor: progress; }
           <code>disabled</code> default from the Field.
         </li>
         <li>
-          The two channels stay separate: a control's own action (the Switch above saves on its own)
-          gives <em>it</em> <code>data-pending</code>; the form's submission gives the Field{" "}
-          <code>data-pending</code>, never the control.
+          The <a href="/concepts/action-props#form-channel">two channels</a> stay separate: a
+          control's own action (the Switch above saves on its own) gives <em>it</em>{" "}
+          <code>data-pending</code>; the form's submission gives the Field <code>data-pending</code>
+          , never the control.
         </li>
         <li>
           Combobox: the <code>Combobox.Input</code> is the control, the hidden input takes the

@@ -29,7 +29,7 @@ export function NumberFieldPage() {
         visible <code>type="text"</code> input the user edits, and right after it a visually hidden
         native <code>type="number"</code> input that carries <code>name</code>, <code>min</code> /{" "}
         <code>max</code> / <code>step</code> / <code>required</code>, the posted value, the form
-        reset and the browser's own constraint messages. The library adds the Async React half: the
+        reset and the browser's own constraint messages. The library adds the asynchronous half: the
         typed text is urgent, a <strong>step</strong> is a transition, and each{" "}
         <strong>gesture</strong> is one commit with <code>data-pending</code> and a rollback if the
         save fails.
@@ -59,6 +59,11 @@ export function NumberFieldPage() {
 
       <h3 id="how-it-works">How it works</h3>
       <h4>Two actions: steps and commits</h4>
+      <p>
+        A <strong>step</strong> is one value change; a <strong>commit</strong> here is the gesture's
+        save through <code>valueCommitAction</code>, not React's{" "}
+        <a href="/concepts/transitions#commit">render commit</a>.
+      </p>
       <Table
         head={["", "valueChangeAction", "valueCommitAction"]}
         rows={[
@@ -91,8 +96,9 @@ export function NumberFieldPage() {
       />
       <Callout title="The save goes in valueCommitAction">
         <p>
-          A held button steps every 60 ms, and every pending async action entangles every transition
-          in the app. Keep <code>valueChangeAction</code> cheap and put the network call in{" "}
+          A held button steps every 60 ms, and an awaited action holds every transition in the app (
+          <a href="/concepts/action-props#await-only">Action props</a>). Keep{" "}
+          <code>valueChangeAction</code> cheap and put the network call in{" "}
           <code>valueCommitAction</code>, which runs once per gesture. A typed value and a key press
           fire both, with the same value; only a held button separates them.
         </p>
@@ -502,7 +508,7 @@ export function NumberFieldPage() {
       <BehaviourSection
         id="transition-types"
         summary={
-          "A step: `fsui-number-field` plus `fsui-number-field-change`. A commit: `fsui-number-field` plus `fsui-number-field-commit`. No part takes a `transition` prop; use the types in your own boundaries."
+          "A step: `fsui-number-field` plus `fsui-number-field-change`. A gesture's save (`valueCommitAction`): `fsui-number-field` plus `fsui-number-field-commit`. No part takes a `transition` prop; use the types in your own boundaries."
         }
       />
 
@@ -611,8 +617,8 @@ export function NumberFieldPage() {
           a server error); a rollback or a form reset re-runs <code>validate</code> only.
         </li>
         <li>
-          The two channels stay separate: the field's own save is its <code>data-pending</code>, the
-          form's submission is the Field's.
+          The <a href="/concepts/action-props#form-channel">two channels</a> stay separate: the
+          field's own save is its <code>data-pending</code>, the form's submission is the Field's.
         </li>
       </ul>
       <CodeBlock>{`// A Server Function as the save, straight from a Server Component:

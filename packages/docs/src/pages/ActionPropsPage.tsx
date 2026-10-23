@@ -1,5 +1,5 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { ConceptExample, Term } from "../components/Concept.js";
+import { ConceptExample, Term, Terms } from "../components/Concept.js";
 import { Callout, Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { Table } from "../components/Tables.js";
@@ -28,6 +28,36 @@ export function ActionPropsPage() {
         screen while the update is prepared (see{" "}
         <a href="/concepts/transitions">Transitions & ViewTransition</a>).
       </p>
+
+      <h3 id="terms">Terms</h3>
+      <Terms
+        items={[
+          {
+            id: "settle",
+            term: "Settle",
+            definition:
+              "An action settles when its promise resolves or rejects (a synchronous action settles when it returns). `data-pending` stays on until the settle and the render it causes have committed.",
+          },
+          {
+            id: "adopt",
+            term: "Adopt",
+            definition:
+              "A controlled parent adopts a dispatched value by setting its controlled prop to it (in the synchronous part of the action, or inside `startTransition` after an `await`).",
+          },
+          {
+            id: "veto",
+            term: "Veto",
+            definition:
+              "A controlled parent refuses a change by not adopting the value: when the action settles, the optimistic value snaps back to the committed one. Only library-owned changes can be vetoed; a [dismissal](/concepts/browser-owned-state#dismissal) cannot.",
+          },
+          {
+            id: "form-channel",
+            term: "Form channel",
+            definition:
+              "React's own form machinery: `<form action>`, `useFormStatus`, `useActionState` and the automatic reset after a successful action. Independent of a control's change action; see [Form actions are a separate channel](#form-actions).",
+          },
+        ]}
+      />
 
       <h3>Naming</h3>
       <p>
@@ -180,7 +210,7 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
   }}
 >`}</CodeBlock>
 
-      <h3>Await only what the UI must wait for</h3>
+      <h3 id="await-only">Await only what the UI must wait for</h3>
       <p>
         While an async action is pending, React holds <em>every</em> transition in the app that
         started meanwhile and commits them together. A two-second awaited save in one Toggle also
@@ -272,7 +302,7 @@ import { setFavorite } from "./actions"; // "use server"
         </p>
       </Callout>
 
-      <h3>Form actions are a separate channel</h3>
+      <h3 id="form-actions">Form actions are a separate channel</h3>
       <p>
         <code>&lt;form action&gt;</code>, <code>useFormStatus</code> and React's automatic form
         reset are React's form channel. A control's change action is per control and runs in the
@@ -301,8 +331,8 @@ import { setFavorite } from "./actions"; // "use server"
           Server Function keeps React's progressive enhancement.
         </li>
         <li>
-          While a form action is pending, a control's transition is entangled with it, and the
-          reverse: React commits them together.
+          While a form action is pending, a control's transition waits for it, and the reverse:
+          React commits them together.
         </li>
       </ul>
 

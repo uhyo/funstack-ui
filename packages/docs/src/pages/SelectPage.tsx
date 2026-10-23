@@ -378,14 +378,12 @@ export function SelectPage() {
             action's duration, then the old option again.
           </li>
         </ol>
-        <Callout title="Why the select shows the optimistic value">
-          <p>
-            After every event react-dom restores a controlled select's options to its{" "}
-            <code>value</code> prop. Only the synchronous optimistic state has rendered by then, so
-            a select driven by committed state would snap back (button included) for the whole
-            pending time. Rendering the optimistic value is a correctness requirement.
-          </p>
-        </Callout>
+        <p>
+          The select shows the optimistic value because react-dom restores a controlled select's
+          options after every event (
+          <a href="/concepts/browser-owned-state#native-inputs">Native inputs</a>); a select driven
+          by committed state would snap back, button included, for the whole pending time.
+        </p>
       </BehaviourSection>
 
       <BehaviourSection
@@ -501,10 +499,11 @@ export function SelectPage() {
   <SubmitButton />
 </form>`}</CodeBlock>
       <p>
-        The two channels are independent and may be combined. Every dispatch adds the view
-        transition type <code>fsui-select</code>; no part takes a <code>transition</code> prop,
-        since the picker and the button's copy are drawn by the browser. An action-less Select is a
-        working native select before hydration, including the copy into the button.
+        The <a href="/concepts/action-props#form-channel">two channels</a> are independent and may
+        be combined. Every dispatch adds the view transition type <code>fsui-select</code>; no part
+        takes a <code>transition</code> prop, since the picker and the button's copy are drawn by
+        the browser. An action-less Select is a working native select before hydration, including
+        the copy into the button.
       </p>
 
       <h3 id="styling">Styling</h3>

@@ -1,5 +1,5 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PropsTable, Table } from "../components/Tables.js";
@@ -207,22 +207,14 @@ export function SwitchPage() {
             above).
           </li>
         </ol>
-        <Callout title="Why the DOM shows the optimistic value">
-          <p>
-            This is a correctness requirement, not a style choice. After every event react-dom
-            restores a controlled input to its current props. Only the synchronous optimistic state
-            has rendered by then, so an input driven by committed (transition) state would snap back
-            right after the click and stay wrong until the action finished.
-          </p>
-        </Callout>
-        <Callout kind="warning" title="preventDefault() is not a veto">
-          <p>
-            Calling <code>details.event.preventDefault()</code> inside the action makes the browser
-            undo the click after React has rendered it, so the input disagrees with{" "}
-            <code>data-checked</code> while the action is pending (development warning). To veto,
-            use controlled mode and do not adopt the value.
-          </p>
-        </Callout>
+        <p>
+          The input shows the optimistic value because react-dom restores a controlled input after
+          every event (<a href="/concepts/browser-owned-state#native-inputs">Native inputs</a>). So{" "}
+          <code>details.event.preventDefault()</code> is not a veto: it makes the browser undo the
+          click after React has rendered it, and the input disagrees with <code>data-checked</code>{" "}
+          while the action is pending (development warning). To veto, use controlled mode and do not{" "}
+          <a href="/concepts/action-props#adopt">adopt</a> the value.
+        </p>
       </BehaviourSection>
 
       <BehaviourSection
@@ -236,7 +228,9 @@ export function SwitchPage() {
           'A native `<input>`: the browser flips it before any JavaScript runs. A form reset and clicks before hydration reach `checkedChangeAction` with `reason: "platform"`.'
         }
       >
-        <h4 id="the-platform-paths">The platform paths</h4>
+        <h4 id="the-platform-paths">
+          The <a href="/concepts/browser-owned-state#platform-path">platform paths</a>
+        </h4>
         <p>
           The library owns <code>checked</code>, but the browser can still change it on its own.
           Both cases reach <code>checkedChangeAction</code> with <code>reason: "platform"</code>:
@@ -309,7 +303,9 @@ export function SwitchPage() {
 
       <h4>Server Functions and forms</h4>
       <p>
-        Two independent channels. A Server Component can use either, or both on the same Switch:
+        The Switch's own action and the{" "}
+        <a href="/concepts/action-props#form-channel">form channel</a> are independent. A Server
+        Component can use either, or both on the same Switch:
       </p>
       <CodeBlock>{`// Autosave on change: a per-switch action with data-pending.
 <Switch defaultChecked={user.notifications} checkedChangeAction={setNotifications} />
@@ -333,10 +329,8 @@ export function SwitchPage() {
         ]}
       />
       <p>
-        The Switch never reads <code>useFormStatus</code>: that would mark every control pending
-        during a submit. To dim controls while a form submits, style <code>form:has(...)</code> or
-        read <code>useFormStatus</code> in your own <code>className</code> function. "Submit on
-        change" is <code>checkedChangeAction={"{() => formRef.current?.requestSubmit()}"}</code>.
+        "Submit on change" is{" "}
+        <code>checkedChangeAction={"{() => formRef.current?.requestSubmit()}"}</code>.
       </p>
       <p>
         A Switch with no action and no <code>checked</code> is a working native input before

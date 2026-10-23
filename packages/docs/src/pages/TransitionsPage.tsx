@@ -41,7 +41,7 @@ export function TransitionsPage() {
         ]}
       />
 
-      <h3>
+      <h3 id="transition-prop">
         The <code>transition</code> prop
       </h3>
       <p>

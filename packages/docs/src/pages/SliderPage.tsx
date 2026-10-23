@@ -26,7 +26,7 @@ export function SliderPage() {
         <code>&lt;input type="range"&gt;</code>, so the role, the value and bounds, every key (RTL
         mirroring included), labels, forms and <code>disabled</code> are the platform's. The library
         adds the styleable thumb and track, pointer dragging, several thumbs that cannot cross, and
-        the Async React half: a drag produces many <strong>steps</strong> and one{" "}
+        the asynchronous half: a drag produces many <strong>steps</strong> and one{" "}
         <strong>commit</strong>.
       </p>
 
@@ -87,6 +87,11 @@ export function SliderPage() {
 
       <h3 id="how-it-works">How it works</h3>
       <h4>Two actions: steps and commits</h4>
+      <p>
+        A <strong>step</strong> is one value change; a <strong>commit</strong> here is the gesture's
+        save through <code>valueCommitAction</code>, not React's{" "}
+        <a href="/concepts/transitions#commit">render commit</a>.
+      </p>
       <Table
         head={["", "valueChangeAction", "valueCommitAction"]}
         rows={[
@@ -119,8 +124,9 @@ export function SliderPage() {
       />
       <Callout title="The save goes in valueCommitAction">
         <p>
-          A drag is dozens of steps, and every pending async action entangles every transition in
-          the app. Keep <code>valueChangeAction</code> cheap and put the network call in{" "}
+          A drag is dozens of steps, and an awaited action holds every transition in the app (
+          <a href="/concepts/action-props#await-only">Action props</a>). Keep{" "}
+          <code>valueChangeAction</code> cheap and put the network call in{" "}
           <code>valueCommitAction</code>, which runs once per gesture.
         </p>
       </Callout>
@@ -393,7 +399,7 @@ export function SliderPage() {
       <BehaviourSection
         id="transition-types"
         summary={
-          "A step: `fsui-slider` plus `fsui-slider-change`. A commit: `fsui-slider` plus `fsui-slider-commit`. No part takes a `transition` prop; use the types in your own boundaries."
+          "A step: `fsui-slider` plus `fsui-slider-change`. A gesture's save (`valueCommitAction`): `fsui-slider` plus `fsui-slider-commit`. No part takes a `transition` prop; use the types in your own boundaries."
         }
       />
 
@@ -526,8 +532,8 @@ export function SliderPage() {
           form reset re-runs <code>validate</code> but does not dismiss a server error.
         </li>
         <li>
-          The two channels stay separate: the Slider's own save is its <code>data-pending</code>,
-          the form's submission is the Field's.
+          The <a href="/concepts/action-props#form-channel">two channels</a> stay separate: the
+          Slider's own save is its <code>data-pending</code>, the form's submission is the Field's.
         </li>
       </ul>
     </div>

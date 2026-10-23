@@ -544,10 +544,10 @@ export function CheckboxGroupPage() {
   <SubmitButton />
 </form>`}</CodeBlock>
       <p>
-        The two channels are independent and may be combined. The group never reads{" "}
-        <code>useFormStatus</code>. An action-less group is a working set of native checkboxes
-        before hydration and with JavaScript off; the Parent's cascade and the dynamic{" "}
-        <code>required</code> need hydration.
+        The <a href="/concepts/action-props#form-channel">two channels</a> are independent and may
+        be combined. An action-less group is a working set of native checkboxes before hydration and
+        with JavaScript off; the Parent's cascade and the dynamic <code>required</code> need
+        hydration.
       </p>
       <p>
         Transition types: every dispatch adds <code>fsui-checkbox-group</code>, plus{" "}

@@ -15,15 +15,15 @@ export function AccordionPage() {
     <div className="learn-content">
       <PageHead
         title="Accordion"
-        description="An accordion built on <details>/<summary>: JS-free when you need no state, a transition-driven state owner with optimistic data-open when you do."
+        description="An accordion built on <details>/<summary>: no JavaScript when you need no state; actions, optimistic data-open and Suspense-friendly panels when you do."
       />
       <h2>Accordion</h2>
       <p className="page-intro">
         Built on <code>&lt;details&gt;</code> and <code>&lt;summary&gt;</code>. Without value props
         its behaviour needs no JavaScript (the parts still ship as client modules; see{" "}
-        <a href="/concepts/server-components">Server Components</a>); with them it becomes a regular
-        FUNSTACK UI state owner with actions, optimistic <code>data-open</code> and
-        Suspense-friendly panels.
+        <a href="/concepts/server-components">Server Components</a>); with them it becomes a regular{" "}
+        <a href="/concepts/pending-and-optimistic#state-owner">state owner</a> with actions,
+        optimistic <code>data-open</code> and Suspense-friendly panels.
       </p>
 
       <Example

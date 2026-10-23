@@ -45,6 +45,24 @@ export function BrowserOwnedStatePage() {
               "A button's `commandfor` and `command` attributes (Invoker Commands), which make the browser itself open or close a dialog or popover on click, without JavaScript.",
           },
           {
+            id: "platform-path",
+            term: "Platform path",
+            definition:
+              'A change the browser makes to library-owned state on its own, without a click the library sees: a form reset, find-in-page opening an item, a click before hydration. The component dispatches it like a user change, with `details.reason: "platform"`, and re-applies the committed state afterwards.',
+          },
+          {
+            id: "notification",
+            term: "Notification",
+            definition:
+              "A change action called after the browser has already made the change (a dismissal, a platform path). It is still awaited, but the UI did not wait for it: nothing can be vetoed, only re-applied.",
+          },
+          {
+            id: "parts-close",
+            term: "A part's close",
+            definition:
+              "A close the user asks one of the component's parts for (a Close button, the Trigger, a form submit). It is library-owned: dispatched in a transition, awaited, vetoable and animatable. The opposite of a dismissal.",
+          },
+          {
             id: "js-free-mode",
             term: "JS-free mode and library mode",
             definition:
@@ -132,7 +150,7 @@ export function BrowserOwnedStatePage() {
 <Accordion.Root exclusive defaultValue={null} valueChangeAction={save}>...</Accordion.Root>`}</CodeBlock>
       </ConceptExample>
 
-      <h3>Parts vs dismissals</h3>
+      <h3 id="parts-vs-dismissals">Parts vs dismissals</h3>
       <p>
         For something that opens and closes in library mode, ownership is split by{" "}
         <strong>who asked</strong>. Opening, and a close the user asks one of the component's parts
@@ -160,7 +178,7 @@ export function BrowserOwnedStatePage() {
         </p>
       </ConceptExample>
 
-      <h3>Native inputs: the DOM is the optimistic state</h3>
+      <h3 id="native-inputs">Native inputs: the DOM is the optimistic state</h3>
       <p>
         A form control built on a real <code>&lt;input&gt;</code> has library-owned state, but the
         browser flips the input before any JavaScript runs, and after every event react-dom restores
