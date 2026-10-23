@@ -55,8 +55,8 @@ Findings that matter beyond this issue:
   `identifierPrefix` option, but `defer()` does not set one. **`Progress.Root` and `Meter.Root`
   are affected today**: they derive the Label id from a server `useId`. A Progress inside a
   `defer()` chunk and another outside it can collide, which breaks `aria-labelledby`. Client
-  `useId` (`_R_…`) is unaffected. This should become an issue in this repo, plus an upstream
-  FUNSTACK Static report (a human task): set a distinct `identifierPrefix` per deferred payload.
+  `useId` (`_R_…`) is unaffected. Filed as #94 here and uhyo/funstack-static#198 upstream (set a
+  distinct `identifierPrefix` per deferred payload).
 - **A `React.cache()`-scoped mutable "server context" is unsafe.** It works only while rendering
   stays synchronous and depth-first. An async child resumes after a sibling Root has overwritten
   the shared value. In the probe, item `1b` of group `g1` rendered `name="g2"`. Reject it as a way
@@ -195,11 +195,11 @@ WebKit `standards-positions` `summary.json` and Bugzilla, checked on 2026-10-23.
 Recommendation: **A now**, and record B as a ready plan. Track the `useId` collision as its own
 issue regardless of the option chosen.
 
-## Should be filed (in this repo; external reports are a human task)
+## Filed
 
-1. `Progress.Root` / `Meter.Root` server `useId` ids collide across `defer()` payloads.
-   Reproduction: `memo/platform-researcher/probes/19-zero-js/src/app-defer.tsx`. Upstream
-   (FUNSTACK Static, human): give each deferred Flight render a distinct `identifierPrefix`.
+1. `Progress.Root` / `Meter.Root` server `useId` ids collide across `defer()` payloads: **#94**.
+   Reproduction: `memo/platform-researcher/probes/19-zero-js/src/app-defer.tsx`. Upstream:
+   **uhyo/funstack-static#198** (give each deferred Flight render a distinct `identifierPrefix`).
 
 ## References
 
