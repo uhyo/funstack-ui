@@ -333,5 +333,5 @@ export type {
   ChangeReason,
   RenderProp,
   StateValue,
-  UrgentChangeAction,
+  UrgentChangeHandler,
 } from "./internal/types.js";

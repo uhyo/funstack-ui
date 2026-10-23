@@ -173,13 +173,13 @@ function TagInput() {
       <p>
         The value may be any text. Enter (with no active suggestion) or leaving the field commits it
         with <code>details.custom: true</code>. The text is controlled with a plain{" "}
-        <code>setState</code> in <code>inputValueChangeAction</code>, the urgent lane.
+        <code>setState</code> in <code>onInputValueChange</code>, the urgent lane.
       </p>
       <Combobox.Root
         allowCustomValue
         value={tag}
         inputValue={text}
-        inputValueChangeAction={(next) => setText(next)}
+        onInputValueChange={(next) => setText(next)}
         valueChangeAction={async (next, details) => {
           console.log(`[drink] ${JSON.stringify(next)} custom=${details.custom}`);
           startTransition(() => setTag(next));

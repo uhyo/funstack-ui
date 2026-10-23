@@ -1,5 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { Action, ActionDetails, ChangeAction, UrgentChangeAction } from "./types.js";
+import type { Action, ActionDetails, ChangeAction, UrgentChangeHandler } from "./types.js";
+// @ts-expect-error renamed `UrgentChangeHandler` (#96): no deprecated alias may come back.
+import type { UrgentChangeAction } from "../index.js";
 
 /**
  * Type-level checks for the action signatures (conventions 2.2). `expectTypeOf` is a no-op at
@@ -33,15 +35,17 @@ describe("Action types", () => {
     expectTypeOf<ActionDetails["event"]>().toEqualTypeOf<Event | undefined>();
   });
 
-  it("UrgentChangeAction is synchronous: (next, details) => void", () => {
-    expectTypeOf<UrgentChangeAction<string>>().parameters.toEqualTypeOf<
+  it("UrgentChangeHandler is synchronous: (next, details) => void", () => {
+    expectTypeOf<UrgentChangeHandler<string>>().parameters.toEqualTypeOf<
       [next: string, details: ActionDetails]
     >();
-    expectTypeOf<UrgentChangeAction<string>>().returns.toBeVoid();
+    expectTypeOf<UrgentChangeHandler<string>>().returns.toBeVoid();
     // A plain state setter fits (the controlled text input case).
     const setText = (_next: string): void => {};
-    const urgent: UrgentChangeAction<string> = (next) => setText(next);
+    const urgent: UrgentChangeHandler<string> = (next) => setText(next);
     void urgent;
+    // The removed name resolves to nothing (the import above is a type error).
+    expectTypeOf<UrgentChangeAction>().toBeAny();
   });
 
   it("rejects a callback whose parameters do not fit", () => {

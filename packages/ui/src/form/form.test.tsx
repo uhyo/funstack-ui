@@ -6,7 +6,7 @@
 // `useFormStatus` through a portal are pinned again in `form.browser.test.tsx`.
 //
 // N/A rows (conventions 10.1): sync / async change actions, optimistic state, controlled parity,
-// post-await and urgent action. `Form.Root action` is React's form channel, not a library action
+// post-await and urgent handler. `Form.Root action` is React's form channel, not a library action
 // prop: there is no `x` / `defaultX` triple, nothing optimistic, and the Form never interprets a
 // return value (results reach the Fields as the `errors` prop). Rejection, overlap and suspending
 // content apply to the submission and are covered below.

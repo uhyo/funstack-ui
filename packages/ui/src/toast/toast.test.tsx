@@ -7,7 +7,7 @@
 //   not an `x` / `defaultX` triple, its input is the imperative `toast()`.
 // - Optimistic + rollback: nothing in Toast is optimistic (design 3.6).
 // - Platform path: no residual browser path (the region is driven by the library both ways).
-// - Urgent action: the queue is urgent but has no `UrgentChangeAction` prop; the urgency is
+// - Urgent handler: the queue is urgent but has no `UrgentChangeHandler` prop; the urgency is
 //   tested under "Lanes".
 //
 // In `toast.browser.test.tsx`: top layer and re-raise, the move into a real modal dialog, enter /

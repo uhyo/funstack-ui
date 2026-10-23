@@ -21,7 +21,7 @@ import type {
   ChangeAction,
   ChangeReason,
   StateValue,
-  UrgentChangeAction,
+  UrgentChangeHandler,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -45,7 +45,7 @@ export interface ComboboxValueChangeDetails extends ActionDetails {
   readonly custom: boolean;
 }
 
-/** Details passed as the second argument of `Combobox.Root`'s `inputValueChangeAction`. */
+/** Details passed as the second argument of `Combobox.Root`'s `onInputValueChange`. */
 export interface ComboboxInputValueChangeDetails extends ActionDetails {
   /**
    * `"activate"`: typing (the `input` event), an accepted option's label, Clear.
@@ -107,13 +107,14 @@ export interface ComboboxRootProps {
    */
   defaultInputValue?: string;
   /**
-   * The urgent lane: called synchronously, outside any Transition, on every change of the text
-   * (typing, and the library's own writes: an accepted option's label, a revert, Clear, a form
-   * reset, text typed before hydration). Not awaited; nothing is pending for it. A controlled
-   * parent updates its state in the body (an urgent update, which is what a controlled text
-   * input needs).
+   * The urgent lane, a handler and not an action: called synchronously, outside any Transition,
+   * on every change of the text (typing, and the library's own writes: an accepted option's
+   * label, a revert, Clear, a form reset, text typed before hydration). Not awaited; nothing is
+   * pending for it. A controlled parent updates its state in the body (an urgent update, which is
+   * what a controlled text input needs). A returned promise is ignored (development warns once: a
+   * fetch belongs in a transition).
    */
-  inputValueChangeAction?: UrgentChangeAction<string, ComboboxInputValueChangeDetails>;
+  onInputValueChange?: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>;
 
   /** Controlled open state. `undefined`: uncontrolled. */
   open?: boolean;
@@ -212,8 +213,8 @@ interface OrderedOption extends ComboboxOptionEntry {
 /**
  * Owns the two states of a combobox (design/components/combobox.md 2): the selection (`value`,
  * a transition with `useOptimistic`, like every other value) and the text (`inputValue`, the
- * library's **urgent** lane: `inputValueChangeAction` is called synchronously, outside any
- * transition). The results render from `useDeferredValue(inputValue)`; the active option is
+ * library's **urgent** lane: the `onInputValueChange` handler is called synchronously, outside
+ * any transition). The results render from `useDeferredValue(inputValue)`; the active option is
  * urgent virtual focus (`aria-activedescendant`); the listbox is a `popover="auto"` opened by the
  * library with the input as `source`. Renders no DOM, except one `<input type="hidden">` when
  * `name` is given.
@@ -290,21 +291,21 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   });
 
   const warnedThenable = useRef(false);
-  /** Writes the text (urgent) and calls `inputValueChangeAction` synchronously (design 2.2). */
+  /** Writes the text (urgent) and calls `onInputValueChange` synchronously (design 2.2). */
   const writeText = useCallback(
     (next: string, reason: ChangeReason, event: Event | undefined): void => {
       const latest = propsRef.current;
       if (latest.inputValue === undefined) setInternalText(next);
       textRef.current = next;
-      const action = latest.inputValueChangeAction;
-      if (action === undefined) return;
-      const result: unknown = action(next, createActionDetails(event, { reason }));
+      const handler = latest.onInputValueChange;
+      if (handler === undefined) return;
+      const result: unknown = handler(next, createActionDetails(event, { reason }));
       if (isDev && !warnedThenable.current && isThenable(result)) {
         warnedThenable.current = true;
         console.error(
-          "Combobox.Root: `inputValueChangeAction` returned a promise. It is the urgent lane: " +
-            "called synchronously and never awaited. Put async work in `valueChangeAction`, or " +
-            "derive the results from the deferred `query`.",
+          "Combobox.Root: `onInputValueChange` returned a promise. It is the urgent lane: it is " +
+            "not awaited. Fetch in a transition instead (`valueChangeAction`, or " +
+            "`useDeferredValue` of `inputValue`).",
         );
       }
     },
@@ -341,7 +342,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     } catch (error) {
       // Walkthrough 4: the text rolls back with the optimistic value. A synchronous throw lands
       // here inside the Root's `startTransition` callback; yield once so the write (and the
-      // consumer's `inputValueChangeAction`) is urgent, as every text write (conventions 2.6).
+      // consumer's `onInputValueChange`) is urgent, as every text write (conventions 2.6).
       await undefined;
       const record = textRecord.current;
       if (meta !== undefined && record !== null && record.id === meta.id) {

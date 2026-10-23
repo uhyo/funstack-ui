@@ -23,7 +23,7 @@ import {
   setupUser,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
-import type { UrgentChangeAction } from "../index.js";
+import type { UrgentChangeHandler } from "../index.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import type { FormErrors } from "../form/index.js";
@@ -158,7 +158,7 @@ function ControlledText({ action, ...rest }: HarnessProps & { action?: TextActio
         root={{
           ...others,
           inputValue: text,
-          inputValueChangeAction: (next, details) => {
+          onInputValueChange: (next, details) => {
             action?.(next, details);
             setText(next);
           },
@@ -174,7 +174,7 @@ function TextHarness({
   ...rest
 }: HarnessProps & { mode: ControlMode; action?: TextAction }) {
   if (mode === "controlled") return <ControlledText action={action} {...rest} />;
-  return <Harness {...rest} root={{ ...rest.root, inputValueChangeAction: action }} />;
+  return <Harness {...rest} root={{ ...rest.root, onInputValueChange: action }} />;
 }
 
 const input = () => screen.getByTestId("input") as HTMLInputElement;
@@ -490,7 +490,7 @@ describe("Combobox", () => {
   });
 
   renderBoth("urgent text", (mode) => {
-    it("updates the DOM and calls inputValueChangeAction synchronously per keystroke", async () => {
+    it("updates the DOM and calls onInputValueChange synchronously per keystroke", async () => {
       const calls: { next: string; dom: string; type: string | undefined; reason: string }[] = [];
       const action = vi.fn<TextAction>((next, details) => {
         calls.push({
@@ -555,12 +555,14 @@ describe("Combobox", () => {
       await flush();
     });
 
-    it("warns once when inputValueChangeAction returns a promise", async () => {
+    it("warns once when onInputValueChange returns a promise", async () => {
       const error = silenceErrors();
       const user = setupUser();
-      render(<Harness root={{ inputValueChangeAction: async () => {} }} />);
+      render(<Harness root={{ onInputValueChange: async () => {} }} />);
       await typeText(user, "ab");
-      const warnings = error.mock.calls.filter(([m]) => String(m).includes("returned a promise"));
+      const warnings = error.mock.calls.filter(([m]) =>
+        String(m).includes("`onInputValueChange` returned a promise"),
+      );
       expect(warnings).toHaveLength(1);
     });
   });
@@ -568,7 +570,7 @@ describe("Combobox", () => {
   it("restores the DOM when a controlled parent does not adopt a keystroke", async () => {
     const user = setupUser();
     const action = vi.fn();
-    render(<Harness root={{ inputValue: "Fr", inputValueChangeAction: action }} />);
+    render(<Harness root={{ inputValue: "Fr", onInputValueChange: action }} />);
     await user.click(input());
     await user.keyboard("a");
     expect(action).toHaveBeenCalledWith("Fra", expect.anything());
@@ -943,7 +945,7 @@ describe("Combobox", () => {
         <ValueHarness
           mode={mode}
           action={action}
-          root={{ name: "country", inputValueChangeAction: texts }}
+          root={{ name: "country", onInputValueChange: texts }}
           results={() => <Options query="ja" />}
         />,
       );
@@ -1075,7 +1077,7 @@ describe("Combobox", () => {
           mode={mode}
           action={() => save.promise}
           boundary={caught}
-          root={{ defaultValue: "fr", defaultInputValue: "France", inputValueChangeAction: texts }}
+          root={{ defaultValue: "fr", defaultInputValue: "France", onInputValueChange: texts }}
         />,
       );
       await user.click(input());
@@ -1168,7 +1170,7 @@ describe("Combobox", () => {
           value: "fr",
           defaultInputValue: "France",
           valueChangeAction: async () => {},
-          inputValueChangeAction: texts,
+          onInputValueChange: texts,
           name: "country",
         }}
         results={() => <Options query="" />}
@@ -1407,7 +1409,7 @@ describe("Combobox", () => {
             defaultValue: "fr",
             defaultInputValue: "France",
             valueChangeAction: action,
-            inputValueChangeAction: texts,
+            onInputValueChange: texts,
           }}
         />,
       );
@@ -1448,7 +1450,7 @@ describe("Combobox", () => {
       const texts = vi.fn<TextAction>();
       const user = setupUser();
       for (const allowCustomValue of [true, false]) {
-        const root = { allowCustomValue, valueChangeAction: action, inputValueChangeAction: texts };
+        const root = { allowCustomValue, valueChangeAction: action, onInputValueChange: texts };
         const { rerender, unmount } = render(<Harness root={root} />);
         await typeText(user, "jam");
         texts.mockClear();
@@ -1807,7 +1809,7 @@ describe("Combobox", () => {
             defaultValue: "fr",
             defaultInputValue: "France",
             valueChangeAction: action,
-            inputValueChangeAction: texts,
+            onInputValueChange: texts,
             name: "country",
           }}
         />,
@@ -1953,7 +1955,7 @@ describe("Combobox", () => {
     it("dispatches nothing when the DOM text matches", async () => {
       const texts = vi.fn<TextAction>();
       await hydrate(
-        <Harness root={{ defaultInputValue: "Fr", inputValueChangeAction: texts }} />,
+        <Harness root={{ defaultInputValue: "Fr", onInputValueChange: texts }} />,
         "Fr",
       );
       expect(texts).not.toHaveBeenCalled();
@@ -1971,7 +1973,7 @@ describe("Combobox", () => {
               name: "country",
               defaultValue: "fr",
               defaultInputValue: "France",
-              inputValueChangeAction: texts,
+              onInputValueChange: texts,
             }}
           />
           <button type="reset">Reset</button>
@@ -2043,7 +2045,7 @@ describe("Combobox", () => {
     const ui = (root: Partial<ComboboxRootProps>) => (
       <form data-testid="form">
         <Harness
-          root={{ name: "c", valueChangeAction: action, inputValueChangeAction: texts, ...root }}
+          root={{ name: "c", valueChangeAction: action, onInputValueChange: texts, ...root }}
         />
       </form>
     );
@@ -2096,7 +2098,7 @@ describe("Combobox", () => {
     const user = setupUser();
     render(
       <form data-testid="form">
-        <Harness root={{ inputValue: "Kept", inputValueChangeAction: () => {} }} />
+        <Harness root={{ inputValue: "Kept", onInputValueChange: () => {} }} />
       </form>,
     );
     await user.click(input());
@@ -2380,14 +2382,17 @@ describe("Combobox", () => {
     });
   });
 
-  it("types: UrgentChangeAction is exported and multiple is not a prop", () => {
-    expectTypeOf<ComboboxRootProps["inputValueChangeAction"]>().toEqualTypeOf<
-      UrgentChangeAction<string, ComboboxInputValueChangeDetails> | undefined
+  it("types: UrgentChangeHandler is exported, UrgentChangeAction and inputValueChangeAction are not, multiple is not a prop", () => {
+    expectTypeOf<ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
+      UrgentChangeHandler<string, ComboboxInputValueChangeDetails> | undefined
     >();
-    const anySync: UrgentChangeAction<string> = (next) => {
+    const anySync: UrgentChangeHandler<string> = (next) => {
       void next;
     };
     void anySync;
+    // @ts-expect-error `inputValueChangeAction` was renamed `onInputValueChange` (#96), no alias.
+    const renamed: ComboboxRootProps = { inputValueChangeAction: () => {} };
+    void renamed;
     // @ts-expect-error `multiple` is not in v1 (design 13).
     const props: ComboboxRootProps = { multiple: true };
     void props;

@@ -6,7 +6,7 @@ const SUGGESTIONS = ["Coffee", "Tea", "Matcha", "Hot chocolate", "Lemonade"];
 
 // Free text: `allowCustomValue` makes the typed text the value (Enter with no active
 // suggestion, or leaving the field). The text is controlled with a plain setState in the urgent
-// `inputValueChangeAction`. `name` puts the value in a hidden input for the form.
+// `onInputValueChange`. `name` puts the value in a hidden input for the form.
 export function ComboboxDrink() {
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function ComboboxDrink() {
         name="drink"
         allowCustomValue
         inputValue={text}
-        inputValueChangeAction={(next) => setText(next)}
+        onInputValueChange={(next) => setText(next)}
       >
         <Combobox.Label>Favourite drink</Combobox.Label>
         <div className="demo-combobox-field">

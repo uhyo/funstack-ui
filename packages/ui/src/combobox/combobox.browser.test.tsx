@@ -353,7 +353,7 @@ describe("Combobox (browser)", () => {
       const texts = vi.fn<TextAction>();
       render(
         <Harness
-          root={{ defaultValue: "fr", defaultInputValue: "France", inputValueChangeAction: texts }}
+          root={{ defaultValue: "fr", defaultInputValue: "France", onInputValueChange: texts }}
         />,
       );
       await user.click(input());
@@ -543,7 +543,7 @@ describe("Combobox (browser)", () => {
     function App() {
       return (
         <Combobox.Root
-          inputValueChangeAction={texts}
+          onInputValueChange={texts}
           valueChangeAction={action}
           openChangeAction={openAction}
         >

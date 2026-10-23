@@ -10,7 +10,7 @@
 //
 // N/A rows (conventions 10.1): sync / async action, optimistic, rejection, overlap, superseded
 // rejection, controlled parity, post-await, suspending content, platform path dispatches and
-// urgent action. No Field part has an action prop or an `x` / `defaultX` triple: the validity
+// urgent handler. No Field part has an action prop or an `x` / `defaultX` triple: the validity
 // state is an urgent mirror of browser-owned state (design 2.4) with no consumer-facing action.
 // The form channel (pending, server errors, the reset policy) is covered in `form.test.tsx`.
 import { act, fireEvent, render, screen } from "@testing-library/react";
