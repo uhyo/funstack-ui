@@ -253,3 +253,5 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Research 3a3341e. USER DECISION: option A (no new components; reword JS-free = no behaviour JS / works without hydration; native-HTML recipes on form-control pages; option B native Accordion recorded as ready plan).
 - Filed #94 (Progress/Meter server useId collision in Static defer()) and upstream uhyo/funstack-static#198 (allowed: FUNSTACK family).
 - Running: architect (design-93) records decision in design/; developer impl-19 docs on wave13/zero-js-docs. Then review → merge → alpha.11? (docs-only; deploy-docs needs a release or workflow_dispatch). Then user does a human review.
+- Docs d83c4ba..5908286 (review fd875e4 incl. Select recipe, roadmap). Closed #19. No library change → no npm release; docs deployed via deploy-docs workflow_dispatch.
+- WAVE 13 DONE. Next: user's human review of everything built. Open: #94 (waits on funstack-static#198) + human/upstream tasks #16 #34 #44 #51 #52 #58 #70 #73 #89 #90 #91 #92.
