@@ -40,14 +40,15 @@ export function ComboboxPage() {
       <p>
         "Everything is a transition" has one exception, and this is it: React requires a controlled
         text input to update urgently, in the same event as the keystroke. So the text is the
-        library's first <strong>urgent state</strong>. It keeps the usual triple,{" "}
-        <code>inputValue</code> / <code>defaultInputValue</code> /{" "}
-        <code>inputValueChangeAction</code>, but the action's type is{" "}
-        <code>UrgentChangeAction</code>: it is called synchronously, outside any transition, and
-        never awaited. A controlled parent simply sets its state in the body:
+        library's first <strong>urgent state</strong>. It keeps the usual pair,{" "}
+        <code>inputValue</code> / <code>defaultInputValue</code>, but its callback is a handler, not
+        an action: <code>onInputValueChange</code> (
+        <a href="/concepts/action-props#urgent-lane">the urgent lane</a>) is called synchronously,
+        outside any transition, and never awaited. A controlled parent simply sets its state in the
+        body:
       </p>
       <CodeBlock>{`const [text, setText] = useState("");
-<Combobox.Root inputValue={text} inputValueChangeAction={(next) => setText(next)}>`}</CodeBlock>
+<Combobox.Root inputValue={text} onInputValueChange={(next) => setText(next)}>`}</CodeBlock>
       <p>Everything downstream of the text leaves the urgent lane at once:</p>
       <ul>
         <li>
@@ -65,13 +66,13 @@ export function ComboboxPage() {
           an optimistic selection, exactly as every other value in the library.
         </li>
       </ul>
-      <Callout title="Do not fetch in inputValueChangeAction">
+      <Callout title="Do not fetch in onInputValueChange">
         <p>
-          <code>{"inputValueChangeAction={async (q) => setResults(await search(q))}"}</code> brings
-          back every problem the deferred query solves: responses land in completion order, nothing
-          marks the results stale, and the urgent action is not awaited anyway (development warns
-          when it returns a promise). Read a query-keyed cache with <code>use()</code> inside the
-          List instead.
+          <code>{"onInputValueChange={async (q) => setResults(await search(q))}"}</code> brings back
+          every problem the deferred query solves: responses land in completion order, nothing marks
+          the results stale, and the urgent handler is not awaited anyway (development warns when it
+          returns a promise). Read a query-keyed cache with <code>use()</code> inside the List
+          instead.
         </p>
       </Callout>
       <p>
@@ -205,10 +206,10 @@ export function ComboboxPage() {
               "Initial text when uncontrolled, and the visible input's form-reset target. Pass the selected option's label together with `defaultValue`.",
           },
           {
-            name: "inputValueChangeAction",
-            type: "UrgentChangeAction<string, ComboboxInputValueChangeDetails>",
+            name: "onInputValueChange",
+            type: "UrgentChangeHandler<string, ComboboxInputValueChangeDetails>",
             description:
-              "The urgent lane: called synchronously, outside any transition, on every change of the text (typing, and the library's own writes). Not awaited, never pending. Set your state in the body.",
+              "A handler, not an action: [the urgent lane](/concepts/action-props#urgent-lane), called synchronously, outside any transition, on every change of the text (typing, and the library's own writes). Not awaited, never pending. Set your state in the body.",
           },
           {
             name: "open",
@@ -634,7 +635,7 @@ export function ComboboxPage() {
         </li>
         <li>
           Text typed before hydration (and Firefox's form restoration) is kept and reported once
-          through <code>inputValueChangeAction</code> with <code>reason: "platform"</code>.
+          through <code>onInputValueChange</code> with <code>reason: "platform"</code>.
         </li>
       </ul>
 
@@ -675,7 +676,7 @@ export function ComboboxPage() {
           'Every value dispatch: `fsui-combobox` and `fsui-combobox-select`. Opens and closes: `fsui-combobox` plus `fsui-combobox-open` or `fsui-combobox-close`. A deferred results render carries no `fsui-*` type, so give the Popup\'s `transition` a map with `default: "none"`.'
         }
         optimistic={
-          "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. The typed text is urgent, not optimistic (see [the urgent lane](/concepts/action-props))."
+          "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. The typed text is urgent, not optimistic (see [the urgent lane](/concepts/action-props#urgent-lane))."
         }
         suspense={
           "Results render from a deferred copy of the text (`useDeferredValue`), so an async search is `use(search(query))` inside a boundary in the List. The first load shows your fallback; after that every keystroke keeps the previous results on screen, marked `data-stale` and `aria-busy`, until the new ones are ready. Only the latest query is ever rendered. Option content must not suspend."

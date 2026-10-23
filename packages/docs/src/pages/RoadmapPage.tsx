@@ -80,8 +80,8 @@ export function RoadmapPage() {
         </li>
         <li>
           <a href="/components/combobox">Combobox</a>: an editable combobox whose typing is the
-          library's first urgent state (<code>inputValueChangeAction</code>, typed{" "}
-          <code>UrgentChangeAction</code>), with results from a deferred query inside Suspense,{" "}
+          library's first urgent state (<code>onInputValueChange</code>, typed{" "}
+          <code>UrgentChangeHandler</code>), with results from a deferred query inside Suspense,{" "}
           <code>aria-activedescendant</code>, an option that stays pending until its save settles,
           free text, forms, and a default result-count announcement through <code>ariaNotify</code>{" "}
           (<a href={issue(50)}>#50</a>).
@@ -199,6 +199,12 @@ export function RoadmapPage() {
           behaviour JavaScript, works without hydration, not "no client bundle"), and the Switch,
           Checkbox, RadioGroup, Select, Slider and NumberField pages show the plain HTML a Server
           Component can render.
+        </li>
+        <li>
+          <strong>Breaking:</strong> <code>Combobox.Root</code>'s{" "}
+          <code>inputValueChangeAction</code> is renamed <code>onInputValueChange</code> and the
+          type <code>UrgentChangeAction</code> is renamed <code>UrgentChangeHandler</code>; an
+          action prop always means a transition (<a href={issue(96)}>#96</a>).
         </li>
       </ul>
 

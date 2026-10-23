@@ -25,3 +25,6 @@
   `/concepts/action-props#urgent-lane`.
 - wave14-docs deletes the Action props naming table: keep the deletion when rebasing (do not re-add
   the Combobox row from the checklist).
+- Done after rebasing onto a290d4a: ActionProps urgent-lane section (`id="urgent-lane"`, intro "with one
+  exception, below"), Combobox prose/Callout/props row/platform list/behaviour row link, Roadmap entry +
+  "Breaking" item. ServerComponentsPage no longer mentions the prop after wave14-docs: nothing to change.
