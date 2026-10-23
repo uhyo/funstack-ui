@@ -262,3 +262,5 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Then: reviewer pass, merge, release alpha.11 (breaking rename → call out in notes).
 - User: "review other pages for similar problems; maybe hire a technical writer" → added .claude/agents/technical-writer.md (loads after session restart; meanwhile run as general-purpose following the file). Writer auditing non-concept pages → memo/technical-writer/wave14-docs-audit.md; fixes to follow after wave14-docs merges (likely issue #98).
 - @funstack/static 1.3.4 released by user (fixes funstack-static#198). Researcher verifying; then bump packages/docs dep, update/remove defer() id note (#94) — fold into the docs branch to avoid ServerComponentsPage conflicts.
+- #94: researcher verified fix (4d5a5a5). Bump + note removal sent to wave14-docs developer. Close #94 after merge.
+- #96 design accepted (74b47a4; vision §2/§3, conventions 2.1/2.6/10.1, RQ39, type-level guard test action-naming.test.ts). Developer implementing on wave14-rename (ui + example now; docs prose after wave14-docs merges — merge order: wave14-docs first, then rebase wave14-rename).
