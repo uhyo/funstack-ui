@@ -1,7 +1,9 @@
 // Unit rows for `useControllableAction` that no component suite isolates. The state model itself
-// (optimistic, transitions, superseded rejections) is covered through every component's suite.
+// (optimistic, transitions) is covered through every component's suite; the superseded-rejection
+// rules (boundary, one per burst, unmount, external capture) also have direct rows here.
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { deferred, ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
 import type { ActionDetails } from "./types.js";
 import { useControllableAction } from "./use-controllable-action.js";
 import type { ControllableAction } from "./use-controllable-action.js";
@@ -155,5 +157,87 @@ describe("useControllableAction: referential stability", () => {
     expect(before).not.toHaveBeenCalled();
     expect(after).toHaveBeenCalledExactlyOnceWith("c");
     expect(types).toHaveBeenCalledExactlyOnceWith("c", "b");
+  });
+});
+
+describe("useControllableAction: superseded rejections", () => {
+  /** Three dispatches whose actions settle when the test says; the Probe sits in a boundary. */
+  function setupBurst(options: { captureSuperseded?: (error: unknown) => void } = {}) {
+    const runs = [deferred(), deferred(), deferred()];
+    let call = 0;
+    const caught = vi.fn();
+    let hook!: Hook;
+    function CaptureProbe({ onHook }: { onHook: (h: Hook) => void }) {
+      const h = useControllableAction<string, ActionDetails>({
+        controlled: undefined,
+        defaultValue: undefined,
+        initialValue: "",
+        action: () => runs[call++]!.promise,
+        captureSuperseded: options.captureSuperseded,
+      });
+      onHook(h);
+      return <output data-testid="value">{h.committed}</output>;
+    }
+    const view = render(
+      <ErrorCatcher onError={caught}>
+        <CaptureProbe onHook={(h) => (hook = h)} />
+      </ErrorCatcher>,
+    );
+    act(() => {
+      hook.dispatch("a", {} as ActionDetails);
+      hook.dispatch("b", {} as ActionDetails);
+      hook.dispatch("c", {} as ActionDetails);
+    });
+    return { runs, caught, view };
+  }
+
+  it("throws a superseded dispatch's rejection to the boundary while the latest is pending", async () => {
+    silenceErrors();
+    const { runs, caught } = setupBurst();
+    await act(async () => runs[0]!.reject(new Error("older")));
+    expect(caught).toHaveBeenCalledTimes(1);
+    expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
+  });
+
+  it("throws the first of a burst and reports the later ones through reportError", async () => {
+    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const { runs, caught } = setupBurst();
+    const first = new Error("first");
+    const second = new Error("second");
+    await act(async () => {
+      runs[0]!.reject(first);
+      runs[1]!.reject(second);
+    });
+    expect(caught).toHaveBeenCalledExactlyOnceWith(first);
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(second);
+    vi.unstubAllGlobals();
+  });
+
+  it("drops superseded rejections once unmounted: nothing thrown or reported", async () => {
+    const consoleError = silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const { runs, caught, view } = setupBurst();
+    view.unmount();
+    await act(async () => {
+      runs[0]!.reject(new Error("first"));
+      runs[1]!.reject(new Error("second"));
+      runs[2]!.resolve();
+    });
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("hands superseded rejections to an external captureSuperseded instead of throwing", async () => {
+    const capture = vi.fn();
+    const { runs, caught } = setupBurst({ captureSuperseded: capture });
+    const older = new Error("older");
+    await act(async () => runs[0]!.reject(older));
+    expect(capture).toHaveBeenCalledExactlyOnceWith(older);
+    expect(caught).not.toHaveBeenCalled();
   });
 });

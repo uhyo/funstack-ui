@@ -248,6 +248,22 @@ describe("CheckboxGroup", () => {
       expect(box("x").name).not.toBe("perm");
     });
 
+    it("gives two unnamed groups distinct names", () => {
+      render(
+        <>
+          <CheckboxGroup.Root aria-label="A">
+            <CheckboxGroup.Item value="x" aria-label="x" />
+          </CheckboxGroup.Root>
+          <CheckboxGroup.Root aria-label="B">
+            <CheckboxGroup.Item value="y" aria-label="y" />
+          </CheckboxGroup.Root>
+        </>,
+      );
+      expect(box("x").name).not.toBe("");
+      expect(box("y").name).not.toBe("");
+      expect(box("x").name).not.toBe(box("y").name);
+    });
+
     it("renders value and form on every Item and form on the fieldset; the Parent has neither name, value, form nor required", () => {
       render(
         <>
@@ -1916,6 +1932,49 @@ describe("CheckboxGroup", () => {
       expect(checkedValues()).toEqual(["a"]);
       expect(parentShows()).toBe("mixed");
       expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it("late Items and a late Parent replace the server's stale state attributes when they hydrate", async () => {
+      silenceErrors();
+      const save = deferred();
+      const action = vi.fn<ActionFn>(() => save.promise);
+      function Group({ gate }: { gate: Promise<void> }) {
+        return (
+          <CheckboxGroup.Root aria-label="T" defaultValue={[]} required valueChangeAction={action}>
+            <CheckboxGroup.Item value="a" aria-label="a" />
+            <Suspense fallback={null}>
+              <Gate promise={gate}>
+                <CheckboxGroup.Parent values={["a", "b"]} aria-label="all" />
+                <CheckboxGroup.Item value="b" aria-label="b" />
+              </Gate>
+            </Suspense>
+          </CheckboxGroup.Root>
+        );
+      }
+      const container = document.createElement("div");
+      document.body.append(container);
+      container.innerHTML = renderToString(<Group gate={fulfilled()} />);
+      const g = gate();
+      await act(async () => {
+        render(<Group gate={g.promise} />, { container, hydrate: true });
+      });
+      // The hydrated Item is checked while the Parent and Item b are still dehydrated: the server
+      // rendered them for an empty group (Parent unchecked, b required).
+      await act(async () => {
+        box("a").click();
+      });
+      expect(action).toHaveBeenCalledTimes(1);
+      await act(async () => save.resolve());
+      await act(async () => {
+        g.open();
+      });
+      await flushMicrotasks();
+      expect(action).toHaveBeenCalledTimes(1);
+
+      // Hydration alone keeps server attributes that differ from the client render.
+      expect(box("b")).not.toHaveAttribute("required");
+      expect(parentBox()).toHaveAttribute("data-indeterminate", "");
+      expect(parentBox()).not.toHaveAttribute("data-checked");
     });
   });
 

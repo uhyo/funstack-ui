@@ -138,3 +138,66 @@ describe("useActionTrigger: openGeneration", () => {
     expect(then).not.toHaveBeenCalled();
   });
 });
+
+describe("useActionTrigger: superseded rejections, burst and unmount", () => {
+  function runThree(hook: () => ActionTrigger) {
+    const runs = [deferred(), deferred(), deferred()];
+    act(() => {
+      for (const run of runs) hook().run(() => run.promise);
+    });
+    return runs;
+  }
+
+  it("throws the first of a burst and reports the later ones through reportError", async () => {
+    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const caught = vi.fn();
+    const { hook } = setup({ ignoreWhilePending: false }, caught);
+    const runs = runThree(hook);
+    const first = new Error("first");
+    const second = new Error("second");
+    await act(async () => {
+      runs[0]!.reject(first);
+      runs[1]!.reject(second);
+    });
+    expect(caught).toHaveBeenCalledExactlyOnceWith(first);
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(second);
+    vi.unstubAllGlobals();
+  });
+
+  it("drops superseded rejections once unmounted: nothing thrown or reported", async () => {
+    const consoleError = silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    let hook!: ActionTrigger;
+    const caught = vi.fn();
+    const view = render(
+      <ErrorCatcher onError={caught}>
+        <Probe options={{ ignoreWhilePending: false }} onHook={(h) => (hook = h)} />
+      </ErrorCatcher>,
+    );
+    const runs = runThree(() => hook);
+    view.unmount();
+    await act(async () => {
+      runs[0]!.reject(new Error("first"));
+      runs[1]!.reject(new Error("second"));
+      runs[2]!.resolve();
+    });
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("hands superseded rejections to an external captureSuperseded instead of throwing", async () => {
+    const capture = vi.fn();
+    const caught = vi.fn();
+    const { hook } = setup({ ignoreWhilePending: false, captureSuperseded: capture }, caught);
+    const runs = runThree(hook);
+    const older = new Error("older");
+    await act(async () => runs[0]!.reject(older));
+    expect(capture).toHaveBeenCalledExactlyOnceWith(older);
+    expect(caught).not.toHaveBeenCalled();
+  });
+});

@@ -212,6 +212,24 @@ describe("RadioGroup", () => {
       expect(radio("x").name).not.toBe("plan");
     });
 
+    it("gives two unnamed groups distinct names, so each keeps its own checked radio", () => {
+      render(
+        <>
+          <RadioGroup.Root aria-label="A" defaultValue="x">
+            <RadioGroup.Item value="x" aria-label="x" />
+          </RadioGroup.Root>
+          <RadioGroup.Root aria-label="B" defaultValue="y">
+            <RadioGroup.Item value="y" aria-label="y" />
+          </RadioGroup.Root>
+        </>,
+      );
+      expect(radio("x").name).not.toBe("");
+      expect(radio("y").name).not.toBe("");
+      expect(radio("x").name).not.toBe(radio("y").name);
+      expect(radio("x").checked).toBe(true);
+      expect(radio("y").checked).toBe(true);
+    });
+
     it("renders value, required and form on every Item and form on the fieldset", () => {
       render(
         <>
