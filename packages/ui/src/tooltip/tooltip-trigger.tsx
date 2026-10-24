@@ -2,7 +2,7 @@
 import { use, useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { CSPContext } from "../internal/csp-context.js";
-import { FSUI_PRECEDENCE } from "../internal/anchor-position.js";
+import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
 import { dataAttr } from "../internal/data-attr.js";
 import {
   TOOLTIP_TRIGGER_MARKER,

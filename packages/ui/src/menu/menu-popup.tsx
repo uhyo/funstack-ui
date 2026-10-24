@@ -19,8 +19,8 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
+import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import {
-  FSUI_PRECEDENCE,
   MENU_POINT_FALLBACKS,
   MENU_POINT_GAP,
   MENU_POINT_HREF,
@@ -28,9 +28,8 @@ import {
   MENU_POINT_TOUCH_GAP,
   MENU_POINT_X,
   MENU_POINT_Y,
-  POSITION_TRY_FALLBACKS,
-  positionArea,
-} from "../internal/anchor-position.js";
+} from "../internal/menu-point.js";
+import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
 import { mergeRefs } from "../internal/merge-props.js";
