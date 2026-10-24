@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { createActionDetails } from "../internal/action-details.js";
 import type { AriaNotifyTarget } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
@@ -31,7 +32,6 @@ import { useLatest } from "../internal/use-latest.js";
 import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
-import { comboboxKeyDown } from "./combobox-keyboard.js";
 import { useComboboxForm } from "./use-combobox-form.js";
 import { useOptionRegistry } from "./use-option-registry.js";
 import type { ComboboxContextValue } from "./combobox-context.js";
@@ -616,6 +616,21 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     popover.requestOpen(event, "activate");
   };
 
+  const move = (direction: 1 | -1): void => {
+    const enabled = orderedOptions().filter((option) => !option.disabled);
+    if (enabled.length === 0) return;
+    const last = enabled.length - 1;
+    const index = enabled.findIndex((option) => option.value === activeRef.current);
+    let next: number;
+    if (direction === 1) next = index < 0 ? 0 : index >= last ? (loop ? 0 : last) : index + 1;
+    else next = index < 0 ? last : index <= 0 ? (loop ? last : 0) : index - 1;
+    const target = enabled[next]!;
+    setActive(target.value);
+    if (typeof target.element.scrollIntoView === "function") {
+      target.element.scrollIntoView({ block: "nearest" });
+    }
+  };
+
   const activeEnabled = (): string | null => {
     const current = activeRef.current;
     if (current === null) return null;
@@ -623,24 +638,69 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     return entry !== undefined && !entry.disabled ? current : null;
   };
 
-  const keyDown = (event: KeyboardEvent): boolean =>
-    comboboxKeyDown(event, {
-      disabled,
-      allowCustomValue,
-      loop,
-      isOpen: isPopoverOpen(popover.popupRef.current),
-      active: activeRef.current,
-      enabledOptions: () => orderedOptions().filter((option) => !option.disabled),
-      activeEnabled,
-      setActive,
-      open: (openEvent, edge) => {
-        if (edge !== undefined) pendingEdge.current = edge;
-        popover.requestOpen(openEvent, "activate");
-      },
-      close: (closeEvent) => popover.requestClose(closeEvent, "activate"),
-      accept,
-      commitText,
-    });
+  const keyDown = (event: KeyboardEvent): boolean => {
+    if (disabled || event.ctrlKey || event.metaKey) return false;
+    // IME: the key belongs to the composition (Enter commits it, arrows pick a candidate).
+    if (event.isComposing || event.keyCode === 229) return false;
+    // What the user sees, not what is intended: right after Escape the platform has hidden the
+    // popup but its `toggle` (and the library's notification) is still queued, and an open that
+    // is still committing shows nothing yet. Enter must submit and arrows must open in both.
+    const isOpen = isPopoverOpen(popover.popupRef.current);
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        if (event.altKey) {
+          if (!isOpen) popover.requestOpen(event, "activate");
+        } else if (!isOpen) {
+          pendingEdge.current = "first";
+          popover.requestOpen(event, "activate");
+        } else {
+          move(1);
+        }
+        return true;
+      case "ArrowUp":
+        event.preventDefault();
+        if (event.altKey) {
+          if (isOpen) {
+            const active = activeEnabled();
+            if (active !== null) accept(active, event);
+            else popover.requestClose(event, "activate");
+          }
+        } else if (!isOpen) {
+          pendingEdge.current = "last";
+          popover.requestOpen(event, "activate");
+        } else {
+          move(-1);
+        }
+        return true;
+      case "Enter": {
+        if (isOpen) {
+          // An open listbox means the user is choosing: never submit from here.
+          event.preventDefault();
+          const active = activeEnabled();
+          if (active !== null) accept(active, event);
+          else if (allowCustomValue && !commitText(event, true)) {
+            popover.requestClose(event, "activate");
+          }
+          return true;
+        }
+        // Closed: not prevented, so a form still submits. The key's default action (implicit
+        // submission) must see the optimistic hidden value: Firefox submits before React's
+        // scheduled flush of the optimistic render, so it is flushed here (design 5.3).
+        if (allowCustomValue) flushSync(() => commitText(event, false));
+        return false;
+      }
+      case "Home":
+      case "End":
+      case "ArrowLeft":
+      case "ArrowRight":
+        // APG: the caret keys move visual focus to the input (not prevented: the caret moves).
+        if (activeRef.current !== null) setActive(null);
+        return false;
+      default:
+        return false;
+    }
+  };
 
   /** Focus has left the input and the popup (design 5.4). */
   const leave = (event: Event): void => {
