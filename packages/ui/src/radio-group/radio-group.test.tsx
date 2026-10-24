@@ -10,7 +10,7 @@
 // adopt the value (veto, or an error caught inside the action), which is the same optimistic
 // revert and the same settle commit.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, use, useState } from "react";
+import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -25,6 +25,9 @@ import {
   flushMicrotasks,
   hydrateFromServer,
   silenceErrors,
+  fulfilledPromise,
+  hydrationGate,
+  Gate,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { radioGroupDriver } from "../__tests__/drivers/radio-group.js";
@@ -682,31 +685,6 @@ describe("RadioGroup", () => {
   });
 
   describe("platform: items that mount after the Root (Suspense between Root and Items)", () => {
-    /** A promise `use()` reads synchronously (already fulfilled), as React expects. */
-    function fulfilled(): Promise<void> {
-      const p = Promise.resolve() as Promise<void> & { status?: string; value?: unknown };
-      p.status = "fulfilled";
-      p.value = undefined;
-      return p;
-    }
-    /** A pending gate; `open()` marks it fulfilled the way React's `use` expects, then resolves. */
-    function gate() {
-      const d = deferred();
-      const p = d.promise as Promise<void> & { status?: string; value?: unknown };
-      p.status = "pending";
-      return {
-        promise: d.promise,
-        open() {
-          p.status = "fulfilled";
-          p.value = undefined;
-          d.resolve();
-        },
-      };
-    }
-    function Gate({ promise, children }: { promise: Promise<void>; children: ReactNode }) {
-      use(promise);
-      return children;
-    }
     function LateGroup({
       gate,
       mode,
@@ -744,9 +722,9 @@ describe("RadioGroup", () => {
         const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         // The Root hydrates; the boundary around b and c stays dehydrated until `gate` resolves.
-        const g = gate();
+        const g = hydrationGate();
         const { container } = await hydrateFromServer(
-          <LateGroup gate={fulfilled()} mode={mode} action={action} />,
+          <LateGroup gate={fulfilledPromise()} mode={mode} action={action} />,
           {
             client: <LateGroup gate={g.promise} mode={mode} action={action} />,
             inAct: true,
@@ -783,9 +761,9 @@ describe("RadioGroup", () => {
       it("a click on a hydrated radio while siblings are dehydrated: react-dom throws; the state is consistent after hydration", async () => {
         const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
-        const g = gate();
+        const g = hydrationGate();
         const { container } = await hydrateFromServer(
-          <LateGroup gate={fulfilled()} mode={mode} action={action} initial="b" />,
+          <LateGroup gate={fulfilledPromise()} mode={mode} action={action} initial="b" />,
           {
             client: <LateGroup gate={g.promise} mode={mode} action={action} initial="b" />,
             inAct: true,
@@ -858,7 +836,7 @@ describe("RadioGroup", () => {
     it("late items mounted by createRoot do not dispatch", async () => {
       const consoleError = vi.spyOn(console, "error");
       const action = vi.fn<ActionFn>();
-      const g = gate();
+      const g = hydrationGate();
       await act(async () => {
         render(<LateGroup gate={g.promise} mode="uncontrolled" action={action} />);
       });

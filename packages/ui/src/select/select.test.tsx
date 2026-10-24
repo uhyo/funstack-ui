@@ -32,6 +32,9 @@ import {
   flushMicrotasks,
   hydrateFromServer,
   silenceErrors,
+  fulfilledPromise,
+  hydrationGate,
+  Gate,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { selectDriver, takeSelectedContentWarning } from "../__tests__/drivers/select.js";
@@ -742,29 +745,6 @@ describe("Select", () => {
   });
 
   describe("platform: options that mount after the Root (late hydration)", () => {
-    function fulfilled(): Promise<void> {
-      const p = Promise.resolve() as Promise<void> & { status?: string; value?: unknown };
-      p.status = "fulfilled";
-      p.value = undefined;
-      return p;
-    }
-    function gate() {
-      const d = deferred();
-      const p = d.promise as Promise<void> & { status?: string; value?: unknown };
-      p.status = "pending";
-      return {
-        promise: d.promise,
-        open() {
-          p.status = "fulfilled";
-          p.value = undefined;
-          d.resolve();
-        },
-      };
-    }
-    function Gate({ promise, children }: { promise: Promise<void>; children: ReactNode }) {
-      use(promise);
-      return children;
-    }
     function LateSelect({
       gate,
       mode,
@@ -795,8 +775,12 @@ describe("Select", () => {
       );
     }
     /** Hydrates with the late options' boundary dehydrated until `g.open()`. */
-    const hydrateLate = (mode: ControlMode, action: ActionFn, g: ReturnType<typeof gate>) =>
-      hydrateFromServer(<LateSelect gate={fulfilled()} mode={mode} action={action} />, {
+    const hydrateLate = (
+      mode: ControlMode,
+      action: ActionFn,
+      g: ReturnType<typeof hydrationGate>,
+    ) =>
+      hydrateFromServer(<LateSelect gate={fulfilledPromise()} mode={mode} action={action} />, {
         client: <LateSelect gate={g.promise} mode={mode} action={action} />,
         inAct: true,
         flush: null,
@@ -806,7 +790,7 @@ describe("Select", () => {
       it("a pre-hydration pick of a late option dispatches exactly once when it hydrates", async () => {
         const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
-        const g = gate();
+        const g = hydrationGate();
         const { container } = await hydrateLate(mode, action, g);
         expect(action).not.toHaveBeenCalled();
         const c = container.querySelector<HTMLOptionElement>('option[value="c"]')!;
@@ -831,7 +815,7 @@ describe("Select", () => {
 
       it("late options hydrating with no pick dispatch nothing", async () => {
         const action = vi.fn<ActionFn>();
-        const g = gate();
+        const g = hydrationGate();
         await hydrateLate(mode, action, g);
         await act(async () => {
           g.open();
@@ -844,7 +828,7 @@ describe("Select", () => {
 
     it("late options created by createRoot never dispatch, even when the browser auto-selects", async () => {
       const action = vi.fn<ActionFn>();
-      const g = gate();
+      const g = hydrationGate();
       await act(async () => {
         render(<LateSelect gate={g.promise} mode="controlled" action={action} />);
       });

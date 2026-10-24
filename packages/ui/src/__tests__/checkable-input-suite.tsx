@@ -5,7 +5,7 @@
 // half of 26) live in the components' *.browser.test.tsx; row 25 (directive) is in
 // directives.test.ts.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
+import { StrictMode, Suspense, startTransition, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ComponentType, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Field } from "../field/index.js";
@@ -23,6 +23,8 @@ import {
   flushMicrotasks,
   hydrateFromServer,
   silenceErrors,
+  fulfilledPromise,
+  Gate,
 } from "./helpers.js";
 import type { ControlMode } from "./helpers.js";
 
@@ -1188,10 +1190,6 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       describe("inside a Suspense boundary that hydrates after its parent", () => {
-        function Gate({ promise, children }: { promise: Promise<void>; children: ReactNode }) {
-          use(promise);
-          return children;
-        }
         function Page({ gate, action }: { gate: Promise<void>; action: ActionFn }) {
           return (
             <main>
@@ -1211,10 +1209,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
             const consoleError = silenceErrors();
             const action = vi.fn<ActionFn>();
             const wrap = (ui: ReactNode) => (strict ? <StrictMode>{ui}</StrictMode> : ui);
-            const ready = Object.assign(Promise.resolve(), {
-              status: "fulfilled",
-              value: undefined,
-            });
+            const ready = fulfilledPromise();
             const gate = deferred();
             const { container } = await hydrateFromServer(
               wrap(<Page gate={ready} action={action} />),

@@ -316,6 +316,46 @@ export async function hydrateFromServer(
   return result;
 }
 
+/**
+ * A promise `use()` reads synchronously (already marked fulfilled, as React expects): the server
+ * render of a `Gate`, so the server HTML contains what the client will hydrate later.
+ */
+export function fulfilledPromise(): Promise<void> {
+  return Object.assign(Promise.resolve(), { status: "fulfilled", value: undefined });
+}
+
+/**
+ * A pending promise for a `Gate` on the client: a Suspense boundary behind it stays dehydrated
+ * until `open()`, which marks it fulfilled the way React's `use` expects, then resolves it.
+ */
+export function hydrationGate(): { readonly promise: Promise<void>; open(): void } {
+  const d = deferred();
+  const p = Object.assign(d.promise, { status: "pending" }) as Promise<void> & {
+    status?: string;
+    value?: unknown;
+  };
+  return {
+    promise: d.promise,
+    open() {
+      p.status = "fulfilled";
+      p.value = undefined;
+      d.resolve();
+    },
+  };
+}
+
+/** Suspends until `promise` is fulfilled (React's `use`), then renders `children`. */
+export function Gate({
+  promise,
+  children,
+}: {
+  promise: Promise<void>;
+  children: ReactNode;
+}): ReactNode {
+  use(promise);
+  return children;
+}
+
 /** A plain component for `render={<PlainButton />}`: forwards every prop to a `<button>`. */
 export function PlainButton(props: ComponentPropsWithRef<"button">): ReactNode {
   return <button {...props} />;

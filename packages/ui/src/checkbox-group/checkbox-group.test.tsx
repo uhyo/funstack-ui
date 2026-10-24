@@ -11,7 +11,7 @@
 // adopt the value (veto, or an error caught inside the action), which is the same optimistic
 // revert and the same settle commit.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, use, useState } from "react";
+import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -25,6 +25,9 @@ import {
   flushMicrotasks,
   hydrateFromServer,
   silenceErrors,
+  fulfilledPromise,
+  hydrationGate,
+  Gate,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { checkboxGroupDriver } from "../__tests__/drivers/checkbox-group.js";
@@ -1533,29 +1536,6 @@ describe("CheckboxGroup", () => {
   });
 
   describe("platform: parts that mount after the Root (Suspense between Root and parts)", () => {
-    function fulfilled(): Promise<void> {
-      const p = Promise.resolve() as Promise<void> & { status?: string; value?: unknown };
-      p.status = "fulfilled";
-      p.value = undefined;
-      return p;
-    }
-    function gate() {
-      const d = deferred();
-      const p = d.promise as Promise<void> & { status?: string; value?: unknown };
-      p.status = "pending";
-      return {
-        promise: d.promise,
-        open() {
-          p.status = "fulfilled";
-          p.value = undefined;
-          d.resolve();
-        },
-      };
-    }
-    function Gate({ promise, children }: { promise: Promise<void>; children: ReactNode }) {
-      use(promise);
-      return children;
-    }
     function LateGroup({
       gate,
       mode,
@@ -1591,12 +1571,15 @@ describe("CheckboxGroup", () => {
       );
     }
     async function hydrateLate(props: Omit<Parameters<typeof LateGroup>[0], "gate">) {
-      const g = gate();
-      const { container } = await hydrateFromServer(<LateGroup gate={fulfilled()} {...props} />, {
-        client: <LateGroup gate={g.promise} {...props} />,
-        inAct: true,
-        flush: null,
-      });
+      const g = hydrationGate();
+      const { container } = await hydrateFromServer(
+        <LateGroup gate={fulfilledPromise()} {...props} />,
+        {
+          client: <LateGroup gate={g.promise} {...props} />,
+          inAct: true,
+          flush: null,
+        },
+      );
       return { container, g };
     }
 
@@ -1690,8 +1673,8 @@ describe("CheckboxGroup", () => {
           </CheckboxGroup.Root>
         );
       }
-      const g = gate();
-      await hydrateFromServer(<Group gate={fulfilled()} />, {
+      const g = hydrationGate();
+      await hydrateFromServer(<Group gate={fulfilledPromise()} />, {
         client: <Group gate={g.promise} />,
         inAct: true,
         flush: null,
@@ -1713,7 +1696,7 @@ describe("CheckboxGroup", () => {
     it("late Items mounted by createRoot do not dispatch", async () => {
       const consoleError = vi.spyOn(console, "error");
       const action = vi.fn<ActionFn>();
-      const g = gate();
+      const g = hydrationGate();
       await act(async () => {
         render(<LateGroup gate={g.promise} mode="uncontrolled" action={action} lateParent />);
       });
@@ -1746,8 +1729,8 @@ describe("CheckboxGroup", () => {
           </CheckboxGroup.Root>
         );
       }
-      const g = gate();
-      await hydrateFromServer(<Group gate={fulfilled()} />, {
+      const g = hydrationGate();
+      await hydrateFromServer(<Group gate={fulfilledPromise()} />, {
         client: <Group gate={g.promise} />,
         inAct: true,
         flush: null,

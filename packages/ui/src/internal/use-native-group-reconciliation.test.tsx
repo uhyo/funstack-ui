@@ -14,6 +14,8 @@ import {
   flushMicrotasks,
   hydrateFromServer,
   silenceErrors,
+  fulfilledPromise,
+  Gate,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { createActionDetails } from "./action-details.js";
@@ -111,17 +113,6 @@ function Item({ value }: { value: string }) {
       onChange={(e) => ctx.select(value, e.nativeEvent)}
     />
   );
-}
-
-/** Suspends until `promise` is fulfilled (React's `use`). */
-function Gate({ promise, children }: { promise: Promise<void>; children: ReactNode }) {
-  use(promise);
-  return children;
-}
-
-/** A promise `use()` reads synchronously, for the server render of a `Gate`. */
-function fulfilled(): Promise<void> {
-  return Object.assign(Promise.resolve(), { status: "fulfilled", value: undefined });
 }
 
 /**
@@ -408,7 +399,7 @@ describe("useNativeGroupReconciliation", () => {
     ) {
       const gate = deferred();
       const { container } = await hydrateFromServer(
-        wrap(<Harness mode={mode} initial="s" action={action} late={fulfilled()} />),
+        wrap(<Harness mode={mode} initial="s" action={action} late={fulfilledPromise()} />),
         { client: wrap(<Harness mode={mode} initial="s" action={action} late={gate.promise} />) },
       );
       // The Root and "s" are hydrated; "m" and "l" are still server HTML.
