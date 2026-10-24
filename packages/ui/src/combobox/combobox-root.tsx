@@ -721,6 +721,32 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   };
   const leaveRef = useLatest(leave);
 
+  // A press blurs the input at `mousedown`, but its outcome is known only at the `click`, which
+  // runs in the `pointerup` task: a `<label for>` (Combobox.Label, Field.Label) refocuses the
+  // input there (#111). While a pointer is down, a leave check waits for its release.
+  const pressing = useRef(false);
+  const afterPress = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const doc = inputRef.current?.ownerDocument ?? document;
+    const down = () => {
+      pressing.current = true;
+    };
+    const up = () => {
+      pressing.current = false;
+      const check = afterPress.current;
+      afterPress.current = null;
+      if (check !== null) setTimeout(check, 0);
+    };
+    doc.addEventListener("pointerdown", down, true);
+    doc.addEventListener("pointerup", up, true);
+    doc.addEventListener("pointercancel", up, true);
+    return () => {
+      doc.removeEventListener("pointerdown", down, true);
+      doc.removeEventListener("pointerup", up, true);
+      doc.removeEventListener("pointercancel", up, true);
+    };
+  }, []);
+
   const focusOut = (event: FocusEvent): void => {
     const input = inputRef.current;
     const popup = popover.popupRef.current;
@@ -730,18 +756,21 @@ export function ComboboxRoot(props: ComboboxRootProps) {
       leave(event);
       return;
     }
-    // No related target: the window lost focus (nothing to do), or a click landed on something
-    // that takes no focus (the page itself: focus moved to <body>). Decide after the click.
+    // No related target: the window lost focus (nothing to do), or a press landed on something
+    // that takes no focus (a label, the page itself: focus moved to <body>). Decide one task
+    // after the press is released (its click has run then), or one task later without a press.
     if (input === null) return;
     const doc = input.ownerDocument;
-    setTimeout(() => {
+    const check = () => {
       if (!doc.hasFocus()) return;
       const active = doc.activeElement;
       if (active === input || (active !== null && popup !== null && popup.contains(active))) {
         return;
       }
       if (input.isConnected) leaveRef.current(event);
-    }, 0);
+    };
+    if (pressing.current) afterPress.current = check;
+    else setTimeout(check, 0);
   };
 
   const inputClick = (event: MouseEvent): void => {

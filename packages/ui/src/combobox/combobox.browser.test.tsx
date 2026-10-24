@@ -32,7 +32,9 @@ import {
   supportsAriaNotify,
 } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
+import { mouse } from "../__tests__/browser-commands.js";
 import { Dialog } from "../dialog/index.js";
+import { Field } from "../field/index.js";
 import { Popover } from "../popover/index.js";
 import { Combobox } from "./index.js";
 import type {
@@ -52,6 +54,7 @@ import {
   leaveActEnvironment,
   spyViewTransitions,
   quietPeriod,
+  sleep,
 } from "../__tests__/browser-helpers.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
@@ -80,6 +83,7 @@ function Options({ query }: { query: string }) {
 
 const popupStyle = { margin: 0, inset: "auto", padding: 0, border: "1px solid" } as const;
 const optionStyle = { padding: "2px 4px" } as const;
+const labelStyle = { display: "inline-block", padding: 8 } as const;
 
 interface HarnessProps {
   root?: Partial<ComboboxRootProps>;
@@ -90,7 +94,7 @@ interface HarnessProps {
 function Box({ root, popup, results }: HarnessProps) {
   return (
     <Combobox.Root {...root}>
-      <Combobox.Label>Country</Combobox.Label>
+      <Combobox.Label style={labelStyle}>Country</Combobox.Label>
       <Combobox.Input data-testid="input" style={{ width: 200 }} />
       <Combobox.Trigger data-testid="trigger" aria-label="Show all">
         ▾
@@ -339,6 +343,124 @@ describe("Combobox (browser)", () => {
       expect(action).toHaveBeenCalledWith("Narnia", expect.anything());
       expect(action.mock.calls[0]![1].custom).toBe(true);
       expect(action.mock.calls[0]![1].event?.type).toBe("focusout");
+    });
+  });
+
+  // Issue #111: a press on a `<label for=input>` blurs the input with `relatedTarget === null`
+  // at `mousedown`; the label's activation refocuses it at `click`. The leave check waits for the
+  // `pointerup` (the click runs in the same task), so the typed text survives on every engine
+  // however long the press is held. The listbox itself closes by light dismiss (browser-owned):
+  // the label is outside the popup.
+  describe("a press on a label is not focus loss (#111)", () => {
+    function InField({ root }: HarnessProps) {
+      return (
+        <Field.Root>
+          <Field.Label data-testid="field-label" style={labelStyle}>
+            Country
+          </Field.Label>
+          <Box root={root} />
+        </Field.Root>
+      );
+    }
+
+    async function press(target: Element, hold: number) {
+      const r = target.getBoundingClientRect();
+      const x = r.left + 4;
+      const y = r.top + 4;
+      if (hold === 0) {
+        await mouse.click(x, y);
+      } else {
+        await mouse.down(x, y);
+        await sleep(hold);
+        await mouse.up(x, y);
+      }
+    }
+
+    afterEach(async () => {
+      await mouse.releaseHeld();
+    });
+
+    for (const [where, label] of [
+      ["Combobox.Label", () => screen.getByText("Country", { selector: "label" })],
+      ["Field.Label", () => screen.getByTestId("field-label")],
+    ] as const) {
+      for (const [how, hold] of [
+        ["a quick click", 0],
+        ["a held press (80 ms)", 80],
+      ] as const) {
+        for (const allowCustomValue of [false, true]) {
+          it(`${how} on ${where} keeps the typed text (allowCustomValue: ${allowCustomValue})`, async () => {
+            const action = vi.fn<ValueAction>();
+            const texts = vi.fn<TextAction>();
+            const root = {
+              defaultValue: "fr",
+              defaultInputValue: "France",
+              allowCustomValue,
+              valueChangeAction: action,
+              onInputValueChange: texts,
+            };
+            render(where === "Field.Label" ? <InField root={root} /> : <Box root={root} />);
+            await user.click(input());
+            await user.clear(input());
+            await user.keyboard("Ja");
+            await settle(() => expect(isOpen()).toBe(true));
+            texts.mockClear();
+            await press(label(), hold);
+            await settle(() => expect(document.activeElement).toBe(input()));
+            await flushFor(60);
+            expect(input().value).toBe("Ja");
+            expect(texts).not.toHaveBeenCalled();
+            expect(action).not.toHaveBeenCalled();
+            expect(isOpen()).toBe(false);
+          });
+        }
+      }
+    }
+
+    it("a held press on the page (no focus target) still reverts once released", async () => {
+      const texts = vi.fn<TextAction>();
+      render(
+        <>
+          <div data-testid="page" style={{ height: 80 }}>
+            page
+          </div>
+          <Harness
+            root={{ defaultValue: "fr", defaultInputValue: "France", onInputValueChange: texts }}
+          />
+        </>,
+      );
+      await user.click(input());
+      await user.clear(input());
+      await user.keyboard("Ja");
+      await settle(() => expect(isOpen()).toBe(true));
+      const r = screen.getByTestId("page").getBoundingClientRect();
+      await mouse.down(r.left + 4, r.top + 4);
+      await flushFor(80);
+      // Still held: nothing decided yet.
+      expect(input().value).toBe("Ja");
+      await mouse.up(r.left + 4, r.top + 4);
+      await settle(() => expect(input().value).toBe("France"));
+      expect(isOpen()).toBe(false);
+      expect(texts.mock.lastCall![1].reason).toBe("dismiss");
+      expect(texts.mock.lastCall![1].event?.type).toBe("focusout");
+    });
+
+    it("allowCustomValue: a quick click on the page commits the text", async () => {
+      const action = vi.fn<ValueAction>();
+      render(
+        <>
+          <div data-testid="page" style={{ height: 80 }}>
+            page
+          </div>
+          <Harness root={{ allowCustomValue: true, valueChangeAction: action }} />
+        </>,
+      );
+      await typeInto("Narnia");
+      const r = screen.getByTestId("page").getBoundingClientRect();
+      await mouse.click(r.left + 4, r.top + 4);
+      await settle(() => expect(action).toHaveBeenCalledWith("Narnia", expect.anything()));
+      expect(action.mock.calls[0]![1].event?.type).toBe("focusout");
+      expect(isOpen()).toBe(false);
     });
   });
 

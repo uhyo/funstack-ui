@@ -1480,6 +1480,81 @@ describe("Combobox", () => {
       expect(input().value).toBe("j");
     });
 
+    // #111: focus moving to <body> during a press is decided one task after the release, when
+    // the click has run (a `<label for>` refocuses the input there).
+    describe("focus to nowhere during a press (#111)", () => {
+      it("waits for the release: a press that refocuses the input keeps the text", async () => {
+        const action = vi.fn<ValueAction>();
+        const user = setupUser();
+        for (const allowCustomValue of [false, true]) {
+          const { unmount } = render(
+            <Harness root={{ allowCustomValue, valueChangeAction: action }} />,
+          );
+          await typeText(user, "ja");
+          fireEvent.pointerDown(screen.getByTestId("label"));
+          input().blur();
+          await flushTasks(3);
+          expect(input().value).toBe("ja");
+          // The release, then in the same task its click: the label's activation focuses.
+          fireEvent.pointerUp(screen.getByTestId("label"));
+          input().focus();
+          await flushTasks(3);
+          expect(input().value).toBe("ja");
+          expect(isOpen()).toBe(true);
+          expect(action).not.toHaveBeenCalled();
+          unmount();
+        }
+      });
+
+      it("a released press on nothing focusable reverts, or commits with allowCustomValue", async () => {
+        const action = vi.fn<ValueAction>();
+        const user = setupUser();
+        for (const allowCustomValue of [false, true]) {
+          const { unmount } = render(
+            <Harness root={{ allowCustomValue, valueChangeAction: action }} />,
+          );
+          await typeText(user, "ja");
+          fireEvent.pointerDown(document.body);
+          input().blur();
+          await flushTasks(3);
+          expect(input().value).toBe("ja");
+          expect(isOpen()).toBe(true);
+          fireEvent.pointerUp(document.body);
+          await flushTasks(3);
+          expect(isOpen()).toBe(false);
+          if (allowCustomValue) {
+            expect(action).toHaveBeenCalledWith("ja", expect.anything());
+            expect(action.mock.calls[0]![1].event?.type).toBe("focusout");
+          } else {
+            expect(input().value).toBe("");
+            expect(action).not.toHaveBeenCalled();
+          }
+          unmount();
+        }
+      });
+
+      it("a cancelled press decides too", async () => {
+        const user = setupUser();
+        render(<Harness />);
+        await typeText(user, "ja");
+        fireEvent.pointerDown(document.body);
+        input().blur();
+        fireEvent.pointerCancel(document.body);
+        await flushTasks(3);
+        expect(input().value).toBe("");
+      });
+
+      it("without a press, focus to <body> decides one task later", async () => {
+        const user = setupUser();
+        render(<Harness />);
+        await typeText(user, "ja");
+        input().blur();
+        await flushTasks(3);
+        expect(input().value).toBe("");
+        expect(isOpen()).toBe(false);
+      });
+    });
+
     it("a press on an option or the popup is prevented and keeps focus in the input", async () => {
       const user = setupUser();
       render(<Harness />);
