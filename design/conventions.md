@@ -1114,7 +1114,20 @@ Rules:
   in every engine and the popup hides in the close commit. jsdom cannot catch this class of bug
   (user-event fires mousedown, mouseup and click in one task, so a `toggle` queued by the press
   lands after the click); a browser row that asserts the reason and `document.activeElement`
-  across the click is required.
+  across the click is required. The second known trap is **light dismiss** (Combobox's Trigger,
+  #112; engine-independent): a press on a part outside the popup that is neither the popover's
+  `source` nor a button naming it hides the popup at `pointerup`, a task before the `click`. The
+  exemption is the invoker relationship of HTML's "topmost clicked popover": the element the
+  popover was shown with (`source`) and a `<button>` whose `commandfor` (with a popover
+  `command`) or `popovertarget` names the shown popover count as part of it; Chromium, Firefox
+  and WebKit all implement both attributes there (a custom `command` does not qualify). A part
+  that closes through its action therefore names the popup with `commandfor` +
+  `command="toggle-popover"` and cancels its click so the command never runs (`usePopoverTrigger`
+  does both for Popover and Menu; Combobox's Trigger writes the pair through its ref after
+  hydration, section 7.4, because a pre-hydration command would open an empty, mis-anchored
+  popup). A part whose close is browser-owned by design (Combobox's Clear) needs none of this.
+  The browser-row requirement is the same: assert `:popover-open` across the click's pending
+  window.
 
 ### 3.6 `disabled`
 
@@ -1824,6 +1837,7 @@ notes"):
 | Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). |
 | Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. Mechanism verified by the reviewer: tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
+| Attribute that must act on the client but must not be in the server HTML (Combobox Trigger's `commandfor` / `command`, #112: the invoker relationship exempts its press from light dismiss, but a pre-hydration command would open an empty, button-anchored popup) | Not rendered; written with `setAttribute` from the part's ref callback once the element is known to be a `<button>` (removed in the cleanup), so hydration never sees it and the click handler that cancels the command is installed before the attribute exists. The key is still owned (omitted from the props type). Named in the component design (section 3.5 lists the parts that use it). |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6: `on*` is reserved for the urgent lane, and these are interactions, not an urgent state). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
 | Element whose children the **parser writes before hydration** (`<selectedcontent>`: Chromium and Safari clone the selected option's children into it at parse time, so a plain element fails hydration and client-renders the whole root) | Render it with `suppressHydrationWarning` and `dangerouslySetInnerHTML={{ __html: "" }}`, so React treats the children as opaque and the attribute mismatch is silenced (verified in `docs/research/select-combobox.md` §4: hydrates with no recoverable error, later browser writes keep working); the part has no `children` prop. One such element per component at most, named in its design doc (`Select.Value`). |

@@ -168,3 +168,37 @@ The developer's `action-naming.test.ts` differs from my snippet in two places, b
 Conventions 10.1 and the Combobox checklist now describe the implemented guard. Also corrected
 the checklist's "top-of-file row list" item (`combobox.test.tsx` has none; the urgent rows are
 the `renderBoth("urgent text")` describe).
+
+## #112: Trigger click while open was a light dismiss (2026-10-24)
+
+Wave 17 audit C1 / D1. The Trigger is not the popover's `source` and named no popover, so its
+press light-dismissed the listbox at `pointerup` on every engine; the `pointerdown` snapshot in
+3.3 existed only to toggle in the right direction afterwards. 5.4 row 1 and the docs claimed the
+close was awaited; it was not (refusing controlled parent flickered, no view-transition exit).
+
+Decision: make the Trigger an invoker of the popup after hydration (`commandfor` + `command=
+"toggle-popover"` written through the ref, click always cancelled), judge the toggle against
+`intended()`, drop the snapshot and `onPointerCancel`. Same rule as #110 (conventions 3.5, "a
+part's library-owned close is the single source of that close"), second trap recorded there.
+
+Facts relied on:
+- HTML "topmost clicked popover" treats the invoker's popover as the clicked one; the invoker is
+  found through the popover target (`popovertarget`, or `commandfor` with a popover command). A
+  custom `command` would not qualify.
+- WebKit `Document::handlePopoverLightDismiss` (main, 2026-10-24) checks
+  `button->commandForElement()` then `button->popoverTargetElement()`. Chromium / Firefox were
+  verified by the reviewer's probe (`invoker-light-dismiss.browser.test.tsx`: `none` closed,
+  `commandfor` and `popovertarget` stayed open). WebKit cannot be run on this machine; the CI job
+  decides, with `popovertarget` as the recorded fallback.
+- The pre-hydration objection (PO decision 8) is only about the server HTML; light dismiss only
+  exists after the library opened the popup, i.e. after hydration. Writing from the ref keeps
+  decision 8 intact. Precedents: `hidden="until-found"` upgrade, JS-free Popover Trigger's
+  `aria-expanded` write.
+
+Left alone, on purpose: Clear (browser-owned close by design, deviation 5); other overlays
+(Popover / Menu Trigger = `source` + `commandfor`; Dialog Trigger = invoker; Select's picker is
+native); writing the attributes only while open (no benefit); a non-button `render` (dev
+warning, not a snapshot path).
+
+Open: audit T1's sweep ("every click-X-while-open row of every overlay gets a real-mouse browser
+row") is still worth doing after #110 and #112 land; not part of either issue.
