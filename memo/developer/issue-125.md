@@ -49,3 +49,8 @@ table (foreign opens are "activate"). But a real press on a plain foreign button
 - fix: a consumer's own `<button popovertarget>` closing a library-mode Popover, Menu or Combobox
   now reports `openChangeAction(false, { reason: "activate" })` with the `beforetoggle`
   `ToggleEvent` (its `source` is the button) instead of `"dismiss"` (#125).
+
+## CI
+
+Branch run 40107078736 (workflow_dispatch on `feat/125-toggle-source`): ci, browser chromium,
+firefox and webkit all green (WebKit covers ToggleEvent.source from Safari 26.5).
