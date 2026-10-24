@@ -89,3 +89,20 @@ WebKit: not runnable locally. CI (all three engines green) ran the press, caret,
 - fix: a press on `Combobox.Input` while the listbox is open no longer closes it (the Input now owns
   `onPointerDown` and captures the pointer to the Popup). In Firefox, a drag-to-select in the
   field does not extend while the listbox is open. (#123)
+
+## Review fixes (memo/reviewer/issue-123-review.md)
+
+- R1: docs overview carries the architect's #124 caveat sentence. The design (81d6de1) already had it
+  at 12.2 and the Verified table.
+- R2: the docs Input note and the amendment's consequences say that `onPointerUp` / `onMouseUp` /
+  `onDoubleClick` go to the Popup during a captured press, and that the Input gets leave/enter
+  events.
+- R3: conventions 3.5 and the amendment say "mouse or pen" for "the click lands on the popup" (a
+  touch tap's compat click is hit-tested and reaches the input).
+- 12.2 had said the touch row asserts "the open state in Firefox", which can't be done: the harness
+  creates no hasTouch context and CDP touch is Chromium's. Corrected to Chromium-only with the
+  `window === window.top` branch.
+- R4: a browser row for a closed listbox: a real `mouse.click` with `openOnClick` reaches the
+  input (no `gotpointercapture`), and the listbox opens with `(true, "activate", "click")`. With
+  the `:popover-open` check removed, only this row fails among the browser rows (chromium +
+  firefox).

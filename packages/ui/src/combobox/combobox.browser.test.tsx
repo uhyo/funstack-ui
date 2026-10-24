@@ -1198,6 +1198,32 @@ describe("Input press (#123, browser)", () => {
     expect(valueAction).not.toHaveBeenCalled();
   });
 
+  it("closed: a click on the input reaches it (nothing captured) and openOnClick opens", async () => {
+    const openAction = vi.fn<OpenAction>();
+    render(<Harness root={{ openOnClick: true, openChangeAction: openAction }} />);
+    restoreAct = leaveActEnvironment();
+    expect(isOpen()).toBe(false);
+    const clicks: EventTarget[] = [];
+    const captures: EventTarget[] = [];
+    const recordClick = (event: Event) => clicks.push(event.target!);
+    const recordCapture = (event: Event) => captures.push(event.target!);
+    document.addEventListener("click", recordClick, true);
+    document.addEventListener("gotpointercapture", recordCapture, true);
+    onCleanup(() => {
+      document.removeEventListener("click", recordClick, true);
+      document.removeEventListener("gotpointercapture", recordCapture, true);
+    });
+    const r = input().getBoundingClientRect();
+    await mouse.click(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+    await expect.poll(() => isOpen()).toBe(true);
+    expect(captures).toEqual([]);
+    expect(clicks).toEqual([input()]);
+    expect(document.activeElement).toBe(input());
+    expect(openAction.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
+      [true, "activate", "click"],
+    ]);
+  });
+
   it("a double click on a word selects it; the listbox stays", async () => {
     const openAction = vi.fn<OpenAction>();
     await openWithText({ openChangeAction: openAction });
