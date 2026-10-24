@@ -225,3 +225,18 @@ Mutations (transition-boundary.tsx, browser project, Chromium + Firefox):
 1. Always wrap in `<ViewTransition default={transition ?? "none"}>`: both converted rows fail on
    both engines (4 failures).
 2. Never wrap: both converted rows fail (plus Button's `transition="auto"` settle row), 6 failures.
+
+## Totals (branch start 0578f90 -> 31b6bb4)
+
+- jsdom: 2923 -> 3001 tests (+4 Dialog, +13 Popover, +61 Menu; every removed title mapped above).
+  Browser: 411 -> 411 per engine (renames only). Local: Chromium + Firefox (WebKit cannot launch
+  here); CI ran all three: https://github.com/uhyo/funstack-ui/actions/runs/40071250292 (green).
+- Lines: dialog.test.tsx 3468 -> 1004 + dialog-close 987 + dialog-form 617 + dialog-disabled 256;
+  popover.test.tsx 2339 -> 1800; menu.test.tsx 2279 -> 2361; new shared modules 1136
+  (overlay-open-state-suite 1005, dialog-harness 70, view-transition-mount 61). packages/ui net
+  +3779 / -3747. Far below the audit's 600-900 saving: the suite also runs the rows each
+  component lacked (Popover +13, Menu +61 tests), the split adds four file headers, and the
+  formatter wraps the long row titles.
+- `expect` lines: Dialog 618 -> 462 local + 209 in the suite; Popover 459 -> 310 + 209.
+- No library bug found: every row the suite added for a component that lacked it passed first time
+  (Menu's item-close shape is by design, menu.md 2.2).
