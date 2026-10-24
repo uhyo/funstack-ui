@@ -338,3 +338,12 @@ Left (#106):
 - Not run: the full gate after the RadioGroup commit (typecheck --noUnusedLocals and jsdom ran
   for every commit; lint/format were clean as of the ToggleGroup commit), shuffled jsdom runs,
   browser tests after step 1, CI.
+
+## Resume attempt 2 (stopped again at the usage limit)
+
+Resumed on the coordinator's go-ahead (order: CheckboxGroup, Select, T3, T13; leave the
+dialog/popover hydrate copies; T7 only if origin/master has __tests__/view-transition-mount.tsx,
+which it did not at 4506f37). Stopped while reading checkbox-group.test.tsx, before any edit:
+nothing new is committed. Next step: CheckboxGroup driver (patch commit + orderIndependentCommit,
+as ToggleGroup; harness initial ["a"]; switch checkbox-group-transition-types.test.tsx to the
+shared spy).
