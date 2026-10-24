@@ -63,7 +63,7 @@ export function rendersButton<Props, State>(render: RenderProp<Props, State> | u
  * Whether the rendered element is certainly a host `<button>`: no `render`, the function form, or
  * a host `"button"` element. The strict predicate for native `disabled`, which means nothing on a
  * link and would expose it as enabled to assistive technology; anything else (a link, a
- * component) takes the `aria-disabled` branch (design/components/button.md, review fold F1).
+ * component) takes the `aria-disabled` branch (design/components/button.md).
  */
 export function isHostButton<Props, State>(render: RenderProp<Props, State> | undefined): boolean {
   if (render === undefined || typeof render === "function") return true;

@@ -8,6 +8,7 @@ import type {
   ReactNode,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -21,14 +22,9 @@ import {
   useMenuContext,
 } from "./menu-context.js";
 import { capturePointer, isDisabledItem, isEditableTarget, ITEM_SELECTOR } from "./menu-dom.js";
+import type { MenuTriggerState } from "./menu-trigger.js";
 
-export interface MenuContextTriggerState {
-  /** Optimistic open state (the Root's). */
-  readonly open: boolean;
-  /** The Root's transition is pending (an open or a close in flight). */
-  readonly pending: boolean;
-  readonly disabled: boolean;
-}
+export type MenuContextTriggerState = MenuTriggerState;
 
 export interface MenuContextTriggerProps extends Omit<
   ComponentPropsWithRef<"div">,
@@ -103,13 +99,13 @@ const isTouchLike = (pointerType: string) => pointerType === "touch" || pointerT
  * release, `pointercancel`, `lostpointercapture` and the menu closing. Returns the cleanup.
  *
  * The 500 ms count from when the popup is shown, not from the press: with an async
- * `openChangeAction` or suspending items the menu appears only when they settle (review M2). A
+ * `openChangeAction` or suspending items the menu appears only when they settle. A
  * gesture that starts on a popup already showing (a move) counts from its start.
  */
 function startDrag(popup: HTMLElement, options: DragOptions): () => void {
   const doc = popup.ownerDocument;
   // `performance.now()` at the first open `toggle`; null until the popup has been shown.
-  let shownAt: number | null = popup.matches(":popover-open") ? performance.now() : null;
+  let shownAt: number | null = isPopoverOpen(popup) ? performance.now() : null;
   // The SubmenuTrigger the pointer is over, whose hover intent is running.
   let submenuTrigger: HTMLElement | null = null;
 
@@ -167,7 +163,7 @@ function startDrag(popup: HTMLElement, options: DragOptions): () => void {
     if (
       shownAt !== null &&
       performance.now() - shownAt >= DRAG_DISMISS_DELAY &&
-      popup.matches(":popover-open")
+      isPopoverOpen(popup)
     ) {
       popup.hidePopover();
     }
@@ -176,7 +172,7 @@ function startDrag(popup: HTMLElement, options: DragOptions): () => void {
     if (ours(event)) end();
   };
   const onToggle = () => {
-    if (!popup.matches(":popover-open")) end();
+    if (!isPopoverOpen(popup)) end();
     else shownAt ??= performance.now();
   };
   const end = () => {
@@ -208,7 +204,7 @@ const TOUCH_END_WAIT = 250;
  * pointer's `pointercancel`, and shortly after its `pointerup` if no touch event follows (a
  * synthetic pointer). Returns the cleanup.
  *
- * Only the gesture finger's lift ends it (review L4): another finger lifting while it is still
+ * Only the gesture finger's lift ends it: another finger lifting while it is still
  * down must not hand its next slide to panning. Pointer events expose no `Touch.identifier`, so
  * the lift is recognised by order: the engines dispatch a lift's `pointerup` and `touchend` from
  * the same input, the `pointerup` first. A `touchend` before that pointer's `pointerup` is another
@@ -277,12 +273,13 @@ export function MenuContextTrigger({
   const { popover } = menu;
   useDevWarning(
     menu.submenu,
-    "Menu.ContextTrigger: rendered in a submenu. A Menu.Root inside a Menu.Popup is a submenu; a " +
-      "context menu region belongs to a top-level Menu.Root.",
+    isDev &&
+      "Menu.ContextTrigger: rendered in a submenu. A Menu.Root inside a Menu.Popup is a submenu; a " +
+        "context menu region belongs to a top-level Menu.Root.",
   );
   useDevWarning(
     longPressDelay < 0,
-    "Menu.ContextTrigger: `longPressDelay` is negative; it is a number of milliseconds.",
+    isDev && "Menu.ContextTrigger: `longPressDelay` is negative; it is a number of milliseconds.",
   );
 
   // Modality bookkeeping (design 2.1): a sequence number, not a clock, so two events in the same
@@ -320,7 +317,7 @@ export function MenuContextTrigger({
     if (disabled) cancelLongPress();
   }, [disabled, cancelLongPress]);
 
-  // A close ends any armed click swallow (review H1) and the drag gesture.
+  // A close ends any armed click swallow and the drag gesture.
   const open = popover.optimistic;
   useEffect(() => {
     if (open) return;
@@ -330,7 +327,7 @@ export function MenuContextTrigger({
 
   // The modality bookkeeping observes `keydown` and `pointerdown` without owning them (the region
   // is full of the consumer's interactive content), in the capture phase, so a descendant's
-  // `stopPropagation()` (a slider, a drag handle) does not hide them (review L2).
+  // `stopPropagation()` (a slider, a drag handle) does not hide them.
   const modalityRef = useCallback((element: HTMLElement) => {
     const onKeyDown = () => {
       lastKeyDown.current = ++sequence.current;
@@ -361,7 +358,7 @@ export function MenuContextTrigger({
 
   /**
    * One-shot swallow of the `click` an engine may synthesise when the long-press ends (2.2),
-   * scoped to that release (review H1): the click comes in the same task as the `pointerup` of
+   * scoped to that release: the click comes in the same task as the `pointerup` of
    * `pointerId`, so the swallow ends one task after that `pointerup` (or `pointercancel`), and at
    * once on any `keydown`, the next `pointerdown`, or the menu closing. iOS synthesises no click
    * after a long-press; a swallow left armed would eat the next keyboard activation

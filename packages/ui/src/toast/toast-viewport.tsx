@@ -14,12 +14,14 @@ import type { ComponentPropsWithRef, CSSProperties, FocusEvent, ReactNode } from
 import { createPortal } from "react-dom";
 import { DialogContext } from "../dialog/dialog-context.js";
 import { createActionDetails } from "../internal/action-details.js";
+import type { AriaNotifyTarget } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
 import {
   getServerTopmostModal,
   getTopmostModal,
   subscribeModals,
 } from "../internal/modal-registry.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import type { ChangeReason, RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { animationBaseline } from "../internal/use-exit-animation.js";
@@ -223,9 +225,7 @@ function anyPause(sources: PauseSources): boolean {
   return sources.hover || sources.focus || sources.hidden || sources.blurred;
 }
 
-type DocumentWithAriaNotify = Document & {
-  ariaNotify?: (announcement: string, options?: { priority?: ToastPriority }) => void;
-};
+type DocumentWithAriaNotify = Document & AriaNotifyTarget;
 
 /**
  * The toast region: a `<section popover="manual">` named "Notifications (F8)", shown in the top
@@ -763,7 +763,7 @@ export function ToastViewport({
     if (target === null || host.parentNode === target) return;
     const moved = host.parentNode !== null;
     target.append(host);
-    // A moved region gets no `pointerleave` (review L3): drop the hover pause; a pointer still
+    // A moved region gets no `pointerleave`: drop the hover pause; a pointer still
     // over it enters it again on its next move.
     if (moved) setPause("hover", false);
   });
@@ -782,12 +782,7 @@ export function ToastViewport({
       setPause("focus", false);
     }
     if (region !== null && region.isConnected && region.hasAttribute("popover")) {
-      let open = false;
-      try {
-        open = region.matches(":popover-open");
-      } catch {
-        open = false;
-      }
+      const open = isPopoverOpen(region);
       try {
         if (current.length > 0) {
           if (!open) region.showPopover();
@@ -805,7 +800,7 @@ export function ToastViewport({
       }
     }
     // An emptied region is hidden, often right under the pointer (its last toast's Close), and
-    // a hidden element gets no `pointerleave` (review L3): the next toast must not start paused.
+    // a hidden element gets no `pointerleave`: the next toast must not start paused.
     if (current.length === 0 && pauses.current.hover) setPause("hover", false);
     addedSinceEffect.current = false;
 
@@ -836,8 +831,9 @@ export function ToastViewport({
   const insideDialog = use(DialogContext) !== null;
   useDevWarning(
     insideDialog,
-    "Toast.Viewport: rendered inside a Dialog. The region would close with the dialog; render " +
-      "the Viewport once near the root of the app (it moves into open modal Dialogs by itself).",
+    isDev &&
+      "Toast.Viewport: rendered inside a Dialog. The region would close with the dialog; render " +
+        "the Viewport once near the root of the app (it moves into open modal Dialogs by itself).",
   );
 
   // --- Render ---------------------------------------------------------------------------------

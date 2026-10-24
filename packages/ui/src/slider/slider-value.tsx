@@ -6,6 +6,8 @@ import { useRender } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderRootState, SliderValue } from "./slider-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /**
  * `T` defaults to `SliderValue` (a number or an array): a part is not connected to its Root's
  * value type. Pass it to narrow, `<Slider.Value<number>>`, or read `values`.
@@ -52,8 +54,9 @@ export function SliderValuePart<T extends SliderValue = SliderValue>({
   const missing = children === undefined && index === undefined && ctx.shown.length > 1;
   useDevWarning(
     missing,
-    "Slider.Value: a multi-thumb slider has no single value to show. Pass `index` to show one " +
-      "thumb's value, or `children` (a function of the state) to format them all.",
+    isDev &&
+      "Slider.Value: a multi-thumb slider has no single value to show. Pass `index` to show one " +
+        "thumb's value, or `children` (a function of the state) to format them all.",
   );
 
   let fallback: ReactNode = null;

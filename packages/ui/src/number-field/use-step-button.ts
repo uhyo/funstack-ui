@@ -4,8 +4,8 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import type { NumberFieldContextValue, StepDirection } from "./number-field-context.js";
 
 /** First repeat after the press, then the interval between repeats (Base UI, React Aria). */
-export const HOLD_DELAY = 400;
-export const HOLD_INTERVAL = 60;
+const HOLD_DELAY = 400;
+const HOLD_INTERVAL = 60;
 
 interface ActiveHold {
   readonly pointerId: number;
@@ -50,7 +50,7 @@ export function useStepButton(
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
     if (event.button !== 0 || !event.isPrimary) return;
     if (disabled) {
-      // A focusable disabled render (`aria-disabled`, #83) must not take focus from the input
+      // A focusable disabled render (`aria-disabled`) must not take focus from the input
       // either; native `disabled` focused nothing.
       event.preventDefault();
       return;
@@ -119,7 +119,7 @@ export function useStepButton(
   };
 
   const onClick = (event: ReactMouseEvent<HTMLElement>): void => {
-    // A disabled link or component render (`aria-disabled`, #83) must not navigate either.
+    // A disabled link or component render (`aria-disabled`) must not navigate either.
     if (disabled) event.preventDefault();
     if (pointerSeen.current || active.current !== null || event.detail !== 0) {
       pointerSeen.current = false;

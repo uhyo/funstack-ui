@@ -2,16 +2,11 @@
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
+import type { PopoverTriggerHookState } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
 
-export interface PopoverTriggerState {
-  /** Optimistic open state (library mode); `false` in JS-free mode. */
-  readonly open: boolean;
-  /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
-  readonly pending: boolean;
-  readonly disabled: boolean;
-}
+export type PopoverTriggerState = PopoverTriggerHookState;
 
 export interface PopoverTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
@@ -40,7 +35,8 @@ export interface PopoverTriggerProps extends Omit<
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`
  * (library mode, link or component `render`), `commandfor`, `command`, `aria-expanded`,
- * `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `aria-haspopup` and `aria-controls` pass through.
+ * `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `aria-haspopup` and
+ * `aria-controls` pass through.
  */
 export function PopoverTrigger({
   disabled = false,

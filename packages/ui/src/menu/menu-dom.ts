@@ -17,7 +17,7 @@ export function isMenuItem(element: Element, popup: Element): boolean {
 
 /**
  * Disabled by its `disabled` prop. Keys on `data-disabled`, not `aria-disabled`: an item is also
- * `aria-disabled` while its own action is pending (#81). A pending item is an ordinary item for
+ * `aria-disabled` while its own action is pending. A pending item is an ordinary item for
  * navigation; only the open focus (`edgeItem`) skips items with the `disabled` prop. Arrow keys,
  * Home / End and typeahead skip nothing.
  */

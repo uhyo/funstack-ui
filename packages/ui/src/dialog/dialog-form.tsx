@@ -9,6 +9,8 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { hasAnyError } from "../internal/validity.js";
 import { useDialogContext } from "./dialog-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface DialogFormState {
   /** `useFormStatus().pending` of this form, exposed for `className` / `children` functions. */
   readonly pending: boolean;
@@ -92,7 +94,7 @@ export function DialogForm({
   const [pending, setPending] = useState(false);
   const submission = useRef<{ event: Event; returnValue: string } | null>(null);
   // The dialog closed after the last submit (Escape, a Close part): the settle must not close it
-  // again, also when the user re-opened it meanwhile (the review's walkthrough 11.8 variant).
+  // again, also when the user re-opened it meanwhile.
   const closedSinceSubmit = useRef(false);
   const watches = typeof action === "function";
 
@@ -196,9 +198,10 @@ function DialogFormSettle({
   const form = use(FormContext);
   useDevWarning(
     form !== null && missingAction,
-    "`Dialog.Form` rendered as a `Form.Root` needs a function `action`; without one the form " +
-      "navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a " +
-      '`method="dialog"` form.',
+    isDev &&
+      "`Dialog.Form` rendered as a `Form.Root` needs a function `action`; without one the form " +
+        "navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a " +
+        '`method="dialog"` form.',
   );
   const isForm = form !== null;
   const errors = form?.errors;

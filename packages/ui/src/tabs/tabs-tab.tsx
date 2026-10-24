@@ -40,10 +40,9 @@ export interface TabsTabProps extends Omit<
    * that settles the action (or rolls it back), never on the optimistic selection; animate the
    * selection itself with a CSS `transition` on `[data-selected]`.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, TabsTabState>;

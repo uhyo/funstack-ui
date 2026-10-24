@@ -55,7 +55,7 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
    */
   readonly reason: ChangeReason;
   /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
-  readonly source: "input" | "increment" | "decrement" | "keyboard" | "wheel" | null;
+  readonly source: NumberFieldSource;
 }
 
 /** The state every NumberField part's function props receive (one object, Field's precedent). */
@@ -375,7 +375,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       // A revert has no commit after it: the optimistic value already shows the committed one.
       if (reason !== "dismiss") setStepHeld(true);
       const { valueChangeAction: action, runStep: run } = latest.current;
-      // Without a step action nothing runs and no transition starts (Slider M2).
+      // Without a step action nothing runs and no transition starts (as Slider).
       if (action === undefined) return true;
       run(() => {
         for (const type of STEP_TYPES) addTransitionType(type);
@@ -659,18 +659,23 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       (defaultValueProp !== undefined &&
         defaultValueProp !== null &&
         !Number.isFinite(defaultValueProp)),
-    "NumberField.Root: `value` / `defaultValue` must be a finite number or `null`; " +
-      `got ${String(valueProp ?? defaultValueProp)}, treated as empty.`,
+    isDev &&
+      "NumberField.Root: `value` / `defaultValue` must be a finite number or `null`; " +
+        `got ${String(valueProp ?? defaultValueProp)}, treated as empty.`,
   );
   useDevWarning(
     bounds.min !== undefined && bounds.max !== undefined && bounds.min > bounds.max,
-    `NumberField.Root: \`min\` (${String(min)}) is greater than \`max\` (${String(max)}).`,
+    isDev && `NumberField.Root: \`min\` (${String(min)}) is greater than \`max\` (${String(max)}).`,
   );
   useDevWarning(
     !stepValid || !largeStepValid,
-    "NumberField.Root: `step` and `largeStep` must be positive numbers; using the defaults.",
+    isDev &&
+      "NumberField.Root: `step` and `largeStep` must be positive numbers; using the defaults.",
   );
-  useDevWarning(formatter.warning !== null, `NumberField.Root: ${formatter.warning ?? ""}`);
+  useDevWarning(
+    formatter.warning !== null,
+    isDev && `NumberField.Root: ${formatter.warning ?? ""}`,
+  );
   const warnedLang = useRef(false);
   useEffect(() => {
     if (!isDev || warnedLang.current || locale !== undefined) return;

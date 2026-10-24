@@ -22,7 +22,6 @@ import {
 } from "../__tests__/helpers.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { CSPProvider } from "../csp/index.js";
-import { MENU_POINT_FALLBACKS, MENU_POINT_RULES } from "../internal/anchor-position.js";
 import { Menu } from "./index.js";
 import type {
   MenuContextTriggerProps,
@@ -33,6 +32,7 @@ import type {
   MenuRootProps,
   MenuRootState,
 } from "./index.js";
+import { MENU_POINT_FALLBACKS, MENU_POINT_RULES } from "./menu-point.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
 

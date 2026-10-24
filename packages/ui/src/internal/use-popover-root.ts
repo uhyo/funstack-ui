@@ -2,11 +2,14 @@
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createActionDetails } from "./action-details.js";
+import { isPopoverOpen } from "./popover-open.js";
 import { transitionTypes } from "./transition-types.js";
 import type { ActionDetails, ChangeAction, ChangeReason } from "./types.js";
 import { useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import { useLatest } from "./use-latest.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
@@ -111,15 +114,6 @@ export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
   readonly onDispatch?: (next: boolean, details: Details) => void;
 }
 
-function isPopoverOpen(element: Element | null): boolean {
-  if (element === null) return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
-}
-
 /** How long a recorded close intent survives when the popover did not close (design 2.3). */
 function clearLater(
   intentRef: { current: PopoverCloseIntent | undefined },
@@ -155,9 +149,10 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   const isLibrary = mode === "library";
   useDevWarning(
     isLibrary !== isLibraryNow,
-    `${part}: the mode changed after mount (\`open\`, \`defaultOpen\` and \`openChangeAction\` ` +
-      "were all absent on one render and present on another). Switching between JS-free and " +
-      "library mode is not supported.",
+    isDev &&
+      `${part}: the mode changed after mount (\`open\`, \`defaultOpen\` and \`openChangeAction\` ` +
+        "were all absent on one render and present on another). Switching between JS-free and " +
+        "library mode is not supported.",
   );
 
   // Hooks cannot be conditional: JS-free mode calls the hook too and never dispatches.
@@ -208,7 +203,7 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   );
 
   // `details` and `onDispatch` are usually inline functions: read the committed render's through a
-  // ref so that the functions below, and with them the returned value, stay stable (#48).
+  // ref so that the functions below, and with them the returned value, stay stable.
   const callbacks = useLatest({ details, onDispatch });
 
   const send = useCallback(
@@ -241,22 +236,13 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
     [isLibrary, intended, send],
   );
 
-  // Same guard as `requestClose`; a separate name because the callers mean different things.
-  const notifyClosed = useCallback(
-    (event: Event | undefined, reason: ChangeReason): void => {
-      if (!isLibrary || !intended()) return;
-      send(false, event, reason);
-    },
-    [isLibrary, intended, send],
-  );
-
   const ids = useMemo(
     () => ({ popup: id, title: `${id}-title`, description: `${id}-description` }),
     [id],
   );
 
   // Memoised: every function above is stable, so the value changes only with the open state and
-  // pending, and the components' context values built on it are reused otherwise (#48).
+  // pending, and the components' context values built on it are reused otherwise.
   return useMemo(
     () => ({
       mode,
@@ -269,7 +255,9 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
       nextOpenGeneration,
       requestOpen,
       requestClose,
-      notifyClosed,
+      // The same function as `requestClose`; a separate name because the callers mean different
+      // things (a part asks to close; the platform already closed).
+      notifyClosed: requestClose,
       latestInFlight,
       triggerRef,
       popupRef,
@@ -288,7 +276,6 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
       nextOpenGeneration,
       requestOpen,
       requestClose,
-      notifyClosed,
       latestInFlight,
       recordCloseIntent,
       takeCloseIntent,

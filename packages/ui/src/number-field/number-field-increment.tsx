@@ -10,6 +10,8 @@ import { useNumberFieldContext } from "./number-field-context.js";
 import type { StepDirection } from "./number-field-context.js";
 import { useStepButton } from "./use-step-button.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface NumberFieldButtonState {
   /** The Root is pending and the latest step or commit came from this button. */
   readonly pending: boolean;
@@ -60,13 +62,14 @@ export function useStepButtonElement(
   const buttonState: NumberFieldButtonState = { pending, disabled };
   const handlers = useStepButton(ctx, direction, disabled);
   // A link or component render: native `disabled` would mean nothing on a link; the press and
-  // click handlers refuse, so `aria-disabled` (#83). The at-bound case follows the same branch.
+  // click handlers refuse, so `aria-disabled`. The at-bound case follows the same branch.
   const focusable = !isHostButton(render);
 
   useDevWarning(
     rest["aria-label"] === "",
-    `${part}: \`aria-label=""\` leaves the button without a name. Pass the label text instead ` +
-      `(the default is "${LABELS[direction]}").`,
+    isDev &&
+      `${part}: \`aria-label=""\` leaves the button without a name. Pass the label text instead ` +
+        `(the default is "${LABELS[direction]}").`,
   );
 
   // The built-in name is a default the consumer's `aria-label` or `aria-labelledby` replaces.

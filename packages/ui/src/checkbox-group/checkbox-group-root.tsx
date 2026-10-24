@@ -20,13 +20,21 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
+import { useElementCheck } from "../internal/use-element-check.js";
+import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import {
-  useFieldControl,
-  useFieldValueChange,
-  useMergedRef,
-} from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
+import {
+  applyPatch,
+  arraysEqual,
+  EMPTY_SET,
+  firstDuplicate,
+  setsEqual,
+  sortByOrder,
+  toSet,
+} from "../internal/value-set.js";
+import type { ValueSet } from "../internal/value-set.js";
 import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
 import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
 
@@ -58,7 +66,7 @@ export interface CheckboxGroupRootState {
   readonly value: readonly string[];
   /** An action dispatched through this group is in flight. */
   readonly pending: boolean;
-  /** The `disabled` prop. */
+  /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
 }
 
@@ -125,40 +133,6 @@ export interface CheckboxGroupRootProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"fieldset">, CheckboxGroupRootState>;
 }
 
-type ValueSet = ReadonlySet<string>;
-
-const EMPTY: ValueSet = new Set();
-
-function toSet(value: readonly string[]): ValueSet {
-  return new Set(value);
-}
-
-function setsEqual(a: ValueSet, b: ValueSet): boolean {
-  if (a.size !== b.size) return false;
-  for (const v of a) if (!b.has(v)) return false;
-  return true;
-}
-
-/** The optimistic reducer (design 5.2): apply a patch, so stacked dispatches re-base. */
-function reduce(set: ValueSet, patch: CheckboxGroupPatch): ValueSet {
-  const next = new Set(set);
-  for (const v of patch.removed) next.delete(v);
-  for (const v of patch.added) next.add(v);
-  return next;
-}
-
-/**
- * `values` sorted by `order` (the Items' values in document order); values not in `order` keep
- * their iteration order, after the others.
- */
-function sortByOrder(values: Iterable<string>, order: readonly string[]): string[] {
-  const wanted = new Set(values);
-  const sorted: string[] = [];
-  for (const v of order) if (wanted.delete(v)) sorted.push(v);
-  for (const v of wanted) sorted.push(v);
-  return sorted;
-}
-
 /** Value → "has an Item without its own `disabled`", over the registered Items. */
 type ItemRegistry = Map<object, { readonly value: string; readonly disabled: boolean }>;
 
@@ -171,20 +145,16 @@ function summarize(registry: ItemRegistry): Map<string, boolean> {
 }
 
 function disabledOf(items: ReadonlyMap<string, boolean> | null): ValueSet {
-  if (items === null) return EMPTY;
+  if (items === null) return EMPTY_SET;
   const disabled = new Set<string>();
   for (const [value, enabled] of items) if (!enabled) disabled.add(value);
-  return disabled.size === 0 ? EMPTY : disabled;
+  return disabled.size === 0 ? EMPTY_SET : disabled;
 }
 
 function mapsEqual(a: ReadonlyMap<string, boolean>, b: ReadonlyMap<string, boolean>): boolean {
   if (a.size !== b.size) return false;
   for (const [k, v] of a) if (b.get(k) !== v) return false;
   return true;
-}
-
-function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
 /** The group's Items: checkboxes of this `name` in the fieldset (Parents have none). */
@@ -238,7 +208,6 @@ export function CheckboxGroupRoot({
   const fallbackName = useId();
   const name = field.name ?? fallbackName;
   const fieldsetRef = useRef<HTMLFieldSetElement | null>(null);
-  const warnedElement = useRef(false);
   const warnedDuplicate = useRef(false);
   /** Parent reports waiting for the next mount read (design 8.1). */
   const parentReports = useRef<{ values: readonly string[]; checked: boolean }[]>([]);
@@ -283,7 +252,7 @@ export function CheckboxGroupRoot({
   >({
     controlled: controlledSet,
     defaultValue: defaultSet,
-    initialValue: EMPTY,
+    initialValue: EMPTY_SET,
     action:
       valueChangeAction && ((next, details) => valueChangeAction(sortByDocument(next), details)),
     transitionTypes: (_next, _prev, details) => [
@@ -291,7 +260,7 @@ export function CheckboxGroupRoot({
       ...(details.added.length > 0 ? ["fsui-checkbox-group-check"] : []),
       ...(details.removed.length > 0 ? ["fsui-checkbox-group-uncheck"] : []),
     ],
-    reducer: (prev, _next, details) => reduce(prev, details),
+    reducer: (prev, _next, details) => applyPatch(prev, details),
     warn: { component: "CheckboxGroup.Root", prop: "value" },
   });
   // Deliberately no warning when neither `value` nor `defaultValue` is given: an empty group is
@@ -315,7 +284,7 @@ export function CheckboxGroupRoot({
       added: sortByDocument(patch.added),
       removed: sortByDocument(patch.removed),
     });
-    dispatch(reduce(from, details), details);
+    dispatch(applyPatch(from, details), details);
   };
 
   /**
@@ -374,7 +343,7 @@ export function CheckboxGroupRoot({
     // no `defaultChecked` to read). Controlled: from `base()`, as for the mount read; the parent
     // decides.
     readDefault: () =>
-      readGroup("defaultChecked", value === undefined ? (defaultSet ?? EMPTY) : base()),
+      readGroup("defaultChecked", value === undefined ? (defaultSet ?? EMPTY_SET) : base()),
     base,
     equals: setsEqual,
     onPlatformChange: (next, event) => {
@@ -419,7 +388,7 @@ export function CheckboxGroupRoot({
 
     // Dev only: Item values must be unique within the Root (design 14.6).
     if (!isDev || warnedDuplicate.current) return;
-    const duplicate = order.find((v, i) => order.indexOf(v) !== i);
+    const duplicate = firstDuplicate(order);
     if (duplicate !== undefined) {
       warnedDuplicate.current = true;
       console.error(
@@ -432,21 +401,26 @@ export function CheckboxGroupRoot({
     syncItemOrder();
   });
 
-  const libraryRef = useCallback((el: HTMLFieldSetElement) => {
-    fieldsetRef.current = el;
-    if (isDev && !warnedElement.current && el.tagName !== "FIELDSET") {
-      warnedElement.current = true;
-      console.error(
-        `CheckboxGroup.Root: expected to render a <fieldset> element but got ` +
-          `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
-          `inheritance, form reset) need a real <fieldset>.`,
-      );
-    }
-    return () => {
-      fieldsetRef.current = null;
-    };
-  }, []);
-  const rootRef = useMergedRef<HTMLFieldSetElement>(libraryRef, field.ref);
+  const checkElement = useElementCheck<HTMLFieldSetElement>(
+    isDev &&
+      ((el) =>
+        el.tagName !== "FIELDSET"
+          ? `CheckboxGroup.Root: expected to render a <fieldset> element but got ` +
+            `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
+            `inheritance, form reset) need a real <fieldset>.`
+          : null),
+  );
+  const libraryRef = useCallback(
+    (el: HTMLFieldSetElement) => {
+      fieldsetRef.current = el;
+      checkElement?.(el);
+      return () => {
+        fieldsetRef.current = null;
+      };
+    },
+    [checkElement],
+  );
+  const rootRef = useMergedRefs<HTMLFieldSetElement>(libraryRef, field.ref);
 
   const itemsRequired =
     required &&
@@ -472,7 +446,7 @@ export function CheckboxGroupRoot({
     committed,
     pending,
     disabled,
-    defaultValue: value === undefined ? (defaultSet ?? EMPTY) : undefined,
+    defaultValue: value === undefined ? (defaultSet ?? EMPTY_SET) : undefined,
     onItemMounted,
     reportParent: (values, checked) => {
       parentReports.current.push({ values, checked });

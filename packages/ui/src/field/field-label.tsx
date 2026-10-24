@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { useFieldContext } from "../internal/field-context.js";
 import type { FieldState } from "../internal/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { fieldDataAttributes } from "./field-root.js";
 
@@ -30,18 +30,14 @@ export interface FieldLabelProps extends Omit<
  */
 export function FieldLabel({ className, style, children, render, ...rest }: FieldLabelProps) {
   const ctx = useFieldContext("Field.Label");
-  const warned = useRef(false);
-  const ref = useCallback((el: HTMLElement) => {
-    if (isDev && !warned.current && el.tagName !== "LABEL") {
-      warned.current = true;
-      console.error(
-        `Field.Label: expected to render a <label> element but got <${el.tagName.toLowerCase()}>. ` +
-          "Label activation and the control's accessible name need a real <label>.",
-      );
-    }
-    // A cleanup, so the merged ref never calls this with `null`.
-    return () => {};
-  }, []);
+  const ref = useElementCheck(
+    isDev &&
+      ((el) =>
+        el.tagName !== "LABEL"
+          ? `Field.Label: expected to render a <label> element but got <${el.tagName.toLowerCase()}>. ` +
+            "Label activation and the control's accessible name need a real <label>."
+          : null),
+  );
   return useRender<ComponentPropsWithRef<"label">, FieldState>({
     defaultElement: "label",
     render,

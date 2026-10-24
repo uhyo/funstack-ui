@@ -14,6 +14,8 @@ import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { ComboboxListContext, optionId, useComboboxContext } from "./combobox-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface ComboboxOptionState {
   readonly value: string;
   /** Optimistic: this option's value is the (optimistic) selection. */
@@ -81,7 +83,7 @@ export function ComboboxOption({
   const inList = use(ComboboxListContext);
   useDevWarning(
     !inList,
-    "Combobox.Option: rendered outside a Combobox.List. Options belong in the listbox.",
+    isDev && "Combobox.Option: rendered outside a Combobox.List. Options belong in the listbox.",
   );
   const { registerOption } = ctx;
 

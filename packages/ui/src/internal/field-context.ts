@@ -39,7 +39,7 @@ export interface FieldControlRegistration {
    * that is not the registered element (NumberField: the hidden `input[type=number]` after the
    * visible text input). `:user-invalid`, the listeners and the focus target stay on `element`;
    * after writing the slot the Field mirrors this element's `validationMessage` into `element`
-   * (design/components/field-form.md, amendment `validityElement`). Resolved on every read.
+   * (design/components/field-form.md, `validityElement`). Resolved on every read.
    */
   readonly validityElement?: (() => ValidatableElement | null) | undefined;
 }

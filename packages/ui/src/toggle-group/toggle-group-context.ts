@@ -1,7 +1,8 @@
 "use client";
 import { createContext, use } from "react";
+import type { Orientation } from "../internal/types.js";
 
-export type ToggleGroupOrientation = "horizontal" | "vertical";
+export type ToggleGroupOrientation = Orientation;
 
 export interface ToggleGroupContextValue {
   /** Optimistic pressed values: Items render `aria-pressed` from it. */

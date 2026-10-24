@@ -8,6 +8,8 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface AccordionPanelState {
   readonly value: string;
   /** Committed open state. `undefined` in JS-free mode. */
@@ -23,10 +25,9 @@ export interface AccordionPanelProps extends Omit<
    * Library mode only. Forwarded as `default` to the `<ViewTransition>` around the panel's
    * `div`; animates content that mounts or changes in the commit that ends an action.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionPanelState>;
@@ -52,7 +53,7 @@ export function AccordionPanel({
   render,
   ...rest
 }: AccordionPanelProps) {
-  // Only the Item's context (memoised per item, #48).
+  // Only the Item's context (memoised per item).
   const item = use(AccordionItemContext);
   if (item === null) {
     throw new Error("Accordion.Panel must be rendered inside an Accordion.Item.");
@@ -61,8 +62,9 @@ export function AccordionPanel({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Accordion.Panel: `transition` has no effect in JS-free mode; the browser toggles the item " +
-      "outside any React transition.",
+    isDev &&
+      "Accordion.Panel: `transition` has no effect in JS-free mode; the browser toggles the item " +
+        "outside any React transition.",
   );
 
   const state: AccordionPanelState = {

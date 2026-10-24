@@ -70,10 +70,10 @@ export function TabsPage() {
               <>
                 Runs inside the Root's transition whenever a tab is selected. Sync or async;
                 rejections reach the nearest Error Boundary and roll the selection back.{" "}
-                <code>details.reason</code> is <code>"activate"</code> (click, Enter/Space, or focus
-                in automatic mode) or <code>"platform"</code> (find-in-page revealed a{" "}
-                <code>keepMounted="until-found"</code> panel; <code>event</code> is the{" "}
-                <code>beforematch</code> event).
+                <code>details.reason</code> (a <code>ChangeReason</code>) is <code>"activate"</code>{" "}
+                (click, Enter/Space, or focus in automatic mode) or <code>"platform"</code>{" "}
+                (find-in-page revealed a <code>keepMounted="until-found"</code> panel;{" "}
+                <code>event</code> is the <code>beforematch</code> event).
               </>
             ),
           },

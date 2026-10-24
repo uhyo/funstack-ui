@@ -1,14 +1,5 @@
 "use client";
-import {
-  Activity,
-  use,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useSyncExternalStore,
-} from "react";
+import { Activity, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -19,25 +10,18 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
-import {
-  FSUI_PRECEDENCE,
-  MENU_POINT_FALLBACKS,
-  MENU_POINT_GAP,
-  MENU_POINT_HREF,
-  MENU_POINT_RULES,
-  MENU_POINT_TOUCH_GAP,
-  MENU_POINT_X,
-  MENU_POINT_Y,
-  POSITION_TRY_FALLBACKS,
-  positionArea,
-} from "../internal/anchor-position.js";
+import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
-import { mergeRefs } from "../internal/merge-props.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
+import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -55,8 +39,19 @@ import {
   typeaheadText,
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
+import {
+  MENU_POINT_FALLBACKS,
+  MENU_POINT_GAP,
+  MENU_POINT_HREF,
+  MENU_POINT_RULES,
+  MENU_POINT_TOUCH_GAP,
+  MENU_POINT_X,
+  MENU_POINT_Y,
+} from "./menu-point.js";
 
-/** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
+const isDev = process.env.NODE_ENV !== "production";
+
+/** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type MenuSide = AnchorSide;
 export type MenuAlign = AnchorAlign;
 
@@ -143,13 +138,8 @@ export interface MenuPopupProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuPopupState>;
 }
 
-/** Engine capabilities never change while the page lives. */
-const subscribeNever = () => () => {};
-
 /** Typeahead buffer lifetime after the last keystroke (design 5.1). */
 const TYPEAHEAD_RESET_MS = 500;
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /** What a press may focus inside a popup: items, the popup itself, the consumer's controls. */
 const FOCUSABLE_SELECTOR =
@@ -161,7 +151,7 @@ type PointPlacement = Extract<MenuPlacement, { kind: "point" }>;
  * The inline placement of a point open (context-menu.md 3.3): the point and the gap as custom
  * properties (`--menu-point-gap`: `0px`, `16px` for a touch or pen open, 4.7), and unless the
  * stylesheet owns placement, the menu below the point (`top`) or, for a touch or pen open, above
- * it (`bottom`), and by the popup's direction read at the open (4.6, #88), `left` (LTR) or
+ * it (`bottom`), and by the popup's direction read at the open (4.6), `left` (LTR) or
  * `right` (RTL: the menu's right edge at the point), with the other two insets `auto`
  * (longhands, so React never sees a shorthand next to its longhands), `position-area: none` (a
  * consumer's anchored `position-area` would otherwise place the popup inside a grid area) and
@@ -220,11 +210,11 @@ function scrollsWithin(popup: HTMLElement, target: EventTarget | null, event: Wh
  * middle-button `pointerdown` outside it, hides the root popup at once (`"dismiss"` through the
  * `toggle` notification). Chromium's click-based light dismiss ignores those buttons.
  *
- * Wave 11 (#88, 4.8): while the menu is placed at a point (read at each event: a right-click may
+ * While the menu is placed at a point (4.8; read at each event: a right-click may
  * re-place a Trigger-opened menu), a `scroll` of the document or of an element that contains the
  * region closes it the same way; scrolls elsewhere and inside the menu are ignored. Scrolling
  * already in flight at the open (a smooth scroll, trackpad momentum) does not count: scroll
- * events are ignored until the first animation frame without one (review L6). And a `wheel`
+ * events are ignored until the first animation frame without one. And a `wheel`
  * over any menu never scrolls the page: it is prevented unless something in the menu under the
  * pointer can scroll that way, or it is a zoom (`ctrlKey`: Ctrl+wheel, trackpad pinch). Returns
  * the cleanup.
@@ -237,7 +227,7 @@ function listenOutside(
   const doc = popup.ownerDocument;
   const inside = (target: EventTarget | null) => target instanceof Node && popup.contains(target);
   const close = () => {
-    if (popup.matches(":popover-open")) popup.hidePopover();
+    if (isPopoverOpen(popup)) popup.hidePopover();
   };
   // Bubble phase: the region's handler ran first and marked a move.
   const onContextMenu = (event: Event) => {
@@ -280,7 +270,7 @@ function listenOutside(
   // the wheel to the page (Firefox ignores `overscroll-behavior` there).
   const onWheel = (event: WheelEvent) => {
     // A zoom, not a scroll: Ctrl+wheel and a trackpad pinch (`wheel` with `ctrlKey`) stay the
-    // user's (review L3).
+    // user's.
     if (event.ctrlKey) return;
     if (!scrollsWithin(popup, event.target, event)) event.preventDefault();
   };
@@ -311,12 +301,11 @@ function listenOutside(
  * `tabIndex`, `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
  * non-item space keeps focus on the current item), `onContextMenu` (no native menu over this
  * one), `onPointerEnter` / `onPointerLeave`, `data-side` / `data-align` unless `side` is `null`
- * or the menu is placed at a point, and `data-context` for an open from a `Menu.ContextTrigger`
- * (placed at the pointer: `--menu-point-x` / `--menu-point-y` inline, and unless `side` is
- * `null`, `top` and `left` (`right` for an RTL popup) at the point with the library's
- * `@position-try` fallbacks, whose rules
- * it renders as a hoisted `<style>`). A top-level menu closes at once on a right- or
- * middle-click outside it.
+ * or the menu is placed at a point, and `data-context` for an open from a `Menu.ContextTrigger`.
+ * Such an open is placed at the pointer: `--menu-point-x` / `--menu-point-y` inline and, unless
+ * `side` is `null`, `top` and `left` (`right` for an RTL popup) at the point with the library's
+ * `@position-try` fallbacks, whose rules it renders as a hoisted `<style>`. A top-level menu
+ * closes at once on a right- or middle-click outside it.
  */
 export function MenuPopup({
   side: sideProp,
@@ -336,7 +325,7 @@ export function MenuPopup({
   // The listeners installed at the open read the placement of the latest commit (4.8).
   const latestPlacement = useLatest(menu.placement);
   // A submenu opens on the inline-end side of its item: the side ArrowRight (ArrowLeft in RTL)
-  // points to (wave 11, #53).
+  // points to.
   const sideOption = sideProp === undefined ? (submenu ? "inline-end" : "bottom") : sideProp;
   // A ContextTrigger's open is placed at the point; nothing is anchored (context-menu.md 3.3).
   const point = menu.placement.kind === "point" ? menu.placement : null;
@@ -346,12 +335,7 @@ export function MenuPopup({
   const { side } = placement;
   const resolvedAlign = placement.align;
 
-  // As Tabs.List (#43): detected only with the flag, never during SSR or hydration.
-  const nativeFocusgroup = useSyncExternalStore(
-    subscribeNever,
-    () => experimental_focusgroup && "focusGroup" in HTMLElement.prototype,
-    () => false,
-  );
+  const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
 
   const typeahead = useRef({ text: "", at: 0 });
   const typingAhead = useCallback(() => {
@@ -372,7 +356,7 @@ export function MenuPopup({
     initialFocus: undefined,
     // Design 6.1: the first (or last) enabled item by open cause, nothing for a hover open, the
     // popup itself when there are no items.
-    // A pointer open focuses without the focus ring where the engine can be told so (H1).
+    // A pointer open focuses without the focus ring where the engine can be told so.
     resolveInitialFocus: (popup) => {
       const { cause, pointer } = menu.takeOpenCause();
       if (cause === "none") return null;
@@ -386,7 +370,7 @@ export function MenuPopup({
     onToggle: (event) => {
       if (submenu) return;
       const element = popover.popupRef.current;
-      if (event.newState === "open" && element !== null && element.matches(":popover-open")) {
+      if (event.newState === "open" && element !== null && isPopoverOpen(element)) {
         outside.current ??= listenOutside(element, menu, () => latestPlacement.current);
       } else if (event.newState === "closed") {
         stopOutside();
@@ -402,13 +386,13 @@ export function MenuPopup({
   // Once the popup is not visible (hidden, exit animation over) and no open is intended or in
   // flight, a point placement goes back to anchored for the next open that is not a
   // ContextTrigger's: after a point open that was shown and closed, and after one that was
-  // rejected or refused (review L1).
+  // rejected or refused.
   const shownKey = useRef<number | "anchor" | null>(null);
   useLayoutEffect(() => {
     const element = popover.popupRef.current;
     if (element === null) return;
     const key = point !== null ? point.generation : "anchor";
-    if (element.matches(":popover-open")) {
+    if (isPopoverOpen(element)) {
       if (shownKey.current !== null && shownKey.current !== key && reshow()) {
         capturePointer(element, point?.pointerId);
       }
@@ -421,24 +405,27 @@ export function MenuPopup({
     }
   });
 
-  const devRef = useCallback((element: HTMLElement) => {
-    if (isDev && element.tagName === "DIALOG") {
-      console.error(
-        "Menu.Popup: rendered a <dialog>. Render a <div>: a <dialog popover> runs the dialog " +
-          "focusing steps, which fight the menu's item focus.",
-      );
-    }
-    // A press inside a menu is never a long-press of a Menu.ContextTrigger around it (review M1).
-    // Native, so it runs before React's root listener dispatches to the region.
-    const onPointerDown = (event: Event) => claimPress(event);
-    element.addEventListener("pointerdown", onPointerDown);
-    return () => element.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-  const placementRef = placement.ref;
-  const ref = useMemo(
-    () => mergeRefs(setElement, devRef, placementRef),
-    [setElement, devRef, placementRef],
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName === "DIALOG"
+          ? "Menu.Popup: rendered a <dialog>. Render a <div>: a <dialog popover> runs the dialog " +
+            "focusing steps, which fight the menu's item focus."
+          : null),
   );
+  const devRef = useCallback(
+    (element: HTMLElement) => {
+      checkElement?.(element);
+      // A press inside a menu is never a long-press of a Menu.ContextTrigger around it.
+      // Native, so it runs before React's root listener dispatches to the region.
+      const onPointerDown = (event: Event) => claimPress(event);
+      element.addEventListener("pointerdown", onPointerDown);
+      return () => element.removeEventListener("pointerdown", onPointerDown);
+    },
+    [checkElement],
+  );
+  const placementRef = placement.ref;
+  const ref = useMergedRefs(setElement, devRef, placementRef);
 
   const listContext = useMemo<MenuListContextValue>(
     () => ({ menu, nativeFocusgroup, typingAhead }),
@@ -497,7 +484,7 @@ export function MenuPopup({
     if (key === "ArrowDown" || key === "ArrowUp" || key === "Home" || key === "End") {
       if (!onItem) {
         // The popup itself has focus (no items at open, or focus landed on it some other way):
-        // into the list from its edge (review M1).
+        // into the list from its edge.
         event.preventDefault();
         const items = menuItems(popup);
         const item = key === "ArrowDown" || key === "Home" ? items[0] : items.at(-1);
@@ -533,11 +520,11 @@ export function MenuPopup({
     const popup = event.currentTarget;
     const next = event.relatedTarget;
     if (!(next instanceof Node) || popup.contains(next)) return;
-    if (popup.matches(":popover-open")) popup.hidePopover();
+    if (isPopoverOpen(popup)) popup.hidePopover();
   };
 
   // A press on non-item space (padding, a Separator, a GroupLabel) would focus the popup itself
-  // (`tabindex="-1"`) and take focus off the current item; keep it where it is (review M1, the
+  // (`tabindex="-1"`) and take focus off the current item; keep it where it is (the
   // pointer-focus model of design 6.2). Focusable content of the consumer's (a text field) still
   // takes focus.
   const onMouseDown = (event: MouseEvent<HTMLElement>) => {

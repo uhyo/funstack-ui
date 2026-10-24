@@ -1,5 +1,5 @@
 "use client";
-import { Activity, useCallback, useMemo } from "react";
+import { Activity } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,14 +9,17 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { mergeRefs } from "../internal/merge-props.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { ComboboxPopupContext, useComboboxContext } from "./combobox-context.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface ComboboxPopupState {
   /** Committed open state. Read `:popover-open` for the DOM truth. */
@@ -59,8 +62,6 @@ export interface ComboboxPopupProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxPopupState>;
 }
 
-const isDev = process.env.NODE_ENV !== "production";
-
 const preventDefault = (event: { preventDefault(): void }) => event.preventDefault();
 
 /**
@@ -96,16 +97,15 @@ export function ComboboxPopup({
     transition,
   });
 
-  const devRef = useCallback((element: HTMLElement) => {
-    if (isDev && element.tagName !== "DIV") {
-      console.error(
-        `Combobox.Popup: rendered a <${element.tagName.toLowerCase()}>. Render a <div>: a ` +
-          "<dialog popover> runs the dialog focusing steps and takes focus out of the input.",
-      );
-    }
-    return () => {};
-  }, []);
-  const ref = useMemo(() => mergeRefs(setElement, devRef), [setElement, devRef]);
+  const devRef = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DIV"
+          ? `Combobox.Popup: rendered a <${element.tagName.toLowerCase()}>. Render a <div>: a ` +
+            "<dialog popover> runs the dialog focusing steps and takes focus out of the input."
+          : null),
+  );
+  const ref = useMergedRefs(setElement, devRef);
 
   const state: ComboboxPopupState = {
     open: popover.committed,

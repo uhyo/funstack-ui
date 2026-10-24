@@ -55,12 +55,7 @@ export interface UseNativeGroupReconciliationResult {
    * makes the adapter reconcile the group again: `readCurrent()` vs `base()`, in a microtask, once
    * for all members mounted in the same commit. Members mounting in the Root's own commit are
    * covered by the Root's mount reconciliation (their effects run before the Root's) and are
-   * ignored.
-   *
-   * RadioGroup wiring: `const { onItemMounted } = useNativeGroupReconciliation(...)` in the Root,
-   * put `onItemMounted` in the group context, and in each Item
-   * `useNativeChecked({ type: "radio", group: true, onItemMounted: ctx.onItemMounted, ... })`.
-   * The member's element argument is not used here; the Root may use it (dev warnings).
+   * ignored. The member's element argument is not used here; the Root may use it (dev warnings).
    */
   readonly onItemMounted: (element?: Element | null) => void;
 }

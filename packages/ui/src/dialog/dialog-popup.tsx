@@ -16,13 +16,16 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useContentFocusProbe } from "../internal/content-focus-probe.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useExitAnimation } from "../internal/use-exit-animation.js";
 import { useModalRegistration } from "../internal/use-modal-registration.js";
+import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
@@ -79,10 +82,9 @@ export interface DialogPopupProps extends Omit<
    * `open={false}`), in all engines; dismissals (Escape, a click outside) are the browser's and
    * animate with CSS only. Ignored (dev warning) in JS-free mode.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, DialogPopupState>;
@@ -119,11 +121,7 @@ function isOpenLightPopover(element: Element): boolean {
   const state =
     typeof reflected === "string" ? reflected : element.getAttribute("popover")!.toLowerCase();
   if (state === "manual") return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
+  return isPopoverOpen(element);
 }
 
 /**
@@ -207,10 +205,10 @@ export function DialogPopup({
   // not re-open it from a commit that lands in between.
   const awaitingClose = useRef(false);
   // Set right before the library's own `close()` (the apply effect), consumed by the `close`
-  // event it causes: the echo is recognised by its source, not by what is intended (review L4).
+  // event it causes: the echo is recognised by its source, not by what is intended.
   const libraryClose = useRef(false);
   // A dismissal (Escape, a click outside) that closed the dialog while a part-initiated close
-  // was in flight (review M1). Its notification was skipped because `false` was intended; if that
+  // was in flight. Its notification was skipped because `false` was intended; if that
   // close then settles with committed `true` (a controlled parent vetoed it), the apply effect
   // sends the dismissal instead of re-opening. Valid only for the open generation it was
   // recorded in: a re-open (Trigger, foreign invoker) supersedes it.
@@ -246,23 +244,28 @@ export function DialogPopup({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Dialog.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
-      "dialog outside any React transition. Animate it with CSS (`@starting-style`).",
+    isDev &&
+      "Dialog.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
+        "dialog outside any React transition. Animate it with CSS (`@starting-style`).",
   );
   useDevWarning(
     !isLibrary && keepMounted === false,
-    "Dialog.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
-      "always mounted so that the server HTML is complete.",
+    isDev &&
+      "Dialog.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
+        "always mounted so that the server HTML is complete.",
   );
 
+  const checkElement = useElementCheck<HTMLDialogElement>(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DIALOG"
+          ? `Dialog.Popup: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
+            "Top layer, backdrop, focus and Escape all come from a real <dialog>."
+          : null),
+  );
   const libraryRef = useCallback(
     (element: HTMLDialogElement) => {
-      if (isDev && element.tagName !== "DIALOG") {
-        console.error(
-          `Dialog.Popup: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
-            "Top layer, backdrop, focus and Escape all come from a real <dialog>.",
-        );
-      }
+      checkElement?.(element);
       dialogRef.current = element;
       setDialog(element);
       return () => {
@@ -270,7 +273,7 @@ export function DialogPopup({
         setDialog(null);
       };
     },
-    [dialogRef],
+    [checkElement, dialogRef],
   );
 
   // --- Opening -----------------------------------------------------------------------------
@@ -329,15 +332,13 @@ export function DialogPopup({
     else if (active instanceof HTMLElement && active !== doc.body) active.blur();
   };
 
-  // The apply effect (design 2.5): after every commit that re-renders the Popup, once nothing
-  // is in flight, the DOM follows committed state. The Root's context is memoised (#48), so an
-  // unrelated Root render does not re-render the Popup and does not run this; every path that
-  // makes the DOM diverge from state goes through a dispatch, whose `pending` flips re-render the
-  // Popup (review of #48, finding 4). Do not rely on an unrelated render to re-apply state.
-  // Opens on the user's dispatch, `defaultOpen`, a controlled parent, the re-open of a refused
-  // dismissal; closes after a part-initiated close settled, a controlled close, or a refused
-  // pre-hydration open. Also returns focus after a close whose commit unmounted the focused
-  // content, and releases a `held` no exit animation is going to release (4.4).
+  // The apply effect (design 2.5), as usePopoverPopup's: once nothing is in flight, the DOM
+  // follows committed state. Opens on the user's dispatch, `defaultOpen`, a controlled parent,
+  // the re-open of a refused dismissal; closes after a part-initiated close settled, a controlled
+  // close, or a refused pre-hydration open. Also returns focus after a close whose commit
+  // unmounted the focused content, and releases a `held` no exit animation is going to release
+  // (4.4). It runs only for commits that re-render the Popup (the Root's context is memoised):
+  // do not rely on an unrelated render to re-apply state.
   useLayoutEffect(() => {
     if (!isLibrary) return;
     const element = dialogRef.current;
@@ -350,7 +351,7 @@ export function DialogPopup({
           dismissedWhilePending.current = null;
           if (dismissed !== null && dismissed.generation === ctx.openGeneration()) {
             // The user dismissed the dialog while a part's close was in flight, and that close
-            // was vetoed: the dismissal stands and is notified now (review M1), instead of the
+            // was vetoed: the dismissal stands and is notified now, instead of the
             // dialog coming back. A parent that keeps `open` again gets it re-opened, as for any
             // refused dismissal.
             ctx.notifyClosed(dismissed.event, "dismiss", dismissed.returnValue);
@@ -487,8 +488,8 @@ export function DialogPopup({
     if (ctx.intended()) {
       ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
     } else {
-      // A part's close is in flight (walkthrough 11.13): nothing more to notify unless that close
-      // is vetoed (the apply effect).
+      // A part's close is in flight (design walkthrough 11.13): nothing more to notify unless that
+      // close is vetoed (the apply effect).
       dismissedWhilePending.current = {
         event: intent?.event ?? event,
         returnValue: element.returnValue,
@@ -502,7 +503,7 @@ export function DialogPopup({
     if (element === null || event.target !== element) return;
     const newState = (event as ToggleEvent).newState;
     awaitingClose.current = newState === "closed";
-    // What already runs inside is not the exit (#64).
+    // What already runs inside is not the exit.
     if (newState === "closed") exit.recordBaseline(element);
     // Every native open counts as a new opening (design 3.4, as Popover 14.1): foreign,
     // pre-hydration and JS-free opens too, so a Close action from an earlier opening skips its
@@ -633,19 +634,15 @@ export function DialogPopup({
     };
   }, [dialog, modal, lightDismiss, experimental_closedBy, triggerRef]);
 
-  // Development check: the dialog has an accessible name when it is (or can be) shown.
-  const shown = !isLibrary || ctx.committed;
-  useEffect(() => {
-    if (!isDev || dialog === null || !shown) return;
-    if (dialog.hasAttribute("aria-label")) return;
-    const labelledBy = (dialog.getAttribute("aria-labelledby") ?? "").split(/\s+/);
-    const doc = dialog.ownerDocument;
-    if (labelledBy.some((id) => id !== "" && doc.getElementById(id) !== null)) return;
-    console.error(
+  // Development check (design 9): the dialog has an accessible name when it is (or can be)
+  // shown.
+  useShownNameWarning(
+    dialog,
+    !isLibrary || ctx.committed,
+    isDev &&
       "Dialog.Popup: the dialog has no accessible name. Render a Dialog.Title, or give the " +
         "Popup an `aria-label`.",
-    );
-  }, [dialog, shown]);
+  );
 
   const state: DialogPopupState = { open: ctx.committed, modal };
   const visible = ctx.committed || exit.held;

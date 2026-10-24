@@ -4,29 +4,33 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  RenderProp,
+  StateValue,
+} from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { TabsContext } from "./tabs-context.js";
-import type {
-  TabsActivationMode,
-  TabsChangeReason,
-  TabsContextValue,
-  TabsOrientation,
-} from "./tabs-context.js";
+import type { TabsActivationMode, TabsContextValue, TabsOrientation } from "./tabs-context.js";
 import { tabId } from "./tabs-ids.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export type { TabsActivationMode, TabsOrientation } from "./tabs-context.js";
 
 /** Details passed as the second argument of `valueChangeAction`. */
 export interface TabsValueChangeDetails extends ActionDetails {
   /**
+   * The shared vocabulary (conventions 2.2); Tabs dispatches two of its values.
    * `"activate"`: the user selected the tab (click, Enter/Space, or focus in automatic mode).
    * `"platform"`: the browser revealed a `keepMounted="until-found"` panel through find-in-page or a
    * text fragment (`details.event` is the `beforematch` event).
    */
-  readonly reason: TabsChangeReason;
+  readonly reason: ChangeReason;
 }
 
 export interface TabsRootState {
@@ -128,14 +132,15 @@ export function TabsRoot({
     warn: { component: "Tabs.Root", prop: "value" },
   });
   // `null` is a legitimate default (no panel), but forgetting both props is the likelier cause
-  // of an empty Tabs (design open question 2, product owner decision).
+  // of an empty Tabs (design/components/tabs.md, resolved question 2).
   useDevWarning(
     value === undefined && defaultValue === undefined,
-    "Tabs.Root: neither `value` nor `defaultValue` was passed, so no tab is selected and no " +
-      "panel is shown. Pass `defaultValue`, or `defaultValue={null}` to start with no selection.",
+    isDev &&
+      "Tabs.Root: neither `value` nor `defaultValue` was passed, so no tab is selected and no " +
+        "panel is shown. Pass `defaultValue`, or `defaultValue={null}` to start with no selection.",
   );
 
-  // Memoised (#48): `dispatch` is stable, so this changes only with the state and the props below.
+  // Memoised: `dispatch` is stable, so this changes only with the state and the props below.
   const context = useMemo<TabsContextValue>(
     () => ({
       rootId,

@@ -15,6 +15,14 @@ export function decimalsOf(n: number): number {
   return dot === -1 ? 0 : text.length - dot - 1;
 }
 
+/** Tolerance for grid computations on binary floating point (`0.3 / 0.1` is `2.9999999999999996`). */
+export const EPSILON = 1e-9;
+
+/** The decimal places a grid of `step` from `min` needs: the larger of the two. */
+export function gridDecimals(step: number, min: number): number {
+  return Math.max(decimalsOf(step), decimalsOf(min));
+}
+
 /**
  * `value` rounded to `decimals` places through `toFixed` (decimal, not binary, rounding of the
  * written digits: `roundTo(0.1 + 0.2, 1)` is `0.3`). `-0` becomes `0`.

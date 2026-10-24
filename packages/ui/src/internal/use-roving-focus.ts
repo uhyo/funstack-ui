@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useInsertionEffect, useLayoutEffect, useState } from "react";
 import type { FocusEvent, KeyboardEvent, PointerEvent, RefObject } from "react";
+import { focusWithRing, resolveArrowKey } from "./arrow-keys.js";
+import type { Orientation } from "./types.js";
 
 // The roving-focus engine shared by `Toolbar.Root` and a standalone `ToggleGroup.Root`
 // (design/components/toggle-group.md section 6, conventions 3.2 and 7.4). Items are the focusable
 // descendants of the container, found in the DOM; which one is the Tab stop is urgent library
 // state kept outside React and written to the items as `tabindex` through the DOM.
 
-export type RovingOrientation = "horizontal" | "vertical";
+export type RovingOrientation = Orientation;
 
 export interface RovingFocusOptions {
   /** `false`: the engine writes nothing and handles nothing (a ToggleGroup inside a Toolbar). Default `true`. */
@@ -162,32 +164,6 @@ export function ownsArrows(el: Element): boolean {
   return el instanceof HTMLElement && el.isContentEditable === true;
 }
 
-type Move = "next" | "prev" | "first" | "last";
-
-function resolveKey(key: string, orientation: RovingOrientation, rtl: boolean): Move | null {
-  switch (key) {
-    case "Home":
-      return "first";
-    case "End":
-      return "last";
-    case "ArrowRight":
-      return orientation === "horizontal" ? (rtl ? "prev" : "next") : null;
-    case "ArrowLeft":
-      return orientation === "horizontal" ? (rtl ? "next" : "prev") : null;
-    case "ArrowDown":
-      return orientation === "vertical" ? "next" : null;
-    case "ArrowUp":
-      return orientation === "vertical" ? "prev" : null;
-    default:
-      return null;
-  }
-}
-
-function focusItem(item: HTMLElement): void {
-  // Keyboard focus: the ring shows even where the engine's heuristic would not (as Tabs).
-  item.focus({ focusVisible: true } as FocusOptions);
-}
-
 interface Engine {
   /** The options of the last committed render (written from an insertion effect). */
   readonly setOptions: (options: RovingFocusOptions) => void;
@@ -329,18 +305,18 @@ function createEngine(): Engine {
       const checked = unit?.find((radio) => radio.checked);
       if (checked !== undefined && checked !== target) {
         event.preventDefault();
-        focusItem(checked);
+        focusWithRing(checked);
         return;
       }
       const next = items[index + (event.shiftKey ? -1 : 1)];
       if (next === undefined) return;
       event.preventDefault();
-      focusItem(next);
+      focusWithRing(next);
       return;
     }
 
     const rtl = options.orientation === "horizontal" && getComputedStyle(root).direction === "rtl";
-    const move = resolveKey(event.key, options.orientation, rtl);
+    const move = resolveArrowKey(event.key, options.orientation, rtl);
     if (move === null) return;
     event.preventDefault();
     const last = items.length - 1;
@@ -360,7 +336,7 @@ function createEngine(): Engine {
         break;
     }
     const next = items[nextIndex];
-    if (next !== undefined && next !== target) focusItem(next);
+    if (next !== undefined && next !== target) focusWithRing(next);
   };
 
   return {

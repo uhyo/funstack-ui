@@ -1,5 +1,8 @@
 import type { ReactElement, ReactNode } from "react";
 
+/** The arrow-key axis of a composite widget (Toolbar, Tabs, ToggleGroup, Slider). */
+export type Orientation = "horizontal" | "vertical";
+
 /**
  * A callback the library runs inside a Transition. May be sync or async: the library awaits
  * whatever it returns (a thenable is awaited, anything else is ignored). The return type is

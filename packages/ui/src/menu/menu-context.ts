@@ -10,7 +10,7 @@ import type { PopoverRootValue } from "../internal/use-popover-root.js";
  */
 export type MenuOpenCause = "first" | "last" | "none";
 
-/** How the open being shown should place focus (design 6.1; review H1). */
+/** How the open being shown should place focus (design 6.1). */
 export interface MenuOpenFocus {
   readonly cause: MenuOpenCause;
   /**
@@ -38,12 +38,12 @@ export type MenuPlacement =
       /** The pointer held down at the open, re-captured after a move's re-show (2.1). */
       readonly pointerId: number | undefined;
       /**
-       * The popup's computed `direction` at this open or move (#88, 4.6): which edge of the menu
+       * The popup's computed `direction` at this open or move (4.6): which edge of the menu
        * sits at the point. Read once by `openAt`, never during render.
        */
       readonly direction: "ltr" | "rtl";
       /**
-       * A touch or pen open (#88, 4.7): the menu is placed above the point with
+       * A touch or pen open (4.7): the menu is placed above the point with
        * `--menu-point-gap`, so it does not open under the finger.
        */
       readonly offset: boolean;
@@ -120,7 +120,7 @@ const handledEvents = new WeakMap<Event, object>();
 /**
  * `pointerdown` events that are not a long-press of an enclosing region: claimed by the innermost
  * region that started its timer for them (nested regions), and by every `Menu.Popup` for the
- * presses inside it (a menu inside a region, review M1). As `contextmenu`'s `defaultPrevented`
+ * presses inside it (a menu inside a region). As `contextmenu`'s `defaultPrevented`
  * rule (context-menu.md 2.4).
  */
 const claimedPresses = new WeakSet<Event>();

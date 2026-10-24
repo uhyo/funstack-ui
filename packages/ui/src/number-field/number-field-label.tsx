@@ -1,8 +1,9 @@
 "use client";
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { useNumberFieldContext } from "./number-field-context.js";
 import type { NumberFieldState } from "./number-field-root.js";
@@ -37,17 +38,14 @@ export function NumberFieldLabel({
   const { registerLabel } = ctx;
   useLayoutEffect(registerLabel, [registerLabel]);
 
-  const warned = useRef(false);
-  const libraryRef = useCallback((element: HTMLElement) => {
-    if (isDev && !warned.current && element.tagName !== "LABEL") {
-      warned.current = true;
-      console.error(
-        `NumberField.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
-          "The Label names the input through `for`, which only a <label> has.",
-      );
-    }
-    return () => {};
-  }, []);
+  const libraryRef = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "LABEL"
+          ? `NumberField.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
+            "The Label names the input through `for`, which only a <label> has."
+          : null),
+  );
 
   return useRender<ComponentPropsWithRef<"label">, NumberFieldState>({
     defaultElement: "label",

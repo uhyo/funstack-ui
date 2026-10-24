@@ -3,11 +3,9 @@ import { createContext, use } from "react";
 import type { PopoverRootValue } from "../internal/use-popover-root.js";
 import type { PopoverPopupState } from "./popover-popup.js";
 
-export type PopoverContextValue = PopoverRootValue;
+export const PopoverContext = createContext<PopoverRootValue | null>(null);
 
-export const PopoverContext = createContext<PopoverContextValue | null>(null);
-
-export function usePopoverContext(part: string): PopoverContextValue {
+export function usePopoverContext(part: string): PopoverRootValue {
   const context = use(PopoverContext);
   if (context === null) {
     throw new Error(`${part} must be rendered inside a Popover.Root.`);
@@ -22,6 +20,6 @@ export const PopoverPopupContext = createContext<PopoverPopupState | null>(null)
  * The state Title and Description receive: the enclosing Popup's, or (outside a Popup, which
  * `aria-labelledby` allows) the Root's committed open state with the default placement.
  */
-export function usePopoverPopupState(ctx: PopoverContextValue): PopoverPopupState {
+export function usePopoverPopupState(ctx: PopoverRootValue): PopoverPopupState {
   return use(PopoverPopupContext) ?? { open: ctx.committed, side: "bottom", align: "center" };
 }

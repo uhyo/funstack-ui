@@ -1,9 +1,10 @@
 "use client";
-import { useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useHydratedMount } from "../internal/use-hydrated-mount.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useFormReset } from "../internal/use-form-reset.js";
 import { useRender } from "../internal/use-render.js";
@@ -62,10 +63,9 @@ export interface CheckboxGroupParentProps extends Omit<
    * commit that settles the action (or rolls it back), never on the optimistic flip; animate the
    * flip itself with CSS on `:checked` / `:indeterminate`.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxGroupParentState>;
@@ -73,8 +73,6 @@ export interface CheckboxGroupParentProps extends Omit<
   /** Replace the rendered element. Must keep an `<input>`; the library sets `type="checkbox"`. */
   render?: RenderProp<ComponentPropsWithRef<"input">, CheckboxGroupParentState>;
 }
-
-const subscribeNothing = () => () => {};
 
 /** `checked` / `indeterminate` of a Parent over `values` against `set` (design 6.1). */
 function derive(values: readonly string[], set: ReadonlySet<string>) {
@@ -112,11 +110,7 @@ export function CheckboxGroupParent({
   // render uses every value, as the server did (it cannot know which Items are disabled), so
   // that the DOM `checked` it hydrates can be compared with the derivation for the
   // pre-hydration report below, also when this Parent hydrates after the Items registered.
-  const hydrating = useSyncExternalStore(
-    subscribeNothing,
-    () => false,
-    () => true,
-  );
+  const hydrating = useHydratedMount();
   const { disabledItems } = ctx;
   const effective = useMemo(
     () => (hydrating ? values : enabledValues(values, disabledItems)),
@@ -218,7 +212,7 @@ export function CheckboxGroupParent({
       defaultChecked: undefined,
       // Not a DOM attribute; the hook sets the property. Owned so that a `render` element's own
       // `indeterminate` prop (which react-dom would warn about) is stripped.
-      ...({ indeterminate: undefined } as object),
+      ...{ indeterminate: undefined },
       "aria-checked": undefined,
       disabled: disabledProp,
       "data-checked": dataAttr(checked),

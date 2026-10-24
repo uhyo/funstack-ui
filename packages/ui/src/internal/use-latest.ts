@@ -11,14 +11,10 @@ import type { RefObject } from "react";
  * that changed the value already sees it. A render that never commits (a discarded concurrent or
  * StrictMode render) never writes it. Never read it during render.
  *
- * Stale window: the write happens in the owner's own insertion effect, and React runs a commit's
- * insertion effects children first, interleaved with that subtree's DOM mutations. So a callback
- * called before the owner's insertion effect of the commit that changed the value still sees the
- * previous commit's value: from a descendant's insertion effect, or from a DOM event the browser
- * fires synchronously during the mutation phase (Chromium fires `blur` / `focusout` when a
- * focused node is removed). This is the same value a per-render closure would have given (the
- * handler attached then was the previous commit's too), so it is not a regression; just do not
- * rely on the new value before the layout phase.
+ * Insertion effects run children first, so earlier in that commit (a descendant's insertion
+ * effect, a DOM event fired during the mutation phase such as Chromium's `blur` on removal) it
+ * still holds the previous commit's value, as a per-render closure would. Rely on the new value
+ * from the layout phase on.
  */
 export function useLatest<T>(value: T): RefObject<T> {
   const ref = useRef(value);

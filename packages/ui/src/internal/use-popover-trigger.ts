@@ -2,15 +2,20 @@
 import { useCallback } from "react";
 import type { ComponentPropsWithRef, DOMAttributes, MouseEvent } from "react";
 import { dataAttr } from "./data-attr.js";
+import { isPopoverOpen } from "./popover-open.js";
 import type { RenderProp } from "./types.js";
+import { useElementCheck } from "./use-element-check.js";
 import { isHostButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
+/** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {
-  /** Optimistic open state (library mode); `false` in JS-free mode. */
+  /** Optimistic open state. A Popover in JS-free mode (the browser owns it) reports `false`. */
   readonly open: boolean;
-  /** The Root's transition is pending (an open, a part-initiated close or a notification). */
+  /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -41,7 +46,7 @@ export interface UsePopoverTriggerOptions<State> {
    * How `disabled` is rendered. `"native"` (default): the `disabled` attribute, so the button is
    * no invoker at all; in library mode a link or component `render` still gets the `"aria"`
    * branch, because native `disabled` means nothing on a link and the installed click handler is
-   * what refuses (#83). `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
+   * what refuses. `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
    * focusable); the click handler still refuses.
    */
   readonly disabledAs?: "native" | "aria";
@@ -53,17 +58,6 @@ export interface PopoverTriggerHook {
   readonly libraryProps: ComponentPropsWithRef<"button"> & DataAttributes;
   /** Registers the element as the Root's Trigger; pass as `useRender`'s `ref`. */
   readonly ref: (element: HTMLElement) => () => void;
-}
-
-const isDev = process.env.NODE_ENV !== "production";
-
-function isPopoverOpen(element: Element | null): boolean {
-  if (element === null) return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -90,15 +84,18 @@ export function usePopoverTrigger<State>(
     disabled,
   };
 
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        !isLibrary && element.tagName !== "BUTTON"
+          ? `${part}: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
+            '<button> runs `command="toggle-popover"`; this trigger will not open the popover. ' +
+            "Render a <button>, or put the component in library mode (`defaultOpen={false}`)."
+          : null),
+  );
   const ref = useCallback(
     (element: HTMLElement) => {
-      if (isDev && !isLibrary && element.tagName !== "BUTTON") {
-        console.error(
-          `${part}: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
-            '<button> runs `command="toggle-popover"`; this trigger will not open the popover. ' +
-            "Render a <button>, or put the component in library mode (`defaultOpen={false}`).",
-        );
-      }
+      checkElement?.(element);
       triggerRef.current = element;
       // JS-free mode: the DOM owns `aria-expanded` (design 9). A Trigger that mounts after the
       // Popup (or is re-created) picks up the current state here.
@@ -109,7 +106,7 @@ export function usePopoverTrigger<State>(
         if (triggerRef.current === element) triggerRef.current = null;
       };
     },
-    [isLibrary, part, triggerRef, popupRef],
+    [isLibrary, checkElement, triggerRef, popupRef],
   );
 
   const onClick = (event: MouseEvent<HTMLElement>) => {
@@ -141,12 +138,12 @@ export function usePopoverTrigger<State>(
           };
   }
   // A link or component render in library mode: the click handler (installed only there) cancels
-  // and refuses, so `aria-disabled` is safe and native `disabled` would mean nothing (#83). In
-  // JS-free mode the command needs native `disabled` to stop it.
+  // and refuses, so `aria-disabled` is safe and native `disabled` would mean nothing. In JS-free
+  // mode the command needs native `disabled` to stop it.
   const ariaDisabled = disabledAs === "aria" || (isLibrary && !isHostButton(render));
   // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
   // `disabled` the element would still be a live invoker before hydration (a component render
-  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  // spreading onto a real <button>), and the command would run.
   const noInvoker = ariaDisabled && disabled;
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -165,7 +162,7 @@ export function usePopoverTrigger<State>(
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),
     // Every mode: the styling hook agrees with the rendered `disabled` / `aria-disabled`
-    // (conventions 1.2, wave 9 fold W8).
+    // (conventions 1.2).
     "data-disabled": dataAttr(disabled),
   };
 

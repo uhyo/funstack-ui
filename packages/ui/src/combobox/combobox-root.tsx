@@ -14,7 +14,9 @@ import {
 import { flushSync } from "react-dom";
 import type { ReactNode, RefObject } from "react";
 import { createActionDetails } from "../internal/action-details.js";
+import type { AriaNotifyTarget } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { useFieldValueChange } from "../internal/use-field-control.js";
 import type {
   ActionDetails,
@@ -27,6 +29,7 @@ import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFormReset } from "../internal/use-form-reset.js";
 import type { FormAssociatedElement } from "../internal/use-form-reset.js";
+import { useLatest } from "../internal/use-latest.js";
 import { usePopoverRoot } from "../internal/use-popover-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
@@ -160,7 +163,7 @@ export interface ComboboxRootProps {
 }
 
 /** The default announcement (design 6.4; conventions 11: English, always overridable). */
-export function defaultComboboxAnnouncement(count: number): string {
+function defaultComboboxAnnouncement(count: number): string {
   if (count === 0) return "No results";
   if (count === 1) return "1 result";
   return `${count} results`;
@@ -169,15 +172,6 @@ export function defaultComboboxAnnouncement(count: number): string {
 const VALUE_TRANSITION_TYPES = ["fsui-combobox", "fsui-combobox-select"] as const;
 
 const isDev = process.env.NODE_ENV !== "production";
-
-function isPopoverOpen(element: Element | null): boolean {
-  if (element === null) return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
-}
 
 function isThenable(value: unknown): boolean {
   return (
@@ -268,12 +262,8 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   // --- Refs the handlers read after an `await` or from a timer ------------------------------
 
-  const propsRef = useRef(props);
-  const popoverRef = useRef(popover);
-  useInsertionEffect(() => {
-    propsRef.current = props;
-    popoverRef.current = popover;
-  });
+  const propsRef = useLatest(props);
+  const popoverRef = useLatest(popover);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLElement | null>(null);
@@ -309,7 +299,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
         );
       }
     },
-    [],
+    [propsRef],
   );
 
   // --- Labels (design 2.3) -------------------------------------------------------------------
@@ -330,7 +320,6 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   const dispatchSeq = useRef(0);
   const [dispatchMeta] = useState(() => new WeakMap<object, DispatchMeta>());
   const textRecord = useRef<TextRecord | null>(null);
-  const committedRef = useRef<string | null>(null);
 
   const runValueAction = async (
     next: string | null,
@@ -377,9 +366,8 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     transitionTypes: () => VALUE_TRANSITION_TYPES,
     warn: { component: "Combobox.Root", prop: "value" },
   });
-  useInsertionEffect(() => {
-    committedRef.current = selection.committed;
-  });
+  // Read by `runValueAction` above, which only runs after a commit.
+  const committedRef = useLatest(selection.committed);
 
   /** The next change of the optimistic selection comes from the user (a dispatch). */
   const userEdit = useRef(false);
@@ -515,7 +503,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
       autoArmed.current = false;
     } else if (autoHighlight && autoArmed.current && !stale && enabled.length > 0) {
       // Only settled results: a stale list's first option is never auto-highlighted, so a fast
-      // Enter commits the typed text or does nothing (design L5).
+      // Enter commits the typed text or does nothing (design 6.5).
       next = enabled[0]!.value;
       autoArmed.current = false;
     }
@@ -574,14 +562,14 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     const key = `${count}\u0000${query}`;
     if (lastAnnounced.current === key) return;
     lastAnnounced.current = key;
-    const list = listRef.current as (HTMLElement & { ariaNotify?: (m: string) => void }) | null;
+    const list = listRef.current as (HTMLElement & AriaNotifyTarget) | null;
     if (list === null || typeof list.ariaNotify !== "function") return;
     const announce = propsRef.current.announce ?? defaultComboboxAnnouncement;
     const message = announce(count, state);
     if (message !== null) list.ariaNotify(message);
   });
 
-  // --- Form: hidden input, reset, mount reconciliation (design 11.1, walkthroughs 10, 11) ----
+  // --- Form: hidden input, reset, mount reconciliation (design 11.1, walkthroughs 10 and 11) ---
 
   const [mountValue] = useState(value);
   const [mountText] = useState(inputValueProp);
@@ -655,9 +643,10 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   );
   useDevWarning(
     missingText,
-    "Combobox.Root: `value` / `defaultValue` is set but neither `inputValue` nor " +
-      "`defaultInputValue` is: the input will show no text for the selection. The library never " +
-      "derives the text from the value; pass the selected option's label as well.",
+    isDev &&
+      "Combobox.Root: `value` / `defaultValue` is set but neither `inputValue` nor " +
+        "`defaultInputValue` is: the input will show no text for the selection. The library never " +
+        "derives the text from the value; pass the selected option's label as well.",
   );
 
   // --- Interaction (design 5, 8) -------------------------------------------------------------
@@ -824,10 +813,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     const label = labelFor(selection.optimistic);
     if (textRef.current !== label) writeText(label, "dismiss", event);
   };
-  const leaveRef = useRef(leave);
-  useInsertionEffect(() => {
-    leaveRef.current = leave;
-  });
+  const leaveRef = useLatest(leave);
 
   const focusOut = (event: FocusEvent): void => {
     const input = inputRef.current;

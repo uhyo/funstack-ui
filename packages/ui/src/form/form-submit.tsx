@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -20,7 +20,7 @@ export interface FormSubmitProps extends Omit<
 > {
   /**
    * Native `disabled`; owned. Never set by the library (conventions 3.6). Always native, also
-   * with a component `render`: a submitter has no handler to honour `aria-disabled` (#83).
+   * with a component `render`: a submitter has no handler to honour `aria-disabled`.
    */
   disabled?: boolean;
   className?: StateValue<string | undefined, FormSubmitState>;
@@ -47,21 +47,18 @@ export function FormSubmit({
   ...rest
 }: FormSubmitProps) {
   const { pending } = useFormStatus();
-  const warned = useRef(false);
-  const ref = useCallback((el: HTMLElement) => {
-    const submitter =
-      el.tagName === "BUTTON" ||
-      (el.tagName === "INPUT" && ["submit", "image"].includes((el as HTMLInputElement).type));
-    if (isDev && !warned.current && !submitter) {
-      warned.current = true;
-      console.error(
-        `Form.Submit: expected to render a <button> (or <input type="submit">) but got ` +
-          `<${el.tagName.toLowerCase()}>. Only a submit button submits the form natively.`,
-      );
-    }
-    // A cleanup, so the merged ref never calls this with `null`.
-    return () => {};
-  }, []);
+  const ref = useElementCheck(
+    isDev &&
+      ((el) => {
+        const submitter =
+          el.tagName === "BUTTON" ||
+          (el.tagName === "INPUT" && ["submit", "image"].includes((el as HTMLInputElement).type));
+        return submitter
+          ? null
+          : `Form.Submit: expected to render a <button> (or <input type="submit">) but got ` +
+              `<${el.tagName.toLowerCase()}>. Only a submit button submits the form natively.`;
+      }),
+  );
   const state: FormSubmitState = { pending, disabled };
   return useRender<ComponentPropsWithRef<"button">, FormSubmitState>({
     defaultElement: "button",

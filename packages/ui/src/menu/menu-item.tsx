@@ -77,7 +77,7 @@ export function MenuItem({
     activate: (event) => {
       const details: MenuItemDetails = createActionDetails(event, {});
       // A second activation while this item's own run is in flight starts nothing and is
-      // cancelled (the hook's guard, #81): a link does not navigate, a composed command does not
+      // cancelled (the hook's guard): a link does not navigate, a composed command does not
       // run. Enter / Space reach here through the element's click, their keydown is cancelled.
       const started = run(
         () => action?.(details),
@@ -100,7 +100,7 @@ export function MenuItem({
     libraryProps: {
       ...(rendersButton(render) && { type: "button" as const }),
       ...libraryProps,
-      // Also while pending (#81): an item that will not act is unavailable to AT. Navigation keys
+      // Also while pending: an item that will not act is unavailable to AT. Navigation keys
       // on `data-disabled` (the `disabled` prop), so a pending item is still an enabled item.
       "aria-disabled": disabled || pending ? true : undefined,
       "data-pending": dataAttr(pending),

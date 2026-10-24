@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -7,10 +7,10 @@ import type {
   PointerEvent,
   ReactNode,
 } from "react";
-import { mergeRefs } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { registerSubmenuHover, useMenuContext } from "./menu-context.js";
@@ -20,6 +20,8 @@ import type { MenuItemProps } from "./menu-item.js";
 import { openMenuWithFocus } from "./menu-trigger.js";
 import type { MenuTriggerState } from "./menu-trigger.js";
 import { useMenuItem } from "./use-menu-item.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export type MenuSubmenuTriggerState = MenuTriggerState;
 
@@ -67,20 +69,21 @@ export function MenuSubmenuTrigger({
   const menu = useMenuContext("Menu.SubmenuTrigger");
   useDevWarning(
     !menu.submenu,
-    "Menu.SubmenuTrigger: rendered in a top-level Menu.Root. Use Menu.Trigger, or put this Root " +
-      "inside the parent's Menu.Popup.",
+    isDev &&
+      "Menu.SubmenuTrigger: rendered in a top-level Menu.Root. Use Menu.Trigger, or put this Root " +
+        "inside the parent's Menu.Popup.",
   );
 
   const open = (event: Event) => openMenuWithFocus(menu, event, "first");
 
   // The item half: role, roving tabindex, aria-disabled, Enter / Space, pointer focus. Its
-  // activation is the click, which the trigger half handles (`activate` below).
+  // activation is the click, which the trigger half handles (`activate` below), so the item's own
+  // `onClick` is not used.
   const item = useMenuItem({
     part: "Menu.SubmenuTrigger",
     role: "menuitem",
     disabled,
     label,
-    activate: open,
   });
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -144,7 +147,7 @@ export function MenuSubmenuTrigger({
     // A click opens (or moves focus into the open submenu); it never closes.
     activate: (event) => open(event.nativeEvent),
   });
-  const ref = useMemo(() => mergeRefs(triggerRef, hoverRef), [triggerRef, hoverRef]);
+  const ref = useMergedRefs(triggerRef, hoverRef);
 
   return useRender<ComponentPropsWithRef<"button">, MenuSubmenuTriggerState>({
     defaultElement: "button",

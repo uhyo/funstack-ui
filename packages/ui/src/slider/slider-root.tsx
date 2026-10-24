@@ -19,17 +19,14 @@ import type {
   ActionDetails,
   ChangeAction,
   ChangeReason,
+  Orientation,
   RenderProp,
   StateValue,
 } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import {
-  useFieldControl,
-  useFieldValueChange,
-  useMergedRef,
-} from "../internal/use-field-control.js";
+import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/use-form-reset.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
@@ -51,7 +48,7 @@ import type { SliderContextValue, SliderFieldWiring } from "./slider-context.js"
 /** One number (one thumb) or one number per thumb, in ascending order. */
 export type SliderValue = number | readonly number[];
 
-export type SliderOrientation = "horizontal" | "vertical";
+export type SliderOrientation = Orientation;
 
 /** Details passed as the second argument of `Slider.Root`'s `valueChangeAction` (each step). */
 export interface SliderValueChangeDetails extends ActionDetails {
@@ -339,11 +336,12 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     (index: number) => (index === 0 && fieldId !== undefined ? fieldId : `${id}-thumb-${index}`),
     [id, fieldId],
   );
-  const rootRef = useMergedRef<HTMLElement>(undefined, thumbCount > 1 ? field.ref : undefined);
+  const rootRef = thumbCount > 1 ? field.ref : undefined;
   useDevWarning(
     field.inField && field.required,
-    "Slider.Root: a range is never empty, so `required` on the enclosing Field.Root has no " +
-      "effect on the slider.",
+    isDev &&
+      "Slider.Root: a range is never empty, so `required` on the enclosing Field.Root has no " +
+        "effect on the slider.",
   );
   /**
    * The reason of the latest change the user or the platform made, consumed by the Field
@@ -781,32 +779,36 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   useDevWarning(
     !stepValid,
-    `Slider.Root: \`step\` must be a positive number (got ${String(stepProp)}); using 1.`,
+    isDev && `Slider.Root: \`step\` must be a positive number (got ${String(stepProp)}); using 1.`,
   );
   useDevWarning(
     stepValid && !isMaxReachable(min, max, step),
-    `Slider.Root: \`max\` (${max}) is not on the step grid from \`min\` (${min}) with \`step\` ` +
-      `${step}: it is unreachable, as on a native range. The last reachable value is the last ` +
-      `step below \`max\`.`,
+    isDev &&
+      `Slider.Root: \`max\` (${max}) is not on the step grid from \`min\` (${min}) with \`step\` ` +
+        `${step}: it is unreachable, as on a native range. The last reachable value is the last ` +
+        `step below \`max\`.`,
   );
   const given = value ?? defaultValue;
   const givenValues = given === undefined ? [] : toArray(given);
   useDevWarning(
     givenValues.some((v) => !isOnGrid(v, min, max, step)),
-    `Slider.Root: the ${value !== undefined ? "`value`" : "`defaultValue`"} ` +
-      `(${givenValues.join(", ")}) is off the step grid or outside \`min\` / \`max\`. It is ` +
-      `rendered as given and the browser sanitises it; the first user step snaps it.`,
+    isDev &&
+      `Slider.Root: the ${value !== undefined ? "`value`" : "`defaultValue`"} ` +
+        `(${givenValues.join(", ")}) is off the step grid or outside \`min\` / \`max\`. It is ` +
+        `rendered as given and the browser sanitises it; the first user step snaps it.`,
   );
   useDevWarning(
     givenValues.some((v, i) => i > 0 && v < (givenValues[i - 1] as number)),
-    `Slider.Root: the values (${givenValues.join(", ")}) must be in ascending order; the thumbs ` +
-      `would be rendered crossed.`,
+    isDev &&
+      `Slider.Root: the values (${givenValues.join(", ")}) must be in ascending order; the thumbs ` +
+        `would be rendered crossed.`,
   );
   const currentShape = shapeOf(given);
   useDevWarning(
     currentShape !== undefined && currentShape !== shape,
-    `Slider.Root: the value changed shape between a number and an array after mount. The shape ` +
-      `is fixed at mount; remount the Slider (a \`key\`) to change the number of thumbs.`,
+    isDev &&
+      `Slider.Root: the value changed shape between a number and an array after mount. The shape ` +
+        `is fixed at mount; remount the Slider (a \`key\`) to change the number of thumbs.`,
   );
   // Inside a Field, `Field.Label` names the group (design 9.4.2).
   const unnamedGroup =
@@ -853,12 +855,11 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     [shownValue, shown, pending, dragging, orientation, disabled, min, max, step],
   );
 
-  // Memoised (#48): the functions are stable, so this changes only with the state below.
+  // Memoised: the functions are stable, so this changes only with the state below.
   const context = useMemo<SliderContextValue>(
     () => ({
       state: state as SliderRootState<SliderValue>,
       shown,
-      shownValue: shownValue as SliderValue,
       min,
       max,
       step,
@@ -886,7 +887,6 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     [
       state,
       shown,
-      shownValue,
       min,
       max,
       step,

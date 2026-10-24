@@ -74,7 +74,7 @@ export function ToastAction({
     const native = event.nativeEvent;
     const details = createActionDetails(native, { id: root.toast.id });
     // A second click while this Action's own run is in flight starts nothing and is cancelled
-    // (the hook's guard, #81): one Undo, one Retry.
+    // (the hook's guard): one Undo, one Retry.
     const started = run(
       () => effective(details),
       () => {
@@ -88,7 +88,7 @@ export function ToastAction({
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     onClick,
-    // Exactly while `data-pending` (#81). Owned, so an idle Action removes a render element's own.
+    // Exactly while `data-pending`. Owned, so an idle Action removes a render element's own.
     "aria-disabled": pending ? true : undefined,
     "data-pending": dataAttr(pending),
   };

@@ -5,8 +5,9 @@ import { dataAttr } from "../internal/data-attr.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { MenuListContext } from "./menu-context.js";
-import type { MenuListContextValue } from "./menu-context.js";
 import { hasModifier } from "./menu-dom.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface MenuItemBaseOptions {
   /** Public name of the part for development warnings. */
@@ -14,12 +15,14 @@ export interface MenuItemBaseOptions {
   readonly role: "menuitem" | "menuitemcheckbox" | "menuitemradio";
   readonly disabled: boolean;
   readonly label: string | undefined;
-  /** Runs for a click, Enter or Space on an enabled item (never for a disabled one). */
-  readonly activate: (event: Event) => void;
+  /**
+   * Runs for a click on an enabled item (never for a disabled one). Omitted when another hook
+   * handles the click (SubmenuTrigger).
+   */
+  readonly activate?: (event: Event) => void;
 }
 
 export interface MenuItemBase {
-  readonly list: MenuListContextValue | null;
   /** Owned props shared by every item kind (design 3.4). */
   readonly libraryProps: {
     role: string;
@@ -40,7 +43,7 @@ export interface MenuItemBase {
 export function useMenuItem(options: MenuItemBaseOptions): MenuItemBase {
   const { part, role, disabled, label, activate } = options;
   const list = use(MenuListContext);
-  useDevWarning(list === null, `${part}: rendered outside a Menu.Popup.`);
+  useDevWarning(list === null, isDev && `${part}: rendered outside a Menu.Popup.`);
 
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (disabled) {
@@ -48,7 +51,7 @@ export function useMenuItem(options: MenuItemBaseOptions): MenuItemBase {
       event.preventDefault();
       return;
     }
-    activate(event.nativeEvent);
+    activate?.(event.nativeEvent);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -70,7 +73,6 @@ export function useMenuItem(options: MenuItemBaseOptions): MenuItemBase {
   };
 
   return {
-    list,
     libraryProps: {
       role,
       tabIndex: list?.nativeFocusgroup === true ? undefined : -1,

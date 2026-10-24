@@ -55,10 +55,9 @@ export interface ToggleProps extends Omit<
    * commit that ends an action (and rollbacks), not the optimistic flip itself; animate the flip
    * with a CSS `transition` on `[data-pressed]`.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, ToggleState>;
@@ -100,7 +99,7 @@ export function Toggle({
 
   const state: ToggleState = { pressed: optimistic, pending, disabled };
   // Not a host <button> (a link, a component): native `disabled` would mean nothing to a link and
-  // hide the state from AT, so `aria-disabled`; the click handler enforces it (#83).
+  // hide the state from AT, so `aria-disabled`; the click handler enforces it.
   const focusable = !isHostButton(render);
 
   const element = useRender<ComponentPropsWithRef<"button">, ToggleState>({

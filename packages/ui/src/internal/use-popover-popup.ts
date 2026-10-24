@@ -1,16 +1,12 @@
 "use client";
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useInsertionEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
+import { isPopoverOpen } from "./popover-open.js";
+import { useElementCheck } from "./use-element-check.js";
 import { useExitAnimation } from "./use-exit-animation.js";
+import { useLatest } from "./use-latest.js";
+import { useShownNameWarning } from "./use-name-warning.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
 export interface UsePopoverPopupOptions {
@@ -42,7 +38,7 @@ export interface UsePopoverPopupOptions {
 /**
  * An initial focus target opened by a pointer: where the engine reads `focus({ focusVisible })`,
  * the library focuses it with `focusVisible: false` right after `showPopover()` instead of
- * writing `autofocus` (WebKit shows the ring for an `autofocus` target after a click; review H1).
+ * writing `autofocus` (WebKit shows the ring for an `autofocus` target after a click).
  * Elsewhere it is an ordinary target.
  */
 export interface QuietFocusTarget {
@@ -78,12 +74,10 @@ export interface PopoverPopupHook {
 
 const isDev = process.env.NODE_ENV !== "production";
 
-function isPopoverOpen(element: Element): boolean {
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
+/** The popup roles that require a name (a listbox's name is checked on the List). */
+function needsName(element: Element): boolean {
+  const role = element.getAttribute("role");
+  return role === "dialog" || role === "alertdialog" || role === "menu";
 }
 
 let focusVisibleOption: boolean | undefined;
@@ -169,7 +163,7 @@ export function usePopoverPopup(
     if (isLibrary && prevCommitted && transition === undefined) exit.holdDuringRender();
   }
 
-  // Whether the content unmounted while holding focus since the popup was last shown (H1).
+  // Whether the content unmounted while holding focus since the popup was last shown.
   const contentProbe = useContentFocusProbe(popupRef);
   const { wrapContent } = contentProbe;
 
@@ -284,13 +278,12 @@ export function usePopoverPopup(
   }, []);
 
   // The apply effect (design 2.5): after every commit that re-renders the Popup, once nothing is
-  // in flight, the DOM follows committed state. Since the Root's value is memoised (#48) an
-  // unrelated Root render does not re-render the Popup, so this does not run for it; every path
-  // that makes the DOM diverge from state goes through a dispatch, whose `pending` flips re-render
-  // the Popup (review of #48, finding 4). Do not rely on an unrelated render to re-apply state.
-  // One effect covers the normal open, `defaultOpen`, a controlled open
-  // or close, a library-driven close after `openChangeAction(false)` settled, the re-open of a
-  // refused dismissal, and the close after a refused or failed pre-hydration open.
+  // in flight, the DOM follows committed state. One effect covers the normal open, `defaultOpen`,
+  // a controlled open or close, a library-driven close after `openChangeAction(false)` settled,
+  // the re-open of a refused dismissal, and the close after a refused or failed pre-hydration
+  // open. The Root's value is memoised, so an unrelated Root render does not re-render the Popup
+  // and does not run this; every path that makes the DOM diverge from state goes through a
+  // dispatch, whose `pending` flips do. Do not rely on an unrelated render to re-apply state.
   useLayoutEffect(() => {
     if (!isLibrary) return;
     const element = popupRef.current;
@@ -303,7 +296,7 @@ export function usePopoverPopup(
         // An echo: the `toggle` listener finds `false` intended and skips the dispatch.
         ctx.recordCloseIntent(undefined);
         element.hidePopover();
-        // The close commit may have unmounted the focused content before the hide (H1): the
+        // The close commit may have unmounted the focused content before the hide: the
         // platform restores focus only from inside the popover, so do it now.
         if (focusWasInside.current) returnFocus(element);
       }
@@ -401,10 +394,7 @@ export function usePopoverPopup(
   // The listeners the callback ref attaches call the latest render's handlers. An insertion
   // effect publishes them before refs attach and before any layout effect (whose
   // `hidePopover()` dispatches `beforetoggle` synchronously).
-  const handlers = useRef({ onBeforeToggle, onToggle, onCommand });
-  useInsertionEffect(() => {
-    handlers.current = { onBeforeToggle, onToggle, onCommand };
-  });
+  const handlers = useLatest({ onBeforeToggle, onToggle, onCommand });
 
   // --- Element ------------------------------------------------------------------------------
 
@@ -412,14 +402,17 @@ export function usePopoverPopup(
   // the element (no passive-effect window, no extra render). JS-free mode: there is no "right
   // before showPopover()" (the browser runs the command), so the `autofocus` attribute stays on
   // the `initialFocus` target while it is mounted (as Dialog).
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DIALOG" && element.tagName !== "DIV"
+          ? `${part}: expected to render a <dialog> or a <div> but got ` +
+            `<${element.tagName.toLowerCase()}>.`
+          : null),
+  );
   const setElement = useCallback(
     (element: HTMLElement) => {
-      if (isDev && element.tagName !== "DIALOG" && element.tagName !== "DIV") {
-        console.error(
-          `${part}: expected to render a <dialog> or a <div> but got ` +
-            `<${element.tagName.toLowerCase()}>.`,
-        );
-      }
+      checkElement?.(element);
       popupRef.current = element;
       const listeners: [string, EventListener][] = [
         ["beforetoggle", (event) => handlers.current.onBeforeToggle(event)],
@@ -443,28 +436,19 @@ export function usePopoverPopup(
         if (popupRef.current === element) popupRef.current = null;
       };
     },
-    [part, popupRef, isLibrary, initialFocus],
+    [checkElement, popupRef, handlers, isLibrary, initialFocus],
   );
 
   // Development check (design 9): `role="dialog"` needs a name once the popup is (or can be)
   // shown.
-  const shown = !isLibrary || ctx.committed;
-  const warnedName = useRef(false);
-  useEffect(() => {
-    const element = popupRef.current;
-    if (!isDev || element === null || !shown || warnedName.current) return;
-    if (element.hasAttribute("aria-label")) return;
-    const labelledBy = (element.getAttribute("aria-labelledby") ?? "").split(/\s+/);
-    const doc = element.ownerDocument;
-    if (labelledBy.some((id) => id !== "" && doc.getElementById(id) !== null)) return;
-    const role = element.getAttribute("role");
-    if (role !== "dialog" && role !== "alertdialog" && role !== "menu") return;
-    warnedName.current = true;
-    console.error(
+  useShownNameWarning(
+    popupRef,
+    !isLibrary || ctx.committed,
+    isDev &&
       `${part}: the popup has no accessible name. Render a Title, or give the Popup an ` +
         "`aria-label`.",
-    );
-  }, [popupRef, shown, part]);
+    needsName,
+  );
 
   return { setElement, visible: ctx.committed || exit.held, wrapContent, reshow };
 }

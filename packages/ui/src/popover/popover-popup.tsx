@@ -1,5 +1,5 @@
 "use client";
-import { Activity, useMemo } from "react";
+import { Activity } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,23 +9,28 @@ import type {
 } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
-import { mergeRefs } from "../internal/merge-props.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
 
-/** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
+const isDev = process.env.NODE_ENV !== "production";
+
+/** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type PopoverSide = AnchorSide;
 export type PopoverAlign = AnchorAlign;
 
 export interface PopoverPopupState {
-  /** Committed open state (library mode); `false` in JS-free mode. Read `:popover-open` for the DOM truth. */
+  /**
+   * Committed open state (library mode); `false` in JS-free mode. Read `:popover-open` for the
+   * DOM truth.
+   */
   readonly open: boolean;
   /**
    * While shown: the physical side the browser placed the popup on (after any fallback flip;
@@ -89,10 +94,10 @@ export interface PopoverPopupProps extends Omit<
    * click outside) are the browser's and animate with CSS only. Ignored (dev warning) in JS-free
    * mode.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. A Root inserted by a transition with
-   * `transition` set on its Popup pays the page cross-fade (issue #35); a plain open does not,
-   * because the children mount under the already-mounted popover element.
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
+   * A plain open starts none: the children mount under the already-mounted popover element.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, PopoverPopupState>;
@@ -138,13 +143,15 @@ export function PopoverPopup({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Popover.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
-      "popover outside any React transition. Animate it with CSS (`@starting-style`).",
+    isDev &&
+      "Popover.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
+        "popover outside any React transition. Animate it with CSS (`@starting-style`).",
   );
   useDevWarning(
     !isLibrary && keepMounted === false,
-    "Popover.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
-      "always mounted so that the server HTML is complete.",
+    isDev &&
+      "Popover.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
+        "always mounted so that the server HTML is complete.",
   );
 
   const { setElement, visible, wrapContent } = usePopoverPopup(ctx, {
@@ -158,7 +165,7 @@ export function PopoverPopup({
   // the platform's `toggle`, not off library state).
   const placement = useResolvedPlacement({ side: sideProp, align: alignProp });
   const { side, align } = placement;
-  const ref = useMemo(() => mergeRefs(setElement, placement.ref), [setElement, placement.ref]);
+  const ref = useMergedRefs(setElement, placement.ref);
 
   const state: PopoverPopupState = { open: ctx.committed, side, align };
 

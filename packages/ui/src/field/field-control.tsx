@@ -1,10 +1,11 @@
 "use client";
-import { useCallback, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties } from "react";
 import { useFieldContext } from "../internal/field-context.js";
 import type { FieldState } from "../internal/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import { useElementCheck } from "../internal/use-element-check.js";
+import { useFieldControl } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useRender } from "../internal/use-render.js";
 import { fieldDataAttributes } from "./field-root.js";
 
@@ -59,20 +60,16 @@ export function FieldControl({
     id: consumerId,
     component: "Field.Control",
   });
-  const warned = useRef(false);
-  const checkElement = useCallback((el: HTMLElement) => {
-    if (isDev && !warned.current && !CONTROL_TAGS.has(el.tagName)) {
-      warned.current = true;
-      console.error(
-        "Field.Control: expected to render an <input>, <textarea> or <select> but got " +
-          `<${el.tagName.toLowerCase()}>. Validation, labelling and form participation need a ` +
-          "native form control.",
-      );
-    }
-    // A cleanup, so the merged ref never calls this with `null`.
-    return () => {};
-  }, []);
-  const ref = useMergedRef<HTMLElement>(checkElement, field.ref);
+  const checkElement = useElementCheck(
+    isDev &&
+      ((el) =>
+        !CONTROL_TAGS.has(el.tagName)
+          ? "Field.Control: expected to render an <input>, <textarea> or <select> but got " +
+            `<${el.tagName.toLowerCase()}>. Validation, labelling and form participation need a ` +
+            "native form control."
+          : null),
+  );
+  const ref = useMergedRefs<HTMLElement>(checkElement, field.ref);
 
   return useRender<ComponentPropsWithRef<"input">, FieldState>({
     defaultElement: "input",

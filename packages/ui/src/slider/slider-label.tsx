@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderRootState, SliderValue } from "./slider-root.js";
@@ -37,19 +38,13 @@ export function SliderLabel<T extends SliderValue = SliderValue>({
   useLayoutEffect(registerLabel, [registerLabel]);
 
   const single = ctx.shown.length === 1;
-  const warnedElement = useRef(false);
-  const libraryRef = useCallback(
-    (element: HTMLElement) => {
-      if (isDev && single && !warnedElement.current && element.tagName !== "LABEL") {
-        warnedElement.current = true;
-        console.error(
-          `Slider.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
-            `With one thumb the Label names the input through \`for\`, which only a <label> has.`,
-        );
-      }
-      // A cleanup, so the ref is never called with `null`.
-      return () => {};
-    },
+  const libraryRef = useElementCheck(
+    isDev &&
+      ((element) =>
+        single && element.tagName !== "LABEL"
+          ? `Slider.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
+            `With one thumb the Label names the input through \`for\`, which only a <label> has.`
+          : null),
     [single],
   );
 

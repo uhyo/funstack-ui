@@ -9,7 +9,7 @@ const isDev = process.env.NODE_ENV !== "production";
  * passed `transition`** (conventions 5.1). With `transition === undefined` the node is returned
  * unwrapped and the part renders no boundary at all.
  *
- * Reason (docs/research/view-transition-mount-cost.md, issue #35): react-dom 19.3 starts a
+ * Reason (docs/research/view-transition-mount-cost.md): react-dom 19.3 starts a
  * document view transition whenever a `<ViewTransition>` mounts or is revealed by `<Activity>` in
  * a transition-lane commit, whatever its class resolves to (`"none"` included). The browser's
  * 250 ms root cross-fade then runs and every later transition commit waits for it. Exits and

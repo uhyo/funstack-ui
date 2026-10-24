@@ -3,8 +3,8 @@ import { useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import { dataAttr } from "../internal/data-attr.js";
-import { mergeRefs } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -92,10 +92,7 @@ export function TooltipPopup({
   const { side, align } = placement;
   const state: TooltipPopupState = { disabled: ctx.disabled, side, align };
   const arrow = useMemo<TooltipPopupContextValue>(() => ({ side, align }), [side, align]);
-  const ref = useMemo(
-    () => mergeRefs(ctx.setPopupElement, placement.ref),
-    [ctx.setPopupElement, placement.ref],
-  );
+  const ref = useMergedRefs(ctx.setPopupElement, placement.ref);
 
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
     id: ctx.popupId,

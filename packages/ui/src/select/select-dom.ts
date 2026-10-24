@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useRef } from "react";
 import type { RefCallback, RefObject } from "react";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -24,32 +25,32 @@ export function useSelectPartRef<E extends Element>(
   position?: (el: E) => string | null,
 ): SelectPartRef<E> {
   const node = useRef<E | null>(null);
-  const warnedTag = useRef(false);
-  const warnedPosition = useRef(false);
+  const checkTag = useElementCheck<E>(
+    isDev &&
+      ((el) =>
+        el.tagName !== tag.toUpperCase()
+          ? `${component}: expected to render a <${tag}> element but got ` +
+            `<${el.tagName.toLowerCase()}>. The parser, the picker and <selectedcontent> cloning ` +
+            `key on the native element; a \`render\` element must keep it.`
+          : null),
+  );
+  const checkPosition = useElementCheck<E>(
+    isDev &&
+      ((el) => {
+        const message = position?.(el) ?? null;
+        return message === null ? null : `${component}: ${message}`;
+      }),
+  );
   const ref = useCallback(
     (el: E) => {
       node.current = el;
-      if (isDev && !warnedTag.current && el.tagName !== tag.toUpperCase()) {
-        warnedTag.current = true;
-        console.error(
-          `${component}: expected to render a <${tag}> element but got ` +
-            `<${el.tagName.toLowerCase()}>. The parser, the picker and <selectedcontent> cloning ` +
-            `key on the native element; a \`render\` element must keep it.`,
-        );
-      }
-      if (isDev && position && !warnedPosition.current) {
-        const message = position(el);
-        if (message !== null) {
-          warnedPosition.current = true;
-          console.error(`${component}: ${message}`);
-        }
-      }
+      checkTag?.(el);
+      checkPosition?.(el);
       return () => {
         node.current = null;
       };
     },
-    // `position` is a module-level function at every call site, so the callback is stable.
-    [component, tag, position],
+    [checkTag, checkPosition],
   );
   return { ref, node };
 }

@@ -11,9 +11,12 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext, AccordionRootContext } from "./accordion-context.js";
 import type { AccordionItemContextValue } from "./accordion-context.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface AccordionItemState {
   readonly value: string;
@@ -46,10 +49,9 @@ export interface AccordionItemProps extends Omit<
    * animates the commit that ends an action (the `open` attribute flip), not the optimistic
    * `data-open` flip. Ignored (dev warning) in JS-free mode.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionItemState>;
@@ -58,8 +60,6 @@ export interface AccordionItemProps extends Omit<
   /** Must render a `<details>` element. */
   render?: RenderProp<ComponentPropsWithRef<"details">, AccordionItemState>;
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * One accordion entry: the `<details>` element. In library mode its `open` attribute follows
@@ -90,30 +90,35 @@ export function AccordionItem({
 
   useDevWarning(
     isLibrary && defaultOpen,
-    "Accordion.Item: `defaultOpen` is ignored in library mode. Use `defaultValue` or `value` on " +
-      "Accordion.Root instead.",
+    isDev &&
+      "Accordion.Item: `defaultOpen` is ignored in library mode. Use `defaultValue` or `value` on " +
+        "Accordion.Root instead.",
   );
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Accordion.Item: `transition` has no effect in JS-free mode; the browser toggles the item " +
-      "outside any React transition. Animate `::details-content` with CSS instead.",
+    isDev &&
+      "Accordion.Item: `transition` has no effect in JS-free mode; the browser toggles the item " +
+        "outside any React transition. Animate `::details-content` with CSS instead.",
   );
 
   const registerItem = root?.registerItem;
+  const checkElement = useElementCheck<HTMLDetailsElement>(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DETAILS"
+          ? `Accordion.Item: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
+            "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>."
+          : null),
+  );
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
-      if (isDev && element.tagName !== "DETAILS") {
-        console.error(
-          `Accordion.Item: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
-            "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>.",
-        );
-      }
+      checkElement?.(element);
       const unregister = registerItem?.(value, element);
       return () => {
         unregister?.();
       };
     },
-    [registerItem, value],
+    [checkElement, registerItem, value],
   );
 
   // Platform path (design 2.3): the Root reconciles pre-hydration clicks on mount and re-applies
@@ -136,7 +141,7 @@ export function AccordionItem({
   const state: AccordionItemState = { value, open: optimisticOpen, pending, disabled };
   const dispatch = root?.dispatch;
   const registerTrigger = root?.registerTrigger;
-  // Memoised (#48): changes only with this item's own values, not with every Root change.
+  // Memoised: changes only with this item's own values, not with every Root change.
   const itemContext = useMemo<AccordionItemContextValue>(
     () => ({
       value,

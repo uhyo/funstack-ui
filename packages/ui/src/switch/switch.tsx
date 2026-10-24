@@ -16,8 +16,8 @@ import {
   fieldInputProps,
   useFieldControl,
   useFieldValueChange,
-  useMergedRef,
 } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 
@@ -78,10 +78,9 @@ export interface SwitchProps extends Omit<
    * Forwarded as `default` to the Switch's `<ViewTransition>`. Default: no boundary. Animates the
    * commit that ends an action, not the optimistic flip; animate the flip with CSS on `:checked`.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, SwitchState>;
@@ -157,7 +156,7 @@ export function Switch({
 
   const state: SwitchState = { checked: optimistic, pending, disabled };
 
-  const ref = useMergedRef<HTMLInputElement>(inputRef, field.ref);
+  const ref = useMergedRefs<HTMLInputElement>(inputRef, field.ref);
 
   const element = useRender<ComponentPropsWithRef<"input">, SwitchState>({
     defaultElement: "input",

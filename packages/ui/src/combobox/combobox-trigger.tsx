@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef } from "react";
+import { useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,9 +9,12 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface ComboboxTriggerState {
   /** Optimistic open state. */
@@ -48,30 +51,6 @@ export interface ComboboxTriggerProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"button">, ComboboxTriggerState>;
 }
 
-const isDev = process.env.NODE_ENV !== "production";
-
-/**
- * Development check (design 9): an icon-only Trigger needs a name from the consumer. Checked a
- * microtask after the element attaches, once per instance.
- */
-export function useNameWarning(part: string): (element: HTMLElement) => () => void {
-  const warned = useRef(false);
-  return useCallback(
-    (element: HTMLElement) => {
-      if (!isDev || warned.current) return () => {};
-      queueMicrotask(() => {
-        if (warned.current || !element.isConnected) return;
-        if (element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby")) return;
-        if ((element.textContent ?? "").trim() !== "" || element.hasAttribute("title")) return;
-        warned.current = true;
-        console.error(`${part}: the button has no accessible name. Give it an \`aria-label\`.`);
-      });
-      return () => {};
-    },
-    [part],
-  );
-}
-
 /**
  * The optional button that toggles the listbox: `<button type="button" tabindex="-1"
  * aria-expanded aria-controls>` (the APG keeps it out of the Tab sequence; the input is the one
@@ -97,10 +76,14 @@ export function ComboboxTrigger({
   // What the user saw at the press: a press outside the popup light-dismisses it before the
   // click arrives, so the toggle is decided against the state at `pointerdown`.
   const openAtPress = useRef<boolean | null>(null);
-  const ref = useNameWarning("Combobox.Trigger");
+  // Development check (design 9): an icon-only Trigger needs a name from the consumer.
+  const ref = useNameWarning(
+    isDev && "Combobox.Trigger: the button has no accessible name. Give it an `aria-label`.",
+    BUTTON_NAME,
+  );
 
   // A link or component render: native `disabled` would mean nothing on a link; the click
-  // handler refuses, so `aria-disabled` (#83).
+  // handler refuses, so `aria-disabled`.
   const focusable = !isHostButton(render);
 
   const state: ComboboxTriggerState = {

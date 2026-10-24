@@ -12,13 +12,13 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useNativeSelectValue } from "../internal/use-native-select-value.js";
 import {
   fieldInputProps,
   useFieldControl,
   useFieldValueChange,
-  useMergedRef,
 } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useNativeSelectValue } from "../internal/use-native-select-value.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
 import type { SelectContextValue } from "./select-context.js";
@@ -123,7 +123,7 @@ export function SelectRoot({
     component: "Select.Root",
   });
   const disabled = field.disabled;
-  const rootRef = useMergedRef<HTMLSelectElement>(libraryRef, field.ref);
+  const rootRef = useMergedRefs<HTMLSelectElement>(libraryRef, field.ref);
 
   const { optimistic, pending, dispatch, latestInFlight, adopt } = useControllableAction<
     string,
@@ -140,7 +140,7 @@ export function SelectRoot({
   // controlled change) re-reads validity and `validate` after the commit.
   useFieldValueChange(optimistic);
   // Deliberately no warning when neither `value` nor `defaultValue` is given: the browser's
-  // first-option default is adopted (design decision 3, product-owner decision 4).
+  // first-option default is adopted (design decisions 3 and 4).
 
   // Controlled: the mount-time value is the reset target (conventions 3.8 rule 6). Neither
   // `value` nor `defaultValue`: the value adopted at mount, chosen inside the hook.
@@ -167,7 +167,7 @@ export function SelectRoot({
       dispatchChange(next, createActionDetails(event, { reason: "platform" })),
   });
 
-  // Memoised (#48): every member is a state value, a prop or a stable callback.
+  // Memoised: every member is a state value, a prop or a stable callback.
   const context = useMemo<SelectContextValue>(
     () => ({ optimistic, pending, disabled, groupDisabled: false, optionMounted }),
     [optimistic, pending, disabled, optionMounted],

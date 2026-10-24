@@ -26,7 +26,6 @@ import { useFormOwnerEvent } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import {
-  arraysEqual,
   focusTargetOf,
   normaliseErrorValue,
   snapshotValidity,
@@ -36,6 +35,7 @@ import {
   validityEquals,
 } from "../internal/validity.js";
 import type { FieldErrorValue, FieldValidity, ValidatableElement } from "../internal/validity.js";
+import { arraysEqual } from "../internal/value-set.js";
 
 export type { FieldState } from "../internal/field-context.js";
 export type { FieldValidity } from "../internal/validity.js";
@@ -133,13 +133,15 @@ export function FieldRoot({
   const form = use(FormContext);
   useDevWarning(
     parent !== null,
-    "Field.Root: nested inside another Field.Root. A control registers with the nearest Field " +
-      "only; give each control its own, sibling Field.",
+    isDev &&
+      "Field.Root: nested inside another Field.Root. A control registers with the nearest Field " +
+        "only; give each control its own, sibling Field.",
   );
   useDevWarning(
     validate !== undefined && name === undefined,
-    "Field.Root: `validate` without `name`. `validate` receives `formData.get(name)`, which is " +
-      'always "" without a name.',
+    isDev &&
+      "Field.Root: `validate` without `name`. `validate` receives `formData.get(name)`, which is " +
+        'always "" without a name.',
   );
 
   const id = useId();
@@ -246,7 +248,7 @@ export function FieldRoot({
     (options: RefreshOptions = {}): readonly string[] => {
       const registration = controlRef.current;
       if (registration === null) return NONE;
-      // The element whose validity is real (field-form.md amendment `validityElement`) and the
+      // The element whose validity is real (field-form.md, `validityElement`) and the
       // element whose `:user-invalid` the user's interaction sets; the same for every control but
       // NumberField.
       const surface = validityElementOf(registration.element);

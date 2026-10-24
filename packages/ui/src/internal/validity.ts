@@ -63,10 +63,6 @@ export function validityEquals(a: FieldValidity, b: FieldValidity): boolean {
   return VALIDITY_KEYS.every((key) => a[key] === b[key]);
 }
 
-export function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
-
 const NONE: readonly string[] = Object.freeze([]);
 
 /** `""`, `[]`, `null` and `undefined` mean no error; empty strings inside an array are dropped. */
@@ -169,14 +165,4 @@ export function focusTargetOf(el: Element | null): HTMLElement | null {
     members[0] ??
     null
   );
-}
-
-/** Sorts elements into document order. */
-export function sortByDocumentOrder<T>(items: readonly T[], elementOf: (item: T) => Node): T[] {
-  return [...items].sort((a, b) => {
-    const position = elementOf(a).compareDocumentPosition(elementOf(b));
-    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-    return 0;
-  });
 }

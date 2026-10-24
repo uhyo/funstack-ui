@@ -20,6 +20,8 @@ import type {
 } from "./menu-context.js";
 import { isRtl } from "./menu-dom.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** Details passed as the second argument of `Menu.Root`'s `openChangeAction`. */
 export interface MenuOpenChangeDetails extends ActionDetails {
   /**
@@ -73,6 +75,8 @@ export interface MenuRootProps {
   children?: StateValue<ReactNode, MenuRootState>;
 }
 
+const DEFAULT_FOCUS: MenuOpenFocus = { cause: "first", pointer: false };
+
 /**
  * Owns the ids, the open state and the context of one menu level. Renders no DOM. A `Menu.Root`
  * rendered inside a `Menu.Popup` is a **submenu**: its Trigger is a `Menu.SubmenuTrigger` (an
@@ -83,8 +87,6 @@ export interface MenuRootProps {
  * `showPopover()` / `hidePopover()` once the change has committed); dismissals are the
  * browser's and `openChangeAction(false)` is a notification.
  */
-const DEFAULT_FOCUS: MenuOpenFocus = { cause: "first", pointer: false };
-
 export function MenuRoot({
   open,
   defaultOpen,
@@ -102,14 +104,16 @@ export function MenuRoot({
 
   useDevWarning(
     !submenu && (delay !== undefined || closeDelay !== undefined),
-    "Menu.Root: `delay` and `closeDelay` only apply to a submenu (a Menu.Root inside a " +
-      "Menu.Popup); a top-level menu does not open on hover.",
+    isDev &&
+      "Menu.Root: `delay` and `closeDelay` only apply to a submenu (a Menu.Root inside a " +
+        "Menu.Popup); a top-level menu does not open on hover.",
   );
   const inRegion = use(MenuRegionContext);
   useDevWarning(
     parent !== null && !submenu && !inRegion,
-    "Menu.Root: rendered inside another Menu.Root but outside its Menu.Popup. A submenu's Root " +
-      "goes inside the parent's Menu.Popup.",
+    isDev &&
+      "Menu.Root: rendered inside another Menu.Root but outside its Menu.Popup. A submenu's Root " +
+        "goes inside the parent's Menu.Popup.",
   );
 
   const timers = useDelayedPair();
@@ -135,7 +139,7 @@ export function MenuRoot({
     defaultOpen,
     openChangeAction,
     onDispatch: (next) => {
-      // Any dispatch cancels hover intent (walkthrough 9).
+      // Any dispatch cancels hover intent (design walkthrough 9).
       timers.cancel();
       if (next) openCause.current = nextCause.current ?? DEFAULT_FOCUS;
       nextCause.current = null;
@@ -197,7 +201,7 @@ export function MenuRoot({
 
   const resolvedDelay = delay ?? 100;
   const resolvedCloseDelay = closeDelay ?? 150;
-  // `popover` is memoised by `usePopoverRoot` (#48) and the other members are stable, so this
+  // `popover` is memoised by `usePopoverRoot` and the other members are stable, so this
   // changes only with the open state, pending and the props listed below.
   const value = useMemo<MenuContextValue>(() => {
     const self: MenuContextValue = {

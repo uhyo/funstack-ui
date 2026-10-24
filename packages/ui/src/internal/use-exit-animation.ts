@@ -11,7 +11,7 @@ function ends(animation: Animation): boolean {
  * The animations running in an element's subtree right before it closes (the synchronous
  * `beforetoggle` of the hide, Toast's `data-ending` write): the baseline that `exitAnimations`
  * excludes, so a finite animation already running inside (a progress bar) does not hold the exit
- * (Toast 10.2, #64). Empty where `getAnimations` is absent (jsdom).
+ * (Toast 10.2). Empty where `getAnimations` is absent (jsdom).
  */
 export function animationBaseline(element: Element): ReadonlySet<Animation> {
   if (!element.isConnected || typeof element.getAnimations !== "function") return new Set();
@@ -45,7 +45,7 @@ export interface ExitAnimation {
   readonly waiting: () => boolean;
   /**
    * Record the animations already running in `element`'s subtree. Call from the synchronous
-   * `beforetoggle` of a close, before the hide starts the exit (#64).
+   * `beforetoggle` of a close, before the hide starts the exit.
    */
   readonly recordBaseline: (element: Element) => void;
   /** `exitAnimations(element)` minus the recorded baseline, which it consumes. */
@@ -63,7 +63,7 @@ export function useExitAnimation(): ExitAnimation {
   // The generation of the wait in progress, or null; a newer wait supersedes an older one.
   const wait = useRef<number | null>(null);
   const generation = useRef(0);
-  // The animations running right before the latest close (#64), consumed by `exitAnimations`.
+  // The animations running right before the latest close, consumed by `exitAnimations`.
   const baseline = useRef<ReadonlySet<Animation> | null>(null);
 
   const holdUntil = (animations: readonly Animation[]): void => {

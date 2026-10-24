@@ -11,18 +11,25 @@ import {
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { compareDocumentOrder } from "../internal/dom-order.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  RenderProp,
+  StateValue,
+} from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { EMPTY_SET, setsEqual, toSet } from "../internal/value-set.js";
+import type { ValueSet } from "../internal/value-set.js";
 import { AccordionRootContext } from "./accordion-context.js";
-import type {
-  AccordionChangeReason,
-  AccordionMode,
-  AccordionRootContextValue,
-} from "./accordion-context.js";
+import type { AccordionMode, AccordionRootContextValue } from "./accordion-context.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface AccordionRootState {
   /** An action dispatched through this Accordion is in flight (library mode only). */
@@ -34,11 +41,12 @@ export interface AccordionRootState {
 /** Details passed as the second argument of `valueChangeAction`. */
 export interface AccordionValueChangeDetails extends ActionDetails {
   /**
+   * The shared vocabulary (conventions 2.2); Accordion dispatches two of its values.
    * `"activate"`: the user activated a Trigger. `"platform"`: the browser changed `open` itself
    * (find-in-page, a text fragment, a click before hydration); `event` is then the `toggle`
    * event, or `undefined` when the mismatch was found on mount.
    */
-  readonly reason: AccordionChangeReason;
+  readonly reason: ChangeReason;
   /** The item whose open state changed. */
   readonly item: string;
   /** That item's new open state. */
@@ -110,14 +118,7 @@ export interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
 export type AccordionRootProps = AccordionRootMultipleProps | AccordionRootExclusiveProps;
 
 type AccordionValue = string[] | string | null;
-type OpenSet = ReadonlySet<string>;
-
-const EMPTY: OpenSet = new Set();
-
-function toSet(value: AccordionValue): OpenSet {
-  if (value === null) return EMPTY;
-  return typeof value === "string" ? new Set([value]) : new Set(value);
-}
+type OpenSet = ValueSet;
 
 /**
  * Converts the open set back to the public value. Multiple mode lists the items in registration
@@ -143,17 +144,6 @@ function reduce(set: OpenSet, item: string, open: boolean, exclusive: boolean): 
   }
   if (exclusive) return new Set([item]);
   return set.has(item) ? set : new Set(set).add(item);
-}
-
-function setsEqual(a: OpenSet, b: OpenSet): boolean {
-  if (a.size !== b.size) return false;
-  for (const v of a) if (!b.has(v)) return false;
-  return true;
-}
-
-function byDocumentOrder<T extends Node>(a: T, b: T): number {
-  if (a === b) return 0;
-  return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
 }
 
 const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
@@ -213,9 +203,10 @@ export function AccordionRoot(props: AccordionRootProps) {
   const [mode] = useState<AccordionMode>(isLibraryNow ? "library" : "static");
   useDevWarning(
     (mode === "library") !== isLibraryNow,
-    "Accordion.Root: the mode changed after mount (`value`, `defaultValue` and `valueChangeAction` " +
-      "were all absent on one render and present on another). Switching between JS-free and " +
-      "library mode is not supported.",
+    isDev &&
+      "Accordion.Root: the mode changed after mount (`value`, `defaultValue` and `valueChangeAction` " +
+        "were all absent on one render and present on another). Switching between JS-free and " +
+        "library mode is not supported.",
   );
 
   // Both prop variants are narrowed by `exclusive` at the call site; internally one signature.
@@ -244,7 +235,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   >({
     controlled: controlledSet,
     defaultValue: defaultValue === undefined ? undefined : toSet(defaultValue),
-    initialValue: EMPTY,
+    initialValue: EMPTY_SET,
     action:
       action && ((next, details) => action(fromSet(next, exclusive, registeredValues()), details)),
     transitionTypes: (_next, _prev, details) =>
@@ -277,7 +268,7 @@ export function AccordionRoot(props: AccordionRootProps) {
       next: OpenSet,
       item: string,
       open: boolean,
-      reason: AccordionChangeReason,
+      reason: ChangeReason,
       event: Event | undefined,
     ): void => {
       dispatch(next, createActionDetails(event, { reason, item, open }));
@@ -286,7 +277,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   );
 
   // The two dispatchers below read the last committed optimistic set through `latest`, so they
-  // keep one identity and the Items' contexts are reused across open-state changes (#48): a
+  // keep one identity and the Items' contexts are reused across open-state changes: a
   // handler only ever runs against the committed UI, so this is the set it closed over before.
   const latest = useLatest({ optimistic, exclusive });
 
@@ -305,7 +296,7 @@ export function AccordionRoot(props: AccordionRootProps) {
       // The browser flipped one item (design 2.3). `next` builds on what the user already
       // intends (the latest in-flight dispatch, else the optimistic set), never on the DOM: a
       // pending optimistic open would otherwise be lost to latest-wins. Exclusive mode therefore
-      // lets the toggled item win when it opened (walkthrough 9.6).
+      // lets the toggled item win when it opened (design walkthrough 9.6).
       const base = latestInFlight()?.next ?? optimistic;
       const next = reduce(base, item, open, exclusive);
       if (setsEqual(next, base)) return;
@@ -356,7 +347,7 @@ export function AccordionRoot(props: AccordionRootProps) {
     if (!NAV_KEYS.has(event.key)) return;
     const target = event.target;
     if (!(target instanceof HTMLElement) || !triggers.current.has(target)) return;
-    const sorted = [...triggers.current].sort(byDocumentOrder);
+    const sorted = [...triggers.current].sort(compareDocumentOrder);
     const next = nextTrigger(sorted, target, event.key);
     if (next === undefined) return;
     event.preventDefault();
@@ -369,10 +360,10 @@ export function AccordionRoot(props: AccordionRootProps) {
   const name = !isLibrary && exclusive ? id : undefined;
   const rootPending = isLibrary && pending;
   const state: AccordionRootState = { pending: rootPending, disabled };
-  const contextCommitted = isLibrary ? committed : EMPTY;
-  const contextOptimistic = isLibrary ? optimistic : EMPTY;
+  const contextCommitted = isLibrary ? committed : EMPTY_SET;
+  const contextOptimistic = isLibrary ? optimistic : EMPTY_SET;
 
-  // Memoised (design 12, #48): the dispatchers are stable, so this changes only with the open
+  // Memoised (design 12): the dispatchers are stable, so this changes only with the open
   // sets, pending and the props below.
   const context = useMemo<AccordionRootContextValue>(
     () => ({

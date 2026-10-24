@@ -2,12 +2,8 @@
 // no client-only API. The library computes exactly what the platform's range sanitisation would,
 // so the number it renders is the number the DOM holds and `FormData` posts.
 
-import { decimalsOf, roundTo } from "../internal/decimal.js";
-
-export { decimalsOf };
-
-/** Tolerance for grid computations on binary floating point (`0.3 / 0.1` is `2.9999999999999996`). */
-const EPSILON = 1e-9;
+import { EPSILON, gridDecimals, roundTo } from "../internal/decimal.js";
+import { clamp, percentage } from "../internal/range-value.js";
 
 /**
  * The value a native range with these bounds would hold for `value`: snapped to
@@ -17,7 +13,7 @@ const EPSILON = 1e-9;
  * platform's maximum is `min`.
  */
 export function snap(value: number, min: number, max: number, step: number): number {
-  const decimals = Math.max(decimalsOf(step), decimalsOf(min));
+  const decimals = gridDecimals(step, min);
   if (!Number.isFinite(value)) return min;
   if (!(max > min)) return roundTo(min, decimals);
   const lastIndex = Math.floor((max - min) / step + EPSILON);
@@ -47,7 +43,7 @@ export function thumbBounds(
   max: number,
   gap: number,
 ): { readonly lower: number; readonly upper: number } {
-  const decimals = Math.max(decimalsOf(gap), decimalsOf(min));
+  const decimals = gridDecimals(gap, min);
   const before = values[index - 1];
   const after = values[index + 1];
   const lower = before === undefined ? min : roundTo(before + gap, decimals);
@@ -98,9 +94,7 @@ export function sanitize(
 
 /** Position of `value` in `[min, max]`, in percent, clamped to `0`–`100`. */
 export function percent(value: number, min: number, max: number): number {
-  if (!(max > min)) return 0;
-  const fraction = (value - min) / (max - min);
-  return Math.min(100, Math.max(0, fraction * 100));
+  return clamp(percentage(value, min, max), 0, 100);
 }
 
 /**

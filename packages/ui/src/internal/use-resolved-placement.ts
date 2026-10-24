@@ -10,6 +10,7 @@ import type {
   PhysicalSide,
   ResolvedPlacement,
 } from "./anchor-position.js";
+import { isPopoverOpen } from "./popover-open.js";
 
 export interface PlacementRequest<Side extends AnchorSide> {
   /** The requested side; `null` when the stylesheet owns placement (the hook is idle). */
@@ -147,7 +148,7 @@ export function useResolvedPlacement<Side extends AnchorSide>(
         write(null, urgent);
         return;
       }
-      if (element.isConnected && element.matches(":popover-open")) {
+      if (element.isConnected && isPopoverOpen(element)) {
         listen(true);
         const style = getComputedStyle(element);
         const placement = parsePositionArea(

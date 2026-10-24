@@ -17,6 +17,8 @@ import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** Details passed to `Button`'s `action`. Serialisable; `event` is virtual (conventions 2.2). */
 export interface ButtonActionDetails extends ActionDetails {}
 
@@ -72,8 +74,10 @@ export interface ButtonProps extends Omit<
   focusableWhenDisabled?: boolean;
   /**
    * Forwarded as `default` to the Button's `<ViewTransition>`: animates the commit that ends the
-   * action (content keyed on `pending`), not a click. Static; any value makes a mount inside a
-   * transition start a document view transition (issue #35).
+   * action (content keyed on `pending`), not a click.
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, ButtonState>;
@@ -107,7 +111,7 @@ export function Button({
 }: ButtonProps) {
   const toolbar = useToolbarContext();
   // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
-  // browser and hide the state from AT, so the focusable-disabled branch (review fold F1).
+  // browser and hide the state from AT, so the focusable-disabled branch.
   const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
   const { pending: ownPending, run } = useActionTrigger();
 
@@ -127,14 +131,16 @@ export function Button({
 
   useDevWarning(
     action !== undefined && formAction !== undefined,
-    "Button: `action` and `formAction` were both given. One click would run two actions; the " +
-      "Button runs `action` and leaves `formAction` to the form submission. Pass one of them.",
+    isDev &&
+      "Button: `action` and `formAction` were both given. One click would run two actions; the " +
+        "Button runs `action` and leaves `formAction` to the form submission. Pass one of them.",
   );
   useDevWarning(
     action !== undefined && (type === "submit" || type === "reset"),
-    `Button: \`action\` together with type="${type}". One click would run \`action\` in a ` +
-      `transition and ${type === "reset" ? "reset" : "submit"} the form. Use \`formAction\` ` +
-      `for a submitter, or drop \`type\`.`,
+    isDev &&
+      `Button: \`action\` together with type="${type}". One click would run \`action\` in a ` +
+        `transition and ${type === "reset" ? "reset" : "submit"} the form. Use \`formAction\` ` +
+        `for a submitter, or drop \`type\`.`,
   );
 
   const state: ButtonState = { pending, disabled };

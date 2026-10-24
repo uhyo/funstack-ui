@@ -1,5 +1,5 @@
 "use client";
-import { useEffectEvent, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffectEvent, useLayoutEffect, useRef } from "react";
 import type {
   ChangeEvent,
   ComponentPropsWithRef,
@@ -9,14 +9,17 @@ import type {
   Ref,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { mergeRefs, mergeTokenLists } from "../internal/merge-props.js";
+import { mergeTokenLists } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { percent, thumbBounds } from "./slider-arithmetic.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderOrientation } from "./slider-root.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface SliderThumbState {
   readonly index: number;
@@ -124,14 +127,10 @@ export function SliderThumb({
   const inputRef = useRef<HTMLInputElement | null>(null);
   // Inside a Field with one thumb, Thumb 0's input is the Field's control (design 9.4.1).
   const fieldInputRef = index === 0 ? ctx.field?.inputRef : undefined;
-  const mergedInputRef = useMemo(
-    () =>
-      mergeRefs<HTMLInputElement | null>(
-        inputRef,
-        consumerInputRef,
-        fieldInputRef as Ref<HTMLInputElement | null> | undefined,
-      ),
-    [consumerInputRef, fieldInputRef],
+  const mergedInputRef = useMergedRefs<HTMLInputElement | null>(
+    inputRef,
+    consumerInputRef,
+    fieldInputRef,
   );
 
   // Registration with the Root (pointer focus, reconciliation, reset), from a layout effect so
@@ -166,20 +165,23 @@ export function SliderThumb({
 
   useDevWarning(
     !inRange,
-    `Slider.Thumb: \`index={${index}}\` is outside the value (${ctx.shown.length} ` +
-      `${ctx.shown.length === 1 ? "value" : "values"}). The Thumb renders nothing.`,
+    isDev &&
+      `Slider.Thumb: \`index={${index}}\` is outside the value (${ctx.shown.length} ` +
+        `${ctx.shown.length === 1 ? "value" : "values"}). The Thumb renders nothing.`,
   );
   useDevWarning(
     inRange && ctx.shown.length > 1 && ariaLabel === undefined && ariaLabelledBy === undefined,
-    `Slider.Thumb: each thumb of a multi-thumb slider needs its own name (\`aria-label\` or ` +
-      `\`aria-labelledby\`), e.g. "Minimum price"; the thumb at index ${index} has none.`,
+    isDev &&
+      `Slider.Thumb: each thumb of a multi-thumb slider needs its own name (\`aria-label\` or ` +
+        `\`aria-labelledby\`), e.g. "Minimum price"; the thumb at index ${index} has none.`,
   );
 
   const fieldName = ctx.field?.name;
   useDevWarning(
     inRange && name !== undefined && fieldName !== undefined && name !== fieldName,
-    `Slider.Thumb: its \`name\` ("${name}") differs from the Field.Root's ("${fieldName}"). ` +
-      "The Field reads server errors and `validate`'s value by the Field's name.",
+    isDev &&
+      `Slider.Thumb: its \`name\` ("${name}") differs from the Field.Root's ("${fieldName}"). ` +
+        "The Field reads server errors and `validate`'s value by the Field's name.",
   );
 
   const pending = ctx.pending && ctx.pendingThumb === index;

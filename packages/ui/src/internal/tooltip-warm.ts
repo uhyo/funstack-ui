@@ -3,7 +3,7 @@
 // Trigger computes to 0. No "use client" directive: constants only (conventions 7.1).
 
 /** Registered, non-inherited: `1` on the marked triggers while a tooltip is showing, else `0`. */
-export const TOOLTIP_WARM_PROPERTY = "--fsui-tooltip-warm";
+const TOOLTIP_WARM_PROPERTY = "--fsui-tooltip-warm";
 /** The marker a flagged Trigger renders; the shipped rule matches nothing else. */
 export const TOOLTIP_TRIGGER_MARKER = "data-fsui-tooltip-trigger";
 /** The dedupe key of the shipped rule (`<style href precedence>`). */

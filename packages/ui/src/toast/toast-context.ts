@@ -1,6 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { ChangeReason } from "../internal/types.js";
+import type { ToastRootState } from "./toast-root.js";
 import type { ToastItem, ToastPriority } from "./toast.js";
 
 /** What a Root (and the parts under it) need from the Viewport. Stable for the Viewport's life. */
@@ -43,7 +44,7 @@ export interface ToastRootContextValue {
   readonly toast: ToastItem;
   readonly ids: { readonly title: string; readonly description: string };
   /** Root state, so Title and Description can resolve their function props against it. */
-  readonly state: ToastRootStateShape;
+  readonly state: ToastRootState;
   readonly registerTitle: (element: HTMLElement | null) => void;
   readonly registerDescription: (element: HTMLElement | null) => void;
   /** An Action part's run is (no longer) in flight; `token` identifies the part. */
@@ -57,15 +58,6 @@ export interface ToastRootContextValue {
   readonly setSuspended: (suspended: boolean) => void;
   /** Close this toast. */
   readonly close: (reason: ChangeReason, event: Event | undefined) => void;
-}
-
-/** Same shape as `ToastRootState` (declared in toast-root.tsx). */
-export interface ToastRootStateShape {
-  readonly toast: ToastItem;
-  readonly pending: boolean;
-  readonly ending: boolean;
-  readonly type: string | undefined;
-  readonly priority: ToastPriority;
 }
 
 export const ToastRootContext = createContext<ToastRootContextValue | null>(null);

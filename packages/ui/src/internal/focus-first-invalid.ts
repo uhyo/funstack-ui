@@ -1,5 +1,6 @@
 // Directive-free: the module-level first-invalid collector (design/components/field-form.md 2.5).
-import { sortByDocumentOrder } from "./validity.js";
+import type { AriaNotifyTarget } from "./announce.js";
+import { sortByDocumentOrder } from "./dom-order.js";
 
 interface Batch {
   readonly targets: HTMLElement[];
@@ -13,7 +14,7 @@ interface Batch {
   announced: HTMLElement | null;
 }
 
-type NotifyingElement = HTMLElement & { ariaNotify?: (announcement: string) => void };
+type NotifyingElement = HTMLElement & AriaNotifyTarget;
 
 /**
  * Speaks `message` through `element.ariaNotify()` where the browser has it (design 5.3: the

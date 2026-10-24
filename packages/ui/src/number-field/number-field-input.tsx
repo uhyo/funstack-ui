@@ -1,12 +1,5 @@
 "use client";
-import {
-  isValidElement,
-  useCallback,
-  useEffectEvent,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { isValidElement, useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type {
   ChangeEvent,
   ComponentPropsWithRef,
@@ -16,15 +9,18 @@ import type {
   Ref,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { mergeRefs } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import { useElementCheck } from "../internal/use-element-check.js";
+import { useFieldControl } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { hiddenText } from "./number-field-root.js";
 import type { NumberFieldState } from "./number-field-root.js";
 import { useNumberFieldContext } from "./number-field-context.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface NumberFieldInputProps extends Omit<
   ComponentPropsWithRef<"input">,
@@ -55,8 +51,6 @@ export interface NumberFieldInputProps extends Omit<
   /** Must render an `<input>` of type `text`, `search` or `tel`; the hidden input is rendered after it regardless. */
   render?: RenderProp<ComponentPropsWithRef<"input">, NumberFieldState>;
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /** Visually hidden, unfocusable, out of the accessibility tree: the form's control (6.1). */
 const HIDDEN_STYLE: CSSProperties = {
@@ -109,35 +103,35 @@ export function NumberFieldInput({
   const restName = (rest as { name?: unknown }).name;
   useDevWarning(
     restName !== undefined,
-    "NumberField.Input: `name` belongs on NumberField.Root (it goes to the hidden number input); " +
-      "on the visible input it would post the formatted text.",
+    isDev &&
+      "NumberField.Input: `name` belongs on NumberField.Root (it goes to the hidden number input); " +
+        "on the visible input it would post the formatted text.",
   );
 
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) => {
+        const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
+        return !TEXT_TYPES.includes(type)
+          ? `NumberField.Input: rendered <${element.tagName.toLowerCase()}` +
+              `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text", ` +
+              '"search" or "tel": a number input would re-introduce the native parser.'
+          : null;
+      }),
+  );
   const libraryRef = useCallback(
     (element: HTMLElement) => {
-      if (isDev) {
-        const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
-        if (!TEXT_TYPES.includes(type)) {
-          console.error(
-            `NumberField.Input: rendered <${element.tagName.toLowerCase()}` +
-              `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text", ` +
-              '"search" or "tel": a number input would re-introduce the native parser.',
-          );
-        }
-      }
+      checkElement?.(element);
       visibleRef.current = element as HTMLInputElement;
       return () => {
         if (visibleRef.current === element) visibleRef.current = null;
       };
     },
-    [visibleRef],
+    [checkElement, visibleRef],
   );
-  const mergedRef = useMergedRef<HTMLElement>(libraryRef, field.ref);
+  const mergedRef = useMergedRefs<HTMLElement>(libraryRef, field.ref);
 
-  const hiddenMergedRef = useMemo(
-    () => mergeRefs<HTMLInputElement | null>(hiddenRef, hiddenInputRef),
-    [hiddenRef, hiddenInputRef],
-  );
+  const hiddenMergedRef = useMergedRefs<HTMLInputElement | null>(hiddenRef, hiddenInputRef);
 
   // After every commit: the hidden input holds the shown value (a rollback, a controlled change,
   // a reset) and the visible input mirrors its validity (a changed `min` / `max` / `required`).
@@ -187,9 +181,10 @@ export function NumberFieldInput({
   const type = renderType !== undefined && TEXT_TYPES.includes(renderType) ? renderType : "text";
   useDevWarning(
     renderType !== undefined && !TEXT_TYPES.includes(renderType),
-    `NumberField.Input: \`render\` has type="${renderType ?? ""}"; the visible input is ` +
-      'rendered as type "text". A number input would re-introduce the native parser the ' +
-      "NumberField exists to avoid.",
+    isDev &&
+      `NumberField.Input: \`render\` has type="${renderType ?? ""}"; the visible input is ` +
+        'rendered as type "text". A number input would re-introduce the native parser the ' +
+        "NumberField exists to avoid.",
   );
 
   const dataInvalid =

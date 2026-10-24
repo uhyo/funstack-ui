@@ -5,10 +5,8 @@ import {
   MENU_POINT_RULES,
   MENU_POINT_X,
   MENU_POINT_Y,
-  POSITION_TRY_FALLBACKS,
-  parsePositionArea,
-  positionArea,
-} from "./anchor-position.js";
+} from "../menu/menu-point.js";
+import { POSITION_TRY_FALLBACKS, parsePositionArea, positionArea } from "./anchor-position.js";
 import type { AnchorAlign, AnchorSide, Direction, ResolvedPlacement } from "./anchor-position.js";
 
 describe("positionArea", () => {

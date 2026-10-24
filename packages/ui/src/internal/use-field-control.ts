@@ -1,12 +1,13 @@
 "use client";
-import { use, useCallback, useLayoutEffect, useMemo, useRef } from "react";
-import type { Ref, RefCallback } from "react";
+import { use, useCallback, useLayoutEffect, useRef } from "react";
+import type { RefCallback } from "react";
 import { dataAttr } from "./data-attr.js";
 import { FieldContext } from "./field-context.js";
 import type { FieldState } from "./field-context.js";
-import { mergeRefs } from "./merge-props.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import type { ValidatableElement } from "./validity.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface UseFieldControlOptions {
   /** `<label for>` can target the element (input, select, textarea). Groups pass `false`. */
@@ -21,7 +22,7 @@ export interface UseFieldControlOptions {
   readonly component: string;
   /**
    * The element whose validity is real when it is not the registered one (NumberField's hidden
-   * number input; field-form.md amendment `validityElement`). Keep its identity stable.
+   * number input; field-form.md `validityElement`). Keep its identity stable.
    */
   readonly validityElement?: (() => ValidatableElement | null) | undefined;
 }
@@ -72,14 +73,6 @@ export function fieldInputProps(field: FieldControlBinding): FieldControlAttribu
   return { ...field.attributes, name: field.name, required: field.required };
 }
 
-/** `mergeRefs` with a stable identity while both refs keep theirs. */
-export function useMergedRef<T>(
-  a: Ref<T> | undefined,
-  b: Ref<T> | undefined,
-): RefCallback<T> | Ref<T> | undefined {
-  return useMemo(() => (b === undefined ? a : a === undefined ? b : mergeRefs(a, b)), [a, b]);
-}
-
 /**
  * The contract between a Field and its control (design/components/field-form.md 7.1), called by
  * `Field.Control` and by the owner part of every FUNSTACK form control. Outside a `Field.Root` it
@@ -112,13 +105,15 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
 
   useDevWarning(
     field !== null && id !== undefined,
-    `${component}: the \`id\` prop is ignored inside a Field.Root; the Field owns the control's ` +
-      "id so that Field.Label can point at it.",
+    isDev &&
+      `${component}: the \`id\` prop is ignored inside a Field.Root; the Field owns the control's ` +
+        "id so that Field.Label can point at it.",
   );
   useDevWarning(
     field !== null && name !== undefined && field.name !== undefined && name !== field.name,
-    `${component}: its \`name\` ("${name}") differs from the Field.Root's ("${field?.name}"). ` +
-      "The Field reads server errors and `validate`'s value by the Field's name.",
+    isDev &&
+      `${component}: its \`name\` ("${name}") differs from the Field.Root's ("${field?.name}"). ` +
+        "The Field reads server errors and `validate`'s value by the Field's name.",
   );
 
   if (field === null) {
@@ -145,7 +140,7 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
 
   return {
     inField: true,
-    ref: ref as RefCallback<HTMLElement>,
+    ref,
     id: labelable ? ids.control : undefined,
     name: name ?? field.name,
     disabled: disabled || field.disabled,

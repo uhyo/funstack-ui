@@ -11,9 +11,12 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 import type { AccordionItemState } from "./accordion-item.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 /** The trigger is the item's control; it renders the item's state object. */
 export type AccordionTriggerState = AccordionItemState;
@@ -27,10 +30,9 @@ export interface AccordionTriggerProps extends Omit<
    * Animates only the commit that ends an action (for example a spinner rendered from `pending`
    * disappearing); the optimistic `data-open` flip is a CSS job.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionTriggerState>;
@@ -40,8 +42,6 @@ export interface AccordionTriggerProps extends Omit<
   /** Must render a `<summary>` element. */
   render?: RenderProp<ComponentPropsWithRef<"summary">, AccordionTriggerState>;
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 const NESTED_INTERACTIVE =
   "a[href], button, label, input, select, textarea, [contenteditable]:not([contenteditable='false'])";
@@ -77,7 +77,7 @@ export function AccordionTrigger({
   render,
   ...rest
 }: AccordionTriggerProps) {
-  // Only the Item's context (memoised per item, #48), which carries what is needed of the Root's.
+  // Only the Item's context (memoised per item), which carries what is needed of the Root's.
   const item = use(AccordionItemContext);
   if (item === null) {
     throw new Error("Accordion.Trigger must be rendered inside an Accordion.Item.");
@@ -86,26 +86,30 @@ export function AccordionTrigger({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Accordion.Trigger: `transition` has no effect in JS-free mode; the browser toggles the item " +
-      "outside any React transition.",
+    isDev &&
+      "Accordion.Trigger: `transition` has no effect in JS-free mode; the browser toggles the item " +
+        "outside any React transition.",
   );
 
   const registerTrigger = item.registerTrigger;
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "SUMMARY"
+          ? `Accordion.Trigger: expected to render a <summary> element but got <${element.tagName.toLowerCase()}>. ` +
+            "Only a <summary> toggles its parent <details>."
+          : null),
+  );
   const libraryRef = useCallback(
     (element: HTMLElement) => {
-      if (isDev && element.tagName !== "SUMMARY") {
-        console.error(
-          `Accordion.Trigger: expected to render a <summary> element but got <${element.tagName.toLowerCase()}>. ` +
-            "Only a <summary> toggles its parent <details>.",
-        );
-      }
+      checkElement?.(element);
       const unregister = registerTrigger?.(element);
       // Always return a cleanup so the merged ref never calls back with `null`.
       return () => {
         unregister?.();
       };
     },
-    [registerTrigger],
+    [checkElement, registerTrigger],
   );
 
   const state: AccordionTriggerState = {

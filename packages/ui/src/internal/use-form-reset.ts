@@ -9,11 +9,7 @@ export type { FormAssociatedElement } from "./use-form-owner-event.js";
 /**
  * Stable `reset` subscription on the form owner of `ref.current` (conventions 3.8).
  *
- * - The owner (`element.form`, which honours the `form` attribute) is re-read after every commit,
- *   but the listener is moved only when the owner changed. It is never removed and re-added on an
- *   ordinary re-render: React's automatic reset after a successful `<form action>` runs in the
- *   commit's mutation phase, between an effect's cleanup and its next run, so a subscription that
- *   followed every commit would miss it (rule 4). Built on `useFormOwnerEvent`.
+ * - Built on `useFormOwnerEvent`, with its owner-following rules (rule 4).
  * - The `reset` event fires before the reset algorithm, so `onReset` is called in a microtask,
  *   when the inputs hold their reset values (rule 5), and only if no listener cancelled the reset
  *   (rule 7).

@@ -1,9 +1,6 @@
 "use client";
 import { createContext } from "react";
 
-/** Why a change was dispatched (design 2.2 / 2.3). */
-export type AccordionChangeReason = "activate" | "platform";
-
 /**
  * "static": JS-free mode, the browser owns `open`. "library": `open` is driven by React
  * committed state inside the Root's transition (design section 2).
@@ -44,7 +41,7 @@ export interface AccordionItemContextValue {
   /**
    * The Root's mode is `"library"`. The Root members the Trigger and Panel need are copied here
    * so they read only this context, which is memoised per item: opening another item re-renders
-   * every Item (they read the Root's sets) but not their Triggers and Panels (#48).
+   * every Item (they read the Root's sets) but not their Triggers and Panels.
    */
   readonly library: boolean;
   /** The Root's `dispatch` (stable); `undefined` outside a Root. */

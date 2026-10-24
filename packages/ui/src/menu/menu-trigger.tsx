@@ -1,21 +1,19 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
+import type { PopoverTriggerHookState } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import type { MenuContextValue } from "./menu-context.js";
 import { edgeItem, focusItem, hasModifier, isRtl } from "./menu-dom.js";
 
-export interface MenuTriggerState {
-  /** Optimistic open state. */
-  readonly open: boolean;
-  /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
-  readonly pending: boolean;
-  readonly disabled: boolean;
-}
+const isDev = process.env.NODE_ENV !== "production";
+
+export type MenuTriggerState = PopoverTriggerHookState;
 
 export interface MenuTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
@@ -36,7 +34,7 @@ export interface MenuTriggerProps extends Omit<
 
 /**
  * Opens with the first (`"first"`) or last (`"last"`) item focused, or focuses that item when the
- * menu is already open (a pre-hydration open, walkthrough 10). Shared with SubmenuTrigger.
+ * menu is already open (a pre-hydration open, design walkthrough 10). Shared with SubmenuTrigger.
  */
 export function openMenuWithFocus(
   menu: MenuContextValue,
@@ -46,7 +44,7 @@ export function openMenuWithFocus(
   const { popover } = menu;
   if (popover.intended()) {
     const popup = popover.popupRef.current;
-    if (popup !== null && popup.matches(":popover-open")) {
+    if (popup !== null && isPopoverOpen(popup)) {
       const item = edgeItem(popup, which);
       if (item !== null) focusItem(item);
     }
@@ -57,7 +55,7 @@ export function openMenuWithFocus(
 }
 
 /** A click from a pointing device (`detail` counts clicks; keyboard and `click()` give 0). */
-export function isPointerClick(event: Event): boolean {
+function isPointerClick(event: Event): boolean {
   return event.type === "click" && (event as MouseEvent).detail > 0;
 }
 
@@ -68,8 +66,8 @@ export function isPointerClick(event: Event): boolean {
  * vertical `Toolbar.Root`: the inline-end arrow, with the first item focused).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
- * (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `data-open`,
- * `data-pending`, `data-disabled`.
+ * (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`,
+ * `onClick`, `onKeyDown`, `data-open`, `data-pending`, `data-disabled`.
  */
 export function MenuTrigger({
   disabled = false,
@@ -82,8 +80,9 @@ export function MenuTrigger({
   const menu = useMenuContext("Menu.Trigger");
   useDevWarning(
     menu.submenu,
-    "Menu.Trigger: rendered in a submenu. Use Menu.SubmenuTrigger, which is also an item of the " +
-      "parent menu.",
+    isDev &&
+      "Menu.Trigger: rendered in a submenu. Use Menu.SubmenuTrigger, which is also an item of the " +
+        "parent menu.",
   );
 
   // Inside a vertical Toolbar, ArrowDown / ArrowUp are the Toolbar's: the trigger opens on the
