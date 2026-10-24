@@ -14,6 +14,7 @@ import {
 import { flushSync } from "react-dom";
 import type { ReactNode, RefObject } from "react";
 import { createActionDetails } from "../internal/action-details.js";
+import type { AriaNotifyTarget } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
 import { useFieldValueChange } from "../internal/use-field-control.js";
 import type {
@@ -574,7 +575,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     const key = `${count}\u0000${query}`;
     if (lastAnnounced.current === key) return;
     lastAnnounced.current = key;
-    const list = listRef.current as (HTMLElement & { ariaNotify?: (m: string) => void }) | null;
+    const list = listRef.current as (HTMLElement & AriaNotifyTarget) | null;
     if (list === null || typeof list.ariaNotify !== "function") return;
     const announce = propsRef.current.announce ?? defaultComboboxAnnouncement;
     const message = announce(count, state);

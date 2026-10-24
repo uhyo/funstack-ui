@@ -125,12 +125,7 @@ export function SliderThumb({
   // Inside a Field with one thumb, Thumb 0's input is the Field's control (design 9.4.1).
   const fieldInputRef = index === 0 ? ctx.field?.inputRef : undefined;
   const mergedInputRef = useMemo(
-    () =>
-      mergeRefs<HTMLInputElement | null>(
-        inputRef,
-        consumerInputRef,
-        fieldInputRef as Ref<HTMLInputElement | null> | undefined,
-      ),
+    () => mergeRefs<HTMLInputElement | null>(inputRef, consumerInputRef, fieldInputRef),
     [consumerInputRef, fieldInputRef],
   );
 

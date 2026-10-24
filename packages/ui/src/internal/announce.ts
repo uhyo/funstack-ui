@@ -4,7 +4,12 @@
 // `role="status"` live region appended to `document.body` on first use. No part renders a live
 // region of its own for these announcements.
 
-type NotifyingElement = Element & { ariaNotify?: (announcement: string) => void };
+/** `ariaNotify()` on an element or a document, where the engine has it (not in the DOM types yet). */
+export interface AriaNotifyTarget {
+  ariaNotify?: (announcement: string, options?: { priority?: "normal" | "high" }) => void;
+}
+
+type NotifyingElement = Element & AriaNotifyTarget;
 
 /** How long the fallback region keeps a message before it is cleared, so a repeat is spoken. */
 export const ANNOUNCE_CLEAR_DELAY = 1000;

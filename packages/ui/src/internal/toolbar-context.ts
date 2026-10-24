@@ -1,10 +1,11 @@
 "use client";
 import { createContext, use } from "react";
+import type { Orientation } from "./types.js";
 
 /** What a part inside a `Toolbar.Root` learns about it (design/components/toggle-group.md 7.3, 7.4). */
 export interface ToolbarContextValue {
   /** The Toolbar's arrow-key axis. */
-  readonly orientation: "horizontal" | "vertical";
+  readonly orientation: Orientation;
 }
 
 /**

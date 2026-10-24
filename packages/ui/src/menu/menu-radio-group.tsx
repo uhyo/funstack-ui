@@ -4,7 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type { ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useRender } from "../internal/use-render.js";
 import { MenuGroupContext, MenuRadioGroupContext } from "./menu-context.js";
@@ -76,7 +76,7 @@ export function MenuRadioGroup({
       value: optimistic,
       pending,
       select: (next, event, then) => {
-        const details = createActionDetails(event, {}) as ActionDetails;
+        const details = createActionDetails(event, {});
         if (then !== undefined) after.current.set(details, then);
         dispatch(next, details);
       },

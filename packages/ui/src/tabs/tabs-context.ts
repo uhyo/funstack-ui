@@ -1,7 +1,8 @@
 "use client";
 import { createContext, use } from "react";
+import type { Orientation } from "../internal/types.js";
 
-export type TabsOrientation = "horizontal" | "vertical";
+export type TabsOrientation = Orientation;
 export type TabsActivationMode = "automatic" | "manual";
 
 /** Why a Tabs change was dispatched (design section 3.1). */

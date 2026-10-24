@@ -3,11 +3,11 @@ import { useMemo, useRef, useSyncExternalStore } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import type { ToolbarContextValue } from "../internal/toolbar-context.js";
-import type { RenderProp, StateValue } from "../internal/types.js";
+import type { Orientation, RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
 
-export type ToolbarOrientation = "horizontal" | "vertical";
+export type ToolbarOrientation = Orientation;
 
 export interface ToolbarRootState {
   readonly orientation: ToolbarOrientation;

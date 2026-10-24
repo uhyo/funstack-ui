@@ -7,10 +7,11 @@ import { isHostButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
+/** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */
   readonly open: boolean;
-  /** The Root's transition is pending (an open, a part-initiated close or a notification). */
+  /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
   readonly pending: boolean;
   readonly disabled: boolean;
 }

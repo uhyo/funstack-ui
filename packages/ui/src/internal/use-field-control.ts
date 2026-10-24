@@ -145,7 +145,7 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
 
   return {
     inField: true,
-    ref: ref as RefCallback<HTMLElement>,
+    ref,
     id: labelable ? ids.control : undefined,
     name: name ?? field.name,
     disabled: disabled || field.disabled,

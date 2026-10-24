@@ -14,6 +14,7 @@ import type { ComponentPropsWithRef, CSSProperties, FocusEvent, ReactNode } from
 import { createPortal } from "react-dom";
 import { DialogContext } from "../dialog/dialog-context.js";
 import { createActionDetails } from "../internal/action-details.js";
+import type { AriaNotifyTarget } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
 import {
   getServerTopmostModal,
@@ -223,9 +224,7 @@ function anyPause(sources: PauseSources): boolean {
   return sources.hover || sources.focus || sources.hidden || sources.blurred;
 }
 
-type DocumentWithAriaNotify = Document & {
-  ariaNotify?: (announcement: string, options?: { priority?: ToastPriority }) => void;
-};
+type DocumentWithAriaNotify = Document & AriaNotifyTarget;
 
 /**
  * The toast region: a `<section popover="manual">` named "Notifications (F8)", shown in the top

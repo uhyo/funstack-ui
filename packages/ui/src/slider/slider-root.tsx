@@ -19,6 +19,7 @@ import type {
   ActionDetails,
   ChangeAction,
   ChangeReason,
+  Orientation,
   RenderProp,
   StateValue,
 } from "../internal/types.js";
@@ -51,7 +52,7 @@ import type { SliderContextValue, SliderFieldWiring } from "./slider-context.js"
 /** One number (one thumb) or one number per thumb, in ascending order. */
 export type SliderValue = number | readonly number[];
 
-export type SliderOrientation = "horizontal" | "vertical";
+export type SliderOrientation = Orientation;
 
 /** Details passed as the second argument of `Slider.Root`'s `valueChangeAction` (each step). */
 export interface SliderValueChangeDetails extends ActionDetails {

@@ -20,15 +20,10 @@ import {
   submenuHover,
   useMenuContext,
 } from "./menu-context.js";
+import type { MenuTriggerState } from "./menu-trigger.js";
 import { capturePointer, isDisabledItem, isEditableTarget, ITEM_SELECTOR } from "./menu-dom.js";
 
-export interface MenuContextTriggerState {
-  /** Optimistic open state (the Root's). */
-  readonly open: boolean;
-  /** The Root's transition is pending (an open or a close in flight). */
-  readonly pending: boolean;
-  readonly disabled: boolean;
-}
+export type MenuContextTriggerState = MenuTriggerState;
 
 export interface MenuContextTriggerProps extends Omit<
   ComponentPropsWithRef<"div">,

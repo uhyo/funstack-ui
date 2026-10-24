@@ -4,18 +4,13 @@ import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
+import type { PopoverTriggerHookState } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import type { MenuContextValue } from "./menu-context.js";
 import { edgeItem, focusItem, hasModifier, isRtl } from "./menu-dom.js";
 
-export interface MenuTriggerState {
-  /** Optimistic open state. */
-  readonly open: boolean;
-  /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
-  readonly pending: boolean;
-  readonly disabled: boolean;
-}
+export type MenuTriggerState = PopoverTriggerHookState;
 
 export interface MenuTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,

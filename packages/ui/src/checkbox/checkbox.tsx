@@ -202,7 +202,7 @@ export function Checkbox({
       defaultChecked: undefined,
       // Not a DOM attribute; the hook sets the property. Owned so a `render` element's own
       // `indeterminate` prop (which react-dom would warn about) is stripped.
-      ...({ indeterminate: undefined } as object),
+      ...{ indeterminate: undefined },
       "aria-checked": undefined,
       // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
       // `render` element cannot re-enable (`disabled={false}`) or disable the input on its own.

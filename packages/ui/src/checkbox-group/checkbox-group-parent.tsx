@@ -218,7 +218,7 @@ export function CheckboxGroupParent({
       defaultChecked: undefined,
       // Not a DOM attribute; the hook sets the property. Owned so that a `render` element's own
       // `indeterminate` prop (which react-dom would warn about) is stripped.
-      ...({ indeterminate: undefined } as object),
+      ...{ indeterminate: undefined },
       "aria-checked": undefined,
       disabled: disabledProp,
       "data-checked": dataAttr(checked),

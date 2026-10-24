@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useInsertionEffect, useLayoutEffect, useState } from "react";
 import type { FocusEvent, KeyboardEvent, PointerEvent, RefObject } from "react";
+import type { Orientation } from "./types.js";
 
 // The roving-focus engine shared by `Toolbar.Root` and a standalone `ToggleGroup.Root`
 // (design/components/toggle-group.md section 6, conventions 3.2 and 7.4). Items are the focusable
 // descendants of the container, found in the DOM; which one is the Tab stop is urgent library
 // state kept outside React and written to the items as `tabindex` through the DOM.
 
-export type RovingOrientation = "horizontal" | "vertical";
+export type RovingOrientation = Orientation;
 
 export interface RovingFocusOptions {
   /** `false`: the engine writes nothing and handles nothing (a ToggleGroup inside a Toolbar). Default `true`. */
