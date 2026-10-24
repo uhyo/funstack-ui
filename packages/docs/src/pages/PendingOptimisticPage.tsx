@@ -1,17 +1,15 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample, Terms } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { TabsSaved } from "../examples/TabsSaved.js";
 
 export function PendingOptimisticPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Pending & optimistic state"
-        description="A state owner keeps a committed, an optimistic and a pending value. Triggers render the optimistic value, content regions the committed one, and data-pending marks an action in flight."
-      />
-      <h2>Pending & optimistic state</h2>
+    <DocPage
+      title="Pending & optimistic state"
+      description="A state owner keeps a committed, an optimistic and a pending value. Triggers render the optimistic value, content regions the committed one, and data-pending marks an action in flight."
+    >
       <p className="page-intro">
         Every component that owns state keeps three values for it. Knowing which part of the
         component shows which value is the key to styling FUNSTACK UI.
@@ -189,6 +187,6 @@ export function PendingOptimisticPage() {
         optimistic data attribute is visual only; the component page says so when that applies (for
         example <a href="/components/accordion">Accordion</a>).
       </p>
-    </div>
+    </DocPage>
   );
 }

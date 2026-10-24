@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleGroupAlignment } from "../examples/ToggleGroupAlignment.js";
 import { ToggleGroupStyles } from "../examples/ToggleGroupStyles.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function ToggleGroupPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="ToggleGroup"
-        description="A set of aria-pressed toggle buttons sharing one value: several pressed, or at most one with exclusive. Optimistic, with pending state."
-      />
-      <h2>ToggleGroup</h2>
+    <DocPage
+      title="ToggleGroup"
+      description="A set of aria-pressed toggle buttons sharing one value: several pressed, or at most one with exclusive. Optimistic, with pending state."
+    >
       <p className="page-intro">
         A set of toggle buttons that share one value: any number pressed by default, at most one
         with <code>exclusive</code>. Every Item is the <a href="/components/toggle">Toggle</a>{" "}
@@ -346,6 +344,6 @@ export function ToggleGroupPage() {
         <a href="/concepts/action-props#await-only">Await only what the UI must wait for</a>); for a
         fire-and-forget save, call <code>void save(next)</code> without awaiting it.
       </p>
-    </div>
+    </DocPage>
   );
 }

@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ProgressForm } from "../examples/ProgressForm.js";
 import { ProgressJobs } from "../examples/ProgressJobs.js";
@@ -15,12 +15,10 @@ const partProps = (element: string) => [
 
 export function ProgressPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Progress"
-        description="A progress bar on div[role=progressbar]: the display of someone else's action, correct in every lane, localised aria-valuetext, and a Root that is itself a Server Component."
-      />
-      <h2>Progress</h2>
+    <DocPage
+      title="Progress"
+      description="A progress bar on div[role=progressbar]: the display of someone else's action, correct in every lane, localised aria-valuetext, and a Root that is itself a Server Component."
+    >
       <p className="page-intro">
         A progress bar (WAI-ARIA <code>progressbar</code>) and the library's first{" "}
         <strong>output-only</strong> component: nothing is pressed or typed, so there is no action,
@@ -348,6 +346,6 @@ export function ProgressPage() {
           attributes, and Field registration.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

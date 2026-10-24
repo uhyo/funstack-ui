@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxForm } from "../examples/CheckboxForm.js";
@@ -9,12 +9,10 @@ import { CheckboxSelectAll } from "../examples/CheckboxSelectAll.js";
 
 export function CheckboxPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Checkbox"
-        description="A native <input type=checkbox> with an async checkedChangeAction, optimistic checked state, a controlled indeterminate state and native form participation."
-      />
-      <h2>Checkbox</h2>
+    <DocPage
+      title="Checkbox"
+      description="A native <input type=checkbox> with an async checkedChangeAction, optimistic checked state, a controlled indeterminate state and native form participation."
+    >
       <p className="page-intro">
         A checkbox (WAI-ARIA Checkbox pattern, two-state and mixed). It renders a real{" "}
         <code>&lt;input type="checkbox"&gt;</code> and behaves like{" "}
@@ -308,6 +306,6 @@ export function CheckboxPage() {
           posts its value when checked.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

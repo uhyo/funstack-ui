@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example, ExampleSource } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ButtonCompose } from "../examples/ButtonCompose.js";
 import { ButtonFormActions } from "../examples/ButtonFormActions.js";
@@ -12,12 +12,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function ButtonPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Button"
-        description="A button whose click is a transition: action in its own transition, data-pending, a second click ignored while pending, formAction with per-submitter pending."
-      />
-      <h2>Button</h2>
+    <DocPage
+      title="Button"
+      description="A button whose click is a transition: action in its own transition, data-pending, a second click ignored while pending, formAction with per-submitter pending."
+    >
       <p className="page-intro">
         A button whose click is a transition. Compared with <code>{"<button onClick>"}</code>, a{" "}
         <code>Button</code> runs <code>action</code> in its own transition and shows{" "}
@@ -388,6 +386,6 @@ import { archive } from "./actions"; // "use server"
         <a href="/components/toolbar">Toolbar</a> a disabled Button stays focusable and in the
         arrow-key sequence (<code>aria-disabled</code>, the APG Toolbar rule).
       </p>
-    </div>
+    </DocPage>
   );
 }

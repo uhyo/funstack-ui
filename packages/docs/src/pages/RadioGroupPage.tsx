@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { RadioGroupForm } from "../examples/RadioGroupForm.js";
 import { RadioGroupRtl } from "../examples/RadioGroupRtl.js";
@@ -10,12 +10,10 @@ import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function RadioGroupPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="RadioGroup"
-        description="A radio group of native <input type=radio> in a <fieldset>: native keyboard and forms, an async valueChangeAction, optimistic checked state and data-pending."
-      />
-      <h2>RadioGroup</h2>
+    <DocPage
+      title="RadioGroup"
+      description="A radio group of native <input type=radio> in a <fieldset>: native keyboard and forms, an async valueChangeAction, optimistic checked state and data-pending."
+    >
       <p className="page-intro">
         A radio group (WAI-ARIA Radio Group pattern, native radio variant): a{" "}
         <code>&lt;fieldset&gt;</code> of real <code>&lt;input type="radio"&gt;</code> elements. The
@@ -412,6 +410,6 @@ export function RadioGroupPage() {
         be combined. An action-less group is a working native radio group before hydration and with
         JavaScript off.
       </p>
-    </div>
+    </DocPage>
   );
 }

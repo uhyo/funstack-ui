@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MeterStorage } from "../examples/MeterStorage.js";
 import { MeterStrength } from "../examples/MeterStrength.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function MeterPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Meter"
-        description="A gauge on div[role=meter] with the platform's low / high / optimum regions, localised aria-valuetext, and a Root that is itself a Server Component."
-      />
-      <h2>Meter</h2>
+    <DocPage
+      title="Meter"
+      description="A gauge on div[role=meter] with the platform's low / high / optimum regions, localised aria-valuetext, and a Root that is itself a Server Component."
+    >
       <p className="page-intro">
         A scalar measurement within a known range (WAI-ARIA <code>meter</code>): storage used, a
         password's strength, a battery. Output-only and directive-free like{" "}
@@ -245,6 +243,6 @@ export function MeterPage() {
       <Example file="MeterStrength.tsx" css="meter.css">
         <MeterStrength />
       </Example>
-    </div>
+    </DocPage>
   );
 }

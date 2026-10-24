@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ContextMenuCanvas } from "../examples/ContextMenuCanvas.js";
 import { ContextMenuFiles } from "../examples/ContextMenuFiles.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function ContextMenuPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Context menu"
-        description="Menu.ContextTrigger: a region whose right-click, Shift+F10 or touch long-press opens a Menu at the pointer, with the menu's pending items, optimistic checkbox and radio items and submenus unchanged."
-      />
-      <h2>Context menu</h2>
+    <DocPage
+      title="Context menu"
+      description="Menu.ContextTrigger: a region whose right-click, Shift+F10 or touch long-press opens a Menu at the pointer, with the menu's pending items, optimistic checkbox and radio items and submenus unchanged."
+    >
       <p className="page-intro">
         A context menu is a <a href="/components/menu">Menu</a> opened from a different trigger.{" "}
         <code>Menu.ContextTrigger</code> is a region (any element) whose <code>contextmenu</code>{" "}
@@ -584,6 +582,6 @@ export function ContextMenuPage() {
         Details and the hash values:{" "}
         <a href="/concepts/content-security-policy">Content Security Policy</a>.
       </p>
-    </div>
+    </DocPage>
   );
 }

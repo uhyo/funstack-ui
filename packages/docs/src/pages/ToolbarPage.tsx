@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToolbarEditor } from "../examples/ToolbarEditor.js";
 import { ToolbarVertical } from "../examples/ToolbarVertical.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ToolbarPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Toolbar"
-        description="A WAI-ARIA toolbar with one Tab stop and arrow keys over any focusable children: toggles, menu buttons, links, inputs. No wrapper parts."
-      />
-      <h2>Toolbar</h2>
+    <DocPage
+      title="Toolbar"
+      description="A WAI-ARIA toolbar with one Tab stop and arrow keys over any focusable children: toggles, menu buttons, links, inputs. No wrapper parts."
+    >
       <p className="page-intro">
         A <code>role="toolbar"</code> container (WAI-ARIA APG Toolbar pattern) with one Tab stop and
         arrow keys between its controls. Its items are its focusable descendants, found in the DOM:
@@ -322,6 +320,6 @@ import { Toolbar } from "@funstack/ui/toolbar";
         on that side: <code>side="inline-end"</code>, the right in LTR and the left in a
         right-to-left page or container. ArrowDown moves on to the next tool.
       </p>
-    </div>
+    </DocPage>
   );
 }

@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SelectCountry } from "../examples/SelectCountry.js";
 import { SelectForm } from "../examples/SelectForm.js";
@@ -10,12 +10,10 @@ import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function SelectPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Select"
-        description="A real <select>, progressively enhanced with customizable select (appearance: base-select): native forms, keyboard and pickers, an async valueChangeAction, optimistic selection and data-pending."
-      />
-      <h2>Select</h2>
+    <DocPage
+      title="Select"
+      description="A real <select>, progressively enhanced with customizable select (appearance: base-select): native forms, keyboard and pickers, an async valueChangeAction, optimistic selection and data-pending."
+    >
       <p className="page-intro">
         A real <code>&lt;select&gt;</code>. The platform gives it form participation,{" "}
         <code>required</code>, autofill, typeahead, option groups, the native combobox semantics,
@@ -586,6 +584,6 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         <code>@media (pointer: fine)</code> if you need the wheel). Search, free text and async
         loading on open are <a href="/components/combobox">Combobox</a>'s job.
       </p>
-    </div>
+    </DocPage>
   );
 }

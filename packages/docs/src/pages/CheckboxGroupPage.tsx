@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxGroupForm } from "../examples/CheckboxGroupForm.js";
 import { CheckboxGroupToppings } from "../examples/CheckboxGroupToppings.js";
@@ -15,12 +15,10 @@ const transitionRow = (part: string) => ({
 
 export function CheckboxGroupPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="CheckboxGroup"
-        description="A group of native <input type=checkbox> in a <fieldset> with a set value, a mixed-state select-all Parent, group-level required, an async valueChangeAction and data-pending."
-      />
-      <h2>CheckboxGroup</h2>
+    <DocPage
+      title="CheckboxGroup"
+      description="A group of native <input type=checkbox> in a <fieldset> with a set value, a mixed-state select-all Parent, group-level required, an async valueChangeAction and data-pending."
+    >
       <p className="page-intro">
         A group of checkboxes sharing one value, a set of strings: a <code>&lt;fieldset&gt;</code>{" "}
         of real <code>&lt;input type="checkbox"&gt;</code> elements with a shared <code>name</code>.
@@ -521,6 +519,6 @@ export function CheckboxGroupPage() {
         <code>fsui-checkbox-group-uncheck</code> when it unchecks something (a reset can carry
         both).
       </p>
-    </div>
+    </DocPage>
   );
 }

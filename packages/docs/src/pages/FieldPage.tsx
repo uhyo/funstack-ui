@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { FieldControls } from "../examples/FieldControls.js";
 import { FieldSignUp } from "../examples/FieldSignUp.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function FieldPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Field and Form"
-        description="Labelled, described, validated form fields on top of native constraint validation and :user-invalid, and a Form that runs its action in a transition, routes server errors to fields and resets only on success."
-      />
-      <h2>Field and Form</h2>
+    <DocPage
+      title="Field and Form"
+      description="Labelled, described, validated form fields on top of native constraint validation and :user-invalid, and a Form that runs its action in a transition, routes server errors to fields and resets only on success."
+    >
       <p className="page-intro">
         <code>Field</code> wires a label, a description and an error message to a form control;{" "}
         <code>Form</code> runs the form's action. There is no validation engine: the browser's own
@@ -604,6 +602,6 @@ form[data-pending]           { cursor: progress; }
           the Form.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

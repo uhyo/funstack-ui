@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example, ExampleSource } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToastArchive } from "../examples/ToastArchive.js";
 import { ToastNotifications } from "../examples/ToastNotifications.js";
@@ -11,12 +11,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function ToastPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Toast"
-        description="Notifications fed by a toast() function and rendered by your own Viewport: an urgent queue that shows while the action it reports on is still pending, promise toasts, an Undo action prop, closeAction for the Undo window, ariaNotify announcements, and a region that stays interactive above modal dialogs."
-      />
-      <h2>Toast</h2>
+    <DocPage
+      title="Toast"
+      description="Notifications fed by a toast() function and rendered by your own Viewport: an urgent queue that shows while the action it reports on is still pending, promise toasts, an Undo action prop, closeAction for the Undo window, ariaNotify announcements, and a region that stays interactive above modal dialogs."
+    >
       <p className="page-intro">
         Toasts report on something that already happened or is happening elsewhere. The input is a
         function, <code>toast()</code>, callable from anywhere: an action body, a store, an effect.
@@ -575,6 +573,6 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </li>
         <li>No swipe to dismiss yet: Close, Escape and the timer cover WCAG 2.5.1.</li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

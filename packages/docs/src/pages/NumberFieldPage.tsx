@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { NumberFieldField } from "../examples/NumberFieldField.js";
 import { NumberFieldFormats } from "../examples/NumberFieldFormats.js";
@@ -10,12 +10,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function NumberFieldPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="NumberField"
-        description="A text field that holds a number: typed in the user's locale, stepped with keys and press-and-hold buttons, posted as a plain number through a hidden native number input, saved once per gesture with rollback."
-      />
-      <h2>NumberField</h2>
+    <DocPage
+      title="NumberField"
+      description="A text field that holds a number: typed in the user's locale, stepped with keys and press-and-hold buttons, posted as a plain number through a hidden native number input, saved once per gesture with rollback."
+    >
       <p className="page-intro">
         A number field: the user types in their locale's notation, steps with the keys or two
         buttons, and the form posts a machine number. The platform's{" "}
@@ -599,6 +597,6 @@ export function NumberFieldPage() {
       </ul>
       <CodeBlock>{`// A Server Function as the save, straight from a Server Component:
 <NumberField.Root defaultValue={line.quantity} min={1} locale="en-US" valueCommitAction={saveQuantity}>…</NumberField.Root>`}</CodeBlock>
-    </div>
+    </DocPage>
   );
 }

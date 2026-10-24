@@ -1,17 +1,15 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { TabsSuspending } from "../examples/TabsSuspending.js";
 
 export function SuspensePage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Suspense"
-        description="FUNSTACK UI content regions keep old content on screen while new content suspends. You own the Suspense boundaries."
-      />
-      <h2>Suspense</h2>
+    <DocPage
+      title="Suspense"
+      description="FUNSTACK UI content regions keep old content on screen while new content suspends. You own the Suspense boundaries."
+    >
       <p className="page-intro">
         Suspending children are the normal case, not an edge case. Content that reads data with{" "}
         <code>use()</code> works inside any FUNSTACK UI{" "}
@@ -104,6 +102,6 @@ export function SuspensePage() {
         component renders ahead of time, before it is shown, follows the same rule: keep it static
         or put the boundary inside the part that shows it.
       </p>
-    </div>
+    </DocPage>
   );
 }

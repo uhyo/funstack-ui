@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ComboboxCountry } from "../examples/ComboboxCountry.js";
 import { ComboboxDrink } from "../examples/ComboboxDrink.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ComboboxPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Combobox"
-        description="An editable combobox with list autocomplete: urgent typing, results from a deferred query inside Suspense, aria-activedescendant, an async valueChangeAction with the option pending, free text, forms and ariaNotify."
-      />
-      <h2>Combobox</h2>
+    <DocPage
+      title="Combobox"
+      description="An editable combobox with list autocomplete: urgent typing, results from a deferred query inside Suspense, aria-activedescendant, an async valueChangeAction with the option pending, free text, forms and ariaNotify."
+    >
       <p className="page-intro">
         A text input with a listbox of suggestions (the WAI-ARIA "editable combobox with list
         autocomplete"). Focus stays in the input; the active option moves with{" "}
@@ -693,6 +691,6 @@ export function ComboboxPage() {
           <code>minWidth: "anchor-size(--group width)"</code> through <code>style</code>.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

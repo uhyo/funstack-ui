@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { TooltipArrow } from "../examples/TooltipArrow.js";
 import { TooltipToolbar } from "../examples/TooltipToolbar.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function TooltipPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Tooltip"
-        description="A tooltip built on the Popover API and CSS Anchor Positioning, with a native interestfor path in Chromium. Open state belongs to the browser."
-      />
-      <h2>Tooltip</h2>
+    <DocPage
+      title="Tooltip"
+      description="A tooltip built on the Popover API and CSS Anchor Positioning, with a native interestfor path in Chromium. Open state belongs to the browser."
+    >
       <p className="page-intro">
         The WAI-ARIA Tooltip pattern on the platform: the popup lives in the top layer (Popover
         API), is placed with CSS Anchor Positioning and animates with <code>@starting-style</code>.
@@ -547,6 +545,6 @@ export function TooltipPage() {
           The library ships no workaround.
         </p>
       </Callout>
-    </div>
+    </DocPage>
   );
 }

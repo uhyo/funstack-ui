@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SwitchForm } from "../examples/SwitchForm.js";
@@ -9,12 +9,10 @@ import { SwitchSettings } from "../examples/SwitchSettings.js";
 
 export function SwitchPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Switch"
-        description="An on/off switch rendered as a native <input type=checkbox role=switch>: optimistic checked state, data-pending while checkedChangeAction runs, native form participation."
-      />
-      <h2>Switch</h2>
+    <DocPage
+      title="Switch"
+      description="An on/off switch rendered as a native <input type=checkbox role=switch>: optimistic checked state, data-pending while checkedChangeAction runs, native form participation."
+    >
       <p className="page-intro">
         An on/off switch (WAI-ARIA Switch pattern, HTML checkbox variant). It is a real{" "}
         <code>&lt;input type="checkbox" role="switch"&gt;</code>: the DOM <code>checked</code> is
@@ -314,6 +312,6 @@ export function SwitchPage() {
         A Switch with no action and no <code>checked</code> is a working native input before
         hydration and with JavaScript off.
       </p>
-    </div>
+    </DocPage>
   );
 }

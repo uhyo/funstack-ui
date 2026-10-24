@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { TabsSaved } from "../examples/TabsSaved.js";
 import { TabsSuspending } from "../examples/TabsSuspending.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function TabsPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Tabs"
-        description="Tabs with optimistic selection, committed panels that may suspend, automatic or manual activation, an anchor-positioned indicator, and find-in-page support."
-      />
-      <h2>Tabs</h2>
+    <DocPage
+      title="Tabs"
+      description="Tabs with optimistic selection, committed panels that may suspend, automatic or manual activation, an anchor-positioned indicator, and find-in-page support."
+    >
       <p className="page-intro">
         The WAI-ARIA Tabs pattern. Tabs and the indicator show the optimistic selection; panels show
         the committed one, so a panel that suspends keeps the current panel on screen while the
@@ -388,6 +386,6 @@ export function TabsPage() {
 <Tabs.Panel value="changelog" keepMounted="until-found">
   <Changelog />
 </Tabs.Panel>`}</CodeBlock>
-    </div>
+    </DocPage>
   );
 }

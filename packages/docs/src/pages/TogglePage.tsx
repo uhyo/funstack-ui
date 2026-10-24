@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
@@ -9,12 +9,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function TogglePage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Toggle"
-        description="A two-state button with an async pressedChangeAction, optimistic aria-pressed and data-pending."
-      />
-      <h2>Toggle</h2>
+    <DocPage
+      title="Toggle"
+      description="A two-state button with an async pressedChangeAction, optimistic aria-pressed and data-pending."
+    >
       <p className="page-intro">
         A two-state button (WAI-ARIA Button pattern, toggle variant). The pressed state flips
         optimistically and the button carries <code>data-pending</code> while{" "}
@@ -203,6 +201,6 @@ export function TogglePage() {
           <code>aria-busy</code> yourself.
         </p>
       </Callout>
-    </div>
+    </DocPage>
   );
 }

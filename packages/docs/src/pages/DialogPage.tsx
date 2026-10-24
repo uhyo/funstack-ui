@@ -1,7 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout, Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { DialogConfirm } from "../examples/DialogConfirm.js";
 import { DialogOrders } from "../examples/DialogOrders.js";
@@ -10,12 +10,10 @@ import { functionProps, renderProp } from "./shared-props.js";
 
 export function DialogPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Dialog"
-        description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state; a transition-driven open with a pending trigger, Suspense-ready content, and library-owned closes with a ViewTransition exit in every engine when you do."
-      />
-      <h2>Dialog</h2>
+    <DocPage
+      title="Dialog"
+      description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state; a transition-driven open with a pending trigger, Suspense-ready content, and library-owned closes with a ViewTransition exit in every engine when you do."
+    >
       <p className="page-intro">
         Built on <code>&lt;dialog&gt;</code>, <code>showModal()</code> and Invoker Commands. The
         platform supplies the top layer, the backdrop, the inert page, Escape, initial focus and
@@ -787,6 +785,6 @@ html:active-view-transition .dialog { transition: none; }
         that happens when the content mounts parts that render one, such as a nested Dialog or a
         control with <code>transition</code> set.
       </p>
-    </div>
+    </DocPage>
   );
 }
