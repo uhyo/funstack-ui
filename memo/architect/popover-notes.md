@@ -132,3 +132,26 @@ What changed in the design and why I wrote it the way I did:
 Open (not design changes): M2 superseded rejection in `Popover.Close` until `useActionTrigger`
 (#41); the still-open 14.5 checks (`source` on `<div>`/`<a>`, Chromium AX exposure, screen
 readers).
+
+## #127: lost interest never hides a library-mode Popover (2026-10-25)
+
+Decision: supported; the library hides by proxy. Amendment at the end of popover.md.
+
+- Cause read in Chromium source (`element.cc` `InterestGained` / `InterestLost`,
+  `html_element.cc` `InvokePopover`, `ShowPopoverInternal`): lost interest hides only a popover
+  whose `invokedVia == kInterest`, set after a successful interest show; our cancel-and-reshow
+  leaves `kNone`. No script API can set `kInterest`, so handing the hide back to the platform is
+  impossible; the alternative "pass the interest button as `source` on the re-show" would not
+  help either (`invokedVia` stays `kNone`) and would change the anchor.
+- Probes: `probes/127-interestfor/`. Surprises: (1) Chromium fires `loseinterest` from inside
+  *every* hide of an interest-targeted popup (Escape, script), before the state flips, so a
+  listener sees `:popover-open` true; (2) `hidePopover()` synchronously inside `loseinterest`
+  loses the `toggle` event entirely (nested hide), so the hide must be deferred by a task, not a
+  microtask (a microtask still runs inside the platform's `InterestLost`). `queueMicrotask`
+  reshow right inside the cancelled `beforetoggle` also fails silently (not relevant to the
+  library, which re-shows in a later commit).
+- Rejected: hiding on any `loseinterest` regardless of how the popup opened. One ref
+  (`interestOpen`) keeps the platform rule, with a stated staleness (Trigger click cancelling
+  a pending interest open).
+- Not done here: a hover-to-open prop (follow-ups), Firefox/WebKit (attribute inert), ARIA of the
+  interest relationship (the platform's, as for Tooltip's native path).

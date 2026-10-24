@@ -1,0 +1,125 @@
+
+[sync #1] open=false
+    3ms interest src=b open=false
+    3ms beforetoggle closed->open src=b
+    3ms cancelled
+    53ms beforetoggle closed->open src=t
+    54ms toggle closed->open src=t
+    306ms loseinterest src=b open=true
+    306ms lib hidePopover
+    306ms beforetoggle open->closed src=null
+    306ms loseinterest src=b open=true
+    306ms lib hidePopover
+
+[sync #2] open=false
+    3ms interest src=b open=false
+    3ms beforetoggle closed->open src=b
+    3ms cancelled
+    53ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    304ms loseinterest src=b open=true
+    304ms lib hidePopover
+    304ms beforetoggle open->closed src=null
+    304ms loseinterest src=b open=true
+    304ms lib hidePopover
+
+[sync #3] open=false
+    3ms interest src=b open=false
+    3ms beforetoggle closed->open src=b
+    3ms cancelled
+    53ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    306ms loseinterest src=b open=true
+    306ms lib hidePopover
+    306ms beforetoggle open->closed src=null
+    306ms loseinterest src=b open=true
+    306ms lib hidePopover
+
+[micro #1] open=false
+    3ms interest src=b open=false
+    3ms beforetoggle closed->open src=b
+    3ms cancelled
+    53ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    306ms loseinterest src=b open=true
+    306ms lib hidePopover
+    306ms beforetoggle open->closed src=null
+    306ms loseinterest src=b open=true
+    306ms lib: not open, skip
+    306ms toggle open->closed src=null
+
+[micro #2] open=false
+    2ms interest src=b open=false
+    2ms beforetoggle closed->open src=b
+    2ms cancelled
+    53ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    305ms loseinterest src=b open=true
+    305ms lib hidePopover
+    305ms beforetoggle open->closed src=null
+    305ms loseinterest src=b open=true
+    306ms lib: not open, skip
+    306ms toggle open->closed src=null
+
+[micro #3] open=false
+    2ms interest src=b open=false
+    2ms beforetoggle closed->open src=b
+    2ms cancelled
+    52ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    305ms loseinterest src=b open=true
+    305ms lib hidePopover
+    305ms beforetoggle open->closed src=null
+    305ms loseinterest src=b open=true
+    305ms lib: not open, skip
+    305ms toggle open->closed src=null
+
+[task #1] open=false
+    2ms interest src=b open=false
+    2ms beforetoggle closed->open src=b
+    2ms cancelled
+    53ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    305ms loseinterest src=b open=true
+    305ms lib hidePopover
+    305ms beforetoggle open->closed src=null
+    305ms toggle open->closed src=null
+
+[task #2] open=false
+    3ms interest src=b open=false
+    3ms beforetoggle closed->open src=b
+    3ms cancelled
+    53ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    305ms loseinterest src=b open=true
+    305ms lib hidePopover
+    305ms beforetoggle open->closed src=null
+    305ms toggle open->closed src=null
+
+[task #3] open=false
+    2ms interest src=b open=false
+    2ms beforetoggle closed->open src=b
+    2ms cancelled
+    53ms beforetoggle closed->open src=t
+    53ms toggle closed->open src=t
+    306ms loseinterest src=b open=true
+    306ms lib hidePopover
+    306ms beforetoggle open->closed src=null
+    306ms toggle open->closed src=null
+
+[slow-open+micro] after appear: true
+[slow-open+micro] after re-hover+leave: open=false
+    2ms interest src=b open=false
+    2ms beforetoggle closed->open src=b
+    2ms cancelled
+    306ms loseinterest src=b open=false
+    307ms lib: not open, skip
+    603ms beforetoggle closed->open src=t
+    603ms toggle closed->open src=t
+    1013ms interest src=b open=true
+    1316ms loseinterest src=b open=true
+    1316ms lib hidePopover
+    1316ms beforetoggle open->closed src=null
+    1316ms loseinterest src=b open=true
+    1316ms lib: not open, skip
+    1316ms toggle open->closed src=null

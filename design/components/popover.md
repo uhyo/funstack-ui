@@ -48,7 +48,7 @@ animate the exit in every engine, Firefox included.
 | 5 | Dismissal | `auto` only: light dismiss, Escape, Android back, one-at-a-time stacking are the platform's in every engine. No `lightDismiss` prop, no `manual` variant in v0. |
 | 6 | Nesting | A Popover inside a Popup is a nested auto popover: opened with `commandfor` or `showPopover({ source })` so the outer stays open; Escape closes the innermost; an outside click closes the stack. The platform restores focus only for the first popover in a stack, so the library restores focus to the Trigger when focus was inside the closed popup (or inside the content the close commit unmounted) and the platform left it on `<body>` (section 6.2). Never portals (inside a modal Dialog a portalled popover would be inert). |
 | 7 | Pending UI | Trigger: `data-open` (optimistic), `data-pending` (library mode). **No `aria-expanded` on a `<button>` Trigger (#121)**: it is a `popovertarget` invoker and every engine exposes its popover's own shown state; a non-button `render` (no invoker) renders `aria-expanded` from the Root's urgent `shown` mirror of the popup's `toggle` (#118). The Popup emits no `data-open` (`:popover-open` is exact). Root has no DOM, so `pending` lives on the Trigger and in Root's `children(state)`. JS-free mode: `data-open` is written on the Trigger from the popup's `toggle` listener (no React state). |
-| 8 | Reasons | `details.reason`: `"activate"` (Trigger, Close, a foreign invoker), `"dismiss"` (Escape, light dismiss, script `hidePopover()`), `"platform"` (found open on mount after a pre-hydration click). No `returnValue`: popovers have none. |
+| 8 | Reasons | `details.reason`: `"activate"` (Trigger, Close, a foreign invoker), `"dismiss"` (Escape, light dismiss, script `hidePopover()`, lost interest on an `interestfor` button, #127), `"platform"` (found open on mount after a pre-hydration click). No `returnValue`: popovers have none. |
 | 9 | Content mounting | Library mode: children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">` (boolean only). Unmount waits for the popover's CSS exit animation **unless `transition` is set**, in which case a library-driven close unmounts in the close commit and the view transition carries the content out (section 4.4). JS-free mode: always mounted. |
 | 10 | Positioning | `side` (`"bottom"`) and `align` (`"center"`) on Popup set inline `position-area` and `position-try-fallbacks`, the shared matrix of conventions 13.1 (physical sides plus `inline-start` / `inline-end`; inline-relative `align` on a horizontal side; wave 11, #53); `side={null}` emits nothing. `data-side` / `data-align` and `state.side` / `state.align` are the **resolved** placement while shown (conventions 13.2; wave 11, #20). Anchor: the implicit anchor from `popovertarget` (JS-free, #121) or `showPopover({ source: trigger })` (library). |
 | 11 | Animation | CSS (`@starting-style`, `allow-discrete`, `overlay`) for every open and for browser-owned closes; exit is progressive enhancement (none in Firefox). With `transition`, `<ViewTransition>` wraps **the `<dialog popover>` element itself** and animates library-driven opens and closes in all three engines, Firefox's exit included (research, "ViewTransition"). |
@@ -281,8 +281,9 @@ What the user sees while the open is pending:
 | Controlled parent sets `open={false}` | library | apply effect `hidePopover()`; the resulting `toggle` is an echo, no dispatch | (no dispatch) | |
 | Escape, Android back, AT dismiss, light dismiss | browser | popover hidden at once; `toggle` → dispatch `false` as a notification: optimistic `false`, action awaited inside the Root's transition, uncontrolled state committed after it | `"dismiss"` | the `toggle` `ToggleEvent` |
 | A foreign `hide-popover` / `toggle-popover` invoker | browser | the Popup's `command` listener records an `"activate"` intent while the popup is shown (the `command` event fires whatever the popover's state, HTML; one at a hidden popup closes nothing and records nothing); `toggle` consumes it | `"activate"` | the `CommandEvent` |
-| A foreign `popovertarget` invoker (#125) | browser | no `command` event; the Popup's `beforetoggle` listener records an `"activate"` intent when the close's `ToggleEvent.source` is a button or input whose `popoverTargetElement` is the popup. Other sources stay dismissals: `null` (Escape, light dismiss, script, another popover opening), an `interestfor` button (Chromium names it on a lost-interest hide), a `commandfor` invoker (its `command` row above). An intent already recorded for this close wins (a button with both `commandfor` and `popovertarget` runs its command, whose `command` listener comes first); `toggle` consumes it | `"activate"` | the `beforetoggle` `ToggleEvent` (its `source` is the button) |
+| A foreign `popovertarget` invoker (#125) | browser | no `command` event; the Popup's `beforetoggle` listener records an `"activate"` intent when the close's `ToggleEvent.source` is a button or input whose `popoverTargetElement` is the popup. Other sources stay dismissals: `null` (Escape, light dismiss, script, another popover opening), a `commandfor` invoker (its `command` row above); an `interestfor` button never reaches this row in library mode (its lost-interest hide is the library's own `hidePopover()`, next row). An intent already recorded for this close wins (a button with both `commandfor` and `popovertarget` runs its command, whose `command` listener comes first); `toggle` consumes it | `"activate"` | the `beforetoggle` `ToggleEvent` (its `source` is the button) |
 | Script `hidePopover()`, another `auto` popover or modal dialog opening elsewhere | browser | as a dismissal | `"dismiss"` | the `toggle` `ToggleEvent` |
+| Lost interest on an `interestfor` button naming the popup, after an interest open (#127, Chromium) | library, by proxy | the platform fires `loseinterest` on the popup but cannot hide it (the library's re-show lost the interest relationship, amendment #127), so the Popup records a `"dismiss"` intent and calls `hidePopover()` one task later if the popup is still shown; during a pending interest open it dispatches `false` instead. Browser-shaped: not awaited, not vetoable, CSS exit only | `"dismiss"` | the `loseinterest` `InterestEvent` (its `source` is the button) |
 
 Why the line is drawn here and not at "close is browser-owned" as in Dialog: a dialog's close
 requests are vetoable only once per user activation and `close()` from a `method="dialog"` form
@@ -928,6 +929,7 @@ only when DOM-adjacent, section 1).
 | Another `auto` popover or a modal dialog opens outside the stack | platform: the stack closes ("hide all popovers until") |
 | `hint` popover (a Tooltip) opens inside or beside | nothing: hints never close `auto` popovers (and the Tooltip baseline is `manual`) |
 | Close part | JS-free: `hide-popover`; library: intercepted |
+| Lost interest (`interestfor` button naming the Popup; Chromium) | JS-free: platform; library: the Popup hides on `loseinterest` when the open was an interest open, or cancels the pending open (amendment #127) |
 
 Nothing in the library handles Escape or outside clicks; the Tooltip's JS Escape
 (`preventDefault()` while a tooltip is open) and Dialog's non-modal Escape listener (which yields
@@ -1531,6 +1533,10 @@ is passed as `ref`; consumers destructure). Effects and listeners:
    - `command`: `hide-popover`, or `toggle-popover` while open → `recordCloseIntent({ reason:
      "activate", event })`; `show-popover` / `toggle-popover` while closed need nothing (the
      open is caught at `beforetoggle`).
+   - `interest` / `loseinterest` (library mode, #127): `interest` remembers the popup's interest
+     invoker; the routed open sets `interestOpen` when its `source` is that invoker;
+     `loseinterest` hides a shown interest-opened popup in a task (`"dismiss"` intent with the
+     `InterestEvent`) or cancels a pending one with `requestClose(event, "dismiss")`.
 4. **`held`** (4.4, `useCloseHold(committed, isLibrary, transition)` in `overlay-popup.tsx`,
    over `use-exit-animation.ts`'s `{ held, holdUntil, release, holdDuringRender, waiting }`,
    plus `afterClose(popup, echo)` for the `toggle(closed)` read and `releaseIfIdle` for the apply
@@ -1685,8 +1691,9 @@ acceptance). Kept for the record:
   here.
 - `internal/anchor-position.ts` shared by Tooltip, Popover and Menu; Tooltip's design names the
   helper locally.
-- `Popover.Form`, an `anchor` prop, hover-to-open ("hover to preview, click to pin" with
-  `interestfor`), a `manual` pinned variant, and a `returnFocus` prop: each when a consumer case
+- `Popover.Form`, an `anchor` prop, a hover-to-open prop ("hover to preview, click to pin";
+  a consumer's own `interestfor` button already opens and, since #127, dismisses a library
+  Popover on Chromium), a `manual` pinned variant, and a `returnFocus` prop: each when a consumer case
   appears. Context menus: #45.
 - Human upstream reports collected in #44: Chromium `<dialog popover>` exposed as modal; WebKit
   302008 / 317926.
@@ -2210,3 +2217,154 @@ sentence, the owned keys, the `data-open` row's aside); `BrowserOwnedStatePage.t
 page on pending and optimistic state ("a `<button>` overlay Trigger renders no `aria-expanded`;
 the browser exposes the popup's state"); the release notes' BREAKING line with the two selector
 migrations. `DialogPage.tsx` and `ButtonPage.tsx` unchanged.
+
+## Amendment: lost interest hides an interest-opened popup (#127, 2026-10-25)
+
+Status: architect decision (low priority, Chromium-only today). Probes in
+`memo/architect/probes/127-interestfor/`, notes in `memo/architect/popover-notes.md`. Edited in
+place: decision 8, the 2.3 close table (the `popovertarget` row and a new lost-interest row),
+the section 7 dismissal table, 14.2 item 3, the follow-ups list. Menu and Combobox share the
+hook and inherit the behaviour with no amendment of their own.
+
+### Decision
+
+**Supported.** A `<button interestfor={popupId}>` naming a library-mode Popup (a consumer's own
+button, or the Trigger with `interestfor` added through props) opens it on interest, which
+already works through the foreign-open route of 2.2, and **loses it on lost interest**: the
+library hides the popup itself, as a dismissal (`reason: "dismiss"`, `details.event` the
+`loseinterest` `InterestEvent`, whose `source` is the button). Lost interest **during a pending
+interest open** cancels the open (dispatch `false`, same reason and event), so a hover card
+whose content is still loading does not appear under a pointer that has left. Nothing changes
+in JS-free mode, where the platform's own interest relationship is intact.
+
+Why support rather than warn: 2.2 promises that a foreign open is "cancelled at `beforetoggle`
+and routed the same way", a transparent interception. Today the interception is what breaks the
+platform's lost-interest hide (below), so a popup that opens on hover and never closes on
+hover-out is a library bug, not a missing feature. The fix is one listener pair and one flag in
+`usePopoverPopup`; a dev warning would have to detect the attribute in Chromium only and would
+leave the consumer with nothing. Tooltip remains the component for `role="tooltip"` content
+(name or description, `hint`, no focus, delays and warm opens): an `interestfor` Popover is a
+hover card, interactive content a pointer can enter, which `auto` and the dialog focusing steps
+already fit. The deferred "hover to preview, click to pin" API (follow-ups) is unchanged: this
+amendment adds no prop.
+
+### Cause (Chromium 156, source and probe)
+
+`Element::InterestGained` fires `interest` on the target, registers the button as the target's
+interest invoker, **then** shows the popover through `InvokePopover(button, kInterest)`, which
+upgrades the popover's `invokedVia` to `kInterest` only if the show succeeded.
+`Element::InterestLost` fires `loseinterest`, clears the invoker, and hides the popover **only
+when `invokedVia == kInterest`**. The library cancels the interest show at `beforetoggle` and
+re-shows in a later commit with `showPopover({ source: trigger })`, which `ShowPopoverInternal`
+records as `kNone`, and no script API sets `kInterest`. So after the library's open the button
+is still the popup's interest invoker (`:interest-source` matches, `loseinterest` still fires on
+the popup) and the platform never hides. Measured (`interestfor-library-popover.mjs`): a plain
+popover hides on hover-out with `ToggleEvent.source` = the button; after cancel-and-reshow with
+the Trigger or no source the popup stays shown and `loseinterest` arrives with `:popover-open`
+true; with a 600 ms "action" the pointer leaves while the popup is hidden (`loseinterest` on a
+hidden popup) and the popup then appears and stays. Two more facts the implementation depends
+on: (1) hiding the popup by **any** means while the button has interest (Escape, script
+`hidePopover()`, the library's own close) makes Chromium fire `loseinterest` on the popup from
+inside the hide, before the state flips, so a `loseinterest` listener sees `:popover-open`
+still true; (2) a `hidePopover()` called synchronously from that listener re-enters the hide
+(a nested `loseinterest`, a second hide) and **the `toggle` event never arrives** (three of
+three cycles, `fix-shapes.mjs`, `sync`), whereas a hide deferred by one task fires no nested
+`loseinterest` and the `toggle` arrives (`task`, three of three).
+
+### Behaviour
+
+| Situation (library mode, Chromium) | What happens | `reason` | `details.event` |
+| --- | --- | --- | --- |
+| Interest on a button naming the popup (hover or keyboard focus, after `interest-delay-start`) | `interest` fires on the popup, then the platform's show is cancelled at `beforetoggle` and routed as in 2.2; the Popup remembers that this open was an interest open; the popup shows when the action settles, anchored to the Trigger (`source`), or centred without one (2.7) | `"activate"` | the `beforetoggle` `ToggleEvent` (unchanged) |
+| Lost interest (pointer left button and popup, or blur, after `interest-delay-end`) while the popup is shown and the current open was an interest open | the Popup records a `"dismiss"` intent and calls `hidePopover()` **in a task** (`setTimeout(0)`), only if the popup is still shown then; the `toggle` consumes the intent and notifies | `"dismiss"` | the `loseinterest` `InterestEvent` |
+| Lost interest while the interest open is still pending (popup hidden, `intended()` true) | dispatch `false`: latest intent wins, the open never shows (walkthrough 11.7 shape); `openChangeAction` sees `true` then `false` | `"dismiss"` | the `loseinterest` `InterestEvent` |
+| Lost interest while shown, but the current open was **not** an interest open (Trigger click, foreign `commandfor`, pre-hydration) | nothing: the platform rule (`invokedVia`) says a click-opened popover does not hide on lost interest | | |
+| `loseinterest` fired from inside another hide (Escape, light dismiss, script, the apply effect) | the task finds the popup hidden and does nothing; the hide notifies once, as before | (that hide's) | |
+| Pointer re-enters the button or the shown popup before `interest-delay-end` | nothing fires; the popup stays | | |
+
+The hide is browser-shaped even though the library calls it: nothing is awaited, a controlled
+parent that keeps `open={true}` sees the popup re-open after the action (conventions 3.5), the
+exit is the 10.1 CSS exit and `held` works as for any dismissal, and there is no
+`<ViewTransition>` exit (10.2). The one deliberate difference from a plain popover is the
+`ToggleEvent.source` of the hide: `null` (a script `hidePopover()`), not the button; the button
+is on `details.event.source` instead. Focus: the platform's lost-interest hide and
+`hidePopover()` both run the "focus previous element" steps, so a focus-driven interest open
+closed by blur leaves focus where the user moved it, and a hover open never moved focus unless
+`initialFocus` / the dialog focusing steps did, which behave as for any library open (6.1).
+Other engines: `interestfor` is inert in Firefox and WebKit, so the button does nothing there;
+a consumer who needs the hover card everywhere makes the button the Trigger (click opens in
+every engine, interest adds hover on Chromium). Menu and Combobox inherit the rows (shared
+hook); nothing composes `interestfor` with them today.
+
+### Implementation plan (developer)
+
+`internal/use-popover-popup.ts`, library mode only (the listeners are added with the others in
+the callback ref and removed in its cleanup; the events exist only where `interestfor` does):
+
+- `interestInvoker` ref (`Element | null`): set from an `interest` listener
+  (`event.target === popup`) to `(event as InterestEvent).source` (not in TypeScript's DOM lib;
+  read it as `Element | null | undefined` like `closedByPopoverTarget` reads
+  `ToggleEvent.source`); cleared by `loseinterest` when its `source` is the same element.
+- `interestOpen` ref (boolean): in `onBeforeToggle`, open branch, routed case, set to
+  `toggle.source !== null && toggle.source === interestInvoker.current` right before
+  `requestOpen` (the `interest` dispatch and the cancelled show are one synchronous platform
+  step, so the comparison is exact); cleared in `onToggle` when the popup is closed, and by the
+  pending cancel below. (Accepted staleness: a Trigger click that cancels a pending interest
+  open leaves the flag set until the next close; the only effect is that a later lost interest
+  of a re-hovered button closes that Trigger-opened popup, which is what the consumer asked for
+  by naming the popup.)
+- `onLoseInterest(event)`: `event.target === popup`, library mode, `source ===
+  interestInvoker.current`; clear `interestInvoker`; return unless `interestOpen.current`. If
+  `isPopoverOpen(popup)`: `setTimeout(() => { if (!isPopoverOpen(popup) || !ctx.intended())
+  return; ctx.recordCloseIntent({ reason: "dismiss", event }); popup.hidePopover(); }, 0)`,
+  the timer id kept in a ref and cleared on detach. Else if `ctx.intended()`:
+  `interestOpen.current = false; ctx.requestClose(event, "dismiss")` (`PopoverRootValue` has no
+  close args). The intent is recorded inside the task right before the hide, so its one-task
+  clear (which clears only while the popover is still open) cannot run first.
+- `onBeforeToggle` close branch and `closedByPopoverTarget` are unchanged (the `source` of this
+  hide is `null`). Doc comment on `onLoseInterest` names the Chromium facts above and #127.
+- Nothing in `use-popover-trigger.ts`, the Root, Menu or Combobox.
+
+Tests:
+
+- jsdom (`popover.test.tsx`; helpers in `src/__tests__/popover-shim.ts` or a new
+  `interest-shim.ts`: `dispatchInterest(popup, source)` / `dispatchLoseInterest(popup, source)`
+  dispatching a plain `Event` with a `source` property, since jsdom has no `InterestEvent`; the
+  platform's interest show is emulated by `popup.showPopover({ source: button })` right after
+  `dispatchInterest`, which the library cancels and routes exactly as Chromium's
+  `InvokePopover` is): (1) interest open then `loseinterest`: the popup hides,
+  `openChangeAction(false, { reason: "dismiss", event })` with `event.type === "loseinterest"`
+  and `event.source` the button, one call; (2) a 300 ms action, `loseinterest` before it
+  settles: `openChangeAction` saw `true` then `false` (`"dismiss"`), the popup never shows,
+  `data-pending` on the Trigger until the second settles; (3) Trigger-click open, then
+  `interest` + `loseinterest` from a foreign button: stays open, no dispatch; (4)
+  `loseinterest` with nothing pending and nothing shown: nothing; (5) interest open, then
+  `loseinterest` fired synchronously followed by `hidePopover()` in the same task (Chromium's
+  Escape shape): exactly one `false` notification, no error; (6) a Trigger-less controlled
+  Popup: rows 1 and 2 hold. One `use-popover-hooks.test.tsx` row that Menu's popup hides on
+  the same shape is optional. The #125 F1 jsdom row (an `interestfor` source stays `"dismiss"`)
+  is unchanged.
+- Browser (`popover.browser.test.tsx`, branch on `supportsInterestFor` from
+  `src/__tests__/engine.ts`; `interest-delay: 0s` on the button): Chromium: real hover on a
+  foreign `interestfor` button opens the popup (anchored to the Trigger), moving the pointer to
+  an outside element hides it within 500 ms and notifies `"dismiss"` with a `loseinterest`
+  event; Tab to the button opens, Tab away hides, focus is on the next element; a 600 ms action
+  with the pointer leaving at 300 ms: the popup never becomes `:popover-open` and the second
+  dispatch is `"dismiss"`; Escape while hovered: one notification, the popup hidden, and a
+  later hover-out does nothing; the Trigger itself with `interestfor` (the issue's second case):
+  hover opens, hover-out hides, a click while open closes through the library (`"activate"`).
+  Firefox and WebKit: the same markup, hover and Tab open nothing and the popup stays hidden
+  (the documented degradation). The #125 review-F1 Chromium row ("if still open, dispatch the
+  lost-interest shape, then hide") loses its fallback: the hover-out itself must hide.
+- Mutations: no task deferral → the Escape row (double hide, lost `toggle`) and jsdom row 5;
+  no `interestOpen` check → jsdom row 3; no pending cancel → jsdom row 2 and the 600 ms
+  browser row; no `intended()` guard in the task → row 5 variant where the Trigger's close
+  lands first.
+
+Docs (`packages/docs/src/pages/PopoverPage.tsx`, technical writer): a short "Hover card
+(Chromium)" note under the foreign-invoker material: `interestfor` naming the Popup opens on
+interest and dismisses on lost interest in library mode; `details.event` is the `loseinterest`
+event; other engines ignore the attribute, so give the button a click path (make it the
+Trigger) when the card must open everywhere; point to Tooltip for name/description content.
+Release notes: "fix: a library-mode Popover opened by an `interestfor` button now hides on
+lost interest (Chromium), and lost interest during a pending open cancels it (#127)."

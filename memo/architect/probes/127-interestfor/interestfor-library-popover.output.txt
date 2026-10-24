@@ -1,0 +1,172 @@
+chromium 156.0.8078.4
+interestForElement: true
+
+[plain #1] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    toggle closed->open src=b
+    loseinterest src=b cancelable=true open=true
+    beforetoggle open->closed src=b
+    toggle open->closed src=b
+
+[plain #2] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    toggle closed->open src=b
+    loseinterest src=b cancelable=true open=true
+    beforetoggle open->closed src=b
+    toggle open->closed src=b
+
+[cancel-micro-button #1] after hover: {"open":false,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    loseinterest src=b cancelable=true open=false
+
+[cancel-micro-button #2] after hover: {"open":false,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    loseinterest src=b cancelable=true open=false
+
+[cancel-task-trigger #1] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":true,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=true open=true
+
+[cancel-task-trigger #2] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":true,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=true
+    loseinterest src=b cancelable=true open=true
+
+[cancel-task-none #1] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":true,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=null
+    reshown src=none
+    toggle closed->open src=null
+    loseinterest src=b cancelable=true open=true
+
+[cancel-task-none #2] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":true,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=true
+    loseinterest src=b cancelable=true open=true
+
+[cancel-only #1] after hover: {"open":false,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    loseinterest src=b cancelable=true open=false
+
+[cancel-only #2] after hover: {"open":false,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    loseinterest src=b cancelable=true open=false
+
+[fix-sync #1] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+    beforetoggle open->closed src=null
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+
+[fix-sync #2] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+    beforetoggle open->closed src=null
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+
+[fix-micro #1] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+    beforetoggle open->closed src=null
+    loseinterest src=b cancelable=true open=true
+    toggle open->closed src=null
+
+[fix-micro #2] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+    beforetoggle open->closed src=null
+    loseinterest src=b cancelable=true open=true
+    toggle open->closed src=null
+
+[slow-open] after pointer left during pending open, 900ms: {"open":true,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    loseinterest src=b cancelable=true open=false
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+
+[slow-open re-hover] after hover: {"open":true,"bSource":true,"pTarget":true}  after leave: {"open":true,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=true
+    loseinterest src=b cancelable=true open=true
+
+[keyboard fix-sync] after focus: {"open":true,"bSource":true,"pTarget":true,"active":"b"}  after blur: {"open":false,"bSource":false,"pTarget":false,"active":"t"}
+    toggle open->closed src=null
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+    beforetoggle open->closed src=null
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+
+[escape while hovered, fix-sync]: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=false open=true
+    lib hidePopover
+    beforetoggle open->closed src=null
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
+   after leave: {"open":false,"bSource":false,"pTarget":false}
+    interest src=b cancelable=true open=false
+    beforetoggle closed->open src=b
+    cancelled
+    beforetoggle closed->open src=t
+    reshown src=t
+    toggle closed->open src=t
+    loseinterest src=b cancelable=false open=true
+    lib hidePopover
+    beforetoggle open->closed src=null
+    loseinterest src=b cancelable=true open=true
+    lib hidePopover
