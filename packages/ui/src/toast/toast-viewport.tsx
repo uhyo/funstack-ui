@@ -35,11 +35,13 @@ import type {
   ToastItem,
   ToastListener,
   ToastManager,
-  ToastOptions,
   ToastPriority,
 } from "./toast.js";
 import { ToastViewportContext } from "./toast-context.js";
 import type { ToastViewportContextValue } from "./toast-context.js";
+import { DEFAULT_HOTKEY, matchesHotkey, regionLabel } from "./toast-hotkey.js";
+import { makeEntry, partition, plainText, withFlags } from "./toast-queue.js";
+import type { Entry } from "./toast-queue.js";
 
 export interface ToastViewportState {
   /** Rendered toasts, chronological (oldest first), exiting ones included. */
@@ -89,37 +91,6 @@ export interface ToastViewportProps extends Omit<
 
 const isDev = process.env.NODE_ENV !== "production";
 
-const DEFAULT_HOTKEY: readonly string[] = ["F8"];
-
-const MODIFIER_NAMES: Readonly<Record<string, string>> = {
-  altKey: "Alt",
-  ctrlKey: "Ctrl",
-  metaKey: "Meta",
-  shiftKey: "Shift",
-};
-
-/** `["altKey", "KeyT"]` → `"Alt+T"`, `["F8"]` → `"F8"`. */
-function hotkeyLabel(hotkey: readonly string[]): string {
-  return hotkey
-    .map((key) => MODIFIER_NAMES[key] ?? key.replace(/^Key(?=[A-Z]$)/, "").replace(/^Digit/, ""))
-    .join("+");
-}
-
-/** The region's built-in accessible name (conventions 11): `"Notifications (F8)"`. */
-function regionLabel(hotkey: readonly string[] | null): string {
-  if (hotkey === null || hotkey.length === 0) return "Notifications";
-  return `Notifications (${hotkeyLabel(hotkey)})`;
-}
-
-/** The listed keys and modifiers, and no unlisted modifier (Ctrl+F8 is not F8). */
-function matchesHotkey(hotkey: readonly string[], event: KeyboardEvent): boolean {
-  const flags = event as unknown as Record<string, unknown>;
-  for (const modifier of Object.keys(MODIFIER_NAMES)) {
-    if ((flags[modifier] === true) !== hotkey.includes(modifier)) return false;
-  }
-  return hotkey.every((key) => key in MODIFIER_NAMES || event.code === key);
-}
-
 /** No store: `useSyncExternalStore` only tells the hydration render from a client render. */
 const subscribeNothing = (): (() => void) => () => {};
 const onClient = (): boolean => true;
@@ -135,69 +106,6 @@ function createHost(): HTMLElement | null {
   const host = document.createElement("div");
   host.style.display = "contents";
   return host;
-}
-
-/** One queue entry: the toast's options and the flags its `ToastItem` is built from. */
-interface Entry {
-  readonly options: ToastOptions & { readonly id: string };
-  readonly promisePending: boolean;
-  readonly actionPending: boolean;
-  readonly ending: boolean;
-  /** The public item, rebuilt whenever any of the above changes (stable identity otherwise). */
-  readonly item: ToastItem;
-}
-
-function makeEntry(
-  options: ToastOptions & { readonly id: string },
-  flags: { promisePending: boolean; actionPending: boolean; ending: boolean },
-): Entry {
-  return {
-    options,
-    ...flags,
-    item: {
-      ...options,
-      id: options.id,
-      pending: flags.promisePending || flags.actionPending,
-      ending: flags.ending,
-    },
-  };
-}
-
-function withFlags(
-  entry: Entry,
-  flags: Partial<{ promisePending: boolean; actionPending: boolean; ending: boolean }>,
-): Entry {
-  return makeEntry(entry.options, {
-    promisePending: flags.promisePending ?? entry.promisePending,
-    actionPending: flags.actionPending ?? entry.actionPending,
-    ending: flags.ending ?? entry.ending,
-  });
-}
-
-/** Rendered entries (the first `limit` open ones plus every ending one) and the queued count. */
-function partition(
-  entries: readonly Entry[],
-  limit: number,
-): { visible: Entry[]; queued: Entry[] } {
-  const visible: Entry[] = [];
-  const queued: Entry[] = [];
-  let open = 0;
-  for (const entry of entries) {
-    if (entry.ending) visible.push(entry);
-    else if (open < limit) {
-      visible.push(entry);
-      open++;
-    } else queued.push(entry);
-  }
-  return { visible, queued };
-}
-
-/** Plain text of a `ReactNode` that is text (queued toasts have no DOM to read yet). */
-function plainText(node: unknown): string {
-  if (typeof node === "string") return node;
-  if (typeof node === "number" || typeof node === "bigint") return String(node);
-  if (Array.isArray(node)) return node.map(plainText).join("");
-  return "";
 }
 
 /** Document order. */
