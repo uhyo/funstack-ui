@@ -36,7 +36,7 @@ for review.
       ContextMenu, Roadmap breaking line; popover.css / popover-demo.css `[data-open]`).
 - [x] Full browser suite on Chromium + Firefox: 50 files, 967 passed, 29 skipped (includes the
       #110, #112, #115, #117, #123 rows). WebKit does not launch locally (host deps): CI job.
-- [ ] CI dispatch on the branch (`gh workflow run ci.yml --ref feat/121-popovertarget-triggers`).
+- [x] CI run 40104731683 on the branch: ci, browser chromium / firefox / webkit all green.
 
 ## Not done / follow-ups
 
