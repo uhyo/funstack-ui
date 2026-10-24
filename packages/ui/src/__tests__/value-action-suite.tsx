@@ -87,6 +87,11 @@ export interface ValueActionDriver<V, D extends { readonly event: Event | undefi
    * without a dev warning (default true; Tabs warns).
    */
   readonly implicitDefault?: boolean;
+  /**
+   * Whether the component takes a `transition` prop (default true). Select has none (design
+   * decision 13): its "transition prop" rows would only render the same tree twice.
+   */
+  readonly transitionProp?: boolean;
   /** The component's prop names, for the dev warnings (`pressed` / `defaultPressed`). */
   readonly props: { readonly value: string; readonly defaultValue: string };
   /**
@@ -659,42 +664,44 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
       });
     });
 
-    describe("transition prop", () => {
-      const typeMap: TransitionProp = Object.fromEntries([
-        ...[...new Set(driver.transitionTypes.flat())].map((t) => [t, "fsui-fade"]),
-        ["default", "none"],
-      ]);
+    if (driver.transitionProp !== false) {
+      describe("transition prop", () => {
+        const typeMap: TransitionProp = Object.fromEntries([
+          ...[...new Set(driver.transitionTypes.flat())].map((t) => [t, "fsui-fade"]),
+          ["default", "none"],
+        ]);
 
-      it("renders the same markup with and without `transition` (class or type map)", () => {
-        const consoleError = silenceErrors();
-        const markup = (transition?: TransitionProp) => {
-          const { container, unmount } = render(
-            <>{driver.render(definedProps({ defaultValue: values[1], transition }))}</>,
-          );
-          // `useId` values differ from root to root; everything else must be identical.
-          const html = container.innerHTML.replace(/_r_[0-9a-z]+_/g, "_r_id_");
-          unmount();
-          return html;
-        };
-        const plain = markup();
-        expect(markup("fsui-fade")).toBe(plain);
-        expect(markup(typeMap)).toBe(plain);
-        expect(consoleError).not.toHaveBeenCalled();
-      });
+        it("renders the same markup with and without `transition` (class or type map)", () => {
+          const consoleError = silenceErrors();
+          const markup = (transition?: TransitionProp) => {
+            const { container, unmount } = render(
+              <>{driver.render(definedProps({ defaultValue: values[1], transition }))}</>,
+            );
+            // `useId` values differ from root to root; everything else must be identical.
+            const html = container.innerHTML.replace(/_r_[0-9a-z]+_/g, "_r_id_");
+            unmount();
+            return html;
+          };
+          const plain = markup();
+          expect(markup("fsui-fade")).toBe(plain);
+          expect(markup(typeMap)).toBe(plain);
+          expect(consoleError).not.toHaveBeenCalled();
+        });
 
-      it.each([
-        ["a class", "fsui-fade"],
-        ["a type map", typeMap],
-      ] as const)("still dispatches with %s as `transition`", async (_label, transition) => {
-        const action = vi.fn<ActionFn>();
-        render(<Harness mode="uncontrolled" action={action} transition={transition} />);
-        await driver.gesture(setupUser(), 0);
-        expect(action).toHaveBeenCalledTimes(1);
-        expect(action.mock.calls[0]?.[0]).toEqual(values[1]);
-        driver.expectShown(values[1]);
-        expectCommittedValue(values[1]);
+        it.each([
+          ["a class", "fsui-fade"],
+          ["a type map", typeMap],
+        ] as const)("still dispatches with %s as `transition`", async (_label, transition) => {
+          const action = vi.fn<ActionFn>();
+          render(<Harness mode="uncontrolled" action={action} transition={transition} />);
+          await driver.gesture(setupUser(), 0);
+          expect(action).toHaveBeenCalledTimes(1);
+          expect(action.mock.calls[0]?.[0]).toEqual(values[1]);
+          driver.expectShown(values[1]);
+          expectCommittedValue(values[1]);
+        });
       });
-    });
+    }
 
     describe("details", () => {
       it("exposes `event` as a virtual, non-own property", async () => {

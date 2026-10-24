@@ -17,7 +17,7 @@
 // About "rejection rolls the DOM back": a rejected action reaches the Error Boundary above the
 // Root, which replaces the Select, so the rollback is asserted where the Select stays mounted (a
 // controlled veto, a rejection caught inside the action, a refused platform dispatch).
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -34,6 +34,8 @@ import {
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { selectDriver, takeSelectedContentWarning } from "../__tests__/drivers/select.js";
+import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { Select } from "./index.js";
@@ -162,25 +164,15 @@ const defaultSelected = () =>
     .map((o) => o.value);
 const form = () => screen.getByTestId("form") as HTMLFormElement;
 
-// React warns once per file that `<selectedcontent>` is an unknown tag (jsdom has no customizable
-// select). Take that warning before any row, so the rows asserting no `console.error` do not
-// depend on running after another row that rendered a Select (#101: failed under
-// --sequence.shuffle). The expectation below fails the day React stops warning: drop the warm-up.
-beforeAll(() => {
-  const error = silenceErrors();
-  render(
-    <Select.Root aria-label="warm-up">
-      <Select.Trigger>
-        <Select.Value />
-      </Select.Trigger>
-      <Select.Option value="a">A</Select.Option>
-    </Select.Root>,
-  );
-  // Unmounts it and removes its container: the first row starts from an empty body.
-  cleanup();
-  expect(error).toHaveBeenCalledWith(expect.stringContaining("is unrecognized"), "selectedcontent");
-  error.mockRestore();
-});
+// React's one-time `<selectedcontent>` warning, taken before any row (see the helper).
+beforeAll(takeSelectedContentWarning);
+
+// The action-prop rows shared by every value component (sync and async actions, rejection,
+// overlap, superseded rejection, suspending content, the post-await rule, the controlled veto,
+// details, the value/defaultValue warnings) come from __tests__/value-action-suite.tsx with the
+// driver __tests__/drivers/select.tsx; the transition types are in
+// select-transition-types.test.tsx.
+describeValueAction(selectDriver);
 
 describe("Select", () => {
   describe("roles and ARIA", () => {
@@ -338,22 +330,6 @@ describe("Select", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("calls valueChangeAction(next, details) with the native change event", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toBe("b");
-      expect(details.reason).toBe("activate");
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(details.event?.type).toBe("change");
-      expect(sel().value).toBe("b");
-      expect(dataSelected()).toEqual(["b"]);
-      expect(committed()).toHaveTextContent("b");
-    });
-
     it("re-picking the selected option or picking under Root disabled never dispatches", async () => {
       const action = vi.fn<ActionFn>();
       const { unmount } = render(<Harness mode={mode} action={action} />);
@@ -373,122 +349,7 @@ describe("Select", () => {
     });
   });
 
-  renderBoth("async action", (mode) => {
-    it("shows the pick and data-pending on Root, Trigger and that Option until resolve", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "c");
-      expect(sel().value).toBe("c");
-      expect(opt("c").selected).toBe(true);
-      expect(dataSelected()).toEqual(["c"]);
-      expectPending(sel());
-      expectPending(screen.getByTestId("trigger"));
-      expect(dataPending()).toEqual(["c"]);
-      expect(committed()).toHaveTextContent("a");
-
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(sel());
-      expectNotPending(screen.getByTestId("trigger"));
-      expect(dataPending()).toEqual([]);
-      expect(sel().value).toBe("c");
-      expect(committed()).toHaveTextContent("c");
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("reaches the Error Boundary and leaves committed state", async () => {
-      silenceErrors();
-      const d = deferred();
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await act(async () => {
-        d.reject(new Error("nope"));
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("nope");
-      expect(committed()).toHaveTextContent("a");
-    });
-
-    it("caught inside the action counts as success", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} catchErrors />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await act(async () => {
-        d.reject(new Error("caught"));
-      });
-      expect(screen.getByTestId("error")).toHaveTextContent("caught");
-      expectNotPending(sel());
-      if (mode === "uncontrolled") {
-        // The library saw a resolved action: the pick is committed.
-        expect(sel().value).toBe("b");
-      } else {
-        // The parent did not adopt it: the DOM rolls back to the parent's option.
-        expect(sel().value).toBe("a");
-        expect(dataSelected()).toEqual(["a"]);
-      }
-    });
-  });
-
-  describe("rollback of the DOM to the previous option", () => {
-    it("a controlled veto re-selects the old option after settle (walkthrough 9.5)", async () => {
-      const d = deferred();
-      render(
-        <Select.Root aria-label="Fruit" value="a" valueChangeAction={() => d.promise}>
-          <Select.Option value="a">A</Select.Option>
-          <Select.Option value="b">B</Select.Option>
-        </Select.Root>,
-      );
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      expect(sel().value).toBe("b");
-      expect(dataSelected()).toEqual(["b"]);
-      await act(async () => {
-        d.resolve();
-      });
-      expect(sel().value).toBe("a");
-      expect(opt("a").selected).toBe(true);
-      expect(dataSelected()).toEqual(["a"]);
-      expectNotPending(sel());
-    });
-  });
-
   describe("overlapping actions", () => {
-    it("resolved out of order: DOM and data-selected stay on the latest; the latest commits", async () => {
-      const first = deferred();
-      const second = deferred();
-      const queue = [first, second];
-      const action = vi.fn<ActionFn>(() => queue.shift()!.promise);
-      render(
-        <Select.Root aria-label="Fruit" defaultValue="a" valueChangeAction={action}>
-          <Select.Option value="a">A</Select.Option>
-          <Select.Option value="b">B</Select.Option>
-          <Select.Option value="c">C</Select.Option>
-        </Select.Root>,
-      );
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await user.selectOptions(sel(), "c");
-      expect(sel().value).toBe("c");
-      await act(async () => {
-        second.resolve();
-      });
-      expect(sel().value).toBe("c");
-      expect(dataSelected()).toEqual(["c"]);
-      await act(async () => {
-        first.resolve();
-      });
-      expect(sel().value).toBe("c");
-      expect(dataSelected()).toEqual(["c"]);
-      expectNotPending(sel());
-      expect(action.mock.calls.map(([n]) => n)).toEqual(["b", "c"]);
-    });
-
     it("picking the committed option back while another is pending dispatches (walkthrough 9.6)", async () => {
       const slow = deferred();
       const action = vi.fn<ActionFn>((next) => (next === "b" ? slow.promise : undefined));
@@ -505,70 +366,6 @@ describe("Select", () => {
       });
       expect(sel().value).toBe("a");
       expectNotPending(sel());
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      silenceErrors();
-      const older = deferred();
-      const newer = deferred();
-      const queue = [older, newer];
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => queue.shift()!.promise} boundary={onError} />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await user.selectOptions(sel(), "c");
-      await act(async () => {
-        newer.resolve();
-      });
-      await act(async () => {
-        older.reject(new Error("older"));
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older");
-    });
-
-    it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      silenceErrors();
-      const older = deferred();
-      const newer = deferred();
-      const queue = [older, newer];
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => queue.shift()!.promise} boundary={onError} />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await user.selectOptions(sel(), "c");
-      await act(async () => {
-        older.reject(new Error("older"));
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older");
-      await act(async () => {
-        newer.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  renderBoth("suspending content", (mode) => {
-    it("keeps old content, no fallback, Root pending while the new content loads", async () => {
-      const suspender = createSuspender();
-      suspender.resolve("a");
-      render(<Harness mode={mode} suspender={suspender} />);
-      expect(screen.getByTestId("suspender")).toHaveTextContent("a");
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      expect(screen.queryByTestId("fallback")).toBeNull();
-      expect(screen.getByTestId("suspender")).toHaveTextContent("a");
-      expectPending(sel());
-      expect(sel().value).toBe("b");
-      await act(async () => {
-        suspender.resolve("b");
-      });
-      expect(screen.getByTestId("suspender")).toHaveTextContent("b");
-      expectNotPending(sel());
-      expect(sel().value).toBe("b");
     });
   });
 
@@ -1433,34 +1230,6 @@ describe("Select", () => {
     });
   });
 
-  describe("details", () => {
-    it("exposes `event` as a virtual, non-own property", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="uncontrolled" action={action} />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      const details = action.mock.calls[0]![1];
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect("event" in details).toBe(true);
-      expect(Object.keys(details)).not.toContain("event");
-      expect(JSON.stringify(details)).toBe('{"reason":"activate"}');
-    });
-
-    it("can be passed straight to a Server-Function-shaped action", async () => {
-      const serverFn = vi.fn(async (_next: string, _details: Details) => {});
-      render(
-        <Select.Root aria-label="Fruit" defaultValue="a" valueChangeAction={serverFn}>
-          <Select.Option value="a">A</Select.Option>
-          <Select.Option value="b">B</Select.Option>
-        </Select.Root>,
-      );
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      const [next, details] = serverFn.mock.calls[0]!;
-      expect(JSON.parse(JSON.stringify([next, details]))).toEqual(["b", { reason: "activate" }]);
-    });
-  });
-
   describe("function props", () => {
     it("className / style / children on Root, Trigger and Option receive the documented state", async () => {
       const d = deferred();
@@ -1684,51 +1453,6 @@ describe("Select", () => {
     });
   });
 
-  describe("post-await rule", () => {
-    it("value and data-pending converge with startTransition after the await", async () => {
-      const d = deferred();
-      const snapshots: { value: string; pending: boolean }[] = [];
-      function Recorder() {
-        useLayoutEffect(() => {
-          const s = document.querySelector("select")!;
-          snapshots.push({ value: s.value, pending: s.hasAttribute("data-pending") });
-        });
-        return null;
-      }
-      function Parent() {
-        const [value, setValue] = useState("a");
-        return (
-          <Select.Root
-            aria-label="Fruit"
-            value={value}
-            valueChangeAction={async (next) => {
-              await d.promise;
-              startTransition(() => setValue(next));
-            }}
-          >
-            {() => (
-              <>
-                <Select.Option value="a">A</Select.Option>
-                <Select.Option value="b">B</Select.Option>
-                <Recorder />
-              </>
-            )}
-          </Select.Root>
-        );
-      }
-      render(<Parent />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      const inFlight = snapshots.at(-1);
-      await act(async () => {
-        d.resolve();
-      });
-      expect(inFlight).toEqual({ value: "b", pending: true });
-      expect(snapshots.at(-1)).toEqual({ value: "b", pending: false });
-      expect(snapshots.slice(1).every((s) => s.value === "b")).toBe(true);
-    });
-  });
-
   describe("controlled edge cases", () => {
     it("a value prop change while pending converges after settle (walkthrough 9.11)", async () => {
       const d = deferred();
@@ -1947,21 +1671,6 @@ describe("Select", () => {
   });
 
   describe("dev warnings", () => {
-    it("warns once when value and defaultValue are both set", () => {
-      const consoleError = silenceErrors();
-      const ui = (
-        <Select.Root aria-label="x" value="a" defaultValue="a">
-          <Select.Option value="a">A</Select.Option>
-        </Select.Root>
-      );
-      const { rerender } = render(ui);
-      rerender(ui);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(
-        /^Select\.Root: both `value` and `defaultValue`/,
-      );
-    });
-
     it("does not warn in normal use, nor for a value matching no option", async () => {
       const consoleError = vi.spyOn(console, "error");
       render(

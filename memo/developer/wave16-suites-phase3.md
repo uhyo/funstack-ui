@@ -402,3 +402,47 @@ Mutations (reverted):
 1. checkbox-group-item.tsx: every Item pending while the Root is: 22 rows fail (18 suite rows).
 2. checkbox-group-root.tsx: -check / -uncheck swapped: the 3 suite type rows + the reset row fail.
 3. checkbox-group-parent.tsx: the Parent never pending: 21 rows fail (18 suite rows).
+
+### Select (commit 3g)
+
+Suite change: `transitionProp?: false` leaves out the "transition prop" describe (Select has no
+`transition` anywhere, design decision 13; the local `types:` row asserts that at compile time).
+Not `describe.skipIf`: skipped rows would show up as titles of rows that never run.
+
+Driver: Trigger with Value and options a, b, c from "a"; gestures `user.selectOptions` b, c, a
+(gesture 2 picks the committed option while the others are pending: walkthrough 9.6 dispatches);
+`eventType` "change"; `expectShown` = `select.value`, the option's `selected`, `data-selected` list;
+`pendingOn` = select, Trigger, the optimistic Option; `pendingOff` the other Options. The
+`<selectedcontent>` warm-up moved from select.test.tsx into the driver file as
+`takeSelectedContentWarning()` (both Select test files call it in `beforeAll`).
+
+Removed title (select.test.tsx, `Select …`) -> suite row (`Select.Root: value action conformance …`):
+- sync action (both) calls valueChangeAction(next, details) with the native change event -> sync
+  action (both) (event type change, reason, value, data-selected, committed; now three gestures)
+- async action (both) shows the pick and data-pending on Root, Trigger and that Option until
+  resolve -> async action (both) (`dataPending()` exactly the picked option = pendingOn + pendingOff)
+- rejection (both) two rows -> suite rejection rows (the Error Boundary row now also checks the
+  optimistic DOM and pending before the reject and the boundary error identity)
+- rollback of the DOM to the previous option: a controlled veto re-selects the old option after
+  settle (walkthrough 9.5) -> controlled veto snaps back … (value, `selected`, data-selected, not
+  pending: the same checks)
+- overlapping actions resolved out of order: DOM and data-selected stay on the latest; the latest
+  commits -> the latest dispatch wins when resolved second then first (+ first then second, + stays
+  pending until every in-flight action settles)
+- superseded rejection (both) two rows -> suite rows (now also the committed value of the newer)
+- suspending content (both) -> suspending content (both)
+- details both rows -> details rows
+- post-await rule value and data-pending converge … -> post-await rule (controlled parent) (Profiler
+  instead of a Recorder in function children)
+- dev warnings warns once when value and defaultValue are both set -> the suite's
+New: select-transition-types.test.tsx (3 rows; Select had no type assertion), the suite's
+uncontrolled -> controlled warning row, sync throw, reportError, unmount rows.
+Kept: re-pick / disabled no-dispatch, walkthrough 9.6 (dataPending), late options, platform rows,
+reset target, forms, function props, render, 9.11 value change while pending, Value refresh,
+"does not warn … nor for a value matching no option", Field rows.
+jsdom titles: 3076 -> 3096 (-19, +39).
+
+Mutations (reverted):
+1. select-option.tsx: every Option pending while the Root is: 19 rows fail (18 suite rows).
+2. select-root.tsx: types `fsui-selectx`: the 3 type rows fail.
+3. select-trigger.tsx: Trigger never pending: 18 suite rows fail.
