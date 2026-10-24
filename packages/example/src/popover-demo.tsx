@@ -3,9 +3,8 @@ import { useFormStatus } from "react-dom";
 import { Dialog } from "@funstack/ui/dialog";
 import { Popover } from "@funstack/ui/popover";
 import type { PopoverOpenChangeDetails } from "@funstack/ui/popover";
+import { sleep } from "./shared/fake-backend";
 import "./popover-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function logChange(label: string) {
   return (open: boolean, { reason }: PopoverOpenChangeDetails) => {

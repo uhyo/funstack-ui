@@ -2,17 +2,8 @@ import { startTransition, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { CheckboxGroup } from "@funstack/ui/checkbox-group";
 import type { CheckboxGroupValueChangeDetails } from "@funstack/ui/checkbox-group";
+import { fakeSave } from "./shared/fake-backend";
 import "./checkbox-group-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fake backend: resolves after 800 ms; rejects when asked to. */
-async function fakeSave(label: string, value: unknown, { fail = false } = {}): Promise<void> {
-  console.log(`[${label}] saving ${JSON.stringify(value)}`);
-  await sleep(800);
-  if (fail) throw new Error(`[${label}] the server rejected ${JSON.stringify(value)}`);
-  console.log(`[${label}] saved ${JSON.stringify(value)}`);
-}
 
 const toppings = [
   { id: "cheese", label: "Cheese" },

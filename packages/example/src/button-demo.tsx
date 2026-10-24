@@ -1,41 +1,14 @@
-import { Component, startTransition, useState } from "react";
-import type { ReactNode } from "react";
+import { startTransition, useState } from "react";
 import { Button } from "@funstack/ui/button";
 import { Form } from "@funstack/ui/form";
 import { Tooltip } from "@funstack/ui/tooltip";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
+import { fakeSave } from "./shared/fake-backend";
 import "./button-demo.css";
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fake backend: resolves after `ms`; rejects when asked to. */
-async function fakeCall(label: string, { ms = 1000, fail = false } = {}): Promise<void> {
-  console.log(`[button] ${label}…`);
-  await sleep(ms);
-  if (fail) throw new Error(`[button] ${label} failed`);
-  console.log(`[button] ${label} done`);
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+/** Fake backend call; 1 s by default. */
+const fakeCall = (label: string, { ms = 1000, fail = false } = {}) =>
+  fakeSave("button", label, { ms, fail });
 
 function SaveDemo() {
   const [calls, setCalls] = useState(0);

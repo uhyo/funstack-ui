@@ -1,9 +1,8 @@
 import { startTransition, useState, useTransition } from "react";
 import { Meter } from "@funstack/ui/meter";
 import { Progress } from "@funstack/ui/progress";
+import { sleep } from "./shared/fake-backend";
 import "./progress-meter-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const FILE_SIZE = 8_400_000;
 

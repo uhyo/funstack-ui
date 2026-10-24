@@ -1,9 +1,9 @@
-import { Component, Suspense, use, useState } from "react";
-import type { ReactNode } from "react";
+import { Suspense, use, useState } from "react";
 import { Tabs } from "@funstack/ui/tabs";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
+import { sleep } from "./shared/fake-backend";
+import { Spinner } from "./shared/Spinner";
 import "./tabs-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
  * A tiny cache so that `use()` receives the same promise on every render (an uncached promise
@@ -32,32 +32,6 @@ function DataList({ name }: { name: string }) {
       ))}
     </ul>
   );
-}
-
-function Spinner() {
-  return <span className="tabs-spinner" aria-hidden />;
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="tabs-error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 /** Directional slide by DOM order of the tabs, cross-fade otherwise (design 10.3). */
@@ -97,7 +71,7 @@ function SuspendingDemo() {
                 {({ pending }) => (
                   <>
                     {section[0]!.toUpperCase() + section.slice(1)}
-                    {pending && <Spinner />}
+                    {pending && <Spinner className="tabs-spinner" />}
                   </>
                 )}
               </Tabs.Tab>
@@ -143,7 +117,7 @@ function ManualAsyncDemo() {
         arrow keys only move focus (Enter, Space or click selects). Every third save fails: the
         selection rolls back and the error reaches the Error Boundary.
       </p>
-      <DemoErrorBoundary>
+      <DemoErrorBoundary className="tabs-error-box">
         <Tabs.Root
           className="tabs-root"
           defaultValue="general"
@@ -157,13 +131,13 @@ function ManualAsyncDemo() {
               General
             </Tabs.Tab>
             <Tabs.Tab value="billing" className="tabs-tab">
-              {({ pending }) => <>Billing{pending && <Spinner />}</>}
+              {({ pending }) => <>Billing{pending && <Spinner className="tabs-spinner" />}</>}
             </Tabs.Tab>
             <Tabs.Tab value="danger" className="tabs-tab" disabled>
               Danger zone
             </Tabs.Tab>
             <Tabs.Tab value="team" className="tabs-tab">
-              {({ pending }) => <>Team{pending && <Spinner />}</>}
+              {({ pending }) => <>Team{pending && <Spinner className="tabs-spinner" />}</>}
             </Tabs.Tab>
             <Tabs.Indicator className="tabs-indicator" />
           </Tabs.List>

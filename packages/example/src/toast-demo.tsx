@@ -3,9 +3,8 @@ import { Dialog } from "@funstack/ui/dialog";
 import { Menu } from "@funstack/ui/menu";
 import { Toast, toast } from "@funstack/ui/toast";
 import type { ToastItem } from "@funstack/ui/toast";
+import { sleep } from "./shared/fake-backend";
 import "./toast-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /* The Viewport, rendered once. It moves into an open modal Dialog by itself. ------------------- */
 

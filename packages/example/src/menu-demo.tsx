@@ -1,9 +1,8 @@
 import { startTransition, use, useState } from "react";
 import { Menu } from "@funstack/ui/menu";
 import type { MenuOpenChangeDetails } from "@funstack/ui/menu";
+import { sleep } from "./shared/fake-backend";
 import "./menu-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function logChange(label: string) {
   return (open: boolean, { reason }: MenuOpenChangeDetails) => {
