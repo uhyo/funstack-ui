@@ -2,13 +2,11 @@
 // rows 20, 21 and 23): Tab enters on the pressed Item on the native `focusgroup` path (Chromium,
 // `nomemory` + `focusgroupstart`) and on the JS path, and the ViewTransition mount cost.
 import { render, screen } from "@testing-library/react";
-import { startTransition, useState } from "react";
-import type { ViewTransitionClass } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { supportsFocusgroup } from "../__tests__/engine.js";
 import { ToggleGroup } from "./index.js";
-import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
+import { itStartsNoViewTransitionOnMount } from "../__tests__/view-transition-mount.js";
 
 const button = (name: string) => screen.getByRole("button", { name });
 const focused = () => document.activeElement;
@@ -62,39 +60,18 @@ describe.each([
 });
 
 describe("ToggleGroup.Item view transitions (row 23)", () => {
-  async function mountItem(transition: ViewTransitionClass | undefined): Promise<number> {
-    const vt = spyViewTransitions();
-    function Late() {
-      const [shown, setShown] = useState(false);
-      return (
-        <>
-          <button type="button" onClick={() => startTransition(() => setShown(true))}>
-            show
-          </button>
-          <ToggleGroup.Root aria-label="T">
-            <ToggleGroup.Item value="a">A</ToggleGroup.Item>
-            {shown && (
-              <ToggleGroup.Item value="b" {...(transition !== undefined && { transition })}>
-                B
-              </ToggleGroup.Item>
-            )}
-          </ToggleGroup.Root>
-        </>
-      );
-    }
-    const { unmount } = render(<Late />);
-    // A view transition commits in its callback, after any `act` scope (issue #49).
-    await outsideAct(async () => {
-      button("show").click();
-      await expect.poll(() => screen.queryByRole("button", { name: "B" })).not.toBeNull();
-    });
-    unmount();
-    vt.restore();
-    return vt.calls();
-  }
-
-  it("without `transition` a mount starts no view transition; with `none` it does", async () => {
-    expect(await mountItem(undefined)).toBe(0);
-    expect(await mountItem("none")).toBe(1);
+  itStartsNoViewTransitionOnMount({
+    late: (props) => (
+      <ToggleGroup.Item value="b" {...props}>
+        B
+      </ToggleGroup.Item>
+    ),
+    wrap: (late) => (
+      <ToggleGroup.Root aria-label="T">
+        <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+        {late}
+      </ToggleGroup.Root>
+    ),
+    mounted: () => screen.queryByRole("button", { name: "B" }),
   });
 });

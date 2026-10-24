@@ -529,3 +529,20 @@ Mutations (reverted):
    synchronous-reset rows and the StrictMode several-changes rows fail.
 CheckboxGroup value-action mutations re-run after the reorder: item pending 22 (18 suite), types
 swapped 4, Parent never pending 21 (18 suite).
+
+## After the overlay-suite merge (rebased on origin/master 3f65d32)
+
+### T7 rows (commit 3i)
+
+toggle-group.browser and checkbox-group.browser use `itStartsNoViewTransitionOnMount`
+(view-transition-mount.tsx) instead of their own `mountItem` + `Late`. CheckboxGroup asserted
+`> 0` for `transition="none"`; the shared row asserts exactly 1, which holds on Chromium and
+Firefox (WebKit does not launch on this machine; CI runs it). Exactly 1 is right: react-dom 19.3
+starts one view transition for the mount of a `"none"` boundary (transition-boundary.tsx, #35),
+the same count Button, Toolbar and ToggleGroup assert. Titles: ToggleGroup's
+"without `transition` a mount starts no view transition; with `none` it does" and CheckboxGroup's
+"an Item mounted in a transition without `transition` starts no view transition" -> the shared
+"a mount in a transition starts no view transition without `transition`, one with `none`".
+Select: nothing to convert. It has no `transition` prop; its "a pick never starts a document view
+transition" row is a different check (audit T7's second family) and stays.
+Mutation: both Items always passing `"none"` to `useTransitionBoundary`: both rows fail (Chromium).

@@ -6,8 +6,7 @@
 // engine does them (35). Runs in Chromium, Firefox and WebKit.
 /// <reference types="@vitest/browser-playwright" />
 import { act, render, screen } from "@testing-library/react";
-import { startTransition, useState } from "react";
-import type { ReactNode, ViewTransitionClass } from "react";
+import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { cdp } from "vitest/browser";
@@ -21,7 +20,7 @@ import {
 } from "../__tests__/helpers.js";
 import { CheckboxGroup } from "./index.js";
 import type { CheckboxGroupValueChangeDetails } from "./index.js";
-import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
+import { itStartsNoViewTransitionOnMount } from "../__tests__/view-transition-mount.js";
 
 type ActionFn = (next: string[], details: CheckboxGroupValueChangeDetails) => unknown;
 
@@ -297,45 +296,15 @@ describe("CheckboxGroup (browser)", () => {
   });
 
   describe("view transitions", () => {
-    async function mountItem(transition: ViewTransitionClass | undefined): Promise<number> {
-      const vt = spyViewTransitions();
-      function Late() {
-        const [shown, setShown] = useState(false);
-        return (
-          <>
-            <button type="button" onClick={() => startTransition(() => setShown(true))}>
-              show
-            </button>
-            <CheckboxGroup.Root aria-label="T">
-              <CheckboxGroup.Item value="a" aria-label="a" />
-              {shown && (
-                <CheckboxGroup.Item
-                  value="b"
-                  aria-label="b"
-                  {...(transition !== undefined && { transition })}
-                />
-              )}
-            </CheckboxGroup.Root>
-          </>
-        );
-      }
-      const { unmount } = render(<Late />);
-      // A view transition commits the update in its callback, after any `act` scope has
-      // returned (WebKit logged "not wrapped in act(...)", issue #49): like the ViewTransition
-      // rows of popover / menu, the click and the commit run outside React's act environment.
-      await outsideAct(async () => {
-        screen.getByRole("button", { name: "show" }).click();
-        await expect.poll(() => screen.queryByRole("checkbox", { name: "b" })).not.toBeNull();
-      });
-      unmount();
-      vt.restore();
-      return vt.calls();
-    }
-
-    it("an Item mounted in a transition without `transition` starts no view transition", async () => {
-      expect(await mountItem(undefined)).toBe(0);
-      // Control: with a boundary, the mount does start one (react-dom 19.3, issue #35).
-      expect(await mountItem("none")).toBeGreaterThan(0);
+    itStartsNoViewTransitionOnMount({
+      late: (props) => <CheckboxGroup.Item value="b" aria-label="b" {...props} />,
+      wrap: (late) => (
+        <CheckboxGroup.Root aria-label="T">
+          <CheckboxGroup.Item value="a" aria-label="a" />
+          {late}
+        </CheckboxGroup.Root>
+      ),
+      mounted: () => screen.queryByRole("checkbox", { name: "b" }),
     });
   });
 
