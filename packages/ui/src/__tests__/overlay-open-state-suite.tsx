@@ -472,9 +472,12 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(details.event!.type).toBe(config.dismissEvent);
         expectPending(trigger());
         expect(trigger()).not.toHaveAttribute("data-open");
+        // The accepted gap (#118): committed until the notification settles, though hidden.
+        expectExpanded(true);
         expect(content()).toBeInTheDocument(); // committed is still true
         await act(async () => d.resolve());
         expectNotPending(trigger());
+        expectExpanded(false);
         expect(content()).toBeNull();
         expect(committedText()).toBe("false");
         expect(isOpen()).toBe(false);
@@ -648,11 +651,14 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(isOpen()).toBe(false);
         await flushTasks(2);
         expectPending(trigger());
+        // Committed never left true (#118).
+        expectExpanded(true);
         expect(open).not.toHaveBeenCalled();
         await act(async () => d.resolve());
         expect(open).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
         expect(trigger()).toHaveAttribute("data-open", "");
+        expectExpanded(true);
         expectNotPending(trigger());
       });
 

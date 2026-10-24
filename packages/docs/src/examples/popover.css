@@ -118,8 +118,10 @@ html:active-view-transition .demo-popover-vt {
   font: inherit;
 }
 
-/* The Trigger: `aria-expanded` in both modes, pending in library mode. */
-.demo-button[aria-expanded="true"] {
+/* The Trigger: `data-open` flips at the click in library mode (`aria-expanded` follows the shown
+   popup, so it lags while an action runs); JS-free mode has only `aria-expanded`. */
+.demo-button[data-open],
+.demo-button[aria-expanded="true"]:not([data-pending]) {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }

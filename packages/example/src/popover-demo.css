@@ -117,7 +117,9 @@ html:active-view-transition .pop-vt {
   font: inherit;
   cursor: pointer;
 }
-.pop-btn[aria-expanded="true"] {
+/* `data-open` flips at the click (library mode); `aria-expanded` is the shown popup (JS-free). */
+.pop-btn[data-open],
+.pop-btn[aria-expanded="true"]:not([data-pending]) {
   border-color: #2563eb;
   color: #2563eb;
 }

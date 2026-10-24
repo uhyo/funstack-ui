@@ -769,12 +769,13 @@ describe("Combobox", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("a refused controlled open snaps aria-expanded back and keeps the text", async () => {
+    it("a refused controlled open keeps aria-expanded false, snaps data-open back and keeps the text", async () => {
       const user = setupUser();
       render(<Harness root={{ open: false, openChangeAction: () => {} }} />);
       await typeText(user, "j");
       expect(input().value).toBe("j");
       expect(input()).toHaveAttribute("aria-expanded", "false");
+      expect(input()).not.toHaveAttribute("data-open");
       expect(isOpen()).toBe(false);
     });
   });
