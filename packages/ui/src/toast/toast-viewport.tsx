@@ -40,7 +40,7 @@ import type {
 import { ToastViewportContext } from "./toast-context.js";
 import type { ToastViewportContextValue } from "./toast-context.js";
 import { DEFAULT_HOTKEY, matchesHotkey, regionLabel } from "./toast-hotkey.js";
-import { makeEntry, partition, plainText, withFlags } from "./toast-queue.js";
+import { applyCommands, makeEntry, partition, plainText, withFlags } from "./toast-queue.js";
 import type { Entry } from "./toast-queue.js";
 
 export interface ToastViewportState {
@@ -369,92 +369,27 @@ export function ToastViewport({
   };
 
   const apply = (commands: readonly ToastCommand[]): void => {
-    const next = [...entriesRef.current];
-    // Dismissals apply in order: each closes the toasts open at that point of the batch, never
-    // one added after it in the same tick. Their side effects run after the loop.
-    const dismissed: Entry[] = [];
-    for (const command of commands) {
-      if (command.kind === "dismiss") {
-        for (let i = 0; i < next.length; i++) {
-          const entry = next[i]!;
-          if (entry.ending) continue;
-          const id = entry.options.id;
-          if (command.id !== undefined && id !== command.id) continue;
-          dismissed.push(entry);
-          if (roots.current.has(id)) {
-            next[i] = withFlags(entry, { ending: true });
-          } else {
-            // Never rendered (queued beyond `limit`, or added in this tick): nothing to
-            // animate, so it leaves at once instead of mounting once as an ending Root.
-            next.splice(i--, 1);
-            lastAnnounced.current.delete(id);
-            exitBaselines.current.delete(id);
-          }
-        }
-        continue;
-      }
-      const index = next.findIndex((e) => e.options.id === command.id);
-      const existing = index === -1 ? undefined : next[index]!;
-      if (command.kind === "add") {
-        const options = { ...command.options, id: command.id };
-        if (existing !== undefined && !existing.ending) {
-          // An explicit existing id is an update ("one toast per key").
-          next[index] = makeEntry(
-            { ...existing.options, ...options },
-            {
-              promisePending: command.pending || existing.promisePending,
-              actionPending: existing.actionPending,
-              ending: false,
-            },
-          );
-          continue;
-        }
-        if (existing !== undefined) {
-          // An ending toast replaced by a new one with its id (the keyed Root may be reused):
-          // a fresh timer, a fresh announcement, no exit.
-          next.splice(index, 1);
-          clearTimer(command.id);
-          lastAnnounced.current.delete(command.id);
-          exitBaselines.current.delete(command.id);
-        }
-        next.push(
-          makeEntry(options, {
-            promisePending: command.pending,
-            actionPending: false,
-            ending: false,
-          }),
-        );
-        addedSinceEffect.current = true;
-      } else {
-        if (existing === undefined) {
-          if (isDev && !command.settle) {
-            console.error(`toast.update: no toast with id "${command.id}"; the update is ignored.`);
-          }
-          continue;
-        }
-        if (existing.ending) continue;
-        const options = command.settle
-          ? { ...command.options, id: command.id }
-          : { ...existing.options, ...command.options, id: command.id };
-        next[index] = makeEntry(options, {
-          promisePending: command.settle ? false : existing.promisePending,
-          actionPending: existing.actionPending,
-          ending: false,
-        });
+    const result = applyCommands(entriesRef.current, commands, (id) => roots.current.has(id));
+    for (const id of result.replaced) clearTimer(id);
+    for (const id of result.forgotten) {
+      lastAnnounced.current.delete(id);
+      exitBaselines.current.delete(id);
+    }
+    if (result.added) addedSinceEffect.current = true;
+    if (isDev) {
+      for (const id of result.missing) {
+        console.error(`toast.update: no toast with id "${id}"; the update is ignored.`);
       }
     }
-    if (dismissed.length === 0) {
-      write(next);
+    if (result.dismissed.length === 0) {
+      write(result.next);
       return;
     }
-    // Toasts that leave the DOM: not one replaced by a later add with its id in this batch.
-    const stays = new Set(next.filter((e) => !e.ending).map((e) => e.options.id));
-    const leaving = new Set(dismissed.map((e) => e.options.id).filter((id) => !stays.has(id)));
-    moveFocusOut(leaving);
-    snapshotExitBaselines(leaving);
-    write(next);
+    moveFocusOut(result.leaving);
+    snapshotExitBaselines(result.leaving);
+    write(result.next);
     syncTimers();
-    scheduleCloseActions(dismissed, "dismiss", undefined);
+    scheduleCloseActions(result.dismissed, "dismiss", undefined);
   };
 
   const setActionPending = (id: string, pending: boolean): void => {
