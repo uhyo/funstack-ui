@@ -25,7 +25,6 @@ import type {
 } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
@@ -42,6 +41,8 @@ import type {
   StepDirection,
 } from "./number-field-context.js";
 import { createNumberFormatter, formatKey } from "./number-field-format.js";
+import type { NumberFormatter } from "./number-field-format.js";
+import { useNumberFieldDevWarnings } from "./use-number-field-dev-warnings.js";
 
 /** Details passed as the second argument of both NumberField actions. */
 export interface NumberFieldValueChangeDetails extends ActionDetails {
@@ -137,8 +138,6 @@ export interface NumberFieldRootProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, NumberFieldState>;
 }
 
-const isDev = process.env.NODE_ENV !== "production";
-
 const STEP_TYPES = transitionTypes("number-field", "change");
 const COMMIT_TYPES = transitionTypes("number-field", "commit");
 
@@ -153,8 +152,33 @@ function hiddenText(value: number | null): string {
   return value === null ? "" : String(value);
 }
 
-function languageOf(tag: string): string {
-  return tag.split("-")[0]?.toLowerCase() ?? "";
+/**
+ * Mount reconciliation's read of the visible input (design 4.5): the value the hydrated text
+ * means. The client's own formatting of `current` is `current`. Focused text is still being typed
+ * (even a partial `12,` or `-`): handed to `adoptDraft`, never overwritten under the caret; the
+ * blur commits or reverts it by the ordinary rule. Otherwise the parsed text, or, for another
+ * locale's formatting of the same value or text that is no number, `current` with the client's
+ * text written back (react-dom kept the hydrated DOM value).
+ */
+function readVisible(
+  visible: HTMLInputElement | null,
+  current: number | null,
+  formatter: NumberFormatter,
+  adoptDraft: (text: string) => void,
+): number | null {
+  if (visible === null) return current;
+  const domText = visible.value;
+  if (domText === formatter.format(current)) return current;
+  if (visible.ownerDocument.activeElement === visible) {
+    adoptDraft(domText);
+    return current;
+  }
+  const parsed = formatter.parse(domText);
+  if (parsed === undefined || Object.is(parsed, current)) {
+    visible.value = formatter.format(current);
+    return current;
+  }
+  return parsed;
 }
 
 /**
@@ -574,28 +598,11 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   const { onItemMounted } = useNativeGroupReconciliation<number | null>({
     element: hiddenRef as RefObject<FormAssociatedElement | null>,
-    readCurrent: () => {
-      const visible = visibleRef.current;
-      const current = shownRef.current;
-      if (visible === null) return current;
-      const domText = visible.value;
-      if (domText === formatter.format(current)) return current;
-      if (visible.ownerDocument.activeElement === visible) {
-        // Still typing (even a partial `12,` or `-`): adopted as the draft, never overwritten
-        // under the caret. The blur commits it, or reverts it by the ordinary rule.
-        draftRef.current = domText;
-        setDraft(domText);
-        return current;
-      }
-      const parsed = formatter.parse(domText);
-      if (parsed === undefined || Object.is(parsed, current)) {
-        // Another locale's formatting of the same value, or text that is no number: show the
-        // client's text (react-dom kept the hydrated DOM value).
-        visible.value = formatter.format(current);
-        return current;
-      }
-      return parsed;
-    },
+    readCurrent: () =>
+      readVisible(visibleRef.current, shownRef.current, formatter, (text) => {
+        draftRef.current = text;
+        setDraft(text);
+      }),
     readDefault: () => {
       // A reset clears an open draft whatever the target.
       clearDraft();
@@ -617,39 +624,17 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // --- Development warnings -------------------------------------------------------------------
 
-  useDevWarning(
-    (valueProp !== undefined && valueProp !== null && !Number.isFinite(valueProp)) ||
-      (defaultValueProp !== undefined &&
-        defaultValueProp !== null &&
-        !Number.isFinite(defaultValueProp)),
-    isDev &&
-      "NumberField.Root: `value` / `defaultValue` must be a finite number or `null`; " +
-        `got ${String(valueProp ?? defaultValueProp)}, treated as empty.`,
-  );
-  useDevWarning(
-    bounds.min !== undefined && bounds.max !== undefined && bounds.min > bounds.max,
-    isDev && `NumberField.Root: \`min\` (${String(min)}) is greater than \`max\` (${String(max)}).`,
-  );
-  useDevWarning(
-    !stepValid || !largeStepValid,
-    isDev &&
-      "NumberField.Root: `step` and `largeStep` must be positive numbers; using the defaults.",
-  );
-  useDevWarning(
-    formatter.warning !== null,
-    isDev && `NumberField.Root: ${formatter.warning ?? ""}`,
-  );
-  const warnedLang = useRef(false);
-  useEffect(() => {
-    if (!isDev || warnedLang.current || locale !== undefined) return;
-    const lang = document.documentElement.lang;
-    if (lang === "" || languageOf(lang) === languageOf(formatter.locale)) return;
-    warnedLang.current = true;
-    console.error(
-      `NumberField.Root: the page is \`lang="${lang}"\` but NumberField formats as ` +
-        `\`${formatter.locale}\` (the runtime's locale); pass \`locale\`.`,
-    );
-  }, [locale, formatter]);
+  useNumberFieldDevWarnings({
+    value: valueProp,
+    defaultValue: defaultValueProp,
+    min,
+    max,
+    bounds,
+    stepValid,
+    largeStepValid,
+    formatter,
+    locale,
+  });
 
   // An unmount mid-hold leaves nothing behind (the buttons detach their own listeners).
   useEffect(
