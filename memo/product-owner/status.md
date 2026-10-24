@@ -332,3 +332,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 ## WAVE 17 (small follow-ups) — STARTED 2026-10-24
 - #110 architect: decide intended Menu close behaviour with async openChangeAction(false) across engines → then developer.
 - #109 developer: shared browser overlay suite + disabled-render suite; Firefox toggle-order fragility.
+- #110 MERGED 34933fd (Menu.Trigger prevents primary mousedown while open; Chromium hid at mousedown, Firefox reported dismiss + RE-OPENED). Release notes: behaviour change (menu stays shown during async close on all engines), type-breaking MenuTriggerProps drops onMouseDown.
+- Wave 17 audit (memo/reviewer/wave17-improvement-audit.md) → #111 Combobox label press (dev-111), #112 Combobox Trigger light dismiss (arch-112), #113 small items (dev-113 code; arch-112 API1/A2), #114 human VoiceOver check. #110 review → #115 non-button Trigger light dismiss, #116 Dialog closedBy Trigger (both arch-112).
+- #109 on test/109-overlay-browser-suite, CI green, review-109 running. T1 "click X while open" browser sweep: AFTER #112/#115/#116 land.
