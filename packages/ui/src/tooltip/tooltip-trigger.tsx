@@ -54,7 +54,8 @@ export interface TooltipTriggerProps extends Omit<
  * Owned keys (conventions 1.2): `aria-describedby` (with `provides="description"`) or
  * `aria-labelledby` (with `provides="name"`), both token-merged with the consumer's ids;
  * `data-disabled`; and `interestfor` and `data-fsui-tooltip-trigger` when
- * `experimental_interestFor` is on.
+ * `experimental_interestFor` is on. `type="button"` is a default the consumer may override (the
+ * part installs no click handler), unlike the overlay Triggers, which own it.
  */
 export function TooltipTrigger({
   experimental_interestFor = false,

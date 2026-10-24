@@ -34,25 +34,13 @@ const toDirection = (value: string): Direction => (value === "rtl" ? "rtl" : "lt
 
 /**
  * Where the browser actually placed an anchored popup (design/conventions.md 13.2): the
- * `position-try-fallbacks` option it applied, read from `getComputedStyle(popup).positionArea`
- * while the popup is shown and parsed into a physical side and an alignment. Observation, not
- * positioning: the browser keeps placing the popup; this only reports where.
- *
- * Sources: a `ResizeObserver` on the popup from mount (hidden to shown is a resize, delivered
- * after layout and before paint, so the first painted frame carries the resolved side), `toggle`
- * (and the jsdom shim's), and while shown `scroll` on the document (capture, passive: nested
- * scrollers too) and `resize` on the window, each read at once and again in the next two
- * animation frames (an engine applies the option a scroll calls for only in the layout after the
- * event). The write is urgent (`flushSync`, so the attribute lands before paint; conventions 3.5)
- * and happens only when the rendered pair would change: a popup with a physical `side` that opens
- * where it was asked costs no render (the state holds `null` then). A logical side
- * (`inline-start` / `inline-end`) costs one render on show and one on hide, because `data-side`
- * turns physical while shown. Hidden again resets to the requested values, once the popup no
- * longer renders (an exit animation keeps the resolved side to its end).
- *
- * Idle with `side: null` (a stylesheet's `@position-try` rules may set insets the parser cannot
- * interpret): no reads, the result's `side` is `null`. Runs whatever opened the popup, the
- * native `interestfor` and `commandfor` paths included.
+ * `position-try-fallbacks` option it applied, read from the computed `position-area` while the
+ * popup is shown. Observation only; runs whatever opened the popup (`interestfor` and
+ * `commandfor` included). Read on a `ResizeObserver` (hidden to shown is a resize, delivered
+ * before paint), `toggle`, and while shown document `scroll` and window `resize` plus the next
+ * two frames. Written urgently (`flushSync`), and only when the rendered pair changes: an open
+ * where it was asked costs no render. Hidden again, it resets once the popup no longer renders
+ * (an exit animation keeps the resolved side). Idle with `side: null`.
  */
 export function useResolvedPlacement<Side extends AnchorSide>(
   request: PlacementRequest<Side>,

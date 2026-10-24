@@ -31,18 +31,13 @@ export const isTouchLike = (pointerType: string) =>
   pointerType === "touch" || pointerType === "pen";
 
 /**
- * Press-drag-release (context-menu.md 2.6): while the popup holds the capture of `pointerId`
- * (taken at the open), every `pointermove` and the `pointerup` target the popup and items never
- * see boundary events, so the gesture hit-tests with `elementFromPoint`. A move focuses the item
- * under the pointer quietly (a SubmenuTrigger also starts its hover intent); a release more than
- * the slop away from the open point activates an enabled, non-submenu item through its
- * `click()` (Menu's one activation path), or dismisses the menu when it lands outside every popup
- * of the tree at least 500 ms after the open; any other release leaves the menu open. Ends at the
- * release, `pointercancel`, `lostpointercapture` and the menu closing. Returns the cleanup.
- *
- * The 500 ms count from when the popup is shown, not from the press: with an async
- * `openChangeAction` or suspending items the menu appears only when they settle. A
- * gesture that starts on a popup already showing (a move) counts from its start.
+ * Press-drag-release (context-menu.md 2.6). The popup holds the capture of `pointerId`, so its
+ * items see no boundary events and the gesture hit-tests with `elementFromPoint`. A move focuses
+ * the item under the pointer without the ring (a SubmenuTrigger starts its hover intent); a
+ * release beyond the slop activates an enabled, non-submenu item through `click()`, or dismisses
+ * when outside every popup of the tree at least 500 ms after the popup was shown (not after the
+ * press: an async open appears late). Ends at the release, `pointercancel`,
+ * `lostpointercapture` or the close. Returns the cleanup.
  */
 export function startDrag(popup: HTMLElement, options: DragOptions): () => void {
   const doc = popup.ownerDocument;
@@ -137,20 +132,13 @@ export function startDrag(popup: HTMLElement, options: DragOptions): () => void 
 const TOUCH_END_WAIT = 250;
 
 /**
- * While the finger that opened a touch menu is still down, the browser must not take its drag
- * as a pan (it would end the stream with `pointercancel`): a non-passive document `touchmove`
- * listener prevents it (context-menu.md 2.2). The lift's `touchend`, which follows that
- * pointer's `pointerup`, is prevented as well, so the engine synthesises no click from it: a click
- * where the finger was (beside the offset menu) would light-dismiss the menu in Chromium, and one
- * over an item would activate it a second time. Ends at that `touchend` / `touchcancel`, at the
- * pointer's `pointercancel`, and shortly after its `pointerup` if no touch event follows (a
- * synthetic pointer). Returns the cleanup.
- *
- * Only the gesture finger's lift ends it: another finger lifting while it is still
- * down must not hand its next slide to panning. Pointer events expose no `Touch.identifier`, so
- * the lift is recognised by order: the engines dispatch a lift's `pointerup` and `touchend` from
- * the same input, the `pointerup` first. A `touchend` before that pointer's `pointerup` is another
- * finger's; it is still prevented (no click may light-dismiss the menu mid-gesture).
+ * The touch guard while the finger that opened a menu is down (context-menu.md 2.2): a
+ * non-passive `touchmove` listener keeps its drag from becoming a pan (`pointercancel`), and the
+ * lift's `touchend` is prevented so no click is synthesised (it would light-dismiss the menu or
+ * activate an item twice). Only that finger's lift ends it, recognised by order (its
+ * `pointerup` comes first; pointer events carry no `Touch.identifier`); other fingers'
+ * `touchend`s are prevented too. Also ends at `touchcancel`, the pointer's `pointercancel`, and
+ * shortly after its `pointerup` when no touch event follows. Returns the cleanup.
  */
 export function guardTouch(doc: Document, pointerId: number): () => void {
   let fallback: ReturnType<typeof setTimeout> | undefined;

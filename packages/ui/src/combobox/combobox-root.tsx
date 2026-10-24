@@ -24,6 +24,7 @@ import type {
   StateValue,
   UrgentChangeHandler,
 } from "../internal/types.js";
+import { transitionTypes } from "../internal/transition-types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
@@ -169,7 +170,7 @@ function defaultComboboxAnnouncement(count: number): string {
   return `${count} results`;
 }
 
-const VALUE_TRANSITION_TYPES = ["fsui-combobox", "fsui-combobox-select"] as const;
+const VALUE_TRANSITION_TYPES = transitionTypes("combobox", "select");
 
 const isDev = process.env.NODE_ENV !== "production";
 
