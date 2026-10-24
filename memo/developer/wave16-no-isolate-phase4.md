@@ -39,8 +39,16 @@
   `__tests__/pointer-capture-shim.ts`, imported by the setup, `capturedPointers.clear()` per test.
 - `resetWarnOnce()`, `resetToastServerWarning()`: library once-only warnings (progress/meter and
   toast already reset their own; this makes every file start fresh).
-- `vi.useRealTimers()`, `vi.unstubAllGlobals()`, `vi.unstubAllEnvs()`: safety nets; every file
-  that fakes or stubs already restores.
+- `vi.unstubAllGlobals()`, `vi.unstubAllEnvs()`: safety nets; every file that stubs already
+  restores.
+- Not `vi.useRealTimers()`: first added as a safety net, it failed CI's Firefox browser job
+  deterministically (environment.browser.test.tsx "fires ToggleEvent when a popover opens": the
+  queued `toggle` came after the test's `setTimeout(0)`). Even a guarded `vi.isFakeTimers()` does
+  it, so merely touching vitest's lazily created timer controller in the setup hook changes
+  Firefox's task ordering. Every file that fakes timers restores them in its own afterEach
+  (checked: combobox, menu, menu-context-trigger, number-field, toast, tooltip), so no net.
+  That test relies on `toggle` (popover task source) running before a timer task, which the spec
+  does not order; worth hardening (wait for the event) if it flakes again.
 - React's own once-only warnings cannot be reset. Only `<selectedcontent>` "is unrecognized" is
   asserted (Select warm-up, `takeSelectedContentWarning`): it now keeps a module flag (the driver
   module lives exactly as long as React's module graph); the first call expects the warning, later
@@ -64,5 +72,9 @@
 
 - Before the announcer / csp fixes: seeds 101 and 707 failed (form "multiple renderers", progress
   two status regions); order-dependent, did not always reproduce.
-- Final: seeds 101 202 303 404 505 606 707 808 909 1010 green (3178/3178); plus maxWorkers=1
-  (seeds 3046 18560 9841) and maxWorkers=2 (26837 4845 15474) green.
+- After the fixes: seeds 101 202 303 404 505 606 707 808 909 1010 green (3178/3178); plus
+  maxWorkers=1 (seeds 3046 18560 9841) and maxWorkers=2 (26837 4845 15474) green.
+- Final (rebased on #108, setup without useRealTimers): seeds 11 22 33 44 55 66 77 88 99 110
+  green (3182/3182), maxWorkers=1 seed 4242 green.
+- Test list (JSON reporter, sorted titles): identical to origin/master's jsdom project plus the
+  new isolation.test.ts row; `vitest run` (all projects) picks up the same jsdom rows.
