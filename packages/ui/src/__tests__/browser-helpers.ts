@@ -4,6 +4,7 @@
 import { act } from "@testing-library/react";
 import { vi } from "vitest";
 import type { MockInstance } from "vitest";
+import { onCleanup } from "./cleanups.js";
 
 export const sleep = (ms: number): Promise<void> =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -67,21 +68,7 @@ export function quietPeriod(ms: number, _whatMustNotHappen: string): Promise<voi
   return sleep(ms);
 }
 
-const cleanups: (() => void)[] = [];
-
-/** Registers `cleanup` to run at `runCleanups()` (the file's `afterEach`, or the setup file's). */
-export function onCleanup(cleanup: () => void): void {
-  cleanups.push(cleanup);
-}
-
-/**
- * Runs the registered cleanups in order and forgets them. Files call it in their `afterEach`
- * where the order against their other teardown matters; vitest.setup.ts calls it after the
- * unmount for everything left.
- */
-export function runCleanups(): void {
-  for (const cleanup of cleanups.splice(0)) cleanup();
-}
+export { onCleanup, runCleanups } from "./cleanups.js";
 
 /** Appends a `<style>` to <head>, removed at the next `runCleanups()`; returns the remover. */
 export function addStyle(css: string): () => void {
@@ -144,33 +131,41 @@ type StartArg = StartViewTransitionOptions | ViewTransitionUpdateCallback | unde
 
 /** What `spyViewTransitions` recorded; the real `startViewTransition` still runs. */
 export interface ViewTransitionSpy {
-  /** The argument of every call, in order. */
-  readonly args: StartArg[];
   /** The transitions the real method returned. */
   readonly transitions: ViewTransition[];
   /** How many view transitions were started. */
   readonly calls: () => number;
-  readonly spy: MockInstance<Document["startViewTransition"]> | undefined;
+  /** Restores the real method now (rows that spy twice in one test). */
+  readonly restore: () => void;
 }
 
 /**
  * Counts and records `document.startViewTransition` calls and lets each one run. `onCall` runs
- * at the call, before the real method (to snapshot the DOM then). Where the engine has no
- * `startViewTransition`, nothing is spied and nothing is ever recorded.
+ * at the call, before the real method (to snapshot the DOM then). Throws where the engine has
+ * no `startViewTransition`, so a "no view transition" row cannot pass vacuously; a row whose
+ * claim also holds without the API opts in with `allowMissing` (then nothing is recorded).
  */
-export function spyViewTransitions(onCall?: (arg: StartArg) => void): ViewTransitionSpy {
-  const args: StartArg[] = [];
+export function spyViewTransitions(
+  onCall?: (arg: StartArg) => void,
+  { allowMissing = false }: { allowMissing?: boolean } = {},
+): ViewTransitionSpy {
   const transitions: ViewTransition[] = [];
-  let spy: MockInstance<Document["startViewTransition"]> | undefined;
-  if (typeof document.startViewTransition === "function") {
-    const original = document.startViewTransition.bind(document);
-    spy = vi.spyOn(document, "startViewTransition").mockImplementation(((arg?: StartArg) => {
-      args.push(arg);
+  let calls = 0;
+  if (typeof document.startViewTransition !== "function") {
+    if (!allowMissing) {
+      throw new Error("spyViewTransitions: this engine has no document.startViewTransition");
+    }
+    return { transitions, calls: () => calls, restore: () => {} };
+  }
+  const original = document.startViewTransition.bind(document);
+  const spy: MockInstance<Document["startViewTransition"]> = vi
+    .spyOn(document, "startViewTransition")
+    .mockImplementation(((arg?: StartArg) => {
+      calls++;
       onCall?.(arg);
       const transition = original(arg);
       transitions.push(transition);
       return transition;
     }) as typeof document.startViewTransition);
-  }
-  return { args, transitions, calls: () => args.length, spy };
+  return { transitions, calls: () => calls, restore: () => spy.mockRestore() };
 }

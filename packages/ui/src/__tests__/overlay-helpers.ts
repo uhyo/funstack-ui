@@ -14,7 +14,7 @@ export function spyHide(): MockInstance<HTMLElement["hidePopover"]> {
 }
 
 /** One `showPopover()` call as `watchShow` records it. */
-export interface ShowCall {
+interface ShowCall {
   readonly popup: HTMLElement;
   /** The element carrying `autofocus` at the call (the library writes it right before, 6.1). */
   readonly autofocus: Element | null;
@@ -25,10 +25,10 @@ export interface ShowCall {
  * Records, for every `showPopover()` call, the popup, the element carrying `autofocus` at that
  * moment (the keyboard path) and the `source`; the call goes through.
  */
-export function watchShow(): { calls: ShowCall[]; spy: MockInstance<HTMLElement["showPopover"]> } {
+export function watchShow(): { calls: readonly ShowCall[] } {
   const calls: ShowCall[] = [];
   const original = HTMLElement.prototype.showPopover;
-  const spy = vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
+  vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
     this: HTMLElement,
     options?: ShowPopoverOptions,
   ) {
@@ -36,7 +36,7 @@ export function watchShow(): { calls: ShowCall[]; spy: MockInstance<HTMLElement[
     calls.push({ popup: this, autofocus, source: options?.source });
     return original.call(this, options);
   });
-  return { calls, spy };
+  return { calls };
 }
 
 /**

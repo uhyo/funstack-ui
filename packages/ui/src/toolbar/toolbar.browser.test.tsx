@@ -332,7 +332,7 @@ describe("Button view transitions in a Toolbar (row 23)", () => {
       await expect.poll(() => screen.queryByRole("button", { name: "B" })).not.toBeNull();
     });
     unmount();
-    vt.spy?.mockRestore();
+    vt.restore();
     return vt.calls();
   }
 

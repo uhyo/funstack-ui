@@ -3,7 +3,7 @@ import "./popover-shim.js";
 import "./dialog-shim.js";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
-import { runCleanups } from "./browser-helpers.js";
+import { runCleanups } from "./cleanups.js";
 import { settleOpenDeferreds } from "./helpers.js";
 
 // Restore every `vi.spyOn` first, so the unmount runs on the real methods (no file needs its own

@@ -141,11 +141,15 @@ describe("top layer (browser)", () => {
     await user.click(screen.getByTestId("menu-trigger"));
     await settle(() => expect(isOpen(screen.getByTestId("menu"))).toBe(true));
     const id = await call(() => manager({ title: "Hello", duration: null }));
-    await settle(() => expect(isOpen(screen.getByTestId("menu"))).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen(screen.getByTestId("menu"))).toBe(true);
     expect(isOpen(region())).toBe(true);
     // Re-raised above it for a second toast as well.
     await call(() => manager({ title: "Again", duration: null }));
-    await settle(() => expect(isOpen(screen.getByTestId("menu"))).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen(screen.getByTestId("menu"))).toBe(true);
     expect(root(id)).toBeVisible();
   });
 

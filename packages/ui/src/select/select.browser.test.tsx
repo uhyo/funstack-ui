@@ -600,7 +600,8 @@ describe("Select (browser)", () => {
   );
 
   it("ViewTransition: a pick never starts a document view transition (no part takes `transition`)", async () => {
-    const vt = spyViewTransitions();
+    // "None started" also holds on an engine without the API (as before #101): opt in.
+    const vt = spyViewTransitions(undefined, { allowMissing: true });
     const action = vi.fn<ActionFn>();
     render(<Fruits action={action} />);
     await selectOption(sel(), "b");

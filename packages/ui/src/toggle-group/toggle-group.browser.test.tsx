@@ -89,7 +89,7 @@ describe("ToggleGroup.Item view transitions (row 23)", () => {
       await expect.poll(() => screen.queryByRole("button", { name: "B" })).not.toBeNull();
     });
     unmount();
-    vt.spy?.mockRestore();
+    vt.restore();
     return vt.calls();
   }
 

@@ -212,7 +212,9 @@ describe("opening at the pointer (browser)", () => {
       await mouse.up(x + 2, y - 2, "right");
     });
     await flushFor();
-    await settle(() => expect(isOpen()).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen()).toBe(true);
   });
 
   it("survives the pending pointerup when it flips away from the pointer (bottom-right corner)", async () => {
@@ -234,7 +236,9 @@ describe("opening at the pointer (browser)", () => {
       await mouse.up(x, y, "right");
     });
     await flushFor();
-    await settle(() => expect(isOpen()).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen()).toBe(true);
   });
 });
 
@@ -441,7 +445,9 @@ describe("move (browser)", () => {
       await mouse.up(238, 218, "right");
     });
     await flushFor();
-    await settle(() => expect(isOpen()).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen()).toBe(true);
     expectTopLeftAtPoint();
     expect(action).toHaveBeenCalledTimes(1);
   });
@@ -687,7 +693,9 @@ describe("long-press (browser)", () => {
     await act(async () => {
       region().dispatchEvent(new PointerEvent("pointerup", { ...init, buttons: 0 }));
     });
-    await settle(() => expect(isOpen()).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen()).toBe(true);
   });
 
   it.runIf(browserName === "chromium")(
@@ -988,7 +996,9 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     await act(async () => {
       await mouse.up(x, y, "right");
     });
-    await settle(() => expect(isOpen()).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen()).toBe(true);
     expect(item("rename")).toHaveFocus();
     expect(archive).not.toHaveBeenCalled();
     const target = centre(item("archive"));
@@ -1234,7 +1244,9 @@ describe("scrolling (browser, wave 11, #88)", () => {
       await wheel(400, 400, 0, 200);
     });
     await expect.poll(() => window.scrollY).toBeGreaterThan(0);
-    await settle(() => expect(isOpen()).toBe(true));
+    // Still open (nothing closed it): checked after the flush, not waited for.
+    await flushFor();
+    expect(isOpen()).toBe(true);
     const t = screen.getByTestId("trigger").getBoundingClientRect();
     expect(Math.abs(rect().top - t.bottom)).toBeLessThanOrEqual(1);
   });

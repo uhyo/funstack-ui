@@ -625,7 +625,8 @@ describe("NumberField (browser)", () => {
   });
 
   it("never starts a document view transition", async () => {
-    const vt = spyViewTransitions();
+    // "None started" also holds on an engine without the API (as before #101): opt in.
+    const vt = spyViewTransitions(undefined, { allowMissing: true });
     render(<Fixture defaultValue={1} valueCommitAction={() => undefined} />);
     await focusInput();
     await user.keyboard("{ArrowUp}");
@@ -639,7 +640,8 @@ describe("NumberField (browser)", () => {
   });
 
   it("a rejected commit starts no document view transition either (boundary and rollback)", async () => {
-    const vt = spyViewTransitions();
+    // "None started" also holds on an engine without the API (as before #101): opt in.
+    const vt = spyViewTransitions(undefined, { allowMissing: true });
     silenceErrors();
     const caught = vi.fn();
     let reject!: (error: Error) => void;

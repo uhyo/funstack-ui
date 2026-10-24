@@ -17,7 +17,7 @@
 // About "rejection rolls the DOM back": a rejected action reaches the Error Boundary above the
 // Root, which replaces the Select, so the rollback is asserted where the Select stays mounted (a
 // controlled veto, a rejection caught inside the action, a refused platform dispatch).
-import { act, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
@@ -175,7 +175,9 @@ beforeAll(() => {
       </Select.Trigger>
       <Select.Option value="a">A</Select.Option>
     </Select.Root>,
-  ).unmount();
+  );
+  // Unmounts it and removes its container: the first row starts from an empty body.
+  cleanup();
   expect(error).toHaveBeenCalledWith(expect.stringContaining("is unrecognized"), "selectedcontent");
   error.mockRestore();
 });

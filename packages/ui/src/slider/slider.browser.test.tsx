@@ -488,7 +488,8 @@ describe("Slider (browser)", () => {
   });
 
   it("never starts a document view transition (no boundary exists)", async () => {
-    const vt = spyViewTransitions();
+    // "None started" also holds on an engine without the API (as before #101): opt in.
+    const vt = spyViewTransitions(undefined, { allowMissing: true });
     render(<Fixture defaultValue={20} valueCommitAction={() => undefined} />);
     await user.click(screen.getByTestId("track"), { position: { x: 120, y: 10 } });
     await focusThumb();

@@ -325,7 +325,7 @@ describe("CheckboxGroup (browser)", () => {
         await expect.poll(() => screen.queryByRole("checkbox", { name: "b" })).not.toBeNull();
       });
       unmount();
-      vt.spy?.mockRestore();
+      vt.restore();
       return vt.calls();
     }
 
