@@ -79,9 +79,6 @@ export function ToggleGroupItem({
   const { register } = ctx;
   const registerRef = useCallback((el: HTMLElement) => register(el, value), [register, value]);
 
-  // A link or component Item is `aria-disabled` (`disabledButton`): the roving engine skips
-  // `:disabled` only, so such an Item is reached by the arrows.
-
   const state: ToggleGroupItemState = {
     pressed,
     pending,

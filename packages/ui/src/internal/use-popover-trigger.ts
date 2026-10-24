@@ -141,7 +141,7 @@ export function usePopoverTrigger<State>(
   // native `disabled` to stop it.
   const disabledProps = disabledButton(render, disabled, {
     handlesClick: isLibrary,
-    focusable: disabledAs === "aria",
+    alwaysFocusable: disabledAs === "aria",
   });
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {

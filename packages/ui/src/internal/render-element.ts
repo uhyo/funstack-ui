@@ -72,14 +72,10 @@ export function isHostButton<Props, State>(render: RenderProp<Props, State> | un
 
 export interface DisabledButton {
   /**
-   * The `aria-disabled` branch: the element may not be a host `<button>` and the part's own click
-   * handler refuses (and cancels) while disabled, so the element stays focusable.
-   */
-  readonly focusable: boolean;
-  /**
    * Owned keys, spread where `disabled` goes: `disabled` (owned as absent in the focusable
-   * branch, so a render element's own is removed), and in that branch only `aria-disabled` (a
-   * host button keeps a consumer's own).
+   * branch, where the element may not be a host `<button>` and the part's click handler refuses,
+   * so a render element's own is removed), and in that branch only `aria-disabled` (a host
+   * button keeps a consumer's own).
    */
   readonly props: {
     readonly disabled: boolean | undefined;
@@ -97,18 +93,17 @@ export interface DisabledButton {
  * The disabled rule of a button-like part that accepts an arbitrary `render`
  * (conventions 1.2, design/components/button.md 17): native `disabled` on a host `<button>`, or
  * where the browser handles the click (`handlesClick: false`: a JS-free command, which only
- * native `disabled` stops); `aria-disabled` otherwise. `focusable: true` always takes the
+ * native `disabled` stops); `aria-disabled` otherwise. `alwaysFocusable` always takes the
  * `aria-disabled` branch (a menu item stays focusable).
  */
 export function disabledButton<Props, State>(
   render: RenderProp<Props, State> | undefined,
   disabled: boolean,
-  options: { readonly handlesClick?: boolean; readonly focusable?: boolean } = {},
+  options: { readonly handlesClick?: boolean; readonly alwaysFocusable?: boolean } = {},
 ): DisabledButton {
-  const { handlesClick = true, focusable: always = false } = options;
-  const focusable = always || (handlesClick && !isHostButton(render));
+  const { handlesClick = true, alwaysFocusable = false } = options;
+  const focusable = alwaysFocusable || (handlesClick && !isHostButton(render));
   return {
-    focusable,
     props: {
       disabled: focusable ? undefined : disabled,
       ...(focusable && { "aria-disabled": disabled ? true : undefined }),
