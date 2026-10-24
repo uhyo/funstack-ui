@@ -600,6 +600,29 @@ describe("Toolbar", () => {
       expect(screen.getByRole("menuitem", { name: "First" })).toHaveFocus();
     });
 
+    it("JS-free Popover.Popup and Dialog.Popup reset it too (content always mounted)", () => {
+      render(
+        <Toolbar.Root aria-label="T" orientation="vertical">
+          <Popover.Root>
+            <Popover.Trigger>More</Popover.Trigger>
+            <Popover.Popup aria-label="P">
+              <Toolbar.Separator data-testid="popover-sep" />
+            </Popover.Popup>
+          </Popover.Root>
+          <Dialog.Root>
+            <Dialog.Trigger>Open</Dialog.Trigger>
+            <Dialog.Popup aria-label="D">
+              <Toolbar.Separator data-testid="dialog-sep" />
+            </Dialog.Popup>
+          </Dialog.Root>
+        </Toolbar.Root>,
+      );
+      // A plain separator (vertical), not perpendicular to the vertical toolbar.
+      for (const id of ["popover-sep", "dialog-sep"]) {
+        expect(screen.getByTestId(id)).toHaveAttribute("aria-orientation", "vertical");
+      }
+    });
+
     it("Dialog.Popup and Menu.Popup reset it too", async () => {
       render(
         <Toolbar.Root aria-label="T" orientation="vertical">

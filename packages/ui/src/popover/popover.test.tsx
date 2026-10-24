@@ -1850,6 +1850,39 @@ describe("Popover", () => {
       );
     });
 
+    it("initialFocus outside the popup warns once and is not autofocused", async () => {
+      const user = setupUser();
+      const error = silenceErrors();
+      let autofocused = false;
+      const show = HTMLElement.prototype.showPopover;
+      vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
+        this: HTMLElement,
+        options,
+      ) {
+        autofocused = screen.getByTestId("outside").hasAttribute("autofocus");
+        show.call(this, options);
+      });
+      function App() {
+        const ref = useRef<HTMLInputElement>(null);
+        return (
+          <>
+            <input ref={ref} data-testid="outside" />
+            <Harness mode="uncontrolled" popup={{ initialFocus: ref }} />
+          </>
+        );
+      }
+      render(<App />);
+      await openThroughTrigger(user);
+      expect(autofocused).toBe(false);
+      await user.click(trigger());
+      await flushTasks(2);
+      await openThroughTrigger(user);
+      const outside = error.mock.calls.filter(([message]) =>
+        String(message).includes("Popover.Popup: `initialFocus` is outside the popup"),
+      );
+      expect(outside).toHaveLength(1);
+    });
+
     renderBoth("focus return (design 6.2)", (mode) => {
       it("focus inside the hidden popup goes back to the Trigger (nested: the platform does not)", async () => {
         const user = setupUser();
@@ -2284,6 +2317,19 @@ describe("Popover", () => {
       await act(async () => {
         const event = dispatchCommand(popup(), "hide-popover", screen.getByTestId("elsewhere"));
         expect(event.defaultPrevented).toBe(false);
+        popup().hidePopover();
+      });
+      await flushTasks(2);
+      expect(action.mock.calls[1]![1].reason).toBe("activate");
+    });
+
+    it("the command name is matched case-insensitively (as the platform's)", async () => {
+      const action = vi.fn<ActionFn>();
+      const user = setupUser();
+      render(<Harness mode="uncontrolled" action={action} />);
+      await openThroughTrigger(user);
+      await act(async () => {
+        dispatchCommand(popup(), "Hide-Popover", screen.getByTestId("elsewhere"));
         popup().hidePopover();
       });
       await flushTasks(2);
