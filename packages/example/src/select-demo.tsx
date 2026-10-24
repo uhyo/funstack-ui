@@ -3,6 +3,7 @@ import { Select } from "@funstack/ui/select";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
 import { fakeSave, sleep } from "./shared/fake-backend.js";
 import { Demo } from "./shared/Demo.js";
+import { Spinner } from "./shared/Spinner.js";
 import "./select-demo.css";
 
 /** A decorative swatch: an SVG with no text, so the option still reads as plain text. */
@@ -39,7 +40,7 @@ function FruitPicker() {
           {({ pending }) => (
             <>
               <Select.Value />
-              {pending && <span className="sel-spinner" aria-hidden />}
+              {pending && <Spinner className="sel-spinner" />}
             </>
           )}
         </Select.Trigger>
