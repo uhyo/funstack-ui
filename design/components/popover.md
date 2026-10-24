@@ -133,7 +133,8 @@ Why these parts, where they differ from Dialog:
 
 Element constraints for `render`: `Trigger` and `Close` should render a `<button>` for the
 command path (a non-button `render` works in library mode through the click handler, never in
-JS-free mode; dev warning, as Dialog). `Popup` may render a `<dialog>` (default) or a `<div>`
+JS-free mode; dev warning in both modes, as Dialog: in library mode a non-button Trigger's
+close while open is a light dismiss, not the library-owned close, 2.7 and #115). `Popup` may render a `<dialog>` (default) or a `<div>`
 (section 6.1, focus stays on the trigger); anything else warns. The library's `[popover]`,
 `role`, `aria-modal` and ids go on whichever element renders.
 
@@ -404,8 +405,21 @@ Nested, Trigger-less popovers still work when the inner Popup is a DOM descendan
 (the "DOM child" nesting rule).
 
 A `render={<a href />}` Trigger works in library mode (click handler) and never in JS-free mode
-(only buttons run commands); dev warning, as Dialog. Note that in library mode a non-button
-Trigger is still passed as `source`, so anchoring and focus order work.
+(only buttons run commands). Note that in library mode a non-button Trigger is still passed as
+`source`, so anchoring and focus order work. What a non-button Trigger does **not** get is the
+library-owned close of 2.3 (#115): HTML's light dismiss spares the shown popover's invoker only
+through the button attributes (`commandfor` with a popover command, `popovertarget`; the
+`source` alone does not count, and an `<a>` or `<span>` cannot be an invoker), so a press on a
+non-button Trigger while the popup is open hides it at `pointerup`, a task before the `click`.
+The click still dispatches `(false, "activate")` in the right direction (the hide's `toggle`
+task lands after the click, which is in the `pointerup` task, so `intended()` is still `true`),
+but the close is browser-shaped: nothing is awaited, a controlled parent cannot veto it (it
+re-opens, as for any dismissal) and there is no `<ViewTransition>` exit. Nothing in the
+platform can give an `<a>` the exemption, so the library does not try (a `pointerdown`
+snapshot, Combobox's pre-#112 shape, would only fix a direction that is already right). The
+guarantee is therefore stated for a `<button>` Trigger, and the existing non-button dev warning
+runs in library mode too, with that text. Consumers who need a link-shaped Trigger render a
+`<button>` styled as one.
 
 ---
 
@@ -481,7 +495,10 @@ export interface PopoverTriggerProps
   style?: StateValue<CSSProperties | undefined, PopoverTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, PopoverTriggerState>;
-  /** Should render a `<button>`; another element works only in library mode (click handler). */
+  /**
+   * Should render a `<button>`; another element works only in library mode (click handler), and
+   * a press on it while the popup is open is a light dismiss rather than the awaited close (2.7).
+   */
   render?: RenderProp<ComponentPropsWithRef<"button">, PopoverTriggerState>;
 }
 ```
@@ -1721,3 +1738,36 @@ Implementation deviations of Part A (d3d0359) folded on 2026-10-23: the section 
 is symmetric (`margin-block` / `margin-inline`: a flip swaps the popup's own margins) and the
 scroll row asserts the geometry invariant rather than a flip; the list is in Tooltip's
 amendment ("Implementation deviations folded") and conventions 13.2.
+
+## Amendment: a non-button Trigger's close while open is a light dismiss (#115, 2026-10-24)
+
+Status: architect decision; no API change. Edited in place: section 1's element constraints,
+2.7, the `render` doc comment in 3.2. Menu shares the rule (menu.md's element constraints) and
+conventions 3.5 records it next to the #110 / #112 traps.
+
+Finding (#110 review F1): `usePopoverTrigger` renders `commandfor` only on a button
+(`disabledProps.invoker`), and the platform's light dismiss exempts only invoker buttons, so a
+Trigger rendered as `<a>` or `<span>` is light-dismissed at `pointerup`, before its click, in
+Chromium and Firefox (and WebKit, by the same algorithm). The close is browser-shaped: not
+awaited, no veto, no view-transition exit. The direction of the click's dispatch is right.
+
+Decision: the library-owned close is guaranteed for a `<button>` Trigger; a non-button Trigger
+keeps the browser-shaped close and is warned about in development. Options rejected: a
+`pointerdown` snapshot (fixes nothing here: the direction is already right and the close cannot
+be made library-owned without an invoker); re-showing the popup after the dismissal to then
+close it through the action (a visible blink to recover a guarantee the consumer gave up by
+choosing the element); wrapping the rendered element in a `<button>` (changes the consumer's
+markup; a button inside a link or a link inside a button is invalid HTML either way).
+
+Implementation (developer), `packages/ui/src/internal/use-popover-trigger.ts`: the
+`useElementCheck` message gains a library-mode branch, roughly: `${part}: rendered a <x>. Only a
+<button> is the popover's invoker: a press on this element while the popup is open closes it
+through light dismiss before the click, so openChangeAction(false) is not awaited and cannot
+veto. Render a <button>.` (JS-free text unchanged.) No behaviour change. Doc comments on
+`Popover.Trigger` / `Menu.Trigger` `render` say so; docs pages: the Menu page's "on every
+browser" sentence already qualifies "a `<button>` Trigger" (#115); the Popover page's Trigger
+row gets the same qualification. Tests: jsdom, the existing "non-button Trigger warns" row runs
+in library mode too and asserts the new text; browser (Chromium / Firefox / WebKit, unbranched):
+a `render={<a href="#" />}` Trigger with an async `openChangeAction`, real mouse: popup hidden at
+`pointerup` + 20 ms, one dispatch `(false, "activate")` with the `click`, documenting the
+degraded shape, next to #110's `<button>` row that asserts the awaited one.

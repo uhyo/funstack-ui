@@ -1125,7 +1125,11 @@ Rules:
   `command="toggle-popover"` and cancels its click so the command never runs (`usePopoverTrigger`
   does both for Popover and Menu; Combobox's Trigger writes the pair through its ref after
   hydration, section 7.4, because a pre-hydration command would open an empty, mis-anchored
-  popup). A part whose close is browser-owned by design (Combobox's Clear) needs none of this.
+  popup). The exemption exists for `<button>`s only, so a Trigger rendered as another element
+  through `render` keeps a browser-shaped close in library mode (right reason, nothing awaited,
+  no veto, no exit transition); the guarantee is stated for a `<button>` Trigger and the
+  non-button dev warning says so (#115, popover.md 2.7). A part whose close is browser-owned by
+  design (Combobox's Clear) needs none of this.
   The browser-row requirement is the same: assert `:popover-open` across the click's pending
   window.
 

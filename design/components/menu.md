@@ -168,7 +168,9 @@ Why these parts:
   `action` (activation closes). No `Menu.Title` / `Description`: the Trigger names the menu.
 
 Element constraints for `render`: `Trigger` and `SubmenuTrigger` should render a `<button>` for
-the command path (another element works through the click handler); items may render anything
+the command path (another element works through the click handler, but a non-button `Trigger`'s
+press while the menu is open is a light dismiss, not the awaited close of 2.2 / #110: the
+platform exempts invoker buttons only; dev warning, popover.md 2.7 and #115); items may render anything
 focusable (a link, a `div` with `tabIndex`), with the keydown handler providing Enter / Space;
 `Popup` should render a `<div>` (a `<dialog>` would run the dialog focusing steps and fight the
 item focus); `RadioGroup` / `Group` any element; `Separator` any element with `role="separator"`
