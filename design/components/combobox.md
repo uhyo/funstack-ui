@@ -1820,11 +1820,23 @@ popover from the button's popover target (`popovertarget`, or `commandfor` with 
 command), and WebKit's `handlePopoverLightDismiss` checks `commandForElement()` and
 `popoverTargetElement()` in that order (`Source/WebCore/dom/Document.cpp`, main, 2026-10-24).
 The reviewer's probe verified Chromium and Firefox (`none` → closed, `commandfor` → stays open,
-`popovertarget` → stays open). WebKit is verified by the CI job (12.2); should that job alone
-fail the "+ 20 ms still shown" assertion, switch the written pair to `popovertarget` and record
-the WebKit build that needed it. A custom command (`command="--x"`) would **not** be exempt (the
-exemption is tied to the popover commands), so the pair must be a real popover command and the
-click must always be cancelled.
+`popovertarget` → stays open). WebKit is verified by the CI job (12.2): the "Trigger close"
+rows passed on WebKit with `commandfor` (branch CI run 40089882553), so the `popovertarget`
+fallback was not needed.
+
+By the spec only a popover command is exempt (HTML "get the target popover" returns null
+unless the command is `toggle-popover`, `show-popover` or `hide-popover`). Chromium and Firefox
+(Playwright builds, 2026-10) exempt any `commandfor` that names the popover, whatever the
+command (a custom `--x`, none, or `close`). So the behaviour rows cannot tell the command apart,
+and the jsdom and hydration attribute assertions are what pin `command="toggle-popover"`. We
+write the spec's form so the exemption holds on a conformant engine; the click must always be
+cancelled so that the command never runs. A disabled button is never exempt (step 2 of the same
+algorithm; probed on Chromium and Firefox).
+
+Disabled flavours differ while open (review F7, recorded behaviour, no code change): a
+native-`disabled` Trigger is not exempt, so a press on it light-dismisses the open listbox
+(`"dismiss"`, as before #112); an `aria-disabled` `<button>` (component `render`) is exempt and
+its cancelled click returns early, so a press on it does nothing and the listbox stays open.
 
 Chromium exposes an invoker relationship to accessibility (an implicit `aria-expanded`, and
 `aria-details` when the popover is not DOM-adjacent). The Trigger's explicit `aria-expanded` and
