@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ReactNode, RefObject } from "react";
+import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import type { AriaNotifyTarget } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
@@ -26,13 +26,12 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useFormReset } from "../internal/use-form-reset.js";
-import type { FormAssociatedElement } from "../internal/use-form-reset.js";
 import { useLatest } from "../internal/use-latest.js";
 import { usePopoverRoot } from "../internal/use-popover-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import { comboboxKeyDown } from "./combobox-keyboard.js";
+import { useComboboxForm } from "./use-combobox-form.js";
 import { useOptionRegistry } from "./use-option-registry.js";
 import type { ComboboxContextValue } from "./combobox-context.js";
 
@@ -521,69 +520,24 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   // --- Form: hidden input, reset, mount reconciliation (design 11.1, walkthroughs 10 and 11) ---
 
-  const [mountValue] = useState(value);
-  const [mountText] = useState(inputValueProp);
-  // Reset targets (conventions 3.8 rule 6): uncontrolled, the latest default props; controlled,
-  // the mount-time values.
-  const valueResetTarget = value !== undefined ? (mountValue ?? null) : (defaultValue ?? null);
-  const inputDefaultValue =
-    inputValueProp !== undefined ? (mountText ?? "") : (defaultInputValue ?? "");
-  // After a form reset a controlled parent may not adopt the text: put React's value back into
-  // the DOM (react-dom only does that after its own input events).
-  const [resync, setResync] = useState(0);
-  useLayoutEffect(() => {
-    const input = inputRef.current;
-    if (resync > 0 && input !== null && input.value !== textRef.current) {
-      input.value = textRef.current;
-    }
-  }, [resync]);
-
-  const formElement = useMemo<RefObject<FormAssociatedElement | null>>(
-    () => ({
-      get current() {
-        return hiddenRef.current ?? inputRef.current;
-      },
-      set current(_ignored) {},
-    }),
-    [],
-  );
-  useFormReset(
-    formElement,
-    (event) => {
-      const input = inputRef.current;
-      const domText = input?.value ?? inputDefaultValue;
-      if (domText !== textRef.current) writeText(domText, "platform", event);
-      // A controlled parent that does not adopt the text gets the DOM re-synced.
-      setResync((n) => n + 1);
-      if (valueResetTarget !== selection.optimistic) {
-        dispatchValue(
-          valueResetTarget,
-          event,
-          { reason: "platform", custom: false },
-          { close: false, text: undefined },
-        );
-      }
-    },
-    () => {
-      // react-dom writes `defaultValue = value` after every update of a controlled input, so the
-      // reset target is written here, right before the browser's reset algorithm reads it.
-      const input = inputRef.current;
-      if (input !== null && input.defaultValue !== inputDefaultValue) {
-        input.defaultValue = inputDefaultValue;
-      }
-    },
-  );
-
-  // Walkthrough 11: react-dom keeps a hydrated text input's DOM value and fires no `onChange`.
-  const reconciled = useRef(false);
-  useLayoutEffect(() => {
-    if (reconciled.current) return;
-    reconciled.current = true;
-    const input = inputRef.current;
-    if (input !== null && input.value !== textRef.current) {
-      writeText(input.value, "platform", undefined);
-    }
-  }, [writeText]);
+  useComboboxForm({
+    value,
+    defaultValue,
+    inputValue: inputValueProp,
+    defaultInputValue,
+    inputRef,
+    hiddenRef,
+    textRef,
+    writeText,
+    optimistic: selection.optimistic,
+    resetValue: (next, event) =>
+      dispatchValue(
+        next,
+        event,
+        { reason: "platform", custom: false },
+        { close: false, text: undefined },
+      ),
+  });
 
   const [missingText] = useState(
     () =>
