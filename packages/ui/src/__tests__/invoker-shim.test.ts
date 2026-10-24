@@ -69,6 +69,15 @@ describe("invoker shim: popovertarget (#121)", () => {
     ]);
   });
 
+  it("popoverTargetElement reflects popovertarget (#125)", () => {
+    const { popover, button } = setup({ popovertarget: "target" });
+    expect(button.popoverTargetElement).toBe(popover);
+    button.setAttribute("popovertarget", "missing");
+    expect(button.popoverTargetElement).toBeNull();
+    button.removeAttribute("popovertarget");
+    expect(button.popoverTargetElement).toBeNull();
+  });
+
   it("an unknown popovertargetaction is toggle", () => {
     const { popover, button } = setup({ popovertarget: "target", popovertargetaction: "bogus" });
     button.click();
@@ -117,8 +126,11 @@ describe("invoker shim: popovertarget (#121)", () => {
       command: "hide-popover",
     });
     button.click();
-    // `hide-popover` on a hidden popover is invalid: nothing, and the toggle never ran.
+    // `hide-popover` at a hidden popover fires the command (validity ignores the state, HTML),
+    // then does nothing; the toggle never ran.
     expect(isOpen(popover)).toBe(false);
-    expect(commands).toEqual([]);
+    expect(commands.map((event) => (event as Event & { command?: string }).command)).toEqual([
+      "hide-popover",
+    ]);
   });
 });

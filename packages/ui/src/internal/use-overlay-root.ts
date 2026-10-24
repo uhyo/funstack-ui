@@ -20,8 +20,8 @@ export type OverlayMode = "static" | "library";
 
 /**
  * What caused the next close, recorded just before it happens (design 2.3). The `toggle` event
- * names no cause beyond a `popovertarget` invoker (`ToggleEvent.source`, #125); without an intent
- * a close is a `"dismiss"`.
+ * names no cause beyond its invoker (`ToggleEvent.source`: a `popovertarget`, `commandfor` or
+ * `interestfor` button, #125); without an intent a close is a `"dismiss"`.
  */
 export interface OverlayCloseIntent {
   readonly reason: ChangeReason;

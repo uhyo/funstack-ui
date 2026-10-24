@@ -6,7 +6,9 @@
 // As in the platform: the command runs as the button's activation behaviour, after the `click`
 // has been dispatched and only if nobody cancelled it. A submit button in a form does not invoke
 // (its activation behaviour submits instead); a disabled button does nothing. An invalid command
-// for the target fires no `command` event and does nothing; custom `--commands` always fire. A
+// for the target (HTML "is valid", which ignores the target's state: an unknown command, a
+// popover command at a non-popover) fires no `command` event and does nothing; custom
+// `--commands` always fire. A
 // valid one dispatches a cancelable `command` event (with `command` and `source`) at the target
 // and runs the command unless that event was cancelled.
 //
@@ -19,7 +21,7 @@
 
 /** One kind of command target (dialogs, popovers). */
 export interface CommandHandler {
-  /** Whether `command` is a valid built-in command for `target` right now (HTML "is valid"). */
+  /** Whether `command` is a valid built-in command for `target` (HTML "is valid"; stateless). */
   readonly isValid: (target: Element, command: string) => boolean;
   /** Runs a valid, uncancelled built-in command. */
   readonly run: (target: Element, command: string, button: HTMLButtonElement) => void;

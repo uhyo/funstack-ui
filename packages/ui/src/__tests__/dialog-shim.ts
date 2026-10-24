@@ -19,9 +19,9 @@
 //   cancelable `command` event (with `command` and `source`) at the target and, unless that is
 //   cancelled, runs `show-modal`, `close` or `request-close` with the button's `value`. A submit
 //   button in a form does not invoke (the button's activation behaviour submits instead). As in
-//   the platform, an invalid command (`show-modal` on an open dialog, `close` / `request-close` on
-//   a closed one, an unknown non-custom command) fires no event and does nothing; custom
-//   `--commands` always fire.
+//   the platform, validity ignores the dialog's state: `show-modal` at an open dialog and `close`
+//   / `request-close` at a closed one fire the `command` event, then do nothing (HTML "command
+//   steps", #125); an unknown non-custom command fires no event; custom `--commands` always fire.
 // - `<form method="dialog">` (or a submitter with `formmethod="dialog"`): a submit that nobody
 //   cancelled closes the nearest dialog with the submitter's `value` after every document
 //   listener ran (also when its propagation was stopped), and is then cancelled so jsdom does
@@ -107,11 +107,12 @@ export function isModal(dialog: Element): boolean {
 
 export { dispatchCommand };
 
-/** The dialog's "is valid command steps" (HTML): invalid commands fire no `command` event. */
-function isValidDialogCommand(dialog: HTMLDialogElement, command: string): boolean {
-  if (command === "show-modal") return !dialog.open;
-  if (command === "close" || command === "request-close") return dialog.open;
-  return false;
+/**
+ * The dialog's "is valid command steps" (HTML): invalid commands fire no `command` event. The
+ * dialog's state is not considered; the run step checks it.
+ */
+function isValidDialogCommand(command: string): boolean {
+  return command === "show-modal" || command === "close" || command === "request-close";
 }
 
 if (typeof HTMLDialogElement !== "undefined" && !("showModal" in HTMLDialogElement.prototype)) {
@@ -158,11 +159,14 @@ if (typeof HTMLDialogElement !== "undefined" && !("showModal" in HTMLDialogEleme
   // activation behaviour, after the click has been dispatched and only if it was not cancelled.
   registerCommandHandler({
     isValid: (target, command) =>
-      target instanceof HTMLDialogElement && isValidDialogCommand(target, command),
+      target instanceof HTMLDialogElement && isValidDialogCommand(command),
     run: (target, command, button) => {
       const dialog = target as HTMLDialogElement;
-      if (command === "show-modal") dialog.showModal();
-      else if (command === "close") dialog.close(button.value);
+      if (command === "show-modal") {
+        if (!dialog.open) dialog.showModal();
+      } else if (!dialog.open) {
+        // `close` / `request-close` at a closed dialog: nothing.
+      } else if (command === "close") dialog.close(button.value);
       else if (command === "request-close") dialog.requestClose(button.value);
     },
   });

@@ -1015,10 +1015,6 @@ describe("light dismiss and layering (browser)", () => {
   });
 });
 
-// #110: a press on the Trigger of an open menu moves no focus (its mousedown is prevented), so the
-// Popup's focusout never hides the menu first; the click is the single source of the close
-// (design/components/menu.md 2.2, "A press on the Trigger is not a focus-out"). One outcome on
-// every engine.
 describe("foreign popovertarget invoker (browser, #125)", () => {
   it("a press that keeps focus in the menu closes it with 'activate' and the ToggleEvent", async () => {
     const action = vi.fn<OpenAction>();
@@ -1057,6 +1053,10 @@ describe("foreign popovertarget invoker (browser, #125)", () => {
   });
 });
 
+// #110: a press on the Trigger of an open menu moves no focus (its mousedown is prevented), so the
+// Popup's focusout never hides the menu first; the click is the single source of the close
+// (design/components/menu.md 2.2, "A press on the Trigger is not a focus-out"). One outcome on
+// every engine.
 describe("Trigger click while open (browser, #110)", () => {
   afterEach(async () => {
     // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.

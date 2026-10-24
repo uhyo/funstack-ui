@@ -240,6 +240,35 @@ describe("Dialog", () => {
       expect(isModal(popup())).toBe(false);
     });
 
+    it("a foreign close command at a closed dialog leaves no close intent (#125 review F2)", async () => {
+      const user = setupUser();
+      let ctx: { takeCloseIntent: () => unknown } | null = null;
+      function Probe() {
+        ctx = use(DialogContext)!;
+        return null;
+      }
+      render(
+        <>
+          <button type="button" data-testid="foreign">
+            Foreign
+          </button>
+          <Dialog.Root>
+            <Dialog.Popup data-testid="popup" aria-label="Probe">
+              <Probe />
+            </Dialog.Popup>
+          </Dialog.Root>
+        </>,
+      );
+      const foreign = screen.getByTestId("foreign");
+      foreign.setAttribute("commandfor", popup().id);
+      foreign.setAttribute("command", "close");
+      // The platform fires `command` whatever the dialog's state; nothing closes.
+      await user.click(foreign);
+      await flushTasks(1);
+      expect(popup().open).toBe(false);
+      expect(ctx!.takeCloseIntent()).toBeUndefined();
+    });
+
     it("a disabled Trigger never opens", async () => {
       const user = setupUser();
       render(<Harness mode="static" trigger={{ disabled: true }} />);

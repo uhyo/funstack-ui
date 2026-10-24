@@ -695,12 +695,46 @@ describe("Popover", () => {
       expect((details.event as ToggleEvent & { source?: unknown }).source).toBe(foreign);
     });
 
-    it("a commandfor toggle-popover close keeps the CommandEvent though its toggle has a source (#125)", async () => {
+    it("a close whose source is no popovertarget invoker of the popup stays 'dismiss' (#125 review F1)", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = screen.getByTestId("elsewhere");
+      // An `interestfor` button (Chromium's lost-interest hide names it), or a `popovertarget`
+      // naming another popover.
+      for (const [name, value] of [
+        ["interestfor", () => popup().id],
+        ["popovertarget", () => "another"],
+      ] as const) {
+        await openThroughTrigger(user);
+        foreign.setAttribute(name, value());
+        await act(async () => {
+          popup().dispatchEvent(
+            Object.assign(new Event("beforetoggle"), {
+              oldState: "open",
+              newState: "closed",
+              source: foreign,
+            }),
+          );
+          popup().hidePopover();
+        });
+        await flushTasks(2);
+        foreign.removeAttribute(name);
+        expect(isOpen()).toBe(false);
+        const [next, details] = action.mock.calls.at(-1)!;
+        expect(next).toBe(false);
+        expect(details.reason).toBe("dismiss");
+      }
+    });
+
+    it("a commandfor toggle-popover close keeps the CommandEvent though its toggle names the button (#125)", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);
       await openThroughTrigger(user);
       const foreign = screen.getByTestId("elsewhere");
+      // `popovertarget` as well: the command takes precedence, and its intent stays.
+      foreign.setAttribute("popovertarget", popup().id);
       foreign.setAttribute("commandfor", popup().id);
       foreign.setAttribute("command", "toggle-popover");
       await user.click(foreign);
@@ -735,6 +769,26 @@ describe("Popover", () => {
       expect(action).toHaveBeenCalledTimes(6);
       expect(action.mock.calls[5]![1].reason).toBe("dismiss");
       expect(action.mock.calls[5]![1].event!.type).toBe("toggle");
+    });
+
+    it("a hide-popover command at a closed popup leaves no intent for a later close (#125 review F2)", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = screen.getByTestId("elsewhere");
+      foreign.setAttribute("commandfor", popup().id);
+      foreign.setAttribute("command", "hide-popover");
+      // The platform fires `command` at a hidden popover too (HTML); nothing hides.
+      await user.click(foreign);
+      await flushTasks(2);
+      expect(action).not.toHaveBeenCalled();
+      await openThroughTrigger(user);
+      // Escape in jsdom: `hidePopover()`.
+      await act(async () => popup().hidePopover());
+      await flushTasks(2);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
     });
 
     it("a hide-popover command that does not close leaves no intent: a later dismissal is 'dismiss'", async () => {

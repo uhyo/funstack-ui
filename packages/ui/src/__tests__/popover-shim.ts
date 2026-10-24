@@ -23,8 +23,10 @@
 //   `toggle` carries the latest change's.
 // - Invoker Commands (invoker-shim.ts): a click on `button[commandfor]` with `show-popover`,
 //   `hide-popover` or `toggle-popover` dispatches a cancelable `command` event at the popover and
-//   runs the command, with the button as `source`, unless it was cancelled. `show-popover` on an
-//   open popover and `hide-popover` on a closed one are invalid (no event). A click on
+//   runs the command, with the button as `source`, unless it was cancelled. Validity ignores the
+//   popover's state (HTML): `show-popover` at an open popover and `hide-popover` at a closed one
+//   fire the event, then do nothing (#125). `popoverTargetElement` reflects `popovertarget` on
+//   buttons and inputs. A click on
 //   `button[popovertarget]` (no `commandfor`) runs the same command for `popovertargetaction`
 //   (`toggle`, `show`, `hide`) with no `command` event (#121).
 // - `showPopover()` runs the popover focusing steps (HTML): a `<dialog>` runs the dialog focusing
@@ -217,11 +219,11 @@ if (typeof HTMLElement !== "undefined" && !("showPopover" in HTMLElement.prototy
   registerCommandHandler({
     isValid: (target, command) => {
       if (!(target instanceof HTMLElement) || !target.hasAttribute("popover")) return false;
-      if (command === "toggle-popover") return true;
-      if (command === "show-popover") return !isOpen(target);
-      if (command === "hide-popover") return isOpen(target);
-      return false;
+      return (
+        command === "toggle-popover" || command === "show-popover" || command === "hide-popover"
+      );
     },
+    // `setOpen` does nothing when the popover is already in the state (the run step's check).
     run: (target, command, button) => {
       const popover = target as HTMLElement;
       if (command === "show-popover") setOpen(popover, true, button);
@@ -230,6 +232,19 @@ if (typeof HTMLElement !== "undefined" && !("showPopover" in HTMLElement.prototy
     },
   });
   installInvokerShim();
+
+  // The reflected `popovertarget` (HTML: the element with that id in the button's tree).
+  for (const proto of [HTMLButtonElement.prototype, HTMLInputElement.prototype]) {
+    Object.defineProperty(proto, "popoverTargetElement", {
+      configurable: true,
+      get(this: HTMLElement) {
+        const id = this.getAttribute("popovertarget");
+        if (id === null) return null;
+        const root = this.getRootNode() as Document | ShadowRoot;
+        return root.getElementById?.(id) ?? null;
+      },
+    });
+  }
 
   const matches = Element.prototype.matches;
   Element.prototype.matches = function (this: Element, selector: string): boolean {

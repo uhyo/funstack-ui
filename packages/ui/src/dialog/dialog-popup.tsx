@@ -338,7 +338,8 @@ export function DialogPopup({
   // --- Native listeners (conventions 7.4) ---------------------------------------------------
 
   const onCommand = useEffectEvent((event: Event) => {
-    if (event.target !== popupRef.current || event.defaultPrevented) return;
+    const element = popupRef.current;
+    if (element === null || event.target !== element || event.defaultPrevented) return;
     const command = commandOf(event);
     if (command === "show-modal") {
       // A foreign invoker (design 2.2): opening goes through the library in library mode.
@@ -353,7 +354,9 @@ export function DialogPopup({
         event.preventDefault();
         const source = (event as Event & { source?: unknown }).source;
         ctx.requestClose(event, "activate", valueOf(source));
-      } else {
+      } else if (element.open) {
+        // The `command` event fires whatever the dialog's state (HTML): a close at a closed
+        // dialog leaves no intent for a later close.
         ctx.recordCloseIntent({ reason: "activate", event });
       }
     }

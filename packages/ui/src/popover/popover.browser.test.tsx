@@ -28,6 +28,7 @@ import {
   anchorPositionHonoursParentDirection,
   browserName,
   pressFocusesButtons,
+  supportsInterestFor,
   supportsPopoverHint,
 } from "../__tests__/engine.js";
 import {
@@ -425,6 +426,8 @@ describe("library mode (browser)", () => {
       />,
     );
     const foreign = screen.getByTestId("foreign");
+    // `popovertarget` as well: the command takes precedence, and its intent stays.
+    foreign.setAttribute("popovertarget", popup().id);
     foreign.setAttribute("commandfor", popup().id);
     foreign.setAttribute("command", "hide-popover");
     await user.click(trigger());
@@ -435,6 +438,81 @@ describe("library mode (browser)", () => {
     expect(action.mock.calls[1]![1].reason).toBe("activate");
     expect(action.mock.calls[1]![1].event!.type).toBe("command");
   });
+
+  it("a foreign hide-popover command while closed leaves no intent: a later Escape is 'dismiss' (#125 review F2)", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library
+        action={action}
+        before={
+          <button type="button" data-testid="foreign">
+            Foreign
+          </button>
+        }
+      />,
+    );
+    const foreign = screen.getByTestId("foreign");
+    foreign.setAttribute("commandfor", popup().id);
+    foreign.setAttribute("command", "hide-popover");
+    const commands: Event[] = [];
+    popup().addEventListener("command", (event) => commands.push(event));
+    // Every engine fires `command` at the hidden popover (HTML: the state is not considered).
+    await user.click(foreign);
+    await flushFor();
+    expect(commands).toHaveLength(1);
+    expect(action).not.toHaveBeenCalled();
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await user.keyboard("{Escape}");
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+    expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
+  });
+
+  it.runIf(supportsInterestFor)(
+    "an interestfor button's hide stays 'dismiss' though its ToggleEvent names the button (#125 review F1)",
+    async () => {
+      const action = vi.fn<ActionFn>();
+      render(
+        <Library
+          action={action}
+          before={
+            <button type="button" data-testid="foreign" style={{ display: "block" }}>
+              Foreign
+            </button>
+          }
+        />,
+      );
+      const foreign = screen.getByTestId("foreign");
+      foreign.setAttribute("interestfor", popup().id);
+      foreign.style.setProperty("interest-delay", "0s");
+      // Interest opens through the library (cancelled at `beforetoggle`, shown with the Trigger
+      // as `source`).
+      await user.hover(foreign);
+      await settle(() => expect(isOpen()).toBe(true));
+      expect(action.mock.calls[0]![1].reason).toBe("activate");
+      // Chromium 156 hides a plain popover on lost interest with the button as `source`, but not
+      // one the library re-showed (its invoker is the Trigger): any close is a dismissal.
+      await user.hover(screen.getByTestId("outside"));
+      await sleep(300);
+      if (isOpen()) {
+        // The lost-interest close's shape, then the hide.
+        await act(async () => {
+          const lost = new ToggleEvent("beforetoggle", {
+            oldState: "open",
+            newState: "closed",
+            source: foreign,
+          } as ToggleEventInit);
+          popup().dispatchEvent(lost);
+          popup().hidePopover();
+        });
+      }
+      await settle(() => expect(isOpen()).toBe(false));
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+    },
+  );
 
   it("a click outside light-dismisses ('dismiss'); focus stays on the clicked element", async () => {
     const action = vi.fn<ActionFn>();

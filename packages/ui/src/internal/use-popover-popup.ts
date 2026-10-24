@@ -117,9 +117,18 @@ export function resetFocusVisibleOption(): void {
   focusVisibleOption = undefined;
 }
 
-/** `ToggleEvent.source` (Chromium 140, Firefox 145, Safari 26.5); not in TypeScript's DOM lib. */
-function toggleSource(event: ToggleEvent): Element | null | undefined {
-  return (event as ToggleEvent & { readonly source?: Element | null }).source;
+/**
+ * Whether the `ToggleEvent.source` of a close (Chromium 140, Firefox 145, Safari 26.5; not in
+ * TypeScript's DOM lib) is a `popovertarget` invoker of `popup`. A `commandfor` or `interestfor`
+ * invoker sets `source` too (Chromium's lost-interest hide, a dismissal), and so names no
+ * `popovertarget` here.
+ */
+function closedByPopoverTarget(event: ToggleEvent, popup: HTMLElement): boolean {
+  const source = (event as ToggleEvent & { readonly source?: Element | null }).source;
+  return (
+    (source instanceof HTMLButtonElement || source instanceof HTMLInputElement) &&
+    source.popoverTargetElement === popup
+  );
 }
 
 /** Whether `element` sits inside a popover that is not shown (an outer popup that closed). */
@@ -304,8 +313,8 @@ export function usePopoverPopup(
       // A foreign `popovertarget` invoker closing the popup (design 2.3, #125): `source` is the
       // button, and `null` for Escape, light dismiss and script. The library's own parts never
       // get here with a source (their clicks are cancelled; their closes are `hidePopover()`). A
-      // `commandfor` invoker sets `source` too, and its `command` intent comes first and stays.
-      if (isLibrary && toggleSource(toggle) != null) {
+      // button with `commandfor` as well runs its command, whose intent comes first and stays.
+      if (isLibrary && closedByPopoverTarget(toggle, element)) {
         ctx.recordCloseIntent({ reason: "activate", event }, { unlessRecorded: true });
       }
       awaitingClose.current = true;
@@ -351,7 +360,9 @@ export function usePopoverPopup(
     const command = commandOf(event);
     // A foreign `commandfor` invoker closing the popup (design 2.3). Opens are caught at
     // `beforetoggle`.
-    if (command === "hide-popover" || (command === "toggle-popover" && isPopoverOpen(element))) {
+    // The `command` event fires whatever the popover's state (HTML): a `hide-popover` at a
+    // hidden popup closes nothing and must leave no intent for a later close.
+    if ((command === "hide-popover" || command === "toggle-popover") && isPopoverOpen(element)) {
       ctx.recordCloseIntent({ reason: "activate", event });
     }
   };
