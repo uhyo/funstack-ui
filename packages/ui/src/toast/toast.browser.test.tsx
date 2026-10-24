@@ -23,14 +23,13 @@ import { Dialog } from "../dialog/index.js";
 import { Menu } from "../menu/index.js";
 import { createToastManager, Toast } from "./index.js";
 import type { ToastItem, ToastManager, ToastViewportState } from "./index.js";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Lets the manager's microtask, queued `toggle` tasks and React's follow-up work run. */
-const flush = () =>
-  act(async () => {
-    await sleep(20);
-  });
+import {
+  addStyle,
+  closeOpenTopLayer,
+  flushFor,
+  runCleanups,
+  sleep,
+} from "../__tests__/browser-helpers.js";
 
 async function call<T>(fn: () => T): Promise<T> {
   let result!: T;
@@ -39,13 +38,6 @@ async function call<T>(fn: () => T): Promise<T> {
     await sleep(0);
   });
   return result;
-}
-
-function addStyle(css: string): () => void {
-  const style = document.createElement("style");
-  style.textContent = css;
-  document.head.append(style);
-  return () => style.remove();
 }
 
 /** The design's starter stylesheet (10.4), with short transitions. */
@@ -67,7 +59,6 @@ const PLAIN_CSS = `
   .toast { padding: 12px; background: white; }
 `;
 
-const cleanups: (() => void)[] = [];
 let manager: ToastManager;
 
 beforeEach(() => {
@@ -75,11 +66,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
-  for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
-    if (element.matches(":popover-open")) element.hidePopover();
-  }
-  for (const cleanup of cleanups.splice(0)) cleanup();
+  closeOpenTopLayer();
+  runCleanups();
   await sleep(0);
 });
 
@@ -124,20 +112,20 @@ function hitTestable(element: Element): boolean {
 
 describe("top layer (browser)", () => {
   it("shows the region with the first toast and hides it after the last leaves", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     render(<Viewport />);
     expect(isOpen(region())).toBe(false);
     const id = await call(() => manager({ title: "Saved", duration: null }));
     expect(isOpen(region())).toBe(true);
     expect(hitTestable(root(id))).toBe(true);
     await user.click(screen.getByTestId(`close-${id}`));
-    await flush();
+    await flushFor();
     expect(queryRoot(id)).toBeNull();
     expect(isOpen(region())).toBe(false);
   });
 
   it("adding a toast does not close an open Menu", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     render(
       <Viewport
         before={
@@ -151,21 +139,21 @@ describe("top layer (browser)", () => {
       />,
     );
     await user.click(screen.getByTestId("menu-trigger"));
-    await flush();
+    await flushFor();
     expect(isOpen(screen.getByTestId("menu"))).toBe(true);
     const id = await call(() => manager({ title: "Hello", duration: null }));
-    await flush();
+    await flushFor();
     expect(isOpen(screen.getByTestId("menu"))).toBe(true);
     expect(isOpen(region())).toBe(true);
     // Re-raised above it for a second toast as well.
     await call(() => manager({ title: "Again", duration: null }));
-    await flush();
+    await flushFor();
     expect(isOpen(screen.getByTestId("menu"))).toBe(true);
     expect(root(id)).toBeVisible();
   });
 
   it("a click on a toast light-dismisses an open auto popover (expected)", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     render(
       <Viewport
         before={
@@ -180,14 +168,14 @@ describe("top layer (browser)", () => {
     pop.showPopover();
     expect(isOpen(pop)).toBe(true);
     await user.click(root(id));
-    await flush();
+    await flushFor();
     expect(isOpen(pop)).toBe(false);
   });
 });
 
 describe("re-raise (browser)", () => {
   it("a toast added while a later popover covers the region is on top; the popover stays open", async () => {
-    cleanups.push(addStyle(STARTER_CSS));
+    addStyle(STARTER_CSS);
     render(
       <Viewport
         before={
@@ -245,14 +233,14 @@ describe("modal dialog (browser)", () => {
   }
 
   it("moves the region into an open modal Dialog so the Undo is focusable and clickable, and back", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     const undo = vi.fn();
     render(<Viewport before={<WithDialog />} />);
     const id = await call(() =>
       manager({ title: "Archived", action: { label: "Undo", action: undo }, closeAction() {} }),
     );
     await user.click(screen.getByTestId("open-dialog"));
-    await flush();
+    await flushFor();
     const dialog = screen.getByTestId("dialog");
     expect(dialog.matches(":modal")).toBe(true);
     expect(dialog.contains(region())).toBe(true);
@@ -263,13 +251,13 @@ describe("modal dialog (browser)", () => {
     expect(hitTestable(action)).toBe(true);
 
     await user.click(screen.getByTestId("close-dialog"));
-    await flush();
+    await flushFor();
     expect(dialog.matches(":modal")).toBe(false);
     expect(region().closest("dialog")).toBeNull();
     expect(isOpen(region())).toBe(true);
     expect(region().checkVisibility()).toBe(true);
     await user.click(screen.getByTestId(`action-${id}`));
-    await flush();
+    await flushFor();
     expect(undo).toHaveBeenCalledTimes(1);
     expect(queryRoot(id)).toBeNull();
   });
@@ -279,7 +267,7 @@ describe("enter and exit (browser)", () => {
   it("animates the enter; holds the closed toast with data-ending until its animations settle", async () => {
     // A long exit, so the held state is asserted without racing the clock; the test then
     // finishes the exit itself.
-    cleanups.push(addStyle(STARTER_CSS + ".toast[data-ending] { transition-duration: 5s; }"));
+    addStyle(STARTER_CSS + ".toast[data-ending] { transition-duration: 5s; }");
     render(<Viewport />);
     const id = await call(() => manager({ title: "Saved", duration: null }));
     expect(root(id).getAnimations().length).toBeGreaterThan(0);
@@ -307,14 +295,12 @@ describe("enter and exit (browser)", () => {
   });
 
   it("does not wait for an animation that ran before the close (a progress bar)", async () => {
-    cleanups.push(
-      addStyle(
-        PLAIN_CSS +
-          `@keyframes toast-progress { from { scale: 1 1; } to { scale: 0 1; } }
+    addStyle(
+      PLAIN_CSS +
+        `@keyframes toast-progress { from { scale: 1 1; } to { scale: 0 1; } }
            .progress { height: 2px; background: black; transform-origin: left;
                        animation: toast-progress 5s linear; }
            .toasts[data-paused] .progress { animation-play-state: paused; }`,
-      ),
     );
     render(
       <>
@@ -335,13 +321,13 @@ describe("enter and exit (browser)", () => {
     expect(root(id).getAnimations({ subtree: true }).length).toBeGreaterThan(0);
     // The click rests the pointer over the region: the progress bar is paused too.
     await user.click(screen.getByTestId(`close-${id}`));
-    await flush();
+    await flushFor();
     expect(queryRoot(id)).toBeNull();
     expect(isOpen(region())).toBe(false);
   });
 
   it("without animations the closed toast is dropped at once", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     render(<Viewport />);
     const id = await call(() => manager({ title: "Saved", duration: null }));
     await user.click(screen.getByTestId(`close-${id}`));
@@ -352,11 +338,11 @@ describe("enter and exit (browser)", () => {
 
 describe("announcement (browser)", () => {
   it("calls document.ariaNotify once per add", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     if (!supportsAriaNotify) {
       render(<Viewport />);
       await call(() => manager({ title: "Saved" }));
-      await flush();
+      await flushFor();
       expect(screen.getByText("Saved")).toBeInTheDocument();
       return;
     }
@@ -364,11 +350,11 @@ describe("announcement (browser)", () => {
     const spy = vi.spyOn(document as Document & { ariaNotify: () => void }, "ariaNotify");
     render(<Viewport />);
     await call(() => manager({ title: "Saved", description: "All changes stored" }));
-    await flush();
+    await flushFor();
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith("Saved All changes stored", { priority: "normal" });
     await call(() => manager({ title: "Failed", priority: "high" }));
-    await flush();
+    await flushFor();
     expect(spy).toHaveBeenCalledTimes(2);
     expect(spy).toHaveBeenLastCalledWith("Failed", { priority: "high" });
   });
@@ -376,17 +362,17 @@ describe("announcement (browser)", () => {
 
 describe("no view transition (browser)", () => {
   it("never starts a document view transition for add, update, Close, Escape or Undo settle", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     const spy = vi.spyOn(document, "startViewTransition");
     render(<Viewport />);
     const a = await call(() => manager({ title: "A", duration: null }));
     await call(() => manager.update(a, { title: "A2" }));
     await user.click(screen.getByTestId(`close-${a}`));
-    await flush();
+    await flushFor();
     const b = await call(() => manager({ title: "B", duration: null }));
     root(b).focus();
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     const c = await call(() =>
       manager({ title: "C", action: { label: "Undo", action: () => sleep(10) } }),
     );
@@ -401,7 +387,7 @@ describe("no view transition (browser)", () => {
 
 describe("focus (browser)", () => {
   it("F8 focuses the newest toast; Escape returns focus to the button that had it", async () => {
-    cleanups.push(addStyle(PLAIN_CSS));
+    addStyle(PLAIN_CSS);
     render(<Viewport />);
     await call(() => manager({ title: "A", duration: null }));
     const b = await call(() => manager({ title: "B", duration: null }));
@@ -412,11 +398,11 @@ describe("focus (browser)", () => {
     expect(region()).toHaveAttribute("data-paused", "");
     await user.keyboard("{ArrowUp}");
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     // Focus moved on to the remaining (newest) toast.
     expect(root(b)).toHaveFocus();
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(outside).toHaveFocus();
   });
 });

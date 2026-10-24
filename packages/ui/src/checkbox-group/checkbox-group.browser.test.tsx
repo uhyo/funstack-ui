@@ -13,13 +13,13 @@ import { describe, expect, it, vi } from "vitest";
 import { cdp } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
-import { deferred, silenceErrors } from "../__tests__/helpers.js";
+import { deferred, silenceErrors, flushMicrotasks } from "../__tests__/helpers.js";
 import { CheckboxGroup } from "./index.js";
 import type { CheckboxGroupValueChangeDetails } from "./index.js";
+import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: string[], details: CheckboxGroupValueChangeDetails) => unknown;
 
-const flush = () => act(async () => {});
 const box = (v: string) => screen.getByRole("checkbox", { name: v }) as HTMLInputElement;
 const items = () =>
   (screen.getAllByRole("checkbox") as HTMLInputElement[]).filter((b) => b.name !== "");
@@ -172,7 +172,7 @@ describe("CheckboxGroup (browser)", () => {
 
       box("a").focus();
       await user.keyboard(" ");
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toEqual(["a", "b"]);
       expect(action.mock.calls[0]?.[1].event?.type).toBe("click");
@@ -180,7 +180,7 @@ describe("CheckboxGroup (browser)", () => {
 
       // Arrows do nothing (no roving, no focusgroup).
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushMicrotasks();
       expect(box("a")).toHaveFocus();
       expect(action).toHaveBeenCalledTimes(1);
 
@@ -189,7 +189,7 @@ describe("CheckboxGroup (browser)", () => {
       expect(box("all").checked).toBe(true);
       box("all").focus();
       await user.keyboard(" ");
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       expect(action.mock.calls[1]?.[0]).toEqual([]);
       expect(action.mock.calls[1]?.[1].removed).toEqual(["a", "b"]);
@@ -211,7 +211,7 @@ describe("CheckboxGroup (browser)", () => {
       );
       await user.click(box("b"));
       await user.click(box("all"));
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["a"]);
       expect(box("all").matches(":indeterminate")).toBe(true);
@@ -236,7 +236,7 @@ describe("CheckboxGroup (browser)", () => {
       expect(serverParent.checked).toBe(true);
 
       render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toEqual(["a", "b", "c"]);
       expect(action.mock.calls[0]?.[1].reason).toBe("platform");
@@ -277,7 +277,7 @@ describe("CheckboxGroup (browser)", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(submitted).toEqual([
         [
           ["t", "a"],
@@ -295,14 +295,7 @@ describe("CheckboxGroup (browser)", () => {
 
   describe("view transitions", () => {
     async function mountItem(transition: ViewTransitionClass | undefined): Promise<number> {
-      let calls = 0;
-      const original = document.startViewTransition.bind(document);
-      const spy = vi.spyOn(document, "startViewTransition").mockImplementation(((
-        arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-      ) => {
-        calls++;
-        return original(arg);
-      }) as typeof document.startViewTransition);
+      const vt = spyViewTransitions();
       function Late() {
         const [shown, setShown] = useState(false);
         return (
@@ -327,22 +320,13 @@ describe("CheckboxGroup (browser)", () => {
       // A view transition commits the update in its callback, after any `act` scope has
       // returned (WebKit logged "not wrapped in act(...)", issue #49): like the ViewTransition
       // rows of popover / menu, the click and the commit run outside React's act environment.
-      type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-      const actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-      (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-      try {
+      await outsideAct(async () => {
         screen.getByRole("button", { name: "show" }).click();
         await expect.poll(() => screen.queryByRole("checkbox", { name: "b" })).not.toBeNull();
-        // Let a started view transition finish so it cannot hold the next test's commits.
-        await (
-          document as Document & { __reactViewTransition?: ViewTransition | null }
-        ).__reactViewTransition?.finished.catch(() => {});
-      } finally {
-        (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
-      }
+      });
       unmount();
-      spy.mockRestore();
-      return calls;
+      vt.spy?.mockRestore();
+      return vt.calls();
     }
 
     it("an Item mounted in a transition without `transition` starts no view transition", async () => {

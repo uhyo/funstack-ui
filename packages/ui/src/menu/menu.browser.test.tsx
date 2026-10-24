@@ -42,6 +42,16 @@ import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import { Menu } from "./index.js";
 import type { MenuOpenChangeDetails, MenuPopupProps, MenuRootProps } from "./index.js";
+import {
+  addStyle,
+  closeOpenTopLayer,
+  flushFor,
+  onCleanup,
+  runCleanups,
+  sleep,
+  leaveActEnvironment,
+  spyViewTransitions,
+} from "../__tests__/browser-helpers.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
 
@@ -50,29 +60,10 @@ const popup = () => screen.getByTestId("popup");
 const sub = () => screen.getByTestId("subpopup");
 const item = (id: string) => screen.getByTestId(id);
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Lets queued `toggle` tasks and React's follow-up work run. */
-const flush = () =>
-  act(async () => {
-    await sleep(20);
-  });
-
-function addStyle(css: string): () => void {
-  const style = document.createElement("style");
-  style.textContent = css;
-  document.head.append(style);
-  return () => style.remove();
-}
-
-const cleanups: (() => void)[] = [];
 
 afterEach(async () => {
-  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
-  for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
-    if (element.matches(":popover-open")) element.hidePopover();
-  }
-  for (const cleanup of cleanups.splice(0)) cleanup();
+  closeOpenTopLayer();
+  runCleanups();
 });
 
 const popupStyle = {
@@ -155,13 +146,13 @@ function Submenu({
 }
 
 beforeEach(() => {
-  cleanups.push(addStyle(menuCss));
+  addStyle(menuCss);
 });
 
 async function openWithKeyboard(key = "{ArrowDown}") {
   trigger().focus();
   await user.keyboard(key);
-  await flush();
+  await flushFor();
   await expect.poll(() => isOpen()).toBe(true);
 }
 
@@ -199,7 +190,7 @@ describe("keyboard end to end (browser)", () => {
     await user.keyboard("{Home}d");
     expect(item("duplicate")).toHaveFocus();
     await user.keyboard("{Enter}");
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveFocus();
     expect(action.mock.calls.at(-1)![0]).toBe(false);
@@ -213,7 +204,7 @@ describe("keyboard end to end (browser)", () => {
     await user.keyboard("{Escape}");
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveFocus();
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
 
@@ -224,7 +215,7 @@ describe("keyboard end to end (browser)", () => {
     await user.tab({ shift: true });
     expect(trigger()).toHaveFocus();
     expect(isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
 
@@ -240,7 +231,7 @@ describe("keyboard end to end (browser)", () => {
     const focus = vi.spyOn(HTMLElement.prototype, "focus");
     render(<Basic />);
     await user.click(trigger());
-    await flush();
+    await flushFor();
     await expect.poll(() => isOpen()).toBe(true);
     expect(item("rename")).toHaveFocus();
     if (supportsFocusVisibleOption) {
@@ -309,7 +300,7 @@ describe("experimental_focusgroup (browser)", () => {
         }
       };
       document.addEventListener("keydown", listener);
-      cleanups.push(() => document.removeEventListener("keydown", listener));
+      onCleanup(() => document.removeEventListener("keydown", listener));
       const action = vi.fn();
       render(
         <Basic popup={{ experimental_focusgroup: true }}>
@@ -344,7 +335,7 @@ describe("experimental_focusgroup (browser)", () => {
       expect(item("duplicate")).toHaveFocus();
       await sleep(600);
       await user.keyboard("{Enter}");
-      await flush();
+      await flushFor();
       expect(action).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
     },
@@ -355,7 +346,7 @@ describe("submenus (browser)", () => {
   async function openSub() {
     await openWithKeyboard();
     await user.keyboard("{ArrowDown}{ArrowRight}");
-    await flush();
+    await flushFor();
     await expect.poll(() => isOpen(sub())).toBe(true);
   }
 
@@ -386,7 +377,7 @@ describe("submenus (browser)", () => {
     expect(isOpen(sub())).toBe(false);
     expect(isOpen()).toBe(true);
     await expect.poll(() => document.activeElement).toBe(item("move"));
-    await flush();
+    await flushFor();
     expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
 
@@ -399,7 +390,7 @@ describe("submenus (browser)", () => {
     );
     await openSub();
     await user.keyboard("{ArrowLeft}");
-    await flush();
+    await flushFor();
     expect(isOpen(sub())).toBe(false);
     expect(isOpen()).toBe(true);
     await expect.poll(() => document.activeElement).toBe(item("move"));
@@ -418,7 +409,7 @@ describe("submenus (browser)", () => {
     await openSub();
     const subElement = sub();
     await user.keyboard("{Enter}");
-    await flush();
+    await flushFor();
     expect(onInbox).toHaveBeenCalledTimes(1);
     expect(isOpen()).toBe(false);
     expect(isOpen(subElement)).toBe(false);
@@ -443,12 +434,7 @@ describe("submenus (browser)", () => {
   it("hover intent: opens after ~100 ms without moving focus, closes ~150 ms after leaving", async () => {
     // The hover timers update the Roots outside any `act` scope: like the ViewTransition rows,
     // this row runs outside React's act environment and drives the raw `userEvent` (review L4).
-    type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-    const actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-    cleanups.push(() => {
-      (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
-    });
+    onCleanup(leaveActEnvironment());
     const times: Record<string, number> = {};
     render(
       <Basic>
@@ -528,7 +514,7 @@ describe("submenus (browser)", () => {
       await expect.poll(() => isOpen(sub())).toBe(false);
       expect(item("move")).toHaveFocus();
       await user.keyboard("{ArrowRight}");
-      await flush();
+      await flushFor();
       await expect.poll(() => isOpen(sub())).toBe(true);
       expect(item("inbox")).toHaveFocus();
       await user.keyboard("{Escape}{Escape}");
@@ -591,7 +577,7 @@ describe("resolved side and direction (browser, wave 11)", () => {
     }
     expect(popup()).toHaveAttribute("data-align", "start");
     await user.keyboard("{ArrowDown}{ArrowLeft}");
-    await flush();
+    await flushFor();
     await expect.poll(() => isOpen(sub())).toBe(true);
     expect(item("inbox")).toHaveFocus();
     expect(sub().style.getPropertyValue("position-area")).toBe("self-x-end span-bottom");
@@ -650,7 +636,7 @@ describe("resolved side and direction (browser, wave 11)", () => {
       render(<RtlMenus fixedLeft />);
       await openWithKeyboard();
       await user.keyboard("{ArrowDown}{ArrowLeft}");
-      await flush();
+      await flushFor();
       await expect.poll(() => isOpen(sub())).toBe(true);
       await actPoll(() => side(sub()), "right");
       const m = item("move").getBoundingClientRect();
@@ -713,7 +699,7 @@ describe("checkbox and radio items (browser)", () => {
     expect(isOpen()).toBe(true);
     expect(item("dense")).toHaveAttribute("data-pending", "");
     await act(async () => resolve());
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveFocus();
   });
@@ -726,15 +712,13 @@ describe("exit animation (browser)", () => {
    * under load. The row ends the exit itself with `finish()` and then expects the release.
    */
   function heldExitStyle() {
-    cleanups.push(
-      addStyle(`
+    addStyle(`
         .held-exit {
           opacity: 0;
           transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
         }
         .held-exit:popover-open { opacity: 1; transition-duration: 0s; }
-      `),
-    );
+      `);
   }
 
   /**
@@ -780,7 +764,7 @@ describe("exit animation (browser)", () => {
     await openWithKeyboard();
     const exit = watchExit();
     await user.keyboard("{Enter}");
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     await expectHeldThenReleased(exit);
   });
@@ -791,45 +775,34 @@ describe("exit animation (browser)", () => {
     await openWithKeyboard();
     const exit = watchExit();
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     await expectHeldThenReleased(exit);
   });
 });
 
 describe("ViewTransition (browser)", () => {
-  type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-  let actEnvironment: boolean | undefined;
+  let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
   let transitions: ViewTransition[] = [];
 
   beforeEach(() => {
     calls = [];
-    transitions = [];
-    const original = document.startViewTransition.bind(document);
-    vi.spyOn(document, "startViewTransition").mockImplementation(((
-      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-    ) => {
+    ({ transitions } = spyViewTransitions(() => {
       const element = document.querySelector("[data-testid=popup]");
       calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
-      const transition = original(arg);
-      transitions.push(transition);
-      return transition;
-    }) as typeof document.startViewTransition);
-    actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-    cleanups.push(
-      addStyle(`
+    }));
+    restoreAct = leaveActEnvironment();
+    addStyle(`
         ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
         ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
         @keyframes vt-pop-out { to { opacity: 0; } }
         @keyframes vt-pop-in { from { opacity: 0; } }
-      `),
-    );
+      `);
   });
 
   afterEach(async () => {
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    restoreAct();
     await Promise.allSettled(transitions.map((transition) => transition.finished));
   });
 
@@ -906,7 +879,7 @@ describe("light dismiss and layering (browser)", () => {
     await openWithKeyboard();
     await user.click(item("outside"));
     expect(isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
 
@@ -945,12 +918,12 @@ describe("light dismiss and layering (browser)", () => {
     );
     await openWithKeyboard();
     await user.keyboard("{Enter}");
-    await flush();
+    await flushFor();
     const dialog = screen.getByTestId("dialog") as HTMLDialogElement;
     await expect.poll(() => dialog.open).toBe(true);
     expect(isOpen()).toBe(true);
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(dialog.open).toBe(false);
     expect(isOpen()).toBe(true);
   });

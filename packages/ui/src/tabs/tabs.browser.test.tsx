@@ -9,6 +9,7 @@ import { supportsFocusgroup } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Tabs } from "./index.js";
 import type { TabsValueChangeDetails } from "./index.js";
+import { spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 describe("Tabs.Indicator anchor positioning", () => {
   it("is placed under the optimistic tab and moves before the action resolves", async () => {
@@ -63,14 +64,10 @@ describe("Tabs.Indicator anchor positioning", () => {
 describe("Tabs view transitions", () => {
   it("a committed switch passes fsui-tabs and the direction type to startViewTransition", async () => {
     const types: string[][] = [];
-    const original = document.startViewTransition.bind(document);
     // Record what React passes, then let the real transition run.
-    vi.spyOn(document, "startViewTransition").mockImplementation(((
-      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-    ) => {
+    spyViewTransitions((arg) => {
       if (typeof arg === "object" && arg.types != null) types.push([...arg.types]);
-      return original(arg);
-    }) as typeof document.startViewTransition);
+    });
 
     render(
       <Tabs.Root defaultValue="b" activationMode="manual">

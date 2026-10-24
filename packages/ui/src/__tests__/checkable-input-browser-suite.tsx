@@ -14,7 +14,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { SwitchCheckedChangeDetails, SwitchProps } from "../switch/switch.js";
 import { user } from "./browser-user.js";
-import { deferred, silenceErrors } from "./helpers.js";
+import { deferred, silenceErrors, flushMicrotasks } from "./helpers.js";
 
 type Details = SwitchCheckedChangeDetails;
 type ActionFn = (next: boolean, details: Details) => unknown;
@@ -24,8 +24,6 @@ export interface CheckableInputBrowserConfig {
   readonly Control: ComponentType<SwitchProps>;
   readonly role: "switch" | "checkbox";
 }
-
-const flush = () => act(async () => {});
 
 export function describeCheckableInputInBrowser(config: CheckableInputBrowserConfig): void {
   const { name, Control, role } = config;
@@ -39,7 +37,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       expect(input()).toHaveFocus();
 
       await user.keyboard(" ");
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe(true);
       expect(action.mock.calls[0]?.[1].event?.type).toBe("click");
@@ -48,7 +46,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       expect(input()).toHaveAttribute("data-checked", "");
 
       await user.keyboard("{Enter}");
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(input().matches(":checked")).toBe(true);
     });
@@ -96,7 +94,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
         />,
       );
       await user.click(input());
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(input().checked).toBe(false);
       expect(input().matches(":checked")).toBe(false);
@@ -118,7 +116,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
         />,
       );
       await user.click(input());
-      await flush();
+      await flushMicrotasks();
       expect(input().checked).toBe(false);
       expect(input()).toHaveAttribute("data-checked", "");
       // Resolve before asserting on the warning: an unsettled async action would entangle every
@@ -158,7 +156,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(submitted).toEqual([[["newsletter", "on"]]]);
       expect(input().matches(":checked")).toBe(false);
       expect(input()).not.toHaveAttribute("data-checked");
@@ -190,7 +188,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       await user.click(input());
       expect(input().checked).toBe(false);
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(actions).toEqual([
         [false, "activate", "click"],
         [true, "platform", "reset"],
@@ -210,7 +208,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       expect(server.checked).toBe(true);
 
       render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe(true);
       expect(action.mock.calls[0]?.[1].reason).toBe("platform");

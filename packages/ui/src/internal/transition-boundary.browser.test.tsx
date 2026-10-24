@@ -20,38 +20,33 @@
 import { render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { server } from "vitest/browser";
 import { Accordion } from "../accordion/index.js";
 import { Dialog } from "../dialog/index.js";
 import { Tabs } from "../tabs/index.js";
 import { silenceErrors } from "../__tests__/helpers.js";
+import {
+  closeOpenTopLayer,
+  leaveActEnvironment,
+  spyViewTransitions,
+  viewTransitionFinished,
+} from "../__tests__/browser-helpers.js";
+import type { ViewTransitionSpy } from "../__tests__/browser-helpers.js";
 
-type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-
-let calls = 0;
-let actEnvironment: boolean | undefined;
+let vt: ViewTransitionSpy;
+let restoreAct: () => void;
 
 beforeEach(() => {
-  calls = 0;
-  const original = document.startViewTransition.bind(document);
-  vi.spyOn(document, "startViewTransition").mockImplementation(((
-    arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-  ) => {
-    calls++;
-    return original(arg);
-  }) as typeof document.startViewTransition);
-  actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-  (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
+  vt = spyViewTransitions();
+  restoreAct = leaveActEnvironment();
 });
 
 afterEach(async () => {
-  (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
-  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
+  restoreAct();
+  closeOpenTopLayer();
   // Let a still-running view transition finish so it cannot hold the next test's commits.
-  await (
-    document as Document & { __reactViewTransition?: ViewTransition | null }
-  ).__reactViewTransition?.finished.catch(() => {});
+  await viewTransitionFinished();
 });
 
 /** Resolves with `performance.now()` at the first DOM mutation (or check) where `cond` holds. */
@@ -125,7 +120,7 @@ function log(label: string, { delay }: SecondCommit) {
 
 /** No startViewTransition at all, and nothing running that react-dom could hold a commit for. */
 function expectNotHeld(result: SecondCommit) {
-  expect(calls).toBe(0);
+  expect(vt.calls()).toBe(0);
   expect(result.runningAtClick).toBe(false);
   expect(result.runningAtCommit).toBe(false);
 }
@@ -169,7 +164,7 @@ describe("Tabs switch", () => {
       render(tree(keepMounted, "none"));
       const result = await run();
       log(`Tabs keepMounted=${keepMounted} transition="none"`, result);
-      expect(calls).toBe(2);
+      expect(vt.calls()).toBe(2);
       // The first switch's transition is still running at the second click (its commit is
       // observed from inside the update callback, before `finished`), so the probe the "not
       // held" rows rely on does see a transition that holds the next commit.
@@ -208,7 +203,7 @@ describe("Accordion expand", () => {
     render(tree("none"));
     const result = await run();
     log('Accordion transition="none"', result);
-    expect(calls).toBe(0);
+    expect(vt.calls()).toBe(0);
   });
 });
 
@@ -250,7 +245,7 @@ describe("Dialog open", () => {
     render(<Nested transition="none" />);
     const result = await run();
     log('Dialog nested transition="none"', result);
-    expect(calls).toBeGreaterThanOrEqual(1);
+    expect(vt.calls()).toBeGreaterThanOrEqual(1);
   });
 
   // memo/reviewer/dialog.md: a plain open mounts the content under the always-mounted <dialog>,
@@ -270,10 +265,8 @@ describe("Dialog open", () => {
     );
     screen.getByTestId("trigger").click();
     await when(() => dialog("popup")?.open === true);
-    await (
-      document as Document & { __reactViewTransition?: ViewTransition | null }
-    ).__reactViewTransition?.finished.catch(() => {});
-    expect(calls).toBe(n);
+    await viewTransitionFinished();
+    expect(vt.calls()).toBe(n);
   });
 
   /** Inserts its child at the top of a subtree in a transition. */
@@ -306,6 +299,6 @@ describe("Dialog open", () => {
     );
     screen.getByRole("button", { name: "insert" }).click();
     await when(() => dialog("popup") !== null);
-    expect(calls).toBe(n);
+    expect(vt.calls()).toBe(n);
   });
 });

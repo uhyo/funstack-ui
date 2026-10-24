@@ -42,6 +42,17 @@ import type {
   ComboboxRootProps,
   ComboboxValueChangeDetails,
 } from "./index.js";
+import {
+  addStyle,
+  closeOpenTopLayer,
+  flushFor,
+  onCleanup,
+  runCleanups,
+  settle,
+  sleep,
+  leaveActEnvironment,
+  spyViewTransitions,
+} from "../__tests__/browser-helpers.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -112,53 +123,16 @@ const popup = () => screen.getByTestId("popup");
 const option = (code: string) => screen.getByTestId(`opt-${code}`);
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
 const optionTexts = () => screen.queryAllByRole("option").map((o) => o.textContent);
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Lets queued `toggle` tasks and React's follow-up work run. */
-const flush = () =>
-  act(async () => {
-    await sleep(20);
-  });
-
-/**
- * Flushes until `check` passes (up to `timeout` ms), so an update that lands after an interaction
- * (a `toggle` task, a slow engine) still happens inside `act`. `expect.poll` would observe it
- * outside `act`, which logs React's act() warning.
- */
-async function settle(check: () => void, timeout = 2000): Promise<void> {
-  const start = performance.now();
-  for (;;) {
-    await flush();
-    try {
-      check();
-      return;
-    } catch (error) {
-      if (performance.now() - start > timeout) throw error;
-    }
-  }
-}
 
 async function typeInto(text: string) {
   if (document.activeElement !== input()) await user.click(input());
   await user.keyboard(text);
-  await flush();
+  await flushFor();
 }
-
-function addStyle(css: string): () => void {
-  const style = document.createElement("style");
-  style.textContent = css;
-  document.head.append(style);
-  return () => style.remove();
-}
-
-const cleanups: (() => void)[] = [];
 
 afterEach(async () => {
-  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
-  for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
-    if (element.matches(":popover-open")) element.hidePopover();
-  }
-  for (const cleanup of cleanups.splice(0)) cleanup();
+  closeOpenTopLayer();
+  runCleanups();
 });
 
 describe("Combobox (browser)", () => {
@@ -179,7 +153,7 @@ describe("Combobox (browser)", () => {
     // direction, so a page and a container both flip it (next row).
     it("aligns the inline-start edges under a page-level dir=rtl (the right edges)", async () => {
       document.documentElement.dir = "rtl";
-      cleanups.push(() => document.documentElement.removeAttribute("dir"));
+      onCleanup(() => document.documentElement.removeAttribute("dir"));
       render(
         <div style={{ paddingInline: 40 }}>
           <Harness />
@@ -244,7 +218,7 @@ describe("Combobox (browser)", () => {
       expect(input().value).toBe("Jamaica");
       expect(isOpen()).toBe(true);
       await act(async () => save.resolve());
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(false);
       expect(document.activeElement).toBe(input());
     });
@@ -252,16 +226,16 @@ describe("Combobox (browser)", () => {
     it("the Trigger opens with the input focused; Clear leaves focus in the input", async () => {
       render(<Harness root={{ defaultValue: "fr", defaultInputValue: "France" }} />);
       await user.click(screen.getByTestId("trigger"));
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(true);
       expect(document.activeElement).toBe(input());
       // A second press closes it (decided against the state at pointerdown).
       await user.click(screen.getByTestId("trigger"));
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(false);
       expect(document.activeElement).toBe(input());
       await user.click(screen.getByTestId("clear"));
-      await flush();
+      await flushFor();
       expect(document.activeElement).toBe(input());
       expect(input().value).toBe("");
     });
@@ -278,10 +252,10 @@ describe("Combobox (browser)", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("Ja");
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(true);
       await user.click(screen.getByTestId("page"));
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(false);
       expect(input().value).toBe("France");
     });
@@ -294,7 +268,7 @@ describe("Combobox (browser)", () => {
       await typeInto("ja");
       await user.keyboard("{ArrowDown}");
       await user.keyboard("{Escape}");
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(false);
       expect(openAction.mock.calls.at(-1)![0]).toBe(false);
       expect(openAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
@@ -320,29 +294,29 @@ describe("Combobox (browser)", () => {
       expect(isOpen()).toBe(true);
       expect(dialog.open).toBe(true);
       await user.keyboard("{Escape}");
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(false);
       expect(dialog.open).toBe(true);
       await user.keyboard("{Escape}");
-      await flush();
+      await flushFor();
       expect(dialog.open).toBe(false);
     });
 
     it("inside a Popover: the first Escape closes the listbox, the second the Popover", async () => {
       render(<InPopover />);
       await user.click(screen.getByTestId("popover-trigger"));
-      await flush();
+      await flushFor();
       const outer = screen.getByTestId("popover");
       expect(isOpen(outer)).toBe(true);
       await typeInto("j");
       expect(isOpen()).toBe(true);
       expect(isOpen(outer)).toBe(true);
       await user.keyboard("{Escape}");
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(false);
       expect(isOpen(outer)).toBe(true);
       await user.keyboard("{Escape}");
-      await flush();
+      await flushFor();
       expect(isOpen(outer)).toBe(false);
     });
   });
@@ -358,10 +332,10 @@ describe("Combobox (browser)", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("Jam");
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(true);
       await user.tab();
-      await flush();
+      await flushFor();
       expect(document.activeElement).toBe(screen.getByTestId("after"));
       expect(isOpen()).toBe(false);
       expect(input().value).toBe("France");
@@ -373,7 +347,7 @@ describe("Combobox (browser)", () => {
       render(<Harness root={{ allowCustomValue: true, valueChangeAction: action }} />);
       await typeInto("Narnia");
       await user.tab({ shift: true });
-      await flush();
+      await flushFor();
       expect(document.activeElement).toBe(screen.getByTestId("before"));
       expect(isOpen()).toBe(false);
       expect(action).toHaveBeenCalledWith("Narnia", expect.anything());
@@ -397,7 +371,7 @@ describe("Combobox (browser)", () => {
     // Still pending: the save holds every transition, not the deferred render.
     expect(input()).toHaveAttribute("data-pending", "");
     await act(async () => save.resolve());
-    await flush();
+    await flushFor();
     expect(input()).not.toHaveAttribute("data-pending");
   });
 
@@ -419,13 +393,13 @@ describe("Combobox (browser)", () => {
     await user.keyboard("{ArrowDown}{Enter}");
     await user.clear(input());
     await user.keyboard("f");
-    await flush();
+    await flushFor();
     expect(screen.getByTestId("list")).toHaveAttribute("data-stale", "");
     await act(async () => search.resolve("f"));
     await expect.poll(() => optionTexts(), { timeout: 2000 }).toEqual(["France"]);
     expect(input()).toHaveAttribute("data-pending", "");
     await act(async () => save.resolve());
-    await flush();
+    await flushFor();
   });
 
   it("Enter submits with the new value: the hidden input is updated before implicit submission", async () => {
@@ -442,10 +416,10 @@ describe("Combobox (browser)", () => {
     );
     await typeInto("Narnia");
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     await user.keyboard("{Enter}");
-    await flush();
+    await flushFor();
     // Document the engine's order if this ever differs (design 5.3).
     expect(submitted).toEqual(["Narnia"]);
   });
@@ -461,13 +435,13 @@ describe("Combobox (browser)", () => {
         </>,
       );
       await user.click(screen.getByTestId("popover-trigger"));
-      await flush();
+      await flushFor();
       await typeInto("j");
       const outer = screen.getByTestId("popover");
       expect(isOpen()).toBe(true);
       expect(isOpen(outer)).toBe(true);
       await user.click(screen.getByTestId("outside"));
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(false);
       expect(isOpen(outer)).toBe(false);
     });
@@ -483,7 +457,7 @@ describe("Combobox (browser)", () => {
       async () => {
         render(<InPopover />);
         await user.click(screen.getByTestId("popover-trigger"));
-        await flush();
+        await flushFor();
         expect(getComputedStyle(popup()).getPropertyValue("position-try-fallbacks")).toContain(
           "flip-block",
         );
@@ -526,11 +500,11 @@ describe("Combobox (browser)", () => {
       }
       expect(calls).toEqual([{ element: screen.getByTestId("list"), message: "3 results" }]);
       await user.keyboard("a");
-      await flush();
+      await flushFor();
       expect(screen.getByTestId("list")).toHaveAttribute("data-stale", "");
       expect(calls).toHaveLength(1);
       await act(async () => search.resolve("ja"));
-      await flush();
+      await flushFor();
       expect(calls.map((c) => c.message)).toEqual(["3 results", "2 results"]);
     });
   });
@@ -581,7 +555,7 @@ describe("Combobox (browser)", () => {
       await act(async () => {
         hydrateRoot(container, <App />, { onRecoverableError: (e) => recoverable.push(e) });
       });
-      await flush();
+      await flushFor();
       expect(recoverable).toEqual([]);
       expect(consoleError).not.toHaveBeenCalled();
       expect(container.querySelector("input")).toBe(field);
@@ -607,7 +581,7 @@ describe("Combobox (browser)", () => {
       render(<Harness root={{ valueChangeAction: action }} results={() => <Options query="" />} />);
       await user.click(input());
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushFor();
       expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id);
       if (browserName === "chromium") {
         const session = cdp();
@@ -618,7 +592,7 @@ describe("Combobox (browser)", () => {
             selectionEnd: 1,
           });
         });
-        await flush();
+        await flushFor();
         expect(input().value).toBe("に");
         expect(isOpen()).toBe(true);
         // Enter while composing commits the composition, not the active option.
@@ -631,7 +605,7 @@ describe("Combobox (browser)", () => {
           });
           await session.send("Input.insertText", { text: "に" });
         });
-        await flush();
+        await flushFor();
         expect(action).not.toHaveBeenCalled();
         expect(input().value).toBe("に");
         // The composed text is an edit: visual focus went back to the input (APG).
@@ -659,38 +633,27 @@ describe("Combobox (browser)", () => {
 });
 
 describe("ViewTransition (browser)", () => {
-  type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-  let actEnvironment: boolean | undefined;
+  let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
   let transitions: ViewTransition[] = [];
 
   beforeEach(() => {
     calls = [];
-    transitions = [];
-    const original = document.startViewTransition.bind(document);
-    vi.spyOn(document, "startViewTransition").mockImplementation(((
-      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-    ) => {
+    ({ transitions } = spyViewTransitions(() => {
       const element = document.querySelector("[data-testid=popup]");
       calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
-      const transition = original(arg);
-      transitions.push(transition);
-      return transition;
-    }) as typeof document.startViewTransition);
-    actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-    cleanups.push(
-      addStyle(`
+    }));
+    restoreAct = leaveActEnvironment();
+    addStyle(`
         ::view-transition-old(.pop) { animation: 150ms ease-in both cb-pop-out; }
         ::view-transition-new(.pop) { animation: 150ms ease-out both cb-pop-in; }
         @keyframes cb-pop-out { to { opacity: 0; } }
         @keyframes cb-pop-in { from { opacity: 0; } }
-      `),
-    );
+      `);
   });
 
   afterEach(async () => {
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    restoreAct();
     await Promise.allSettled(transitions.map((transition) => transition.finished));
   });
 

@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { supportsFocusgroup } from "../__tests__/engine.js";
 import { ToggleGroup } from "./index.js";
+import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 const button = (name: string) => screen.getByRole("button", { name });
 const focused = () => document.activeElement;
@@ -62,14 +63,7 @@ describe.each([
 
 describe("ToggleGroup.Item view transitions (row 23)", () => {
   async function mountItem(transition: ViewTransitionClass | undefined): Promise<number> {
-    let calls = 0;
-    const original = document.startViewTransition.bind(document);
-    const spy = vi.spyOn(document, "startViewTransition").mockImplementation(((
-      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-    ) => {
-      calls++;
-      return original(arg);
-    }) as typeof document.startViewTransition);
+    const vt = spyViewTransitions();
     function Late() {
       const [shown, setShown] = useState(false);
       return (
@@ -90,21 +84,13 @@ describe("ToggleGroup.Item view transitions (row 23)", () => {
     }
     const { unmount } = render(<Late />);
     // A view transition commits in its callback, after any `act` scope (issue #49).
-    type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-    const actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-    try {
+    await outsideAct(async () => {
       button("show").click();
       await expect.poll(() => screen.queryByRole("button", { name: "B" })).not.toBeNull();
-      await (
-        document as Document & { __reactViewTransition?: ViewTransition | null }
-      ).__reactViewTransition?.finished.catch(() => {});
-    } finally {
-      (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
-    }
+    });
     unmount();
-    spy.mockRestore();
-    return calls;
+    vt.spy?.mockRestore();
+    return vt.calls();
   }
 
   it("without `transition` a mount starts no view transition; with `none` it does", async () => {

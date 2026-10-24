@@ -13,17 +13,16 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { cdp, userEvent } from "vitest/browser";
-import { ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
+import { ErrorCatcher, silenceErrors, flushMicrotasks } from "../__tests__/helpers.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { NumberField } from "./index.js";
 import type { NumberFieldRootProps, NumberFieldValueChangeDetails } from "./index.js";
+import { spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 type Fn = (next: number | null, details: NumberFieldValueChangeDetails) => unknown;
-
-const flush = () => act(async () => {});
 
 function Fixture(props: Partial<NumberFieldRootProps>) {
   return (
@@ -90,7 +89,7 @@ describe("NumberField (browser)", () => {
       ];
       for (const [key, value] of expected) {
         await user.keyboard(key);
-        await flush();
+        await flushMicrotasks();
         expect(input().value, key).toBe(value);
         expect(hidden().value, key).toBe(value);
       }
@@ -120,7 +119,7 @@ describe("NumberField (browser)", () => {
       await user.clear(input());
       await user.type(input(), "1,5");
       await user.tab();
-      await flush();
+      await flushMicrotasks();
       expect(hidden().value).toBe("1.5");
       expect(input().value).toBe("1,5");
       expect(onCommit.mock.calls[0]![0]).toBe(1.5);
@@ -135,7 +134,7 @@ describe("NumberField (browser)", () => {
       await user.clear(input());
       await user.type(input(), "1,5");
       await user.tab();
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("1");
       expect(hidden().value).toBe("1");
       expect(onCommit).not.toHaveBeenCalled();
@@ -162,7 +161,7 @@ describe("NumberField (browser)", () => {
     await user.clear(input());
     await user.type(input(), "0");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await flush();
+    await flushMicrotasks();
     expect(submitted).not.toHaveBeenCalled();
     expect(hidden().validity.rangeUnderflow).toBe(true);
     expect(input().validationMessage).not.toBe("");
@@ -198,7 +197,7 @@ describe("NumberField (browser)", () => {
             </form>
           </>,
         );
-        await flush();
+        await flushMicrotasks();
         await act(async () => {
           (screen.getByTestId("nf") as HTMLFormElement).requestSubmit();
         });
@@ -241,7 +240,7 @@ describe("NumberField (browser)", () => {
         <Form.Submit>Save</Form.Submit>
       </Form.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     const invalid: Event[] = [];
     input().addEventListener("invalid", (e) => invalid.push(e));
     let hiddenFocused = false;
@@ -254,11 +253,11 @@ describe("NumberField (browser)", () => {
     // first: a click on Save would blur too, and the error appearing between its mousedown and
     // mouseup would move the button away from the pointer in this unstyled layout.)
     await user.tab();
-    await flush();
+    await flushMicrotasks();
     expect(input().matches(":user-invalid")).toBe(true);
     expect(screen.getByTestId("error")).toHaveTextContent("Enter a multiple of six.");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await flush();
+    await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
     expect(invalid).toHaveLength(1);
     expect(invalid[0]!.defaultPrevented).toBe(true);
@@ -268,13 +267,13 @@ describe("NumberField (browser)", () => {
     expect(screen.getByTestId("error")).toHaveTextContent("Enter a multiple of six.");
 
     await user.click(inc());
-    await flush();
+    await flushMicrotasks();
     expect(input().value).toBe("12");
     expect(screen.queryByTestId("error")).toBeNull();
     expect(input().matches(":user-invalid")).toBe(false);
 
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await flush();
+    await flushMicrotasks();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![0].get("quantity")).toBe("12");
   });
@@ -290,7 +289,7 @@ describe("NumberField (browser)", () => {
     await user.clear(input());
     await user.type(input(), "12");
     await user.keyboard("{Enter}");
-    await flush();
+    await flushMicrotasks();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![0].get("quantity")).toBe("12");
   });
@@ -311,7 +310,7 @@ describe("NumberField (browser)", () => {
         await userEvent.wheel(element, { delta: { y: deltaY } });
         await delivered;
       });
-      await flush();
+      await flushMicrotasks();
     }
 
     function Tall(props: Partial<NumberFieldRootProps>) {
@@ -359,7 +358,7 @@ describe("NumberField (browser)", () => {
       render(
         <Fixture defaultValue={0} valueChangeAction={onChange} valueCommitAction={onCommit} />,
       );
-      await flush();
+      await flushMicrotasks();
       const button = inc();
       const pointerTypes: string[] = [];
       button.addEventListener("pointerdown", (e) => pointerTypes.push(e.pointerType));
@@ -393,7 +392,7 @@ describe("NumberField (browser)", () => {
         await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
         await up;
       });
-      await flush();
+      await flushMicrotasks();
       expect(pointerTypes).toEqual(["touch"]);
       const held = upAt - downAt;
       expect(held).toBeGreaterThanOrEqual(650);
@@ -431,7 +430,7 @@ describe("NumberField (browser)", () => {
           });
           await composed;
         });
-        await flush();
+        await flushMicrotasks();
         expect(input().value).toBe("１２");
         expect(onCommit).not.toHaveBeenCalled();
         // The confirming Enter arrives while composing (keyCode 229), then the text is inserted.
@@ -448,7 +447,7 @@ describe("NumberField (browser)", () => {
           await session.send("Input.insertText", { text: "１２" });
           await ended;
         });
-        await flush();
+        await flushMicrotasks();
         expect(onCommit).not.toHaveBeenCalled();
         expect(input().value).toBe("１２");
         // Nothing committed: the hidden input still holds the value before the edit.
@@ -472,7 +471,7 @@ describe("NumberField (browser)", () => {
       }
       // Outside a composition Enter commits the full-width digits as 12.
       await user.keyboard("{Enter}");
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toBe(12);
       expect(hidden().value).toBe("12");
@@ -493,7 +492,7 @@ describe("NumberField (browser)", () => {
     inc().addEventListener("pointerdown", () => (downAt = performance.now()));
     inc().addEventListener("pointerup", () => (upAt = performance.now()));
     await user.click(inc(), { delay: 700 });
-    await flush();
+    await flushMicrotasks();
     const value = Number(input().value);
     // One step at the press, one at 400 ms, then one per 60 ms until the release: about 6 for a
     // 700 ms press. Measured against the press as the page saw it, so a loaded machine (late
@@ -526,7 +525,7 @@ describe("NumberField (browser)", () => {
       expect(notify).toHaveBeenCalledTimes(1);
       expect(notify).toHaveBeenLastCalledWith("1,001");
       await user.click(inc(), { delay: 500 });
-      await flush();
+      await flushMicrotasks();
       expect(notify).toHaveBeenCalledTimes(2);
       expect(notify).toHaveBeenLastCalledWith(input().value);
       notify.mockRestore();
@@ -611,7 +610,7 @@ describe("NumberField (browser)", () => {
       await act(async () => {
         hydrateRoot(container, <App />, { onRecoverableError: (e) => recoverable.push(e) });
       });
-      await flush();
+      await flushMicrotasks();
       expect(recoverable).toEqual([]);
       expect(field.value).toBe("3");
       expect((field.nextElementSibling as HTMLInputElement).value).toBe("3");
@@ -626,16 +625,7 @@ describe("NumberField (browser)", () => {
   });
 
   it("never starts a document view transition", async () => {
-    const start = vi.fn();
-    if (typeof document.startViewTransition === "function") {
-      const original = document.startViewTransition.bind(document);
-      vi.spyOn(document, "startViewTransition").mockImplementation(((
-        arg: Parameters<typeof document.startViewTransition>[0],
-      ) => {
-        start();
-        return original(arg);
-      }) as typeof document.startViewTransition);
-    }
+    const vt = spyViewTransitions();
     render(<Fixture defaultValue={1} valueCommitAction={() => undefined} />);
     await focusInput();
     await user.keyboard("{ArrowUp}");
@@ -643,22 +633,13 @@ describe("NumberField (browser)", () => {
     await user.clear(input());
     await user.type(input(), "9");
     await user.tab();
-    await flush();
+    await flushMicrotasks();
     expect(input().value).toBe("9");
-    expect(start).not.toHaveBeenCalled();
+    expect(vt.calls()).toBe(0);
   });
 
   it("a rejected commit starts no document view transition either (boundary and rollback)", async () => {
-    const start = vi.fn();
-    if (typeof document.startViewTransition === "function") {
-      const original = document.startViewTransition.bind(document);
-      vi.spyOn(document, "startViewTransition").mockImplementation(((
-        arg: Parameters<typeof document.startViewTransition>[0],
-      ) => {
-        start();
-        return original(arg);
-      }) as typeof document.startViewTransition);
-    }
+    const vt = spyViewTransitions();
     silenceErrors();
     const caught = vi.fn();
     let reject!: (error: Error) => void;
@@ -678,7 +659,7 @@ describe("NumberField (browser)", () => {
     );
     await focusInput();
     await user.keyboard("{ArrowUp}");
-    await flush();
+    await flushMicrotasks();
     expect(input().value).toBe("2");
     expect(screen.getByTestId("root")).toHaveAttribute("data-pending");
     await act(async () => reject(new Error("save failed")));
@@ -686,6 +667,6 @@ describe("NumberField (browser)", () => {
     // Uncontrolled: the rollback step ("dismiss") ran, and the boundary replaced the field.
     expect(onChange.mock.calls.at(-1)?.[1].reason).toBe("dismiss");
     expect(screen.queryByTestId("root")).toBeNull();
-    expect(start).not.toHaveBeenCalled();
+    expect(vt.calls()).toBe(0);
   });
 });

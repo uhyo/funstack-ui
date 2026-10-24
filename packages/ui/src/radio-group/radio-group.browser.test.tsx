@@ -13,13 +13,12 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
-import { deferred, silenceErrors } from "../__tests__/helpers.js";
+import { deferred, silenceErrors, flushMicrotasks } from "../__tests__/helpers.js";
 import { RadioGroup } from "./index.js";
 import type { RadioGroupValueChangeDetails } from "./index.js";
 
 type ActionFn = (next: string | null, details: RadioGroupValueChangeDetails) => unknown;
 
-const flush = () => act(async () => {});
 const radio = (v: string) => screen.getByRole("radio", { name: v }) as HTMLInputElement;
 const group = () => screen.getByRole("radiogroup");
 const checkedValues = () =>
@@ -69,21 +68,21 @@ describe("RadioGroup (browser)", () => {
       radio("a").focus();
 
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushMicrotasks();
       expect(radio("b")).toHaveFocus();
       await user.keyboard("{ArrowRight}");
-      await flush();
+      await flushMicrotasks();
       expect(radio("c")).toHaveFocus();
       await user.keyboard("{ArrowDown}");
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushMicrotasks();
       // Wrapped from d to a; WebKit stays on d without dispatching.
       expect(radio(arrowsWrap ? "a" : "d")).toHaveFocus();
       await user.keyboard("{ArrowUp}");
-      await flush();
+      await flushMicrotasks();
       expect(radio(arrowsWrap ? "d" : "c")).toHaveFocus();
       await user.keyboard("{ArrowLeft}");
-      await flush();
+      await flushMicrotasks();
       expect(radio(arrowsWrap ? "c" : "b")).toHaveFocus();
 
       expect(action.mock.calls.map(([n]) => n)).toEqual(
@@ -101,15 +100,15 @@ describe("RadioGroup (browser)", () => {
       render(<Fruits action={action} dir="rtl" defaultValue="b" />);
       radio("b").focus();
       await user.keyboard("{ArrowRight}");
-      await flush();
+      await flushMicrotasks();
       expect(radio(arrowsMirrorRtl ? "a" : "c")).toHaveFocus();
       await user.keyboard("{ArrowLeft}");
       await user.keyboard("{ArrowLeft}");
-      await flush();
+      await flushMicrotasks();
       expect(radio(arrowsMirrorRtl ? "c" : "a")).toHaveFocus();
       // Up / Down are not mirrored.
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushMicrotasks();
       const last = arrowsMirrorRtl ? "d" : "b";
       expect(radio(last)).toHaveFocus();
       expect(action.mock.calls.map(([n]) => n)).toEqual(
@@ -123,7 +122,7 @@ describe("RadioGroup (browser)", () => {
       const { unmount } = render(<Fruits action={action} disabled={["b", "c"]} />);
       radio("a").focus();
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushMicrotasks();
       expect(radio("d")).toHaveFocus();
       expect(action.mock.calls.map(([n]) => n)).toEqual(["d"]);
       unmount();
@@ -156,17 +155,17 @@ describe("RadioGroup (browser)", () => {
 
       await user.keyboard("{Home}");
       await user.keyboard("{End}");
-      await flush();
+      await flushMicrotasks();
       expect(radio("c")).toHaveFocus();
       expect(action).not.toHaveBeenCalled();
 
       // Space on the checked radio does nothing; on another radio it checks it.
       await user.keyboard(" ");
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       radio("a").focus();
       await user.keyboard(" ");
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe("a");
       expect(action.mock.calls[0]?.[1].event?.type).toBe("click");
@@ -217,7 +216,7 @@ describe("RadioGroup (browser)", () => {
       </RadioGroup.Root>,
     );
     await user.click(radio("b"));
-    await flush();
+    await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
     expect(checkedValues()).toEqual(["a"]);
     expect(radio("a")).toHaveAttribute("data-checked", "");
@@ -266,7 +265,7 @@ describe("RadioGroup (browser)", () => {
     expect(serverC.checked).toBe(true);
 
     render(ui, { container, hydrate: true });
-    await flush();
+    await flushMicrotasks();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]?.[0]).toBe("c");
     expect(action.mock.calls[0]?.[1].reason).toBe("platform");
@@ -316,7 +315,7 @@ describe("RadioGroup (browser)", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(submitted).toEqual([[["plan", "pro"]]]);
       expect(action.mock.calls.map(([n, det]) => [n, det.reason, det.event?.type])).toEqual([
         ["pro", "activate", "click"],
@@ -361,7 +360,7 @@ describe("RadioGroup (browser)", () => {
     await user.click(radio("b"));
     expect(checkedValues()).toEqual(["b"]);
     await user.click(screen.getByRole("button", { name: "Reset" }));
-    await flush();
+    await flushMicrotasks();
     expect(actions).toEqual([
       ["b", "activate", "click"],
       ["a", "platform", "reset"],

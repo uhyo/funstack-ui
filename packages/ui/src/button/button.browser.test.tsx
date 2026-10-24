@@ -14,6 +14,7 @@ import { deferred, expectNotPending, expectPending } from "../__tests__/helpers.
 import { Form } from "../form/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import { Button } from "./index.js";
+import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 afterEach(async () => {
   await userEvent.unhover(document.body);
@@ -186,35 +187,8 @@ describe("implicit submission (row 24)", () => {
 });
 
 describe("ViewTransition (row 25)", () => {
-  type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-  type VTDocument = Document & { __reactViewTransition?: ViewTransition | null };
-
-  function countViewTransitions(): { readonly calls: () => number } {
-    let calls = 0;
-    const original = document.startViewTransition.bind(document);
-    vi.spyOn(document, "startViewTransition").mockImplementation(((
-      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-    ) => {
-      calls++;
-      return original(arg);
-    }) as typeof document.startViewTransition);
-    return { calls: () => calls };
-  }
-
-  /** A view transition commits in its callback, after any `act` scope (issue #49). */
-  async function outsideAct(body: () => Promise<void>): Promise<void> {
-    const actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-    try {
-      await body();
-      await (document as VTDocument).__reactViewTransition?.finished.catch(() => {});
-    } finally {
-      (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
-    }
-  }
-
   async function mount(transition: ViewTransitionClass | undefined): Promise<number> {
-    const counter = countViewTransitions();
+    const counter = spyViewTransitions();
     function Late() {
       const [shown, setShown] = useState(false);
       return (
@@ -256,7 +230,7 @@ describe("ViewTransition (row 25)", () => {
           {(s) => (s.pending ? <span>Saving</span> : <span>Save</span>)}
         </Button>,
       );
-      const counter = countViewTransitions();
+      const counter = spyViewTransitions();
       await outsideAct(async () => {
         button("Save").click();
         await expect.poll(() => button("Saving").dataset["pending"]).toBe("");

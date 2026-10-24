@@ -20,36 +20,22 @@ import { browserName, supportsDialogClosedBy } from "../__tests__/engine.js";
 import { createSuspender, deferred } from "../__tests__/helpers.js";
 import { Dialog } from "./index.js";
 import type { DialogOpenChangeDetails, DialogPopupProps } from "./index.js";
+import {
+  addStyle,
+  closeOpenTopLayer,
+  flushFor,
+  runCleanups,
+  settle,
+  sleep,
+  leaveActEnvironment,
+  spyViewTransitions,
+} from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
 
 const trigger = () => screen.getByTestId("trigger");
 const popup = () => screen.getByTestId("popup") as HTMLDialogElement;
 const isModal = () => popup().matches(":modal");
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Lets queued `close` / `toggle` tasks and React's follow-up work run. */
-const flush = () =>
-  act(async () => {
-    await sleep(20);
-  });
-
-/**
- * Flushes until `check` passes, rethrowing its last failure after `timeout` ms. The first round
- * is one `flush()`; more rounds only absorb a slow `close` / `toggle` task under load (issue #49).
- */
-async function settle(check: () => void, timeout = 2000): Promise<void> {
-  const start = performance.now();
-  for (;;) {
-    await flush();
-    try {
-      check();
-      return;
-    } catch (error) {
-      if (performance.now() - start > timeout) throw error;
-    }
-  }
-}
 
 /** Clicks the Trigger and waits for the library's deferred `showModal()` / `show()`. */
 async function openWithTrigger(): Promise<void> {
@@ -57,19 +43,10 @@ async function openWithTrigger(): Promise<void> {
   await settle(() => expect(popup().open).toBe(true));
 }
 
-function addStyle(css: string): () => void {
-  const style = document.createElement("style");
-  style.textContent = css;
-  document.head.append(style);
-  return () => style.remove();
-}
-
-const cleanups: (() => void)[] = [];
-
 afterEach(async () => {
   // Close anything left open so the next test starts with an interactive page.
-  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
-  for (const cleanup of cleanups.splice(0)) cleanup();
+  closeOpenTopLayer();
+  runCleanups();
 });
 
 function Library({
@@ -239,7 +216,7 @@ describe("library mode (browser)", () => {
       </Suspense>,
     );
     await user.click(trigger());
-    await flush();
+    await flushFor();
     expect(popup().open).toBe(false);
     expect(trigger()).toHaveAttribute("data-pending", "");
     expect(screen.queryByTestId("fallback")).toBeNull();
@@ -316,7 +293,7 @@ describe("library mode (browser)", () => {
     expect(inner.open).toBe(false);
     expect(popup().open).toBe(true);
     expect(screen.getByTestId("inner-trigger")).toHaveFocus();
-    await flush();
+    await flushFor();
     await user.keyboard("{Escape}");
     expect(popup().open).toBe(false);
     expect(trigger()).toHaveFocus();
@@ -359,7 +336,7 @@ describe("library mode (browser)", () => {
     );
     await openWithTrigger();
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await flush();
+    await flushFor();
     expect(popup().open).toBe(true);
     await act(async () => save.resolve());
     await settle(() => expect(popup().open).toBe(false));
@@ -520,7 +497,7 @@ describe("review rows (browser)", () => {
       targetPosition: { x: -20, y: -20 },
       force: true,
     });
-    await flush();
+    await flushFor();
     expect(popup().open).toBe(true);
     expect(action).toHaveBeenCalledTimes(1);
     // A real backdrop click still closes.
@@ -549,7 +526,7 @@ describe("review rows (browser)", () => {
     act(() => menu.showPopover());
     screen.getByTestId("item").focus();
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(menu.matches(":popover-open")).toBe(false);
     expect(popup().open).toBe(true);
     // With no popover open, Escape inside the dialog closes it.
@@ -566,15 +543,13 @@ describe("exit animation and the deferred unmount (browser)", () => {
    * under load. The row ends the exit itself with `finish()` and then expects the release.
    */
   function heldExitStyle() {
-    cleanups.push(
-      addStyle(`
+    addStyle(`
         .held-exit, .held-exit::backdrop {
           opacity: 0;
           transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
         }
         .held-exit:open, .held-exit:open::backdrop { opacity: 1; transition-duration: 0s; }
-      `),
-    );
+      `);
   }
 
   /** Resolves with the exit animations running when the dialog's `close` (a queued task) fires. */
@@ -634,16 +609,14 @@ describe("exit animation and the deferred unmount (browser)", () => {
   it.each(["Escape", "Close part"] as const)(
     "%s: the close ignores a finite animation that was already running inside (#64)",
     async (kind) => {
-      cleanups.push(
-        addStyle(`
+      addStyle(`
           .fade, .fade::backdrop {
             opacity: 0;
             transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
           }
           .fade:open, .fade:open::backdrop { opacity: 1; }
           @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
-        `),
-      );
+        `);
       let bar: Animation | undefined;
       render(
         <Library popup={{ className: "fade" }}>
@@ -723,38 +696,27 @@ describe("exit animation and the deferred unmount (browser)", () => {
 });
 
 describe("ViewTransition (browser, #46)", () => {
-  type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-  let actEnvironment: boolean | undefined;
+  let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
   let transitions: ViewTransition[] = [];
 
   beforeEach(() => {
     calls = [];
-    transitions = [];
-    const original = document.startViewTransition.bind(document);
-    vi.spyOn(document, "startViewTransition").mockImplementation(((
-      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-    ) => {
+    ({ transitions } = spyViewTransitions(() => {
       const element = document.querySelector<HTMLDialogElement>("[data-testid=popup]");
       calls.push({ openAtStart: element?.open ?? false });
-      const transition = original(arg);
-      transitions.push(transition);
-      return transition;
-    }) as typeof document.startViewTransition);
-    actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-    cleanups.push(
-      addStyle(`
+    }));
+    restoreAct = leaveActEnvironment();
+    addStyle(`
         ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
         ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
         @keyframes vt-pop-out { to { opacity: 0; } }
         @keyframes vt-pop-in { from { opacity: 0; } }
-      `),
-    );
+      `);
   });
 
   afterEach(async () => {
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    restoreAct();
     await Promise.allSettled(transitions.map((transition) => transition.finished));
   });
 
@@ -927,7 +889,7 @@ describe("ViewTransition (browser, #46)", () => {
   `;
 
   it('transition="pop" plus a CSS exit and the recipe: an Escape runs one view transition, no new image of the dialog', async () => {
-    cleanups.push(addStyle(cssExit(true)));
+    addStyle(cssExit(true));
     render(<Plain transition="pop" className="fade" />);
     await open();
     await sleep(250); // the enter fade
@@ -949,7 +911,7 @@ describe("ViewTransition (browser, #46)", () => {
   ])(
     'transition="pop" plus a CSS exit and the recipe: %s has the old image only',
     async (_, testId) => {
-      cleanups.push(addStyle(cssExit(true)));
+      addStyle(cssExit(true));
       render(<Plain transition="pop" className="fade" controlled={testId === "parent-close"} />);
       await open();
       await sleep(250); // the enter fade
@@ -978,7 +940,7 @@ describe("ViewTransition (browser, #46)", () => {
   );
 
   it('characterisation: transition="pop" plus a CSS exit without the recipe has a live new image in Chromium', async () => {
-    cleanups.push(addStyle(cssExit(false)));
+    addStyle(cssExit(false));
     render(<Plain transition="pop" className="fade" />);
     await open();
     await sleep(250);
@@ -1032,12 +994,10 @@ describe("ViewTransition (browser, #46)", () => {
 
 describe("scroll lock recipe (browser)", () => {
   it("html:has(dialog:modal) { overflow: hidden } applies while a modal dialog is open", async () => {
-    cleanups.push(
-      addStyle(`
+    addStyle(`
         html { scrollbar-gutter: stable; }
         html:has(dialog:modal) { overflow: hidden; }
-      `),
-    );
+      `);
     render(<Library />);
     const html = document.documentElement;
     expect(getComputedStyle(html).overflow).not.toBe("hidden");

@@ -23,6 +23,7 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Tooltip } from "./index.js";
 import type { TooltipPopupProps, TooltipPopupState, TooltipTriggerProps } from "./index.js";
+import { sleep } from "../__tests__/browser-helpers.js";
 
 function Harness({
   trigger,
@@ -59,7 +60,6 @@ function Harness({
 const trigger = () => screen.getByRole("button", { name: "Save" });
 const popup = () => screen.getByTestId("popup");
 const isOpen = () => popup().matches(":popover-open");
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 afterEach(async () => {
   // Park the real mouse away from any trigger so the next test starts un-hovered.

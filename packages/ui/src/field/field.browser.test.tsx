@@ -13,25 +13,8 @@ import { browserName } from "../__tests__/engine.js";
 import { Form } from "../form/index.js";
 import { RadioGroup } from "../radio-group/index.js";
 import { Field } from "./index.js";
-
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-/** Flushes until `check` passes (2 s cap): an engine may fire `input` / `change` in a later task. */
-async function settle(check: () => void, timeout = 2000): Promise<void> {
-  const start = performance.now();
-  for (;;) {
-    await flush();
-    try {
-      check();
-      return;
-    } catch (error) {
-      if (performance.now() - start > timeout) throw error;
-    }
-  }
-}
+import { flushTasks } from "../__tests__/helpers.js";
+import { settle } from "../__tests__/browser-helpers.js";
 
 function EmailField({ name = "email" }: { name?: string }) {
   return (
@@ -65,7 +48,7 @@ describe("Field: :user-invalid timing", () => {
         <EmailField />
       </TestForm>,
     );
-    await flush();
+    await flushTasks();
     await user.type(control(), "a");
     await user.clear(control());
     // Still focused, never left: the platform does not flag it yet.
@@ -88,7 +71,7 @@ describe("Field: :user-invalid timing", () => {
     await user.clear(control());
     expect(error()).not.toBeNull();
     await act(async () => form().reset());
-    await flush();
+    await flushTasks();
     expect(control().matches(":user-invalid")).toBe(false);
     expect(error()).toBeNull();
   });
@@ -99,11 +82,11 @@ describe("Field: :user-invalid timing", () => {
         <EmailField />
       </TestForm>,
     );
-    await flush();
+    await flushTasks();
     let invalid: Event | undefined;
     control().addEventListener("invalid", (event) => (invalid = event));
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushTasks();
     expect(invalid?.defaultPrevented).toBe(true);
     expect(error()).toHaveTextContent(control().validationMessage);
     expect(control().validationMessage).not.toBe("");
@@ -116,13 +99,13 @@ describe("Field: :user-invalid timing", () => {
         <EmailField />
       </TestForm>,
     );
-    await flush();
+    await flushTasks();
     const events: Event[] = [];
     control().addEventListener("invalid", (event) => events.push(event));
     await act(async () => {
       expect(form().checkValidity()).toBe(false);
     });
-    await flush();
+    await flushTasks();
     expect(events).toHaveLength(1);
     expect(events[0]!.defaultPrevented).toBe(false);
     expect(error()).toBeNull();
@@ -131,7 +114,7 @@ describe("Field: :user-invalid timing", () => {
     await act(async () => {
       expect(control().reportValidity()).toBe(false);
     });
-    await flush();
+    await flushTasks();
     expect(events).toHaveLength(2);
     // Not a submission attempt: the platform's UI is expected, so the Field leaves it alone.
     expect(events[1]!.defaultPrevented).toBe(false);
@@ -150,9 +133,9 @@ describe("Field: bubble and focus", () => {
         <EmailField name="second" />
       </TestForm>,
     );
-    await flush();
+    await flushTasks();
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushTasks();
     expect(document.activeElement).toBe(control("first"));
     expect(error("first")).not.toBeNull();
     expect(error("second")).not.toBeNull();
@@ -165,11 +148,11 @@ describe("Field: bubble and focus", () => {
         <EmailField />
       </TestForm>,
     );
-    await flush();
+    await flushTasks();
     let plainInvalid: Event | undefined;
     screen.getByTestId("plain").addEventListener("invalid", (event) => (plainInvalid = event));
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushTasks();
     expect(plainInvalid?.defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(screen.getByTestId("plain"));
     // The Field still shows its own error.
@@ -198,9 +181,9 @@ describe("Field: group", () => {
         </Field.Root>
       </TestForm>,
     );
-    await flush();
+    await flushTasks();
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushTasks();
     const radios = screen.getAllByRole("radio") as HTMLInputElement[];
     expect(screen.getByTestId("group")).toHaveAttribute("aria-invalid", "true");
     expect(radios[0]!.validationMessage).not.toBe("");
@@ -268,11 +251,11 @@ describe.runIf(browserName === "chromium")("Field: accessibility tree (Chromium,
         </Field.Root>
       </TestForm>,
     );
-    await flush();
+    await flushTasks();
     // A typeMismatch the user has not been told about: not exposed as invalid.
     expect(axInvalid(await axNode("Mail"))).toBe("false");
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushTasks();
     // valueMissing, which Chromium never exposes natively: exposed through aria-invalid.
     const given = await axNode("Given");
     expect(axInvalid(given)).toBe("true");
@@ -293,7 +276,7 @@ describe("Field: field-sizing", () => {
         />
       </Field.Root>,
     );
-    await flush();
+    await flushTasks();
     const ta = screen.getByTestId("ta") as HTMLTextAreaElement;
     const before = ta.getBoundingClientRect().height;
     await user.type(ta, "one{Enter}two{Enter}three");
@@ -357,7 +340,7 @@ describe("Field: progressive enhancement", () => {
         onRecoverableError: (e) => recoverable.push(e),
       });
     });
-    await flush();
+    await flushTasks();
     expect(recoverable).toEqual([]);
     expect(container.querySelector("input[type=email]")).toBe(input);
     expect(input.outerHTML).toBe(before);
@@ -424,7 +407,7 @@ describe("Field: progressive enhancement", () => {
         onRecoverableError: (e) => recoverable.push(e),
       });
     });
-    await flush();
+    await flushTasks();
     expect(recoverable).toEqual([]);
     expect(container.querySelector("input[type=email]")).toBe(input);
     expect(input.outerHTML).toBe(before);

@@ -35,6 +35,16 @@ import type {
   MenuPopupProps,
   MenuRootProps,
 } from "./index.js";
+import {
+  addStyle,
+  closeOpenTopLayer,
+  flushFor,
+  onCleanup,
+  runCleanups,
+  sleep,
+  leaveActEnvironment,
+  spyViewTransitions,
+} from "../__tests__/browser-helpers.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
 
@@ -42,22 +52,6 @@ const region = () => screen.getByTestId("region");
 const popup = () => screen.getByTestId("popup");
 const item = (id: string) => screen.getByTestId(id);
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Lets queued `toggle` tasks and React's follow-up work run. */
-const flush = () =>
-  act(async () => {
-    await sleep(20);
-  });
-
-const cleanups: (() => void)[] = [];
-
-function addStyle(css: string): () => void {
-  const style = document.createElement("style");
-  style.textContent = css;
-  document.head.append(style);
-  return () => style.remove();
-}
 
 /** The last `contextmenu` the page saw: its point, and whether the library prevented it. */
 let lastMenu: { x: number; y: number; prevented: boolean } | null = null;
@@ -69,23 +63,19 @@ beforeEach(() => {
     event.preventDefault();
   };
   window.addEventListener("contextmenu", suppress);
-  cleanups.push(() => window.removeEventListener("contextmenu", suppress));
-  cleanups.push(
-    addStyle(`
+  onCleanup(() => window.removeEventListener("contextmenu", suppress));
+  addStyle(`
       [data-testid="popup"] { margin: 0; padding: 4px; border: 1px solid; width: 120px; box-sizing: border-box; }
       [role="menu"] [role^="menuitem"] { display: block; width: 100%; height: 24px; text-align: start; }
-    `),
-  );
+    `);
 });
 
 afterEach(async () => {
   // A row that failed between `mouse.down` and `mouse.up` must not leave the (in Firefox, shared,
   // #62) button down for the next rows.
   await mouse.releaseHeld();
-  for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
-    if (element.matches(":popover-open")) element.hidePopover();
-  }
-  for (const cleanup of cleanups.splice(0)) cleanup();
+  closeOpenTopLayer();
+  runCleanups();
   window.scrollTo(0, 0);
 });
 
@@ -165,7 +155,7 @@ async function openAt(x: number, y: number, target: Element = popup()) {
     await mouse.click(x, y, "right");
   });
   await expect.poll(() => isOpen(target)).toBe(true);
-  await flush();
+  await flushFor();
 }
 
 function rect(element: Element = popup()) {
@@ -211,7 +201,7 @@ describe("opening at the pointer (browser)", () => {
       await mouse.down(x, y, "right");
     });
     await expect.poll(() => isOpen()).toBe(true);
-    await flush();
+    await flushFor();
     // Above the menu's top edge, so over no popover: the release Firefox and WebKit would
     // light-dismiss on. Within the press-drag-release slop (4 px, wave 11), so the gesture keeps
     // the menu open whatever the time; a release farther away is the press-drag-release rows'.
@@ -219,8 +209,8 @@ describe("opening at the pointer (browser)", () => {
       await mouse.move(x + 2, y - 2);
       await mouse.up(x + 2, y - 2, "right");
     });
-    await flush();
-    await flush();
+    await flushFor();
+    await flushFor();
     expect(isOpen()).toBe(true);
   });
 
@@ -234,7 +224,7 @@ describe("opening at the pointer (browser)", () => {
       await mouse.down(x, y, "right");
     });
     await expect.poll(() => isOpen()).toBe(true);
-    await flush();
+    await flushFor();
     const r = rect();
     // Flipped up-left: the pointer is not over the menu.
     expect(Math.abs(r.right - lastMenu!.x)).toBeLessThanOrEqual(1);
@@ -242,8 +232,8 @@ describe("opening at the pointer (browser)", () => {
     await act(async () => {
       await mouse.up(x, y, "right");
     });
-    await flush();
-    await flush();
+    await flushFor();
+    await flushFor();
     expect(isOpen()).toBe(true);
   });
 });
@@ -257,14 +247,14 @@ describe("placement (browser)", () => {
     expect(Math.abs(r.right - lastMenu!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(r.top - lastMenu!.y)).toBeLessThanOrEqual(1);
     await act(async () => popup().hidePopover());
-    await flush();
+    await flushFor();
 
     await openAt(100, height - 80);
     r = rect();
     expect(Math.abs(r.left - lastMenu!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(r.bottom - lastMenu!.y)).toBeLessThanOrEqual(1);
     await act(async () => popup().hidePopover());
-    await flush();
+    await flushFor();
 
     await openAt(width - 20, height - 80);
     r = rect();
@@ -344,7 +334,7 @@ describe("direction (browser, wave 11, #88)", () => {
       "--fsui-menu-up-right",
     );
     await act(async () => popup().hidePopover());
-    await flush();
+    await flushFor();
 
     // Near the left edge: flipped rightward (`--fsui-menu-right`).
     await openAt(20, mid.y);
@@ -352,7 +342,7 @@ describe("direction (browser, wave 11, #88)", () => {
     expect(Math.abs(r.left - lastMenu!.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(r.top - lastMenu!.y)).toBeLessThanOrEqual(1);
     await act(async () => popup().hidePopover());
-    await flush();
+    await flushFor();
 
     // The bottom-left corner (the region ends 60 px above the bottom): `--fsui-menu-up-right`.
     await openAt(20, height - 70);
@@ -425,7 +415,7 @@ describe("move (browser)", () => {
     await user.keyboard("{ArrowDown}");
     expect(item("grid")).toHaveFocus();
     await user.keyboard(" ");
-    await flush();
+    await flushFor();
     expect(item("grid")).toHaveAttribute("aria-checked", "true");
     expect(isOpen()).toBe(true);
     await openAt(240, 220);
@@ -444,15 +434,15 @@ describe("move (browser)", () => {
     });
     await expect.poll(() => Math.abs(rect().left - lastMenu!.x)).toBeLessThanOrEqual(1);
     expect(lastMenu!.x).toBeGreaterThan(200);
-    await flush();
+    await flushFor();
     // Within the slop of the new point and off the menu (it spans 240.. on both axes): the
     // press-drag-release gesture (wave 11) keeps it open, so this is the capture's doing alone.
     await act(async () => {
       await mouse.move(238, 218);
       await mouse.up(238, 218, "right");
     });
-    await flush();
-    await flush();
+    await flushFor();
+    await flushFor();
     expect(isOpen()).toBe(true);
     expectTopLeftAtPoint();
     expect(action).toHaveBeenCalledTimes(1);
@@ -469,7 +459,7 @@ describe("closing (browser)", () => {
       await mouse.click(outside.left + 20, outside.top + 20, "right");
     });
     await expect.poll(() => isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)![0]).toBe(false);
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
 
@@ -478,7 +468,7 @@ describe("closing (browser)", () => {
       await mouse.click(outside.left + 20, outside.top + 20, "middle");
     });
     await expect.poll(() => isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
 
@@ -502,8 +492,8 @@ describe("closing (browser)", () => {
     await act(async () => {
       await mouse.click(target.left + 10, target.top + 10, "right");
     });
-    await flush();
-    await flush();
+    await flushFor();
+    await flushFor();
     expect(lastMenu!.prevented).toBe(true);
     expect(isOpen()).toBe(true);
     const after = rect();
@@ -528,7 +518,7 @@ describe("closing (browser)", () => {
     await openAt(100, 100);
     await user.click(screen.getByTestId("outside"));
     await expect.poll(() => isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
     await openAt(100, 100);
     await user.click(item("rename"));
@@ -569,7 +559,7 @@ describe("keyboard (browser)", () => {
         });
       }
       await expect.poll(() => isOpen()).toBe(true);
-      await flush();
+      await flushFor();
       const box = rect(inner);
       const r = rect();
       expect(r.left).toBeGreaterThanOrEqual(box.left - 1);
@@ -591,7 +581,7 @@ describe("focus return (browser)", () => {
     await openAt(200, 150);
     expect(item("rename")).toHaveFocus();
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     expect(document.activeElement).toBe(document.body);
   });
@@ -600,7 +590,7 @@ describe("focus return (browser)", () => {
     render(<Harness withTrigger />);
     await openAt(200, 150);
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     expect(item("trigger")).toHaveFocus();
   });
@@ -610,7 +600,7 @@ describe("focus return (browser)", () => {
     await openAt(200, 150);
     expect(item("rename")).toHaveFocus();
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(region()).toHaveFocus();
   });
 });
@@ -636,12 +626,12 @@ describe("nesting (browser)", () => {
         </Popover.Popup>
       </Popover.Root>,
     );
-    await flush();
+    await flushFor();
     await expect.poll(() => isOpen(item("panel"))).toBe(true);
     await openAt(120, 100);
     expect(isOpen(item("panel"))).toBe(true);
     await user.keyboard("{Escape}");
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(false);
     expect(isOpen(item("panel"))).toBe(true);
   });
@@ -667,7 +657,7 @@ describe("nesting (browser)", () => {
     );
     await openAt(100, 100);
     await user.keyboard("{ArrowDown}{ArrowRight}");
-    await flush();
+    await flushFor();
     await expect.poll(() => isOpen(item("subpopup"))).toBe(true);
     expect(item("inbox")).toHaveFocus();
     const t = rect(item("move"));
@@ -699,7 +689,7 @@ describe("long-press (browser)", () => {
       await sleep(600);
     });
     await expect.poll(() => isOpen()).toBe(true);
-    await flush();
+    await flushFor();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![1].event!.type).toBe("pointerdown");
     // Above the touch point with the 16 px gap (wave 11, 4.7).
@@ -707,7 +697,7 @@ describe("long-press (browser)", () => {
     await act(async () => {
       region().dispatchEvent(new PointerEvent("pointerup", { ...init, buttons: 0 }));
     });
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(true);
   });
 
@@ -736,7 +726,7 @@ describe("long-press (browser)", () => {
       await act(async () => {
         await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       });
-      await flush();
+      await flushFor();
       if (downs.includes("touch")) expect(isOpen()).toBe(true);
     },
   );
@@ -751,8 +741,8 @@ describe("editable targets (browser)", () => {
     await act(async () => {
       await mouse.click(box.left + 10, box.top + 10, "right");
     });
-    await flush();
-    await flush();
+    await flushFor();
+    await flushFor();
     expect(lastMenu).not.toBeNull();
     expect(lastMenu!.prevented).toBe(false);
     expect(isOpen()).toBe(false);
@@ -770,38 +760,27 @@ describe("editable targets (browser)", () => {
 });
 
 describe("ViewTransition (browser)", () => {
-  type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
-  let actEnvironment: boolean | undefined;
+  let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
   let transitions: ViewTransition[] = [];
 
   beforeEach(() => {
     calls = [];
-    transitions = [];
-    const original = document.startViewTransition.bind(document);
-    vi.spyOn(document, "startViewTransition").mockImplementation(((
-      arg?: StartViewTransitionOptions | ViewTransitionUpdateCallback,
-    ) => {
+    ({ transitions } = spyViewTransitions(() => {
       const element = document.querySelector("[data-testid=popup]");
       calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
-      const transition = original(arg);
-      transitions.push(transition);
-      return transition;
-    }) as typeof document.startViewTransition);
-    actEnvironment = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
-    cleanups.push(
-      addStyle(`
+    }));
+    restoreAct = leaveActEnvironment();
+    addStyle(`
         ::view-transition-old(.pop) { animation: 100ms ease-in both vt-cm-out; }
         ::view-transition-new(.pop) { animation: 100ms ease-out both vt-cm-in; }
         @keyframes vt-cm-out { to { opacity: 0; } }
         @keyframes vt-cm-in { from { opacity: 0; } }
-      `),
-    );
+      `);
   });
 
   afterEach(async () => {
-    (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    restoreAct();
     await Promise.allSettled(transitions.map((transition) => transition.finished));
   });
 
@@ -864,15 +843,13 @@ describe("ViewTransition (browser)", () => {
 
 describe("exit animation (browser)", () => {
   it("after the outside right-click close the items stay while the CSS exit runs; none in Firefox", async () => {
-    cleanups.push(
-      addStyle(`
+    addStyle(`
         .held-exit {
           opacity: 0;
           transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
         }
         .held-exit:popover-open { opacity: 1; transition-duration: 0s; }
-      `),
-    );
+      `);
     render(<Harness popup={{ className: "held-exit" }} />);
     await openAt(100, 100);
     const exit = new Promise<Animation[]>((resolve) => {
@@ -951,7 +928,7 @@ function watchGestureTime() {
   window.addEventListener("contextmenu", onMenu, true);
   window.addEventListener("toggle", onToggle, true);
   window.addEventListener("pointerup", onUp, true);
-  cleanups.push(() => {
+  onCleanup(() => {
     window.removeEventListener("contextmenu", onMenu, true);
     window.removeEventListener("toggle", onToggle, true);
     window.removeEventListener("pointerup", onUp, true);
@@ -990,7 +967,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
       await mouse.down(x, y, "right");
     });
     await expect.poll(() => isOpen()).toBe(true);
-    await flush();
+    await flushFor();
     const target = centre(item("archive"));
     await act(async () => {
       await mouse.move(target.x, target.y);
@@ -1003,7 +980,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     });
     await expect.poll(() => archive.mock.calls.length).toBe(1);
     await expect.poll(() => isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)).toEqual([
       false,
       expect.objectContaining({ reason: "activate" }),
@@ -1023,7 +1000,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     await act(async () => {
       await mouse.up(x, y, "right");
     });
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(true);
     expect(item("rename")).toHaveFocus();
     expect(archive).not.toHaveBeenCalled();
@@ -1050,8 +1027,8 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
       await mouse.move(180, 160);
       await mouse.up(180, 160, "right");
     });
-    await flush();
-    await flush();
+    await flushFor();
+    await flushFor();
     if (time.elapsed() < 500) {
       // A quick release is not a dismissal (and the capture held through the re-show).
       expect(isOpen()).toBe(true);
@@ -1077,7 +1054,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     });
     expect(time.elapsed()).toBeGreaterThanOrEqual(500);
     await expect.poll(() => isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)).toEqual([
       false,
       expect.objectContaining({ reason: "dismiss" }),
@@ -1093,15 +1070,15 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
       await mouse.down(x, y, "right");
     });
     await expect.poll(() => isOpen()).toBe(true);
-    await flush();
+    await flushFor();
     // Flipped up-left: the pointer is at the corner, over no item.
     expect(Math.abs(rect().right - lastMenu!.x)).toBeLessThanOrEqual(1);
     await act(async () => {
       await sleep(600);
       await mouse.up(x, y, "right");
     });
-    await flush();
-    await flush();
+    await flushFor();
+    await flushFor();
     // Movement is required to dismiss as well as time.
     expect(isOpen()).toBe(true);
   });
@@ -1129,7 +1106,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
         return;
       }
       await expect.poll(() => isOpen()).toBe(true);
-      await flush();
+      await flushFor();
       // Above the finger with the 16 px gap (4.7).
       expectBottomLeftAt(start.x, start.y - 16);
       const target = centre(item("archive"));
@@ -1173,7 +1150,7 @@ describe("touch offset (browser, wave 11, #88)", () => {
       await sleep(600);
     });
     await expect.poll(() => isOpen()).toBe(true);
-    await flush();
+    await flushFor();
   }
 
   it("a touch open sits 16 px above the point, start-aligned; near the top it opens below", async () => {
@@ -1184,7 +1161,7 @@ describe("touch offset (browser, wave 11, #88)", () => {
     expectBottomLeftAt(150, y - 16);
     expect(popup().style.getPropertyValue("--menu-point-gap")).toBe("16px");
     await act(async () => popup().hidePopover());
-    await flush();
+    await flushFor();
 
     // No room above: `--fsui-menu-down`, below the point with the same gap.
     await longPressAt(150, 30);
@@ -1217,7 +1194,7 @@ describe("scrolling (browser, wave 11, #88)", () => {
     const seen = { prevented: null as boolean | null };
     const onWheel = (event: WheelEvent) => (seen.prevented = event.defaultPrevented);
     window.addEventListener("wheel", onWheel, { passive: true });
-    cleanups.push(() => window.removeEventListener("wheel", onWheel));
+    onCleanup(() => window.removeEventListener("wheel", onWheel));
     return seen;
   }
 
@@ -1251,7 +1228,7 @@ describe("scrolling (browser, wave 11, #88)", () => {
     });
     await expect.poll(() => window.scrollY).toBeGreaterThan(0);
     await expect.poll(() => isOpen()).toBe(false);
-    await flush();
+    await flushFor();
     expect(action.mock.calls.at(-1)).toEqual([
       false,
       expect.objectContaining({ reason: "dismiss" }),
@@ -1262,12 +1239,12 @@ describe("scrolling (browser, wave 11, #88)", () => {
     render(<ScrollPage withTrigger />);
     await user.click(screen.getByTestId("trigger"));
     await expect.poll(() => isOpen()).toBe(true);
-    await flush();
+    await flushFor();
     await act(async () => {
       await wheel(400, 400, 0, 200);
     });
     await expect.poll(() => window.scrollY).toBeGreaterThan(0);
-    await flush();
+    await flushFor();
     expect(isOpen()).toBe(true);
     const t = screen.getByTestId("trigger").getBoundingClientRect();
     expect(Math.abs(rect().top - t.bottom)).toBeLessThanOrEqual(1);

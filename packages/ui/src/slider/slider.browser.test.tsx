@@ -20,12 +20,12 @@ import type {
   SliderValueChangeDetails,
   SliderValueCommitDetails,
 } from "./index.js";
+import { flushMicrotasks } from "../__tests__/helpers.js";
+import { spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 type Value = number | readonly number[];
 type ChangeFn = (next: Value, details: SliderValueChangeDetails) => unknown;
 type CommitFn = (next: Value, details: SliderValueCommitDetails) => unknown;
-
-const flush = () => act(async () => {});
 
 /** The recipe of design 6.2, reduced: a 200px track, 20px thumbs placed from the custom properties. */
 const CSS = `
@@ -116,7 +116,7 @@ describe("Slider (browser)", () => {
         onChange.mockClear();
         onCommit.mockClear();
         await user.keyboard(key);
-        await flush();
+        await flushMicrotasks();
         expect(input().value, key).toBe(value);
         expect(thumb().style.getPropertyValue("--slider-value"), key).toBe(`${value}%`);
         expect(onChange, key).toHaveBeenCalledTimes(1);
@@ -131,13 +131,13 @@ describe("Slider (browser)", () => {
       render(<Fixture dir="rtl" defaultValue={50} valueCommitAction={onCommit} />);
       await focusThumb();
       await user.keyboard("{ArrowLeft}");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("51");
       // Normalised in JS (WebKit does not mirror a native range), as for the vertical keys.
       expect(onCommit.mock.calls[0]![1].event?.type).toBe("keydown");
       await user.keyboard("{ArrowRight}");
       await user.keyboard("{ArrowRight}");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("49");
       expect(onCommit).toHaveBeenCalledTimes(3);
     });
@@ -154,15 +154,15 @@ describe("Slider (browser)", () => {
       );
       await focusThumb(0);
       await user.keyboard("{End}");
-      await flush();
+      await flushMicrotasks();
       expect(input(0).value).toBe("290");
       expect(input(1)).toHaveAttribute("min", "300");
       await focusThumb(1);
       await user.keyboard("{Home}");
-      await flush();
+      await flushMicrotasks();
       expect(input(1).value).toBe("300");
       await user.keyboard("{ArrowLeft}");
-      await flush();
+      await flushMicrotasks();
       expect(input(1).value).toBe("300");
       await user.tab({ shift: true });
       expect(document.activeElement).toBe(input(0));
@@ -183,22 +183,22 @@ describe("Slider (browser)", () => {
       );
       await focusThumb();
       await user.keyboard("{ArrowUp}");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("51");
       await user.keyboard("{ArrowDown}");
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("49");
       onChange.mockClear();
       onCommit.mockClear();
       await user.keyboard("{ArrowRight}");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("50");
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![1].event?.type).toBe("keydown");
       await user.keyboard("{ArrowLeft}");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("49");
       // The thumb counts from the bottom.
       const track = screen.getByTestId("track").getBoundingClientRect();
@@ -222,7 +222,7 @@ describe("Slider (browser)", () => {
       const track = screen.getByTestId("track");
       // 35% of 200px: nearer to thumb 0.
       await user.click(track, { position: { x: 70, y: 10 } });
-      await flush();
+      await flushMicrotasks();
       expect(input(0).value).toBe("35");
       expect(input(1).value).toBe("80");
       expect(document.activeElement).toBe(input(0));
@@ -244,7 +244,7 @@ describe("Slider (browser)", () => {
         sourcePosition: { x: 10, y: 10 },
         targetPosition: { x: 150, y: 10 },
       });
-      await flush();
+      await flushMicrotasks();
       const rect = track.getBoundingClientRect();
       expect(input().value).toBe("75");
       const { x } = centre(thumb());
@@ -262,7 +262,7 @@ describe("Slider (browser)", () => {
       render(<Fixture dir="rtl" defaultValue={50} />);
       const track = screen.getByTestId("track");
       await user.click(track, { position: { x: 50, y: 10 } });
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("75");
       const { x } = centre(thumb());
       expect(Math.abs(x - (track.getBoundingClientRect().left + 50))).toBeLessThanOrEqual(2);
@@ -373,7 +373,7 @@ describe("Slider (browser)", () => {
       await act(async () => {
         hydrateRoot(container, <App />, { onRecoverableError: (e) => recoverable.push(e) });
       });
-      await flush();
+      await flushMicrotasks();
       expect(recoverable).toEqual([]);
       expect(container.querySelector("input")).toBe(field);
       expect(field.value).toBe("100");
@@ -427,7 +427,7 @@ describe("Slider (browser)", () => {
         await act(async () => {
           hydrateRoot(container, <App />);
         });
-        await flush();
+        await flushMicrotasks();
         expect(onCommit.mock.calls.map(([v, d]) => [v, d.reason])).toEqual([[75, "platform"]]);
       } finally {
         iframe.remove();
@@ -466,7 +466,7 @@ describe("Slider (browser)", () => {
           steps: 5,
         });
       });
-      await flush();
+      await flushMicrotasks();
       // Released, the save pending: the gesture value is held.
       expect(input().value).toBe("80");
       expect(screen.getByTestId("root")).toHaveAttribute("data-pending");
@@ -477,7 +477,7 @@ describe("Slider (browser)", () => {
       expect(starts.filter((s) => s.dragging)).toEqual([]);
       starts.length = 0;
       await act(async () => settle());
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("20");
       await expect.poll(() => starts.length).toBeGreaterThan(0);
       await act(() => frames(3));
@@ -488,23 +488,14 @@ describe("Slider (browser)", () => {
   });
 
   it("never starts a document view transition (no boundary exists)", async () => {
-    const start = vi.fn();
-    if (typeof document.startViewTransition === "function") {
-      const original = document.startViewTransition.bind(document);
-      vi.spyOn(document, "startViewTransition").mockImplementation(((
-        arg: Parameters<typeof document.startViewTransition>[0],
-      ) => {
-        start();
-        return original(arg);
-      }) as typeof document.startViewTransition);
-    }
+    const vt = spyViewTransitions();
     render(<Fixture defaultValue={20} valueCommitAction={() => undefined} />);
     await user.click(screen.getByTestId("track"), { position: { x: 120, y: 10 } });
     await focusThumb();
     await user.keyboard("{ArrowRight}");
-    await flush();
+    await flushMicrotasks();
     expect(input().value).toBe("61");
-    expect(start).not.toHaveBeenCalled();
+    expect(vt.calls()).toBe(0);
   });
 });
 // Design 9.4.6 (issue #60): a Slider inside a Field, with real submit clicks and a real drag.
@@ -533,13 +524,13 @@ describe("Slider inside a Field (browser)", () => {
         <Form.Submit>Save</Form.Submit>
       </Form.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     // Observed at the target, after the Field's capture listener on the group.
     const invalidEvents: Event[] = [];
     input(0).addEventListener("invalid", (event) => invalidEvents.push(event));
 
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await flush();
+    await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
     expect(invalidEvents).toHaveLength(1);
     // The Field cancelled the bubble and focused the first thumb's input.
@@ -554,14 +545,14 @@ describe("Slider inside a Field (browser)", () => {
       sourcePosition: { x: 10, y: 10 },
       targetPosition: { x: 100, y: 10 },
     });
-    await flush();
+    await flushMicrotasks();
     expect(input(1).value).toBe("50");
     expect(screen.queryByTestId("error")).toBeNull();
     expect(input(0).validationMessage).toBe("");
     expect(input(0).matches(":user-invalid")).toBe(false);
 
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await flush();
+    await flushMicrotasks();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![0].getAll("price")).toEqual(["10", "50"]);
   });

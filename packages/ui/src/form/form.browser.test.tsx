@@ -9,16 +9,11 @@ import type { ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
-import { deferred, expectNotPending, expectPending } from "../__tests__/helpers.js";
+import { deferred, expectNotPending, expectPending, flushTasks } from "../__tests__/helpers.js";
 import type { Deferred } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
 import { Form } from "./index.js";
 import type { FormErrors } from "./index.js";
-
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
 
 interface Status {
   readonly where: string;
@@ -115,7 +110,7 @@ describe.each(["useActionState dispatch", "plain async function"] as const)(
       const { calls, seen } = setup();
       await user.type(email(), "a@b.c");
       await user.click(submit());
-      await flush();
+      await flushTasks();
       expect(calls).toHaveLength(1);
       expect(calls[0]!.formData.get("email")).toBe("a@b.c");
       expectPending(screen.getByTestId("form"));
@@ -125,7 +120,7 @@ describe.each(["useActionState dispatch", "plain async function"] as const)(
       expect(pending.map((s) => s.where)).toEqual(expect.arrayContaining(["child", "portal"]));
       expect(pending.every((s) => s.email === "a@b.c")).toBe(true);
       await act(async () => calls[0]!.d.resolve({}));
-      await flush();
+      await flushTasks();
       expect(calls).toHaveLength(1);
       expectNotPending(screen.getByTestId("form"));
     });
@@ -135,7 +130,7 @@ describe.each(["useActionState dispatch", "plain async function"] as const)(
       await user.type(email(), "a@b.c");
       await user.click(submit());
       await act(async () => calls[0]!.d.resolve({ errors: { email: "Already registered" } }));
-      await flush();
+      await flushTasks();
       expect(email().value).toBe("a@b.c");
       expect(email().matches(":user-invalid")).toBe(true);
       expect(email().validationMessage).toBe("Already registered");
@@ -149,7 +144,7 @@ describe.each(["useActionState dispatch", "plain async function"] as const)(
       await user.click(submit());
       expect(email().value).toBe("a@b.c");
       await act(async () => calls[0]!.d.resolve({}));
-      await flush();
+      await flushTasks();
       expect(email().value).toBe("");
       expect(email().matches(":user-invalid")).toBe(false);
       expect(screen.queryByTestId("error")).toBeNull();
@@ -172,12 +167,12 @@ describe("Form: editing while the submission is in flight", () => {
     );
     await user.type(email(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushTasks();
     expectPending(screen.getByTestId("form"));
     await user.type(email(), "x");
     expect(screen.queryByTestId("fallback")).toBeNull();
     await act(async () => calls[0]!.resolve({ errors: { email: "Already registered" } }));
-    await flush();
+    await flushTasks();
     expectNotPending(screen.getByTestId("form"));
     expect(screen.queryByTestId("error")).toBeNull();
     expect(email().value).toBe("a@b.cx");
@@ -190,7 +185,7 @@ describe("Form: invalid submission", () => {
     const action = vi.fn();
     render(<PlainForm action={action} seen={[]} />);
     await user.click(submit());
-    await flush();
+    await flushTasks();
     expect(action).not.toHaveBeenCalled();
     expectNotPending(screen.getByTestId("form"));
     expect(screen.getByTestId("error")).toHaveTextContent(email().validationMessage);

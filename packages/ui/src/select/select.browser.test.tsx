@@ -29,14 +29,10 @@ import { Dialog } from "../dialog/index.js";
 import { Popover } from "../popover/index.js";
 import { Select } from "./index.js";
 import type { SelectValueChangeDetails } from "./index.js";
+import { closeOpenTopLayer, flushFor, spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: string, details: SelectValueChangeDetails) => unknown;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-const flush = () =>
-  act(async () => {
-    await sleep(20);
-  });
 const sel = () => screen.getByRole("combobox") as HTMLSelectElement;
 const content = () => sel().querySelector("selectedcontent")!;
 const isOpen = (el: Element = sel()) => el.matches(":open");
@@ -65,10 +61,7 @@ afterEach(async () => {
   for (const s of document.querySelectorAll("select")) {
     if (s.matches(":open")) s.blur();
   }
-  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
-  for (const el of document.querySelectorAll<HTMLElement>("[popover]")) {
-    if (el.matches(":popover-open")) el.hidePopover();
-  }
+  closeOpenTopLayer();
 });
 
 function Fruits({
@@ -145,7 +138,7 @@ describe("Select (browser)", () => {
     await act(async () => {
       form.reset();
     });
-    await flush();
+    await flushFor();
     expect(sel().value).toBe("b");
     if (supportsSelectedContent) expect(content().textContent).toBe("Banana");
     expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
@@ -200,7 +193,7 @@ describe("Select (browser)", () => {
       await act(async () => {
         hydrateRoot(container, <App />, { onRecoverableError: (e) => recoverable.push(e) });
       });
-      await flush();
+      await flushFor();
       expect(recoverable).toEqual([]);
       expect(consoleError).not.toHaveBeenCalled();
       expect(container.querySelector("select")).toBe(select);
@@ -238,7 +231,7 @@ describe("Select (browser)", () => {
     await expect.poll(() => isOpen()).toBe(true);
     const banana = sel().querySelector<HTMLOptionElement>('option[value="b"]')!;
     await user.click(banana);
-    await flush();
+    await flushFor();
     expect(action).toHaveBeenCalledTimes(1);
     const [next, details] = action.mock.calls[0]!;
     expect(next).toBe("b");
@@ -273,12 +266,12 @@ describe("Select (browser)", () => {
       expect(sel().value).toBe("b");
       expect(sel()).toHaveAttribute("data-pending", "");
       if (supportsSelectedContent) expect(content().textContent).toBe("Banana");
-      await flush();
+      await flushFor();
     }
     await act(async () => {
       d.reject(new Error("save failed"));
     });
-    await flush();
+    await flushFor();
     expect(sel().value).toBe("a");
     expect(sel()).not.toHaveAttribute("data-pending");
     if (supportsSelectedContent) expect(content().textContent).toBe("Apple");
@@ -324,7 +317,7 @@ describe("Select (browser)", () => {
       await act(async () => {
         setLabel("Bumblebee");
       });
-      await flush();
+      await flushFor();
       expect(sel().selectedIndex).toBe(1);
       expect(changes).not.toHaveBeenCalled();
       if (supportsSelectedContent) {
@@ -339,7 +332,7 @@ describe("Select (browser)", () => {
       await act(async () => {
         suspender.resolve("cherry", "Cherry");
       });
-      await flush();
+      await flushFor();
       expect(sel().value).toBe("c");
       if (supportsSelectedContent) expect(content().textContent).toBe("Cherry");
       else expect(content().textContent).toBe("");
@@ -358,7 +351,7 @@ describe("Select (browser)", () => {
         await act(async () => {
           setLabel("Hornet");
         });
-        await flush();
+        await flushFor();
         expect(isOpen()).toBe(true);
         expect(content().innerHTML).toBe("<i>Hornet</i>");
         expect(sel().value).toBe("b");
@@ -410,7 +403,7 @@ describe("Select (browser)", () => {
         p.status = "fulfilled";
         d.resolve();
       });
-      await flush();
+      await flushFor();
       expect(isOpen()).toBe(true);
       expect(sel().value).toBe("c");
       expect(content().textContent).toBe("Cherry");
@@ -431,7 +424,7 @@ describe("Select (browser)", () => {
     await act(async () => {
       (screen.getByTestId("form") as HTMLFormElement).reset();
     });
-    await flush();
+    await flushFor();
     expect(action).toHaveBeenCalledTimes(2);
     const [next, details] = action.mock.calls[1]!;
     expect(next).toBe("a");
@@ -607,21 +600,12 @@ describe("Select (browser)", () => {
   );
 
   it("ViewTransition: a pick never starts a document view transition (no part takes `transition`)", async () => {
-    const start = vi.fn();
-    if (typeof document.startViewTransition === "function") {
-      const original = document.startViewTransition.bind(document);
-      vi.spyOn(document, "startViewTransition").mockImplementation(((
-        arg: Parameters<typeof document.startViewTransition>[0],
-      ) => {
-        start();
-        return original(arg);
-      }) as typeof document.startViewTransition);
-    }
+    const vt = spyViewTransitions();
     const action = vi.fn<ActionFn>();
     render(<Fruits action={action} />);
     await selectOption(sel(), "b");
-    await flush();
+    await flushFor();
     expect(action).toHaveBeenCalledTimes(1);
-    expect(start).not.toHaveBeenCalled();
+    expect(vt.calls()).toBe(0);
   });
 });
