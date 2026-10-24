@@ -246,7 +246,9 @@ describe("Combobox", () => {
       expect(t).toHaveAttribute("tabindex", "-1");
       expect(t).toHaveAttribute("aria-expanded", "false");
       expect(t).toHaveAttribute("aria-controls", i.getAttribute("aria-controls"));
-      expect(t).not.toHaveAttribute("commandfor");
+      // Written after hydration (#112); absent from the server HTML (the "Trigger close" rows).
+      expect(t).toHaveAttribute("commandfor", popup().id);
+      expect(t).toHaveAttribute("command", "toggle-popover");
       expect(clearButton()).toHaveAttribute("type", "button");
       expect(clearButton()).toHaveAttribute("tabindex", "-1");
       const p = popup();
@@ -749,43 +751,6 @@ describe("Combobox", () => {
         [true, "activate"],
         [false, "activate"],
       ]);
-    });
-
-    it("the Trigger closes when the press already light-dismissed the popup", async () => {
-      const user = setupUser();
-      render(<Harness />);
-      await user.click(trigger());
-      await flushTasks(2);
-      // A real press outside the popup hides it before the click (light dismiss).
-      fireEvent.pointerDown(trigger());
-      act(() => popup().hidePopover());
-      fireEvent.click(trigger(), { detail: 1 });
-      await flushTasks(2);
-      expect(isOpen()).toBe(false);
-    });
-
-    it("the Trigger forgets a press that never clicked (pointercancel, a click without a press)", async () => {
-      const user = setupUser();
-      render(<Harness />);
-      await user.click(trigger());
-      await flushTasks(2);
-      expect(isOpen()).toBe(true);
-      // A press while open, cancelled; the listbox closes some other way. The next click opens.
-      fireEvent.pointerDown(trigger());
-      fireEvent.pointerCancel(trigger());
-      act(() => popup().hidePopover());
-      await flushTasks(2);
-      fireEvent.click(trigger(), { detail: 1 });
-      await flushTasks(2);
-      expect(isOpen()).toBe(true);
-      // A press while open that was dragged off (no click, no cancel); the listbox closes. A
-      // click without a press (assistive technology, element.click()) reads the current state.
-      fireEvent.pointerDown(trigger());
-      act(() => popup().hidePopover());
-      await flushTasks(2);
-      act(() => trigger().click());
-      await flushTasks(2);
-      expect(isOpen()).toBe(true);
     });
 
     it("disabled: nothing opens, the input and buttons are disabled", async () => {
@@ -2067,6 +2032,107 @@ describe("Combobox", () => {
         expect(el).toBeDisabled();
         expect(el).not.toHaveAttribute("aria-disabled");
       }
+    });
+  });
+
+  // Design 12.1 Trigger row (#112). The popover shim never light-dismisses, so the browser rows
+  // ("Trigger close") are the ones that prove a press is not a light dismiss.
+  describe("Trigger close (#112)", () => {
+    it("a <button> Trigger names the Popup as its invoker after mount, never in the server HTML", () => {
+      const html = renderToString(<Harness />);
+      const server = document.createElement("div");
+      server.innerHTML = html;
+      const serverTrigger = server.querySelector('[data-testid="trigger"]')!;
+      expect(serverTrigger.tagName).toBe("BUTTON");
+      expect(serverTrigger).not.toHaveAttribute("commandfor");
+      expect(serverTrigger).not.toHaveAttribute("command");
+      render(<Harness />);
+      expect(trigger()).toHaveAttribute("commandfor", popup().id);
+      expect(trigger()).toHaveAttribute("command", "toggle-popover");
+    });
+
+    it("a non-button render gets neither attribute and a development warning", () => {
+      const error = silenceErrors();
+      render(
+        <Combobox.Root>
+          <Combobox.Input aria-label="Country" />
+          <Combobox.Trigger data-testid="trigger" aria-label="Show all" render={<span />} />
+          <Combobox.Popup data-testid="popup">
+            <Combobox.List aria-label="Countries">
+              {({ query }) => <Options query={query} />}
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Root>,
+      );
+      expect(trigger().tagName).toBe("SPAN");
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(trigger()).not.toHaveAttribute("command");
+      const messages = error.mock.calls.map(([message]) => String(message));
+      expect(
+        messages.filter((m) => m.includes("Combobox.Trigger: rendered a <span>. Only a <button>")),
+      ).toHaveLength(1);
+    });
+
+    it("every click is cancelled, closed and open (the command never runs)", async () => {
+      render(<Harness />);
+      expect(fireEvent.click(trigger())).toBe(false);
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(popoverSource(popup())).toBe(input());
+      expect(fireEvent.click(trigger())).toBe(false);
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+    });
+
+    it("toggles against the intended state: a click while open closes with one (false, activate)", async () => {
+      const openAction = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: openAction }} />);
+      act(() => trigger().click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      openAction.mockClear();
+      const click = new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 });
+      act(() => {
+        trigger().dispatchEvent(click);
+      });
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(openAction).toHaveBeenCalledTimes(1);
+      expect(openAction.mock.calls[0]![0]).toBe(false);
+      expect(openAction.mock.calls[0]![1].reason).toBe("activate");
+      expect(openAction.mock.calls[0]![1].event).toBe(click);
+      // Closed some other way (a dismissal): the next click opens.
+      act(() => trigger().click());
+      await flushTasks(2);
+      act(() => popup().hidePopover());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      openAction.mockClear();
+      act(() => trigger().click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[true, "activate"]]);
+    });
+
+    it("a controlled open={true} parent that refuses the close keeps the listbox shown", async () => {
+      const close = deferred();
+      const openAction = vi.fn<OpenAction>(() => close.promise);
+      const hide = spyHide();
+      render(<Harness root={{ open: true, openChangeAction: openAction }} />);
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      act(() => trigger().click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expectPending(trigger());
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      await act(async () => close.resolve());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expectNotPending(trigger());
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(hide).not.toHaveBeenCalled();
+      expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "activate"]]);
     });
   });
 

@@ -1,5 +1,5 @@
 "use client";
-import { useRef } from "react";
+import { useCallback } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -10,6 +10,7 @@ import type {
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
@@ -29,10 +30,11 @@ export interface ComboboxTriggerProps extends Omit<
   | "onClick"
   | "onPointerDown"
   | "onMouseDown"
-  | "onPointerCancel"
   | "tabIndex"
   | "aria-expanded"
   | "aria-controls"
+  | "commandfor"
+  | "command"
   | "disabled"
   | "className"
   | "style"
@@ -54,13 +56,16 @@ export interface ComboboxTriggerProps extends Omit<
 /**
  * The optional button that toggles the listbox: `<button type="button" tabindex="-1"
  * aria-expanded aria-controls>` (the APG keeps it out of the Tab sequence; the input is the one
- * stop). A press does not take focus from the input, and a click focuses the input. No
- * `commandfor`: the listbox is anchored to the input, never to this button (design 1).
+ * stop). A press does not take focus from the input, and a click focuses the input. After
+ * hydration a `<button>` also names the Popup as its invoker (`commandfor`,
+ * `command="toggle-popover"`, written through the ref, never server-rendered), so a press while
+ * the listbox is open is not a light dismiss and the click's close is the only one (design 3.3,
+ * #112). Every click is cancelled, so the command never runs: the listbox stays anchored to the
+ * input (design 1).
  *
  * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or
- * component `render`), `aria-expanded`,
- * `aria-controls` (token-merged), `onClick`, `onPointerDown`, `onPointerCancel`, `onMouseDown`,
- * `data-open`, `data-pending`, `data-disabled`.
+ * component `render`), `aria-expanded`, `aria-controls` (token-merged), `commandfor`, `command`,
+ * `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`.
  */
 export function ComboboxTrigger({
   disabled: ownDisabled = false,
@@ -73,13 +78,37 @@ export function ComboboxTrigger({
   const ctx = useComboboxContext("Combobox.Trigger");
   const { popover } = ctx;
   const disabled = ownDisabled || ctx.disabled;
-  // What the user saw at the press: a press outside the popup light-dismisses it before the
-  // click arrives, so the toggle is decided against the state at `pointerdown`.
-  const openAtPress = useRef<boolean | null>(null);
   // Development check (design 9): an icon-only Trigger needs a name from the consumer.
-  const ref = useNameWarning(
+  const checkName = useNameWarning(
     isDev && "Combobox.Trigger: the button has no accessible name. Give it an `aria-label`.",
     BUTTON_NAME,
+  );
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName === "BUTTON"
+          ? null
+          : `Combobox.Trigger: rendered a <${element.tagName.toLowerCase()}>. Only a <button> ` +
+            "can name the listbox as its invoker; a press on this element while the listbox is " +
+            "open light-dismisses it before the click."),
+  );
+  const popupId = popover.ids.popup;
+  // After hydration a `<button>` becomes the popup's invoker (design 3.3, #112): the platform's
+  // light dismiss exempts a press on an invoker of the open popover. Written here, not rendered,
+  // so the server HTML has no `commandfor` and a click before hydration opens nothing.
+  const ref = useCallback(
+    (element: HTMLElement) => {
+      checkName?.(element);
+      checkElement?.(element);
+      if (element.tagName !== "BUTTON") return () => {};
+      element.setAttribute("commandfor", popupId);
+      element.setAttribute("command", "toggle-popover");
+      return () => {
+        element.removeAttribute("commandfor");
+        element.removeAttribute("command");
+      };
+    },
+    [checkName, checkElement, popupId],
   );
 
   const state: ComboboxTriggerState = {
@@ -95,29 +124,18 @@ export function ComboboxTrigger({
     "aria-expanded": popover.optimistic,
     "aria-controls": ctx.ids.list,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
-      openAtPress.current = popover.intended();
       event.preventDefault();
-    },
-    onPointerCancel: () => {
-      // The press never becomes a click.
-      openAtPress.current = null;
     },
     onMouseDown: (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
     },
     onClick: (event: MouseEvent<HTMLButtonElement>) => {
-      // `detail === 0`: a click without a press (assistive technology, `element.click()`); a
-      // snapshot left by a press that never clicked (dragged off) does not belong to it.
-      const pressed = event.detail === 0 ? null : openAtPress.current;
-      const wasOpen = pressed ?? popover.intended();
-      openAtPress.current = null;
-      if (disabled) {
-        // A disabled link must not navigate either.
-        event.preventDefault();
-        return;
-      }
+      // Cancelled first, whatever follows: the command must never run (the library opens the
+      // listbox anchored to the input), and a disabled link must not navigate either.
+      event.preventDefault();
+      if (disabled) return;
       const native = event.nativeEvent;
-      if (wasOpen) popover.requestClose(native, "activate");
+      if (popover.intended()) popover.requestClose(native, "activate");
       else popover.requestOpen(native, "activate");
       ctx.inputRef.current?.focus();
     },

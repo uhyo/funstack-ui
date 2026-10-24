@@ -21,7 +21,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
-import { cdp, userEvent } from "vitest/browser";
+import { cdp, commands, userEvent } from "vitest/browser";
 import { Suspense, use } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,7 +32,6 @@ import {
   supportsAriaNotify,
 } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
-import { mouse } from "../__tests__/browser-commands.js";
 import { Dialog } from "../dialog/index.js";
 import { Field } from "../field/index.js";
 import { Popover } from "../popover/index.js";
@@ -56,6 +55,7 @@ import {
   quietPeriod,
   sleep,
 } from "../__tests__/browser-helpers.js";
+import { mouse, toPagePoint } from "../__tests__/browser-commands.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -231,7 +231,7 @@ describe("Combobox (browser)", () => {
       await user.click(screen.getByTestId("trigger"));
       await settle(() => expect(isOpen()).toBe(true));
       expect(document.activeElement).toBe(input());
-      // A second press closes it (decided against the state at pointerdown).
+      // A second press closes it (the Trigger is an invoker: not a light dismiss, #112).
       await user.click(screen.getByTestId("trigger"));
       await settle(() => expect(isOpen()).toBe(false));
       expect(document.activeElement).toBe(input());
@@ -667,6 +667,7 @@ describe("Combobox (browser)", () => {
         >
           <Combobox.Label>Country</Combobox.Label>
           <Combobox.Input />
+          <Combobox.Trigger aria-label="Show all">▾</Combobox.Trigger>
           <Combobox.Popup>
             <Combobox.List>{({ query }) => <Options query={query} />}</Combobox.List>
           </Combobox.Popup>
@@ -682,6 +683,14 @@ describe("Combobox (browser)", () => {
     try {
       const container = iframe.contentDocument!.getElementById("root")!;
       const field = container.querySelector("input")!;
+      const triggerButton = container.querySelector("button")!;
+      const listbox = container.querySelector("[popover]")!;
+      // The server HTML's Trigger names no popover (#112): a real click before hydration opens
+      // nothing, neither a command nor anything else.
+      expect(triggerButton.hasAttribute("commandfor")).toBe(false);
+      expect(triggerButton.hasAttribute("command")).toBe(false);
+      await clickInFrame(iframe, triggerButton);
+      expect(listbox.matches(":popover-open")).toBe(false);
       // The real keyboard, before any JS is attached (the locator-based click cannot reach into
       // the iframe, so focus comes from script).
       field.focus();
@@ -709,7 +718,11 @@ describe("Combobox (browser)", () => {
       ]);
       expect(action).not.toHaveBeenCalled();
       expect(openAction).not.toHaveBeenCalled();
-      expect(container.querySelector("[popover]")!.matches(":popover-open")).toBe(false);
+      expect(listbox.matches(":popover-open")).toBe(false);
+      // After hydration the Trigger is the listbox's invoker.
+      expect(container.querySelector("button")).toBe(triggerButton);
+      expect(triggerButton.getAttribute("commandfor")).toBe(listbox.id);
+      expect(triggerButton.getAttribute("command")).toBe("toggle-popover");
     } finally {
       iframe.remove();
       // Firefox keeps keyboard focus in the removed frame otherwise (the next row's keys go
@@ -878,7 +891,193 @@ describe("ViewTransition (browser)", () => {
   });
 });
 
+// Design 12.2 "Trigger close (#112)": after hydration the Trigger names the popup
+// (`commandfor` + `command="toggle-popover"`), so a real press on it while the listbox is open is
+// not a light dismiss; the click's `requestClose` is the single source of the close. Real mouse
+// input (`mouse.down` / `mouse.up`), outside React's act environment so the timing is real. No
+// engine branch: WebKit is verified by its CI job.
+describe("Trigger close (#112, browser)", () => {
+  let restoreAct: () => void;
+
+  beforeEach(() => {
+    restoreAct = leaveActEnvironment();
+  });
+
+  afterEach(async () => {
+    await mouse.releaseHeld();
+    restoreAct();
+  });
+
+  const trigger = () => screen.getByTestId("trigger");
+
+  function center(element: Element) {
+    const r = element.getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  }
+
+  /** A real press and release on the Trigger. */
+  async function pressTrigger() {
+    const { x, y } = center(trigger());
+    await mouse.down(x, y);
+    await mouse.up(x, y);
+  }
+
+  /** Records `:popover-open` on every frame until `stop()`. */
+  function sampleFrames() {
+    const samples: boolean[] = [];
+    let id = 0;
+    const tick = () => {
+      samples.push(isOpen());
+      id = requestAnimationFrame(tick);
+    };
+    tick();
+    return {
+      samples,
+      stop: () => cancelAnimationFrame(id),
+    };
+  }
+
+  /** A parent that keeps `open={true}` whatever the action does (it refuses every close). */
+  function Refusing({ action }: { action: OpenAction }) {
+    return <Box root={{ open: true, openChangeAction: action }} />;
+  }
+
+  it("keeps the listbox shown, the input focused, the Trigger pending until the action settles", async () => {
+    const openAction = vi.fn<OpenAction>(async (next) => {
+      if (!next) await sleep(300);
+    });
+    render(<Harness root={{ openChangeAction: openAction }} />);
+    await pressTrigger();
+    await expect.poll(() => isOpen()).toBe(true);
+    await expect.poll(() => trigger().hasAttribute("data-pending")).toBe(false);
+    expect(document.activeElement).toBe(input());
+    openAction.mockClear();
+
+    await pressTrigger();
+    await sleep(20);
+    expect(isOpen()).toBe(true);
+    expect(document.activeElement).toBe(input());
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    await expect.poll(() => isOpen(), { timeout: 2000 }).toBe(false);
+    expect(document.activeElement).toBe(input());
+    expect(openAction).toHaveBeenCalledTimes(1);
+    const [next, details] = openAction.mock.calls[0]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event!.type).toBe("click");
+  });
+
+  for (const kind of ["async", "sync"] as const) {
+    it(`a controlled parent that refuses the close (${kind} action): the listbox never hides`, async () => {
+      const openAction = vi.fn<OpenAction>(kind === "async" ? () => sleep(300) : () => undefined);
+      render(<Refusing action={openAction} />);
+      await expect.poll(() => isOpen()).toBe(true);
+      input().focus();
+      const frames = sampleFrames();
+      try {
+        await pressTrigger();
+        await sleep(400);
+      } finally {
+        frames.stop();
+      }
+      expect(frames.samples.length).toBeGreaterThan(5);
+      expect(frames.samples.every(Boolean)).toBe(true);
+      expect(isOpen()).toBe(true);
+      expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "activate"]]);
+    });
+  }
+
+  it("a click while closed opens once, anchored to the input, at least as wide (no command ran)", async () => {
+    const openAction = vi.fn<OpenAction>();
+    render(<Harness root={{ openChangeAction: openAction }} />);
+    // A command that ran would show the popup first (from the button), then the library again.
+    const toggles: string[] = [];
+    popup().addEventListener("beforetoggle", (event) => toggles.push(event.newState));
+    await pressTrigger();
+    await expect.poll(() => isOpen()).toBe(true);
+    await flushFor();
+    expect(toggles).toEqual(["open"]);
+    expect(document.activeElement).toBe(input());
+    expect(openAction.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
+      [true, "activate", "click"],
+    ]);
+    const i = input().getBoundingClientRect();
+    const p = popup().getBoundingClientRect();
+    expect(Math.abs(p.left - i.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(p.top - i.bottom)).toBeLessThanOrEqual(1);
+    expect(p.width).toBeGreaterThanOrEqual(i.width - 0.5);
+  });
+
+  it("with transition: the Trigger close runs one view transition with the popup's old image", async () => {
+    const calls: { openAtStart: boolean }[] = [];
+    const { transitions } = spyViewTransitions(() => {
+      calls.push({ openAtStart: isOpen() });
+    });
+    addStyle(`
+        ::view-transition-old(.pop) { animation: 150ms ease-in both cb-pop-out; }
+        ::view-transition-new(.pop) { animation: 150ms ease-out both cb-pop-in; }
+        @keyframes cb-pop-out { to { opacity: 0; } }
+        @keyframes cb-pop-in { from { opacity: 0; } }
+      `);
+    try {
+      render(
+        <Harness
+          popup={{
+            transition: {
+              "fsui-combobox-open": "pop",
+              "fsui-combobox-close": "pop",
+              default: "none",
+            },
+          }}
+        />,
+      );
+      await pressTrigger();
+      await expect.poll(() => calls.length).toBe(1);
+      await transitions[0]!.finished;
+      expect(isOpen()).toBe(true);
+
+      await pressTrigger();
+      await expect.poll(() => calls.length).toBe(2);
+      expect(calls[1]!.openAtStart).toBe(true);
+      await transitions[1]!.ready;
+      const oldImages = document
+        .getAnimations()
+        .filter((animation) =>
+          ((animation.effect as KeyframeEffect | null)?.pseudoElement ?? "").startsWith(
+            "::view-transition-old",
+          ),
+        );
+      expect(oldImages.length).toBeGreaterThan(0);
+      await transitions[1]!.finished;
+      expect(isOpen()).toBe(false);
+      expect(calls).toHaveLength(2);
+    } finally {
+      await Promise.allSettled(transitions.map((transition) => transition.finished));
+    }
+  });
+});
+
 // --- helpers ---------------------------------------------------------------------------------
+
+/**
+ * A real left click on `element` inside `iframe` (a same-origin frame of this test frame);
+ * resolves once the frame handled the release and the rest of its task ran.
+ */
+async function clickInFrame(iframe: HTMLIFrameElement, element: Element): Promise<void> {
+  const frame = iframe.getBoundingClientRect();
+  const r = element.getBoundingClientRect();
+  const { x, y } = toPagePoint(
+    frame.left + iframe.clientLeft + r.left + r.width / 2,
+    frame.top + iframe.clientTop + r.top + r.height / 2,
+  );
+  const win = iframe.contentWindow!;
+  const handled = new Promise<void>((resolve) => {
+    win.addEventListener("pointerup", () => setTimeout(resolve, 0), { capture: true, once: true });
+  });
+  await commands.mouse("click", x, y);
+  await handled;
+}
 
 function InPopover() {
   return (
