@@ -286,3 +286,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Docs/example audit done (D1–D11, E1–E6). PO: D3 sidebar group class is a real bug → fix by applying class. D2 unused template CSS → delete (user may override). Waiting on tests audit.
 - USER: breaking changes are fine (alpha). → C14 REVERSED: Tabs/Accordion reason → ChangeReason (conventions as written, no amendment). Ground rule relaxed: public API changes allowed when they make the API more consistent/simpler; every breaking change recorded on #100 for the release notes. Behaviour-preserving remains the default for internal refactors.
 - USER POLICY (standing): during alpha, breaking changes are allowed freely; PO decides when to allow them. PO practice: allow when the change makes the API more consistent/simpler/correct; always log under "Breaking" for release notes; avoid churn for its own sake.
+- Tests audit done (T1–T20; jsdom 25s/2865 tests, chromium 20.7s/412). Plan → sub-issues:
+  #101 P1 test infra (tests only) | #102 P1 source mechanical (+C14 BREAKING) | #103 P1 docs/example code (D3 bug fix)
+  #104 P2 overlay structural | #105 P2 controls structural (C1 last) — start after #101+#102 merge
+  #106 P3 shared test suites (after P2) | #107 P4 jsdom --no-isolate
+- P1 running: 3 developers in agent worktrees, branches wave16/test-infra, wave16/source-cleanup, wave16/docs-example. Branch CI before master; PO merges after reviewer pass. Release alpha.12 at wave end (Breaking: C14).
