@@ -240,3 +240,27 @@ Mutations (transition-boundary.tsx, browser project, Chromium + Firefox):
 - `expect` lines: Dialog 618 -> 462 local + 209 in the suite; Popover 459 -> 310 + 209.
 - No library bug found: every row the suite added for a component that lacked it passed first time
   (Menu's item-close shape is by design, menu.md 2.2).
+
+## Review fixes (memo/reviewer/wave16-overlay-suite-review.md)
+
+- L1: the `triggerToggles` doc says Menu's Trigger mousedown moves focus out and the `focusout`
+  close hides the menu before the click, which then dispatches the same library-owned close.
+- L2: new driver field `partCloseReturnsFocus` (Dialog, Menu: true; Popover: false, its part is
+  the Trigger). When true the part-close row asserts focus is NOT on the Trigger while pending and
+  IS on it after the close; Popover no longer runs the vacuous check. Mutations: dropping
+  `trigger.focus()` in `returnFocusToTrigger` (internal/overlay-popup.tsx) fails Menu's row in both
+  modes (2 failures; Dialog's return is the dialog shim's platform behaviour); setting the flag
+  true for Popover fails the new `not.toHaveFocus` precondition (2 failures). Both restored.
+- L3: `popoverLikeDriver()` in the suite file (isOpen, spies, openArgs, dismiss, foreignOpen,
+  openBeforeHydration, controlled args, `triggerToggles`, `ariaExpanded`); Popover and Menu spread
+  it and add name, Harness, the four partClose fields and closeIntents. The `returnValue` field is
+  gone: derived from `detailsKeys.includes("returnValue")`.
+- L4: review ids and "#83" dropped from titles in popover.test.tsx, menu.test.tsx (M1-M4, L1, M1)
+  and menu.browser ("non-item space (browser)"). Not touched: menu-context-trigger(.browser) titles
+  still carry "review L2/H1/M1/..." (outside this branch's files; candidate for a later cleanup).
+- L5: the 15 jsdom + 3 dialog.browser `// review Xn (memo/reviewer/...).` lines deleted; each
+  row's title already says the behaviour.
+- N1: menu.test.tsx "a controlled parent that adopts after its own await opens and closes"
+  deleted; the suite's controlled part-close rows (the harness adopts after its await) cover it.
+- Gates: typecheck, lint, format:check, test:jsdom (3000 pass), build green; browser dialog +
+  menu on Chromium + Firefox 136 pass, 2 skipped.
