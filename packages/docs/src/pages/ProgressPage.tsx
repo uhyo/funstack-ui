@@ -4,12 +4,8 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ProgressForm } from "../examples/ProgressForm.js";
-import progressFormSource from "../examples/ProgressForm.tsx?raw";
 import { ProgressJobs } from "../examples/ProgressJobs.js";
-import progressJobsSource from "../examples/ProgressJobs.tsx?raw";
 import { ProgressUpload } from "../examples/ProgressUpload.js";
-import progressUploadSource from "../examples/ProgressUpload.tsx?raw";
-import progressCss from "../examples/progress.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 const partProps = (element: string) => [
@@ -34,12 +30,7 @@ export function ProgressPage() {
         client parts still ship; see <a href="#server-components">Server Components</a>).
       </p>
 
-      <Example
-        source={progressUploadSource}
-        fileName="ProgressUpload.tsx"
-        css={progressCss}
-        cssFileName="progress.css"
-      >
+      <Example file="ProgressUpload.tsx" css="progress.css">
         <ProgressUpload />
       </Example>
 
@@ -326,12 +317,7 @@ export function ProgressPage() {
           the Root through a context, so they are small client modules; which of them reach the
           browser depends on how your bundler emits client references.
         </p>
-        <Example
-          source={progressJobsSource}
-          fileName="ProgressJobs.tsx"
-          css={progressCss}
-          cssFileName="progress.css"
-        >
+        <Example file="ProgressJobs.tsx" css="progress.css">
           <ProgressJobs />
         </Example>
       </BehaviourSection>
@@ -344,12 +330,7 @@ export function ProgressPage() {
         the bar with <code>aria-describedby</code> (the APG's advice). Progress does not read the
         form status by itself, so a Progress inside a form is not tied to it by accident.
       </p>
-      <Example
-        source={progressFormSource}
-        fileName="ProgressForm.tsx"
-        css={progressCss}
-        cssFileName="progress.css"
-      >
+      <Example file="ProgressForm.tsx" css="progress.css">
         <ProgressForm />
       </Example>
 

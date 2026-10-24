@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToolbarEditor } from "../examples/ToolbarEditor.js";
-import toolbarEditorSource from "../examples/ToolbarEditor.tsx?raw";
 import { ToolbarVertical } from "../examples/ToolbarVertical.js";
-import toolbarVerticalSource from "../examples/ToolbarVertical.tsx?raw";
-import toolbarCss from "../examples/toolbar.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ToolbarPage() {
@@ -28,12 +25,7 @@ export function ToolbarPage() {
         focusable when disabled inside a toolbar.
       </p>
 
-      <Example
-        source={toolbarEditorSource}
-        fileName="ToolbarEditor.tsx"
-        css={toolbarCss}
-        cssFileName="toolbar.css"
-      >
+      <Example file="ToolbarEditor.tsx" css="toolbar.css">
         <ToolbarEditor />
       </Example>
       <p>
@@ -321,7 +313,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
 
       <h3 id="recipes">Recipes</h3>
       <h4>Vertical toolbar</h4>
-      <Example source={toolbarVerticalSource} fileName="ToolbarVertical.tsx">
+      <Example file="ToolbarVertical.tsx">
         <ToolbarVertical />
       </Example>
       <p>

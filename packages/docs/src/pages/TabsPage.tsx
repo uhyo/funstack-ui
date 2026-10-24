@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { TabsSaved } from "../examples/TabsSaved.js";
-import tabsSavedSource from "../examples/TabsSaved.tsx?raw";
 import { TabsSuspending } from "../examples/TabsSuspending.js";
-import tabsSuspendingSource from "../examples/TabsSuspending.tsx?raw";
-import tabsCss from "../examples/tabs.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function TabsPage() {
@@ -24,12 +21,7 @@ export function TabsPage() {
         selected tab shows <code>data-pending</code>.
       </p>
 
-      <Example
-        source={tabsSuspendingSource}
-        fileName="TabsSuspending.tsx"
-        css={tabsCss}
-        cssFileName="tabs.css"
-      >
+      <Example file="TabsSuspending.tsx" css="tabs.css">
         <TabsSuspending />
       </Example>
 
@@ -323,12 +315,7 @@ export function TabsPage() {
         }
       >
         <h4>Walkthrough</h4>
-        <Example
-          source={tabsSavedSource}
-          fileName="TabsSaved.tsx"
-          css={tabsCss}
-          cssFileName="tabs.css"
-        >
+        <Example file="TabsSaved.tsx" css="tabs.css">
           <TabsSaved />
         </Example>
         <ol>

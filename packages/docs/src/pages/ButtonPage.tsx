@@ -1,18 +1,12 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout, Example, ExampleSource } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ButtonCompose } from "../examples/ButtonCompose.js";
-import buttonComposeSource from "../examples/ButtonCompose.tsx?raw";
 import { ButtonFormActions } from "../examples/ButtonFormActions.js";
-import buttonFormActionsSource from "../examples/ButtonFormActions.tsx?raw";
-import buttonCssPendingSource from "../examples/ButtonCssPending.tsx?raw";
 import { ButtonInvoker } from "../examples/ButtonInvoker.js";
-import buttonInvokerSource from "../examples/ButtonInvoker.tsx?raw";
 import { ButtonSave } from "../examples/ButtonSave.js";
-import buttonSaveSource from "../examples/ButtonSave.tsx?raw";
-import buttonCss from "../examples/button.css?raw";
 import { ToastNotifications } from "../examples/ToastNotifications.js";
 import { functionProps, renderProp } from "./shared-props.js";
 
@@ -35,12 +29,7 @@ export function ButtonPage() {
       {/* This page's toast region, fed by the caught-inside example. */}
       <ToastNotifications />
 
-      <Example
-        source={buttonSaveSource}
-        fileName="ButtonSave.tsx"
-        css={buttonCss}
-        cssFileName="button.css"
-      >
+      <Example file="ButtonSave.tsx" css="button.css">
         <ButtonSave />
       </Example>
       <p>
@@ -255,7 +244,7 @@ export function ButtonPage() {
         }
       >
         <h4>From a Server Component</h4>
-        <Example source={buttonInvokerSource} fileName="ButtonInvoker.tsx">
+        <Example file="ButtonInvoker.tsx">
           <ButtonInvoker />
         </Example>
         <p>
@@ -272,7 +261,7 @@ export function ButtonPage() {
           <code>render</code>, nor a plain client function as <code>action</code>: the
           spinner-in-children pattern needs a Client Component.
         </p>
-        <CodeBlock title="ButtonCssPending.tsx">{buttonCssPendingSource}</CodeBlock>
+        <ExampleSource file="ButtonCssPending.tsx" />
         <CodeBlock>{`// A Server Component
 import { Button } from "@funstack/ui/button";
 import { archive } from "./actions"; // "use server"
@@ -287,7 +276,7 @@ import { archive } from "./actions"; // "use server"
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example source={buttonFormActionsSource} fileName="ButtonFormActions.tsx">
+      <Example file="ButtonFormActions.tsx">
         <ButtonFormActions />
       </Example>
       <p>
@@ -376,7 +365,7 @@ import { archive } from "./actions"; // "use server"
 
       <h3 id="recipes">Recipes</h3>
       <h4>Composition</h4>
-      <Example source={buttonComposeSource} fileName="ButtonCompose.tsx">
+      <Example file="ButtonCompose.tsx">
         <ButtonCompose />
       </Example>
       <p>

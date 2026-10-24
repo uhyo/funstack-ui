@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleGroupAlignment } from "../examples/ToggleGroupAlignment.js";
-import toggleGroupAlignmentSource from "../examples/ToggleGroupAlignment.tsx?raw";
 import { ToggleGroupStyles } from "../examples/ToggleGroupStyles.js";
-import toggleGroupStylesSource from "../examples/ToggleGroupStyles.tsx?raw";
-import toggleGroupCss from "../examples/toggle-group.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function ToggleGroupPage() {
@@ -26,12 +23,7 @@ export function ToggleGroupPage() {
         join the toolbar's sequence.
       </p>
 
-      <Example
-        source={toggleGroupStylesSource}
-        fileName="ToggleGroupStyles.tsx"
-        css={toggleGroupCss}
-        cssFileName="toggle-group.css"
-      >
+      <Example file="ToggleGroupStyles.tsx" css="toggle-group.css">
         <ToggleGroupStyles />
       </Example>
       <p>
@@ -69,7 +61,7 @@ export function ToggleGroupPage() {
 
       <h3 id="how-it-works">How it works</h3>
       <h4>Exclusive mode</h4>
-      <Example source={toggleGroupAlignmentSource} fileName="ToggleGroupAlignment.tsx">
+      <Example file="ToggleGroupAlignment.tsx">
         <ToggleGroupAlignment />
       </Example>
       <p>

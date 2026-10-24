@@ -3,8 +3,6 @@ import { ConceptExample, Terms } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { TabsSaved } from "../examples/TabsSaved.js";
-import tabsSavedSource from "../examples/TabsSaved.tsx?raw";
-import tabsCss from "../examples/tabs.css?raw";
 
 export function PendingOptimisticPage() {
   return (
@@ -98,12 +96,7 @@ export function PendingOptimisticPage() {
           ms save. The indicator and the tab colour move at once (optimistic); the panel changes
           when the save resolves (committed). Every third save fails and everything rolls back.
         </p>
-        <Example
-          source={tabsSavedSource}
-          fileName="TabsSaved.tsx"
-          css={tabsCss}
-          cssFileName="tabs.css"
-        >
+        <Example file="TabsSaved.tsx" css="tabs.css">
           <TabsSaved />
         </Example>
       </ConceptExample>

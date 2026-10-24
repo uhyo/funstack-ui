@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ContextMenuCanvas } from "../examples/ContextMenuCanvas.js";
-import contextMenuCanvasSource from "../examples/ContextMenuCanvas.tsx?raw";
 import { ContextMenuFiles } from "../examples/ContextMenuFiles.js";
-import contextMenuFilesSource from "../examples/ContextMenuFiles.tsx?raw";
-import contextMenuCss from "../examples/context-menu.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function ContextMenuPage() {
@@ -30,12 +27,7 @@ export function ContextMenuPage() {
         and Safari.
       </p>
 
-      <Example
-        source={contextMenuFilesSource}
-        fileName="ContextMenuFiles.tsx"
-        css={contextMenuCss}
-        cssFileName="context-menu.css"
-      >
+      <Example file="ContextMenuFiles.tsx" css="context-menu.css">
         <ContextMenuFiles />
       </Example>
       <p>
@@ -44,12 +36,7 @@ export function ContextMenuPage() {
         <code>data-pending</code> and the menu closes when it settles.
       </p>
 
-      <Example
-        source={contextMenuCanvasSource}
-        fileName="ContextMenuCanvas.tsx"
-        css={contextMenuCss}
-        cssFileName="context-menu.css"
-      >
+      <Example file="ContextMenuCanvas.tsx" css="context-menu.css">
         <ContextMenuCanvas />
       </Example>
       <p>

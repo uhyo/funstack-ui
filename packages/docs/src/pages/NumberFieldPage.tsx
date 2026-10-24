@@ -4,12 +4,8 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { NumberFieldField } from "../examples/NumberFieldField.js";
-import numberFieldFieldSource from "../examples/NumberFieldField.tsx?raw";
 import { NumberFieldFormats } from "../examples/NumberFieldFormats.js";
-import numberFieldFormatsSource from "../examples/NumberFieldFormats.tsx?raw";
 import { NumberFieldQuantity } from "../examples/NumberFieldQuantity.js";
-import numberFieldQuantitySource from "../examples/NumberFieldQuantity.tsx?raw";
-import numberFieldCss from "../examples/number-field.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function NumberFieldPage() {
@@ -35,12 +31,7 @@ export function NumberFieldPage() {
         save fails.
       </p>
 
-      <Example
-        source={numberFieldQuantitySource}
-        fileName="NumberFieldQuantity.tsx"
-        css={numberFieldCss}
-        cssFileName="number-field.css"
-      >
+      <Example file="NumberFieldQuantity.tsx" css="number-field.css">
         <NumberFieldQuantity />
       </Example>
 
@@ -128,12 +119,7 @@ export function NumberFieldPage() {
       </ul>
 
       <h4>Locales and formats</h4>
-      <Example
-        source={numberFieldFormatsSource}
-        fileName="NumberFieldFormats.tsx"
-        css={numberFieldCss}
-        cssFileName="number-field.css"
-      >
+      <Example file="NumberFieldFormats.tsx" css="number-field.css">
         <NumberFieldFormats />
       </Example>
       <ul>
@@ -582,12 +568,7 @@ export function NumberFieldPage() {
 
       <h3 id="recipes">Recipes</h3>
       <h4 id="inside-a-field">Inside a Field</h4>
-      <Example
-        source={numberFieldFieldSource}
-        fileName="NumberFieldField.tsx"
-        css={numberFieldCss}
-        cssFileName="number-field.css"
-      >
+      <Example file="NumberFieldField.tsx" css="number-field.css">
         <NumberFieldField />
       </Example>
       <ul>

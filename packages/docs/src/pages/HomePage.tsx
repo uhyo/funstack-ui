@@ -3,8 +3,6 @@ import { Callout, Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { componentNavItems } from "../navigation.js";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
-import toggleFavoriteSource from "../examples/ToggleFavorite.tsx?raw";
-import toggleCss from "../examples/toggle.css?raw";
 
 const principles = [
   {
@@ -75,12 +73,7 @@ export function HomePage() {
         Click the button below. The star flips at once, the button shows a spinner while the fake
         save runs, and clicking again while it is pending simply wins.
       </p>
-      <Example
-        source={toggleFavoriteSource}
-        fileName="ToggleFavorite.tsx"
-        css={toggleCss}
-        cssFileName="toggle.css"
-      >
+      <Example file="ToggleFavorite.tsx" css="toggle.css">
         <ToggleFavorite />
       </Example>
       <p>

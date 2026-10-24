@@ -4,12 +4,8 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SelectCountry } from "../examples/SelectCountry.js";
-import selectCountrySource from "../examples/SelectCountry.tsx?raw";
 import { SelectForm } from "../examples/SelectForm.js";
-import selectFormSource from "../examples/SelectForm.tsx?raw";
 import { SelectFruit } from "../examples/SelectFruit.js";
-import selectFruitSource from "../examples/SelectFruit.tsx?raw";
-import selectCss from "../examples/select.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function SelectPage() {
@@ -31,12 +27,7 @@ export function SelectPage() {
         <code>&lt;select&gt;</code>.
       </p>
 
-      <Example
-        source={selectFruitSource}
-        fileName="SelectFruit.tsx"
-        css={selectCss}
-        cssFileName="select.css"
-      >
+      <Example file="SelectFruit.tsx" css="select.css">
         <SelectFruit />
       </Example>
 
@@ -406,12 +397,7 @@ export function SelectPage() {
         }
       >
         <h4 id="options-that-load-later">Options that load later</h4>
-        <Example
-          source={selectCountrySource}
-          fileName="SelectCountry.tsx"
-          css={selectCss}
-          cssFileName="select.css"
-        >
+        <Example file="SelectCountry.tsx" css="select.css">
           <SelectCountry />
         </Example>
         <p>
@@ -472,12 +458,7 @@ export function SelectPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={selectFormSource}
-        fileName="SelectForm.tsx"
-        css={selectCss}
-        cssFileName="select.css"
-      >
+      <Example file="SelectForm.tsx" css="select.css">
         <SelectForm />
       </Example>
       <ul>

@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MeterStorage } from "../examples/MeterStorage.js";
-import meterStorageSource from "../examples/MeterStorage.tsx?raw";
 import { MeterStrength } from "../examples/MeterStrength.js";
-import meterStrengthSource from "../examples/MeterStrength.tsx?raw";
-import meterCss from "../examples/meter.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function MeterPage() {
@@ -27,12 +24,7 @@ export function MeterPage() {
         decide whether the value is good, not so good, or bad.
       </p>
 
-      <Example
-        source={meterStorageSource}
-        fileName="MeterStorage.tsx"
-        css={meterCss}
-        cssFileName="meter.css"
-      >
+      <Example file="MeterStorage.tsx" css="meter.css">
         <MeterStorage />
       </Example>
       <p>
@@ -250,12 +242,7 @@ export function MeterPage() {
         <code>aria-describedby</code>. A <code>Field.Root</code> whose only content is a Meter is
         not supported: use a plain element with the Meter's own label.
       </p>
-      <Example
-        source={meterStrengthSource}
-        fileName="MeterStrength.tsx"
-        css={meterCss}
-        cssFileName="meter.css"
-      >
+      <Example file="MeterStrength.tsx" css="meter.css">
         <MeterStrength />
       </Example>
     </div>

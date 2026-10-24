@@ -4,7 +4,6 @@ import { Callout, Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
-import toggleErrorsSource from "../examples/ToggleErrors.tsx?raw";
 
 export function ActionPropsPage() {
   return (
@@ -249,7 +248,7 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
         <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
-        <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
+        <Example file="ToggleErrors.tsx">
           <ToggleErrors />
         </Example>
       </ConceptExample>

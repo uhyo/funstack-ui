@@ -3,7 +3,6 @@ import { ConceptExample } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { TabsSuspending } from "../examples/TabsSuspending.js";
-import tabsSuspendingSource from "../examples/TabsSuspending.tsx?raw";
 
 export function SuspensePage() {
   return (
@@ -47,7 +46,7 @@ export function SuspensePage() {
           keys quickly with automatic activation dispatches one selection per key; the latest one
           wins, and only its panel is committed.
         </p>
-        <Example source={tabsSuspendingSource} fileName="TabsSuspending.tsx">
+        <Example file="TabsSuspending.tsx">
           <TabsSuspending />
         </Example>
       </ConceptExample>

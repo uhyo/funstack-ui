@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { TooltipArrow } from "../examples/TooltipArrow.js";
-import tooltipArrowSource from "../examples/TooltipArrow.tsx?raw";
 import { TooltipToolbar } from "../examples/TooltipToolbar.js";
-import tooltipToolbarSource from "../examples/TooltipToolbar.tsx?raw";
-import tooltipCss from "../examples/tooltip.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function TooltipPage() {
@@ -25,12 +22,7 @@ export function TooltipPage() {
         browser can do the job.
       </p>
 
-      <Example
-        source={tooltipToolbarSource}
-        fileName="TooltipToolbar.tsx"
-        css={tooltipCss}
-        cssFileName="tooltip.css"
-      >
+      <Example file="TooltipToolbar.tsx" css="tooltip.css">
         <TooltipToolbar />
       </Example>
       <p>
@@ -491,12 +483,7 @@ export function TooltipPage() {
 
       <h3 id="recipes">Recipes</h3>
       <h4 id="arrow">Arrow</h4>
-      <Example
-        source={tooltipArrowSource}
-        fileName="TooltipArrow.tsx"
-        css={tooltipCss}
-        cssFileName="tooltip.css"
-      >
+      <Example file="TooltipArrow.tsx" css="tooltip.css">
         <TooltipArrow />
       </Example>
       <p>

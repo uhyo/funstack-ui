@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { FieldControls } from "../examples/FieldControls.js";
-import fieldControlsSource from "../examples/FieldControls.tsx?raw";
 import { FieldSignUp } from "../examples/FieldSignUp.js";
-import fieldSignUpSource from "../examples/FieldSignUp.tsx?raw";
-import fieldCss from "../examples/field.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function FieldPage() {
@@ -32,12 +29,7 @@ export function FieldPage() {
         reported no errors.
       </p>
 
-      <Example
-        source={fieldSignUpSource}
-        fileName="FieldSignUp.tsx"
-        css={fieldCss}
-        cssFileName="field.css"
-      >
+      <Example file="FieldSignUp.tsx" css="field.css">
         <FieldSignUp />
       </Example>
 
@@ -570,12 +562,7 @@ form[data-pending]           { cursor: progress; }
 
       <h3 id="recipes">Recipes</h3>
       <h4>FUNSTACK controls in a Field</h4>
-      <Example
-        source={fieldControlsSource}
-        fileName="FieldControls.tsx"
-        css={fieldCss}
-        cssFileName="field.css"
-      >
+      <Example file="FieldControls.tsx" css="field.css">
         <FieldControls />
       </Example>
       <ul>

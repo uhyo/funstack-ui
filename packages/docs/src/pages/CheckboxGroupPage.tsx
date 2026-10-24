@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxGroupForm } from "../examples/CheckboxGroupForm.js";
-import checkboxGroupFormSource from "../examples/CheckboxGroupForm.tsx?raw";
 import { CheckboxGroupToppings } from "../examples/CheckboxGroupToppings.js";
-import checkboxGroupToppingsSource from "../examples/CheckboxGroupToppings.tsx?raw";
-import checkboxGroupCss from "../examples/checkbox-group.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 const transitionRow = (part: string) => ({
@@ -34,12 +31,7 @@ export function CheckboxGroupPage() {
         unchecks a subset (the WAI-ARIA "select all"), and an "at least one" <code>required</code>.
       </p>
 
-      <Example
-        source={checkboxGroupToppingsSource}
-        fileName="CheckboxGroupToppings.tsx"
-        css={checkboxGroupCss}
-        cssFileName="checkbox-group.css"
-      >
+      <Example file="CheckboxGroupToppings.tsx" css="checkbox-group.css">
         <CheckboxGroupToppings />
       </Example>
 
@@ -459,12 +451,7 @@ export function CheckboxGroupPage() {
       />
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={checkboxGroupFormSource}
-        fileName="CheckboxGroupForm.tsx"
-        css={checkboxGroupCss}
-        cssFileName="checkbox-group.css"
-      >
+      <Example file="CheckboxGroupForm.tsx" css="checkbox-group.css">
         <CheckboxGroupForm />
       </Example>
       <ul>

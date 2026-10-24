@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ComboboxCountry } from "../examples/ComboboxCountry.js";
-import comboboxCountrySource from "../examples/ComboboxCountry.tsx?raw";
 import { ComboboxDrink } from "../examples/ComboboxDrink.js";
-import comboboxDrinkSource from "../examples/ComboboxDrink.tsx?raw";
-import comboboxCss from "../examples/combobox.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ComboboxPage() {
@@ -27,12 +24,7 @@ export function ComboboxPage() {
         synchronously or with <code>use()</code> under your own <code>&lt;Suspense&gt;</code>.
       </p>
 
-      <Example
-        source={comboboxCountrySource}
-        fileName="ComboboxCountry.tsx"
-        css={comboboxCss}
-        cssFileName="combobox.css"
-      >
+      <Example file="ComboboxCountry.tsx" css="combobox.css">
         <ComboboxCountry />
       </Example>
 
@@ -155,12 +147,7 @@ export function ComboboxPage() {
       </p>
 
       <h4>Free text</h4>
-      <Example
-        source={comboboxDrinkSource}
-        fileName="ComboboxDrink.tsx"
-        css={comboboxCss}
-        cssFileName="combobox.css"
-      >
+      <Example file="ComboboxDrink.tsx" css="combobox.css">
         <ComboboxDrink />
       </Example>
       <p>

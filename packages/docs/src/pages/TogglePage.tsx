@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
-import toggleErrorsSource from "../examples/ToggleErrors.tsx?raw";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
-import toggleFavoriteSource from "../examples/ToggleFavorite.tsx?raw";
-import toggleCss from "../examples/toggle.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function TogglePage() {
@@ -24,12 +21,7 @@ export function TogglePage() {
         <code>pressedChangeAction</code> runs.
       </p>
 
-      <Example
-        source={toggleFavoriteSource}
-        fileName="ToggleFavorite.tsx"
-        css={toggleCss}
-        cssFileName="toggle.css"
-      >
+      <Example file="ToggleFavorite.tsx" css="toggle.css">
         <ToggleFavorite />
       </Example>
 
@@ -164,7 +156,7 @@ export function TogglePage() {
             value, so the second click undoes the first. Only the latest dispatch commits.
           </li>
         </ol>
-        <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
+        <Example file="ToggleErrors.tsx">
           <ToggleErrors />
         </Example>
         <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>

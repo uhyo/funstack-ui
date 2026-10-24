@@ -4,12 +4,8 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { RadioGroupForm } from "../examples/RadioGroupForm.js";
-import radioGroupFormSource from "../examples/RadioGroupForm.tsx?raw";
 import { RadioGroupRtl } from "../examples/RadioGroupRtl.js";
-import radioGroupRtlSource from "../examples/RadioGroupRtl.tsx?raw";
 import { RadioGroupTheme } from "../examples/RadioGroupTheme.js";
-import radioGroupThemeSource from "../examples/RadioGroupTheme.tsx?raw";
-import radioGroupCss from "../examples/radio-group.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function RadioGroupPage() {
@@ -29,12 +25,7 @@ export function RadioGroupPage() {
         <code>data-pending</code>.
       </p>
 
-      <Example
-        source={radioGroupThemeSource}
-        fileName="RadioGroupTheme.tsx"
-        css={radioGroupCss}
-        cssFileName="radio-group.css"
-      >
+      <Example file="RadioGroupTheme.tsx" css="radio-group.css">
         <RadioGroupTheme />
       </Example>
 
@@ -295,12 +286,7 @@ export function RadioGroupPage() {
           (the browser does the roving).
         </li>
       </ul>
-      <Example
-        source={radioGroupRtlSource}
-        fileName="RadioGroupRtl.tsx"
-        css={radioGroupCss}
-        cssFileName="radio-group.css"
-      >
+      <Example file="RadioGroupRtl.tsx" css="radio-group.css">
         <RadioGroupRtl />
       </Example>
 
@@ -388,12 +374,7 @@ export function RadioGroupPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={radioGroupFormSource}
-        fileName="RadioGroupForm.tsx"
-        css={radioGroupCss}
-        cssFileName="radio-group.css"
-      >
+      <Example file="RadioGroupForm.tsx" css="radio-group.css">
         <RadioGroupForm />
       </Example>
       <ul>

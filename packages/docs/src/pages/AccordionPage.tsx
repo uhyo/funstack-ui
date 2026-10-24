@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
-import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
 import { AccordionThreads } from "../examples/AccordionThreads.js";
-import accordionThreadsSource from "../examples/AccordionThreads.tsx?raw";
-import accordionCss from "../examples/accordion.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function AccordionPage() {
@@ -26,12 +23,7 @@ export function AccordionPage() {
         optimistic <code>data-open</code> and Suspense-friendly panels.
       </p>
 
-      <Example
-        source={accordionFaqSource}
-        fileName="AccordionFaq.tsx"
-        css={accordionCss}
-        cssFileName="accordion.css"
-      >
+      <Example file="AccordionFaq.tsx" css="accordion.css">
         <AccordionFaq />
       </Example>
 
@@ -323,12 +315,7 @@ export function AccordionPage() {
         }
       >
         <h4 id="async-walkthrough">Walkthrough (library mode)</h4>
-        <Example
-          source={accordionThreadsSource}
-          fileName="AccordionThreads.tsx"
-          css={accordionCss}
-          cssFileName="accordion.css"
-        >
+        <Example file="AccordionThreads.tsx" css="accordion.css">
           <AccordionThreads />
         </Example>
         <ol>

@@ -4,12 +4,8 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { DialogConfirm } from "../examples/DialogConfirm.js";
-import dialogConfirmSource from "../examples/DialogConfirm.tsx?raw";
 import { DialogOrders } from "../examples/DialogOrders.js";
-import dialogOrdersSource from "../examples/DialogOrders.tsx?raw";
 import { DialogProfile } from "../examples/DialogProfile.js";
-import dialogProfileSource from "../examples/DialogProfile.tsx?raw";
-import dialogCss from "../examples/dialog.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function DialogPage() {
@@ -29,12 +25,7 @@ export function DialogPage() {
         animate with a view transition.
       </p>
 
-      <Example
-        source={dialogConfirmSource}
-        fileName="DialogConfirm.tsx"
-        css={dialogCss}
-        cssFileName="dialog.css"
-      >
+      <Example file="DialogConfirm.tsx" css="dialog.css">
         <DialogConfirm />
       </Example>
       <p>
@@ -619,12 +610,7 @@ html:active-view-transition .dialog { transition: none; }
         }
       >
         <h4>Walkthrough (library mode)</h4>
-        <Example
-          source={dialogOrdersSource}
-          fileName="DialogOrders.tsx"
-          css={dialogCss}
-          cssFileName="dialog.css"
-        >
+        <Example file="DialogOrders.tsx" css="dialog.css">
           <DialogOrders />
         </Example>
         <ol>
@@ -730,12 +716,7 @@ html:active-view-transition .dialog { transition: none; }
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={dialogProfileSource}
-        fileName="DialogProfile.tsx"
-        css={dialogCss}
-        cssFileName="dialog.css"
-      >
+      <Example file="DialogProfile.tsx" css="dialog.css">
         <DialogProfile />
       </Example>
       <ol>

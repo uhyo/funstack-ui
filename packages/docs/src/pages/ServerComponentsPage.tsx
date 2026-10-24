@@ -3,7 +3,6 @@ import { ConceptExample, Term } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
-import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
 
 export function ServerComponentsPage() {
   return (
@@ -160,7 +159,7 @@ import { saveOpenSections } from "./actions"; // "use server"
           page behind a Suspense boundary, which needs a small inline script to reveal it, so here
           it needs JavaScript enabled, but not the library's.)
         </p>
-        <Example source={accordionFaqSource} fileName="AccordionFaq.tsx">
+        <Example file="AccordionFaq.tsx">
           <AccordionFaq />
         </Example>
       </ConceptExample>

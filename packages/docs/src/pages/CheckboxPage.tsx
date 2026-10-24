@@ -5,10 +5,7 @@ import { PageHead } from "../components/PageHead.js";
 import { stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxForm } from "../examples/CheckboxForm.js";
-import checkboxFormSource from "../examples/CheckboxForm.tsx?raw";
 import { CheckboxSelectAll } from "../examples/CheckboxSelectAll.js";
-import checkboxSelectAllSource from "../examples/CheckboxSelectAll.tsx?raw";
-import checkboxCss from "../examples/checkbox.css?raw";
 
 export function CheckboxPage() {
   return (
@@ -26,12 +23,7 @@ export function CheckboxPage() {
         a controlled <code>indeterminate</code> state for "select all" parents.
       </p>
 
-      <Example
-        source={checkboxSelectAllSource}
-        fileName="CheckboxSelectAll.tsx"
-        css={checkboxCss}
-        cssFileName="checkbox.css"
-      >
+      <Example file="CheckboxSelectAll.tsx" css="checkbox.css">
         <CheckboxSelectAll />
       </Example>
 
@@ -293,12 +285,7 @@ export function CheckboxPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={checkboxFormSource}
-        fileName="CheckboxForm.tsx"
-        css={checkboxCss}
-        cssFileName="checkbox.css"
-      >
+      <Example file="CheckboxForm.tsx" css="checkbox.css">
         <CheckboxForm />
       </Example>
       <p>

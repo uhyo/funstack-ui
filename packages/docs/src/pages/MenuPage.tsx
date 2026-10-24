@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MenuRowActions } from "../examples/MenuRowActions.js";
-import menuRowActionsSource from "../examples/MenuRowActions.tsx?raw";
 import { MenuViewOptions } from "../examples/MenuViewOptions.js";
-import menuViewOptionsSource from "../examples/MenuViewOptions.tsx?raw";
-import menuCss from "../examples/menu.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 const itemRows = (state: string, closeDefault: string, closeNote: string) => [
@@ -53,12 +50,7 @@ export function MenuPage() {
         clicked and the menu leaves with a view transition in every engine.
       </p>
 
-      <Example
-        source={menuRowActionsSource}
-        fileName="MenuRowActions.tsx"
-        css={menuCss}
-        cssFileName="menu.css"
-      >
+      <Example file="MenuRowActions.tsx" css="menu.css">
         <MenuRowActions />
       </Example>
 
@@ -162,12 +154,7 @@ export function MenuPage() {
       </ul>
 
       <h4>Checkbox and radio items</h4>
-      <Example
-        source={menuViewOptionsSource}
-        fileName="MenuViewOptions.tsx"
-        css={menuCss}
-        cssFileName="menu.css"
-      >
+      <Example file="MenuViewOptions.tsx" css="menu.css">
         <MenuViewOptions />
       </Example>
       <p>

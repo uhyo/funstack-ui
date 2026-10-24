@@ -4,10 +4,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { PageHead } from "../components/PageHead.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { PopoverActions } from "../examples/PopoverActions.js";
-import popoverActionsSource from "../examples/PopoverActions.tsx?raw";
 import { PopoverShare } from "../examples/PopoverShare.js";
-import popoverShareSource from "../examples/PopoverShare.tsx?raw";
-import popoverCss from "../examples/popover.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function PopoverPage() {
@@ -29,12 +26,7 @@ export function PopoverPage() {
         well.
       </p>
 
-      <Example
-        source={popoverShareSource}
-        fileName="PopoverShare.tsx"
-        css={popoverCss}
-        cssFileName="popover.css"
-      >
+      <Example file="PopoverShare.tsx" css="popover.css">
         <PopoverShare />
       </Example>
       <p>
@@ -548,12 +540,7 @@ html:active-view-transition .popover { transition: none; }
         }
       >
         <h4>Walkthrough (library mode)</h4>
-        <Example
-          source={popoverActionsSource}
-          fileName="PopoverActions.tsx"
-          css={popoverCss}
-          cssFileName="popover.css"
-        >
+        <Example file="PopoverActions.tsx" css="popover.css">
           <PopoverActions />
         </Example>
         <ol>

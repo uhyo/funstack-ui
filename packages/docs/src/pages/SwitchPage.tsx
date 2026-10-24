@@ -5,10 +5,7 @@ import { PageHead } from "../components/PageHead.js";
 import { stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SwitchForm } from "../examples/SwitchForm.js";
-import switchFormSource from "../examples/SwitchForm.tsx?raw";
 import { SwitchSettings } from "../examples/SwitchSettings.js";
-import switchSettingsSource from "../examples/SwitchSettings.tsx?raw";
-import switchCss from "../examples/switch.css?raw";
 
 export function SwitchPage() {
   return (
@@ -25,12 +22,7 @@ export function SwitchPage() {
         <code>checkedChangeAction</code> runs, and it takes part in forms like any checkbox.
       </p>
 
-      <Example
-        source={switchSettingsSource}
-        fileName="SwitchSettings.tsx"
-        css={switchCss}
-        cssFileName="switch.css"
-      >
+      <Example file="SwitchSettings.tsx" css="switch.css">
         <SwitchSettings />
       </Example>
 
@@ -280,12 +272,7 @@ export function SwitchPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={switchFormSource}
-        fileName="SwitchForm.tsx"
-        css={switchCss}
-        cssFileName="switch.css"
-      >
+      <Example file="SwitchForm.tsx" css="switch.css">
         <SwitchForm />
       </Example>
       <p>
