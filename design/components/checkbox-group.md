@@ -1007,6 +1007,10 @@ packages/ui/src/checkbox-group/
 packages/ui/src/internal/
   use-native-group-reconciliation.ts   # add `equals?: (a: T, b: T) => boolean` (default Object.is)
   sync-presence.ts                     # attribute-presence sync on hydration; shared with RadioGroup (review L5)
+  use-fieldset-group.ts                # "use client": the Root's fieldset wiring (conventions 3.8; shared with RadioGroup)
+  group-member.ts                      # "use client": groupMemberProps, the Item's owned input layer (shared with RadioGroup)
+  use-item-order.ts                    # "use client": the Items' document order in state (shared with ToggleGroup)
+  value-set.ts                         # no directive: toSet / setsEqual / applyPatch / sortByOrder / EMPTY_SET (shared with Accordion and ToggleGroup)
 ```
 
 Also: `src/index.ts` re-export, `tsdown.config.ts` entry, `package.json` `./checkbox-group`,
@@ -1029,6 +1033,8 @@ interface CheckboxGroupContextValue {
   readonly committed: ReadonlySet<string>;
   readonly pending: boolean;
   readonly disabled: boolean;
+  /** The Root state (`CheckboxGroup.Label`'s function props read it). */
+  readonly state: CheckboxGroupRootState;
   /** Uncontrolled: the latest `defaultValue` as a set (Items mirror `has(value)` into `defaultChecked`); `undefined` when controlled. */
   readonly defaultValue: ReadonlySet<string> | undefined;
   /** Item click. No-op if `optimistic.has(value) === checked`. Neither checks `disabled` nor `defaultPrevented` (the Item's guard does). */
@@ -1044,15 +1050,17 @@ interface CheckboxGroupContextValue {
 
 ### 14.3 Root
 
-- `useId()` fallback name; `useRef` for the fieldset; `useMemo` set normalisation of `value` and
-  `defaultValue` (Accordion `toSet`).
+- `useFieldsetGroup({ component: "CheckboxGroup.Root", name, disabled, required })` (conventions
+  3.8: the fallback name, the Field defaults, the fieldset ref and `rootRef`); `useMemo` set
+  normalisation of `value` and `defaultValue` (`toSet` from `internal/value-set.ts`).
 - `useControllableAction<ReadonlySet<string>, CheckboxGroupValueChangeDetails>({ controlled,
   defaultValue, initialValue: EMPTY, action: action && ((next, details) => action(fromSet(next),
   details)), transitionTypes: (_n, _p, d) => […], reducer: (prev, _next, d) => reduce(prev, d),
   warn: { component: "CheckboxGroup.Root", prop: "value" } })`. `fromSet` sorts by the document
   order of the group's Items read from the fieldset at call time (5.1).
 - `dispatchPatch` (5.2) and `base()` with the explicit null check.
-- Item registry (6.2, 7): `registerItem(value, disabled)` (stable; each Item calls it from a
+- Item registry (6.2, 7; the document-order half is `useItemOrder`, `internal/use-item-order.ts`,
+  conventions 3.8, shared with ToggleGroup): `registerItem(value, disabled)` (stable; each Item calls it from a
   layout effect, returns the unregister function) writes a `Map<token, { value, disabled }>` ref
   and publishes a `Map<value, hasEnabledItem>` state only when the summary changes; `null` until
   an Item registered. `disabledItems` (context) is the set of values with no enabled Item;

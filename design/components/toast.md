@@ -1174,12 +1174,16 @@ packages/ui/src/toast/
   index.ts                 # namespace, `toast`, `createToastManager`, type re-exports
   toast.ts                 # no directive: ToastManager, createToastManager, defaultManager, `toast`
   toast-context.ts         # "use client": ViewportContext (dispatch, focus, pause, register), RootContext (item, ids, register parts)
-  toast-viewport.tsx       # "use client": queue state, subscription, timers, hotkey, pause, portal, popover apply effect, announcements, closeAction transition
+  toast-viewport.tsx       # "use client": queue state (toast-queue.ts), subscription, timers (toast-timers.ts), hotkey (toast-hotkey.ts), pause, portal host (use-modal-portal-host.ts), popover apply effect, announcements, closeAction transition
   toast-root.tsx           # "use client": dialog element, Suspense guard, exit hold, keyboard, Action pending through context
   toast-title.tsx          # "use client"
   toast-description.tsx    # "use client"
   toast-action.tsx         # "use client": useActionTrigger
-  toast-close.tsx          # "use client"
+  toast-close.tsx          # "use client": useNameWarning(TEXT_NAME)
+  toast-queue.ts           # no directive: Entry, makeEntry, withFlags, partition, plainText and the pure command reducer applyCommands (unit-tested in toast-queue.test.ts)
+  toast-hotkey.ts          # no directive: DEFAULT_HOTKEY, regionLabel, matchesHotkey
+  toast-timers.ts          # no directive: syncToastTimers / clearToastTimers over a Map in a ref
+  use-modal-portal-host.ts # "use client": the portal container that follows the topmost open modal dialog (3.5)
   toast.test.tsx
   toast.browser.test.tsx
 packages/ui/src/internal/
@@ -1202,7 +1206,9 @@ packages/ui/src/internal/
   last announced text) for the next subscriber's `restore` (review L1); `isTaken(listener)` is
   readable during render for the second-Viewport case (review L8). The manager never touches
   React or the DOM; `queueMicrotask` is the only platform call.
-- **Queue reducer** in the Viewport: `useState` plus an authoritative `entriesRef` written
+- **Queue reducer** in the Viewport (`applyCommands` in `toast-queue.ts`: a pure function over
+  the entries that also returns the ref deletions, timer clears and dev error to perform after
+  the loop; unit-tested): `useState` plus an authoritative `entriesRef` written
   together, so a burst of commands composes and side effects stay out of updaters. The commands
   of one batch apply **in order inside the loop, dismissals included** (`dismiss` marks the
   entries open at that point `ending: true`); the side effects run after the loop: `moveFocusOut`
@@ -1216,7 +1222,7 @@ packages/ui/src/internal/
   `startTransition(async () => { await closeAction?.(createActionDetails(event, { id, reason })); })`
   from the handler or timer that caused it (never from render). Rejections take React's path to
   the boundary above the Viewport; nothing reads `pending`.
-- **Timers.** A ref map; an effect keyed on the visible, non-pending, un-suspended ids starts
+- **Timers** (`syncToastTimers` / `clearToastTimers`, `toast-timers.ts`). A ref map; an effect keyed on the visible, non-pending, un-suspended ids starts
   missing timers and clears timers of ids that left; `pause()` records the remaining time and
   clears handles, `resume()` restarts them. Pause sources are counted (hover, focus, hidden,
   blur) in a ref with a `paused` state mirror for `data-paused`. The Root reports "suspended" and
@@ -1225,7 +1231,8 @@ packages/ui/src/internal/
   it has items and is not open (also after a container change: the element is new), `hidePopover()`
   when it has none and is open; re-raise on an add while open (a `addedSinceLastEffect` ref set
   by the reducer path). Guard every call with `isConnected` and `matches(":popover-open")`.
-- **Portal host.** `const container = useSyncExternalStore(modalRegistry.subscribe,
+- **Portal host** (`useModalPortalHost`, `use-modal-portal-host.ts`). `const container =
+  useSyncExternalStore(modalRegistry.subscribe,
   modalRegistry.getTopmost, () => null)`; `const [host] = useState(createHost)` (a
   `display: contents` `div`, `null` on the server); `portalled =
   useSyncExternalStore(subscribeNothing, () => true, () => false)` tells the hydration render
@@ -1259,17 +1266,19 @@ packages/ui/src/internal/
   viewport.dismiss(id, "activate", event))`; `pending` is reported to the Root through context
   (`setActionPending`), which merges it into `toast.pending` for its state and the Viewport.
 - **Hotkey.** A document `keydown` listener in an effect keyed on the serialised `hotkey`;
-  match: every modifier flag on the event equals "listed in `hotkey`" (so an unlisted modifier
+  match (`matchesHotkey`, `toast-hotkey.ts`): every modifier flag on the event equals "listed in `hotkey`" (so an unlisted modifier
   held rejects, review L4), and every non-modifier entry equals `event.code`.
 - **Focus return.** `focusin` on the region with `relatedTarget` outside (or null) stores it;
   `focusout` to outside clears it. Before a close of the toast containing focus, compute the
   target (next, previous, stored, body) and `.focus()` it synchronously, then mark ending.
 - **Dev warnings** (`useDevWarning`): second Viewport on one manager; Viewport inside a Dialog
   (`element.closest("dialog")`); `toast.update` on an unknown id; `Toast.Close` with no accessible
-  name (text or `aria-label`); `toast()` on the server.
+  name (text or `aria-label`; `useNameWarning(TEXT_NAME)`, once per instance); `toast()` on the
+  server.
 - **Shared code reused**: `useActionTrigger`, `exitAnimations` (not the `useExitAnimation`
   hook, section 10.2),
-  `createActionDetails`, `dataAttr`, `useRender`, `useDevWarning`, `useLatest`,
+  `createActionDetails`, `dataAttr`, `useRender`, `useDevWarning`, `useNameWarning`, `useLatest`,
+  `isPopoverOpen`,
   `platform-attributes` (nothing new needed: `popover`, `inert` are typed).
 
 ---

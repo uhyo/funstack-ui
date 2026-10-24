@@ -1012,7 +1012,7 @@ packages/ui/src/tooltip/
   tooltip.test.tsx
 packages/ui/src/internal/platform-attributes.d.ts   # add interestfor + interest-delay-* (section 9)
 packages/ui/src/internal/anchor-position.ts         # positionArea(side, align), parsePositionArea (conventions 13; directive-free)
-packages/ui/src/internal/use-resolved-placement.ts  # "use client": useResolvedPlacement({ side, align }) → { side, align, ref } (conventions 13.2)
+packages/ui/src/internal/use-resolved-placement.ts  # "use client": useResolvedPlacement({ side, align }) → { side, align, ref } (conventions 13.2); useAnchoredPlacement({ side, align, fallbacks? }) adds { dataAttributes, style(consumer) }, what Tooltip.Popup, Popover.Popup and Menu.Popup render
 packages/ui/src/__tests__/popover-shim.ts            # jsdom shim (section 13)
 ```
 

@@ -905,6 +905,9 @@ interface TabsContextValue {
 ```
 
 One context; every part re-renders on a dispatch anyway (attributes change).
+`TabsValueChangeDetails.reason` is the shared `ChangeReason` (conventions 2.2), as the type in
+section 3 shows; until #100 the implementation carried a narrower local union, so a consumer
+who annotated that union sees a type change after 0.1.0-alpha.11.
 
 ### 13.3 Root
 
@@ -924,13 +927,15 @@ One context; every part re-renders on a dispatch anyway (attributes change).
   non-disabled tab when the list itself is the target (section 8). `onFocus` is therefore omitted
   from `TabsListProps` as well as `onKeyDown`.
 - `onKeyDown`: ignore if `event.defaultPrevented` or the target is not a tab in this list;
-  resolve the key against `orientation` and computed `direction`; collect tabs by DOM query;
+  resolve the key against `orientation` and computed `direction` (`resolveArrowKey` in
+  `internal/arrow-keys.ts`, shared with the roving-focus engine); collect tabs by DOM query;
   compute the index with `loop`; `preventDefault()`; `focus({ focusVisible: true })`.
 - `experimental_focusgroup`: render the attribute (lowercase, typed by the shared augmentation
-  file) with the `nomemory` token; detect the native path with
-  `useSyncExternalStore(subscribeNever, () => experimental_focusgroup && "focusGroup" in
-  HTMLElement.prototype, () => false)` (camel-cased IDL attribute, #43; the server snapshot keeps
-  hydration markup identical) and provide it through a `TabsListContext` so each Tab can drop
+  file) with the `nomemory` token; detect the native path with `useNativeFocusgroup(experimental_focusgroup)`
+  (`internal/use-native-focusgroup.ts`, shared with Menu.Popup and ToggleGroup: a
+  `useSyncExternalStore` whose client snapshot is `flag && "focusGroup" in
+  HTMLElement.prototype`, the camel-cased IDL attribute, #43, and whose server snapshot is
+  `false`, so hydration markup is identical) and provide it through a `TabsListContext` so each Tab can drop
   `tabindex="-1"` and render `focusgroupstart` when selected; the keydown handler returns early
   for navigation keys when the detected value is true.
 

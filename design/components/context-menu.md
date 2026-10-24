@@ -555,7 +555,8 @@ element where it is. Properties:
   server render (no point before hydration), so it never appears in the server HTML; if a
   future server-rendered point open existed, React would hoist it into the streamed `<head>`.
 
-Where the string lives: `internal/anchor-position.ts` (directive-free) exports
+Where the string lives: `menu/menu-point.ts` (directive-free; the precedence name
+`FSUI_PRECEDENCE` is `internal/shipped-styles.ts`) exports
 `MENU_POINT_RULES`, `MENU_POINT_FALLBACKS` (the two equivalent spellings) and the custom
 property names, next to `positionArea` and `POSITION_TRY_FALLBACKS`.
 
@@ -1066,7 +1067,7 @@ the same context provider").
 | Suspense / rejection | Items suspend on open: `showPopover` not called, `data-pending` on the region (and the Trigger); resolve → shown at the point. `openChangeAction` rejects: `data-open` gone, nothing shown, the catcher above the Root has it. |
 | Function props / `render` | Region `className` / `style` / `children` / `render` receive `{ open, pending, disabled }`; `render={<tr />}` and `render={<canvas tabIndex={0} />}`; the consumer's `style` wins over the owned `WebkitTouchCallout`; `onKeyDown` / `onClick` pass through. |
 | Post-await rule | Controlled Root opened from the region, parent updating after `await`. |
-| Directive | `menu-context-trigger.tsx` is `"use client"`; `internal/anchor-position.ts` stays directive-free. |
+| Directive | `menu-context-trigger.tsx` is `"use client"`; `menu/menu-point.ts`, `menu-gestures.ts` and `menu-outside.ts` are directive-free. |
 | Dev warnings | `Menu.ContextTrigger` inside a submenu Root; a negative `longPressDelay`. |
 
 Existing `menu.test.tsx` rows gain: `onContextMenu` is owned on the Popup (a consumer's is not
@@ -1111,13 +1112,16 @@ assert the documented degraded behaviour rather than skipping.
 
 ```
 packages/ui/src/menu/
-  menu-context-trigger.tsx   # "use client": the region: contextmenu, long-press, modality refs, capture, click swallow
+  menu-context-trigger.tsx   # "use client": the region: contextmenu, long-press, modality refs, capture, click swallow; the gestures from menu-gestures.ts
   menu-root.tsx              # + placement state, openAt(), state.context
-  menu-popup.tsx             # + point style, <style>, data-context, onContextMenu, outside listeners, reshow on generation change
+  menu-popup.tsx             # + pointStyle (menu-point.ts), <style>, data-context, onContextMenu, listenOutside (menu-outside.ts), reshow on generation change
   menu-context.ts            # + MenuPlacement / ANCHOR_PLACEMENT, openAt / resetPlacement in the context, markHandled / isHandledBy (a WeakMap event → root popup ref), claimedPresses (M1), MenuRegionContext (deviation 6)
+  menu-point.ts              # no directive: MENU_POINT_RULES (five options since wave 11), MENU_POINT_FALLBACKS ({ ltr, rtl }, two spellings each), MENU_POINT_X / _Y / _GAP, MENU_POINT_HREF, pointStyle(point, stylesheetOwned)
+  menu-gestures.ts           # no directive: startDrag, guardTouch, armClickSwallow, LONG_PRESS_SLOP / DRAG_SLOP, isTouchLike
+  menu-outside.ts            # no directive: listenOutside (document contextmenu / middle-click / scroll, popup wheel)
   menu-context-trigger.test.tsx, menu-context-trigger.browser.test.tsx
 packages/ui/src/internal/
-  anchor-position.ts         # + MENU_POINT_RULES (five options since wave 11), MENU_POINT_FALLBACKS ({ ltr, rtl }, two spellings each), MENU_POINT_X / _Y names (directive-free)
+  shipped-styles.ts          # FSUI_PRECEDENCE, the precedence bucket of every shipped stylesheet (directive-free)
   use-popover-popup.ts       # + `source` option (per-open source element), `reshow()` (hide + show under the opening flag)
 packages/ui/src/__tests__/browser-commands.ts  # + `mouse` command (page.mouse with frame-mapped points); popover-shim.ts unchanged
 packages/ui/vitest.config.ts                   # registers the command
@@ -1138,7 +1142,8 @@ packages/ui/vitest.config.ts                   # registers the command
   anchored; a move is the same write with `requestOpen` a no-op. The Popup re-shows when the
   shown placement key changes and resets the placement once a shown point open is no longer
   visible (deviation 2).
-- **The document listeners** live in Menu.Popup (top-level only), installed in `onToggle` for
+- **The document listeners** are `listenOutside` (`menu/menu-outside.ts`), installed by
+  Menu.Popup (top-level only) in `onToggle` for
   `newState === "open"` and removed for `"closed"`: `contextmenu` (bubble; skip when
   `rootPopup.contains(target)` or `isHandled(event)`), `pointerdown` (`button === 1`, outside
   the tree). Both call `rootPopup.hidePopover()` directly, like the Tab-out path (Menu 2.2). The
@@ -1162,7 +1167,8 @@ packages/ui/vitest.config.ts                   # registers the command
 - **The `<style>` element** is rendered inside the popup element's children (React hoists it;
   nothing lands in place). Dedupe key `href="@funstack/ui/menu-point"`, `precedence="fsui"`.
   Render it only when `placement.kind === "point" && side !== null`.
-- **Point style** goes through `useRender`'s `style` as the anchored one does, so the
+- **Point style** (`pointStyle(point, stylesheetOwned)`, `menu-point.ts`) goes through
+  `useRender`'s `style` as the anchored one (`useAnchoredPlacement`) does, so the
   consumer's `style` still wins; custom properties are plain keys (`"--menu-point-x": "312px"`).
   `pointStyle(point, stylesheetOwned)` branches on `point.direction` for the inset pair and on
   `point.offset` for the vertical inset, the gap and the fallback list (3.3, 4.7); `openAt`
@@ -1175,8 +1181,9 @@ packages/ui/vitest.config.ts                   # registers the command
   (`registerSubmenuHover` / `submenuHover` in `menu-context.ts`), since no `pointerenter`
   fires under capture; `listenOutside` reads the placement at event time through
   `useLatest(menu.placement)`, so close-on-scroll applies to point placements only.
-- **The drag gesture** (2.6) lives in `menu-context-trigger.tsx` next to the long-press
-  (`startDrag(popup, { pointerId, x, y, timeStamp, slop, touch })`): native listeners on the
+- **The drag gesture** (2.6) is `startDrag(popup, { pointerId, x, y, timeStamp, slop, touch })`
+  in `menu/menu-gestures.ts` (with `guardTouch` and the pure `armClickSwallow`), called by
+  `menu-context-trigger.tsx` next to the long-press: native listeners on the
   popup element for `pointermove` / `pointerup` / `pointercancel` / `lostpointercapture`
   filtered on `pointerId`, the document `touchmove` guard (`{ passive: false }`) for `touch`,
   all removed when the gesture ends or the region unmounts; hit-testing with
@@ -1184,7 +1191,7 @@ packages/ui/vitest.config.ts                   # registers the command
   `focusItem`'s quiet variant; a `SubmenuTrigger` through the submenu Root's hover timers
   (`menu.timers`); activation through `item.click()` plus `armClickSwallow()`; dismissal through
   `rootPopup.hidePopover()`. The gesture is restarted by `openAt` on a move.
-- **Scroll and wheel** (4.8) extend `listenOutside` in `menu-popup.tsx`: `scroll` (document,
+- **Scroll and wheel** (4.8) extend `listenOutside` in `menu-outside.ts`: `scroll` (document,
   capture, passive; installed only while `menu.placement.kind === "point"`, so the function
   takes the placement or re-reads it from the context ref) and `wheel` on the popup element
   (`{ passive: false }`), both removed with the others on `toggle(closed)`.

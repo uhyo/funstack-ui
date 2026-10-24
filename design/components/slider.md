@@ -5,7 +5,8 @@ twelve items of "For the product owner" as recommended, see the end of this docu
 conventions changes are applied, see "Conventions feedback (applied)" and conventions resolved
 question 29). Implemented in 6cef8e7; the review (`memo/reviewer/slider.md`) and its fixes
 (3b96bcb, 8fffbca, 330ba8c) are folded in on 2026-10-18, see "Review corrections (#54)" at the
-end. The code under `packages/ui/src/slider/` is the ground truth where this document is silent.
+end; the wave 16 refactoring (#100, 2026-10-24) into section 15 and the superseded-rejection
+rows. The code under `packages/ui/src/slider/` is the ground truth where this document is silent.
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
 the conventions win.
 
@@ -901,7 +902,7 @@ and keeps passing through; the Field's control id is for the thumb input. The ho
 
 | Piece | One thumb | Several thumbs |
 | --- | --- | --- |
-| `field.ref` (registration) | through context (`ctx.field.inputRef`); **Thumb `index` 0** merges it into its input ref (`useMergedRef`), so the registered element is the input | merged into the Root's library ref, so the registered element is the group `div` |
+| `field.ref` (registration) | through context (`ctx.field.inputRef`); **Thumb `index` 0** merges it into its input ref (`useMergedRefs`), so the registered element is the input | merged into the Root's library ref, so the registered element is the group `div` |
 | `id` (`ids.control`) | `thumbId(0)` returns the Field's control id (`thumbId = (i) => i === 0 && fieldId !== undefined ? fieldId : \`${id}-thumb-${i}\``); the Thumb renders it as today, and `Slider.Label`'s `for` (if one is mounted) agrees | unchanged library ids on every input |
 | `aria-labelledby` | none (the Field's `for` names the input) | on the Root `div`, token-merged: the Field's label id, then `Slider.Label`'s id while one is mounted, then the consumer's; the "a multi-thumb slider needs a name" warning counts the Field as a name |
 | `aria-describedby` | through context to Thumb 0's input, token-merged with the Thumb's forwarded `aria-describedby` (the consumer's tokens first, Field 4.3) | on the Root `div` (the group element, read when focus enters the group, Field 5.1: the same placement as RadioGroup / CheckboxGroup); a Thumb's own forwarded tokens stay on its input |
@@ -1054,7 +1055,7 @@ Type test: `required` is still not a `Slider.Root` prop; no new public prop.
 
 #### 9.4.7 Implementation notes
 
-- `slider-root.tsx`: `useFieldControl` as above; `useMergedRef(libraryRef, count > 1 ?
+- `slider-root.tsx`: `useFieldControl` as above; `useMergedRefs(libraryRef, count > 1 ?
   field.ref : undefined)` for the Root element; `thumbId` reads `field.id`; `name` / `disabled`
   taken from the hook's result before everything that uses them; the Root's `libraryProps` gain
   `aria-labelledby` (count > 1, token-merged: Field label id, `Slider.Label` id, consumer),
@@ -1238,7 +1239,7 @@ Track's `getBoundingClientRect` and polyfill `setPointerCapture` / `releasePoint
 | Rejection (both) | The catcher above Root receives it and the slider is **gone** (the boundary replaced it: no row promises a slide-back it cannot observe, review L1); uncontrolled: `valueChangeAction(prev, { reason: "dismiss", thumb: null, event: undefined })` dispatched once, outside the transition (the `await undefined` yield); controlled: no `"dismiss"` step. A retry boundary remounts the slider showing `defaultValue` (uncontrolled, update on success) or the adopted value (adopt). Caught-inside variants commit. **Mounted rollback**: an update-on-success parent whose commit action catches the failure: `data-pending` leaves, the DOM value, `--slider-value` and `Slider.Value` return to the parent's value, no `"dismiss"`. |
 | No snap | Uncontrolled with a sync `valueChangeAction`: between two simulated moves (after the first step's transition has settled) the input still shows the first step's value. Controlled adopt-steps parent whose dependent content suspends: after release the input shows the gesture value until the content resolves, then the parent's value, never the pre-gesture value in between (guards the `held` derivation of 2.2). Controlled parent that does not adopt steps: the thumb follows during the drag and returns to `value` after release. |
 | Pending without a step action | With no `valueChangeAction`: a press, three moves and a release never set `data-pending` on the Root; a key's `input` holds the value until its `change` (the `stepHeld` row: the react-dom restore must write the new value back); with no actions and a non-adopting controlled parent the release returns to `value` once (no `80 → 20 → 80` bounce). With a `valueChangeAction` each step is pending (the transition is real). |
-| Overlap, superseded rejection (both) | Two key presses with a slow commit: `data-pending` stays, final committed is the latest; the older commit's rejection reaches the catcher after and while the newer is pending; a drag while a commit is pending supersedes it. |
+| Overlap, superseded rejection (both) | Two key presses with a slow commit: `data-pending` stays, final committed is the latest; the older commit's rejection reaches the catcher after and while the newer is pending; a drag while a commit is pending supersedes it. Cross-channel: a superseded step rejection while commits pend, and a superseded commit rejection while a step pends, each reach the catcher promptly (conventions 2.4). |
 | Suspending content (both) | A controlled adopt-steps parent's content keyed on the value suspends: old content stays, no fallback above the component, `data-pending` on Root and Thumb; then new content. Any interaction that may suspend runs inside `await act(async …)`: a sync `act` around a suspending update leaves a later async transition pending forever (React logs "A component suspended inside an `act` scope, but the `act` call was not awaited"; documented as unsupported, not a React bug, review L4). |
 | Platform path (both) | Mount reconciliation: `renderToString`, set the input's value before `hydrateRoot` → one `step` + `commit` with `reason: "platform"`, `thumb: null`, `event: undefined`, StrictMode still one, none when equal; late Thumb through `onItemMounted`. Form reset: `form.reset()`, `<button type="reset">`, automatic reset after a successful `<form action>` → `defaultValue` attributes equal the reset target at the time of the `reset` event (uncontrolled: latest `defaultValue`; controlled: mount-time), one `step` + `commit` with the `reset` event, a cancelled `reset` dispatches nothing, a refusing controlled parent gets the DOM re-synced after settle; `disabled` still follows a reset. |
 | Forms | `FormData` has one entry per thumb under the Thumb's or Root's `name`; `disabled` omits them; `form` attribute honoured. |
@@ -1282,22 +1283,31 @@ rows that failed in RadioGroup, Popover, Combobox and Dialog under load.
 packages/ui/src/slider/
   index.ts               # no directive; namespace + types; imports platform-attributes
   slider-context.ts      # "use client": SliderContext (shown values, bounds, step()/commit()/beginGesture(), registry, ids, state flags)
-  slider-root.tsx        # "use client": useControllableAction (commit), useActionTrigger (steps), live/gesture/pendingThumb state, arithmetic, pointer gesture, registry, reconciliation, reset, custom properties
+  slider-root.tsx        # "use client": useSupersededRejection (one capture for both channels), useControllableAction (commit), useActionTrigger (steps), live/gesture/pendingThumb state, pointer gesture, reconciliation, reset, custom properties
+  use-thumb-registry.ts  # "use client": the Thumb registry (inputs by index, registerThumb, formElement) and its two dev warnings
+  use-slider-dev-warnings.ts  # "use client": the Root's development warnings
   slider-label.tsx       # "use client": registers its id; for= with one thumb
   slider-track.tsx       # "use client": onPointerDown → beginGesture(nearest), touch-action
   slider-indicator.tsx   # "use client"
   slider-thumb.tsx       # "use client": styled element + hidden input; onChange, native change + keydown listeners; registration; forwarded aria-*; inputRef
   slider-value.tsx       # "use client"
-  slider-arithmetic.ts   # no directive (not a part file): snap / clamp / sanitize / neighbours / percent / decimal places (pure; unit-tested)
+  slider-arithmetic.ts   # no directive (not a part file): snap / clamp / sanitize / neighbours / percent, the pointer, tie and geometry math (pointerValue, tiedRange, resolveTie, sliderGeometry), toArray / shapeOf (pure; unit-tested in slider-arithmetic.test.ts); decimal places from internal/decimal.ts
   slider.test.tsx, slider.browser.test.tsx
 packages/ui/src/internal/
   use-native-group-reconciliation.ts   # widen `element` to FormAssociatedElement (an input) and add `onResetEvent` pass-through to useFormReset
+  use-superseded-rejection.ts          # conventions 2.4: called once in the Root, passed as `captureSuperseded` to both hooks
+  use-register-count.ts                # the mounted-Label count
+  decimal.ts                           # decimalsOf / gridDecimals / roundTo (shared with NumberField)
 ```
 
 - **Root.** `useControllableAction<T, SliderValueCommitDetails>({ controlled: value,
   defaultValue, initialValue: platformDefault(min, max, step), action: wrappedCommit,
   transitionTypes: () => ["fsui-slider", "fsui-slider-commit"], warn: { component: "Slider",
-  prop: "value" } })`; `const { pending: stepPending, run: runStep } = useActionTrigger()`;
+  prop: "value" } })`; `const { pending: stepPending, run: runStep } = useActionTrigger({ ignoreWhilePending: false,
+  captureSuperseded })`, where `captureSuperseded = useSupersededRejection()` is called once
+  **before both hooks** and passed to `useControllableAction` too (conventions 2.4): a superseded
+  step's rejection while a commit pends, or a superseded commit's while a step pends, is thrown
+  ahead of both `useTransition`s and reaches the boundary without waiting for the other channel;
   `live`, `gesture`, `stepHeld`, `pendingThumb` as `useState`; `shown` derived as 2.2 (`stepTo`
   writes `liveRef` / `shownRef` synchronously so a commit in the same event reads them; it sets
   `stepHeld` for every reason but `"dismiss"` and starts the step transition only when
@@ -1314,7 +1324,10 @@ packages/ui/src/internal/
 - **Arithmetic** in `slider-arithmetic.ts`: `snap(value, min, max, step)` with decimal rounding
   (`decimals = max(decimals(step), decimals(min))`), `clampToNeighbours(values, i, next, gap)`,
   `percent(value, min, max)`, `nearestThumb(values, target)`, `platformDefault(min, max,
-  step)`.
+  step)`. The pointer and tie math (`pointerValue`, `tiedRange` / `resolveTie`, `sliderGeometry`)
+  and the shape helpers (`toArray`, `shapeOf`) live there too, so the Root's gesture code is
+  wiring only; the Thumb registry is `useThumbRegistry()` and the Root's warnings
+  `useSliderDevWarnings()`, both under `src/slider/`.
 - **Pointer gesture** (`beginGesture(index, event, element)` in Root): `event.preventDefault()`;
   `element.setPointerCapture(event.pointerId)`; read the Track's rect and computed `direction`;
   `setGesture({ thumb: index })`; `gestureStart.current = shownRef.current`; focus the input;

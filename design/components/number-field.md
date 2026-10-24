@@ -6,7 +6,8 @@ conventions changes are applied in 29a94c5, conventions resolved question 33, an
 amendment is in `design/components/field-form.md`, "Amendment: `validityElement`").
 Implemented in c31588b (playground 0a2c701, docs bff9672); the review
 (`memo/reviewer/number-field.md`, "acceptable with minor fixes") and its fixes (6742cb0,
-36b48f4) are folded in on 2026-10-18, see "Review corrections (#67)" at the end. The code under
+36b48f4) are folded in on 2026-10-18, see "Review corrections (#67)" at the end; the wave 16
+refactoring (#100, 2026-10-24) into sections 6 and 15 and the superseded-rejection rows. The code under
 `packages/ui/src/number-field/` is the ground truth where this document is silent. Follows
 `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win.
@@ -265,7 +266,7 @@ function step(next: number | null, source: Source, reason: ChangeReason, event: 
   liveRef.current = next; shownRef.current = next;
   setLive(next); setDraft(null);                                     // urgent
   setPendingSource(source);
-  writeHidden(next);                                                 // the hidden input, synchronously (section 6)
+  syncHidden(next);                                                  // the hidden input, synchronously (section 6)
   if (reason !== "dismiss") setStepHeld(true);
   if (valueChangeAction === undefined) return true;
   runStep(() => {
@@ -734,14 +735,14 @@ restoration" browser row is therefore moot (14.2).
 
 The Root owns both refs (`visibleRef`, `hiddenRef`, passed through context) and the Input merges
 them into its two elements; there is no registry (deviation 4). An Input that mounts after the
-Root reconciled (a Suspense boundary) reports through `onInputMounted` from its first layout
+Root reconciled (a Suspense boundary) reports through `onItemMounted` from its first layout
 effect, the late-mount path of `useNativeGroupReconciliation`.
 
 **Uncontrolled, ref-written** (proposal 4): the input renders `defaultValue` = the reset target
 (uncontrolled mode: the latest `defaultValue ?? ""`; controlled mode: the mount-time value),
 which react-dom keeps in the `value` attribute and updates when the prop changes (probe: for
 an input with no `value` prop react-dom's `updateInput` writes `defaultValue` only). The library
-writes `.value` itself: synchronously in `step()` (`writeHidden(next)`: `String(next)`, `""` for
+writes `.value` itself: synchronously in `step()` (`syncHidden(next)`: `String(next)`, `""` for
 `null`) so the implicit submission on Enter and a submit click after a blur post the new value,
 and in a layout effect after every commit that re-applies `shown` (a rollback, a controlled
 change, a reset). A controlled `value` prop on the hidden input was rejected: react-dom then
@@ -754,9 +755,10 @@ Dev check on the ref: the element is an `<input type="number">`.
 
 ### 6.2 The validity mirror
 
-`mirror()`: `const message = hidden.validationMessage; if (message !== lastMirror) {
-visible.setCustomValidity(message); lastMirror = message; }`. Runs after every `writeHidden`
-(same task), in the Input's layout effect after every commit (so a changed `min` / `max` /
+`syncHidden(value)` writes the hidden input's `.value` when it differs and then mirrors:
+`const message = hidden.validationMessage; if (message !== lastMirror) {
+visible.setCustomValidity(message); lastMirror = message; }`. One function for both writers,
+called synchronously from `step()` (same task) and in the Input's layout effect after every commit (so a changed `min` / `max` /
 `step` / `required` prop is reflected), and in the Field's slot write (section 7). The visible
 input is then invalid exactly when the hidden one is, with the hidden one's localised message
 (custom message first, then the native one: the platform's own precedence in
@@ -905,7 +907,7 @@ sets state). Cross-field rules follow through `Form.Root`'s `refreshFields`.
 ### 7.3 Walkthroughs
 
 1. **`stepMismatch` on submit.** The user types `7` and clicks Save: `focusout` commits `7`
-   (`writeHidden("7")`, mirror: the visible input gets "Please enter a valid value. The two
+   (`syncHidden(7)`, mirror: the visible input gets "Please enter a valid value. The two
    nearest valid values are 6 and 12."); the Field's `focusout` read finds `:user-invalid` on
    the visible input and `validity.stepMismatch` on the hidden one, shows "Enter a multiple of
    six." The click's submission attempt fires `invalid` on the visible (the Field cancels it,
@@ -918,7 +920,7 @@ sets state). Cross-field rules follow through `Form.Root`'s `refreshFields`.
    `edit = true`; the Field dismisses the error, clears the slot (mirror `""`), the next submit
    goes through.
 3. **`required` from the Field, empty draft.** `Field.Root required`: `required` lands on the
-   hidden input. The user clears the text and tabs away: `null` commits (`writeHidden("")`,
+   hidden input. The user clears the text and tabs away: `null` commits (`syncHidden(null)`,
    `valueMissing`, mirror "Please fill in this field."); `:user-invalid` on the visible input;
    `Field.Error` shows the browser's message (or the consumer's `valueMissing` branch).
 4. **Form reset.** The hidden input resets natively, the Field re-reads in its microtask
@@ -1190,7 +1192,7 @@ hold uses fake timers; the wheel row dispatches a `WheelEvent` on the input.
 | Async commit (both) | Deferred `valueCommitAction`: `data-pending` on Root, Input and the source button; the text, the hidden value and `state.value` hold the gesture value; uncontrolled committed state unchanged (a `children` probe) until resolve; then committed. |
 | Rejection (both) | The catcher above Root receives it and the field is gone; uncontrolled: `valueChangeAction(prev, { reason: "dismiss", source: null, event: undefined })` once; controlled: no `"dismiss"`; a retry boundary remounts with `defaultValue` / the adopted value; caught-inside commits; **mounted rollback** (update-on-success parent catching inside): `data-pending` leaves, the text and the hidden input return to the parent's value; a draft open at the rollback stays open and commits later. |
 | No snap | Between two ticks of a hold with a synchronous `valueChangeAction` (settled), the text still shows the last tick; an adopt-steps parent whose content suspends: after release the text shows the gesture value until the content resolves, never the pre-gesture value; a non-adopting controlled parent: follows during the hold, returns to `value` after release once. |
-| Overlap, superseded rejection (both) | Two commits with a slow action (a key press, then typing + blur): `data-pending` stays, the latest wins; the older's rejection reaches the catcher after and while the newer is pending. |
+| Overlap, superseded rejection (both) | Two commits with a slow action (a key press, then typing + blur): `data-pending` stays, the latest wins; the older's rejection reaches the catcher after and while the newer is pending. Cross-channel: a superseded commit rejection while a step pends, and a superseded step rejection while a commit pends, each reach the catcher promptly (conventions 2.4). |
 | Suspending content (both) | A controlled adopt-steps parent's content keyed on the value suspends on a step: old content stays, no fallback above, `data-pending`; then new content (`await act(async …)`). |
 | Platform path (both) | Mount reconciliation: `renderToString`, set the visible input's value to `"3"` before `hydrateRoot` → one `"platform"` step + commit (`source: null`, `event: undefined`), hidden written to `3`, StrictMode still one; the input focused at hydration → adopted as the draft, no dispatch, **also when the text is unparsable (`"12,"` stays under the caret, review M1)**; a value formatted by another locale (`"1.234,5"` under `en`) → no dispatch and the text re-synced to `"1,234.5"`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → the visible `defaultValue` attribute equals `format(target)` at the `reset` event, the hidden resets natively, one step + commit with the `reset` event, a cancelled reset dispatches nothing, a refusing controlled parent is re-synced; a draft open at reset is cleared. |
 | Forms | `FormData` has `name` = `String(value)`, absent when `disabled`, `""` when `null`; `form` attribute honoured; Enter's implicit submission (a `submit` listener) sees the committed value in `FormData`; the text is never posted. |
@@ -1237,18 +1239,20 @@ space); and Firefox's validation bubble swallows the next click (6.2). The "pare
 ```
 packages/ui/src/number-field/
   index.ts                        # no directive; namespace + types; imports platform-attributes
-  number-field-context.ts         # "use client": NumberFieldContext (state, bounds, stepBase, pendingSource, ids, visibleRef / hiddenRef, step()/commit()/beginHold()/commitDraft(), mirror, onInputMounted, field slice)
-  number-field-root.tsx           # "use client": useControllableAction (commit), useActionTrigger (steps), draft / live / hold / stepHeld / pendingSource, stepBase, formatter + parser (memoised), useFieldValueChange, reconciliation + reset (through hiddenRef), announcements, warnings
+  number-field-context.ts         # "use client": NumberFieldContext (state, bounds, stepBase, pendingSource, ids, visibleRef / hiddenRef, step()/commit()/beginHold()/commitDraft(), syncHidden, onItemMounted, field slice)
+  number-field-root.tsx           # "use client": useSupersededRejection (one capture for both channels), useControllableAction (commit), useActionTrigger (steps), draft / live / hold / stepHeld / pendingSource, stepBase, formatter + parser (memoised), useFieldValueChange, reconciliation + reset (through hiddenRef), announcements, warnings
   number-field-label.tsx          # "use client": registers its id; for=
-  number-field-input.tsx          # "use client": visible input (controlled text, handlers, wheel listener) + hidden input (uncontrolled, ref-written, invalid listener, autocomplete=off), the mirror, useFieldControl with validityElement, onInputMounted
-  number-field-increment.tsx      # "use client": also holds the shared button hook `useStepButtonElement`
+  number-field-input.tsx          # "use client": visible input (controlled text, handlers, wheel listener) + hidden input (uncontrolled, ref-written, invalid listener, autocomplete=off), syncHidden after every commit, useFieldControl with validityElement, onItemMounted
+  number-field-increment.tsx      # "use client": `useStepButtonElement("increment", ...)`
   number-field-decrement.tsx      # "use client"
-  use-step-button.ts              # "use client": the hold (timers, capture, release listeners), the click-without-pointer rule
+  use-step-button.ts              # "use client": the hold (timers, capture, release listeners), the click-without-pointer rule; `useStepButtonElement`, the element both buttons render (`disabledButton`, the owned `aria-label`, `data-*`), and the button prop types
+  use-number-field-dev-warnings.ts # "use client": the Root's development warnings
   number-field-format.ts          # no directive: createNumberFormatter(locale, options) → { locale, format, parse, round, fractionDigits, allowsFractions, percent, warning }; the cache
-  number-field-arithmetic.ts      # no directive: stepValue, stepBy, boundValue, isAtBound
+  number-field-arithmetic.ts      # no directive: stepValue, stepBy, boundValue, isAtBound, keyStep (the key-to-step mapping of 4.2); unit-tested in number-field-arithmetic.test.ts
   number-field-format.test.ts, number-field.test.tsx, number-field.browser.test.tsx, number-field.types.test.tsx
 packages/ui/src/internal/
-  decimal.ts                      # no directive: decimalsOf / roundTo moved out of slider-arithmetic.ts (which re-exports decimalsOf)
+  decimal.ts                      # no directive: decimalsOf / gridDecimals / roundTo, shared with Slider
+  use-superseded-rejection.ts     # conventions 2.4: called once in the Root, passed as `captureSuperseded` to both hooks
   announce.ts                     # "use client": announce(element, message): ariaNotify, else the module-level live region (clear, write after 100 ms, clear after 1 s)
   field-context.ts                # FieldControlRegistration gains `validityElement?: () => ValidatableElement | null`
   use-field-control.ts            # the option, passed through to registerControl
@@ -1258,7 +1262,11 @@ packages/ui/src/internal/
 - **Root.** `useControllableAction<number | null, NumberFieldValueChangeDetails>({ controlled:
   value, defaultValue: defaultValue ?? null, action: wrappedCommit, transitionTypes: () =>
   ["fsui-number-field", "fsui-number-field-commit"], warn: { component: "NumberField", prop:
-  "value" } })`; `useActionTrigger()` for steps; `draft`, `live` (+ `liveSet` ref), `hold`,
+  "value" } })`; `useActionTrigger({ ignoreWhilePending: false, captureSuperseded })` for steps, with
+  `captureSuperseded = useSupersededRejection()` called once **before both hooks** and passed to
+  `useControllableAction` too (conventions 2.4: a superseded commit's rejection while a step
+  pends, or a step's while a commit pends, reaches the boundary without waiting for the other
+  channel); `draft`, `live` (+ `liveSet` ref), `hold`,
   `stepHeld`, `pendingSource` as `useState`; `shownRef`, `liveRef`, `committedRef`,
   `gestureStart`, `commitId`, `lastReason` refs; `formatter = useMemo(() =>
   createNumberFormatter(locale, format), [locale, formatKey])` with `formatKey` a stable
@@ -1267,20 +1275,20 @@ packages/ui/src/internal/
 - **Input.** Visible: `value={text}`, `onChange` → `setDraft(e.target.value)`, `onKeyDown` →
   4.2 and Enter (`e.nativeEvent.isComposing` guard), `onBlur` → `commitDraft(e.nativeEvent)`;
   a layout effect adds the non-passive `wheel` listener when `stepOnWheel`. Hidden:
-  `defaultValue={resetTarget}` (`String` or `""`), a layout effect with no deps that writes
-  `.value` to `String(shown ?? "")` when different and then `mirror()`; a native `invalid`
+  `defaultValue={resetTarget}` (`String` or `""`), a layout effect with no deps that calls
+  `syncHidden(shown)` (writes `.value` when different, then mirrors the validity message); a native `invalid`
   listener that `preventDefault()`s; registration with the Root (`registerHidden(el)` from the
   ref callback, returning the cleanup); `useFieldControl({ …, validityElement: () =>
   hiddenRef.current })` with `field.ref` merged into the visible input's ref; the inline
-  `hiddenStyle` constant. `writeHidden` lives on the context so `step()` can call it
-  synchronously.
+  `hiddenStyle` constant. `syncHidden` lives on the context so `step()` and the Input's effect share one writer.
 - **Buttons.** `useStepButton(direction)`: `onPointerDown` (primary button, not disabled) →
   `preventDefault()`, `setPointerCapture`, `beginHold(direction, event)`; the hold's end
   listeners on the element (`pointerup`, `pointercancel`, `lostpointercapture`) and `blur` on
   `window`, attached at the press and detached at the end; `onClick` → if no pointerdown was
   recorded for this activation, `stepOnce(direction, event)` (step + commit); `onContextMenu`
   → `preventDefault()` while holding; `disabled = prop || ctx.disabled || ctx.readOnly ||
-  isAtBound(direction)`.
+  isAtBound(direction)`, rendered through `disabledButton(render, disabled)` (conventions 1.2:
+  native `disabled` on a host button, `aria-disabled` on a link or component render).
 - **Reconciliation and reset** through `useNativeGroupReconciliation` as 6.4, `element` the
   registered hidden input; `onResetEvent` writes the visible input's `defaultValue`.
 - **Announcements**: the Root calls `announceStep()` in `commit()` for `"activate"` commits
@@ -1332,7 +1340,7 @@ deviation the reviewer accepted; none is corrected here.
 | N3 | **Affixes were replaced anywhere in the text**, so `1€234` under `fr-FR` became `1234` (the replacement space is a group separator there). Affixes and literals are stripped at the edges only (and inside the sign and parentheses); in the middle the text is unparsable. | Decisions 7, 5.3, 14.1 |
 | N4 | **The fallback region was written in the task it was inserted** and a repeated text was not a change. It is cleared, written 100 ms later and cleared after a second. | 8.3, 14.1, 15 |
 | N5 | `onCompositionStart` / `onCompositionEnd` pass through `NumberField.Input` (the library installs neither); the details JSDoc and the docs say `event` is `undefined` on hold repeats and at a bound-ended hold. | 1, 2.4, 3.2, 14.1 |
-| Deviations 1 to 11 | Accepted by the reviewer and folded: (1) End → the largest grid point `≤ max`; (2) an empty value skips the against-direction rule; (3) the hydration re-sync writes `visible.value` directly; (4) no hidden-input registry, refs through context with `onInputMounted`; (5) the parser's affix-level leniencies and bidi stripping; (6) `event` undefined on hold ticks; (7) Ctrl / Meta combinations not handled; (8) `deltaY === 0` ignored; (9) a consumer `aria-labelledby` omits the default `aria-label`; (10) a commit while `disabled` / `readOnly` clears the draft; (11) the percent test row needs `maximumFractionDigits: 1` for `0.5 → 0.005`. | 4.1, 4.2, 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 6.1, 8.4, 14.1 |
+| Deviations 1 to 11 | Accepted by the reviewer and folded: (1) End → the largest grid point `≤ max`; (2) an empty value skips the against-direction rule; (3) the hydration re-sync writes `visible.value` directly; (4) no hidden-input registry, refs through context with `onItemMounted`; (5) the parser's affix-level leniencies and bidi stripping; (6) `event` undefined on hold ticks; (7) Ctrl / Meta combinations not handled; (8) `deltaY === 0` ignored; (9) a consumer `aria-labelledby` omits the default `aria-label`; (10) a commit while `disabled` / `readOnly` clears the draft; (11) the percent test row needs `maximumFractionDigits: 1` for `0.5 → 0.005`. | 4.1, 4.2, 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 6.1, 8.4, 14.1 |
 | Reports | **Firefox's bubble and `:user-invalid` persist while the user types a fix** (validity follows the committed value): recorded as a known difference in 6.2 with an open question below, no change now. **Implicit submission needs a submit button** (the hidden number input is a second field): correct platform behaviour, documented in 4.1 and on the docs page. **The Field layout shift under a click** is a property of every Field control; the Field docs page notes it, the rows tab out first. **Combobox and `focus-first-invalid.ts` keep their own announcements**; migrating them onto `announce.ts` is the optional part of #77. | 4.1, 6.2, 8.3, 14.2 |
 
 ## Open question (resolved)

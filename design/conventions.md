@@ -49,7 +49,11 @@ library-wide `disabled` sweep in 1.2; amended 2026-10-22 with the Context menu d
 `context` row in 4.1, and section 12, shipped functional CSS, a user decision; amended 2026-10-23 with
 the urgent-handler rename, #96, **user decision**, see resolved question 39: `fooAction` always means
 a transition, the urgent lane is `on<State>Change: UrgentChangeHandler` in 2.1, 2.6, 3.2, 9.4 and
-10.1, the type guard in 10.1; `docs/vision.md` principle 3 names the exception).
+10.1, the type guard in 10.1; `docs/vision.md` principle 3 names the exception; amended
+2026-10-24 with the wave 16 refactoring fold, #100: `disabledButton` in 1.2, the two-channel
+capture in 2.4 and 3.4, the production-bundle rule for development text in 7.2, the shared
+control hooks in 3.8, the `internal/` layout in 9.1, the cross-channel row in 10.1, the
+shipped-CSS modules in 12).
 Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
@@ -226,6 +230,13 @@ Rules for the element passed to `render` (same as Base UI):
   `aria-disabled` only where it computes it (that branch, or a pending pure trigger); on a host
   button outside it the consumer's own `aria-disabled` passes through. When the element is
   unknown, each attribute takes the choice that is harmless if the guess is wrong.
+  One helper implements the rule for every such part: `disabledButton(render, disabled, {
+  handlesClick?, alwaysFocusable? })` in `internal/render-element.ts` returns `props`, the
+  owned `disabled` / `aria-disabled` keys of the branch it chose, and `invoker`, whether
+  `commandfor` / `command` may render; `handlesClick: false` is the browser-handled case
+  above and `alwaysFocusable` the APG focusable-disabled case (`SubmenuTrigger` through
+  `usePopoverTrigger`'s `disabledAs: "aria"`). `Button` keeps its own expression because
+  `focusableWhenDisabled` and a Toolbar widen its focusable branch.
 - Library-controlled attributes (`role`, `aria-*` *state* the part computes such as
   `aria-pressed` / `aria-selected`, `id` wiring, `data-*` state) win over the element's, with one
   carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`, `aria-controls`,
@@ -564,6 +575,16 @@ Contract:
   a cascade of boundary resets. Which error wins when both the latest and a superseded dispatch
   reject is not defined.
 - A consumer who catches inside the action is unaffected, as before.
+- The catch-store-throw lives in one hook, `useSupersededRejection()`
+  (`internal/use-superseded-rejection.ts`), which `useControllableAction` and
+  `useActionTrigger` call themselves. A component with **two transition channels** (Slider
+  and NumberField: steps through `useActionTrigger`, commits through
+  `useControllableAction`) calls it once, **before both hooks**, and passes the result as
+  `captureSuperseded` to both. React retries an errored render with every pending lane, and in
+  that retry a `useTransition` whose action still pends suspends; a rejection thrown after the
+  other channel's `useTransition` would therefore wait for that channel's action to settle.
+  One capture ahead of both transitions reaches the boundary promptly whichever channel
+  rejected (pinned per component, section 10.1).
 
 Optimistic state reverts automatically. Uncontrolled committed state is written only after the
 action resolves, so a rejected action leaves it untouched (section 3.3). A controlled parent gets
@@ -942,6 +963,11 @@ is React's root container by the time the action runs); Tabs derives `fsui-tabs-
 comparing their DOM order. `prev` is the committed value at dispatch time, not the optimistic
 one.
 
+The sketch's `supersededError` state is `useSupersededRejection()` in the implementation
+(section 2.4). The hook calls it itself unless the component passes its own through the
+`captureSuperseded` option, which Slider and NumberField do with one capture ahead of both
+their channels.
+
 The reducer form of `useOptimistic` is mandatory so that stacked optimistic updates are re-based
 onto a changed `committed` value. For single-value states the reducer is `(_, next) => next`;
 multi-item states (Accordion's expanded set) use a real reducer keyed by item.
@@ -966,7 +992,8 @@ if (!started) event.preventDefault();                        // ignored while pe
   judged by the hook's synchronous in-flight counter alone, not the last render's `pending`
   (section 2.5). **Default `true`** since #81 (`design/components/button.md` 16.2); a continuous
   control that runs steps through the hook passes `ignoreWhilePending: false` (Slider,
-  NumberField). The options object is the only form (`{ openGeneration?, ignoreWhilePending? }`).
+  NumberField). The options object is the only form (`{ openGeneration?, ignoreWhilePending?,
+  captureSuperseded? }`; the last is section 2.4's two-channel capture).
 - A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
   the part; an older run's rejection (the part was clicked again before the first settled) is
   caught, kept and thrown from the part's render before `useTransition` (the superseded-rejection
@@ -1155,8 +1182,14 @@ This is the one contract both designs implement (reconciled 2026-10-16 from
 | `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, future `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns a stable `{ onItemMounted }`, which the Root passes down through context and `group: true` items call from their mount layout effect (`useNativeChecked` takes `onItemMounted` and `component` options). The adapter **ignores calls made before its own mount reconciliation has run** (members rendered in the Root's commit run their effects first, so they are covered by that reconciliation; the flag is reset in the effect cleanup so StrictMode's re-run behaves the same); any later call queues **one microtask per commit** that compares `readCurrent()` with `base()` and dispatches `"platform"` with `event: undefined`. Comparison is `equals` (option, default `Object.is`); a group with a set value (`CheckboxGroup.Root`) passes set equality, because two sets are never `Object.is`-equal. `element` accepts any `FormAssociatedElement`: Slider subscribes through its first Thumb's input (a Root `div` has no `.form`), with `readCurrent` reading every registered input and `readDefault` returning the JS-computed reset target; the optional `onResetEvent` option is passed through to `useFormReset` for the `defaultValue` mirror of a controlled value input (rule 6). |
 | `useNativeSelectValue(options)` (`internal/use-native-select-value.ts`) | `Select.Root` with its `<select>` ref | The select analogue of `useNativeChecked`, built on `useNativeGroupReconciliation`. After every commit, and for each late Option's mount report, it mirrors the reset target into `option.defaultSelected` (uncontrolled: the latest `defaultValue`, nothing when absent; controlled: the Root's mount-time value; react-dom writes `defaultSelected` only for an uncontrolled `defaultValue`) **and then** re-applies the intended option's `selected`, in that order in one synchronous step, because `defaultSelected = true` on an option the user or script never selected moves the selection. Mount reconciliation reads `select.value`; the reset path reads the spec's reset result (the last `defaultSelected` option, else the first enabled option, else `""`); both dispatch once per Select and only when the intended option exists. With neither `value` nor `defaultValue` the uncontrolled value is **adopted** from the browser's choice without a dispatch (`adopt(next)` on `useControllableAction`, uncontrolled only). |
 | `useFormOwnerEvent(ref, type, handler, options?)` (`internal/use-form-owner-event.ts`) | `useFormReset` (now a thin wrapper), `Field.Root` (`input` / `change` on the form owner for cross-field `validate`, `submit` and `reset` for its flags) | The stable form-owner subscription of rule 4 generalised to any event type: re-reads `ref.current.form` after every commit, re-subscribes only when the owner changed, handler body through `useEffectEvent`. |
-| `useFieldControl({ labelable, name?, disabled?, required?, id?, component, validityElement? })` (`internal/use-field-control.ts`) | `Field.Control` and the owner part of every FUNSTACK form control: `Checkbox`, `Switch`, `RadioGroup.Root` and `CheckboxGroup.Root` (their `<fieldset>`, `labelable: false`), `Select.Root`, `Combobox.Input`, `Slider` (#60; one thumb: the thumb's input; several: the group element, `labelable: false`), `NumberField.Input` (#67; registers the visible input, `labelable: true`, with the hidden number input as `validityElement`) | Outside a `Field.Root`: `inField: false`, nothing to merge. Inside: returns a **ref callback** the part merges into its library ref (`useMergedRef`), which registers `{ element, labelable, required, disabled }` with the Field and returns the cleanup (no extra render; a `required` / `disabled` change re-registers without re-attaching listeners); the **Field** attaches its native listeners (`input`, `change`, `focusout`, `invalid`, capture) to the registered element and resolves the **validity element** (the element itself when it is a form control, else the first named `willValidate` member of a `<fieldset>`'s `elements`, else the first control inside) where `validity` / `validationMessage` / `:user-invalid` are read and `setCustomValidity` is written. Returns `name` / `disabled` / `required` (own, else the Field's), `id` (labelable: the Field's control id) and `attributes`, the owned layer the part spreads: `id` (labelable only), `aria-labelledby` (groups: the Label id), `aria-describedby` (token-merged by the part), `aria-invalid` (`"true"` / `"false"`; a `group` such as CheckboxGroup moves it to its items, ARIA 1.2), `data-invalid`. **No `data-pending`**: a control inside a Field keeps its own, for its own action (2.7); only `Field.Control` carries the form's. **`validityElement?: () => ValidatableElement \| null`** (#67): where `validity`, `validationMessage` and the custom-validity slot are read and written when that is not the registered element; `:user-invalid`, the listeners and the focus target stay on the registered element, and the Field mirrors `validityElement.validationMessage` into the registered element's slot after writing its own (3.6). Controls that pass none are unchanged. Two registrations in one Field warn (`design/components/field-form.md` 7). |
+| `useFieldControl({ labelable, name?, disabled?, required?, id?, component, validityElement? })` (`internal/use-field-control.ts`) | `Field.Control` and the owner part of every FUNSTACK form control: `Checkbox`, `Switch`, `RadioGroup.Root` and `CheckboxGroup.Root` (their `<fieldset>`, `labelable: false`), `Select.Root`, `Combobox.Input`, `Slider` (#60; one thumb: the thumb's input; several: the group element, `labelable: false`), `NumberField.Input` (#67; registers the visible input, `labelable: true`, with the hidden number input as `validityElement`) | Outside a `Field.Root`: `inField: false`, nothing to merge. Inside: returns a **ref callback** the part merges into its library ref (`useMergedRefs`, `internal/use-merged-refs.ts`), which registers `{ element, labelable, required, disabled }` with the Field and returns the cleanup (no extra render; a `required` / `disabled` change re-registers without re-attaching listeners); the **Field** attaches its native listeners (`input`, `change`, `focusout`, `invalid`, capture) to the registered element and resolves the **validity element** (the element itself when it is a form control, else the first named `willValidate` member of a `<fieldset>`'s `elements`, else the first control inside) where `validity` / `validationMessage` / `:user-invalid` are read and `setCustomValidity` is written. Returns `name` / `disabled` / `required` (own, else the Field's), `id` (labelable: the Field's control id) and `attributes`, the owned layer the part spreads: `id` (labelable only), `aria-labelledby` (groups: the Label id), `aria-describedby` (token-merged by the part), `aria-invalid` (`"true"` / `"false"`; a `group` such as CheckboxGroup moves it to its items, ARIA 1.2), `data-invalid`. **No `data-pending`**: a control inside a Field keeps its own, for its own action (2.7); only `Field.Control` carries the form's. **`validityElement?: () => ValidatableElement \| null`** (#67): where `validity`, `validationMessage` and the custom-validity slot are read and written when that is not the registered element; `:user-invalid`, the listeners and the focus target stay on the registered element, and the Field mirrors `validityElement.validationMessage` into the registered element's slot after writing its own (3.6). Controls that pass none are unchanged. Two registrations in one Field warn (`design/components/field-form.md` 7). |
 | `useFieldValueChange(value, takeEdit?)` (`internal/use-field-control.ts`) | every owner part that calls `useFieldControl` and whose DOM value can change **without** an `input` / `change` event the Field hears: `Combobox.Root` (a pick; `takeEdit` returns `true` for its own dispatches), `CheckboxGroup.Root` (a Parent click, the derived `required`), `Checkbox`, `Switch`, `RadioGroup.Root`, `Select.Root` (a controlled change from outside, a rollback), `Slider` (#60; a pointer gesture), `NumberField.Root` (#67; `useFieldValueChange(optimistic, edit = "activate")`: a step or commit writes the hidden input through the ref with no event the Field hears) | A layout effect with no deps that compares `value` with the last committed one and, when it changed (never at mount), calls the Field's `notifyChange(edit)` with `edit = takeEdit?.() ?? false`: the Field re-reads validity and recomputes its slot (dismissing a shown server error when `edit`, as an `input` event would) and asks the `Form.Root` to refresh its other Fields (cross-field `validate`); outside a `Form.Root` only the control's own Field is refreshed. Not a synthetic event: the consumer's handlers and other `useFormOwnerEvent` subscribers do not see it (`design/components/field-form.md` 7.1). |
+| `useCheckableInput(options)` (`internal/use-checkable-input.ts`) | `Checkbox`, `Switch` | The single-input machinery the two share, in this hook order: `useFieldControl` (`labelable: true`, the own `name` / `required` / `id`), `useControllableAction<boolean>` (the component passes `transitionTypes` and its warning tag), `useFieldValueChange`, `useNativeChecked` (with `indeterminate` when the component has one), `useMergedRefs`. Returns `{ optimistic, pending, disabled, shownIndeterminate, ref, libraryProps }`: the input's owned layer in the component's key order (Switch's `role`; Checkbox's `indeterminate` / `data-indeterminate` only when the option is given). The components keep their props, state, `useRender` call and transition boundary. |
+| `useFieldsetGroup({ component, name, disabled, required })` (`internal/use-fieldset-group.ts`) | `RadioGroup.Root`, `CheckboxGroup.Root` | The `<fieldset>` wiring of a group Root: `useFieldControl` (`labelable: false`), the fallback `name` (own, else the Field's, else `useId()`), "own or the Field's" `disabled` / `required`, the fieldset ref with its element check, and `rootRef`, the merged library ref (fieldset ref, element check, Field registration). |
+| `groupMemberProps(options)` (`internal/group-member.ts`) | `RadioGroup.Item`, `CheckboxGroup.Item` | The owned layer of a group member's `<input>`: `type`, the group's `name` / `form`, `value`, optimistic `checked`, `defaultChecked` never rendered, a checkbox's `aria-checked` removed, the member's own `disabled` (the Root's reaches it through `<fieldset disabled>`), `required`, `aria-invalid` only when given (CheckboxGroup inside a Field), the state `data-*` attributes and the guarded `onChange`. The hydration-time attribute sync next to it is `syncPresences` (`internal/sync-presence.ts`). |
+| `useItemOrder({ optimistic, initial, read, changed?, duplicateMessage })` (`internal/use-item-order.ts`) | `CheckboxGroup.Root`, `ToggleGroup.Root` | The Items' document order kept in state for the Root state's `value`: a deps-less layout effect re-reads the layout after each Root commit and re-renders only when what renders from it changed; returns `{ layout, renderedValue }` (the optimistic set in document order, values with no Item last). The set and order arithmetic is `internal/value-set.ts` (`toSet`, `setsEqual`, `applyPatch`, `sortByOrder`, `firstDuplicate`, `EMPTY_SET`; Accordion uses it too) and document order `internal/dom-order.ts` (`compareDocumentOrder`, `sortByDocumentOrder`). |
+| `resolveFieldDefaults(field, own)` (`internal/use-field-control.ts`) | `useFieldControl` itself; `NumberField.Root` (whose owner part is the Input but whose `name` / `disabled` the Root resolves) | The one "own or the Field's" rule: `name` falls back to the Field's, `disabled` and `required` are either's; the own props outside a Field. `FieldControlBinding.fieldName` is the Field's own `name` for a control that must tell the two apart (Slider). |
+| `intendedValue(latestInFlight, optimistic)` (`internal/use-controllable-action.ts`) | the group Roots' residual paths | Rule 1's base with the explicit null check, in one place. |
 
 Rules the three hooks implement, which component docs may cite instead of restating:
 
@@ -1164,7 +1197,9 @@ Rules the three hooks implement, which component docs may cite instead of restat
    user already intends: the latest in-flight dispatch's `next` if there is one, else the
    optimistic value (`latestInFlight` comes from `useControllableAction`). Spell it with an
    explicit null check on the *dispatch*, never with `??` on `next`:
-   `const f = latestInFlight(); const base = f === null ? optimistic : f.next;`. For a nullable
+   `const f = latestInFlight(); const base = f === null ? optimistic : f.next;`
+   (`intendedValue(latestInFlight, optimistic)` in `use-controllable-action.ts` is that spelling;
+   the group Roots call it). For a nullable
    `T` (RadioGroup's `string | null`) `latestInFlight()?.next ?? optimistic` silently drops an
    in-flight dispatch *to* `null` (a pending reset to "nothing checked") and would re-dispatch
    against the stale optimistic value. Reading the DOM alone would lose a pending optimistic
@@ -1591,9 +1626,14 @@ is allowed because Server Components may render client-created contexts. No init
 needed the second exception; `Progress.Root` and `Meter.Root` (#68) are its first users: a
 directive-free Root renders `<ProgressContext value>` imported from its `"use client"` context
 module and imports no other client module (the Server render row in 10.1 guards the import graph);
-a component that does this says so in its design doc. Pure arithmetic and formatting modules
-are directive-free (`slider/slider-arithmetic.ts`; NumberField's `number-field-format.ts`,
-`number-field-arithmetic.ts` and `internal/decimal.ts`, #67). A context shared
+a component that does this says so in its design doc. Pure modules are
+directive-free: arithmetic and formatting (`slider/slider-arithmetic.ts`; NumberField's
+`number-field-format.ts`, `number-field-arithmetic.ts` and `internal/decimal.ts`, #67), pure
+DOM reads, prop builders and listener installers (`internal/popover-open.ts`, `dom-order.ts`,
+`arrow-keys.ts`, `render-element.ts`, `value-set.ts`, `shipped-styles.ts`; `menu/menu-dom.ts`,
+`menu-hover.ts`, `menu-gestures.ts`, `menu-outside.ts`, `menu-point.ts`) and the Toast
+Viewport's queue, hotkey and timer models (`toast/toast-queue.ts`, `toast-hotkey.ts`,
+`toast-timers.ts`); `directives.test.ts` lists them. A context shared
 by **several component folders** lives in `internal/` (`internal/field-context.ts`, read by the
 Field parts, `Form.Root` and `useFieldControl` from every form control's folder; `internal/toolbar-context.ts`, read by
 `ToggleGroup.Root`, `Toolbar.Separator` and `Menu.Trigger` to find an enclosing Toolbar, #66); the one-way
@@ -1637,6 +1677,19 @@ export default defineConfig({
   external: ["react", "react-dom", "react/jsx-runtime"],
 });
 ```
+
+**Development text never reaches a consumer's production bundle.** The build is unbundled, so
+`dist` legitimately keeps every warning string; it is the consumer's bundler that folds them
+away, and it can only do so when the text sits behind a `NODE_ENV` test it can evaluate. Every
+module that warns declares its own `const isDev = process.env.NODE_ENV !== "production"` and
+passes each message as `isDev && "..."` (or `isDev && ((element) => ...)`) to `useDevWarning`,
+`useElementCheck`, `useNameWarning` and `useShownNameWarning`, which accept `false`; a direct
+`console.error` sits inside `if (isDev)`. The hooks themselves are exported as `isDev ? hook :
+noop`, so a production render runs no warning hook at all. A dev check fires **once per
+instance** (`useDevWarning`: the first time its condition holds; the element and name checks:
+the first failing check). `src/__tests__/production-bundle.test.ts` bundles `src/index.ts` as a
+consumer would (`NODE_ENV` `"production"`, minified) and fails on any string from those call
+sites that survives, naming the file and the text.
 
 ### 7.3 JS-free primitives
 
@@ -1855,14 +1908,48 @@ packages/ui/src/
     data-attr.ts            # dataAttr(flag) -> "" | undefined (section 4.1)
     transition-types.ts     # transitionTypes(component, change?) -> string[] (section 5.3)
     platform-attributes.ts  # the one `declare module "react"` (section 7.4)
-    use-controllable-action.ts
+    use-controllable-action.ts  # section 3.4; also intendedValue (3.8 rule 1)
+    use-action-trigger.ts   # section 3.4: pure triggers
+    use-superseded-rejection.ts  # section 2.4: the catch-store-throw both hooks share
     use-render.tsx          # resolves render / className / style / children against state
-    merge-props.ts
+    render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton (1.2)
+    merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
+    use-merged-refs.ts      # useMergedRefs(...refs): the memoised ref merge of every part with a library ref (1.4)
+    use-latest.ts           # useLatest(value): a ref written in an insertion effect
+    use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)
+    use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
+    use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2)
+    dev-warn.ts             # warnOnce for directive-free parts (progress.md 14)
     use-form-reset.ts       # section 3.8
+    use-form-owner-event.ts # section 3.8; declares FormAssociatedElement
     use-native-checked.ts   # section 3.8; also exports guardCheckableChange
     use-native-group-reconciliation.ts  # section 3.8
+    use-native-select-value.ts  # section 3.8 (Select)
+    use-checkable-input.ts  # section 3.8: Checkbox / Switch
+    use-fieldset-group.ts   # section 3.8: RadioGroup.Root / CheckboxGroup.Root
+    group-member.ts         # section 3.8: a group Item's owned input layer
+    sync-presence.ts        # hydration-time attribute presence sync (3.8)
+    use-item-order.ts       # section 3.8: the Items' document order in state (CheckboxGroup, ToggleGroup)
+    value-set.ts            # set / order arithmetic of the set-valued components; directive-free
+    dom-order.ts            # compareDocumentOrder, sortByDocumentOrder; directive-free
+    field-context.ts        # FieldContext, FormContext, fieldDataAttributes (7.1)
+    use-field-control.ts    # useFieldControl, useFieldValueChange, fieldInputProps, resolveFieldDefaults (3.8)
+    validity.ts, focus-first-invalid.ts  # Field helpers; directive-free
     toolbar-context.ts      # section 7.1: ToolbarContext, read across folders (#66)
     use-roving-focus.ts     # section 7.4: DOM-written roving tabindex (#66)
+    arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine); directive-free
+    use-native-focusgroup.ts  # useNativeFocusgroup(flag): the native `focusgroup` detection (section 8)
+    use-overlay-root.ts     # useOverlayRoot, popoverDetails, OverlayRootValue (popover.md 14.1): Popover, Menu, Combobox, Dialog
+    use-popover-popup.ts, use-popover-trigger.ts  # popover.md 14.2 / 14.3
+    overlay-popup.tsx       # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings (popover.md 14.2)
+    use-overlay-close.ts    # useOverlayClose: the one Close part of Popover and Dialog
+    content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
+    use-exit-animation.ts   # held content while an exit animates (popover.md 4.4)
+    popover-open.ts         # isPopoverOpen(element); directive-free
+    anchor-position.ts      # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free
+    use-resolved-placement.ts  # useResolvedPlacement, useAnchoredPlacement (13.2)
+    shipped-styles.ts       # FSUI_PRECEDENCE (section 12); directive-free
+    use-hydrated-mount.ts, use-register-count.ts, use-delayed-pair.ts, use-until-found.ts, use-modal-registration.ts, modal-registry.ts, announce.ts, decimal.ts, range-value.ts, csp-context.ts, tooltip-warm.ts, form-status-watcher.tsx
   __tests__/
     vitest.setup.ts
     helpers.tsx             # section 10
@@ -1889,6 +1976,11 @@ packages/ui/src/
 - One part per file. Tests are colocated; a multi-part component has one test file per namespace
   (`tabs.test.tsx`), split only when it grows past a few hundred lines.
 - Relative imports carry `.js` extensions (repo convention).
+- Shared helpers live in `internal/`; a helper only one component's parts use lives in that
+  component's folder (`menu/menu-point.ts`, `toast/toast-queue.ts`, `slider/slider-arithmetic.ts`,
+  `number-field/use-step-button.ts`). A pure module (no hook, no DOM write) carries no directive
+  and says so in its header comment (7.1); a model worth testing on its own gets a colocated
+  unit test (`toast-queue.test.ts`, `slider-arithmetic.test.ts`).
 
 ### 9.2 Exports
 
@@ -1966,7 +2058,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Async action (both) | While the promise is unresolved: `data-pending` on owner and trigger, optimistic state on the trigger, committed state unchanged on content. After resolve: `data-pending` gone, content updated. |
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
 | Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled). |
-| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79; every pure trigger since #81) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. The rows stay required for state owners and for the step actions of continuous controls. |
+| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79; every pure trigger since #81) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. The rows stay required for state owners and for the step actions of continuous controls. A component with two channels (Slider, NumberField) also pins the **cross-channel** case: a superseded rejection on one channel while the other channel's action pends reaches the boundary without waiting for it (section 2.4), in both directions. |
 | Re-entry (pure trigger) | Required for every pure trigger with the guard on (section 2.5; `Button`, #79): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) **runs again** while the element still shows `data-pending` (the guard is the counter only; a non-awaiting action clicked three times under that hold is called three times); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. |
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
@@ -2128,8 +2220,10 @@ may ship **functional at-rules** it needs and cannot express inline, under these
   Human items: FUNSTACK Static's SSR entry passes a string `nonce` (scripts only) and would
   need the object form for styles; React could emit the render nonce instead of dropping the
   rules (`docs/research/interaction-wave11.md`, "Upstream issues"; tracked with Firefox's `overscroll-behavior` gap as issue #91).
-- The CSS text lives in a directive-free module next to the placement helpers
-  (`internal/anchor-position.ts`), as a string constant, and is covered by a jsdom row (one
+- The CSS text lives in a directive-free module of the component that ships it
+  (`menu/menu-point.ts` for the point rules, `internal/tooltip-warm.ts` for the skip-delay
+  rule; the precedence name `FSUI_PRECEDENCE` in `internal/shipped-styles.ts`), as a string
+  constant, and is covered by a jsdom row (one
   `<style>` in `document.head` after use, none without) and a browser row (the computed
   property names the option).
 
@@ -2444,7 +2538,10 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     section 2.2). Server Functions may be passed directly to any action prop; the thin client
     wrapper is optional.
 14. **`details.reason` vocabulary unified** to `"activate"` | `"platform"` (section 2.2); Tabs'
-    `"find"` and Accordion's `"trigger"` are renamed.
+    `"find"` and Accordion's `"trigger"` are renamed. Their public details types declare
+    `reason: ChangeReason` as 2.2 requires; the implementation had kept narrower local unions
+    until #100 (after 0.1.0-alpha.11), a breaking type change for a consumer who annotated the
+    narrower type.
 15. **Tabs warns in development** when neither `value` nor `defaultValue` is given.
 16. **Plain-input anatomy for native form controls** (wave 2, 2026-10-16): `Switch` and
     `Checkbox` are single components rendering the input, with no `Indicator`, `Thumb` or

@@ -1142,8 +1142,8 @@ command. The library covers two platform gaps:
    dialog is unaffected: the platform restores its previously focused element on `close()`
    unconditionally. A **non-modal** dialog restores only when focus is inside at the close, so
    it would leave focus on `<body>`. The Popup renders its library-mode content through the
-   shared `ContentFocusProbe` (Popover 14.2 `wrapContent`, to be extracted to
-   `src/internal/content-focus-probe.tsx`), whose layout-effect cleanup records that the content
+   shared content probe (`useContentFocusProbe` in `src/internal/content-focus-probe.tsx`, the
+   one `usePopoverPopup` uses), whose layout-effect cleanup records that the content
    held focus when it went away; the apply effect, right after `close()`, then applies the
    Popover 6.2 rule: focus is on `<body>` or inside the dialog → focus the Trigger if connected,
    else blur. Cleared whenever the content unmounts while the dialog stays open.
@@ -1949,32 +1949,37 @@ at the start, click in-page outside `act`, await `finished` in `afterEach`), all
 
 ## 14. Implementation notes
 
+The overlay internals Dialog shares with Popover (`useOverlayRoot`, `renderOverlayContent`,
+`useCloseHold`, `useInitialFocusTarget`, `returnFocusToTrigger`, `useOverlayClose`, the content
+probe) are specified in popover.md 14; this section names where Dialog differs.
+
 ```
 packages/ui/src/dialog/
   index.ts                 # no directive: namespace + type re-exports; imports platform-attributes for side effects
   dialog-context.ts        # "use client": DialogContext
-  dialog-root.tsx          # "use client": useId, mode, useControllableAction, trigger element ref, context
+  dialog-root.tsx          # "use client": useOverlayRoot<DialogOpenChangeDetails, HTMLDialogElement, [returnValue]> (Popover 14.1), the returnValue ref, context
   dialog-trigger.tsx       # "use client": button, commandfor/command, click interception
-  dialog-popup.tsx         # "use client": <dialog>, native listeners, apply effect, mount reconciliation, held (useExitAnimation), Activity
-  dialog-close.tsx         # "use client": button, request-close, optional action in its own transition
+  dialog-popup.tsx         # "use client": <dialog>, native listeners, apply effect, mount reconciliation, held (useCloseHold), renderOverlayContent
+  dialog-close.tsx         # "use client": useOverlayClose (the Close part shared with Popover.Close) with command "request-close" and the `value` key
   dialog-form.tsx          # "use client": form, method=dialog or action + FormStatusWatcher
   dialog-title.tsx         # "use client"
   dialog-description.tsx   # "use client"
   dialog.test.tsx
   dialog.browser.test.tsx
 packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
+packages/ui/src/internal/use-overlay-root.ts, overlay-popup.tsx, use-overlay-close.ts, content-focus-probe.tsx   # shared with Popover (popover.md 14)
 ```
 
 - **Every part file is `"use client"`.** Trigger, Popup, Close, Form, Title and Description read
   context (ids, mode, dispatch); Root creates it. No directive-free part (same reasoning as
   Accordion 12 and Tooltip 2.4). The Directive test row lists all eight modules; `index.ts` is
   directive-free.
-- **Context.** `{ mode: "static" | "library", ids: { dialog, title, description }, modal,
+- **Context.** `{ mode: "static" | "library", ids: { popup, title, description }, modal,
   committed, optimistic, pending, intended(), requestOpen(event, reason), requestClose(event,
   reason, returnValue), notifyClosed(event, reason, returnValue) (called only for closes the
   library did not cause: the `close` listener returns first on the `libraryClose` echo),
   takeCloseReturnValue(),
-  latestInFlight, triggerRef, dialogRef (RefObject<HTMLDialogElement | null>),
+  latestInFlight, triggerRef, popupRef (RefObject<HTMLDialogElement | null>),
   recordCloseIntent(intent | undefined), takeCloseIntent(), openGeneration(),
   nextOpenGeneration() }`. `intended()` is `latestInFlight()?.next ?? committedOptimistic`,
   the optimistic value of the last commit kept in a ref written in `useInsertionEffect`
@@ -1984,23 +1989,31 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   }))`. `takeCloseReturnValue()` reads and clears that ref (the apply effect's `close(v)`); the
   insertion effect also clears it whenever `optimistic` is `true` (a veto or a re-open made it
   stale). `openGeneration` reads a counter the Root bumps on every open (3.4); `Dialog.Close`
-  passes it to `useActionTrigger`. Root recomputes the object every render (as Accordion does;
-  `dispatch` is new per render). `dialogRef` is how Close and Form reach the dialog element in
+  passes it to `useActionTrigger`. The object is `DialogContextValue extends
+  OverlayRootValue<HTMLDialogElement, [returnValue: string]>` plus `modal`, the recording
+  `requestClose` and `takeCloseReturnValue`, memoised on the shared root value and `modal`.
+  `popupRef` is how Close and Form reach the dialog element in
   JS-free mode for `close(value)` without a second registry; it is set by the Popup's callback
   ref.
 - **Mode detection** once, from the first render's props, in a `useState` initialiser; warn on
-  change (Accordion pattern).
-- **Root.** `useControllableAction<boolean, DialogOpenChangeDetails>({ controlled: open,
-  defaultValue: defaultOpen, initialValue: false, action: openChangeAction, transitionTypes:
-  (next) => transitionTypes("dialog", next ? "open" : "close"), warn: { component: "Dialog.Root",
-  prop: "open" } })`. In static mode the hook is still called (hooks cannot be conditional) with
+  change (Accordion pattern); inside `useOverlayRoot`.
+- **Root.** `useOverlayRoot<DialogOpenChangeDetails, HTMLDialogElement, [returnValue: string]>({
+  component: "dialog", part: "Dialog.Root", open, defaultOpen, openChangeAction, details:
+  dialogDetails, isShown: isDialogOpen })` (Popover 14.1: the shared Root machinery, which calls
+  `useControllableAction<boolean, DialogOpenChangeDetails>` with `transitionTypes("dialog", next
+  ? "open" : "close")` and `warn: { component: "Dialog.Root", prop: "open" }`).
+  `dialogDetails(event, reason, returnValue)` builds `createActionDetails(event, { reason,
+  returnValue })` (an open passes no `returnValue`, so the key is own with value `undefined`);
+  `isShown` reads `dialog.open` because the hook's default `:popover-open` is wrong for a
+  `<dialog>` (the stale close-intent clear of 2.3). In static mode the hook is still called (hooks cannot be conditional) with
   `action: undefined` and never dispatched. The trigger element is kept in a `useRef`, written by
   the Trigger's callback ref (no state, read only in the `close` listener's focus fallback).
 - **Trigger.** `libraryProps`: `type` via `rendersButton(render)`, `commandfor: modal ? dialogId
   : undefined`, `command: modal ? "show-modal" : undefined`, `onClick` installed (and owned) only
   when `mode === "library" || !modal`, `disabled` (owned), `data-open`, `data-pending`,
   `data-disabled`. `state.pending` is `root.pending` (4.2). Static non-modal click:
-  `dialogRef.current?.show()`. The `disabled` prop maps to native `disabled`.
+  `popupRef.current?.show()`. The `disabled` prop goes through `disabledButton` (conventions
+  1.2; `handlesClick` is whether the click is installed, `invoker` gates `commandfor` / `command`).
 - **Popup, listeners.** All native, attached in one effect through the ref (conventions 7.4), each
   filtered on `event.target === dialog` (React still emulates bubbling for `toggle`, and `command`
   / `submit` bubble from descendants by design):
@@ -2059,24 +2072,31 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   return right after `close()` when the content probe fired (6.2 rule 2); the record is dropped
   when committed is `false` with nothing in flight; and the `held` release rule (4.4). (3)
   `initialFocus` write inside (2) right before `show*()`, removal right after. (4) The listener effect above, re-subscribed when the element
-  changes. (5) `held` (4.4, `useExitAnimation`): `holdDuringRender()` when committed flips
+  changes. (5) `held` (4.4, `useCloseHold(committed, isLibrary, transition)` over
+  `useExitAnimation`, shared with `usePopoverPopup`): `holdDuringRender()` when committed flips
   `true → false` in library mode with `transition === undefined` (the previous-committed
-  pattern, as `usePopoverPopup`).
+  pattern), `afterClose(dialog, echo)` in the `close` listener, `releaseIfIdle` in the apply
+  effect.
 - **Popup, rendering.** `<dialog id … aria-labelledby aria-describedby closedby={flag ?
   (lightDismiss ? "any" : "closerequest") : undefined} data-modal
   suppressHydrationWarning>{content}</dialog>`, wrapped in `<ViewTransition default={transition}>`
-  only when `isLibrary && transition !== undefined` (conventions 5.1), where `content` is: static
-  mode → children; library `keepMounted` → `<Activity mode={committed || held ? "visible" :
+  only when `isLibrary && transition !== undefined` (conventions 5.1), where `content` is
+  `renderOverlayContent({ isLibrary, keepMounted, visible, wrapContent }, () => children)`
+  (`internal/overlay-popup.tsx`, shared with `usePopoverPopup`): static mode → children; library
+  `keepMounted` → `<Activity mode={committed || held ? "visible" :
   "hidden"}>{wrapContent(children)}</Activity>`; library default → `committed || held ?
-  wrapContent(children) : null`, where `wrapContent` is the shared `ContentFocusProbe` (6.2 rule
-  2; extract it from `use-popover-popup.ts` into `src/internal/content-focus-probe.tsx` and use
-  it from both). `closedby` is typed in `@types/react` 19.3 (research) and needs no
+  wrapContent(children) : null`, where `wrapContent` is the content probe of
+  `useContentFocusProbe(popupRef)` (`src/internal/content-focus-probe.tsx`, 6.2 rule 2), all
+  under `<ToolbarContext value={null}>` so the content is outside an enclosing Toolbar. `closedby` is typed in `@types/react` 19.3 (research) and needs no
   augmentation; `commandfor` / `command` on the buttons are already in `platform-attributes.ts`.
-- **Close.** `libraryProps`: `type`, `disabled` (owned), `commandfor: dialogId`,
-  `command: "request-close"`, `value`, `onClick` when `isLibrary || action !== undefined`,
-  `data-pending`, `data-disabled`. `const { pending, run } = useActionTrigger(root.openGeneration)`
-  (conventions 3.4; `src/internal/use-action-trigger.ts`, shared with `Popover.Close` and
-  `Menu.Item`). The click always `preventDefault()`s (library mode, or with `action`) and
+- **Close.** Rendered by `useOverlayClose` (`internal/use-overlay-close.ts`, the one Close part
+  of Dialog and Popover) with `command: "request-close"`, `ownProps: { value }` and Dialog's
+  `close` / `details` callbacks. `libraryProps`: `type`, `disabled` (owned, through
+  `disabledButton` with `handlesClick` = `isLibrary || action !== undefined`, conventions 1.2),
+  `commandfor: popupId`, `command: "request-close"`, `value`, `onClick` when `isLibrary ||
+  action !== undefined`, `aria-disabled` while pending, `data-pending`, `data-disabled`. `const
+  { pending, run } = useActionTrigger({ openGeneration: root.openGeneration })` (conventions
+  3.4; shared with `Popover.Close` and `Menu.Item`). The click always `preventDefault()`s (library mode, or with `action`) and
   returns when `disabled`. `close(native)` is: library mode → `ctx.requestClose(native,
   "activate", value ?? "")`; static mode (only reachable with `action`) → `if (dialog?.open)
   { recordCloseIntent({ reason: "activate", event: native }); dialog.close(value ?? ""); }`.
@@ -2107,7 +2127,9 @@ packages/ui/src/__tests__/dialog-shim.ts   # section 13.1
   the watcher and lifted through a tiny context for the `className` / `children` functions of
   the Form itself (one extra render when pending changes; acceptable).
 - **Title / Description.** `libraryProps: { id }`; `h2` / `p` defaults.
-- **Dev warnings** (`useDevWarning`): mode change; `transition` / `keepMounted={false}` in static
+- **Dev warnings** (`useDevWarning`; `useJsFreePropWarnings` for the static-mode props,
+  `useElementCheck` for the element, `useShownNameWarning` for the name; each once per instance,
+  conventions 7.2): mode change; `transition` / `keepMounted={false}` in static
   mode; wrong `tagName` behind `render`; no name on the dialog; `initialFocus` unresolved or
   outside the dialog; Trigger without a Popup (checked in the Trigger's effect through
   `document.getElementById(dialogId)`). A part rendered outside a `Dialog.Root` **throws** (no
@@ -2180,7 +2202,7 @@ Order of work that keeps the test suite green between steps:
 
 1. **Shared internals.** Extract `ContentFocusProbe` + `wrapContent` from
    `use-popover-popup.ts` into `src/internal/content-focus-probe.tsx` (no behaviour change for
-   Popover and Menu). `useExitAnimation` and `exitAnimations` are already shared.
+   Popover and Menu; today `useContentFocusProbe`). `useExitAnimation` and `exitAnimations` are already shared.
 2. **Root** (`dialog-root.tsx`): `committedOptimistic` ref (`useInsertionEffect`), `intended()`
    from it; `requestClose(event, reason, returnValue)`; `closeReturnValue` ref +
    `takeCloseReturnValue()`, cleared in the same insertion effect when `optimistic` is `true`;

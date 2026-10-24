@@ -10,7 +10,7 @@ menu in 2.2, `data-context`, the point placement and the owned `onContextMenu` i
 placement in 14. Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` first** (accepted): Menu is built on its internal hooks
-(`usePopoverRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
+(`useOverlayRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
 open and part-initiated closes, browser-owned dismissals), its apply effect, close intents,
 nested focus-return rule, deferred unmount, `aria-expanded` handling, positioning helper and
 `<ViewTransition>` wiring around the top-layer element. This document repeats only what differs
@@ -129,7 +129,7 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
-| `Root` | none | | `state.open` (optimistic), `state.pending`, `state.submenu` in `children(state)` | `usePopoverRoot({ component: "menu", mode: "library" })`. A Root under a `MenuContext` is a submenu. |
+| `Root` | none | | `state.open` (optimistic), `state.pending`, `state.submenu` in `children(state)` | `useOverlayRoot({ component: "menu", mode: "library", details: popoverDetails })`. A Root under a `MenuContext` is a submenu. |
 | `Trigger` | `button` | button | `aria-expanded`, `data-open` (optimistic), `data-pending`, `data-disabled` | `usePopoverTrigger` plus `id`, `aria-haspopup="menu"` and the open-with-focus keys. Only valid in a top-level Root (dev warning otherwise). |
 | `Popup` | `div` | `menu` | `data-side`, `data-align` (the resolved placement while shown, conventions 13.2) | `usePopoverPopup` with Menu's initial-focus resolver, keyboard handling, typeahead, `focusout`, `focusgroup`; `useResolvedPlacement` for the attributes. |
 | `Item` | `button` | `menuitem` | `data-pending`, `data-disabled` | `action`, `closeOnActivate` (default `true`). |
@@ -180,7 +180,7 @@ if not an `<hr>`. Dev warnings as Popover.
 
 ### 2.1 Open is library-owned, always
 
-`Menu.Root` calls `usePopoverRoot` with `mode: "library"` unconditionally. Without `open` /
+`Menu.Root` calls `useOverlayRoot` with `mode: "library"` unconditionally. Without `open` /
 `defaultOpen` / `openChangeAction` it is an uncontrolled, action-less state owner (no mode
 switch to warn about). Everything in Popover 2.2, 2.4 and 2.5 applies: Trigger click intercepted
 (`preventDefault()` cancels the command; toggle against `intended()`), foreign opens cancelled at
@@ -240,7 +240,7 @@ inside the tree).
 
 ```tsx
 // inside MenuItem (section 14; useActionTrigger is conventions 3.4)
-const { pending, run } = useActionTrigger(rootMenu.openGeneration); // the open this activation belongs to
+const { pending, run } = useActionTrigger({ openGeneration: rootMenu.openGeneration }); // the open this activation belongs to
 const onClick = (event: MouseEvent) => {                             // Enter / Space arrive here too (5.3)
   if (disabled) return;
   run(
@@ -674,11 +674,11 @@ Top-level menu: the platform returns focus to the Trigger on Escape, item activa
 (`hidePopover()` from the apply effect runs the same hide steps) and ArrowLeft-free closes; a
 light dismiss leaves focus where the mousedown put it; Tab moves it on. Submenu: the platform
 restores nothing, so Popover 6.2's rule applies: `focusWasInside` at `beforetoggle(closed)` (or
-the focused item unmounted in the close commit, recorded by `wrapContent`'s probe) and focus on
+the focused item unmounted in the close commit, recorded by the content probe) and focus on
 `<body>` or inside after → focus the SubmenuTrigger. The same probe covers the top-level menu
 when item activation closes it with `transition` set: the focused item is unmounted before
 `hidePopover()` runs, the platform then restores nothing, and the apply effect focuses the
-Trigger (Popover 6.2, review H1); hence `Menu.Popup` renders its items through `wrapContent`. Covers Escape and ArrowLeft in
+Trigger (Popover 6.2, review H1); hence `Menu.Popup` renders its items through `renderContent`. Covers Escape and ArrowLeft in
 a submenu and a submenu's `toggle` after a programmatic close. When the whole stack closes from
 inside a submenu (item activation, Tab), the root menu's own hide restores focus to the root
 Trigger (first in stack: platform) or lets Tab's target keep it; the submenu's rule sees
@@ -1037,29 +1037,33 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 packages/ui/src/menu/                    (as implemented in #41)
   index.ts                  # no directive; namespace + types; imports platform-attributes
   menu-context.ts           # "use client": MenuContext (root + per-level), MenuGroupContext, MenuRadioGroupContext, MenuListContext (focusgroup); closeStackLater
-  menu-root.tsx             # "use client": usePopoverRoot({ component: "menu", mode: "library" }), submenu detection, open cause (setOpenCause / takeOpenCause), hover timers (useDelayedPair)
+  menu-root.tsx             # "use client": useOverlayRoot({ component: "menu", mode: "library", details: popoverDetails }), submenu detection, open cause (setOpenCause / takeOpenCause), hover timers (useDelayedPair)
   menu-trigger.tsx          # "use client": usePopoverTrigger + aria-haspopup + ArrowDown/ArrowUp (openMenuWithFocus, shared with SubmenuTrigger)
-  menu-popup.tsx            # "use client": usePopoverPopup with the resolver; keyboard, typeahead, focusout, mousedown, focusgroup detection, submenu pointer enter/leave
+  menu-popup.tsx            # "use client": usePopoverPopup with the resolver; useAnchoredPlacement or pointStyle, useMenuKeyboard, listenOutside, focusout, mousedown, useNativeFocusgroup, submenu pointer enter/leave
+  use-menu-keyboard.ts      # "use client": useMenuKeyboard(menu, nativeFocusgroup) → { onKeyDown, typingAhead }: the keyboard model and typeahead of Menu.Popup
+  menu-outside.ts           # no directive: listenOutside, the document contextmenu / middle-click / scroll and popup wheel listeners of a point menu (context-menu.md 14)
+  menu-point.ts             # no directive: MENU_POINT_X / _Y / _GAP, MENU_POINT_HREF, MENU_POINT_RULES, MENU_POINT_FALLBACKS, pointStyle(point, stylesheetOwned) (context-menu.md 4)
+  menu-gestures.ts          # no directive: startDrag, guardTouch, armClickSwallow, the slop constants (context-menu.md 2.6, 14)
   use-menu-item.ts          # "use client": the item half of every item kind: role, roving tabindex, aria-disabled, Enter/Space -> click(), pointermove focus
-  menu-item.tsx             # "use client": useActionTrigger(rootMenu.openGeneration)
+  menu-item.tsx             # "use client": useActionTrigger({ openGeneration: rootMenu.openGeneration })
   menu-checkbox-item.tsx    # "use client": useControllableAction<boolean>
   menu-radio-group.tsx      # "use client": useControllableAction<string | null>
   menu-radio-item.tsx       # "use client"
   menu-group.tsx            # "use client": Group, GroupLabel and Separator (three stateless parts sharing one context; one file, deviation 4)
   menu-submenu-trigger.tsx  # "use client": item + trigger; hover intent
-  menu-context-trigger.tsx  # "use client" (#45): the region: contextmenu, long-press, modality, pointer capture (context-menu.md 14)
-  menu-hover.ts             # "use client": scheduleHoverClose (the :hover / focus-inside checks before a hover close)
-  menu-dom.ts               # items from the DOM, typeahead text
+  menu-context-trigger.tsx  # "use client" (#45): the region: contextmenu, long-press, modality, pointer capture, calling menu-gestures.ts (context-menu.md 14)
+  menu-hover.ts             # no directive: scheduleHoverClose (the :hover / focus-inside checks before a hover close)
+  menu-dom.ts               # no directive: items from the DOM, typeahead text, isRtl, capturePointer, isEditableTarget
   menu.test.tsx, menu.browser.test.tsx
 packages/ui/src/internal/
-  use-action-trigger.ts     # "use client": useActionTrigger(openGeneration?) => { pending, run(work, then?) } (shared with Popover.Close, Dialog.Close)
+  use-action-trigger.ts     # "use client": useActionTrigger({ openGeneration?, ignoreWhilePending?, captureSuperseded? }) => { pending, run(work, then?) } (shared with Popover.Close, Dialog.Close)
   use-delayed-pair.ts       # "use client": createDelayedPair() / useDelayedPair(): one open-or-close timer slot with cancelClose (Tooltip uses the factory inside its effect)
-  use-popover-*.ts          # from #38 / #40; extension points below
+  use-overlay-root.ts, use-popover-popup.ts, use-popover-trigger.ts, overlay-popup.tsx   # Popover 14; extension points below
 ```
 
-- **Extension points in the Popover hooks.** Landed with #40 (`src/internal/use-popover-*.ts`,
-  tested in `use-popover-hooks.test.tsx`): `usePopoverRoot({ component: "menu", mode:
-  "library", details, onDispatch(next, details) })` for the open-cause record and timer
+- **Extension points in the Popover hooks.** Landed with #40 (`src/internal/use-overlay-root.ts` and
+  `use-popover-*.ts`, tested in `use-popover-hooks.test.tsx`): `useOverlayRoot({ component:
+  "menu", mode: "library", details: popoverDetails, onDispatch(next, details) })` for the open-cause record and timer
   cancellation (`onDispatch` runs synchronously before every dispatch); `usePopoverPopup({
   resolveInitialFocus(popup) })`, called right before each library `showPopover()`, **no `cause`
   argument**: Menu reads the open cause from its own ref (written in `onDispatch` / before
@@ -1070,14 +1074,14 @@ packages/ui/src/internal/
   pass-through option being indirection only. `usePopoverTrigger` gained `handlers` (merged in
   front of the Trigger's own), `activate` (a click override: `SubmenuTrigger` opens or focuses
   into, never closes) and `disabledAs: "aria"`, which is how `SubmenuTrigger` reuses it.
-- **`usePopoverPopup` result is `{ setElement, visible, wrapContent }`** (destructure it; a hook
-  result that carries a ref trips React Compiler's ref inference once a member is passed as
-  `ref`). `Menu.Popup` renders `visible ? wrapContent(items) : null` (or
-  `<Activity>{wrapContent(items)}</Activity>` with `keepMounted`): the probe inside `wrapContent`
+- **`usePopoverPopup` result is `{ setElement, visible, renderContent, reshow }`** (destructure
+  it; a hook result that carries a ref trips React Compiler's ref inference once a member is
+  passed as `ref`). `Menu.Popup` renders `renderContent(() => items)` (`visible ? items : null`,
+  or an `<Activity>` with `keepMounted`, Popover 14.2): the probe inside `renderContent`
   is what returns focus to the Trigger when item activation closes the menu with `transition`
   (Popover 6.2, H1); without it a keyboard activation ends with focus on `<body>`.
 - **`useActionTrigger` and the open-generation guard.** `const { pending, run } =
-  useActionTrigger(rootMenu.openGeneration)` (conventions 3.4). The item's click runs
+  useActionTrigger({ openGeneration: rootMenu.openGeneration })` (conventions 3.4). The item's click runs
   `run(() => action?.(details), () => { if (closeOnActivate) rootMenu.requestClose(event,
   "activate"); })`: the hook reads the root Root's open generation when `run` is called and skips
   `then` when it changed by the time the action resolved, meaning the user dismissed the menu and
@@ -1087,6 +1091,10 @@ packages/ui/src/internal/
   guard through `closeStackLater` in `menu-context.ts` (their state lives in
   `useControllableAction`, so they do not use the hook; deviation 6). `Popover.Close` and
   `Dialog.Close` use the same hook.
+- **Keyboard model.** `Menu.Popup`'s `onKeyDown` and typeahead are `useMenuKeyboard(menu,
+  nativeFocusgroup)` (`use-menu-keyboard.ts`, returning `{ onKeyDown, typingAhead }`); the native
+  `focusgroup` path is detected by `useNativeFocusgroup` (`internal/use-native-focusgroup.ts`,
+  shared with Tabs.List and ToggleGroup).
 - **Keyboard activation goes through `element.click()`** (5.3): `use-menu-item.ts` prevents the
   Enter / Space keydown and calls `event.currentTarget.click()`; `onClick` is the single
   activation path, and composed triggers and `render`ed links keep their native command or
@@ -1096,8 +1104,9 @@ packages/ui/src/internal/
   `{ element, focusVisible: false }` (`QuietFocusTarget`) and `usePopoverPopup` focuses it with
   `focus({ focusVisible: false })` after `showPopover()` instead of writing `autofocus`, where
   the engine implements the option (Popover 6.1, 14.2).
-- **Details factory.** Menu's `details` option for `usePopoverRoot` must build with
-  `createActionDetails(event, { reason })`, never an object literal: the Proxy keeps `event`
+- **Details builder.** Menu passes the shared `popoverDetails` as the required `details` of
+  `useOverlayRoot`; a builder must build with `createActionDetails(event, { reason })`, never an
+  object literal: the Proxy keeps `event`
   non-enumerable, which is what lets `openChangeAction` be a Server Function (Popover 14.1).
 - **Context.** Each Root provides `MenuContext` `{ ...popover context, submenu, rootMenu
   (the top-level context), loop, delay, closeDelay, openCause (ref), nativeFocusgroup (from the

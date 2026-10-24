@@ -959,7 +959,7 @@ packages/ui/src/select/
 packages/ui/src/internal/
   use-native-select-value.ts   # "use client"; applySelection, readResetValue, mount reconciliation, reset (on useNativeGroupReconciliation / useFormReset)
   use-hydrated-mount.ts        # "use client"; useSyncExternalStore server-snapshot tell (6.2)
-  use-form-reset.ts            # widen FormAssociatedElement with HTMLSelectElement
+  use-form-owner-event.ts      # FormAssociatedElement includes HTMLSelectElement (declared here; use-form-reset.ts builds on it)
   platform-attributes.ts       # add `selectedcontent` to JSX.IntrinsicElements
 ```
 

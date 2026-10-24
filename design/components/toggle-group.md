@@ -1063,7 +1063,7 @@ packages/ui/src/internal/
   use-roving-focus.test.tsx
 packages/ui/src/toggle-group/
   index.ts
-  toggle-group-context.ts     # "use client": optimistic + committed sets, toggle(value, event), disabled, orientation, nativeFocusgroup, focusgroupStartValue, register(element, value)
+  toggle-group-context.ts     # "use client": optimistic + committed sets, toggle(value, event), disabled, orientation, nativeFocusgroup, focusgroupStartValue, registerItem(element, value)
   toggle-group-root.tsx       # "use client"
   toggle-group-item.tsx       # "use client"
   toggle-group.test.tsx
@@ -1097,13 +1097,16 @@ import `../internal/platform-attributes.js` for the `focusgroup` / `focusgroupst
   its handlers in `libraryProps`; inside a Toolbar: no engine, no handlers, `orientation =
   toolbar.orientation`, and `useDevWarning` for each of `orientation`, `loop`,
   `experimental_focusgroup` when passed (`experimental_focusgroup` only when `true`).
-- Registration: `register(element, value)` adds to a `Map<HTMLElement, string>` in a ref and returns
-  the cleanup; the Item merges it into its ref with `useMergedRef`. Document order at dispatch:
-  `[...map].sort((a, b) => a[0].compareDocumentPosition(b[0]) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)`.
+- Registration: `registerItem(element, value)` adds to a `Map<HTMLElement, string>` in a ref and
+  returns the cleanup; the Item merges it into its ref with `useMergedRefs`. Document order at
+  dispatch: the map's entries sorted with `compareDocumentOrder` (`internal/dom-order.ts`); the
+  set arithmetic (`toSet`, `applyPatch`, `sortByOrder`, `EMPTY_SET`) is `internal/value-set.ts`.
+- `nativeFocusgroup` comes from `useNativeFocusgroup(flag)` (`internal/use-native-focusgroup.ts`,
+  shared with Tabs.List and Menu.Popup).
 - `focusgroupStartValue` (standalone, flag on, every engine): the first pressed enabled value in
-  the current order, or `null`. The order (and which values have a disabled Item) is a `layout`
-  state refreshed in a layout effect after each Root commit, CheckboxGroup's pattern, rather than
-  a ref read during render; `state.value` is the optimistic set sorted by it (the value's own
+  the current order, or `null`. The order (and which values have a disabled Item) is the `layout` of
+  `useItemOrder` (`internal/use-item-order.ts`, conventions 3.8, shared with CheckboxGroup),
+  refreshed in a layout effect after each Root commit rather than a ref read during render; `state.value` is the optimistic set sorted by it (the value's own
   order until the first layout effect), while `next` is always sorted from the DOM at dispatch.
   An Item reordered by a child-only render is picked up at the Root's next commit.
 - The multiple variant declares `deselectable?: never`: TypeScript's excess-property check does

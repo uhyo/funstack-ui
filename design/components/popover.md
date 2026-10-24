@@ -838,15 +838,15 @@ popup that sets a controlled `open={false}`, or a Menu item) from the keyboard, 
 element is removed first, focus falls to `<body>`, and the platform then restores nothing (it
 restores only when focus is inside the popover at the hide). Rule 1's `beforetoggle` read would
 see `<body>` and the library would do nothing either. The fix is a snapshot taken before the DOM
-removal: `usePopoverPopup` returns `wrapContent(children)`, which wraps the library-mode content
-in an internal component whose layout-effect cleanup records `popup.contains(activeElement)`
+removal: `usePopoverPopup` returns `renderContent(() => children)`, which wraps the library-mode
+content in an internal probe component whose layout-effect cleanup records `popup.contains(activeElement)`
 (React runs a deleted component's layout cleanups before it detaches its host nodes). That flag
 is OR-ed into `focusWasInside` at `beforetoggle(closed)`, and it is cleared on every open and
 whenever content unmounts while the popup stays open (a content swap is not a close). With
 `keepMounted`, `<Activity mode="hidden">` does not detach the focused node synchronously, so the
 ordinary rule covers it; without `transition` the children are held (4.4) and focus is still
-inside at the hide. The Popup must render its content through `wrapContent` in both mounting
-shapes (14.4), and so must Menu.Popup.
+inside at the hide. The Popup must render its content through `renderContent` (which covers both
+mounting shapes, 14.4), and so must Menu.Popup and Combobox.Popup.
 
 Why "was inside", not "is on body": a light dismiss on empty space moves focus to `<body>`
 *before* the hide, and the platform deliberately leaves it there; restoring to the Trigger would
@@ -1092,7 +1092,7 @@ Notation: `C` = committed open, `O` = optimistic open, `P` = Root pending. Uncon
    animation plays in every engine. `toggle(closed)`: `intended()` is `false` → echo, no
    dispatch; `getAnimations()` ignored (no `held` with `transition`). `P=false`. Had the close
    come from a `Popover.Close` inside the popup activated with the keyboard, the unmount would
-   have moved focus to `<body>` before the hide; `wrapContent`'s probe records that, and the
+   have moved focus to `<body>` before the hide; the content probe records that, and the
    apply effect focuses the Trigger right after `hidePopover()` (6.2).
 4. **Same, `transition` absent.** As 3 until `C=false`: the render sees committed `true → false`
    and sets `held=true`, so the children stay; apply effect `hidePopover()`; `toggle(closed)`
@@ -1356,42 +1356,55 @@ asserting the documented degraded behaviour rather than skipping:
 packages/ui/src/popover/
   index.ts                 # no directive: namespace + type re-exports; imports platform-attributes for side effects
   popover-context.ts       # "use client": PopoverContext
-  popover-root.tsx         # "use client": usePopoverRoot + context
+  popover-root.tsx         # "use client": useOverlayRoot({ details: popoverDetails }) + context
   popover-trigger.tsx      # "use client"
-  popover-popup.tsx        # "use client": <dialog popover>, usePopoverPopup
-  popover-close.tsx        # "use client"
+  popover-popup.tsx        # "use client": <dialog popover>, usePopoverPopup, useAnchoredPlacement
+  popover-close.tsx        # "use client": useOverlayClose (shared with Dialog.Close), command "hide-popover"
   popover-title.tsx        # "use client"
   popover-description.tsx  # "use client"
   popover.test.tsx
   popover.browser.test.tsx
 packages/ui/src/internal/
-  anchor-position.ts       # positionArea(side, align), POSITION_TRY_FALLBACKS (from tooltip-popup.tsx)
-  use-popover-root.ts      # "use client": section 14.1; shared with Menu
-  use-popover-popup.ts     # "use client": section 14.2; shared with Menu
-  use-popover-trigger.ts   # "use client": section 14.3; shared with Menu
-  use-exit-animation.ts    # "use client": the `held` logic of 4.4 (Dialog's `exiting` may move here)
+  anchor-position.ts       # positionArea(side, align), POSITION_TRY_FALLBACKS, parsePositionArea (directive-free)
+  use-resolved-placement.ts # "use client": useAnchoredPlacement (14.4; shared with Tooltip and Menu)
+  use-overlay-root.ts      # "use client": section 14.1; shared with Menu, Combobox and Dialog
+  use-popover-popup.ts     # "use client": section 14.2; shared with Menu and Combobox
+  use-popover-trigger.ts   # "use client": section 14.3; shared with Menu and Combobox
+  overlay-popup.tsx        # "use client": renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings (14.2; shared with Dialog.Popup)
+  content-focus-probe.tsx  # "use client": useContentFocusProbe (6.2)
+  use-overlay-close.ts     # "use client": useOverlayClose, the Close part (3.4; shared with Dialog.Close)
+  use-exit-animation.ts    # "use client": the `held` logic of 4.4, wrapped by useCloseHold
+  popover-open.ts          # isPopoverOpen(element) (directive-free)
 packages/ui/src/__tests__/popover-shim.ts   # additions, 13.1
 ```
 
 - **Every part file is `"use client"`** (context for ids, mode and dispatch), as Dialog and
   Tooltip. `index.ts` is directive-free. Add `src/popover/index.ts` to the tsdown `entry` list.
-- **Context** (`PopoverContextValue` = `PopoverRootValue`): `{ mode, ids: { popup, title,
+- **Context** (`PopoverContextValue` = `PopoverRootValue` = `OverlayRootValue<HTMLElement, []>`):
+  `{ mode, ids: { popup, title,
   description }, committed, optimistic, pending, intended(), openGeneration(),
   nextOpenGeneration(), requestOpen(event, reason), requestClose(event, reason),
   notifyClosed(event, reason), latestInFlight, triggerRef, popupRef, recordCloseIntent,
-  takeCloseIntent }`. Root recomputes the object every render (Dialog does the same). The
+  takeCloseIntent }`, memoised by the hook on its members (Dialog's context extends it with the
+  `<dialog>` element type and a close's `returnValue`). The
   Popup's state (`{ open: committed, side, align }`) is **not** on the Root context: the Popup
   publishes it through a second context (`PopoverPopupContext`) that Title and Description read;
   outside a Popup (which `aria-labelledby` allows) they fall back to `{ open: committed, side:
   "bottom", align: "center" }`. Better than Root carrying `side` / `align` it does not own
   (review, deviation 2).
 
-### 14.1 `usePopoverRoot(options)` (shared)
+### 14.1 `useOverlayRoot<Details, Popup, CloseArgs>(options)` (shared)
 
-The Root's logic without the public props: mode detection once (`useState` initialiser; warn on
-change), `useControllableAction<boolean, Details>` with `transitionTypes(component, next ?
-"open" : "close")` where `component` is `"popover"` or `"menu"`, `useId`, `triggerRef`,
-`popupRef`, the close-intent ref with `clearLater`, and:
+The Root's logic without the public props, for Popover, Menu, Combobox and Dialog
+(`internal/use-overlay-root.ts`). `options`: `{ component, part, open, defaultOpen,
+openChangeAction, mode?: "library", onDispatch?, details, isShown? }`; the type parameters are the
+details type, the popup element type (`HTMLDialogElement` for Dialog) and the extra arguments of
+a close (Dialog's `[returnValue: string]`), which reach the `details` builder. Inside: mode
+detection once (`useState` initialiser; warn on change), `useControllableAction<boolean,
+Details>` with `transitionTypes(component, next ? "open" : "close")` where `component` is
+`"popover"`, `"menu"`, `"combobox"` or `"dialog"`, `useId`, `triggerRef`, `popupRef`, the
+close-intent ref with `clearLater` (which asks `isShown(popup)`, default `:popover-open`, whether
+the popup is still open a task later; Dialog passes `dialog.open`), and:
 
 - `intended()` = `latestInFlight()?.next ?? committedOptimistic` (a boolean, so `??` is safe
   here), where `committedOptimistic` is a ref of the optimistic value of the **last commit**,
@@ -1409,24 +1422,27 @@ change), `useControllableAction<boolean, Details>` with `transitionTypes(compone
 - `notifyClosed(event, reason)`: library mode and `intended()` → `dispatch(false, details)`
   (same guard as `requestClose`; separate name because callers mean different things and Menu
   may add bookkeeping to one of them).
-- `details` are built with `createActionDetails(event, { reason })`; a component with more
-  fields (Menu) passes a `details` factory, which must itself call `createActionDetails` (its
-  Proxy keeps `event` non-enumerable so the details survive a Server Function boundary; a plain
-  object literal breaks that).
+- `details(event, reason, ...closeArgs)` is a **required** builder: the popover-like components
+  pass the exported `popoverDetails` (`createActionDetails(event, { reason })`); Dialog's adds
+  `returnValue`. A builder must call `createActionDetails` (its Proxy keeps `event`
+  non-enumerable so the details survive a Server Function boundary; a plain object literal
+  breaks that). Requiring it keeps the hook free of a cast from a generic default.
+- Returns `OverlayRootValue<Popup, CloseArgs>`; `PopoverRootValue` is its `<HTMLElement, []>`
+  alias, the first argument of `usePopoverTrigger` and `usePopoverPopup`.
 - Menu's extension points (menu.md 14, landed with #40): `mode: "library"` forces library mode
   whatever the props, and `onDispatch(next, details)` runs synchronously before every dispatch
   (open-cause record, hover-timer cancellation).
 
 ### 14.2 `usePopoverPopup(ctx, options)` (shared)
 
-Everything in the Popup except rendering. `options`: `{ part, initialFocus, resolveInitialFocus?,
-keepMounted, transition, onBeforeToggle?, onToggle? }` (the optional hooks are for Menu:
+Everything in the Popup except rendering. `options`: `{ part, initialFocus?, resolveInitialFocus?,
+keepMounted?, transition, onBeforeToggle?, onToggle?, source? }` (the optional hooks are for Menu:
 `resolveInitialFocus(popup)` replaces `initialFocus` with a function called right before each
 library open, no `cause` argument since the open cause is Menu's own ref; it returns an element,
 `null`, or a `QuietFocusTarget` `{ element, focusVisible: false }` that is focused with
 `focus({ focusVisible: false })` after `showPopover()` where the option is implemented (6.1);
-`onToggle` closes the stack on Tab-out). Returns `{ setElement (callback ref), visible, wrapContent }`; nothing with a
-ref inside the returned object (React Compiler's ref inference would flag every member once one
+`onToggle` closes the stack on Tab-out). Returns `{ setElement (callback ref), visible,
+renderContent, reshow }`; nothing with a ref inside the returned object (React Compiler's ref inference would flag every member once one
 is passed as `ref`; consumers destructure). Effects and listeners:
 
 1. **Mount reconciliation** (layout effect, once): `:popover-open` and library mode →
@@ -1456,23 +1472,37 @@ is passed as `ref`; consumers destructure). Effects and listeners:
    - `command`: `hide-popover`, or `toggle-popover` while open → `recordCloseIntent({ reason:
      "activate", event })`; `show-popover` / `toggle-popover` while closed need nothing (the
      open is caught at `beforetoggle`).
-4. **`held`** (4.4, `use-exit-animation.ts`: `{ held, holdUntil, release, holdDuringRender,
-   waiting }`): the previous-committed derivation during render when `transition === undefined`;
+4. **`held`** (4.4, `useCloseHold(committed, isLibrary, transition)` in `overlay-popup.tsx`,
+   over `use-exit-animation.ts`'s `{ held, holdUntil, release, holdDuringRender, waiting }`,
+   plus `afterClose(popup, echo)` for the `toggle(closed)` read and `releaseIfIdle` for the apply
+   effect's release rule; shared with Dialog.Popup): the previous-committed derivation during render when `transition === undefined`;
    the `getAnimations` read in `toggle(closed)`; `allSettled(...).then(() => setHeld(false))` as
    a normal update with a generation counter; `release()` from `toggle(closed)` with no
    animations and from the apply effect's release rule.
-5. **`wrapContent(children)`** (6.2, H1): wraps the children in `ContentFocusProbe`, a component
-   whose layout-effect cleanup sets `contentHadFocus` when `popup.contains(activeElement)`.
-6. **JS-free `initialFocus`**: the callback ref writes `autofocus` on the resolved target and
+5. **`renderContent(() => children)`** (6.2, H1): `renderOverlayContent({ isLibrary, keepMounted,
+   visible, wrapContent }, children)` (`overlay-popup.tsx`): static mode renders the children;
+   library mode renders them while `visible`, or inside an `<Activity>` with `keepMounted`,
+   through `wrapContent` from `useContentFocusProbe(popupRef)` (`content-focus-probe.tsx`), a
+   component whose layout-effect cleanup sets `contentHadFocus` when
+   `popup.contains(activeElement)`; all under `<ToolbarContext value={null}>`. The thunk is
+   called only when something renders.
+6. **`initialFocus`**: `useInitialFocusTarget(part, noun)` resolves the ref or selector inside
+   the popup and warns once when it does not resolve or lies outside; `resolveInitialFocus`,
+   `returnFocusToTrigger(popup, trigger, canFocus?)` (the 6.2 focus return) and
+   `commandOf(event)` (the `command` listener) are the other `overlay-popup.tsx` helpers
+   Dialog.Popup shares. JS-free: the callback ref writes `autofocus` on the resolved target and
    keeps it while mounted (the browser runs the command; there is no "right before
    `showPopover()`"), as Dialog. The Trigger's callback ref also syncs `aria-expanded` for a
    Trigger that mounts after the Popup.
-7. **Dev warnings** (section 9).
+7. **Dev warnings** (section 9): `useJsFreePropWarnings` (`transition` / `keepMounted` in JS-free
+   mode), `useElementCheck` and `useShownNameWarning`, once per instance (conventions 7.2).
 
-### 14.3 `usePopoverTrigger(ctx, { disabled, render })` (shared)
+### 14.3 `usePopoverTrigger(ctx, { part, disabled, render, handlers?, activate?, disabledAs? })` (shared)
 
 Returns `{ state, libraryProps, ref }`: `type` via `rendersButton`, `commandfor`, `command:
-"toggle-popover"`, `disabled` (owned), `aria-expanded` (library: `optimistic`; JS-free:
+"toggle-popover"`, `disabled` (owned, through `disabledButton(render, disabled, { handlesClick:
+isLibrary, alwaysFocusable: disabledAs === "aria" })`, conventions 1.2: native on a host button
+or for a JS-free command, else `aria-disabled` with `commandfor` / `command` withheld), `aria-expanded` (library: `optimistic`; JS-free:
 `false`), `onClick` only in library mode (`preventDefault()`; `disabled` → return;
 `dispatch(!intended())` through `requestOpen` / `requestClose`), `data-open`, `data-pending`,
 `data-disabled`; the callback ref writes `triggerRef` and warns for a non-button in JS-free mode.
@@ -1485,11 +1515,11 @@ first / last item focused) on top.
 const element = useRender<ComponentPropsWithRef<"dialog">, PopoverPopupState>({
   defaultElement: "dialog",
   render, state, className,
-  style: side === null ? style : (s) => ({ positionArea: positionArea(side, align), positionTryFallbacks: POSITION_TRY_FALLBACKS, ...resolveStateValue(style, s) }),
-  children: content,                       // wrapped in <PopoverPopupContext value={state}>; static → children; keepMounted → <Activity mode={visible ? "visible" : "hidden"}>{wrapContent(children)}</Activity>; default → visible ? wrapContent(children) : null
+  style: placement.style(style),           // useAnchoredPlacement({ side, align }): inline position-area / position-try-fallbacks under the consumer's style; the consumer's alone for side null
+  children: content,                       // <PopoverPopupContext value={state}>{renderContent(() => children)}</PopoverPopupContext>: static → children; keepMounted → <Activity>; default → visible ? children : null (14.2 item 5)
   props: { role: "dialog", ...rest },      // `role` is a default the consumer's `rest` overrides
-  libraryProps: { id, popover: "auto", open: undefined, "aria-modal": "false", "aria-labelledby": ids.title, "aria-describedby": ids.description, ...(side !== null && { "data-side": side, "data-align": align }) },
-  ref: setElement,
+  libraryProps: { id, popover: "auto", open: undefined, "aria-modal": "false", "aria-labelledby": ids.title, "aria-describedby": ids.description, ...placement.dataAttributes },  // data-side / data-align, resolved (conventions 13.2); no keys for side null
+  ref: useMergedRefs(setElement, placement.ref),       // the element and name checks run inside the hook
 });
 return useTransitionBoundary("Popover.Popup", isLibrary ? transition : undefined, element);
 ```
@@ -1512,7 +1542,7 @@ the popup as non-modal (CDP, manual); screen-reader pass (NVDA, JAWS, VoiceOver)
 
 Reused as is, through the internal hooks of section 14:
 
-- The two modes and the Root state (`usePopoverRoot` with `component: "menu"`), including
+- The two modes and the Root state (`useOverlayRoot` with `component: "menu"`), including
   `intended()`, `requestOpen` / `requestClose` / `notifyClosed`, close intents, and the
   `"activate"` / `"dismiss"` / `"platform"` reasons.
 - The Popup machinery (`usePopoverPopup`): apply effect with `showPopover({ source })` and the
@@ -1521,7 +1551,7 @@ Reused as is, through the internal hooks of section 14:
   cause in its own ref, quiet for a pointer open), `beforetoggle` open interception, `toggle` notification,
   `awaitingClose`, the `held` deferred unmount, the JS-free `aria-expanded` sync, the
   **nested focus-return rule** (6.2), which is exactly "focus the parent item when a submenu
-  closes", and `wrapContent`, which Menu.Popup must render its items through so that an item
+  closes", and `renderContent`, which Menu.Popup must render its items through so that an item
   activation closing the menu with `transition` set (the focused item unmounts in the close
   commit) still returns focus to the Trigger.
 - The library-driven close: `requestClose(event, "activate")` after an item's action, so the menu
@@ -1605,7 +1635,7 @@ item is folded into the section named; this list is the audit trail.
 
 | Item | Correction | Section |
 | --- | --- | --- |
-| H1 | Focus-return rule 1 also counts focus that was inside the content when the close commit unmounted it, recorded by `wrapContent`'s layout-cleanup probe; the apply effect returns focus right after `hidePopover()`. Required for every library-driven close with `transition` and the default mounting, Menu's item activation included. | 6.2, 2.5, 11.3, 14.2, 14.4, 15 |
+| H1 | Focus-return rule 1 also counts focus that was inside the content when the close commit unmounted it, recorded by the content probe's layout cleanup (`useContentFocusProbe`); the apply effect returns focus right after `hidePopover()`. Required for every library-driven close with `transition` and the default mounting, Menu's item activation included. | 6.2, 2.5, 11.3, 14.2, 14.4, 15 |
 | M1 | `held` → `false` is a normal update, never a transition: one document view transition per dismissal with `transition` plus a CSS exit. | 4.4, 10.2, 11.2, 11.4, 14.2 |
 | L1 | WebKit runs the dialog focusing steps for `<dialog popover>`; the 6.1 contingency is closed and the up-front fallback removed. The jsdom shim emulates the focusing steps and shows every open popover. | 6.1, 13.1, 13.3, 14.5, decision 1 |
 | L2 | `intended()` reads the last commit's optimistic value from a ref written in `useInsertionEffect`, current for every layout effect of the commit. | 14.1 |

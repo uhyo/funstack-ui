@@ -1261,6 +1261,11 @@ so a link does not navigate), exactly as `Button` does.
 
 - `isHostButton(render)` from `internal/render-element.ts` is the predicate (no `render`, the
   function form, a host `"button"`), the same one `Button` uses.
+- `disabledButton(render, disabled, { handlesClick?, alwaysFocusable? })` in the same module is
+  the rule for every part of 17.1: it returns `props`, the owned `disabled` / `aria-disabled`
+  keys of the chosen branch, and `invoker`, whether `commandfor` / `command` may render.
+  `Button` keeps its own expression because `focusableWhenDisabled` and a Toolbar widen its
+  focusable branch.
 - In the focusable branch the part passes `disabled: undefined` (owned removal) and
   `"aria-disabled": disabled ? true : undefined`; `data-disabled` and `state.disabled` are
   unchanged. Parts that already own `aria-disabled` for another reason (the Close parts, for

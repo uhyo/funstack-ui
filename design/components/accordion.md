@@ -894,11 +894,14 @@ packages/ui/src/accordion/
 - **Mode detection** once, from the first render's props (`value !== undefined ||
   defaultValue !== undefined || valueChangeAction !== undefined`), stored in a ref; warn if it
   changes.
-- **Normalisation.** Root converts `string | null` ⇄ `Set<string>` at the prop boundary and calls
+- **Normalisation.** Root converts `string | null` ⇄ `Set<string>` at the prop boundary (`toSet`,
+  `setsEqual`, `EMPTY_SET` from `internal/value-set.ts`, shared with ToggleGroup and
+  CheckboxGroup) and calls
   `useControllableAction` with the set; the reducer in 4.1 is passed in. `next` for the action is
   converted back before the call.
 - **Registry.** `registerTrigger(el) => cleanup` through a callback ref in Trigger; Root keeps a
-  `Set<HTMLElement>` in a ref and sorts by `compareDocumentPosition` inside the keydown handler
+  `Set<HTMLElement>` in a ref and sorts by document order (`compareDocumentOrder`,
+  `internal/dom-order.ts`) inside the keydown handler
   (`useEffectEvent` is unnecessary; the handler reads refs).
 - **Item.** Renders `<details open={committedOpen}` (wrapped in `<ViewTransition default={transition}>` only in library mode with `transition` given)
   name={staticExclusiveName} onToggle={…} data-open={optimisticOpen || undefined} …>`. In static
@@ -913,6 +916,9 @@ packages/ui/src/accordion/
   when `transition` is given in library mode.
 - **Ids.** `useId()` only in Root, only consumed for `name` in static exclusive mode.
 - **Transition types** added in Root's dispatch, before `setOptimistic`.
+- **`reason`.** `AccordionValueChangeDetails.reason` is the shared `ChangeReason` (conventions
+  2.2); until #100 the implementation carried a narrower local union, a type change after
+  0.1.0-alpha.11 for a consumer who annotated it.
 - **Dev warnings:** mode change after mount; `defaultOpen` in library mode; `transition` in static
   mode; wrong `tagName` behind `render`; Item without Root (Item works standalone as a disclosure
   in static mode, so this one is informational only if the consumer passed `transition` or

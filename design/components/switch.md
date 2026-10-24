@@ -829,6 +829,7 @@ ViewTransition behaviour.
 packages/ui/src/internal/
   use-form-reset.ts            # "use client" (conventions 3.8); stable reset subscription on a form owner
   use-native-checked.ts        # "use client" (section 7); per input, shared with Checkbox and RadioGroup.Item
+  use-checkable-input.ts       # "use client" (conventions 3.8): the Field wiring, controllable action, useNativeChecked and owned input layer shared with Checkbox
 packages/ui/src/switch/
   index.ts                     # no directive: export { Switch } and the three types
   switch.tsx                   # "use client"
@@ -841,6 +842,11 @@ subpaths, exports `Switch`, `SwitchProps`, `SwitchState`, `SwitchCheckedChangeDe
 `src/index.ts` re-exports the same; `tsdown.config.ts` gains `"src/switch/index.ts"`.
 
 ### 12.2 Component sketch
+
+The sketch inlines what `useCheckableInput` (`internal/use-checkable-input.ts`, conventions 3.8)
+does for Switch and Checkbox: `useFieldControl`, `useControllableAction`, `useFieldValueChange`,
+`useNativeChecked`, `useMergedRefs` and the owned layer. `switch.tsx` calls the hook with
+`role: "switch"` and renders its `libraryProps` through `useRender`.
 
 ```tsx
 "use client";

@@ -503,14 +503,17 @@ packages/ui/src/checkbox/
   checkbox.tsx             # "use client"
   checkbox.test.tsx
   checkbox.browser.test.tsx
+packages/ui/src/internal/use-checkable-input.ts   # "use client": shared with Switch (conventions 3.8)
 ```
 
-`checkbox.tsx` is Switch 12.2 with these edits: no `role` in `libraryProps`; `indeterminate`
-destructured and passed to the hook as `indeterminate && !pending`; `data-indeterminate` emitted
-from the same expression; `indeterminate: undefined` in `libraryProps` to strip a `render`
-element's prop; `transitionTypes("checkbox", next ? "check" : "uncheck")`;
-`warn: { component: "Checkbox", prop: "checked" }`. The shared hook is unchanged: its
-`indeterminate` option is already specified in Switch section 7.
+`checkbox.tsx` and `switch.tsx` share `useCheckableInput` (`internal/use-checkable-input.ts`,
+conventions 3.8): the Field wiring, the controllable action, `useNativeChecked` and the input's
+owned layer; each component keeps its props, state, `useRender` call and transition boundary.
+Checkbox's call passes no `role`, passes `indeterminate` (the hook shows `indeterminate &&
+!pending`, emits `data-indeterminate` from the same expression and owns `indeterminate:
+undefined` on the element to strip a `render` element's prop), `transitionTypes("checkbox", next
+? "check" : "uncheck")` and `component: "Checkbox"` (the warning tag; the prop is `checked`).
+`useNativeChecked`'s `indeterminate` option is as specified in Switch section 7.
 
 Dev warnings: the shared ones (both/mode switch, `preventDefault()`, wrong element) plus none
 specific to `indeterminate` (an uncontrolled `checked` with `indeterminate` is allowed, see

@@ -887,6 +887,9 @@ packages/ui/src/internal/
   use-form-reset.ts                    # "use client"; stable reset subscription (conventions 3.8)
   use-native-checked.ts                # "use client"; per input, `group: true` here (conventions 3.8)
   use-native-group-reconciliation.ts   # "use client"; the Root's one-dispatch-per-group adapter
+  use-fieldset-group.ts                # "use client"; the Root's fieldset wiring: useFieldControl, the fallback name, fieldset ref + element check, rootRef (conventions 3.8; shared with CheckboxGroup)
+  group-member.ts                      # "use client"; groupMemberProps, the Item's owned input layer (conventions 3.8; shared with CheckboxGroup)
+  sync-presence.ts                     # "use client"; syncPresences, the Item's hydration-time attribute sync
 ```
 
 ### 13.2 Context
@@ -900,6 +903,8 @@ interface RadioGroupContextValue {
   readonly optimistic: string | null;
   readonly pending: boolean;
   readonly disabled: boolean;
+  /** The Root state (`RadioGroup.Label`'s function props read it). */
+  readonly state: RadioGroupRootState;
   /** No-op if `value === optimistic`, or if `event.defaultPrevented` (section 4.3). Never checks `disabled`; a disabled radio never fires. */
   readonly select: (value: string, event: Event) => void;
   /** From `useNativeGroupReconciliation`; an Item calls it from its mount effect so a late-mounting Item is reconciled (5.1). */
@@ -912,7 +917,10 @@ is not in the context: no part renders it.
 
 ### 13.3 Root
 
-- `useId()` for the fallback `name`; `useRef` for the fieldset element.
+- `useFieldsetGroup({ component: "RadioGroup.Root", name, disabled, required })` (conventions
+  3.8): the fallback `name` (own, else the Field's, else `useId()`), "own or the Field's"
+  `disabled` / `required`, the fieldset ref with its element check, and `rootRef` to merge into
+  the element's ref.
 - `useControllableAction<string | null, RadioGroupValueChangeDetails>({ controlled: value,
   defaultValue, initialValue: null, action: valueChangeAction, transitionTypes: () =>
   transitionTypes("radio-group"), warn: { component: "RadioGroup.Root", prop: "value" } })`.
@@ -920,7 +928,7 @@ is not in the context: no part renders it.
 - `select(value, event)`: return if `event.defaultPrevented` or `value === optimistic`; else
   `dispatch(value, createActionDetails(event, { reason: "activate" }))`; then, in development,
   if `event.defaultPrevented` is now true, warn once (the action's sync prefix cancelled it).
-- `dispatchFromDom(next, event | undefined)`: `const f = latestInFlight(); const base = f === null ? optimistic : f.next;`
+- `dispatchFromDom(next, event | undefined)`: `const base = intendedValue(latestInFlight, optimistic);`
   (an explicit null check: with `T = string | null`, `?.next ?? optimistic` would drop an in-flight
   dispatch to `null`, conventions 3.8 rule 1);
   return if `next === base`; else `dispatch(next, createActionDetails(event, { reason: "platform" }))`.
@@ -947,7 +955,9 @@ is not in the context: no part renders it.
 ### 13.5 Item
 
 - Reads context; `checked = ctx.optimistic === value`; `pending = ctx.pending && checked`;
-  `disabled = ctx.disabled || disabledProp`.
+  `disabled = ctx.disabled || disabledProp`. The input's owned layer is `groupMemberProps({ type:
+  "radio", ... })` (`internal/group-member.ts`, conventions 3.8); the hydration-time attribute
+  sync is `syncPresences`.
 - `useNativeChecked({ type: "radio", component: "RadioGroup.Item", checked, group: true,
   onItemMounted: ctx.onItemMounted,
   defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value })`
