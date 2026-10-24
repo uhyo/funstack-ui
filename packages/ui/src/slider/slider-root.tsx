@@ -29,9 +29,12 @@ import {
   isMaxReachable,
   isOnGrid,
   nearestThumb,
-  percent,
   platformDefault,
+  pointerValue,
+  resolveTie,
   sanitize,
+  sliderGeometry,
+  tiedRange,
 } from "./slider-arithmetic.js";
 import { SliderContext } from "./slider-context.js";
 import type { SliderContextValue, SliderFieldWiring } from "./slider-context.js";
@@ -634,15 +637,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       const valueAt = (clientX: number, clientY: number): number => {
         const { min: lo, max: hi, orientation: axis } = latest.current;
         const rect = (trackRef.current ?? track).getBoundingClientRect();
-        let fraction: number;
-        if (axis === "vertical") {
-          fraction = rect.height > 0 ? (rect.bottom - clientY) / rect.height : 0;
-        } else {
-          fraction = rect.width > 0 ? (clientX - rect.left) / rect.width : 0;
-          if (rtl) fraction = 1 - fraction;
-        }
-        fraction = Math.min(1, Math.max(0, fraction));
-        return lo + fraction * (hi - lo);
+        return pointerValue(rect, clientX, clientY, axis, rtl, lo, hi);
       };
       const moveTo = (thumb: number, raw: number, cause: Event): void => {
         const { min: lo, max: hi, step: inc, gap: g } = latest.current;
@@ -661,32 +656,10 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       // A press on a Thumb that shares its value with a neighbour (stacked thumbs) moves the one
       // that can go toward the pointer, the Track's tie rule; when the press is exactly on the
       // value, the first move decides. Otherwise a Thumb press moves that Thumb.
-      let tied: { readonly first: number; readonly last: number; readonly at: number } | null =
-        null;
-      if (index !== null) {
-        const at = startValues[index];
-        if (at !== undefined) {
-          let first = index;
-          let last = index;
-          while (first > 0 && equalValues([startValues[first - 1] as number], [at])) first -= 1;
-          while (
-            last < startValues.length - 1 &&
-            equalValues([startValues[last + 1] as number], [at])
-          ) {
-            last += 1;
-          }
-          if (first !== last) tied = { first, last, at };
-        }
-      }
-      const resolveTie = (raw: number): number | null => {
-        if (tied === null) return null;
-        if (raw > tied.at) return tied.last;
-        if (raw < tied.at) return tied.first;
-        return null;
-      };
+      const tied = index === null ? null : tiedRange(startValues, index);
       /** The thumb the gesture moves; `null` while a press on stacked thumbs is undecided. */
       let decided: number | null =
-        index === null ? nearestThumb(startValues, start) : tied ? resolveTie(start) : index;
+        index === null ? nearestThumb(startValues, start) : tied ? resolveTie(tied, start) : index;
       /** The thumb shown as dragging and focused meanwhile. */
       let thumb = decided ?? index ?? 0;
       const pointerId = event.pointerId;
@@ -698,7 +671,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
       const decide = (raw: number): boolean => {
         if (decided !== null) return true;
-        decided = resolveTie(raw);
+        decided = resolveTie(tied, raw);
         if (decided === null) return false;
         if (decided !== thumb) {
           thumb = decided;
@@ -814,14 +787,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   // --- Render --------------------------------------------------------------------------------
 
   const count = shown.length;
-  const percents = shown.map((v) => percent(v, min, max));
-  const geometry: Record<string, string> = {
-    "--slider-start": count > 1 ? `${percents[0] ?? 0}%` : "0%",
-    "--slider-end": `${percents[count - 1] ?? 0}%`,
-  };
-  percents.forEach((p, index) => {
-    geometry[`--slider-value-${index}`] = `${p}%`;
-  });
+  const geometry = sliderGeometry(shown, min, max);
 
   const shownValue = fromArray(shown);
   const dragging = gestureThumb !== null;

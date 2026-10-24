@@ -4,6 +4,7 @@
 
 import { EPSILON, gridDecimals, roundTo } from "../internal/decimal.js";
 import { clamp, percentage } from "../internal/range-value.js";
+import type { Orientation } from "../internal/types.js";
 
 /**
  * The value a native range with these bounds would hold for `value`: snapped to
@@ -130,4 +131,87 @@ export function equalValues(a: readonly number[], b: readonly number[]): boolean
     const other = b[index] as number;
     return value === other || Math.abs(value - other) < EPSILON * Math.max(1, Math.abs(value));
   });
+}
+
+/** The part of `DOMRect` a pointer position is mapped through. */
+export interface TrackRect {
+  readonly left: number;
+  readonly bottom: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * The value under a pointer at `(clientX, clientY)` on a track occupying `rect` (design 4.1):
+ * left to right (right to left with `rtl`), or bottom to top when vertical, clamped to the track
+ * and mapped linearly onto `[min, max]`. Not snapped. An empty track maps to `min` (`max` in RTL).
+ */
+export function pointerValue(
+  rect: TrackRect,
+  clientX: number,
+  clientY: number,
+  orientation: Orientation,
+  rtl: boolean,
+  min: number,
+  max: number,
+): number {
+  let fraction: number;
+  if (orientation === "vertical") {
+    fraction = rect.height > 0 ? (rect.bottom - clientY) / rect.height : 0;
+  } else {
+    fraction = rect.width > 0 ? (clientX - rect.left) / rect.width : 0;
+    if (rtl) fraction = 1 - fraction;
+  }
+  fraction = Math.min(1, Math.max(0, fraction));
+  return min + fraction * (max - min);
+}
+
+/** Stacked thumbs: the thumbs `first`..`last` all hold the value `at`. */
+export interface TiedThumbs {
+  readonly first: number;
+  readonly last: number;
+  readonly at: number;
+}
+
+/** The run of thumbs sharing thumb `index`'s value, or `null` when it shares it with none. */
+export function tiedRange(values: readonly number[], index: number): TiedThumbs | null {
+  const at = values[index];
+  if (at === undefined) return null;
+  let first = index;
+  let last = index;
+  while (first > 0 && equalValues([values[first - 1] as number], [at])) first -= 1;
+  while (last < values.length - 1 && equalValues([values[last + 1] as number], [at])) last += 1;
+  return first !== last ? { first, last, at } : null;
+}
+
+/**
+ * Which of the stacked thumbs a pointer at `raw` moves: the one that can go toward it (the last
+ * above the shared value, the first below). `null` exactly on the value (or with no tie).
+ */
+export function resolveTie(tied: TiedThumbs | null, raw: number): number | null {
+  if (tied === null) return null;
+  if (raw > tied.at) return tied.last;
+  if (raw < tied.at) return tied.first;
+  return null;
+}
+
+/**
+ * The Root's geometry custom properties (design 3.1): `--slider-start` (the first thumb with
+ * several, else `0%`), `--slider-end` (the last thumb) and `--slider-value-<i>`, in percent.
+ */
+export function sliderGeometry(
+  shown: readonly number[],
+  min: number,
+  max: number,
+): Record<string, string> {
+  const count = shown.length;
+  const percents = shown.map((v) => percent(v, min, max));
+  const geometry: Record<string, string> = {
+    "--slider-start": count > 1 ? `${percents[0] ?? 0}%` : "0%",
+    "--slider-end": `${percents[count - 1] ?? 0}%`,
+  };
+  percents.forEach((p, index) => {
+    geometry[`--slider-value-${index}`] = `${p}%`;
+  });
+  return geometry;
 }
