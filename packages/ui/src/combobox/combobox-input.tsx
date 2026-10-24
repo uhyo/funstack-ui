@@ -15,6 +15,7 @@ import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { optionId, useComboboxContext } from "./combobox-context.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface ComboboxInputState {
   /** Optimistic selection. */
@@ -58,8 +59,6 @@ export interface ComboboxInputProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"input">, ComboboxInputState>;
 }
 
-const isDev = process.env.NODE_ENV !== "production";
-
 /**
  * The text field: `<input role="combobox" aria-autocomplete="list" aria-expanded aria-controls
  * aria-activedescendant autocomplete="off">`. DOM focus stays here while the active option moves
@@ -86,18 +85,17 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     disabled: ctx.disabled,
   };
 
+  const checkElement = useElementCheck((element) => {
+    const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
+    return type !== "text" && type !== "search"
+      ? `Combobox.Input: rendered <${element.tagName.toLowerCase()}` +
+          `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text" or ` +
+          '"search": `role="combobox"`, `aria-activedescendant` and the caret keys depend on it.'
+      : null;
+  });
   const ref = useCallback(
     (element: HTMLElement) => {
-      if (isDev) {
-        const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
-        if (type !== "text" && type !== "search") {
-          console.error(
-            `Combobox.Input: rendered <${element.tagName.toLowerCase()}` +
-              `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text" or ` +
-              '"search": `role="combobox"`, `aria-activedescendant` and the caret keys depend on it.',
-          );
-        }
-      }
+      checkElement?.(element);
       inputRef.current = element as HTMLInputElement;
       // The popover's "trigger" is the input: `showPopover({ source: input })` anchors the
       // listbox to it and makes clicks on it not light-dismiss (design 5.1).
@@ -107,7 +105,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
         if (triggerRef.current === element) triggerRef.current = null;
       };
     },
-    [inputRef, triggerRef],
+    [checkElement, inputRef, triggerRef],
   );
 
   // Inside a Field.Root (design/components/field-form.md 7.2) the Input is the Field's control:

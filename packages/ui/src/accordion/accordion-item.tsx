@@ -14,6 +14,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext, AccordionRootContext } from "./accordion-context.js";
 import type { AccordionItemContextValue } from "./accordion-context.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface AccordionItemState {
   readonly value: string;
@@ -59,8 +60,6 @@ export interface AccordionItemProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"details">, AccordionItemState>;
 }
 
-const isDev = process.env.NODE_ENV !== "production";
-
 /**
  * One accordion entry: the `<details>` element. In library mode its `open` attribute follows
  * committed state and `data-open` / `data-pending` follow optimistic state; in JS-free mode (or
@@ -100,20 +99,21 @@ export function AccordionItem({
   );
 
   const registerItem = root?.registerItem;
+  const checkElement = useElementCheck<HTMLDetailsElement>((element) =>
+    element.tagName !== "DETAILS"
+      ? `Accordion.Item: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
+        "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>."
+      : null,
+  );
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
-      if (isDev && element.tagName !== "DETAILS") {
-        console.error(
-          `Accordion.Item: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
-            "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>.",
-        );
-      }
+      checkElement?.(element);
       const unregister = registerItem?.(value, element);
       return () => {
         unregister?.();
       };
     },
-    [registerItem, value],
+    [checkElement, registerItem, value],
   );
 
   // Platform path (design 2.3): the Root reconciles pre-hydration clicks on mount and re-applies

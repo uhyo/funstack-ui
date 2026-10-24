@@ -11,10 +11,9 @@ import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { hasAnyError, sortByDocumentOrder } from "../internal/validity.js";
 import type { FormErrors } from "../internal/validity.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export type { FieldErrorValue, FormErrors } from "../internal/validity.js";
-
-const isDev = process.env.NODE_ENV !== "production";
 
 export interface FormRootState {
   /** A submission is in flight: the Form's own transition, or the form's status (`useFormStatus`), including the Suspense wait of the result. */
@@ -92,30 +91,32 @@ export function FormRoot({
   const formRef = useRef<HTMLFormElement | null>(null);
   const submission = useRef<Submission | null>(null);
   const fields = useRef(new Set<FormFieldRegistration>());
-  const warnedElement = useRef(false);
   const latest = useLatest({ errors, autoReset });
   const isFunction = typeof action === "function";
 
   // A native capture listener sees every submission, React's path included (a submitter with its
   // own `formAction`), before React's `onSubmit` runs and marks it intercepted.
-  const libraryRef = useCallback((form: HTMLFormElement) => {
-    formRef.current = form;
-    if (isDev && !warnedElement.current && form.tagName !== "FORM") {
-      warnedElement.current = true;
-      console.error(
-        `Form.Root: expected to render a <form> element but got <${form.tagName.toLowerCase()}>.`,
-      );
-    }
-    const onSubmit = (event: Event) => {
-      if (event.target !== form) return;
-      submission.current = { intercepted: false, formData: null };
-    };
-    form.addEventListener("submit", onSubmit, true);
-    return () => {
-      form.removeEventListener("submit", onSubmit, true);
-      if (formRef.current === form) formRef.current = null;
-    };
-  }, []);
+  const checkElement = useElementCheck<HTMLFormElement>((form) =>
+    form.tagName !== "FORM"
+      ? `Form.Root: expected to render a <form> element but got <${form.tagName.toLowerCase()}>.`
+      : null,
+  );
+  const libraryRef = useCallback(
+    (form: HTMLFormElement) => {
+      formRef.current = form;
+      checkElement?.(form);
+      const onSubmit = (event: Event) => {
+        if (event.target !== form) return;
+        submission.current = { intercepted: false, formData: null };
+      };
+      form.addEventListener("submit", onSubmit, true);
+      return () => {
+        form.removeEventListener("submit", onSubmit, true);
+        if (formRef.current === form) formRef.current = null;
+      };
+    },
+    [checkElement],
+  );
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (typeof action !== "function") return; // a navigating form: the browser's

@@ -6,6 +6,7 @@ import { useExitAnimation } from "./use-exit-animation.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { useLatest } from "./use-latest.js";
+import { useElementCheck } from "./use-element-check.js";
 
 export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */
@@ -395,14 +396,15 @@ export function usePopoverPopup(
   // the element (no passive-effect window, no extra render). JS-free mode: there is no "right
   // before showPopover()" (the browser runs the command), so the `autofocus` attribute stays on
   // the `initialFocus` target while it is mounted (as Dialog).
+  const checkElement = useElementCheck((element) =>
+    element.tagName !== "DIALOG" && element.tagName !== "DIV"
+      ? `${part}: expected to render a <dialog> or a <div> but got ` +
+        `<${element.tagName.toLowerCase()}>.`
+      : null,
+  );
   const setElement = useCallback(
     (element: HTMLElement) => {
-      if (isDev && element.tagName !== "DIALOG" && element.tagName !== "DIV") {
-        console.error(
-          `${part}: expected to render a <dialog> or a <div> but got ` +
-            `<${element.tagName.toLowerCase()}>.`,
-        );
-      }
+      checkElement?.(element);
       popupRef.current = element;
       const listeners: [string, EventListener][] = [
         ["beforetoggle", (event) => handlers.current.onBeforeToggle(event)],
@@ -426,7 +428,7 @@ export function usePopoverPopup(
         if (popupRef.current === element) popupRef.current = null;
       };
     },
-    [part, popupRef, handlers, isLibrary, initialFocus],
+    [checkElement, popupRef, handlers, isLibrary, initialFocus],
   );
 
   // Development check (design 9): `role="dialog"` needs a name once the popup is (or can be)

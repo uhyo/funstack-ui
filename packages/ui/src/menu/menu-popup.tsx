@@ -55,6 +55,7 @@ import {
 import { scheduleHoverClose } from "./menu-hover.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type MenuSide = AnchorSide;
@@ -148,8 +149,6 @@ const subscribeNever = () => () => {};
 
 /** Typeahead buffer lifetime after the last keystroke (design 5.1). */
 const TYPEAHEAD_RESET_MS = 500;
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /** What a press may focus inside a popup: items, the popup itself, the consumer's controls. */
 const FOCUSABLE_SELECTOR =
@@ -421,19 +420,23 @@ export function MenuPopup({
     }
   });
 
-  const devRef = useCallback((element: HTMLElement) => {
-    if (isDev && element.tagName === "DIALOG") {
-      console.error(
-        "Menu.Popup: rendered a <dialog>. Render a <div>: a <dialog popover> runs the dialog " +
-          "focusing steps, which fight the menu's item focus.",
-      );
-    }
-    // A press inside a menu is never a long-press of a Menu.ContextTrigger around it (review M1).
-    // Native, so it runs before React's root listener dispatches to the region.
-    const onPointerDown = (event: Event) => claimPress(event);
-    element.addEventListener("pointerdown", onPointerDown);
-    return () => element.removeEventListener("pointerdown", onPointerDown);
-  }, []);
+  const checkElement = useElementCheck((element) =>
+    element.tagName === "DIALOG"
+      ? "Menu.Popup: rendered a <dialog>. Render a <div>: a <dialog popover> runs the dialog " +
+        "focusing steps, which fight the menu's item focus."
+      : null,
+  );
+  const devRef = useCallback(
+    (element: HTMLElement) => {
+      checkElement?.(element);
+      // A press inside a menu is never a long-press of a Menu.ContextTrigger around it (review M1).
+      // Native, so it runs before React's root listener dispatches to the region.
+      const onPointerDown = (event: Event) => claimPress(event);
+      element.addEventListener("pointerdown", onPointerDown);
+      return () => element.removeEventListener("pointerdown", onPointerDown);
+    },
+    [checkElement],
+  );
   const placementRef = placement.ref;
   const ref = useMergedRefs(setElement, devRef, placementRef);
 

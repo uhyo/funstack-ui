@@ -1,5 +1,4 @@
 "use client";
-import { useCallback } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -8,6 +7,7 @@ import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface DialogCloseState {
   /** The `action` is in flight. */
@@ -48,8 +48,6 @@ export interface DialogCloseProps extends Omit<
   children?: StateValue<ReactNode, DialogCloseState>;
   render?: RenderProp<ComponentPropsWithRef<"button">, DialogCloseState>;
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * A close button: `<button type="button" commandfor command="request-close">`. In JS-free mode
@@ -92,18 +90,13 @@ export function DialogClose({
 
   const state: DialogCloseState = { pending, disabled };
 
-  const devRef = useCallback(
-    (element: HTMLElement) => {
-      if (isDev && !installClick && element.tagName !== "BUTTON") {
-        console.error(
-          `Dialog.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
-            '`action`. Only a <button> runs `command="request-close"`; this element will not ' +
-            "close the dialog.",
-        );
-      }
-      // A cleanup, so the merged ref never calls back with `null`.
-      return () => {};
-    },
+  const devRef = useElementCheck(
+    (element) =>
+      !installClick && element.tagName !== "BUTTON"
+        ? `Dialog.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
+          '`action`. Only a <button> runs `command="request-close"`; this element will not ' +
+          "close the dialog."
+        : null,
     [installClick],
   );
 

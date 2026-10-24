@@ -2,6 +2,7 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefCallback } from "react";
 import { useFormReset } from "./use-form-reset.js";
+import { useElementCheck } from "./use-element-check.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -63,24 +64,23 @@ export interface UseNativeCheckedOptions {
 export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<HTMLInputElement> {
   const { type, component, checked, defaultChecked, indeterminate, group = false } = options;
   const node = useRef<HTMLInputElement | null>(null);
-  const warnedElement = useRef(false);
+  const checkElement = useElementCheck<HTMLInputElement>((el) =>
+    isInputOfType(el, type)
+      ? null
+      : `${component}: expected to render an \`<input type="${type}">\` but got ` +
+        `${describeElement(el)}; the platform semantics (form participation, labels, ` +
+        `keyboard, reset) need a real input. A \`render\` element must keep the input.`,
+  );
 
   const ref = useCallback(
     (el: HTMLInputElement) => {
       node.current = el;
-      if (isDev && !warnedElement.current && !isInputOfType(el, type)) {
-        warnedElement.current = true;
-        console.error(
-          `${component}: expected to render an \`<input type="${type}">\` but got ` +
-            `${describeElement(el)}; the platform semantics (form participation, labels, ` +
-            `keyboard, reset) need a real input. A \`render\` element must keep the input.`,
-        );
-      }
+      checkElement?.(el);
       return () => {
         node.current = null;
       };
     },
-    [type, component],
+    [checkElement],
   );
 
   /** What the user intends: the latest in-flight dispatch, else the optimistic value (rule 1). */

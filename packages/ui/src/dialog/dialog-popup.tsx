@@ -27,6 +27,7 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface DialogPopupState {
   /** Committed open state (library mode); `false` in JS-free mode. Read `:open` for the DOM truth. */
@@ -252,14 +253,15 @@ export function DialogPopup({
       "always mounted so that the server HTML is complete.",
   );
 
+  const checkElement = useElementCheck<HTMLDialogElement>((element) =>
+    element.tagName !== "DIALOG"
+      ? `Dialog.Popup: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
+        "Top layer, backdrop, focus and Escape all come from a real <dialog>."
+      : null,
+  );
   const libraryRef = useCallback(
     (element: HTMLDialogElement) => {
-      if (isDev && element.tagName !== "DIALOG") {
-        console.error(
-          `Dialog.Popup: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
-            "Top layer, backdrop, focus and Escape all come from a real <dialog>.",
-        );
-      }
+      checkElement?.(element);
       dialogRef.current = element;
       setDialog(element);
       return () => {
@@ -267,7 +269,7 @@ export function DialogPopup({
         setDialog(null);
       };
     },
-    [dialogRef],
+    [checkElement, dialogRef],
   );
 
   // --- Opening -----------------------------------------------------------------------------

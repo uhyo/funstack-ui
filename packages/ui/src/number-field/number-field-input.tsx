@@ -18,6 +18,7 @@ import { hiddenText } from "./number-field-root.js";
 import type { NumberFieldState } from "./number-field-root.js";
 import { useNumberFieldContext } from "./number-field-context.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface NumberFieldInputProps extends Omit<
   ComponentPropsWithRef<"input">,
@@ -48,8 +49,6 @@ export interface NumberFieldInputProps extends Omit<
   /** Must render an `<input>` of type `text`, `search` or `tel`; the hidden input is rendered after it regardless. */
   render?: RenderProp<ComponentPropsWithRef<"input">, NumberFieldState>;
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /** Visually hidden, unfocusable, out of the accessibility tree: the form's control (6.1). */
 const HIDDEN_STYLE: CSSProperties = {
@@ -106,24 +105,23 @@ export function NumberFieldInput({
       "on the visible input it would post the formatted text.",
   );
 
+  const checkElement = useElementCheck((element) => {
+    const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
+    return !TEXT_TYPES.includes(type)
+      ? `NumberField.Input: rendered <${element.tagName.toLowerCase()}` +
+          `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text", ` +
+          '"search" or "tel": a number input would re-introduce the native parser.'
+      : null;
+  });
   const libraryRef = useCallback(
     (element: HTMLElement) => {
-      if (isDev) {
-        const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
-        if (!TEXT_TYPES.includes(type)) {
-          console.error(
-            `NumberField.Input: rendered <${element.tagName.toLowerCase()}` +
-              `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text", ` +
-              '"search" or "tel": a number input would re-introduce the native parser.',
-          );
-        }
-      }
+      checkElement?.(element);
       visibleRef.current = element as HTMLInputElement;
       return () => {
         if (visibleRef.current === element) visibleRef.current = null;
       };
     },
-    [visibleRef],
+    [checkElement, visibleRef],
   );
   const mergedRef = useMergedRefs<HTMLElement>(libraryRef, field.ref);
 

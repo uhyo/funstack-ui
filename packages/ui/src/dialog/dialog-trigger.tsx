@@ -6,6 +6,7 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface DialogTriggerState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */
@@ -72,21 +73,22 @@ export function DialogTrigger({
     disabled,
   };
 
+  const checkElement = useElementCheck((element) =>
+    !isLibrary && modal && element.tagName !== "BUTTON"
+      ? `Dialog.Trigger: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
+        '<button> runs `command="show-modal"`; this trigger will not open the dialog. Render ' +
+        "a <button>, or put the Dialog in library mode (`defaultOpen={false}`)."
+      : null,
+  );
   const libraryRef = useCallback(
     (element: HTMLElement) => {
-      if (isDev && !isLibrary && modal && element.tagName !== "BUTTON") {
-        console.error(
-          `Dialog.Trigger: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
-            '<button> runs `command="show-modal"`; this trigger will not open the dialog. Render ' +
-            "a <button>, or put the Dialog in library mode (`defaultOpen={false}`).",
-        );
-      }
+      checkElement?.(element);
       triggerRef.current = element;
       return () => {
         if (triggerRef.current === element) triggerRef.current = null;
       };
     },
-    [isLibrary, modal, triggerRef],
+    [checkElement, triggerRef],
   );
 
   // A Trigger without a Popup opens nothing (design 14, dev warnings).

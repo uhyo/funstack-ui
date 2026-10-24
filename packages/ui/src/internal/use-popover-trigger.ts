@@ -7,6 +7,7 @@ import { isHostButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 import { isPopoverOpen } from "./popover-open.js";
+import { useElementCheck } from "./use-element-check.js";
 
 /** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {
@@ -57,8 +58,6 @@ export interface PopoverTriggerHook {
   readonly ref: (element: HTMLElement) => () => void;
 }
 
-const isDev = process.env.NODE_ENV !== "production";
-
 /**
  * The Trigger of a popover-like component (design/components/popover.md 14.3):
  * `button[commandfor][command="toggle-popover"]` with `aria-expanded`. In JS-free mode the
@@ -83,15 +82,16 @@ export function usePopoverTrigger<State>(
     disabled,
   };
 
+  const checkElement = useElementCheck((element) =>
+    !isLibrary && element.tagName !== "BUTTON"
+      ? `${part}: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
+        '<button> runs `command="toggle-popover"`; this trigger will not open the popover. ' +
+        "Render a <button>, or put the component in library mode (`defaultOpen={false}`)."
+      : null,
+  );
   const ref = useCallback(
     (element: HTMLElement) => {
-      if (isDev && !isLibrary && element.tagName !== "BUTTON") {
-        console.error(
-          `${part}: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
-            '<button> runs `command="toggle-popover"`; this trigger will not open the popover. ' +
-            "Render a <button>, or put the component in library mode (`defaultOpen={false}`).",
-        );
-      }
+      checkElement?.(element);
       triggerRef.current = element;
       // JS-free mode: the DOM owns `aria-expanded` (design 9). A Trigger that mounts after the
       // Popup (or is re-created) picks up the current state here.
@@ -102,7 +102,7 @@ export function usePopoverTrigger<State>(
         if (triggerRef.current === element) triggerRef.current = null;
       };
     },
-    [isLibrary, part, triggerRef, popupRef],
+    [isLibrary, checkElement, triggerRef, popupRef],
   );
 
   const onClick = (event: MouseEvent<HTMLElement>) => {

@@ -1,5 +1,4 @@
 "use client";
-import { useCallback } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -9,6 +8,7 @@ import { isHostButton, rendersButton, useRender } from "../internal/use-render.j
 import type { DataAttributes } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface PopoverCloseState {
   /** The `action` is in flight. */
@@ -40,8 +40,6 @@ export interface PopoverCloseProps extends Omit<
   children?: StateValue<ReactNode, PopoverCloseState>;
   render?: RenderProp<ComponentPropsWithRef<"button">, PopoverCloseState>;
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * A close button: `<button type="button" commandfor command="hide-popover">`. In JS-free mode
@@ -81,18 +79,13 @@ export function PopoverClose({
 
   const state: PopoverCloseState = { pending, disabled };
 
-  const devRef = useCallback(
-    (element: HTMLElement) => {
-      if (isDev && !installClick && element.tagName !== "BUTTON") {
-        console.error(
-          `Popover.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
-            '`action`. Only a <button> runs `command="hide-popover"`; this element will not ' +
-            "close the popover.",
-        );
-      }
-      // A cleanup, so the merged ref never calls back with `null`.
-      return () => {};
-    },
+  const devRef = useElementCheck(
+    (element) =>
+      !installClick && element.tagName !== "BUTTON"
+        ? `Popover.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
+          '`action`. Only a <button> runs `command="hide-popover"`; this element will not ' +
+          "close the popover."
+        : null,
     [installClick],
   );
 

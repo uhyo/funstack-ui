@@ -18,6 +18,7 @@ import { useRender } from "../internal/use-render.js";
 import { RadioGroupContext } from "./radio-group-context.js";
 import type { RadioGroupContextValue } from "./radio-group-context.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -165,7 +166,6 @@ export function RadioGroupRoot({
   const fallbackName = useId();
   const name = field.name ?? fallbackName;
   const fieldsetRef = useRef<HTMLFieldSetElement | null>(null);
-  const warnedElement = useRef(false);
 
   const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     string | null,
@@ -239,20 +239,23 @@ export function RadioGroupRoot({
     [onItemMounted],
   );
 
-  const libraryRef = useCallback((el: HTMLFieldSetElement) => {
-    fieldsetRef.current = el;
-    if (isDev && !warnedElement.current && el.tagName !== "FIELDSET") {
-      warnedElement.current = true;
-      console.error(
-        `RadioGroup.Root: expected to render a <fieldset> element but got ` +
-          `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
-          `inheritance, form reset) need a real <fieldset>.`,
-      );
-    }
-    return () => {
-      fieldsetRef.current = null;
-    };
-  }, []);
+  const checkElement = useElementCheck<HTMLFieldSetElement>((el) =>
+    el.tagName !== "FIELDSET"
+      ? `RadioGroup.Root: expected to render a <fieldset> element but got ` +
+        `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
+        `inheritance, form reset) need a real <fieldset>.`
+      : null,
+  );
+  const libraryRef = useCallback(
+    (el: HTMLFieldSetElement) => {
+      fieldsetRef.current = el;
+      checkElement?.(el);
+      return () => {
+        fieldsetRef.current = null;
+      };
+    },
+    [checkElement],
+  );
   const rootRef = useMergedRefs<HTMLFieldSetElement>(libraryRef, field.ref);
 
   // Memoised (#48): `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with

@@ -14,6 +14,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 import type { AccordionItemState } from "./accordion-item.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 
 /** The trigger is the item's control; it renders the item's state object. */
 export type AccordionTriggerState = AccordionItemState;
@@ -40,8 +41,6 @@ export interface AccordionTriggerProps extends Omit<
   /** Must render a `<summary>` element. */
   render?: RenderProp<ComponentPropsWithRef<"summary">, AccordionTriggerState>;
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 const NESTED_INTERACTIVE =
   "a[href], button, label, input, select, textarea, [contenteditable]:not([contenteditable='false'])";
@@ -91,21 +90,22 @@ export function AccordionTrigger({
   );
 
   const registerTrigger = item.registerTrigger;
+  const checkElement = useElementCheck((element) =>
+    element.tagName !== "SUMMARY"
+      ? `Accordion.Trigger: expected to render a <summary> element but got <${element.tagName.toLowerCase()}>. ` +
+        "Only a <summary> toggles its parent <details>."
+      : null,
+  );
   const libraryRef = useCallback(
     (element: HTMLElement) => {
-      if (isDev && element.tagName !== "SUMMARY") {
-        console.error(
-          `Accordion.Trigger: expected to render a <summary> element but got <${element.tagName.toLowerCase()}>. ` +
-            "Only a <summary> toggles its parent <details>.",
-        );
-      }
+      checkElement?.(element);
       const unregister = registerTrigger?.(element);
       // Always return a cleanup so the merged ref never calls back with `null`.
       return () => {
         unregister?.();
       };
     },
-    [registerTrigger],
+    [checkElement, registerTrigger],
   );
 
   const state: AccordionTriggerState = {
