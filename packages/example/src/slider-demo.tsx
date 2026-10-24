@@ -2,6 +2,7 @@ import { Suspense, use, useRef, useState } from "react";
 import { Slider } from "@funstack/ui/slider";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave, sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./slider-demo.css";
 
 function VolumeDemo() {
@@ -179,12 +180,11 @@ function FormDemo() {
 
 export function SliderDemo() {
   return (
-    <section>
-      <h2>Slider</h2>
+    <Demo title="Slider">
       <VolumeDemo />
       <PriceFilterDemo />
       <VerticalAndRtlDemo />
       <FormDemo />
-    </section>
+    </Demo>
   );
 }

@@ -3,6 +3,7 @@ import { useFormStatus } from "react-dom";
 import { RadioGroup } from "@funstack/ui/radio-group";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./radio-group-demo.css";
 
 const themes = [
@@ -207,13 +208,12 @@ function RtlDemo() {
 
 export function RadioGroupDemo() {
   return (
-    <article className="demo">
-      <h2>RadioGroup</h2>
+    <Demo title="RadioGroup">
       <AutosaveDemo />
       <RejectingDemo />
       <ControlledVetoDemo />
       <FormDemo />
       <RtlDemo />
-    </article>
+    </Demo>
   );
 }

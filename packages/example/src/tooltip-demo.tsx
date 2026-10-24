@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Tooltip } from "@funstack/ui/tooltip";
 import type { TooltipAlign, TooltipSide } from "@funstack/ui/tooltip";
+import { Demo } from "./shared/Demo";
 import "./tooltip-demo.css";
 
 function BoldIcon() {
@@ -255,8 +256,7 @@ function InMenu({ flags }: { flags: Flags }) {
 export function TooltipDemo() {
   const [flags, setFlags] = useState<Flags>({ interestFor: false, hint: false });
   return (
-    <article className="demo">
-      <h2>Tooltip</h2>
+    <Demo title="Tooltip">
       <p>
         Open state belongs to the browser (top layer): there is no <code>open</code> prop and no
         action. Styling uses <code>:popover-open</code>; the fade is pure CSS (
@@ -267,6 +267,6 @@ export function TooltipDemo() {
       <SaveButton flags={flags} />
       <Placement flags={flags} />
       <InMenu flags={flags} />
-    </article>
+    </Demo>
   );
 }

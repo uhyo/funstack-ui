@@ -4,6 +4,7 @@ import { Form } from "@funstack/ui/form";
 import { Tooltip } from "@funstack/ui/tooltip";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./button-demo.css";
 
 /** Fake backend call; 1 s by default. */
@@ -120,12 +121,11 @@ function ComposeDemo() {
 
 export function ButtonDemo() {
   return (
-    <article className="demo">
-      <h2>Button</h2>
+    <Demo title="Button">
       <SaveDemo />
       <RejectDemo />
       <FormDemo />
       <ComposeDemo />
-    </article>
+    </Demo>
   );
 }

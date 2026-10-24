@@ -3,6 +3,7 @@ import { Tabs } from "@funstack/ui/tabs";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { sleep } from "./shared/fake-backend";
 import { Spinner } from "./shared/Spinner";
+import { Demo } from "./shared/Demo";
 import "./tabs-demo.css";
 
 /**
@@ -212,11 +213,10 @@ function KeepMountedDemo() {
 
 export function TabsDemo() {
   return (
-    <article className="tabs-demo">
-      <h2>Tabs</h2>
+    <Demo title="Tabs">
       <SuspendingDemo />
       <ManualAsyncDemo />
       <KeepMountedDemo />
-    </article>
+    </Demo>
   );
 }

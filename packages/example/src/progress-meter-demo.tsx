@@ -2,6 +2,7 @@ import { startTransition, useState, useTransition } from "react";
 import { Meter } from "@funstack/ui/meter";
 import { Progress } from "@funstack/ui/progress";
 import { sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./progress-meter-demo.css";
 
 const FILE_SIZE = 8_400_000;
@@ -149,11 +150,10 @@ function StorageDemo() {
 
 export function ProgressMeterDemo() {
   return (
-    <section>
-      <h2>Progress and Meter</h2>
+    <Demo title="Progress and Meter">
       <UploadDemo />
       <SpinnerDemo />
       <StorageDemo />
-    </section>
+    </Demo>
   );
 }

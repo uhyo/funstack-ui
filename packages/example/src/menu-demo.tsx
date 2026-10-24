@@ -2,6 +2,7 @@ import { startTransition, use, useState } from "react";
 import { Menu } from "@funstack/ui/menu";
 import type { MenuOpenChangeDetails } from "@funstack/ui/menu";
 import { sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./menu-demo.css";
 
 function logChange(label: string) {
@@ -235,12 +236,11 @@ function ContextMenuCards() {
 
 export function MenuDemo() {
   return (
-    <section className="demo">
-      <h2>Menu</h2>
+    <Demo title="Menu">
       <RowActions />
       <ViewOptions />
       <SuspendingMenu />
       <ContextMenuCards />
-    </section>
+    </Demo>
   );
 }

@@ -3,6 +3,7 @@ import { Accordion } from "@funstack/ui/accordion";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave, sleep } from "./shared/fake-backend";
 import { Spinner } from "./shared/Spinner";
+import { Demo } from "./shared/Demo";
 import "./accordion-demo.css";
 
 const faq = [
@@ -324,8 +325,7 @@ function InterpolateSizeDemo() {
 
 export function AccordionDemo() {
   return (
-    <article className="demo">
-      <h2>Accordion</h2>
+    <Demo title="Accordion">
       <p>
         Built on <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code>.
         ArrowUp/ArrowDown/Home/End move between triggers in every section; Enter/Space toggle
@@ -338,6 +338,6 @@ export function AccordionDemo() {
       <RejectingDemo />
       <TransitionDemo />
       <InterpolateSizeDemo />
-    </article>
+    </Demo>
   );
 }

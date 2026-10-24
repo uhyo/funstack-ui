@@ -2,6 +2,7 @@ import { Suspense, startTransition, use, useState } from "react";
 import { Select } from "@funstack/ui/select";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave, sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./select-demo.css";
 
 /** A decorative swatch: an SVG with no text, so the option still reads as plain text. */
@@ -182,8 +183,7 @@ function ShippingDemo() {
 
 export function SelectDemo() {
   return (
-    <section>
-      <h2>Select</h2>
+    <Demo title="Select">
       <p>
         A real <code>&lt;select&gt;</code>. The styled picker is opt-in CSS:{" "}
         <code>appearance: base-select</code> on the select and its <code>::picker(select)</code>{" "}
@@ -193,6 +193,6 @@ export function SelectDemo() {
       <RejectingDemo />
       <LateOptionsDemo />
       <ShippingDemo />
-    </section>
+    </Demo>
   );
 }

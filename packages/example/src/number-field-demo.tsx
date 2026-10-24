@@ -5,6 +5,7 @@ import type { FormErrors } from "@funstack/ui/form";
 import { NumberField } from "@funstack/ui/number-field";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave, sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./number-field-demo.css";
 
 function Stepper({ label }: { label: string }) {
@@ -183,11 +184,10 @@ function FormDemo() {
 
 export function NumberFieldDemo() {
   return (
-    <section>
-      <h2>NumberField</h2>
+    <Demo title="NumberField">
       <CartDemo />
       <FormatsDemo />
       <FormDemo />
-    </section>
+    </Demo>
   );
 }

@@ -26,26 +26,28 @@ export function App() {
         Each demo below exercises one component of <code>@funstack/ui</code>. Open the console to
         follow the fake backend calls.
       </p>
+      {/* Same order as the docs sidebar: buttons, disclosure, overlays, forms, output. */}
       <ButtonDemo />
       <ToggleDemo />
-      <AccordionDemo />
+      <ToolbarDemo />
       <TabsDemo />
+      <AccordionDemo />
       <TooltipDemo />
-      <SwitchCheckboxDemo />
-      <DialogDemo />
       <PopoverDemo />
+      <DialogDemo />
       <MenuDemo />
-      <RadioGroupDemo />
-      <CheckboxGroupDemo />
-      <SelectDemo />
-      <ComboboxDemo />
       <ToastDemo />
       <FieldFormDemo />
-      <Notifications />
+      <SwitchCheckboxDemo />
+      <CheckboxGroupDemo />
+      <RadioGroupDemo />
+      <SelectDemo />
+      <ComboboxDemo />
       <SliderDemo />
-      <ProgressMeterDemo />
-      <ToolbarDemo />
       <NumberFieldDemo />
+      <ProgressMeterDemo />
+      {/* The toast region (a Toast.Viewport) that renders the toasts ToastDemo queues. */}
+      <Notifications />
     </main>
   );
 }

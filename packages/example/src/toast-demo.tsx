@@ -4,6 +4,7 @@ import { Menu } from "@funstack/ui/menu";
 import { Toast, toast } from "@funstack/ui/toast";
 import type { ToastItem } from "@funstack/ui/toast";
 import { sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./toast-demo.css";
 
 /* The Viewport, rendered once. It moves into an open modal Dialog by itself. ------------------- */
@@ -77,8 +78,7 @@ function SlowAction() {
 export function ToastDemo() {
   const [deleted, setDeleted] = useState<readonly string[]>([]);
   return (
-    <section>
-      <h2>Toast</h2>
+    <Demo title="Toast">
       <p>
         <code>toast()</code> is urgent: a toast shows at once even while the action it reports on is
         pending. Hover or focus the stack to pause the timers; press F8 to jump into it, arrows to
@@ -177,6 +177,6 @@ export function ToastDemo() {
         </Dialog.Root>
       </div>
       {deleted.length > 0 && <p>Deleted for real: {deleted.join(", ")}</p>}
-    </section>
+    </Demo>
   );
 }

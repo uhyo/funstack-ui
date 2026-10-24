@@ -3,6 +3,7 @@ import { useFormStatus } from "react-dom";
 import { CheckboxGroup } from "@funstack/ui/checkbox-group";
 import type { CheckboxGroupValueChangeDetails } from "@funstack/ui/checkbox-group";
 import { fakeSave } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./checkbox-group-demo.css";
 
 const toppings = [
@@ -190,11 +191,10 @@ function FormDemo() {
 
 export function CheckboxGroupDemo() {
   return (
-    <article className="demo">
-      <h2>CheckboxGroup</h2>
+    <Demo title="CheckboxGroup">
       <ToppingsDemo />
       <PermissionsDemo />
       <FormDemo />
-    </article>
+    </Demo>
   );
 }

@@ -3,6 +3,7 @@ import { Toggle } from "@funstack/ui/toggle";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave } from "./shared/fake-backend";
 import { Spinner } from "./shared/Spinner";
+import { Demo } from "./shared/Demo";
 import "./toggle-demo.css";
 
 function StarIcon({ filled }: { filled: boolean }) {
@@ -174,14 +175,13 @@ function DisabledDemo() {
 
 export function ToggleDemo() {
   return (
-    <article className="demo">
-      <h2>Toggle</h2>
+    <Demo title="Toggle">
       <UncontrolledDemo />
       <ControlledDemo />
       <ControlledVetoDemo />
       <RejectingDemo />
       <TransitionDemo />
       <DisabledDemo />
-    </article>
+    </Demo>
   );
 }

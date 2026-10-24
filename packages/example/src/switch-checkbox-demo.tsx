@@ -4,6 +4,7 @@ import { Checkbox } from "@funstack/ui/checkbox";
 import { Switch } from "@funstack/ui/switch";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./switch-checkbox-demo.css";
 
 function AutosaveDemo() {
@@ -280,14 +281,13 @@ function SiblingThumbDemo() {
 
 export function SwitchCheckboxDemo() {
   return (
-    <article className="demo">
-      <h2>Switch and Checkbox</h2>
+    <Demo title="Switch and Checkbox">
       <AutosaveDemo />
       <RejectingDemo />
       <ControlledVetoDemo />
       <FormDemo />
       <SelectAllDemo />
       <SiblingThumbDemo />
-    </article>
+    </Demo>
   );
 }

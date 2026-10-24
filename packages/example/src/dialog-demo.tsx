@@ -5,6 +5,7 @@ import { Dialog } from "@funstack/ui/dialog";
 import type { DialogOpenChangeDetails } from "@funstack/ui/dialog";
 import { sleep } from "./shared/fake-backend";
 import { Spinner } from "./shared/Spinner";
+import { Demo } from "./shared/Demo";
 import "./dialog-demo.css";
 
 function logChange(label: string) {
@@ -436,8 +437,7 @@ function TransitionDemo() {
 
 export function DialogDemo() {
   return (
-    <section className="dlg-demo">
-      <h2>Dialog</h2>
+    <Demo title="Dialog">
       <p>
         Built on <code>&lt;dialog&gt;</code> and Invoker Commands. The stylesheet carries the
         documented recipes: enter/exit animation with <code>@starting-style</code> and{" "}
@@ -451,6 +451,6 @@ export function DialogDemo() {
       <DismissDemo />
       <NestedDemo />
       <TransitionDemo />
-    </section>
+    </Demo>
   );
 }

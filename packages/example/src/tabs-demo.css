@@ -1,9 +1,5 @@
 /* Tabs demo: data attributes are the styling hook; interaction state comes from pseudo-classes.
-   Self-contained: no class or keyframes from the other demos' stylesheets. */
-
-.tabs-demo section {
-  margin-block: 1.5rem;
-}
+   No class or keyframes from the other demos' stylesheets; shared rules are in shared/demo.css. */
 
 .tabs-error-box {
   padding: 0.75rem 1rem;

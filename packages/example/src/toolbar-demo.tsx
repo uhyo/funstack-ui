@@ -7,6 +7,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
 import { Tooltip } from "@funstack/ui/tooltip";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./toolbar-demo.css";
 
 const supportsFocusgroup =
@@ -231,8 +232,7 @@ export function ToolbarDemo() {
   const [focusgroup, setFocusgroup] = useState(false);
   const [fail, setFail] = useState(false);
   return (
-    <section>
-      <h2>Toolbar and ToggleGroup</h2>
+    <Demo title="Toolbar and ToggleGroup">
       <fieldset>
         <legend>Options</legend>
         <label>
@@ -260,6 +260,6 @@ export function ToolbarDemo() {
       </DemoErrorBoundary>
       <VerticalToolbar focusgroup={focusgroup} />
       <StandaloneGroup />
-    </section>
+    </Demo>
   );
 }

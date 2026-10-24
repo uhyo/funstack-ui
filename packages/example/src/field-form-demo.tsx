@@ -8,6 +8,7 @@ import { RadioGroup } from "@funstack/ui/radio-group";
 import { Select } from "@funstack/ui/select";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./field-form-demo.css";
 
 interface State {
@@ -119,8 +120,7 @@ function SignUp() {
 
 export function FieldFormDemo() {
   return (
-    <section>
-      <h2>Field and Form</h2>
+    <Demo title="Field and Form">
       <p>
         Native validation shown with <code>:user-invalid</code> timing, the bubble replaced by{" "}
         <code>Field.Error</code>, the first invalid control focused, server errors routed to their
@@ -129,6 +129,6 @@ export function FieldFormDemo() {
       <DemoErrorBoundary className="ff-error-box">
         <SignUp />
       </DemoErrorBoundary>
-    </section>
+    </Demo>
   );
 }

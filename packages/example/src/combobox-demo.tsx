@@ -3,6 +3,7 @@ import { Combobox } from "@funstack/ui/combobox";
 import { Dialog } from "@funstack/ui/dialog";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { fakeSave, sleep } from "./shared/fake-backend";
+import { Demo } from "./shared/Demo";
 import "./combobox-demo.css";
 
 interface Country {
@@ -225,8 +226,7 @@ function InDialog() {
 
 export function ComboboxDemo() {
   return (
-    <section className="cb-demo">
-      <h2>Combobox</h2>
+    <Demo title="Combobox" className="cb-demo">
       <p>
         Before hydration the input is a plain text field: text typed then is kept and adopted at
         mount (<code>reason: &quot;platform&quot;</code>), and nothing opens until the next
@@ -235,6 +235,6 @@ export function ComboboxDemo() {
       <CountryPicker />
       <TagInput />
       <InDialog />
-    </section>
+    </Demo>
   );
 }
