@@ -23,9 +23,9 @@ export interface UseNativeCheckedOptions {
   readonly indeterminate?: boolean | undefined;
   /**
    * `true` inside a group (`RadioGroup.Item`, `CheckboxGroup.Item` and `.Parent`): the hook does
-   * the element check and the re-apply
-   * only; mount reconciliation and form reset are reported once per group by the Root through
-   * `useNativeGroupReconciliation`. Default `false`: the hook reports both paths itself.
+   * the element check and the re-apply only; mount reconciliation and form reset are reported
+   * once per group by the Root through `useNativeGroupReconciliation`. Default `false`: the hook
+   * reports both paths itself.
    */
   readonly group?: boolean | undefined;
   /**

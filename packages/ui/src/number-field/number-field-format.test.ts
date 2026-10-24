@@ -220,6 +220,7 @@ describe("decimal helpers", () => {
   it("decimalsOf and roundTo", () => {
     expect(decimalsOf(0.001)).toBe(3);
     expect(decimalsOf(1e-7)).toBe(7);
+    expect(decimalsOf(5)).toBe(0);
     expect(roundTo(0.1 + 0.2, 1)).toBe(0.3);
     expect(Object.is(roundTo(-0.0001, 2), 0)).toBe(true);
   });

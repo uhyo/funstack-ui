@@ -13,15 +13,6 @@ import type {
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
-import {
-  MENU_POINT_FALLBACKS,
-  MENU_POINT_GAP,
-  MENU_POINT_HREF,
-  MENU_POINT_RULES,
-  MENU_POINT_TOUCH_GAP,
-  MENU_POINT_X,
-  MENU_POINT_Y,
-} from "../internal/menu-point.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
@@ -48,6 +39,15 @@ import {
   typeaheadText,
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
+import {
+  MENU_POINT_FALLBACKS,
+  MENU_POINT_GAP,
+  MENU_POINT_HREF,
+  MENU_POINT_RULES,
+  MENU_POINT_TOUCH_GAP,
+  MENU_POINT_X,
+  MENU_POINT_Y,
+} from "./menu-point.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 

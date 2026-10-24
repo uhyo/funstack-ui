@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { POSITION_TRY_FALLBACKS, parsePositionArea, positionArea } from "./anchor-position.js";
-import type { AnchorAlign, AnchorSide, Direction, ResolvedPlacement } from "./anchor-position.js";
 import {
   MENU_POINT_FALLBACKS,
   MENU_POINT_GAP,
   MENU_POINT_RULES,
   MENU_POINT_X,
   MENU_POINT_Y,
-} from "./menu-point.js";
+} from "../menu/menu-point.js";
+import { POSITION_TRY_FALLBACKS, parsePositionArea, positionArea } from "./anchor-position.js";
+import type { AnchorAlign, AnchorSide, Direction, ResolvedPlacement } from "./anchor-position.js";
 
 describe("positionArea", () => {
   // Conventions 13.1: physical keywords and the `self-*` group only, never a plain logical one.
