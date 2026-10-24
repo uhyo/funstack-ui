@@ -1364,8 +1364,9 @@ packages/ui/src/internal/
   `flushSync` around the commit. `onBlur` (React's `focusout`): nothing while `disabled`; if
   `relatedTarget` is outside the input and the popup → `popup.hidePopover()` with a recorded
   `"dismiss"` intent, then the revert / custom commit (`leave()`); if `relatedTarget === null` →
-  `setTimeout(0)`, then `leave()` only if `document.hasFocus()` and `document.activeElement` is
-  outside the input and the popup. `onClick` → `openOnClick`. Composition: ignore Enter / arrows
+  `setTimeout(0)` (while a pointer is pressed, one task after the last release instead; see 5.4,
+  #111), then `leave()` only if `document.hasFocus()` and `document.activeElement` is outside the
+  input and the popup. `onClick` → `openOnClick`. Composition: ignore Enter / arrows
   while `event.nativeEvent.isComposing`.
 - **Popup.** `usePopoverPopup(ctx, { part, initialFocus: undefined, keepMounted, transition })`;
   `libraryProps`: `id`, `popover: "auto"`, `onPointerDown` and `onMouseDown` →
