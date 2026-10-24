@@ -49,8 +49,11 @@ export interface NumberFieldContextValue {
   readonly endHold: (direction: StepDirection, event: Event) => void;
   /** A click with no pointer gesture (assistive technology): step + commit. */
   readonly activate: (direction: StepDirection, event: Event) => void;
-  /** Mirrors the hidden input's `validationMessage` onto the visible input (6.2). */
-  readonly mirror: () => void;
+  /**
+   * Writes a value into the hidden input, then mirrors its `validationMessage` onto the visible
+   * input (6.2).
+   */
+  readonly syncHidden: (value: number | null) => void;
   /** Called by the Label from a layout effect; returns the unregistration. */
   readonly registerLabel: () => () => void;
   /** Called by the Input from its mount layout effect (late mount reconciliation). */

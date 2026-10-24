@@ -16,7 +16,6 @@ import { useFieldControl } from "../internal/use-field-control.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { hiddenText } from "./number-field-root.js";
 import type { NumberFieldState } from "./number-field-root.js";
 import { useNumberFieldContext } from "./number-field-context.js";
 
@@ -87,7 +86,7 @@ export function NumberFieldInput({
   ...rest
 }: NumberFieldInputProps) {
   const ctx = useNumberFieldContext("NumberField.Input");
-  const { state, visibleRef, hiddenRef, mirror, onItemMounted } = ctx;
+  const { state, visibleRef, hiddenRef, syncHidden, onItemMounted } = ctx;
 
   // --- The Field contract (design 7.1): the visible input registers, the hidden one validates.
   const validityElement = useCallback(() => hiddenRef.current, [hiddenRef]);
@@ -136,12 +135,7 @@ export function NumberFieldInput({
   // After every commit: the hidden input holds the shown value (a rollback, a controlled change,
   // a reset) and the visible input mirrors its validity (a changed `min` / `max` / `required`).
   useLayoutEffect(() => {
-    const hidden = hiddenRef.current;
-    if (hidden !== null) {
-      const text = hiddenText(state.value);
-      if (hidden.value !== text) hidden.value = text;
-    }
-    mirror();
+    syncHidden(state.value);
   });
 
   // The hidden input is never the one the browser reports on (6.3); the visible input is

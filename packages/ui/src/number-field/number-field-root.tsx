@@ -149,7 +149,7 @@ function sanitize(value: number | null | undefined): number | null | undefined {
 }
 
 /** The hidden input's value for `value`. */
-export function hiddenText(value: number | null): string {
+function hiddenText(value: number | null): string {
   return value === null ? "" : String(value);
 }
 
@@ -261,26 +261,21 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     setDraft(null);
   }, []);
 
-  /** The visible input is invalid exactly when the hidden one is (6.2). */
-  const mirror = useCallback(() => {
+  /**
+   * Writes `next` into the hidden input, then mirrors its validity onto the visible input, which
+   * is invalid exactly when the hidden one is (6.2).
+   */
+  const syncHidden = useCallback((next: number | null) => {
     const hidden = hiddenRef.current;
+    if (hidden !== null) {
+      const text = hiddenText(next);
+      if (hidden.value !== text) hidden.value = text;
+    }
     const visible = visibleRef.current;
     if (hidden === null || visible === null) return;
     const message = hidden.validationMessage;
     if (visible.validationMessage !== message) visible.setCustomValidity(message);
   }, []);
-
-  const writeHidden = useCallback(
-    (next: number | null) => {
-      const hidden = hiddenRef.current;
-      if (hidden !== null) {
-        const text = hiddenText(next);
-        if (hidden.value !== text) hidden.value = text;
-      }
-      mirror();
-    },
-    [mirror],
-  );
 
   // A step is not a re-entry: a continuous control dispatches one step per key press or pointer
   // move and every step must run (design/components/button.md 16.1), so no in-flight guard.
@@ -372,7 +367,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       setLive({ value: next });
       clearDraft();
       setPendingSource(source);
-      writeHidden(next);
+      syncHidden(next);
       // A revert has no commit after it: the optimistic value already shows the committed one.
       if (reason !== "dismiss") setStepHeld(true);
       const { valueChangeAction: action, runStep: run } = latest.current;
@@ -384,7 +379,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       });
       return true;
     },
-    [clearDraft, latest, shownRef, writeHidden],
+    [clearDraft, latest, shownRef, syncHidden],
   );
 
   const announceValue = useCallback(
@@ -690,7 +685,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       tickHold,
       endHold,
       activate,
-      mirror,
+      syncHidden,
       registerLabel,
       onItemMounted,
     }),
@@ -717,7 +712,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       tickHold,
       endHold,
       activate,
-      mirror,
+      syncHidden,
       registerLabel,
       onItemMounted,
     ],
