@@ -188,18 +188,10 @@ describe("useNativeChecked", () => {
     });
   });
 
+  // What a component shows of the single-control paths (the hydrated value dispatched once, the
+  // reset event, no dispatch when they match) is in src/__tests__/checkable-input-suite.tsx (rows
+  // 20-22, Checkbox and Switch); these rows keep what only the hook options reach (audit T13).
   describe("mount reconciliation (single control)", () => {
-    it("reports the hydrated DOM value once with no event", async () => {
-      const consoleError = silenceErrors();
-      const onPlatformChange = vi.fn();
-      await hydrate(<Probe checked={false} onPlatformChange={onPlatformChange} />, (el) => {
-        el.checked = true;
-      });
-      expect(onPlatformChange).toHaveBeenCalledTimes(1);
-      expect(onPlatformChange).toHaveBeenCalledWith(true, undefined);
-      expect(consoleError).not.toHaveBeenCalled();
-    });
-
     it("compares against the in-flight value, not only the optimistic one", async () => {
       const onPlatformChange = vi.fn();
       await hydrate(
@@ -222,6 +214,11 @@ describe("useNativeChecked", () => {
         el.checked = true;
       });
       expect(onPlatformChange).not.toHaveBeenCalled();
+      // Control: the same hydration without `group` reports once, with no event.
+      await hydrate(<Probe checked={false} onPlatformChange={onPlatformChange} />, (el) => {
+        el.checked = true;
+      });
+      expect(onPlatformChange.mock.calls).toEqual([[true, undefined]]);
     });
 
     it("group: true leaves the hydrated checked value in the mount commit, even under StrictMode", async () => {
@@ -257,39 +254,27 @@ describe("useNativeChecked", () => {
       );
     }
 
-    it("reports defaultChecked with the reset event when it differs from what the user intends", async () => {
-      const onPlatformChange = vi.fn();
-      render(<Controlled onPlatformChange={onPlatformChange} />);
-      await act(async () => {
-        screen.getByRole("button", { name: "flip" }).click();
-      });
-      expect(probe().checked).toBe(true);
-      const form = screen.getByTestId("form") as HTMLFormElement;
-      form.reset();
-      await flushMicrotasks();
-      expect(onPlatformChange).toHaveBeenCalledTimes(1);
-      const [next, event] = onPlatformChange.mock.calls[0]!;
-      expect(next).toBe(false);
-      expect((event as Event).type).toBe("reset");
-    });
-
-    it("does not report when the reset matches", async () => {
-      const onPlatformChange = vi.fn();
-      render(<Controlled onPlatformChange={onPlatformChange} />);
-      (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flushMicrotasks();
-      expect(onPlatformChange).not.toHaveBeenCalled();
-    });
-
     it("never reports with group: true", async () => {
-      const onPlatformChange = vi.fn();
-      render(<Controlled onPlatformChange={onPlatformChange} group />);
-      await act(async () => {
-        screen.getByRole("button", { name: "flip" }).click();
-      });
-      (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flushMicrotasks();
-      expect(onPlatformChange).not.toHaveBeenCalled();
+      // Control first: without `group` the same flip and reset report `false` with the event.
+      for (const group of [false, true]) {
+        const onPlatformChange = vi.fn();
+        const { unmount } = render(
+          <Controlled onPlatformChange={onPlatformChange} group={group} />,
+        );
+        await act(async () => {
+          screen.getByRole("button", { name: "flip" }).click();
+        });
+        (screen.getByTestId("form") as HTMLFormElement).reset();
+        await flushMicrotasks();
+        if (group) {
+          expect(onPlatformChange).not.toHaveBeenCalled();
+        } else {
+          expect(onPlatformChange).toHaveBeenCalledTimes(1);
+          expect(onPlatformChange.mock.calls[0]![0]).toBe(false);
+          expect((onPlatformChange.mock.calls[0]![1] as Event).type).toBe("reset");
+        }
+        unmount();
+      }
     });
   });
 });

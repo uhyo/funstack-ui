@@ -21,6 +21,7 @@ import {
   setupUser,
   silenceErrors,
 } from "./helpers.js";
+import type { ControlMode } from "./helpers.js";
 import { ValueHarness } from "./value-action-suite.js";
 import type { ValueActionDriver, ValueHarnessProps } from "./value-action-suite.js";
 
@@ -354,7 +355,20 @@ export function describeNativeGroupPlatform<V, D extends PlatformDetails>(
     });
 
     describe("React's automatic reset after a form action", () => {
-      function ActionForm({ submit, action }: { submit: Promise<void>; action?: ActionFn }) {
+      /**
+       * A form whose action awaits `submit`. Uncontrolled from values[0], or (`mode` controlled)
+       * a parent that adopts every dispatch at once, the platform one included.
+       */
+      function ActionForm({
+        submit,
+        action,
+        mode = "uncontrolled",
+      }: {
+        submit: Promise<void>;
+        action?: ActionFn;
+        mode?: ControlMode;
+      }) {
+        const [value, setValue] = useState(values[0]);
         return (
           <form
             action={async () => {
@@ -362,8 +376,13 @@ export function describeNativeGroupPlatform<V, D extends PlatformDetails>(
             }}
           >
             {driver.render({
-              defaultValue: values[0],
-              ...(action && { changeAction: action }),
+              ...(mode === "controlled" ? { value } : { defaultValue: values[0] }),
+              ...(action && {
+                changeAction: (next: V, details: D) => {
+                  action(next, details);
+                  if (mode === "controlled") setValue(next);
+                },
+              }),
               extra: { name: "field" },
             })}
             <button type="submit">Save</button>
@@ -382,18 +401,23 @@ export function describeNativeGroupPlatform<V, D extends PlatformDetails>(
         return user;
       }
 
-      it("returns to the default with one dispatch, in sync afterwards", async () => {
-        const d = deferred();
-        const action = vi.fn<ActionFn>();
-        const user = await submitAfterGesture(<ActionForm submit={d.promise} action={action} />, d);
-        expect(action).toHaveBeenCalledTimes(2);
-        expectPlatformCall(action.mock.calls[1], values[1], values[0], "reset");
-        driver.expectShown(values[0]);
-        expectNotPending(root());
-        // Still in sync: the same gesture dispatches again.
-        await driver.gesture(user, 0);
-        driver.expectShown(values[1]);
-        expect(action).toHaveBeenCalledTimes(3);
+      renderBoth("with an action", (mode) => {
+        it("returns to the default with one dispatch, in sync afterwards", async () => {
+          const d = deferred();
+          const action = vi.fn<ActionFn>();
+          const user = await submitAfterGesture(
+            <ActionForm submit={d.promise} action={action} mode={mode} />,
+            d,
+          );
+          expect(action).toHaveBeenCalledTimes(2);
+          expectPlatformCall(action.mock.calls[1], values[1], values[0], "reset");
+          driver.expectShown(values[0]);
+          expectNotPending(root());
+          // Still in sync: the same gesture dispatches again.
+          await driver.gesture(user, 0);
+          driver.expectShown(values[1]);
+          expect(action).toHaveBeenCalledTimes(3);
+        });
       });
 
       it("works without a valueChangeAction", async () => {

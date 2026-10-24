@@ -555,3 +555,41 @@ there by the overlay-suite branch) and popover.test.tsx's platform-path `hydrate
 hydrates `inAct`, popover's caller wraps it in `act`; `flush: null` as before). No title change.
 `hydrate: true` now appears only in helpers.tsx. Mutation: `mutate` without the pre-hydration
 open: 22 platform-path rows fail (7 suite rows x 3 drivers + the popover row).
+
+### T13: hook test trims (commit 3k)
+
+Suite change first: the native platform suite's "React's automatic reset" row runs in both modes
+(`with an action (controlled|uncontrolled)`; the controlled parent adopts every dispatch at once,
+as the hook test's ProfileForm did). That was the only removed hook row with no component row.
+
+use-native-group-reconciliation.test.tsx (563 -> 377 lines) keeps what the components cannot
+show: two groups in one form, members mounting / hydrating after the Root (onItemMounted, in both
+modes and StrictMode, "in sync afterwards"), a member added on the client, the `equals` option.
+Removed -> covering rows:
+- mount reconciliation (both): hydrated value once / once under StrictMode / not when the DOM
+  matches, nor for createRoot -> native platform suite mount rows (x3 components)
+- form reset (both): default value with the reset event -> suite button reset + form.reset()
+  rows; dispatches null when the group resets to no selection -> RadioGroup "form.reset()
+  dispatches once, also to null" (local, both modes); cancelled or intended value -> the suite's
+  two rows
+- form reset, more cases (both): React's automatic reset after a successful <form action> -> the
+  suite's automatic reset row, now in both modes
+- controlled refusing parent -> suite "a parent that refuses gets the DOM re-synced …"
+- uncontrolled reset after a defaultValue change -> suite "uncontrolled: the reset returns to the
+  latest defaultValue (after a gesture / untouched)"
+use-native-checked.test.tsx: removed "reports the hydrated DOM value once with no event", "reports
+defaultChecked with the reset event when it differs …" and "does not report when the reset
+matches" -> checkable-input-suite rows 20 and 22 (Checkbox and Switch, both modes; they assert
+reason, event, JSON, DOM and committed too). Those rows were also the positive controls of the
+`group: true` rows, so "never reports for createRoot or with group: true" and "never reports with
+group: true" now run the same setup without `group` first and assert the report.
+jsdom titles: 3188 -> 3172 (-20, +4: the 3 renamed automatic reset rows and their controlled twins).
+
+Mutations (reverted):
+1. use-native-checked.ts reports only with an event (mount report dropped): 15 rows fail
+   (Checkbox/Switch rows 22, the hook's control row).
+2. reset reported without its event: 9 rows (rows 20/21 of both components, the hook control).
+3. reset reported even when it matches: 6 rows ("a reset to the value the user already intends",
+   row 21's defaultChecked target).
+The group-hook mutations of T3 above (no mount reconciliation, reset without event, equals,
+cancelled reset, base) are the coverage of the removed group rows.

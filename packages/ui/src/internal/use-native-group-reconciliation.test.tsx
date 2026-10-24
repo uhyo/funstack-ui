@@ -1,8 +1,11 @@
 // The group adapter, exercised through a minimal radio group built from the three shared hooks the
 // way design/components/radio-group.md 13.3 / 13.5 wires them: a fieldset Root owning the state
 // (`useControllableAction` + `useNativeGroupReconciliation`) and Items calling
-// `useNativeChecked({ group: true })`. Guards the contract RadioGroup relies on: one dispatch per
-// group for both residual paths.
+// `useNativeChecked({ group: true })`. Guards what the components cannot show: two groups in one
+// form, members that mount (or hydrate) after the Root through `onItemMounted`, and the `equals`
+// option. The user-visible platform rows (mount reconciliation, form reset, reset target, React's
+// automatic reset) are the native platform suite's (src/__tests__/native-group-platform-suite.tsx,
+// run by RadioGroup, CheckboxGroup and Select; audit T13).
 import { act, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, createContext, startTransition, use, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -117,26 +120,22 @@ function Item({ value }: { value: string }) {
 
 /**
  * Uncontrolled, or controlled with "update on success" (the parent adopts the value after the
- * action's work, in a transition). `refusePlatform`: a controlled parent that does not adopt
- * `"platform"` dispatches. `late`: "m" and "l" sit behind a Suspense boundary gated on it.
+ * action's work, in a transition). `late`: "m" and "l" sit behind a Suspense boundary gated on it.
  */
 function Harness({
   mode,
   initial,
   action,
-  refusePlatform = false,
   late,
 }: {
   mode: ControlMode;
   initial: string | null;
   action: ActionFn;
-  refusePlatform?: boolean;
   late?: Promise<void>;
 }) {
   const [value, setValue] = useState<string | null>(initial);
   const groupAction: ActionFn = async (next, details) => {
     await action(next, details);
-    if (refusePlatform && details.reason === "platform") return;
     startTransition(() => setValue(next));
   };
   const lateItems = (
@@ -168,190 +167,7 @@ function Harness({
 const radio = (v: string, name = "size") =>
   screen.getByLabelText(`${name} ${v}`) as HTMLInputElement;
 
-const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
-  hydrateFromServer(ui, { mutate });
-
 describe("useNativeGroupReconciliation", () => {
-  renderBoth("mount reconciliation", (mode) => {
-    it("dispatches once for the group with the hydrated value and no event", async () => {
-      const consoleError = silenceErrors();
-      const action = vi.fn<ActionFn>();
-      await hydrate(<Harness mode={mode} initial="s" action={action} />, (c) => {
-        (c.querySelector('input[value="l"]') as HTMLInputElement).checked = true;
-      });
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(action.mock.calls[0]?.[0]).toBe("l");
-      expect(action.mock.calls[0]?.[1].reason).toBe("platform");
-      expect(action.mock.calls[0]?.[1].event).toBeUndefined();
-      expect(radio("l").checked).toBe(true);
-      expect(radio("s").checked).toBe(false);
-      expect(screen.getByTestId("value")).toHaveTextContent("l");
-      expect(consoleError).not.toHaveBeenCalled();
-    });
-
-    it("dispatches once under StrictMode", async () => {
-      const action = vi.fn<ActionFn>();
-      await hydrate(
-        <StrictMode>
-          <Harness mode={mode} initial="s" action={action} />
-        </StrictMode>,
-        (c) => {
-          (c.querySelector('input[value="m"]') as HTMLInputElement).checked = true;
-        },
-      );
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(action.mock.calls[0]?.[0]).toBe("m");
-      expect(radio("m").checked).toBe(true);
-    });
-
-    it("does not dispatch when the DOM matches, nor for createRoot", async () => {
-      const action = vi.fn<ActionFn>();
-      await hydrate(<Harness mode={mode} initial="s" action={action} />, () => {});
-      render(<Harness mode={mode} initial="m" action={action} />);
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-    });
-  });
-
-  renderBoth("form reset", (mode) => {
-    it("dispatches once for the group with the default value and the reset event", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} initial="s" action={action} />);
-      const user = setupUser();
-      await user.click(radio("l"));
-      expect(action).toHaveBeenCalledTimes(1);
-      (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]?.[0]).toBe("s");
-      expect(action.mock.calls[1]?.[1].reason).toBe("platform");
-      expect(action.mock.calls[1]?.[1].event?.type).toBe("reset");
-      expect(radio("s").checked).toBe(true);
-      expect(radio("l").checked).toBe(false);
-    });
-
-    it("dispatches null when the group resets to no selection", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} initial={null} action={action} />);
-      const user = setupUser();
-      await user.click(radio("m"));
-      (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([v]) => v)).toEqual(["m", null]);
-      expect(radio("m").checked).toBe(false);
-    });
-
-    it("does nothing for a cancelled reset or a reset to the intended value", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} initial="s" action={action} />);
-      const form = screen.getByTestId("form") as HTMLFormElement;
-      form.reset();
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-
-      const user = setupUser();
-      await user.click(radio("m"));
-      form.addEventListener("reset", (e) => e.preventDefault());
-      form.reset();
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(radio("m").checked).toBe(true);
-    });
-  });
-
-  renderBoth("form reset, more cases", (mode) => {
-    it("follows React's automatic reset of the fieldset after a successful <form action>", async () => {
-      const d = deferred();
-      const action = vi.fn<ActionFn>();
-      function ProfileForm() {
-        const [value, setValue] = useState<string | null>("s");
-        return (
-          <form
-            action={async () => {
-              await d.promise;
-            }}
-          >
-            <Group
-              {...(mode === "controlled" ? { value } : { defaultValue: "s" })}
-              action={(next, details) => {
-                action(next, details);
-                setValue(next);
-              }}
-            >
-              <Item value="s" />
-              <Item value="m" />
-            </Group>
-            <button type="submit">Save</button>
-          </form>
-        );
-      }
-      render(<ProfileForm />);
-      const user = setupUser();
-      await user.click(radio("m"));
-      expect(radio("m").checked).toBe(true);
-      await user.click(screen.getByRole("button", { name: "Save" }));
-      await act(async () => {
-        d.resolve();
-      });
-      await flushMicrotasks();
-      expect(
-        action.mock.calls.map(([v, details]) => [v, details.reason, details.event?.type]),
-      ).toEqual([
-        ["m", "activate", "click"],
-        ["s", "platform", "reset"],
-      ]);
-      expect(radio("s").checked).toBe(true);
-      expect(radio("m").checked).toBe(false);
-      // Still in sync: the next click selects again.
-      await user.click(radio("m"));
-      expect(radio("m").checked).toBe(true);
-      expect(action).toHaveBeenCalledTimes(3);
-    });
-  });
-
-  it("controlled: a parent that refuses the reset gets the DOM re-synced after settle", async () => {
-    const action = vi.fn<ActionFn>();
-    render(<Harness mode="controlled" initial="s" action={action} refusePlatform />);
-    const user = setupUser();
-    await user.click(radio("l"));
-    expect(screen.getByTestId("value")).toHaveTextContent("l");
-    (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flushMicrotasks();
-    expect(action).toHaveBeenCalledTimes(2);
-    expect(action.mock.calls[1]?.[0]).toBe("s");
-    expect(action.mock.calls[1]?.[1].reason).toBe("platform");
-    expect(screen.getByTestId("value")).toHaveTextContent("l");
-    expect(radio("l").checked).toBe(true);
-    expect(radio("s").checked).toBe(false);
-  });
-
-  it("uncontrolled: a reset after a defaultValue change returns to the new default", async () => {
-    const action = vi.fn<ActionFn>();
-    function Settings({ def }: { def: string }) {
-      return (
-        <form data-testid="form">
-          <Group defaultValue={def} action={action}>
-            <Item value="s" />
-            <Item value="m" />
-            <Item value="l" />
-          </Group>
-        </form>
-      );
-    }
-    const { rerender } = render(<Settings def="s" />);
-    const user = setupUser();
-    await user.click(radio("l"));
-    rerender(<Settings def="m" />);
-    expect(radio("m").defaultChecked).toBe(true);
-    expect(radio("s").defaultChecked).toBe(false);
-    expect(radio("l").checked).toBe(true);
-    (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flushMicrotasks();
-    expect(action.mock.calls.map(([v]) => v)).toEqual(["l", "m"]);
-    expect(radio("m").checked).toBe(true);
-    expect(radio("l").checked).toBe(false);
-  });
-
   it("two groups in one form: one reset dispatches once per group, each to its own default", async () => {
     const size = vi.fn<ActionFn>();
     const color = vi.fn<ActionFn>();
