@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useInsertionEffect, useLayoutEffect, useState } from "react";
 import type { FocusEvent, KeyboardEvent, PointerEvent, RefObject } from "react";
-import type { Orientation } from "./types.js";
 import { focusWithRing, resolveArrowKey } from "./arrow-keys.js";
+import type { Orientation } from "./types.js";
 
 // The roving-focus engine shared by `Toolbar.Root` and a standalone `ToggleGroup.Root`
 // (design/components/toggle-group.md section 6, conventions 3.2 and 7.4). Items are the focusable

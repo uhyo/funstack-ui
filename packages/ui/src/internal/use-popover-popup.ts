@@ -2,12 +2,12 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
-import { useExitAnimation } from "./use-exit-animation.js";
-import type { PopoverRootValue } from "./use-popover-root.js";
 import { isPopoverOpen } from "./popover-open.js";
-import { useLatest } from "./use-latest.js";
 import { useElementCheck } from "./use-element-check.js";
+import { useExitAnimation } from "./use-exit-animation.js";
+import { useLatest } from "./use-latest.js";
 import { useShownNameWarning } from "./use-name-warning.js";
+import type { PopoverRootValue } from "./use-popover-root.js";
 
 export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */

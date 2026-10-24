@@ -7,14 +7,14 @@ import type {
   KeyboardEvent,
   ReactNode,
 } from "react";
+import { focusWithRing, resolveArrowKey } from "../internal/arrow-keys.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { useRender } from "../internal/use-render.js";
 import { TabsListContext, useTabsContext } from "./tabs-context.js";
 import type { TabsListContextValue, TabsOrientation } from "./tabs-context.js";
-import { focusWithRing, resolveArrowKey } from "../internal/arrow-keys.js";
-import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 
 export interface TabsListState {
   readonly orientation: TabsOrientation;

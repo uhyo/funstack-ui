@@ -10,6 +10,7 @@ import type {
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { registerSubmenuHover, useMenuContext } from "./menu-context.js";
@@ -19,7 +20,6 @@ import type { MenuItemProps } from "./menu-item.js";
 import { openMenuWithFocus } from "./menu-trigger.js";
 import type { MenuTriggerState } from "./menu-trigger.js";
 import { useMenuItem } from "./use-menu-item.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export type MenuSubmenuTriggerState = MenuTriggerState;
 

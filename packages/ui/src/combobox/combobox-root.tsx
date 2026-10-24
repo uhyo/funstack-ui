@@ -16,6 +16,7 @@ import type { ReactNode, RefObject } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import type { AriaNotifyTarget } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { useFieldValueChange } from "../internal/use-field-control.js";
 import type {
   ActionDetails,
@@ -28,12 +29,11 @@ import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFormReset } from "../internal/use-form-reset.js";
 import type { FormAssociatedElement } from "../internal/use-form-reset.js";
+import { useLatest } from "../internal/use-latest.js";
 import { usePopoverRoot } from "../internal/use-popover-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import type { ComboboxContextValue, ComboboxOptionEntry } from "./combobox-context.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
-import { useLatest } from "../internal/use-latest.js";
 
 /** Details passed as the second argument of `Combobox.Root`'s `valueChangeAction`. */
 export interface ComboboxValueChangeDetails extends ActionDetails {

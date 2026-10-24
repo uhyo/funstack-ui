@@ -12,17 +12,17 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useNativeSelectValue } from "../internal/use-native-select-value.js";
 import {
   fieldInputProps,
   useFieldControl,
   useFieldValueChange,
 } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useNativeSelectValue } from "../internal/use-native-select-value.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
 import type { SelectContextValue } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 /** Details passed as the second argument of `valueChangeAction`. */
 export interface SelectValueChangeDetails extends ActionDetails {

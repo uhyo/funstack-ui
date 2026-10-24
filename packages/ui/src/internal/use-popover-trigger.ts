@@ -2,12 +2,12 @@
 import { useCallback } from "react";
 import type { ComponentPropsWithRef, DOMAttributes, MouseEvent } from "react";
 import { dataAttr } from "./data-attr.js";
+import { isPopoverOpen } from "./popover-open.js";
 import type { RenderProp } from "./types.js";
+import { useElementCheck } from "./use-element-check.js";
 import { isHostButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
-import { isPopoverOpen } from "./popover-open.js";
-import { useElementCheck } from "./use-element-check.js";
 
 /** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {

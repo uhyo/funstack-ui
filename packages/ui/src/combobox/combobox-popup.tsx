@@ -12,12 +12,12 @@ import { dataAttr } from "../internal/data-attr.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { ComboboxPopupContext, useComboboxContext } from "./combobox-context.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface ComboboxPopupState {
   /** Committed open state. Read `:popover-open` for the DOM truth. */

@@ -11,10 +11,10 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 import type { AccordionItemState } from "./accordion-item.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 /** The trigger is the item's control; it renders the item's state object. */
 export type AccordionTriggerState = AccordionItemState;

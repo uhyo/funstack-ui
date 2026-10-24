@@ -4,13 +4,13 @@ import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionC
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useHydratedMount } from "../internal/use-hydrated-mount.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useFormReset } from "../internal/use-form-reset.js";
 import { useRender } from "../internal/use-render.js";
 import { enabledValues, useCheckboxGroupContext } from "./checkbox-group-context.js";
 import type { CheckboxGroupPatch } from "./checkbox-group-context.js";
 import { syncPresence } from "../internal/sync-presence.js";
-import { useHydratedMount } from "../internal/use-hydrated-mount.js";
 
 export interface CheckboxGroupParentState {
   readonly values: readonly string[];

@@ -11,6 +11,8 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
+import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
+import { CSPContext } from "../internal/csp-context.js";
 import {
   MENU_POINT_FALLBACKS,
   MENU_POINT_GAP,
@@ -20,13 +22,15 @@ import {
   MENU_POINT_X,
   MENU_POINT_Y,
 } from "../internal/menu-point.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
-import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
-import { CSPContext } from "../internal/csp-context.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -44,10 +48,6 @@ import {
   typeaheadText,
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { useElementCheck } from "../internal/use-element-check.js";
-import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type MenuSide = AnchorSide;

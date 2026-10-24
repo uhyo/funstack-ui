@@ -16,19 +16,19 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useContentFocusProbe } from "../internal/content-focus-probe.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useExitAnimation } from "../internal/use-exit-animation.js";
 import { useModalRegistration } from "../internal/use-modal-registration.js";
+import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
-import { useElementCheck } from "../internal/use-element-check.js";
-import { useShownNameWarning } from "../internal/use-name-warning.js";
 
 export interface DialogPopupState {
   /** Committed open state (library mode); `false` in JS-free mode. Read `:open` for the DOM truth. */

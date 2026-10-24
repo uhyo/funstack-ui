@@ -8,6 +8,7 @@ import type {
   ReactNode,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -20,9 +21,8 @@ import {
   submenuHover,
   useMenuContext,
 } from "./menu-context.js";
-import type { MenuTriggerState } from "./menu-trigger.js";
 import { capturePointer, isDisabledItem, isEditableTarget, ITEM_SELECTOR } from "./menu-dom.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
+import type { MenuTriggerState } from "./menu-trigger.js";
 
 export type MenuContextTriggerState = MenuTriggerState;
 

@@ -4,12 +4,12 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { TooltipPopupContext, useTooltipContext } from "./tooltip-context.js";
 import type { TooltipAlign, TooltipPopupContextValue, TooltipSide } from "./tooltip-context.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export type { TooltipAlign, TooltipSide } from "./tooltip-context.js";
 

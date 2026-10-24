@@ -12,12 +12,12 @@ import { dataAttr } from "../internal/data-attr.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { percent, thumbBounds } from "./slider-arithmetic.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderOrientation } from "./slider-root.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export interface SliderThumbState {
   readonly index: number;

@@ -17,9 +17,9 @@ import {
   useFieldControl,
   useFieldValueChange,
 } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export interface CheckboxState {
   /** Optimistic checked state: what the user sees, including an in-flight change. */

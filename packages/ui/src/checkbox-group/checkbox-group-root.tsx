@@ -20,13 +20,11 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
-import { useRender } from "../internal/use-render.js";
-import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
-import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useElementCheck } from "../internal/use-element-check.js";
+import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useRender } from "../internal/use-render.js";
 import {
   applyPatch,
   arraysEqual,
@@ -37,6 +35,8 @@ import {
   toSet,
 } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
+import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
+import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 

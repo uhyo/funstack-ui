@@ -4,6 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import {
@@ -11,7 +12,6 @@ import {
   ComboboxPopupContext,
   useComboboxContext,
 } from "./combobox-context.js";
-import { useNameWarning } from "../internal/use-name-warning.js";
 
 export interface ComboboxListState {
   /** The deferred text the results are for: render the Options for it. */

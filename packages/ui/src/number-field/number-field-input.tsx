@@ -11,14 +11,14 @@ import type {
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useFieldControl } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { hiddenText } from "./number-field-root.js";
 import type { NumberFieldState } from "./number-field-root.js";
 import { useNumberFieldContext } from "./number-field-context.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface NumberFieldInputProps extends Omit<
   ComponentPropsWithRef<"input">,

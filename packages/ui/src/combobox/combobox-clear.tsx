@@ -8,10 +8,10 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
-import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 
 export interface ComboboxClearState {
   /** Optimistic selection. */

@@ -2,13 +2,13 @@
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface PopoverCloseState {
   /** The `action` is in flight. */

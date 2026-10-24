@@ -12,13 +12,13 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
 import { RadioGroupContext } from "./radio-group-context.js";
 import type { RadioGroupContextValue } from "./radio-group-context.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 

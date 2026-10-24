@@ -13,12 +13,12 @@ import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type PopoverSide = AnchorSide;

@@ -4,9 +4,9 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import type { ToolbarContextValue } from "../internal/toolbar-context.js";
 import type { Orientation, RenderProp, StateValue } from "../internal/types.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
-import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 
 export type ToolbarOrientation = Orientation;
 

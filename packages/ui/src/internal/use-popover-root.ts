@@ -2,12 +2,12 @@
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createActionDetails } from "./action-details.js";
+import { isPopoverOpen } from "./popover-open.js";
 import { transitionTypes } from "./transition-types.js";
 import type { ActionDetails, ChangeAction, ChangeReason } from "./types.js";
 import { useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import { useLatest } from "./use-latest.js";
-import { isPopoverOpen } from "./popover-open.js";
 
 /**
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":

@@ -3,17 +3,16 @@ import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { compareDocumentOrder } from "../internal/dom-order.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
-import { ToggleGroupContext } from "./toggle-group-context.js";
-import type { ToggleGroupContextValue, ToggleGroupOrientation } from "./toggle-group-context.js";
-import { compareDocumentOrder } from "../internal/dom-order.js";
 import {
   applyPatch,
   EMPTY_SET,
@@ -23,7 +22,8 @@ import {
   toSet,
 } from "../internal/value-set.js";
 import type { SetPatch, ValueSet } from "../internal/value-set.js";
-import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
+import { ToggleGroupContext } from "./toggle-group-context.js";
+import type { ToggleGroupContextValue, ToggleGroupOrientation } from "./toggle-group-context.js";
 
 export type { ToggleGroupOrientation } from "./toggle-group-context.js";
 

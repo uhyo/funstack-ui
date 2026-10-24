@@ -1,8 +1,8 @@
 "use client";
 import { createContext, use } from "react";
 import type { ChangeReason } from "../internal/types.js";
-import type { ToastItem, ToastPriority } from "./toast.js";
 import type { ToastRootState } from "./toast-root.js";
+import type { ToastItem, ToastPriority } from "./toast.js";
 
 /** What a Root (and the parts under it) need from the Viewport. Stable for the Viewport's life. */
 export interface ToastViewportContextValue {

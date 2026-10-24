@@ -1,5 +1,6 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -9,7 +10,6 @@ import { useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import type { MenuContextValue } from "./menu-context.js";
 import { edgeItem, focusItem, hasModifier, isRtl } from "./menu-dom.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
 
 export type MenuTriggerState = PopoverTriggerHookState;
 

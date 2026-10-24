@@ -2,10 +2,10 @@
 import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderRootState, SliderValue } from "./slider-root.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 /** `T` defaults to `SliderValue`; pass it to narrow the state (`<Slider.Label<number>>`). */
 export interface SliderLabelProps<T extends SliderValue = SliderValue> extends Omit<

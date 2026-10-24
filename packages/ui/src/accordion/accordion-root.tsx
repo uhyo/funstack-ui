@@ -11,6 +11,7 @@ import {
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { compareDocumentOrder } from "../internal/dom-order.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
   ActionDetails,
@@ -23,11 +24,10 @@ import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
-import { AccordionRootContext } from "./accordion-context.js";
-import type { AccordionMode, AccordionRootContextValue } from "./accordion-context.js";
-import { compareDocumentOrder } from "../internal/dom-order.js";
 import { EMPTY_SET, setsEqual, toSet } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
+import { AccordionRootContext } from "./accordion-context.js";
+import type { AccordionMode, AccordionRootContextValue } from "./accordion-context.js";
 
 export interface AccordionRootState {
   /** An action dispatched through this Accordion is in flight (library mode only). */

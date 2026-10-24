@@ -2,17 +2,17 @@
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import type { ComponentPropsWithRef, CSSProperties, FormEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
+import { sortByDocumentOrder } from "../internal/dom-order.js";
 import { FormContext } from "../internal/field-context.js";
 import type { FormContextValue, FormFieldRegistration } from "../internal/field-context.js";
 import { announce } from "../internal/focus-first-invalid.js";
 import { FormStatusWatcher } from "../internal/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
-import { sortByDocumentOrder } from "../internal/dom-order.js";
 import { hasAnyError } from "../internal/validity.js";
 import type { FormErrors } from "../internal/validity.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 export type { FieldErrorValue, FormErrors } from "../internal/validity.js";
 

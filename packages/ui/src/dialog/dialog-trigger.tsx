@@ -3,10 +3,10 @@ import { useCallback, useEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface DialogTriggerState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */

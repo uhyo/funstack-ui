@@ -4,10 +4,10 @@ import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 
 export interface DialogCloseState {
   /** The `action` is in flight. */

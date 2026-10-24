@@ -21,6 +21,7 @@ import {
   getTopmostModal,
   subscribeModals,
 } from "../internal/modal-registry.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import type { ChangeReason, RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { animationBaseline } from "../internal/use-exit-animation.js";
@@ -39,7 +40,6 @@ import type {
 } from "./toast.js";
 import { ToastViewportContext } from "./toast-context.js";
 import type { ToastViewportContextValue } from "./toast-context.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
 
 export interface ToastViewportState {
   /** Rendered toasts, chronological (oldest first), exiting ones included. */

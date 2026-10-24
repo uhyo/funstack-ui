@@ -1,11 +1,11 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { useNameWarning } from "../internal/use-name-warning.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastItem } from "./toast.js";
 import { useToastRootContext } from "./toast-context.js";
-import { useNameWarning } from "../internal/use-name-warning.js";
 
 export interface ToastCloseState {
   readonly toast: ToastItem;
