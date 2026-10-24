@@ -12,6 +12,7 @@ import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
 import { useExitAnimation } from "./use-exit-animation.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
+import { isPopoverOpen } from "./popover-open.js";
 
 export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */
@@ -77,14 +78,6 @@ export interface PopoverPopupHook {
 }
 
 const isDev = process.env.NODE_ENV !== "production";
-
-function isPopoverOpen(element: Element): boolean {
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
-}
 
 let focusVisibleOption: boolean | undefined;
 

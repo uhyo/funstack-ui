@@ -26,6 +26,7 @@ import { useModalRegistration } from "../internal/use-modal-registration.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 
 export interface DialogPopupState {
   /** Committed open state (library mode); `false` in JS-free mode. Read `:open` for the DOM truth. */
@@ -119,11 +120,7 @@ function isOpenLightPopover(element: Element): boolean {
   const state =
     typeof reflected === "string" ? reflected : element.getAttribute("popover")!.toLowerCase();
   if (state === "manual") return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
+  return isPopoverOpen(element);
 }
 
 /**

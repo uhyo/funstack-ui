@@ -9,6 +9,7 @@ import { useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import type { MenuContextValue } from "./menu-context.js";
 import { edgeItem, focusItem, hasModifier, isRtl } from "./menu-dom.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 
 export type MenuTriggerState = PopoverTriggerHookState;
 
@@ -41,7 +42,7 @@ export function openMenuWithFocus(
   const { popover } = menu;
   if (popover.intended()) {
     const popup = popover.popupRef.current;
-    if (popup !== null && popup.matches(":popover-open")) {
+    if (popup !== null && isPopoverOpen(popup)) {
       const item = edgeItem(popup, which);
       if (item !== null) focusItem(item);
     }

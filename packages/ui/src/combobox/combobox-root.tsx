@@ -32,6 +32,7 @@ import { usePopoverRoot } from "../internal/use-popover-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import type { ComboboxContextValue, ComboboxOptionEntry } from "./combobox-context.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 
 /** Details passed as the second argument of `Combobox.Root`'s `valueChangeAction`. */
 export interface ComboboxValueChangeDetails extends ActionDetails {
@@ -170,15 +171,6 @@ function defaultComboboxAnnouncement(count: number): string {
 const VALUE_TRANSITION_TYPES = ["fsui-combobox", "fsui-combobox-select"] as const;
 
 const isDev = process.env.NODE_ENV !== "production";
-
-function isPopoverOpen(element: Element | null): boolean {
-  if (element === null) return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
-}
 
 function isThenable(value: unknown): boolean {
   return (

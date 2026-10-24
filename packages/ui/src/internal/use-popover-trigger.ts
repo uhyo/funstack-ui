@@ -6,6 +6,7 @@ import type { RenderProp } from "./types.js";
 import { isHostButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
+import { isPopoverOpen } from "./popover-open.js";
 
 /** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {
@@ -57,15 +58,6 @@ export interface PopoverTriggerHook {
 }
 
 const isDev = process.env.NODE_ENV !== "production";
-
-function isPopoverOpen(element: Element | null): boolean {
-  if (element === null) return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
-}
 
 /**
  * The Trigger of a popover-like component (design/components/popover.md 14.3):

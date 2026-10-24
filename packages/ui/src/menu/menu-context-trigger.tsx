@@ -22,6 +22,7 @@ import {
 } from "./menu-context.js";
 import type { MenuTriggerState } from "./menu-trigger.js";
 import { capturePointer, isDisabledItem, isEditableTarget, ITEM_SELECTOR } from "./menu-dom.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 
 export type MenuContextTriggerState = MenuTriggerState;
 
@@ -104,7 +105,7 @@ const isTouchLike = (pointerType: string) => pointerType === "touch" || pointerT
 function startDrag(popup: HTMLElement, options: DragOptions): () => void {
   const doc = popup.ownerDocument;
   // `performance.now()` at the first open `toggle`; null until the popup has been shown.
-  let shownAt: number | null = popup.matches(":popover-open") ? performance.now() : null;
+  let shownAt: number | null = isPopoverOpen(popup) ? performance.now() : null;
   // The SubmenuTrigger the pointer is over, whose hover intent is running.
   let submenuTrigger: HTMLElement | null = null;
 
@@ -162,7 +163,7 @@ function startDrag(popup: HTMLElement, options: DragOptions): () => void {
     if (
       shownAt !== null &&
       performance.now() - shownAt >= DRAG_DISMISS_DELAY &&
-      popup.matches(":popover-open")
+      isPopoverOpen(popup)
     ) {
       popup.hidePopover();
     }
@@ -171,7 +172,7 @@ function startDrag(popup: HTMLElement, options: DragOptions): () => void {
     if (ours(event)) end();
   };
   const onToggle = () => {
-    if (!popup.matches(":popover-open")) end();
+    if (!isPopoverOpen(popup)) end();
     else shownAt ??= performance.now();
   };
   const end = () => {

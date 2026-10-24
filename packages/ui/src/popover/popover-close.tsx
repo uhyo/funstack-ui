@@ -8,6 +8,7 @@ import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 
 export interface PopoverCloseState {
   /** The `action` is in flight. */
@@ -41,14 +42,6 @@ export interface PopoverCloseProps extends Omit<
 }
 
 const isDev = process.env.NODE_ENV !== "production";
-
-function isPopoverOpen(element: Element): boolean {
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
-}
 
 /**
  * A close button: `<button type="button" commandfor command="hide-popover">`. In JS-free mode

@@ -55,6 +55,7 @@ import {
   typeaheadText,
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type MenuSide = AnchorSide;
@@ -237,7 +238,7 @@ function listenOutside(
   const doc = popup.ownerDocument;
   const inside = (target: EventTarget | null) => target instanceof Node && popup.contains(target);
   const close = () => {
-    if (popup.matches(":popover-open")) popup.hidePopover();
+    if (isPopoverOpen(popup)) popup.hidePopover();
   };
   // Bubble phase: the region's handler ran first and marked a move.
   const onContextMenu = (event: Event) => {
@@ -386,7 +387,7 @@ export function MenuPopup({
     onToggle: (event) => {
       if (submenu) return;
       const element = popover.popupRef.current;
-      if (event.newState === "open" && element !== null && element.matches(":popover-open")) {
+      if (event.newState === "open" && element !== null && isPopoverOpen(element)) {
         outside.current ??= listenOutside(element, menu, () => latestPlacement.current);
       } else if (event.newState === "closed") {
         stopOutside();
@@ -408,7 +409,7 @@ export function MenuPopup({
     const element = popover.popupRef.current;
     if (element === null) return;
     const key = point !== null ? point.generation : "anchor";
-    if (element.matches(":popover-open")) {
+    if (isPopoverOpen(element)) {
       if (shownKey.current !== null && shownKey.current !== key && reshow()) {
         capturePointer(element, point?.pointerId);
       }
@@ -533,7 +534,7 @@ export function MenuPopup({
     const popup = event.currentTarget;
     const next = event.relatedTarget;
     if (!(next instanceof Node) || popup.contains(next)) return;
-    if (popup.matches(":popover-open")) popup.hidePopover();
+    if (isPopoverOpen(popup)) popup.hidePopover();
   };
 
   // A press on non-item space (padding, a Separator, a GroupLabel) would focus the popup itself

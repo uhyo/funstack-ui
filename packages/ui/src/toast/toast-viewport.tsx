@@ -39,6 +39,7 @@ import type {
 } from "./toast.js";
 import { ToastViewportContext } from "./toast-context.js";
 import type { ToastViewportContextValue } from "./toast-context.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 
 export interface ToastViewportState {
   /** Rendered toasts, chronological (oldest first), exiting ones included. */
@@ -781,12 +782,7 @@ export function ToastViewport({
       setPause("focus", false);
     }
     if (region !== null && region.isConnected && region.hasAttribute("popover")) {
-      let open = false;
-      try {
-        open = region.matches(":popover-open");
-      } catch {
-        open = false;
-      }
+      const open = isPopoverOpen(region);
       try {
         if (current.length > 0) {
           if (!open) region.showPopover();

@@ -7,6 +7,7 @@ import type { ActionDetails, ChangeAction, ChangeReason } from "./types.js";
 import { useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import { useLatest } from "./use-latest.js";
+import { isPopoverOpen } from "./popover-open.js";
 
 /**
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
@@ -109,15 +110,6 @@ export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
    * read the open cause).
    */
   readonly onDispatch?: (next: boolean, details: Details) => void;
-}
-
-function isPopoverOpen(element: Element | null): boolean {
-  if (element === null) return false;
-  try {
-    return element.matches(":popover-open");
-  } catch {
-    return false;
-  }
 }
 
 /** How long a recorded close intent survives when the popover did not close (design 2.3). */
