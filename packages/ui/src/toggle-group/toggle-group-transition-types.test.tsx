@@ -1,45 +1,22 @@
-// View Transition types added per ToggleGroup dispatch (design 5.2 and 10, conventions 5.3).
-// jsdom has no `startViewTransition`, so the types are observed by wrapping `addTransitionType`.
+// View Transition types added per ToggleGroup dispatch (design 5.2 and 10, conventions 5.3):
+// fsui-toggle-group plus -press / -release. The press and release rows come from the value-action
+// suite (driver __tests__/drivers/toggle-group.tsx); see __tests__/transition-type-spy.ts.
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { setupUser } from "../__tests__/helpers.js";
+import { toggleGroupDriver } from "../__tests__/drivers/toggle-group.js";
+import { addTransitionTypeSpy, recordedTransitionTypes } from "../__tests__/transition-type-spy.js";
+import { describeValueTransitionTypes } from "../__tests__/value-action-suite.js";
 import { ToggleGroup } from "./index.js";
 
-const addTransitionType = vi.hoisted(() => vi.fn<(type: string) => void>());
-
 vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react")>();
-  return {
-    ...actual,
-    addTransitionType: (type: string) => {
-      addTransitionType(type);
-      actual.addTransitionType(type);
-    },
-  };
+  const { withTransitionTypeSpy } = await import("../__tests__/transition-type-spy.js");
+  return withTransitionTypeSpy(await importOriginal<typeof import("react")>());
 });
 
-const item = (name: string) => screen.getByRole("button", { name });
-const types = () => addTransitionType.mock.calls.map(([t]) => t);
-
-beforeEach(() => {
-  addTransitionType.mockClear();
-});
+describeValueTransitionTypes(toggleGroupDriver);
 
 describe("ToggleGroup transition types", () => {
-  it("press adds fsui-toggle-group and -press; release adds -release", async () => {
-    render(
-      <ToggleGroup.Root aria-label="x">
-        <ToggleGroup.Item value="a">A</ToggleGroup.Item>
-      </ToggleGroup.Root>,
-    );
-    const user = setupUser();
-    await user.click(item("A"));
-    expect(types()).toEqual(["fsui-toggle-group", "fsui-toggle-group-press"]);
-    addTransitionType.mockClear();
-    await user.click(item("A"));
-    expect(types()).toEqual(["fsui-toggle-group", "fsui-toggle-group-release"]);
-  });
-
   it("an exclusive switch carries both", async () => {
     render(
       <ToggleGroup.Root exclusive aria-label="x" defaultValue="a">
@@ -47,8 +24,9 @@ describe("ToggleGroup transition types", () => {
         <ToggleGroup.Item value="b">B</ToggleGroup.Item>
       </ToggleGroup.Root>,
     );
-    await setupUser().click(item("B"));
-    expect(types()).toEqual([
+    addTransitionTypeSpy.mockClear();
+    await setupUser().click(screen.getByRole("button", { name: "B" }));
+    expect(recordedTransitionTypes()).toEqual([
       "fsui-toggle-group",
       "fsui-toggle-group-press",
       "fsui-toggle-group-release",

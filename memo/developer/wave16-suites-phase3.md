@@ -156,3 +156,49 @@ Mutations (reverted):
    suite rows: async, rejection, overlap, suspending content, post-await).
 2. tabs-root.tsx swaps next/prev: the 3 suite transition-type rows fail.
 3. tabs-tab.tsx marks every tab pending while the Root is: 18 rows fail (suite `pendingOff`).
+
+### ToggleGroup (commit 3c)
+
+Suite changes: the committed and suspender text checks are exact (`textContent` equality;
+jest-dom's `toHaveTextContent` is a substring match, too weak once values are lists: "bold" is in
+"bold,italic"); `orderIndependentCommit` asserts the committed value after both overlap orders; the
+sync row runs all three gestures (after mutation 3 below first slipped through the suite: only the
+reportError row used gesture 2, without a DOM check).
+
+Driver: multiple mode, gestures press Bold, press Italic, release Bold; parent commits by patching
+with `added` / `removed` (the old harness's update); format = sorted, comma-joined.
+
+Removed title (toggle-group.test.tsx, `ToggleGroup …`) -> suite row (`ToggleGroup.Root: value
+action conformance …`):
+- async action (row 3) (both) flips at once, pending on Root and Item, committed content unchanged
+  until resolve -> async action (both) shows the optimistic value … (`pendingOn`: Root and the
+  pressed Items; `pendingOff`: the others, Italic included; data-pressed also checked)
+- rejection (row 4) (both) reaches the boundary above the Root; committed unchanged -> rejection
+  (both) reaches the Error Boundary …; caught inside the action counts as success -> rejection
+  (both) caught inside … (Root not pending, error text, Bold by mode)
+- overlap (row 5) Bold then Italic resolved %s commits both -> overlapping actions (uncontrolled)
+  the latest dispatch wins when resolved %s (calls `[["bold"], ["bold","italic"]]`, both pressed,
+  Root not pending, committed `bold,italic` via `orderIndependentCommit`)
+- superseded rejection (row 6) (both), two rows -> superseded rejection (both) after / while the
+  newer … (committed `italic`, the newer's patch on `[]`, as before; boundary once)
+- suspending content (row 7) (both) -> suspending content (both)
+- post-await rule … converges (row 9) -> post-await rule (controlled parent) … (pressed and pending
+  mid-flight, parent's value after)
+- dev warnings (row 17) value and defaultValue together warn once -> dev warnings: warns once when
+  `value` and `defaultValue` are both set (now exactly one console.error, matched)
+- details.event is virtual (row 19) -> details: exposes `event` as a virtual, non-own property
+  (keys `added`, `removed`; JSON `{ added: ["bold"], removed: [] }`)
+- toggle-group-transition-types: press adds fsui-toggle-group and -press; release adds -release
+  -> ToggleGroup.Root: transition types gesture 0 / 1 (press) and 2 (release). "an exclusive switch
+  carries both" stays there.
+Kept: value model rows (incl. exclusive), the same-Item second click, the controlled overlap /
+re-base rows, function props, keyboard, roving tab stop, focusgroup, exclusive and duplicate
+warnings.
+jsdom titles: 2953 -> 2978 (-18, +43).
+
+Mutations (reverted):
+1. toggle-group-item.tsx: every Item pending while the Root is: 20 rows fail (18 suite rows).
+2. toggle-group-root.tsx: press / release types swapped: all 4 type rows fail.
+3. toggle-group-root.tsx: releasing a pressed Item dispatches an empty patch: before the sync-row
+   change only the gesture-2 type row of the suite failed (+5 local rows); after it, the suite's
+   sync rows (both modes) fail too.

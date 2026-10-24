@@ -16,6 +16,8 @@ import {
   PlainButton,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { toggleGroupDriver } from "../__tests__/drivers/toggle-group.js";
+import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { ToggleGroup } from "./index.js";
 import type {
   ToggleGroupItemState,
@@ -108,6 +110,12 @@ const root = () => screen.getByRole("group");
 const committedText = () => screen.getByTestId("committed");
 const tabStops = () =>
   screen.getAllByRole("button").filter((b) => b.getAttribute("tabindex") === "0");
+
+// The action-prop rows shared by every value component (sync and async actions, rejection,
+// overlap, superseded rejection, suspending content, the post-await rule, the controlled veto,
+// `transition`, details, the value/defaultValue warnings) come from
+// __tests__/value-action-suite.tsx with the driver __tests__/drivers/toggle-group.tsx.
+describeValueAction(toggleGroupDriver);
 
 describe("ToggleGroup", () => {
   describe("roles and ARIA (row 1)", () => {
@@ -279,27 +287,6 @@ describe("ToggleGroup", () => {
   });
 
   renderBoth("async action (row 3)", (mode) => {
-    it("flips at once, pending on Root and Item, committed content unchanged until resolve", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} />);
-      const user = setupUser();
-
-      await user.click(item("bold"));
-      expect(item("bold")).toHaveAttribute("aria-pressed", "true");
-      expectPending(item("bold"));
-      expectNotPending(item("italic"));
-      expectPending(root());
-      expect(committedText()).toHaveTextContent("");
-
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(item("bold"));
-      expectNotPending(root());
-      expect(item("bold")).toHaveAttribute("aria-pressed", "true");
-      expect(committedText()).toHaveTextContent("bold");
-    });
-
     it("a second click on the same Item clears its pending while the Root keeps it", async () => {
       const deferreds = sequencedDeferreds(2);
       render(<Harness mode={mode} action={() => deferreds.next()} />);
@@ -318,42 +305,6 @@ describe("ToggleGroup", () => {
       });
       expectNotPending(root());
       expect(item("bold")).toHaveAttribute("aria-pressed", "false");
-    });
-  });
-
-  renderBoth("rejection (row 4)", (mode) => {
-    it("reaches the boundary above the Root; committed unchanged", async () => {
-      silenceErrors();
-      const d = deferred();
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(item("bold"));
-      expect(item("bold")).toHaveAttribute("aria-pressed", "true");
-      const err = new Error("save failed");
-      await act(async () => {
-        d.reject(err);
-      });
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
-      expect(committedText()).toHaveTextContent("");
-    });
-
-    it("caught inside the action counts as success", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} catchErrors />);
-      const user = setupUser();
-      await user.click(item("bold"));
-      await act(async () => {
-        d.reject(new Error("vetoed"));
-      });
-      expectNotPending(root());
-      expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
-      expect(item("bold")).toHaveAttribute(
-        "aria-pressed",
-        mode === "controlled" ? "false" : "true",
-      );
     });
   });
 
@@ -432,29 +383,6 @@ describe("ToggleGroup", () => {
       expect(item("bold")).toHaveAttribute("aria-pressed", "false");
     });
 
-    it.each([
-      ["2 then 1", [1, 0]],
-      ["1 then 2", [0, 1]],
-    ] as const)("Bold then Italic resolved %s commits both", async (_label, order) => {
-      const deferreds = sequencedDeferreds(2);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode="uncontrolled" action={action} />);
-      const user = setupUser();
-
-      await user.click(item("bold"));
-      await user.click(item("italic"));
-      expect(action.mock.calls.map(([n]) => n)).toEqual([["bold"], ["bold", "italic"]]);
-      for (const i of order) {
-        await act(async () => {
-          deferreds[i]!.resolve();
-        });
-      }
-      expect(item("bold")).toHaveAttribute("aria-pressed", "true");
-      expect(item("italic")).toHaveAttribute("aria-pressed", "true");
-      expectNotPending(root());
-      expect(committedText()).toHaveTextContent("bold,italic");
-    });
-
     it("stacked patches re-base: Italic stays pressed while Bold's save is still in flight", async () => {
       const deferreds = sequencedDeferreds(2);
       render(
@@ -475,72 +403,6 @@ describe("ToggleGroup", () => {
       // Controlled and never updated: both revert to the committed value.
       expect(item("bold")).toHaveAttribute("aria-pressed", "false");
       expect(item("italic")).toHaveAttribute("aria-pressed", "false");
-    });
-  });
-
-  renderBoth("superseded rejection (row 6)", (mode) => {
-    it("older rejects after the newer resolved: the catcher records it", async () => {
-      silenceErrors();
-      const deferreds = sequencedDeferreds(2);
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => deferreds.next()} boundary={onError} />);
-      const user = setupUser();
-      await user.click(item("bold"));
-      await user.click(item("italic"));
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).not.toHaveBeenCalled();
-      const err = new Error("older failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledWith(err);
-      // The newer outcome is unaffected.
-      expect(committedText()).toHaveTextContent("italic");
-    });
-
-    it("older rejects while the newer pends: the catcher records it once", async () => {
-      silenceErrors();
-      const deferreds = sequencedDeferreds(2);
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => deferreds.next()} boundary={onError} />);
-      const user = setupUser();
-      await user.click(item("bold"));
-      await user.click(item("italic"));
-      const err = new Error("older failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(committedText()).toHaveTextContent("italic");
-    });
-  });
-
-  renderBoth("suspending content (row 7)", (mode) => {
-    it("keeps old content, no fallback, pending until the new content is ready", async () => {
-      const suspender = createSuspender();
-      suspender.resolve("");
-      render(<Harness mode={mode} suspender={suspender} />);
-      const user = setupUser();
-
-      await user.click(item("bold"));
-      expect(item("bold")).toHaveAttribute("aria-pressed", "true");
-      expectPending(root());
-      expectPending(item("bold"));
-      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
-      expect(committedText()).toHaveTextContent("");
-
-      await act(async () => {
-        suspender.resolve("bold");
-      });
-      expect(screen.getByTestId("suspender")).toHaveTextContent("bold");
-      expectNotPending(root());
-      expectNotPending(item("bold"));
     });
   });
 
@@ -657,38 +519,6 @@ describe("ToggleGroup", () => {
       );
       expect(root().tagName).toBe("SECTION");
     });
-  });
-
-  it("post-await rule: a controlled parent updating inside startTransition converges (row 9)", async () => {
-    const d = deferred();
-    function Parent() {
-      const [value, setValue] = useState<string[]>([]);
-      return (
-        <>
-          <ToggleGroup.Root
-            aria-label="x"
-            value={value}
-            valueChangeAction={async (next) => {
-              await d.promise;
-              startTransition(() => setValue(next));
-            }}
-          >
-            <ToggleGroup.Item value="a">A</ToggleGroup.Item>
-          </ToggleGroup.Root>
-          <output data-testid="parent">{value.join(",")}</output>
-        </>
-      );
-    }
-    render(<Parent />);
-    const user = setupUser();
-    await user.click(item("A"));
-    expect(item("A")).toHaveAttribute("aria-pressed", "true");
-    await act(async () => {
-      d.resolve();
-    });
-    expect(item("A")).toHaveAttribute("aria-pressed", "true");
-    expectNotPending(root());
-    expect(screen.getByTestId("parent")).toHaveTextContent("a");
   });
 
   describe("keyboard, standalone (row 10)", () => {
@@ -1020,16 +850,6 @@ describe("ToggleGroup", () => {
   });
 
   describe("dev warnings (row 17)", () => {
-    it("value and defaultValue together warn once", async () => {
-      const error = silenceErrors();
-      const { rerender } = render(
-        <ToggleGroup.Root aria-label="x" value={[]} defaultValue={["a"]} />,
-      );
-      rerender(<ToggleGroup.Root aria-label="x" value={["a"]} defaultValue={["a"]} />);
-      const calls = error.mock.calls.filter(([m]) => String(m).includes("defaultValue"));
-      expect(calls).toHaveLength(1);
-    });
-
     it("switching exclusive after mount warns", () => {
       const error = silenceErrors();
       const { rerender } = render(<ToggleGroup.Root aria-label="x" />);
@@ -1047,16 +867,5 @@ describe("ToggleGroup", () => {
       );
       expect(error.mock.calls.some(([m]) => String(m).includes('share the value "a"'))).toBe(true);
     });
-  });
-
-  it("details.event is virtual (row 19)", async () => {
-    const action = vi.fn<ActionFn>();
-    render(<Harness mode="uncontrolled" action={action} />);
-    await setupUser().click(item("bold"));
-    const details = action.mock.calls[0]![1];
-    expect(details.event?.type).toBe("click");
-    expect("event" in details).toBe(true);
-    expect(Object.keys(details).sort()).toEqual(["added", "removed"]);
-    expect(JSON.parse(JSON.stringify(details))).toEqual({ added: ["bold"], removed: [] });
   });
 });

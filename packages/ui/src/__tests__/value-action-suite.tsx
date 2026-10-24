@@ -85,6 +85,8 @@ export interface ValueActionDriver<V, D extends { readonly event: Event | undefi
    * patches its previous value with `details.added` / `removed` (design 2.3).
    */
   commit?(prev: V, next: V, details: D): V;
+  /** `commit` gives the same result whatever order two overlapping dispatches resolve in. */
+  readonly orderIndependentCommit?: boolean;
   /** The text the harness writes for a committed value (default `JSON.stringify`). */
   format?(v: V): string;
   /**
@@ -198,7 +200,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
   const format = driver.format ?? JSON.stringify;
   const committed = () => screen.getByTestId("committed");
   const expectCommittedValue = (v: V) => {
-    expect(committed()).toHaveTextContent(format(v), { normalizeWhitespace: false });
+    expect(committed().textContent).toBe(format(v));
     driver.expectCommitted?.(v);
   };
   const expectAllPending = (i: number) => {
@@ -235,11 +237,14 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expectNonePending(0);
         expectCommittedValue(values[1]);
 
-        await driver.gesture(user, 1);
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls[1]?.[0]).toEqual(values[2]);
-        driver.expectShown(values[2]);
-        expectCommittedValue(values[2]);
+        for (const i of [1, 2]) {
+          await driver.gesture(user, i);
+          expect(action).toHaveBeenCalledTimes(i + 1);
+          expect(action.mock.calls[i]?.[0]).toEqual(values[i + 1]);
+          driver.expectShown(values[i + 1]!);
+          expectNonePending(i);
+          expectCommittedValue(values[i + 1]!);
+        }
       });
     });
 
@@ -321,7 +326,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expect(onError).toHaveBeenCalledWith(err);
         expect(driver.queryControl()).toBeNull();
         expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
-        expect(committed()).toHaveTextContent(format(values[0]), { normalizeWhitespace: false });
+        expect(committed().textContent).toBe(format(values[0]));
       });
 
       it("treats a synchronous throw like a rejection", async () => {
@@ -341,7 +346,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expect(onError).toHaveBeenCalledTimes(1);
         expect(onError).toHaveBeenCalledWith(err);
         expect(driver.queryControl()).toBeNull();
-        expect(committed()).toHaveTextContent(format(values[0]), { normalizeWhitespace: false });
+        expect(committed().textContent).toBe(format(values[0]));
       });
 
       it("caught inside the action counts as success; only a controlled parent reverts", async () => {
@@ -356,7 +361,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expectNonePending(0);
         expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
         // The harness never adopted the value in either mode...
-        expect(committed()).toHaveTextContent(format(values[0]), { normalizeWhitespace: false });
+        expect(committed().textContent).toBe(format(values[0]));
         // ...but only a controlled parent can veto: uncontrolled commits the value.
         const settled = mode === "controlled" ? values[0] : values[1];
         driver.expectShown(settled);
@@ -388,6 +393,9 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         driver.expectShown(values[2]);
         driver.expectCommitted?.(values[2]);
         expectNonePending(1);
+        // A parent committing whole values writes them in completion order; one that patches
+        // (ToggleGroup, CheckboxGroup) ends with both changes whatever the order.
+        if (driver.orderIndependentCommit) expect(committed().textContent).toBe(format(values[2]));
       });
 
       it("stays pending until every in-flight action settles", async () => {
@@ -448,7 +456,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
         // The newer action's outcome is unaffected.
         const newer = commitOf(values[0], action.mock.calls[1]! as [V, D]);
-        expect(committed()).toHaveTextContent(format(newer), { normalizeWhitespace: false });
+        expect(committed().textContent).toBe(format(newer));
       });
 
       it("reaches the boundary when the older action rejects while the newer is pending", async () => {
@@ -477,7 +485,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expect(onError).toHaveBeenCalledTimes(1);
         expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
         const newer = commitOf(values[0], action.mock.calls[1]! as [V, D]);
-        expect(committed()).toHaveTextContent(format(newer), { normalizeWhitespace: false });
+        expect(committed().textContent).toBe(format(newer));
       });
 
       it("keeps the first superseded error and reports later ones through reportError", async () => {
@@ -547,25 +555,19 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         const suspender = createSuspender();
         suspender.resolve(format(values[0]));
         render(<Harness mode={mode} suspender={suspender} />);
-        expect(screen.getByTestId("suspender")).toHaveTextContent(format(values[0]), {
-          normalizeWhitespace: false,
-        });
+        expect(screen.getByTestId("suspender").textContent).toBe(format(values[0]));
 
         await driver.gesture(setupUser(), 0);
         driver.expectShown(values[1]);
         expectAllPending(0);
         expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
-        expect(screen.getByTestId("suspender")).toHaveTextContent(format(values[0]), {
-          normalizeWhitespace: false,
-        });
+        expect(screen.getByTestId("suspender").textContent).toBe(format(values[0]));
         expectCommittedValue(values[0]);
 
         await act(async () => {
           suspender.resolve(format(values[1]));
         });
-        expect(screen.getByTestId("suspender")).toHaveTextContent(format(values[1]), {
-          normalizeWhitespace: false,
-        });
+        expect(screen.getByTestId("suspender").textContent).toBe(format(values[1]));
         expectCommittedValue(values[1]);
         expectNonePending(0);
         expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
