@@ -51,16 +51,16 @@ the fix Slider's step case and NumberField's commit case failed (boundary not ca
   external capture). Each checked by breaking the helper once.
 - use-field-listeners inlined back; `effectiveDisabled`; `own`; NumberField's Label count inline;
   dev-warning options with one doc line.
-- C12 follow-up (NumberField step buttons -> `disabledButton`): waits for wave16/overlays.
+- After wave16/overlays merged (rebase had no conflicts): NumberField step buttons use
+  `disabledButton`; ToggleGroup `registerItem`; `useStepButtonElement` and the button types live in
+  use-step-button.ts; the `FormAssociatedElement` re-export is gone (combobox already imported the
+  source).
 
 ## Not done / deferred
 
 - C13 CheckboxGroup context memoisation: memoising changes when Items re-render, and the
   late-hydration snapshot relies on the registration re-render re-applying `checked`. Not
   behaviour-neutral.
-- C13 ToggleGroup `register` -> `registerItem`, `useStepButtonElement` move, dropping the
-  `FormAssociatedElement` re-export (combobox-root imports it): overlap with the overlay
-  developer's C12 / overlay files.
 - C13 controlled-value identity (Accordion / ToggleGroup JSON key vs CheckboxGroup identity):
   design decision, recorded only.
 - Line count (non-test packages/ui/src): 26943 on master -> 27274. The dedupes
