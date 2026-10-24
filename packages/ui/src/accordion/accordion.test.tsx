@@ -1,15 +1,17 @@
 // Accordion tests, mapped to design/components/accordion.md section 11.
 //
-// Browser-mode TODOs (jsdom cannot observe these; conventions 10.1). They belong in a sibling
-// `accordion.browser.test.tsx`:
+// What jsdom cannot observe is covered elsewhere (conventions 10.1):
 // - Enter/Space on a focused <summary> synthesize a click in browsers but not in jsdom, and
 //   user-event's Enter/Space click only buttons, links and inputs. Keyboard toggling is covered
-//   here through the click path (the same handler); the browser file should press the keys.
-// - `<details name>` exclusivity is not implemented by jsdom: JS-free exclusive tests assert the
-//   attribute only. Library-mode exclusivity (which does not use `name`) is tested fully.
+//   here through the click path (the same handler); `accordion.browser.test.tsx` presses the
+//   keys, in library mode and JS-free.
+// - `<details name>` exclusivity is not implemented by jsdom: JS-free exclusive tests here assert
+//   the attribute only; `accordion.browser.test.tsx` shows the platform closing the other item.
+//   Library-mode exclusivity (which does not use `name`) is tested fully here.
 // - Find-in-page cannot be simulated. The platform path is driven by `setAttribute("open", "")`,
 //   which makes jsdom fire `toggle` on a macrotask exactly like a browser does.
-// - ViewTransition: jsdom has no `startViewTransition`, so `transition` is smoke-tested only.
+// - ViewTransition: jsdom has no `startViewTransition`, so `transition` is smoke-tested here;
+//   `internal/transition-boundary.browser.test.tsx` ("Accordion expand") covers it in browsers.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
@@ -257,7 +259,7 @@ describe("Accordion", () => {
       expect(item("b")).toHaveAttribute("name", name!);
       unmount();
 
-      // TODO(browser mode): assert that opening B closes A through the platform's `name` group.
+      // The platform's `name` group closing A is shown in accordion.browser.test.tsx.
       render(<Harness mode="uncontrolled" exclusive />);
       expect(item("a")).not.toHaveAttribute("name");
       expect(item("b")).not.toHaveAttribute("name");
