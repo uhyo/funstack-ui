@@ -417,6 +417,8 @@ export function usePopoverPopup(
       interestHideTask.current = setTimeout(() => {
         interestHideTask.current = undefined;
         if (!isPopoverOpen(element) || !ctx.intended()) return;
+        // Interest regained meanwhile (the pointer came back): the popup stays.
+        if (interestInvoker.current !== null) return;
         // Recorded right before the hide, so its one-task clear cannot run first.
         ctx.recordCloseIntent({ reason: "dismiss", event });
         interestHide.current = true;

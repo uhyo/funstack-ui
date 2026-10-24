@@ -2323,7 +2323,9 @@ the callback ref and removed in its cleanup; the events exist only where `intere
   pending cancel below. (Accepted staleness: a Trigger click that cancels a pending interest
   open leaves the flag set until the next close; the only effect is that a later lost interest
   of a re-hovered button closes that Trigger-opened popup, which is what the consumer asked for
-  by naming the popup.)
+  by naming the popup. A controlled parent that refuses an interest open leaves the flag stale
+  the same way, since no `toggle(closed)` follows an open that never showed, and it is harmless
+  for the same reason.)
 - `onLoseInterest(event)`: `event.target === popup`, library mode, `source ===
   interestInvoker.current`; clear `interestInvoker`; return unless `interestOpen.current`. If
   `isPopoverOpen(popup)`: `setTimeout(() => { if (!isPopoverOpen(popup) || !ctx.intended())

@@ -943,6 +943,91 @@ describe("Popover", () => {
       expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
     });
 
+    it("interest regained before the hide task runs keeps the popup shown", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      await interestOpen(foreign);
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+        // The pointer comes back before the task (an `interest-delay-start` of about 0).
+        dispatchInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it("after a lost-interest hide, a later dismissal returns focus to the Trigger again", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      await interestOpen(foreign);
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      expect(trigger()).not.toHaveFocus();
+      await openThroughTrigger(user);
+      expect(screen.getByTestId("close")).toHaveFocus();
+      // A dismissal with focus inside (jsdom's `hidePopover()` leaves it there): the 6.2
+      // fallback applies, the skip was for the lost-interest hide only.
+      await act(async () => popup().hidePopover());
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      expect(trigger()).toHaveFocus();
+    });
+
+    it("an interest open closed otherwise does not make a later Trigger-click open interest-closable", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      await interestOpen(foreign);
+      await act(async () => popup().hidePopover());
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      await openThroughTrigger(user);
+      expect(action).toHaveBeenCalledTimes(3);
+      await act(async () => gainInterest(popup(), foreign));
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(3);
+    });
+
+    it("a cancelled pending interest open does not make a later Trigger-click open interest-closable", async () => {
+      const user = setupUser();
+      const opening = deferred();
+      const closing = deferred();
+      const action = vi.fn<ActionFn>();
+      action.mockImplementationOnce(() => opening.promise);
+      action.mockImplementationOnce(() => closing.promise);
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      await act(async () => gainInterest(popup(), foreign));
+      await act(async () => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await act(async () => opening.resolve());
+      await act(async () => closing.resolve());
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      await openThroughTrigger(user);
+      expect(action).toHaveBeenCalledTimes(3);
+      await act(async () => gainInterest(popup(), foreign));
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(3);
+    });
+
     it("lost interest after the library's own close began does not hide again", async () => {
       const user = setupUser();
       const closing = deferred();

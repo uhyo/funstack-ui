@@ -45,6 +45,22 @@ before the hover, as the platform's own lost-interest hide). The timer ref is `i
 Mutation (drop the flag): browser hover-out row (focus `<body>`) and Trigger row (re-opens), and
 jsdom row 1 (Trigger focused).
 
+## Review fixes (memo/reviewer/issue-127-review.md)
+
+- F1: jsdom row "after a lost-interest hide, a later dismissal returns focus to the Trigger
+  again" (mutation: drop the `interestHide` clear in `onToggle` → fails).
+- F2: jsdom row "an interest open closed otherwise does not make a later Trigger-click open
+  interest-closable" (drop the `interestOpen` clear at `toggle(closed)` → fails); plus "a
+  cancelled pending interest open ..." for the pending-cancel clear (drop it → fails).
+- F4 (PO: adopt): the hide task also returns when `interestInvoker` is set again (interest
+  regained before the task ran); jsdom row "interest regained before the hide task runs keeps the
+  popup shown" (drop the guard → fails). **For the architect:** the amendment's task snippet
+  does not show this guard yet.
+- F3: one sentence added to the amendment's accepted-staleness note (a controlled parent refusing
+  an interest open leaves `interestOpen` stale, harmless for the same reason). **For the
+  architect** to confirm the wording.
+- F5, F6: no change (F6 accepted by the lead as following the design).
+
 ## Release notes
 
 fix: a library-mode Popover opened by an `interestfor` button now hides on lost interest
