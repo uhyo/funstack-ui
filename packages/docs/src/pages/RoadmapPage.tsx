@@ -37,8 +37,8 @@ export function RoadmapPage() {
           Move CSS from <code>[aria-expanded="true"]</code> to <code>[data-open]</code> (now also
           written in Popover's JS-free mode), or to <code>:has(+ :popover-open)</code> on a page
           that never hydrates; move <code>[commandfor]</code> selectors on these Triggers to{" "}
-          <code>[popovertarget]</code>. A link or component <code>render</code> keeps{" "}
-          <code>aria-expanded</code> (<a href={issue(121)}>#121</a>).
+          <code>[popovertarget]</code>. A link or other non-button element (or a disabled component{" "}
+          <code>render</code>) keeps <code>aria-expanded</code> (<a href={issue(121)}>#121</a>).
         </li>
         <li>
           <strong>Breaking:</strong> <code>Combobox.Root</code>'s{" "}

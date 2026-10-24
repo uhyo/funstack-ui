@@ -278,10 +278,10 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are omitted from the props type (reserved)."
+          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are owned too (never written: an Invoker Command would take precedence over `popovertarget`) and omitted from the props type."
         }
         note={
-          "Use it in a top-level Root only. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown menu's state on a `popovertarget` invoker ([#121](https://github.com/uhyo/funstack-ui/issues/121)); a link or component `render` renders it."
+          "Use it in a top-level Root only. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown menu's state on a `popovertarget` invoker ([#121](https://github.com/uhyo/funstack-ui/issues/121)); a link or other non-button element (or a disabled component `render`) renders it."
         }
       />
 
@@ -501,7 +501,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction`, `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `data-open`, `data-pending`; `commandfor` and `command` reserved) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+          "the Trigger's (`type`, `id`, `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction`, `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `data-open`, `data-pending`; `commandfor` and `command`, never written) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
         }
         note={
           "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. Use it in a submenu Root only."
@@ -515,7 +515,7 @@ export function MenuPage() {
           ["`data-open`", "Trigger, SubmenuTrigger", "Optimistic open state of the Root."],
           [
             "`aria-expanded`",
-            "Trigger, SubmenuTrigger (link or component `render` only)",
+            "Trigger, SubmenuTrigger (a link or other non-button element, or a disabled component `render`, only)",
             "Whether the menu is shown (mirrored from its `toggle` event, not optimistic). A `<button>` has none: the browser exposes the state.",
           ],
           [

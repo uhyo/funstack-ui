@@ -116,7 +116,7 @@ export function PopoverPage() {
           [
             "Trigger's exposed expanded state",
             "the browser's, from `popovertarget` (no `aria-expanded` on a `<button>`)",
-            "the same; a link or component `render` renders `aria-expanded` from whether the popup is shown",
+            "the same; a link or other non-button element (or a disabled component `render`) renders `aria-expanded` from whether the popup is shown",
           ],
           [
             "Trigger `data-open`",
@@ -226,7 +226,7 @@ export function PopoverPage() {
           "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open, a part's close or a dismissal notification."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-expanded` (rendered only without `popoverTarget`), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are omitted from the props type (reserved)."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-expanded` (rendered only without `popoverTarget`), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are owned too (never written: an Invoker Command would take precedence over `popovertarget`) and omitted from the props type."
         }
         note={
           "A click on a `<button>` Trigger while open is a part's close; a second click during a pending open cancels it (the latest intent wins). A `<button>` Trigger renders no `aria-expanded`: the browser exposes the popup's state on a `popovertarget` invoker ([#121](https://github.com/uhyo/funstack-ui/issues/121)). A Trigger rendered as another element (library mode) is no invoker, so it renders `aria-expanded` from whether the popup is shown, and a press on it while open light-dismisses the popup before the click: the close is reported as `\"activate\"` but not awaited, a controlled parent cannot veto it and there is no exit transition ([#115](https://github.com/uhyo/funstack-ui/issues/115)); a development warning says so. `aria-haspopup` and `aria-controls` pass through."
@@ -382,7 +382,7 @@ export function PopoverPage() {
           ],
           [
             "`aria-expanded`",
-            "Trigger (link or component `render` only)",
+            "Trigger (a link or other non-button element, or a disabled component `render`, only)",
             "Whether the popup is shown (library mode). A `<button>` Trigger has none: the browser exposes the state.",
           ],
           [
@@ -503,9 +503,10 @@ export function PopoverPage() {
           popovers; Chromium would expose a <code>&lt;dialog popover&gt;</code> as modal). The
           Trigger is a <code>popovertarget</code> invoker, which every engine exposes as expanded or
           collapsed from the popover itself, so a <code>&lt;button&gt;</code> Trigger renders no{" "}
-          <code>aria-expanded</code> (ARIA in HTML forbids it there); a link or component{" "}
-          <code>render</code> renders it. No <code>aria-haspopup</code> (the APG disclosure shape);
-          add <code>aria-haspopup="dialog"</code> or <code>aria-controls</code> yourself if you want
+          <code>aria-expanded</code> (ARIA in HTML forbids it there); a link or other non-button
+          element (or a disabled component <code>render</code>) renders it. No{" "}
+          <code>aria-haspopup</code> (the APG disclosure shape); add{" "}
+          <code>aria-haspopup="dialog"</code> or <code>aria-controls</code> yourself if you want
           them.
         </li>
         <li>
@@ -567,7 +568,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown state of the popup it targets, so after Escape or a click outside it is collapsed at once, even while the dismissal notification runs (a link or component `render` renders that shown state as `aria-expanded`). The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown state of the popup it targets, so after Escape or a click outside it is collapsed at once, even while the dismissal notification runs (a link or other non-button element (or a disabled component `render`) renders that shown state as `aria-expanded`). The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
         }
       >
         <h4>Walkthrough (library mode)</h4>

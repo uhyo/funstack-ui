@@ -52,3 +52,20 @@ shim branch removed (11 jsdom fails); shim action ignored / command event dispat
 row); button renders `aria-expanded` again (54 jsdom, 9 menu browser); non-button renders none
 (44); Combobox non-button none (1) / button again (8); `popoverTargetAction` not owned (1); AX
 helper inverted (6 Chromium).
+
+## Review fixes (memo/reviewer/issue-121-review.md)
+
+- F1: `commandfor` / `command` are owned again (`undefined` in the hook's and Combobox's
+  libraryProps): a render `<button commandfor command>` would otherwise win over `popovertarget`.
+  Override test restored; new jsdom + browser (Chromium, Firefox) rows show the Trigger opens its
+  own popup. Mutations caught (hook: 2 jsdom + 2 browser; Combobox: 1).
+- F2: "a link or other non-button element (or a disabled component `render`)" in docs and
+  menu-trigger.tsx (an enabled component render is an invoker).
+- F3: JS-free non-button warning names `popovertarget`; a jsdom row pins the text.
+- F4: trigger-ref.ts comment / warning per the reviewer (no "counts as outside").
+- F5: menu.browser rows: SubmenuTrigger collapsed/expanded/collapsed, Menu.Trigger deferred open,
+  refused-Escape re-show (AX on Chromium; inverted-AX mutation fails all three).
+- F6: `axNodeOf` resolves the element with `DOM.querySelector` in the test frame +
+  `Accessibility.getPartialAXTree`; the Popover Escape row and both Combobox rows use deferreds
+  instead of fixed 300 ms windows.
+- F7: popover.md 3.2 says `popoverTargetAction` is owned (separate commit, PO-approved).
