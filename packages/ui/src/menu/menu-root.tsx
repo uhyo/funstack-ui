@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
 import { useDelayedPair } from "../internal/use-delayed-pair.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { usePopoverRoot } from "../internal/use-popover-root.js";
+import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import {
   ANCHOR_PLACEMENT,
@@ -131,13 +131,14 @@ export function MenuRoot({
   // Set by `openAt` around its `requestOpen`: the dispatch is a point open.
   const pointDispatch = useRef(false);
 
-  const popover = usePopoverRoot<MenuOpenChangeDetails>({
+  const popover = useOverlayRoot<MenuOpenChangeDetails>({
     component: "menu",
     part: "Menu.Root",
     mode: "library",
     open,
     defaultOpen,
     openChangeAction,
+    details: popoverDetails,
     onDispatch: (next) => {
       // Any dispatch cancels hover intent (design walkthrough 9).
       timers.cancel();
@@ -201,7 +202,7 @@ export function MenuRoot({
 
   const resolvedDelay = delay ?? 100;
   const resolvedCloseDelay = closeDelay ?? 150;
-  // `popover` is memoised by `usePopoverRoot` and the other members are stable, so this
+  // `popover` is memoised by `useOverlayRoot` and the other members are stable, so this
   // changes only with the open state, pending and the props listed below.
   const value = useMemo<MenuContextValue>(() => {
     const self: MenuContextValue = {

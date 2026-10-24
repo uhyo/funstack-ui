@@ -3,7 +3,7 @@ import { useCallback, useInsertionEffect, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
-import { useOverlayRoot } from "../internal/use-popover-root.js";
+import { useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
 import type { DialogContextValue } from "./dialog-context.js";

@@ -7,7 +7,7 @@ import type { RenderProp } from "./types.js";
 import { useElementCheck } from "./use-element-check.js";
 import { disabledButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
-import type { PopoverRootValue } from "./use-popover-root.js";
+import type { PopoverRootValue } from "./use-overlay-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 

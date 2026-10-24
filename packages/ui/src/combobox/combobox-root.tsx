@@ -28,7 +28,7 @@ import { transitionTypes } from "../internal/transition-types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
-import { usePopoverRoot } from "../internal/use-popover-root.js";
+import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import { comboboxKeyDown } from "./combobox-keyboard.js";
@@ -248,13 +248,14 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     [id, fieldControlId],
   );
 
-  const popover = usePopoverRoot<ComboboxOpenChangeDetails>({
+  const popover = useOverlayRoot<ComboboxOpenChangeDetails>({
     component: "combobox",
     part: "Combobox.Root",
     mode: "library",
     open,
     defaultOpen,
     openChangeAction,
+    details: popoverDetails,
   });
 
   // --- Refs the handlers read after an `await` or from a timer ------------------------------

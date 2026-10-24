@@ -8,8 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import { setupUser, flushTasks } from "../__tests__/helpers.js";
 import type { ChangeReason } from "./types.js";
 import { usePopoverPopup } from "./use-popover-popup.js";
-import { usePopoverRoot } from "./use-popover-root.js";
-import type { PopoverLikeDetails, PopoverRootValue } from "./use-popover-root.js";
+import { popoverDetails, useOverlayRoot } from "./use-overlay-root.js";
+import type { OverlayDetails, PopoverRootValue } from "./use-overlay-root.js";
 import { usePopoverTrigger } from "./use-popover-trigger.js";
 
 function Mini({
@@ -17,17 +17,18 @@ function Mini({
   resolve,
   transition,
 }: {
-  onDispatch?: (next: boolean, details: PopoverLikeDetails) => void;
+  onDispatch?: (next: boolean, details: OverlayDetails) => void;
   resolve?: (popup: HTMLElement) => HTMLElement | null;
   transition?: ViewTransitionClass;
 }) {
-  const ctx = usePopoverRoot<PopoverLikeDetails>({
+  const ctx = useOverlayRoot<OverlayDetails>({
     component: "menu",
     part: "Mini.Root",
     mode: "library",
     open: undefined,
     defaultOpen: undefined,
     openChangeAction: undefined,
+    details: popoverDetails,
     onDispatch,
   });
   // Destructured: React Compiler's ref inference taints an object once one of its members is
@@ -81,7 +82,7 @@ function Mini({
 describe("shared popover hooks: Menu's extension points", () => {
   it('mode: "library" without any prop: the Trigger click is intercepted and opens', async () => {
     const user = setupUser();
-    const onDispatch = vi.fn<(next: boolean, details: PopoverLikeDetails) => void>();
+    const onDispatch = vi.fn<(next: boolean, details: OverlayDetails) => void>();
     render(<Mini onDispatch={onDispatch} />);
     expect(screen.queryByTestId("one")).toBeNull();
     await user.click(screen.getByTestId("trigger"));
@@ -125,13 +126,13 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(screen.getByTestId("trigger")).toHaveFocus();
   });
 
-  it("usePopoverRoot returns the same value across re-renders with unchanged state (#48)", async () => {
+  it("useOverlayRoot returns the same value across re-renders with unchanged state (#48)", async () => {
     const user = setupUser();
     const values: PopoverRootValue[] = [];
     const first = vi.fn();
     const second = vi.fn();
     function Root({ onDispatch }: { onDispatch: () => void }) {
-      const ctx = usePopoverRoot<PopoverLikeDetails>({
+      const ctx = useOverlayRoot<OverlayDetails>({
         component: "menu",
         part: "Stable.Root",
         mode: "library",

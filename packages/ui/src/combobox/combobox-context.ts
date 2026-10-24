@@ -1,7 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { RefObject } from "react";
-import type { PopoverRootValue } from "../internal/use-popover-root.js";
+import type { PopoverRootValue } from "../internal/use-overlay-root.js";
 
 /** What a mounted `Combobox.Option` tells its Root (design 2, "mounted options, labels"). */
 export interface ComboboxOptionEntry {
@@ -13,7 +13,7 @@ export interface ComboboxOptionEntry {
 
 /** One Combobox: what its Root provides to every part (design 14, `combobox-context.ts`). */
 export interface ComboboxContextValue {
-  /** The shared popover machinery (`usePopoverRoot`, library mode). */
+  /** The shared popover machinery (`useOverlayRoot`, library mode). */
   readonly popover: PopoverRootValue;
   readonly ids: {
     readonly input: string;

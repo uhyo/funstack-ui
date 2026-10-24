@@ -1,7 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { ChangeReason } from "../internal/types.js";
-import type { OverlayRootValue } from "../internal/use-popover-root.js";
+import type { OverlayRootValue } from "../internal/use-overlay-root.js";
 
 /**
  * The Root's machinery (`useOverlayRoot`, as Popover's) with the `<dialog>` as the popup element

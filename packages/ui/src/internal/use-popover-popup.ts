@@ -14,7 +14,7 @@ import { isPopoverOpen } from "./popover-open.js";
 import { useElementCheck } from "./use-element-check.js";
 import { useLatest } from "./use-latest.js";
 import { useShownNameWarning } from "./use-name-warning.js";
-import type { PopoverRootValue } from "./use-popover-root.js";
+import type { PopoverRootValue } from "./use-overlay-root.js";
 
 export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */

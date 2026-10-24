@@ -1,7 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
-import { usePopoverRoot } from "../internal/use-popover-root.js";
+import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { PopoverContext } from "./popover-context.js";
 
@@ -64,12 +64,13 @@ export interface PopoverRootProps {
  * browser's and `openChangeAction(false)` is a notification.
  */
 export function PopoverRoot({ open, defaultOpen, openChangeAction, children }: PopoverRootProps) {
-  const context = usePopoverRoot<PopoverOpenChangeDetails>({
+  const context = useOverlayRoot<PopoverOpenChangeDetails>({
     component: "popover",
     part: "Popover.Root",
     open,
     defaultOpen,
     openChangeAction,
+    details: popoverDetails,
   });
 
   const state: PopoverRootState = { open: context.optimistic, pending: context.pending };

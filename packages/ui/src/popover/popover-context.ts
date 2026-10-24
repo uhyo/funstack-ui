@@ -1,6 +1,6 @@
 "use client";
 import { createContext, use } from "react";
-import type { PopoverRootValue } from "../internal/use-popover-root.js";
+import type { PopoverRootValue } from "../internal/use-overlay-root.js";
 import type { PopoverPopupState } from "./popover-popup.js";
 
 export const PopoverContext = createContext<PopoverRootValue | null>(null);

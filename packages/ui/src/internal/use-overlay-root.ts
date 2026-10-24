@@ -16,19 +16,19 @@ const isDev = process.env.NODE_ENV !== "production";
  * opening and part-initiated closing are library-owned (transitions keyed on committed state);
  * dismissals are the browser's and notified (design/components/popover.md section 2).
  */
-export type PopoverMode = "static" | "library";
+export type OverlayMode = "static" | "library";
 
 /**
  * What caused the next close, recorded just before it happens (design 2.3). The `toggle` event
  * carries no source; without an intent a close is a `"dismiss"`.
  */
-export interface PopoverCloseIntent {
+export interface OverlayCloseIntent {
   readonly reason: ChangeReason;
   readonly event: Event | undefined;
 }
 
-/** The `details` every popover-like `openChangeAction` receives. */
-export interface PopoverLikeDetails extends ActionDetails {
+/** The `details` every overlay `openChangeAction` receives (Dialog's adds `returnValue`). */
+export interface OverlayDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
@@ -39,7 +39,7 @@ export interface PopoverLikeDetails extends ActionDetails {
  * close (Dialog's `returnValue`), passed on to the `details` builder.
  */
 export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends unknown[]> {
-  readonly mode: PopoverMode;
+  readonly mode: OverlayMode;
   /** `useId`-based ids: the popup, its Title and its Description. */
   readonly ids: { readonly popup: string; readonly title: string; readonly description: string };
   /** Committed open state (library mode); `false` in JS-free mode. */
@@ -94,14 +94,19 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()` / `close()`. */
   readonly popupRef: RefObject<Popup | null>;
   /** Record what causes the next close. Cleared after a task if the popover did not close. */
-  readonly recordCloseIntent: (intent: PopoverCloseIntent | undefined) => void;
+  readonly recordCloseIntent: (intent: OverlayCloseIntent | undefined) => void;
   /** Read and clear the recorded intent (the Popup's `toggle` listener). */
-  readonly takeCloseIntent: () => PopoverCloseIntent | undefined;
+  readonly takeCloseIntent: () => OverlayCloseIntent | undefined;
 }
 
+/** The root value of the popover-like components (Popover, Menu, Combobox). */
 export type PopoverRootValue = OverlayRootValue<HTMLElement, []>;
 
-export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
+export interface UseOverlayRootOptions<
+  Details extends ActionDetails,
+  Popup extends HTMLElement = HTMLElement,
+  CloseArgs extends unknown[] = [],
+> {
   /** Transition types and messages: `"popover"` gives `fsui-popover`, `fsui-popover-open`, … */
   readonly component: string;
   /** Public name of the Root part for development warnings (`"Popover.Root"`). */
@@ -119,24 +124,7 @@ export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
    * read the open cause).
    */
   readonly onDispatch?: (next: boolean, details: Details) => void;
-  /**
-   * Builds the `details` of a dispatch. Default: `createActionDetails(event, { reason })`, which
-   * fits only a details type with no other fields.
-   */
-  readonly details?: (event: Event | undefined, reason: ChangeReason) => Details;
-}
-
-export interface UseOverlayRootOptions<
-  Details extends ActionDetails,
-  Popup extends HTMLElement,
-  CloseArgs extends unknown[],
-> extends Omit<
-  UsePopoverRootOptions<PopoverLikeDetails>,
-  "openChangeAction" | "onDispatch" | "details"
-> {
-  readonly openChangeAction: ChangeAction<boolean, Details> | undefined;
-  readonly onDispatch?: (next: boolean, details: Details) => void;
-  /** Builds the `details` of a dispatch; an open passes no `args`. */
+  /** Builds the `details` of a dispatch (`popoverDetails`: `{ reason }`); an open passes no args. */
   readonly details: (
     event: Event | undefined,
     reason: ChangeReason,
@@ -148,8 +136,8 @@ export interface UseOverlayRootOptions<
 
 /** How long a recorded close intent survives when the popup did not close (design 2.3). */
 function clearLater<Popup extends HTMLElement>(
-  intentRef: { current: PopoverCloseIntent | undefined },
-  intent: PopoverCloseIntent,
+  intentRef: { current: OverlayCloseIntent | undefined },
+  intent: OverlayCloseIntent,
   popupRef: { current: Popup | null },
   isShown: (popup: Popup) => boolean,
 ): void {
@@ -163,27 +151,9 @@ function clearLater<Popup extends HTMLElement>(
   }, 0);
 }
 
-const popoverDetails = (event: Event | undefined, reason: ChangeReason): PopoverLikeDetails =>
+/** The `details` of a popover-like component: `{ reason }` (and `event`). */
+export const popoverDetails = (event: Event | undefined, reason: ChangeReason): OverlayDetails =>
   createActionDetails(event, { reason });
-
-/**
- * The Root of a popover-like component without its public props (design 14.1), with the
- * default `details` (`{ reason }`).
- */
-export function usePopoverRoot<Details extends PopoverLikeDetails>(
-  options: UsePopoverRootOptions<Details> &
-    (PopoverLikeDetails extends Details
-      ? unknown
-      : Required<Pick<UsePopoverRootOptions<Details>, "details">>),
-): PopoverRootValue;
-export function usePopoverRoot(
-  options: UsePopoverRootOptions<PopoverLikeDetails>,
-): PopoverRootValue {
-  return useOverlayRoot<PopoverLikeDetails, HTMLElement, []>({
-    ...options,
-    details: options.details ?? popoverDetails,
-  });
-}
 
 /**
  * The Root of an overlay without its public props: mode detection (once, from the first
@@ -192,8 +162,8 @@ export function usePopoverRoot(
  */
 export function useOverlayRoot<
   Details extends ActionDetails,
-  Popup extends HTMLElement,
-  CloseArgs extends unknown[],
+  Popup extends HTMLElement = HTMLElement,
+  CloseArgs extends unknown[] = [],
 >(options: UseOverlayRootOptions<Details, Popup, CloseArgs>): OverlayRootValue<Popup, CloseArgs> {
   const { component, part, open, defaultOpen, openChangeAction, details, onDispatch } = options;
 
@@ -203,7 +173,7 @@ export function useOverlayRoot<
     open !== undefined ||
     defaultOpen !== undefined ||
     openChangeAction !== undefined;
-  const [mode] = useState<PopoverMode>(isLibraryNow ? "library" : "static");
+  const [mode] = useState<OverlayMode>(isLibraryNow ? "library" : "static");
   const isLibrary = mode === "library";
   useDevWarning(
     isLibrary !== isLibraryNow,
@@ -229,7 +199,7 @@ export function useOverlayRoot<
   const id = useId();
   const triggerRef = useRef<HTMLElement | null>(null);
   const popupRef = useRef<Popup | null>(null);
-  const closeIntent = useRef<PopoverCloseIntent | undefined>(undefined);
+  const closeIntent = useRef<OverlayCloseIntent | undefined>(undefined);
 
   // The optimistic value of the last commit, for callers that run after an `await` (a Close
   // action's continuation) and would otherwise read the value of the render they were created in.
@@ -246,7 +216,7 @@ export function useOverlayRoot<
   }, []);
 
   const recordCloseIntent = useCallback(
-    (intent: PopoverCloseIntent | undefined) => {
+    (intent: OverlayCloseIntent | undefined) => {
       closeIntent.current = intent;
       if (intent !== undefined) {
         clearLater(closeIntent, intent, popupRef, callbacks.current.isShown ?? isPopoverOpen);

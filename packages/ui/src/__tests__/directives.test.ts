@@ -77,7 +77,7 @@ const clientFiles = [
   "popover/popover-close.mjs",
   "popover/popover-title.mjs",
   "popover/popover-description.mjs",
-  "internal/use-popover-root.mjs",
+  "internal/use-overlay-root.mjs",
   "internal/use-popover-popup.mjs",
   "internal/use-popover-trigger.mjs",
   "internal/use-exit-animation.mjs",

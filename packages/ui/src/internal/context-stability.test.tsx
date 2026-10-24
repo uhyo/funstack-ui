@@ -1,5 +1,5 @@
 // #48: a Root's context value is memoised and the shared hooks under it (`useControllableAction`,
-// `usePopoverRoot`) return stable values, so when the Root re-renders with nothing its parts read
+// `useOverlayRoot`) return stable values, so when the Root re-renders with nothing its parts read
 // having changed (here: its owner re-renders and passes a new inline action), the parts below it
 // do not re-render. The parts are created once, outside the owner, so the only way they can
 // re-render is through a changed context value. Their `className` function counts their renders

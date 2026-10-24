@@ -1,7 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { DelayedPair } from "../internal/use-delayed-pair.js";
-import type { PopoverRootValue } from "../internal/use-popover-root.js";
+import type { PopoverRootValue } from "../internal/use-overlay-root.js";
 
 /**
  * Where focus goes when the menu opens (design/components/menu.md 6.1): the first enabled item,
@@ -65,7 +65,7 @@ export interface MenuOpenAtOptions {
 
 /** One menu level: what its Root provides to its Trigger, Popup and items. */
 export interface MenuContextValue {
-  /** The shared popover machinery (`usePopoverRoot`). */
+  /** The shared popover machinery (`useOverlayRoot`). */
   readonly popover: PopoverRootValue;
   /** This Root is nested in a `Menu.Popup`. */
   readonly submenu: boolean;
