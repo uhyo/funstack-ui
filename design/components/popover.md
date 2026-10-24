@@ -47,12 +47,12 @@ animate the exit in every engine, Firefox included.
 | 4 | Element | `<dialog popover="auto">` with an explicit `aria-modal="false"` (Chromium exposes it as modal otherwise) and `role="dialog"` as an overridable default. The popover focusing steps run the dialog focusing steps (verified in Chromium, Firefox and WebKit; no library fallback), so focus moves into the popup on open as the APG asks for a non-modal dialog, with the same `initialFocus` / `autofocus` story as Dialog. `render={<div />}` keeps focus on the trigger (disclosure-style). |
 | 5 | Dismissal | `auto` only: light dismiss, Escape, Android back, one-at-a-time stacking are the platform's in every engine. No `lightDismiss` prop, no `manual` variant in v0. |
 | 6 | Nesting | A Popover inside a Popup is a nested auto popover: opened with `commandfor` or `showPopover({ source })` so the outer stays open; Escape closes the innermost; an outside click closes the stack. The platform restores focus only for the first popover in a stack, so the library restores focus to the Trigger when focus was inside the closed popup (or inside the content the close commit unmounted) and the platform left it on `<body>` (section 6.2). Never portals (inside a modal Dialog a portalled popover would be inert). |
-| 7 | Pending UI | Trigger: `data-open` (optimistic), `aria-expanded` (shown: the Root's urgent mirror of the popup's `toggle`, #118), `data-pending` (library mode). The Popup emits no `data-open` (`:popover-open` is exact). Root has no DOM, so `pending` lives on the Trigger and in Root's `children(state)`. JS-free mode: `aria-expanded` is written on the Trigger from the popup's `toggle` listener (no React state). |
+| 7 | Pending UI | Trigger: `data-open` (optimistic), `data-pending` (library mode). **No `aria-expanded` on a `<button>` Trigger (#121)**: it is a `popovertarget` invoker and every engine exposes its popover's own shown state; a non-button `render` (no invoker) renders `aria-expanded` from the Root's urgent `shown` mirror of the popup's `toggle` (#118). The Popup emits no `data-open` (`:popover-open` is exact). Root has no DOM, so `pending` lives on the Trigger and in Root's `children(state)`. JS-free mode: `data-open` is written on the Trigger from the popup's `toggle` listener (no React state). |
 | 8 | Reasons | `details.reason`: `"activate"` (Trigger, Close, a foreign invoker), `"dismiss"` (Escape, light dismiss, script `hidePopover()`), `"platform"` (found open on mount after a pre-hydration click). No `returnValue`: popovers have none. |
 | 9 | Content mounting | Library mode: children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">` (boolean only). Unmount waits for the popover's CSS exit animation **unless `transition` is set**, in which case a library-driven close unmounts in the close commit and the view transition carries the content out (section 4.4). JS-free mode: always mounted. |
-| 10 | Positioning | `side` (`"bottom"`) and `align` (`"center"`) on Popup set inline `position-area` and `position-try-fallbacks`, the shared matrix of conventions 13.1 (physical sides plus `inline-start` / `inline-end`; inline-relative `align` on a horizontal side; wave 11, #53); `side={null}` emits nothing. `data-side` / `data-align` and `state.side` / `state.align` are the **resolved** placement while shown (conventions 13.2; wave 11, #20). Anchor: the implicit anchor from `commandfor` (JS-free) or `showPopover({ source: trigger })` (library). |
+| 10 | Positioning | `side` (`"bottom"`) and `align` (`"center"`) on Popup set inline `position-area` and `position-try-fallbacks`, the shared matrix of conventions 13.1 (physical sides plus `inline-start` / `inline-end`; inline-relative `align` on a horizontal side; wave 11, #53); `side={null}` emits nothing. `data-side` / `data-align` and `state.side` / `state.align` are the **resolved** placement while shown (conventions 13.2; wave 11, #20). Anchor: the implicit anchor from `popovertarget` (JS-free, #121) or `showPopover({ source: trigger })` (library). |
 | 11 | Animation | CSS (`@starting-style`, `allow-discrete`, `overlay`) for every open and for browser-owned closes; exit is progressive enhancement (none in Firefox). With `transition`, `<ViewTransition>` wraps **the `<dialog popover>` element itself** and animates library-driven opens and closes in all three engines, Firefox's exit included (research, "ViewTransition"). |
-| 12 | Directives | Every part file is `"use client"` (context for ids and mode). "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration, as in Dialog. A directive-free Popover (#19, resolved 2026-10-23, option A) is not scheduled: a static Trigger could not keep a server-rendered `aria-expanded` current, and Firefox maps no expanded state for a `commandfor` invoker (Chromium and WebKit do; all three map `popovertarget`, #118), so that gap must close first (conventions 7.3; the #118 follow-up issue on `popovertarget` would close it). |
+| 12 | Directives | Every part file is `"use client"` (context for ids and mode). "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration, as in Dialog. A directive-free Popover (#19, resolved 2026-10-23, option A) is not scheduled; since #121 it is viable in principle (a static `popoverTarget` Trigger needs no ARIA kept current, and all three engines map `popovertarget`) and stays unscheduled for the reasons Accordion's option B is (conventions 7.3). |
 | 13 | For Menu | The Root state, the Popup machinery (apply effect, listeners, close intents, focus-return fallback, deferred unmount, `aria-expanded` sync), the Trigger interception and the positioning helper are internal hooks that `Menu` (#39) composes with `role="menu"`, `aria-haspopup`, item parts and keyboard handling of its own (section 15). |
 
 ---
@@ -63,7 +63,7 @@ animate the exit in every engine, Firefox included.
 import { Popover } from "@funstack/ui/popover";
 
 <Popover.Root>                                        {/* no DOM; owns ids, mode, state, context */}
-  <Popover.Trigger>Filters</Popover.Trigger>          {/* button[commandfor][command=toggle-popover] */}
+  <Popover.Trigger>Filters</Popover.Trigger>          {/* button[popovertarget] */}
   <Popover.Popup side="bottom" align="start">         {/* dialog[popover=auto][aria-modal=false] */}
     <Popover.Title>Filters</Popover.Title>            {/* h2; wires aria-labelledby */}
     <Popover.Description>Narrow the list.</Popover.Description>
@@ -76,7 +76,7 @@ import { Popover } from "@funstack/ui/popover";
 Rendered HTML (JS-free mode; ids come from one `useId` in Root):
 
 ```html
-<button type="button" commandfor="_r_1_" command="toggle-popover" aria-expanded="false">Filters</button>
+<button type="button" popovertarget="_r_1_">Filters</button>
 <dialog
   id="_r_1_"
   popover="auto"
@@ -98,7 +98,7 @@ Rendered HTML (JS-free mode; ids come from one `useId` in Root):
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.open` (optimistic), `state.pending` in `children(state)` | Owns `useId`, mode, the state hook, refs and context. No `ref`, `className`, `style`. |
-| `Trigger` | `button` | button | `aria-expanded` (the shown popup in library mode, from the Root's `shown` mirror, #118; DOM-synced in JS-free mode), `data-open` (optimistic), `data-pending` (library mode), `data-disabled` whenever disabled, in every mode (wave 9, 5fc05d5) | `commandfor` + `command="toggle-popover"`. No `aria-haspopup` (APG disclosure has none; Menu adds `"menu"`). |
+| `Trigger` | `button` | button | `data-open` (optimistic in library mode; DOM-synced from `toggle` in JS-free mode, #121), `data-pending` (library mode), `data-disabled` whenever disabled, in every mode (wave 9, 5fc05d5); `aria-expanded` only on a non-button `render` (the shown popup, from the Root's `shown` mirror, #118 / #121) | `popoverTarget` (the Popup's id; default action `toggle`, #121). No `aria-expanded` on the invoker (ARIA in HTML #514; the engines expose the popover's state). No `aria-haspopup` (APG disclosure has none; Menu adds `"menu"`). |
 | `Popup` | `dialog` | `dialog` (explicit) | `data-side`, `data-align`; no `data-open` (`:popover-open`) | Carries `id`, `popover="auto"`, `aria-modal="false"`, `aria-labelledby`, `aria-describedby`, inline placement. The content region: children render from committed state in library mode. |
 | `Close` | `button` | button | `data-pending` (when `action` runs), `data-disabled` | `command="hide-popover"`. |
 | `Title` | `h2` | heading | none | `id` wiring. `render={<h3 />}` changes the level. |
@@ -143,7 +143,7 @@ not place a far popover next in the Tab order after its invoker (research, WPT
 `popover-focus-2` / `-4`), which matters for the `<div>` variant where focus stays on the
 trigger; and HTML-AAM suppresses the redundant `aria-details` relation when the popover is the
 next accessibility sibling. With the default `<dialog>` focus moves into the popup on open, so
-adjacency is a recommendation, not a requirement (as `commandfor` links by id, the parts need
+adjacency is a recommendation, not a requirement (as `popovertarget` links by id, the parts need
 not be siblings at all).
 
 ---
@@ -157,7 +157,7 @@ not be siblings at all).
 | Close by a part (Trigger, Close) | Browser: `toggle-popover` / `hide-popover` | Library: click intercepted, dispatch `false`, `hidePopover()` in the apply effect after the action settles |
 | Close by dismissal (Escape, light dismiss, foreign invoker, script) | Browser | Browser; `openChangeAction(false)` notified from `toggle` |
 | Content | Always mounted | Rendered from committed `open`; unmounted while closed unless `keepMounted` |
-| `aria-expanded` on Trigger | DOM-synced from `toggle` after hydration (section 9) | React-rendered from the Root's `shown` mirror of the popup's `toggle` (#118) |
+| Trigger open state | exposed by the browser from the popover (`popoverTarget`, #121); `data-open` DOM-synced from `toggle` after hydration (section 9) | exposed by the browser likewise; `data-open` React-rendered (optimistic); `aria-expanded` only on a non-button `render`, from the Root's `shown` mirror (#118) |
 | `data-open`, `data-pending` on Trigger | never emitted | emitted |
 | `openChangeAction` | n/a | awaited for `true` and for part-initiated `false`; a notification for dismissals |
 | Works before hydration | yes | the native open happens; the library reconciles on mount (2.4) |
@@ -195,13 +195,15 @@ serialises from a Server Component), not `autoFocus`: React writes `autofocus` o
 server-rendered HTML, not when it renders the element on the client (a client navigation to a
 Server Component page), whereas the library writes the attribute from `initialFocus` after mount
 in JS-free mode and keeps it there (6.1). `autoFocus` remains the plain-HTML alternative for
-markup that is always server-rendered. In Chromium and WebKit the invoker's exposed expanded
-state is its popover's own, whatever the attribute says; Firefox maps none for `commandfor` and
-reads the attribute, so the library keeps it current (section 9, #118).
+markup that is always server-rendered. The Trigger is a `popovertarget` invoker and renders no
+`aria-expanded`: all three engines expose its popover's own shown state, before hydration too
+(section 9, #121).
 
-What still runs JS in this mode, after hydration: the `toggle` listener that writes
-`aria-expanded` on the Trigger and restores focus for nested popovers (6.2), the `Close` action
-when given, and development warnings. None of them changes React state.
+What still runs JS in this mode, after hydration: the `toggle` listener that writes `data-open`
+on the Trigger (a styling hook only; the exposed state needs no JS, #121) and restores focus for
+nested popovers (6.2), the `Close` action when given, and development warnings. None of them
+changes React state. A page that never hydrates styles the open Trigger with `:has()` instead:
+`.btn:has(+ .popover:popover-open)` when the Popup follows the Trigger (section 10).
 
 What this mode cannot do: load content on open, show pending state, or start open (a popover's
 open state cannot be server-rendered: there is no attribute for it). Those are library mode.
@@ -248,7 +250,7 @@ during a pending open is therefore a cancel, resolved by latest intent (walkthro
 The commit that sets committed `open` to `true` renders the Popup's children. If they suspend,
 React keeps the popup closed and the Trigger `data-pending` until the data is ready. The same
 commit's layout effect calls `popup.showPopover({ source: trigger })`, which creates the same
-implicit anchor, focus-order insertion and nesting as the declarative `commandfor` path, and the
+implicit anchor, focus-order insertion and nesting as the declarative `popovertarget` path, and the
 dialog focusing steps run against fully rendered content.
 
 **Foreign opens.** `beforetoggle` for an open is cancelable on a popover (research), and it
@@ -265,7 +267,7 @@ What the user sees while the open is pending:
 | Surface | Reads | During a pending open |
 | --- | --- | --- |
 | `Trigger` `data-open`, `data-pending`, `state.open` | optimistic | present, present, `true` |
-| `Trigger` `aria-expanded` | `shown`, the popup's `toggle` (#118) | `"false"` |
+| `Trigger` exposed expanded state | the popover's own (`popovertarget`, every engine, #121); `aria-expanded` from `shown` on a non-button `render` only | collapsed (nothing is shown) |
 | `Popup` `:popover-open`, visibility | DOM (follows committed) | closed |
 | `Popup` children | committed | not rendered (default) or hidden (`keepMounted`) |
 | `Root` `state.pending` | transition | true |
@@ -310,7 +312,7 @@ a real veto, because the close was library-owned; the docs say so and show the u
 
 ### 2.4 Pre-hydration opens and mount reconciliation (library mode)
 
-Library mode renders the same `commandfor` / `command="toggle-popover"` markup, so a click before
+Library mode renders the same `popovertarget` markup (#121), so a click before
 hydration opens the popover natively, anchored and focused by the browser, and **empty** with the
 default mounting (the children are not in the server HTML while committed `open` is `false`;
 with `defaultOpen`, see 2.5). On mount, a Popup layout effect
@@ -364,16 +366,17 @@ releases a `held` that no animation is going to release (4.4).
 
 **`defaultOpen` and the server HTML.** `defaultOpen={true}` is committed state from the first
 render, as in Dialog: the content and the Trigger's `data-open` are in the server HTML. Only the
-*showing* waits for hydration, because HTML has no attribute for an open popover. The Trigger's
-`aria-expanded` is `"false"` in the server HTML and flips to `"true"` with the `toggle` of the
-apply effect's first `showPopover()` (#118: it reports the shown popup, so it never says expanded
-over a hidden one; before #118 it said `"true"` from the server on, accepted at review).
+*showing* waits for hydration, because HTML has no attribute for an open popover. The Trigger
+exposes collapsed until the apply effect's first `showPopover()`, because the browser derives the
+state from the popover itself (`popovertarget`, no `aria-expanded`, #121; a non-button `render`'s
+attribute follows the `shown` mirror with the same timing, #118). Before #118 the attribute said
+`"true"` from the server on, accepted at review.
 
 ### 2.6 Nesting and stacking
 
 A `Popover.Root` rendered inside a Popup is a nested auto popover and needs nothing from the
 consumer. The platform's rules (research, "Stacking and nesting", verified in Chromium and
-Firefox): opening the inner through its Trigger (`commandfor` in JS-free mode,
+Firefox): opening the inner through its Trigger (`popovertarget` in JS-free mode,
 `showPopover({ source })` in library mode) keeps the outer open whatever the DOM position; two
 inner popovers close each other; Escape closes the innermost only; an outside click closes the
 whole stack (each Popup notifies its own Root with `"dismiss"`); clicking in the outer popup
@@ -506,15 +509,19 @@ export interface PopoverTriggerProps
 }
 ```
 
-Owned keys: `type` (`"button"`, on a `<button>` only), `commandfor`, `command` (on a `<button>`
-or a component render only: another element is no invoker, #115), `disabled`, `aria-expanded`, `data-open`, `data-pending`, `data-disabled`, and `onClick` only when installed
-(library mode; in JS-free mode the Trigger installs no handler and a `render` element's own
-`onClick` passes through). `aria-haspopup` is not rendered and passes through (a consumer may
-set `"dialog"`; Menu's trigger sets `"menu"`). `aria-expanded` is owned in both modes: in library
-mode it renders the shown state (the Root's `shown` mirror of the popup's `toggle`, #118), not the
-optimistic one; in
-JS-free mode its React value is `"false"` and the DOM value is kept current by the Popup's
-`toggle` listener (section 9).
+Owned keys: `type` (`"button"`, on a `<button>` only), `popoverTarget` (on a `<button>` or a
+component render only: another element is no invoker, #115; `popoverTargetAction` is omitted too,
+the default `toggle` is never written), `disabled`, `aria-expanded`, `data-open`, `data-pending`,
+`data-disabled`, and `onClick` only when installed (library mode; in JS-free mode the Trigger
+installs no handler and a `render` element's own `onClick` passes through). `commandfor` and
+`command` are omitted from the type as reserved keys (a second activation behaviour on the
+Trigger's button would conflict with its `popovertarget`; #121). `aria-haspopup` is not rendered
+and passes through (a consumer may set `"dialog"`; Menu's trigger sets `"menu"`). `aria-expanded`
+is owned in both modes and **rendered only when no `popoverTarget` is** (a non-button `render`):
+there it is the shown state (the Root's `shown` mirror of the popup's `toggle`, #118) in library
+mode and `"false"` in JS-free mode (such an element cannot open anything there). On a `<button>` the
+browser exposes the popover's own state and ARIA in HTML #514 forbids the attribute (#121). In
+JS-free mode `data-open` is kept current on the Trigger by the Popup's `toggle` listener (section 9).
 
 ### 3.3 `Popover.Popup`
 
@@ -635,7 +642,10 @@ export interface PopoverCloseProps
 Owned keys: `type`, `commandfor`, `command` (`"hide-popover"`; on a `<button>` or a component
 render only, #115), `disabled`, `onClick` (library
 mode, or with `action`), `data-pending`, `data-disabled`. No `value` and no `returnValue`:
-popovers have none. In library mode the click is always intercepted, with or without `action`,
+popovers have none. The Close keeps `commandfor` + `command="hide-popover"` under #121
+(`popovertargetaction="hide"` would buy nothing: Chromium and Firefox expose no expanded state for
+an invoker inside its own popover with either attribute, and the `command` event is what tells the
+Popup a foreign hide's reason). In library mode the click is always intercepted, with or without `action`,
 so every Close goes through the Root's transition and the apply effect; in JS-free mode without
 `action` the browser runs the command, with `action` the part runs it then calls
 `popup.hidePopover()` directly (a browser-owned close; the `toggle` listener has no Root state to
@@ -683,7 +693,7 @@ export const Popover = {
 
 | State | Owner | Library-owned or browser-owned | Where it shows |
 | --- | --- | --- | --- |
-| `open` | Root (`useControllableAction<boolean>`) | **Library-owned for opening and for part-initiated closing, browser-owned for dismissals** in library mode; fully browser-owned in JS-free mode | optimistic: Trigger `data-open`, `state.open` on Root/Trigger; committed: Popup children mounting, `state.open` on Popup; shown (the Root's urgent mirror of the popup's `toggle`, #118): Trigger `aria-expanded`; DOM: `:popover-open` |
+| `open` | Root (`useControllableAction<boolean>`) | **Library-owned for opening and for part-initiated closing, browser-owned for dismissals** in library mode; fully browser-owned in JS-free mode | optimistic: Trigger `data-open`, `state.open` on Root/Trigger; committed: Popup children mounting, `state.open` on Popup; shown: exposed by the browser from the `popovertarget` Trigger (#121), and the Root's urgent `shown` mirror of the popup's `toggle` (#118) for `aria-expanded` on a non-button Trigger render; DOM: `:popover-open` |
 | `pending` | Root `useTransition` | library | Trigger `data-pending` (whenever the Root is pending, Dialog 4.2), Root `state.pending` |
 | Close `pending` | Close part `useTransition` | library | `data-pending` on that Close button |
 | `held` | Popup local state | library (derived from committed and the DOM's running animations) | keeps children mounted until the hide has finished animating; not exposed |
@@ -888,7 +898,7 @@ state).
 A popover is not modal: Tab past the last element leaves the popup and it **stays open** (research,
 verified). That is the APG non-modal dialog's allowed behaviour and the library does nothing
 about it; Menu closes its stack on focus leaving (#39), Popover does not. Shift+Tab from the
-first element returns to the Trigger: `commandfor` and `showPopover({ source })` insert the
+first element returns to the Trigger: `popovertarget` and `showPopover({ source })` insert the
 popover after its invoker in sequential focus order (Chromium 156 and Firefox 157; Safari 27.0
 only when DOM-adjacent, section 1).
 
@@ -919,7 +929,7 @@ same `position-area` matrix as Tooltip 7.1, the shared one of conventions 13.1 (
 `bottom`, `bottom` + `start` → `bottom span-self-x-end`, `right` + `start` → `right
 span-bottom`, `inline-end` → `self-x-end`, and so on) plus `position-try-fallbacks: flip-block,
 flip-inline, flip-block flip-inline`. The popover UA stylesheet supplies `position: fixed` and
-the implicit anchor comes from `commandfor` or `showPopover({ source })`, so no `anchor-name`
+the implicit anchor comes from `popovertarget` or `showPopover({ source })`, so no `anchor-name`
 or `position-anchor` is needed. The matrix lives in one shared helper,
 `internal/anchor-position.ts` (`positionArea(side, align)`, `POSITION_TRY_FALLBACKS`), which
 Tooltip, Popover and Menu import; `PopoverSide` / `PopoverAlign` are the flat public names for
@@ -941,7 +951,7 @@ a plain state written only when the pair changed, so an unflipped open costs no 
 on the server, or unmappable: the requested values. The gap rules of section 10 therefore sit on
 the side that actually faces the Trigger after a flip; the inline `position-area` stays the
 requested one. In JS-free mode the hook runs the same way (it hangs off the Popup's ref and the
-platform's `toggle`, not off library state), so a `commandfor`-opened popover reports its
+platform's `toggle`, not off library state), so a `popovertarget`-opened popover reports its
 resolved side too. Popover has no Arrow part (conventions resolved question 10); a pseudo-element
 arrow keyed on the Popup's `data-side` is the recipe (Tooltip 10).
 
@@ -967,7 +977,7 @@ and every prior-art library opens it below the trigger.
 | Part | ARIA |
 | --- | --- |
 | Popup | `role="dialog"` (explicit default; WebKit has no minimum role for `[popover]`), `aria-modal="false"` (always; Chromium's `<dialog popover>` exposure), `aria-labelledby` → Title id, `aria-describedby` → Description id, both always emitted and token-merged |
-| Trigger | `aria-expanded`: library mode renders the **shown** state: the Root's `shown`, an urgent mirror of the popup's `toggle` read from `:popover-open` (#118; `data-open` and `state.open` stay optimistic, and no transition can delay the mirror, so the attribute equals `:popover-open` within a task in every phase); JS-free mode renders `"false"` and the Popup's native `toggle` listener writes `"true"` / `"false"` on the Trigger element after hydration (reads `:popover-open`, not `newState`, so a stale task cannot lie), and the mount effect syncs it once for a pre-hydration open. The attribute is not what every engine exposes: Chromium and WebKit derive a `commandfor` invoker's expanded state from its popover and never read `aria-expanded`, Firefox maps nothing for `commandfor` and reads it (`docs/research/invoker-aria-expanded.md`); rendering the shown state is what makes the three agree. No `aria-haspopup` (passes through), no `aria-controls` (`aria-expanded` plus the next-in-focus-order popup is the APG disclosure shape; `aria-controls` passes through for consumers who want it) |
+| Trigger | `popoverTarget` (the Popup's id) and **no `aria-expanded`** on a `<button>` (#121): HTML-AAM maps a `popovertarget` invoker to an implicit expanded state that Chromium, Firefox and WebKit all expose from the popover itself (`docs/research/invoker-aria-expanded.md`; `memo/architect/probes/121-popovertarget/`), and ARIA in HTML #514 forbids the explicit attribute on such a button (Firefox would OR it in). So the exposed state equals `:popover-open` at the show or hide itself, with no mirror to lag, in both modes and before hydration; `data-open` and `state.open` stay optimistic. A non-button `render` is no invoker (#115) and renders `aria-expanded` from the Root's `shown` mirror (an urgent mirror of the popup's `toggle` read from `:popover-open`, #118) in library mode, `"false"` in JS-free mode. A native-disabled Trigger is no invoker either and exposes no state while its popup is shown: transient, accepted (#121). JS-free mode: the Popup's native `toggle` listener writes `data-open` on the Trigger element after hydration (reads `:popover-open`, not `newState`) and the Trigger's ref syncs it once for a pre-hydration open; a styling hook, not ARIA. No `aria-haspopup` (passes through), no `aria-controls` (the implicit expanded state plus the next-in-focus-order popup is the APG disclosure shape; `aria-controls` passes through for consumers who want it) |
 | Close | plain button; an icon-only one gets an `aria-label` from the consumer |
 | Title | `h2` by default |
 
@@ -994,7 +1004,8 @@ The library ships no CSS. Hooks, both modes:
 .popover-any[data-side="top"], .popover-any[data-side="bottom"] { margin-block: 6px; }
 .popover-any[data-side="left"], .popover-any[data-side="right"],
 .popover-any[data-side="inline-start"], .popover-any[data-side="inline-end"] { margin-inline: 6px; }
-.btn[aria-expanded="true"] { background: var(--accent-weak); }  /* both modes: the shown popup; [data-open] for the optimistic flip */
+.btn[data-open] { background: var(--accent-weak); }       /* both modes (#121): optimistic in library mode, the shown popup in JS-free mode */
+.btn:has(+ .popover:popover-open) { background: var(--accent-weak); } /* a page that never hydrates (no data-open yet); the Popup must follow the Trigger */
 .btn[data-pending] { cursor: progress; }                  /* library mode */
 .popover:has([data-pending]) { opacity: .7; }             /* a Close action running */
 ```
@@ -1036,7 +1047,7 @@ Firefox this is the only way a popover exit can animate.
 | Change | Lane | `<ViewTransition>` | Animate with |
 | --- | --- | --- | --- |
 | Trigger's `data-open` flip on click, and its snap-back | sync (optimistic) | never | CSS on `[data-open]` |
-| Trigger's `aria-expanded` (#118) | sync, urgent (the Root's `shown` mirror, one task after `showPopover()` / `hidePopover()`) | never | CSS on `[aria-expanded]`, if at all |
+| Trigger's exposed expanded state (#121) | the browser's, from the popover itself (synchronous with the show / hide); `aria-expanded` on a non-button `render` is the Root's `shown` mirror, sync, urgent, one task after `showPopover()` / `hidePopover()` (#118) | never | none (`[data-open]` is the styling hook) |
 | Opening commit: children mount, then `showPopover()` in the layout effect | transition, `fsui-popover-open` | yes: the popup's box as `new` (a `<dialog popover>` has no `::backdrop` of its own while shown as a popover) | `transition` prop, **or** the CSS enter in 10.1, not both for the same open |
 | Content swap while open | transition | yes | `transition` prop |
 | **Library-driven close** (Trigger, Close, controlled `open={false}`): children unmount and `hidePopover()` in the same commit | transition, `fsui-popover-close` (none for a controlled close) | yes: the popup's box as `old`, content included, in Chromium, Firefox and WebKit (CI). With the 10.1 CSS exit on the popup, Chromium keeps the hidden box rendered through its fade, so the `new` snapshot carries a live, fading copy next to the `old` image (a double image) unless the recipe below cuts the fade | `transition` prop, with the recipe below when the CSS exit is kept |
@@ -1093,7 +1104,7 @@ Notation: `C` = committed open, `O` = optimistic open, `P` = Root pending. Uncon
 
 1. **Open with content that suspends.** Click Trigger → `preventDefault` (no native command)
    → dispatch `true`: `O=true`, `P=true`; Trigger `data-open`, `data-pending`
-   (`aria-expanded` still `"false"`, #118); popup hidden. Action resolves → `setInternal(true)` (transition) → children
+   (exposed state still collapsed: the popup is hidden, #121); popup hidden. Action resolves → `setInternal(true)` (transition) → children
    render, `<FilterOptions>` suspends → React holds. Data arrives → commit: `C=true`, children in
    the DOM; apply effect writes `autofocus` on the `initialFocus` target, `showPopover({ source:
    trigger })` with `opening` set (the `beforetoggle` listener lets it pass) → top layer,
@@ -1108,8 +1119,8 @@ Notation: `C` = committed open, `O` = optimistic open, `P` = Root pending. Uncon
    children unmount. Firefox: no animations, children unmount with the `C=false` commit.
 3. **Trigger click while open (library-driven close), `transition` set.** `C=true`, `O=true`.
    Click → `preventDefault` → `intended()` is `true` → dispatch `false` with `"activate"` and the
-   `MouseEvent`: `O=false` (Trigger loses `data-open`; `aria-expanded` stays `"true"`, the popup is
-   still shown, #118), `P=true`. Action
+   `MouseEvent`: `O=false` (Trigger loses `data-open`; the exposed state stays expanded, the popup is
+   still shown, #121), `P=true`. Action
    resolves → `C=false` commits: React starts a view transition (the boundary's subtree changed),
    captures the popup's box with its content as `old`, unmounts the children, runs the apply
    effect's `hidePopover()` inside the update callback (`beforetoggle` sets `awaitingClose`;
@@ -1153,8 +1164,9 @@ Notation: `C` = committed open, `O` = optimistic open, `P` = Root pending. Uncon
    popup element (nothing focusable inside), Chromium sets its implicit expanded state.
    Hydration → the Popup's mount effect finds `:popover-open` and `C=false` → dispatch `true`
    with `{ reason: "platform", event: undefined }` → `O=true` (Trigger `data-open`,
-   `data-pending`; its `aria-expanded` is already `"true"`: the Popup's mount read set `shown`
-   from `:popover-open`, #118) → action resolves →
+   `data-pending`; its exposed state is already expanded, the browser's own, and the Popup's mount
+   read set `shown` from `:popover-open` for the parts that still render the attribute, #118 /
+   #121) → action resolves →
    `C=true` → children mount into the open
    popup; the apply effect sees it open → nothing. Focus stays where the platform put it. If the
    parent refuses or the action rejects: after settle `C=false`, popup open → `hidePopover()`
@@ -1313,7 +1325,7 @@ a synchronous `beforetoggle`, a coalesced, task-queued `toggle`, and `:popover-o
 needs these additions, each mirroring the platform: `beforetoggle` for an **open** honours
 `preventDefault()` (the popover stays hidden; a close's `beforetoggle` stays non-cancelable);
 `showPopover({ source })` records the source so a test can assert it (no anchoring in jsdom);
-a document-level `click` emulation for `button[commandfor]` with `show-popover`,
+a document-level `click` emulation for `button[popovertarget]` (#121, no `command` event) and for `button[commandfor]` with `show-popover`,
 `hide-popover` and `toggle-popover` that dispatches a cancelable `command` event on the target
 and runs the command unless prevented (shared with the dialog shim in `invoker-shim.ts`);
 **the popover focusing steps** run by `showPopover()` once shown (a `<dialog>`: the `autofocus`
@@ -1339,7 +1351,7 @@ update-on-success). Library mode unless stated.
 | Roles and ARIA | Default elements `button[type=button][commandfor][command=toggle-popover][aria-expanded=false]`, `dialog[id][popover=auto][role=dialog][aria-modal=false][aria-labelledby][aria-describedby][data-side=bottom][data-align=center]`, `h2[id]`, `p[id]`, `button[command=hide-popover]`; ids resolve; consumer `aria-describedby="x"` becomes `"x <id>"`; consumer `role="region"` wins; `aria-haspopup` passes through; `open` is never rendered; `render={<div />}` keeps `role`, `aria-modal`, `popover`, ids. |
 | Keyboard | Enter / Space on the Trigger (user-event clicks) dispatch; Escape is not simulable (13.1). |
 | Sync action (both) | Trigger click → `openChangeAction(true, details)`: `details.event` is the native `MouseEvent`, `reason: "activate"`, `defaultPrevented` true (the command was cancelled); click while optimistically open → `openChangeAction(false)` with `"activate"`; disabled Trigger never dispatches; a `beforetoggle` for an open dispatched on the popup by a test (foreign open) is cancelled and dispatches `true` with that event; a `command` event with `hide-popover` records an `"activate"` intent that the following `hidePopover()` + `toggle` consumes. |
-| Async action (both) | `deferred()` open: `data-open`, `data-pending` and `aria-expanded="false"` (`shown`, #118) on the Trigger, `showPopover` spy not called, children not rendered; resolve: `showPopover` called once with `{ source: trigger }`, children rendered, `aria-expanded="true"`, attributes settled. Part-initiated close with a `deferred()`: popup still open and `:popover-open` while pending, `data-pending` on the Trigger, no `data-open`, `aria-expanded="true"`; resolve: `hidePopover` called once, `aria-expanded="false"`. Dismissal: `hidePopover()` then flush `toggle` → `openChangeAction(false, { reason: "dismiss" })` with the `toggle` event; Trigger pending meanwhile and `aria-expanded="false"` as soon as the `toggle` task has flushed, before the notification settles (also with the notification entangled with a pending unrelated action); a refused dismissal re-shows and the attribute returns to `"true"` with that `toggle` (#118 review M1). |
+| Async action (both) | `deferred()` open: `data-open`, `data-pending` and **no `aria-expanded`** (#121) on the Trigger, `showPopover` spy not called, children not rendered; resolve: `showPopover` called once with `{ source: trigger }`, children rendered, still no `aria-expanded`, attributes settled. Part-initiated close with a `deferred()`: popup still open and `:popover-open` while pending, `data-pending` on the Trigger, no `data-open`; resolve: `hidePopover` called once. Dismissal: `hidePopover()` then flush `toggle` → `openChangeAction(false, { reason: "dismiss" })` with the `toggle` event; Trigger pending meanwhile. The `shown` mirror's phases (`"false"` as soon as the `toggle` task has flushed, before the notification settles, also entangled with a pending unrelated action; `"true"` again with a refused dismissal's re-show `toggle`, #118 review M1) are asserted on a `render={<a href="#" />}` Trigger, the one Popover part that still renders `aria-expanded`, and on the Combobox Input in its own file. |
 | Rejection (both) | Open rejects: `ErrorCatcher` receives it, `showPopover` never called, no `data-open`. Part-initiated close rejects: catcher above Root receives it, `hidePopover` never called by the library. Dismissal notification rejects: catcher receives it (component replaced). Controlled refusal of a dismissal → `showPopover` called again once settled; controlled refusal of a part-initiated close → `hidePopover` never called, `data-open` back. Caught-inside variants commit. |
 | Overlap | Walkthrough 11.7 with two `deferred()`s resolved out of order: `openChangeAction` called twice, `showPopover` never called, final `aria-expanded="false"`. And 11.8: a `hidePopover()` + `toggle` during a pending part-initiated close dispatches nothing more. |
 | Superseded rejection (both) | Older dispatch rejects after and while the newer is pending; the catcher gets it; the newer outcome unaffected. |
@@ -1372,7 +1384,7 @@ asserting the documented degraded behaviour rather than skipping:
 | ViewTransition | With `transition="pop"`: a library open calls `document.startViewTransition` once and the popup is `:popover-open` when the update callback has run; a part-initiated close calls it once and the old snapshot exists (`document.getAnimations()` includes a `::view-transition-old(…)` pseudo during the transition); a dismissal calls it only for the notification commit with the popup already hidden; **`transition="pop"` plus the 10.1 CSS exit: a dismissal calls it once, not twice** (the `held` release is a normal update; fails without the M1 fix in Chromium, Firefox animates no exit). Without `transition`: zero calls for an open and a close. A `Popover.Root` inserted by a transition with `transition="none"` calls it once (conventions 10.1 mount row); a plain open with `"none"` calls it zero times. **`transition="pop"` plus the 10.1 CSS exit, a part-initiated close** (`it.each` over the recipe): with `html:active-view-transition .fade { transition: none }` the popup is `display: none` at `ready` and only the old image of its group exists; the characterisation variant without the recipe has a live new image of the fading popup in Chromium (pseudo-element names read from `document.getAnimations()` at `ready`, reported in the failure message). | None for the mechanism: the old-snapshot row passes on all three engines (WebKit on CI). The recipe rows branch per engine: the live new image exists in Chromium only (Firefox animates no exit; WebKit has the box `display: none` by `ready`, and its pseudo-element names are unreliable, so it asserts `display` only, as Dialog 13.3). |
 | Stack interactions | A Tooltip (`manual`, and `hint` where `supportsPopoverHint`) opened inside the popup does not close it; a modal Dialog opened from inside keeps it open and Escape closes the Dialog first; opening an unrelated `auto` popover closes it with `"dismiss"`. | `supportsPopoverHint` for the hint variant (Safari 27.0 maps it to `manual`; same assertion). |
 | Accessibility | `aria-modal="false"` and `role="dialog"` present on the `<dialog>` (attribute assertions; no AX tree access in vitest browser mode, Chromium's `modal=true` exposure without the attribute is #44). | none |
-| Resolved side (wave 11) | A Trigger at the bottom of the viewport with the default `side="bottom"`: once shown, `data-side="top"` and the section 10 gap sits between the popup's bottom edge and the Trigger (`getBoundingClientRect`); a Trigger in the middle: `data-side="bottom"`. Inside a scrollable container, scrolling the Trigger to the container's bottom edge and waiting two frames: `data-side` equals the side the popup box is on (the geometry invariant of conventions 13.2; this row accepts either side and is **not** pinned on the `topLayerAnchorReChoosesOnScroll` probe: Chromium re-chooses in every run of this row, locally and on CI, although the probe says it keeps the option, for a reason not yet found (noted in #92; the row pre-scrolls the container, opens through the library, 160 × 120 popup, bottom overflow); Tooltip's scroll row is the pinned one); Escape then re-open in the middle: `bottom`. JS-free mode (a `commandfor` click) reports the resolved side the same way. | none (WebKit's computed-style behaviour is from source; this row is one of its first real checks) |
+| Resolved side (wave 11) | A Trigger at the bottom of the viewport with the default `side="bottom"`: once shown, `data-side="top"` and the section 10 gap sits between the popup's bottom edge and the Trigger (`getBoundingClientRect`); a Trigger in the middle: `data-side="bottom"`. Inside a scrollable container, scrolling the Trigger to the container's bottom edge and waiting two frames: `data-side` equals the side the popup box is on (the geometry invariant of conventions 13.2; this row accepts either side and is **not** pinned on the `topLayerAnchorReChoosesOnScroll` probe: Chromium re-chooses in every run of this row, locally and on CI, although the probe says it keeps the option, for a reason not yet found (noted in #92; the row pre-scrolls the container, opens through the library, 160 × 120 popup, bottom overflow); Tooltip's scroll row is the pinned one); Escape then re-open in the middle: `bottom`. JS-free mode (a `popovertarget` click) reports the resolved side the same way. | none (WebKit's computed-style behaviour is from source; this row is one of its first real checks) |
 | Direction (wave 11) | `align="start"` under `document.documentElement.dir = "rtl"`: the popup's right edge meets the Trigger's right edge, `data-align="start"`; `side="inline-end"`: the popup sits left of the Trigger with `data-side="left"`. The same inside a `dir="rtl"` wrapper in an LTR document. | Container case: `anchorPositionHonoursParentDirection` true: mirrored; false (Firefox, Mozilla 2019601): the inline edges meet neither Trigger edge, asserted with the bug named. Page case: none. |
 
 ---
@@ -1457,8 +1469,8 @@ the popup is still open a task later; Dialog passes `dialog.open`), and:
 - Returns `OverlayRootValue<Popup, CloseArgs>`; `PopoverRootValue` is its `<HTMLElement, []>`
   alias, the first argument of `usePopoverTrigger` and `usePopoverPopup`.
 - `shown` / `setShown(next)` (#118): an urgent `useState(false)` mirror of the popup being in the
-  top layer, written by the Popup from `:popover-open` (14.2) and read by `usePopoverTrigger` and
-  the Combobox parts for `aria-expanded`. Never set inside a transition (that is the point: a
+  top layer, written by the Popup from `:popover-open` (14.2) and read by `usePopoverTrigger` (for a
+  non-button `render` only, #121) and the Combobox Input for `aria-expanded`. Never set inside a transition (that is the point: a
   pending notification or an entangled action must not delay it); `false` on the server and at
   hydration; a set to the current value is a no-op. Dialog does not maintain it (its Trigger has
   no `aria-expanded`). Not exposed in any `state` object.
@@ -1498,7 +1510,7 @@ is passed as `ref`; consumers destructure). Effects and listeners:
      cleared. `newState === "closed"` → `awaitingClose = true`, `focusWasInside =
      popup.contains(activeElement) || contentHadFocus`, then `contentHadFocus = false`.
    - `toggle`: `awaitingClose = false`; library: `ctx.setShown(isPopoverOpen(popup))` (#118);
-     JS-free: write `aria-expanded` on the Trigger from `:popover-open`; closed → focus fallback (6.2), then library mode → the `getAnimations`
+     JS-free: write `data-open` on the Trigger from `:popover-open` (#121); closed → focus fallback (6.2), then library mode → the `getAnimations`
      read of 4.4 (sets `held` for a dismissal's CSS exit; for a library-driven close `held` is
      already set by the render, and this read decides when to clear it), then
      `notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss")`.
@@ -1525,8 +1537,8 @@ is passed as `ref`; consumers destructure). Effects and listeners:
    `commandOf(event)` (the `command` listener) are the other `overlay-popup.tsx` helpers
    Dialog.Popup shares. JS-free: the callback ref writes `autofocus` on the resolved target and
    keeps it while mounted (the browser runs the command; there is no "right before
-   `showPopover()`"), as Dialog. The Trigger's callback ref also syncs `aria-expanded` for a
-   Trigger that mounts after the Popup. Library mode (#118): the Popup's callback ref sets
+   `showPopover()`"), as Dialog. The Trigger's callback ref also syncs `data-open` for a
+   Trigger that mounts after the Popup (#121). Library mode (#118): the Popup's callback ref sets
    `shown` from `:popover-open` on attach (a pre-hydration open is `true` at once, before the
    `"platform"` dispatch) and `false` on detach (a popup removed while open fires no `toggle`);
    both are no-ops when the value is unchanged, so the common mount costs no render.
@@ -1539,10 +1551,10 @@ is passed as `ref`; consumers destructure). Effects and listeners:
 
 ### 14.3 `usePopoverTrigger(ctx, { part, disabled, render, handlers?, activate?, disabledAs? })` (shared)
 
-Returns `{ state, libraryProps, ref }`: `type` via `rendersButton`, `commandfor`, `command:
-"toggle-popover"`, `disabled` (owned, through `disabledButton(render, disabled, { handlesClick:
+Returns `{ state, libraryProps, ref }`: `type` via `rendersButton`, `popoverTarget` (the Popup's
+id, on a `<button>` or component render only; the typed camelCase prop, #121), `disabled` (owned, through `disabledButton(render, disabled, { handlesClick:
 isLibrary, alwaysFocusable: disabledAs === "aria" })`, conventions 1.2: native on a host button
-or for a JS-free command, else `aria-disabled` with `commandfor` / `command` withheld), `aria-expanded` (library: `ctx.shown`, #118; JS-free:
+or for a JS-free activation, else `aria-disabled` with `popoverTarget` withheld), `aria-expanded` only when no `popoverTarget` is rendered (library: `ctx.shown`, #118; JS-free:
 `false`), `onClick` only in library mode (`preventDefault()`; `disabled` → return;
 `dispatch(!intended())` through `requestOpen` / `requestClose`), `data-open`, `data-pending`,
 `data-disabled`; the callback ref writes `triggerRef` and warns for a non-button in JS-free mode.
@@ -1628,8 +1640,8 @@ acceptance). Kept for the record:
 2. **8: `focusGroup` detection** (issue #43), with the developer's `useSyncExternalStore` form
    and the Tabs native-path markup.
 
-3. **4.1 `open` row.** Add Popover: Trigger emits optimistic `data-open` and `aria-expanded` in
-   library mode (`aria-expanded` the shown state since #118), `aria-expanded` DOM-synced in JS-free mode; the Popup emits none
+3. **4.1 `open` row.** Add Popover: Trigger emits optimistic `data-open` in library mode and a
+   DOM-synced `data-open` in JS-free mode; its exposed expanded state is the browser's (`popovertarget`, #121; `aria-expanded` only on a non-button render, the shown state since #118); the Popup emits none
    (`:popover-open`).
 4. **5.3 types.** `Popover`: `fsui-popover`, `fsui-popover-open`, `fsui-popover-close`.
 5. **3.5 ownership table.** A third shape next to Dialog's "library-owned open, browser-owned
@@ -1682,7 +1694,7 @@ item is folded into the section named; this list is the audit trail.
 | L3 | A `Popover.Close` action's close is dropped when the popover was dismissed and re-opened meanwhile (open-generation guard; product-owner decision). `openGeneration` / `nextOpenGeneration` on the Root value. | 3.4, 11.5, 13.2, 14.1, 14.2 |
 | L4 | The Popup hook returns no ref-bearing member (`focusWasInside` dropped); consumers destructure. | 14.2 |
 | L5 | Native listeners attach in the callback ref through a handlers ref published in an insertion effect; no element state, no passive-effect window. | 14.2 |
-| L6 | `defaultOpen` renders the content and the Trigger's `data-open` into the server HTML; only the showing waits for hydration (since #118, `aria-expanded` is `"false"` until the popup is shown). | 2.4, 2.5, 3.1 |
+| L6 | `defaultOpen` renders the content and the Trigger's `data-open` into the server HTML; only the showing waits for hydration (since #121 the Trigger renders no `aria-expanded`; the browser exposes collapsed until the popup is shown). | 2.4, 2.5, 3.1 |
 | L7 | `initialFocus` recommended over `autoFocus` in JS-free mode: React writes `autofocus` into server-rendered HTML only. | 2.1, 6.1, 12.1 |
 | Deviation 2 | Title / Description state comes from a Popup context, not from `side` / `align` on the Root context. | 14 |
 | Deviation 4 | The apply-effect release rule for `held`. | 4.4, 2.5 |
@@ -2031,3 +2043,156 @@ Tests (replacing the attribute expectations above; `flushTasks` flushes the shim
   within a frame, AX `expanded=false` on Chromium.
 - A render-count row on the Root (`children(state)` call count): one extra render per show and
   per hide, none for an unchanged value.
+
+## Amendment: `popovertarget` Triggers, no `aria-expanded` (#121, 2026-10-24)
+
+Status: architect decision, **approved by the user through the product owner** (#121; option E of
+`docs/research/invoker-aria-expanded.md`, evaluated in `memo/architect/eval-121-popovertarget.md`,
+probes in `memo/architect/probes/121-popovertarget/`). Cross-component rule: conventions decision
+41 (decision 40 is superseded for `<button>` Triggers). Edited in place: decisions 7 and 12, the
+anatomy table, 2.1 (the mode table and the invoker prose), 2.2 (the pending-open table), 2.5
+(`defaultOpen` and the server HTML), 3.2 (owned keys), 3.4 (the Close keeps its command), 4 (the
+ownership table), 9, 10 (the CSS example and the lane table), walkthroughs 11.1, 11.3 and the
+platform path, 13.2, 14.1, 14.2, 14.3, conventions feedback 3, L6. Menu and Combobox carry a
+shorter amendment each; Dialog is untouched.
+
+**Breaking change (DOM attributes only; no prop, state field or type change).** In the
+0.1.0-alpha line, with a BREAKING line in the release notes:
+
+- `Popover.Trigger`, `Menu.Trigger`, `Menu.SubmenuTrigger` and (after hydration)
+  `Combobox.Trigger` render `popovertarget` instead of `commandfor` + `command="toggle-popover"`.
+- They render **no `aria-expanded`** when they render a `<button>`. CSS on
+  `[aria-expanded="true"]` moves to `[data-open]`; tests that asserted the attribute assert its
+  absence, or the AX state.
+- `commandfor` / `command` stay omitted from the Trigger props types as reserved keys;
+  `popoverTarget` / `popoverTargetAction` join the omitted keys.
+
+Decision and sub-decisions (all five user-approved):
+
+1. **Adopt now**, before 0.1.0; do not wait for w3c/html-aria#514 (open, `mergeable_state: dirty`,
+   last touched 2025-12-01; Chromium and WebKit already ignore the attribute on an invoker, and
+   all three engines map `popovertarget`).
+2. **A non-button `render` keeps `aria-expanded={shown}`** (#115 strips the invoker attribute
+   from it, so nothing else exposes the state; #514 only forbids the attribute next to
+   `popovertarget` or a popover `command`, so this is conforming).
+3. **JS-free mode writes `data-open`** on the Trigger from the Popup's `toggle` listener, the
+   mechanism that wrote `aria-expanded` until now, so `[data-open]` is the styling hook in both
+   modes; the docs page shows `:has(+ :popover-open)` for a page that never hydrates.
+4. **#125** (filed): classify a foreign `popovertarget` invoker's close as `"activate"` from
+   `ToggleEvent.source` (the invoker for an activation, `null` for Escape, light dismiss and
+   script; Chrome 140, Firefox 145, Safari 26.5). Independent of this change.
+5. **A native-disabled Trigger with its popup shown exposes no state** (a disabled button is no
+   invoker, in every engine): accepted as a transient case.
+
+Grounds, in short (the memo has the tables): HTML-AAM maps a `popovertarget` invoker to its
+popover's expanded state and Chromium 156, Firefox 157 and WebKit expose it with no attribute
+present, the `menuitem` role included; the explicit attribute is ignored by Chromium and WebKit
+and OR-ed in by Firefox, and #514 makes it an author MUST NOT; so the one markup that is right in
+every engine and every phase, including before hydration and in the `toggle` task that the
+`shown` mirror lags, is `popovertarget` with no attribute. Everything the Triggers relied on the
+invoker relationship for was measured identical for both attributes on Chromium and Firefox with a
+real pointer and read in WebKit's source: the light-dismiss exemption (#112; `Document.cpp`
+`handlePopoverLightDismiss` checks `commandForElement()` then `popoverTargetElement()`),
+cancelled-click suppression (mouse, Enter, Space), the implicit anchor, nested stacking
+(`Element::topmostPopoverAncestor` reads the popover's `invoker`, which "show popover" sets for
+both), a press on the outer invoker with a stack open, and `ToggleEvent.source`. The only loss is
+the `command` event from the library's own Trigger, which the Trigger cancels anyway.
+
+Unchanged: `Popover.Close` (`commandfor` + `hide-popover`, 3.4), the Dialog parts
+(`popovertarget` cannot open a modal `<dialog>`; `Dialog.Trigger` renders no `aria-expanded`),
+`Combobox.Input` (explicit attribute, `role="combobox"`), the Popup's `onCommand` for foreign
+`commandfor` invokers, `onBeforeToggle`'s routing of foreign opens, `showPopover({ source })`,
+the `shown` mirror in `useOverlayRoot` (now read by non-button renders and the Combobox Input),
+`Button`'s in-flight guard (attribute-agnostic), the `ButtonInvoker` docs example.
+
+Rendering note: react-dom 19.3.1 knows `popoverTarget` / `popoverTargetAction` (the lowercase
+spelling warns "Invalid DOM property"), serialises them camelCase in server HTML (parsed
+case-insensitively) and lowercases them through `setAttribute` on the client; `@types/react`
+types them. Write the camelCase prop in JSX; the Combobox ref write is the lowercase
+`setAttribute("popovertarget", id)`. Nothing is added to `platform-attributes.ts`.
+
+### Implementation plan (developer)
+
+Source:
+
+- `internal/use-popover-trigger.ts`: `popoverTarget: invoker ? ids.popup : undefined` replaces
+  the `commandfor` / `command` pair; `"aria-expanded": invoker ? undefined : isLibrary ?
+  ctx.shown : false`; the JS-free ref sync writes `data-open`
+  (`element.toggleAttribute("data-open", isPopoverOpen(popup))`) instead of `aria-expanded`;
+  doc comments (`button[popoverTarget]`, "no `aria-expanded` on an invoker, #121"). The
+  non-button warnings keep their text (the exemption argument is unchanged).
+- `internal/use-popover-popup.ts`: `syncExpanded` becomes `syncOpen`, writing `data-open` on the
+  Trigger element in JS-free mode; `setShown` in library mode, `onCommand`, `onBeforeToggle`
+  unchanged.
+- `combobox/combobox-trigger.tsx`: the ref callback writes `popovertarget` and removes it in
+  the cleanup (the `command` write goes); `"aria-expanded": rendersButton(render) ? undefined :
+  popover.shown`; `Omit` gains `"popoverTarget" | "popoverTargetAction"`; doc comment.
+  `combobox-input.tsx` unchanged.
+- `popover/popover-trigger.tsx`, `menu/menu-trigger.tsx`, `menu/menu-submenu-trigger.tsx`: the
+  `Omit` lists gain `"commandfor" | "command" | "popoverTarget" | "popoverTargetAction"`
+  (`aria-expanded` stays); doc comments.
+- `popover/popover-close.tsx`: doc comment only (keeps the command, says why).
+- `internal/platform-attributes.ts`: the `commandfor` / `command` comments note they serve
+  `Popover.Close`, Dialog and `Button` (no removal).
+- `__tests__/invoker-shim.ts`: a `popovertarget` branch after the `commandfor` one returns
+  nothing: read `popovertarget`, require a `[popover]` target, apply `popovertargetaction`
+  (`toggle` default, `show`, `hide`; `show` on a shown and `hide` on a hidden popover are
+  no-ops), **no `command` event**, the same disabled and submit-button exclusions, reusing the
+  popover shim's registered `run` (`toggle-popover` / `show-popover` / `hide-popover`). The
+  `popover-shim.ts` header comment names it.
+
+Tests (jsdom has no accessibility tree; the DOM assertions pin the markup and the Chromium CDP
+rows pin the exposed state; about 130 attribute assertion sites in 11 files, mostly mechanical):
+
+- `src/__tests__/overlay-open-state-suite.tsx` (22 sites): `expectExpanded` splits into
+  `expectInvoker()` (a `<button>` Trigger: `popovertarget` equal to the Popup id, no
+  `aria-expanded`, in every phase) and the existing value assertion, which now runs on a
+  `render={<a href="#" />}` Trigger row (the `shown` phases of the #118 revision: `false` during
+  a pending open, `true` during a pending part close, `false` right after a dismissal's `toggle`
+  flush while the notification is pending, `true` again after a refused dismissal's re-show).
+  `data-open` / `data-pending` rows unchanged.
+- `src/__tests__/overlay-disabled-render-suite.tsx` (8 sites): a native-disabled `<button>`
+  renders `popovertarget` and no `aria-expanded`; the `aria-disabled` branch (a link or component
+  render in library mode) withholds `popovertarget` and therefore renders `aria-expanded` (the
+  "no invoker" rule); a non-button render has `aria-expanded` and no `popovertarget`.
+- `popover.test.tsx` (26 + 16 sites): `renderToString` output has `popoverTarget="<id>"` and no
+  `aria-expanded` on the Trigger (with and without `defaultOpen`), hydrates without a mismatch;
+  the JS-free rows assert `data-open` written on the Trigger after a native toggle (through the
+  shim's `popovertarget` branch), synced for a Trigger that mounts late, and the JS-free
+  render-count row still passes; the platform path (popup `:popover-open` before mount) has no
+  attribute to assert on the button and asserts `shown` through the link-render row; Close rows
+  unchanged (`commandfor` + `hide-popover`); the foreign-invoker rows keep `dispatchCommand`.
+- `menu.test.tsx` (10 + 7), `menu-context-trigger.test.tsx` (2 + 2): the Suspense open, #110
+  Trigger-close, Escape and SubmenuTrigger rows assert `popovertarget` and no `aria-expanded`;
+  one link-render row for the `shown` values; the context trigger is unchanged (it never had
+  the attribute).
+- `combobox.test.tsx` (22 + 15): see Combobox's amendment (the Input's rows are kept; the button
+  Trigger's become absence assertions; `popovertarget` after mount, none in `renderToString`,
+  none on a non-button render which renders `aria-expanded` instead).
+- `use-popover-hooks.test.tsx` (1): the hook renders `popoverTarget` and no `aria-expanded` for
+  a button, the reverse for a non-button render.
+- Browser: `popover.browser.test.tsx` (24 + 9), `menu.browser.test.tsx` (6),
+  `combobox.browser.test.tsx` (10 + 7), `overlay-browser-suite.tsx` (5): the DOM assertions swap
+  to `popovertarget` / absence; the existing behaviour rows (light dismiss on the Trigger, the
+  #112 Trigger close at `pointerup` + 20 ms, nested Popovers, Menu positioning and submenus,
+  pre-hydration typing) run unchanged on all three engines. The **Chromium AX rows become the
+  state assertions**: with `getAXNodes()` / `axProperty(node, "expanded")` from
+  `src/__tests__/ax-tree.ts`, on `Popover.Trigger`, `Menu.Trigger`, `Menu.SubmenuTrigger` and
+  `Combobox.Trigger`: `false` closed and during a deferred open, `true` open and during a deferred
+  part close, `false` right after a real Escape with a 300 ms action (sampled within a frame),
+  `true` again after a refused dismissal re-shows. Firefox and WebKit run the DOM assertions only
+  (`server.browser === "chromium"` branch); the Firefox tree is checked manually with
+  `memo/architect/probes/121-popovertarget/ax-firefox.mjs`.
+- Screen-reader pass (owed since #118; NVDA + Firefox, NVDA or JAWS + Chrome, VoiceOver +
+  Safari): the Trigger announces "collapsed" at the hide itself; a VoiceOver check of
+  `Popover.Close` inside its popup (WebKit's quirk, research upstream report 2).
+
+Docs pages (`packages/docs/src/pages`): `PopoverPage.tsx` (the owned keys, the Trigger state
+row, the ARIA table row, the CSS example's `[aria-expanded="true"]` → `[data-open]` with the
+`:has()` recipe, the pending-and-optimistic paragraph); `MenuPage.tsx` (the Trigger attribute
+row, the pending section's list, the entanglement sentence); `ComboboxPage.tsx` (the overview
+sentence, the owned keys, the `data-open` row's aside); `BrowserOwnedStatePage.tsx` (the
+`aria-expanded` mirror sentence now names the non-button render and the Input); the concept
+page on pending and optimistic state ("a `<button>` overlay Trigger renders no `aria-expanded`;
+the browser exposes the popup's state"); the release notes' BREAKING line with the two selector
+migrations. `DialogPage.tsx` and `ButtonPage.tsx` unchanged.

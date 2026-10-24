@@ -73,7 +73,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
-| 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc, and none of the initial four has one. **#19 resolved 2026-10-23 (user decision, option A of `docs/research/zero-js-variants.md` 5): no second, directive-free anatomy; "JS-free" means no behaviour JS on the native path and works before and without hydration, never "no client bundle"** (7.3; resolved question 38). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. |
+| 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc, and none of the initial four has one. **#19 resolved 2026-10-23 (user decision, option A of `docs/research/zero-js-variants.md` 5): no second, directive-free anatomy; "JS-free" means no behaviour JS on the native path and works before and without hydration, never "no client bundle"** (7.3; resolved question 38). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. **#121 (2026-10-24, user-approved): overlay Triggers render `popoverTarget` (typed by `@types/react`, serialised camelCase by react-dom and lowercased by the DOM) instead of `commandfor` / `command`, and no `aria-expanded` on an invoker; JS-free mode DOM-writes `data-open` instead** (resolved question 41). |
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
@@ -833,11 +833,11 @@ The state owner (`Root` or the single component) holds:
 | Value | Source | Lane | Shown by |
 | --- | --- | --- | --- |
 | `committed` | `x ?? internal` | transition | content regions (`Panel`, `Popup`), everything that may suspend |
-| `optimistic` | `useOptimistic(committed, reducer)` | sync | trigger parts (`Tab`, `Trigger`, `Toggle`): `aria-pressed`, `aria-selected`, `data-selected`, state passed to their function props. ARIA state only where the optimistic value is what is displayed: an overlay Trigger's `aria-expanded` follows the shown popup, the `shown` mirror below (#118) |
+| `optimistic` | `useOptimistic(committed, reducer)` | sync | trigger parts (`Tab`, `Trigger`, `Toggle`): `aria-pressed`, `aria-selected`, `data-selected`, state passed to their function props. ARIA state only where the optimistic value is what is displayed: a `<button>` overlay Trigger renders no `aria-expanded` at all (a `popovertarget` invoker: the browser exposes the popup's state, #121), and where the attribute is still rendered (a non-button Trigger render, the Combobox Input) it follows the shown popup, the `shown` mirror below (#118) |
 | `pending` | `useTransition()` | sync | `data-pending` on the owner and on the trigger that initiated the change |
 | urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event; reported through an `on<State>Change` handler, not an action (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
 | urgent, internal (the value a slider gesture has reached, `live`; NumberField's draft text and the value under its held button, #67) | `useState`, written from the pointer or `input` event; no consumer-facing urgent action | sync, urgent | the thumbs, while a pointer is captured or a step or commit is in flight (`held`); otherwise they render `optimistic` (Slider 2.2) |
-| urgent, internal (`shown`: the popup is in the top layer, #118) | `useState` in `useOverlayRoot`, written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on the overlay Triggers and the Combobox Input (library mode); `false` on the server and at hydration |
+| urgent, internal (`shown`: the popup is in the top layer, #118) | `useState` in `useOverlayRoot`, written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on a non-button overlay Trigger render and on the Combobox Input (library mode; a `<button>` Trigger is a `popovertarget` invoker and renders none, #121); `false` on the server and at hydration |
 
 **Virtual focus is urgent library state.** Where a pattern keeps DOM focus on one element and
 moves focus virtually with `aria-activedescendant` (Combobox), the active item is a plain
@@ -887,11 +887,13 @@ tab, a checked menu item). Where the platform owns the ARIA state and forbids ov
 (`<summary>` may not carry `aria-expanded`; its expanded state comes from `<details open>`), or
 where the attribute describes an element whose visibility follows committed state (`aria-expanded`
 on a Popover, Menu or Combobox Trigger and on the Combobox Input: the Popup is shown from
-`committed`, and Chromium and WebKit expose a `commandfor` invoker's shown state whatever the
-attribute says, #118, `docs/research/invoker-aria-expanded.md`), optimistic state is **visual
+`committed`, and every engine exposes a `popovertarget` invoker's shown state whatever an
+attribute would say, #118 / #121, `docs/research/invoker-aria-expanded.md`), optimistic state is **visual
 only** (`data-open`, `state.open`) and assistive technology hears what is shown: `<details open>`
-for the Accordion, and for the overlays the Root's `shown` mirror of the popup's `toggle` (the
-urgent row above; #118, revised after its review M1). The mirror, not `committed`, because a
+for the Accordion, the popover's own state for a `<button>` overlay Trigger (a `popovertarget`
+invoker with no `aria-expanded`, ARIA in HTML #514, #121), and the Root's `shown` mirror of the
+popup's `toggle` (the urgent row above; #118, revised after its review M1) where an attribute is
+still rendered (a non-button Trigger render, the Combobox Input). The mirror, not `committed`, because a
 dismissal hides the popup before its notification settles and a transition entangled with an
 unrelated action can hold `committed` for that action's whole duration, while the attribute must
 equal `:popover-open` within a task in every phase. The component doc says so explicitly.
@@ -1033,7 +1035,7 @@ can delay or roll it back. The boundary:
 | --- | --- | --- |
 | Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in Accordion's static (JS-free) mode, `<dialog open>`; the Toast region (`popover="manual"`), which the library shows and hides in both directions, driven by the urgent queue, and never notifies: it has no `openChangeAction` because nothing a consumer could do with "the region opened" exists |
 | Who changes it | The library, inside its transition | The browser (top layer, light dismiss, `interestfor`, find-in-page) |
-| Optimistic source | `useOptimistic` | The DOM itself. An ARIA attribute on another element that must report it to assistive technology (`aria-expanded` on an overlay Trigger or the Combobox Input, #118) renders an urgent `useState` mirror written from the platform event (`toggle`, reading `:popover-open`), never transition state |
+| Optimistic source | `useOptimistic` | The DOM itself. An ARIA attribute on another element that must report it to assistive technology (`aria-expanded` on a non-button overlay Trigger render or the Combobox Input, #118; a `<button>` Trigger renders none, its `popovertarget` exposes the state, #121) renders an urgent `useState` mirror written from the platform event (`toggle`, reading `:popover-open`), never transition state |
 | `xChangeAction` | Can be awaited; the UI waits for it | Notification: dispatched from the platform event (`toggle`) inside a transition, after the fact |
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
@@ -1140,10 +1142,10 @@ Rules:
   claim that it was came from a probe with a synthesised click, which has no `pointerdown` /
   `pointerup` and never runs light dismiss; light dismiss is only observable with a real pointer,
   which is why these rows are browser rows. A part
-  that closes through its action therefore names the popup with `commandfor` +
-  `command="toggle-popover"` and cancels its click so the command never runs (`usePopoverTrigger`
-  does both for Popover and Menu; Combobox's Trigger writes the pair through its ref after
-  hydration, section 7.4, because a pre-hydration command would open an empty, mis-anchored
+  that closes through its action therefore names the popup with `popovertarget`
+  (#121; `commandfor` + `command="toggle-popover"` before) and cancels its click so the activation never runs (`usePopoverTrigger`
+  does both for Popover and Menu; Combobox's Trigger writes the attribute through its ref after
+  hydration, section 7.4, because a pre-hydration activation would open an empty, mis-anchored
   popup). The exemption exists for `<button>`s only, so a Trigger rendered as another element
   through `render` keeps a browser-shaped close in library mode (right reason, nothing awaited,
   no veto, no exit transition); the guarantee is stated for a `<button>` Trigger and the
@@ -1818,12 +1820,12 @@ HTML, directive or not. So no second anatomy ships. Per component:
   WebKit bug 297786, no position), so a directive-free Tooltip would show nothing at all in two
   of three engines; `design/components/tooltip.md` 2.4 and 14 stand (every part is a client
   module; "zero-JS" there means the native path runs no behaviour JS).
-- **Popover**: possible in principle (`commandfor` + `toggle-popover` in all engines) but a
-  static Trigger could not keep a server-rendered `aria-expanded` current, and Firefox maps no
-  expanded state for a `commandfor` invoker (Chromium and WebKit do; all three map
-  `popovertarget`, #118, `docs/research/invoker-aria-expanded.md`); that accessibility gap must
-  close first. A `popovertarget` Trigger that renders no `aria-expanded` would close it (the
-  #118 follow-up issue). Not scheduled.
+- **Popover**: viable in principle since #121 (the Trigger is a `popoverTarget` invoker with no
+  `aria-expanded`, so a static Trigger needs no ARIA kept current, and all three engines map
+  `popovertarget`, `docs/research/invoker-aria-expanded.md`; before #121 the `commandfor`
+  Trigger's DOM-written attribute, which Firefox alone read, was the blocker). The parts stay
+  client modules for the same reasons as Accordion's (context for ids and the mode; nested focus
+  return and `initialFocus` after hydration). Not scheduled, as Accordion's option B.
 - **Accordion**: the one real candidate (no behaviour loss in any engine, about 5 KB gzip
   saved). **Option B, `@funstack/ui/accordion/native`** (Root `div`, Item `details` with a
   required `name`, Trigger `summary`, Panel `div`; usable from Server and Client Components,
@@ -1863,13 +1865,13 @@ multi-payload pages has the same requirement; the library cannot detect it.
 A third configuration, decided with Menu (#39): a component whose baseline **cannot** be JS-free
 (a menu needs arrow keys, typeahead and focus management that only Chromium's flagged
 `focusgroup` provides natively) runs in library mode always, with no three-prop mode switch, and
-still renders the declarative Invoker Command on its Trigger for the implicit anchor, the
-platform's `aria-expanded` mapping (Chromium and WebKit; Firefox reads the rendered attribute,
-#118) and a pre-hydration open that mount reconciliation fills.
+still renders the declarative invoker on its Trigger (`popovertarget`, #121; `commandfor` +
+`toggle-popover` before) for the implicit anchor, the platform's implicit expanded state (every
+engine; no `aria-expanded` rendered) and a pre-hydration open that mount reconciliation fills.
 That open shows an empty popup until hydration, as Dialog's and Popover's library mode do; it
 is progressive enhancement, not a supported JS-free mode, and the component doc says so.
-Combobox is the second such component: its Trigger renders no command at all (the popup must be
-anchored to the input, not the button), and its progressive enhancement is that the text input
+Combobox is the second such component: its Trigger server-renders no invoker attribute (the popup must be
+anchored to the input, not the button; `popovertarget` is written after hydration, #112 / #121), and its progressive enhancement is that the text input
 works before hydration and the typed text is adopted at mount (section 3.5).
 
 ---
@@ -1882,15 +1884,15 @@ notes"):
 
 | Gap | Convention |
 | --- | --- |
-| Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). |
-| Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. Mechanism verified by the reviewer: tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. |
+| Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). `popovertarget` / `popovertargetaction` are **not** in this row: react-dom 19.3 knows them as `popoverTarget` / `popoverTargetAction` (the lowercase spelling warns "Invalid DOM property"), serialises them camelCase in server HTML (HTML parses attribute names case-insensitively) and lowercases them through `setAttribute` on the client; write the camelCase prop (#121). |
+| Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. Mechanism verified by the reviewer: tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. `popoverTarget` / `popoverTargetAction` are typed upstream, so the overlay Triggers left this row with #121; `command` / `commandfor` stay in it for `Popover.Close`, the Dialog parts and consumers' `Button`s. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
-| Attribute that must act on the client but must not be in the server HTML (Combobox Trigger's `commandfor` / `command`, #112: the invoker relationship exempts its press from light dismiss, but a pre-hydration command would open an empty, button-anchored popup) | Not rendered; written with `setAttribute` from the part's ref callback once the element is known to be a `<button>` (removed in the cleanup), so hydration never sees it and the click handler that cancels the command is installed before the attribute exists. The key is still owned (omitted from the props type). Named in the component design (section 3.5 lists the parts that use it). |
+| Attribute that must act on the client but must not be in the server HTML (Combobox Trigger's `popovertarget`, #112 / #121: the invoker relationship exempts its press from light dismiss, but a pre-hydration activation would open an empty, button-anchored popup) | Not rendered; written with `setAttribute` from the part's ref callback once the element is known to be a `<button>` (removed in the cleanup), so hydration never sees it and the click handler that cancels the activation is installed before the attribute exists. The key is still owned (omitted from the props type). Named in the component design (section 3.5 lists the parts that use it). |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6: `on*` is reserved for the urgent lane, and these are interactions, not an urgent state). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
 | Element whose children the **parser writes before hydration** (`<selectedcontent>`: Chromium and Safari clone the selected option's children into it at parse time, so a plain element fails hydration and client-renders the whole root) | Render it with `suppressHydrationWarning` and `dangerouslySetInnerHTML={{ __html: "" }}`, so React treats the children as opaque and the attribute mismatch is silenced (verified in `docs/research/select-combobox.md` §4: hydrates with no recoverable error, later browser writes keep working); the part has no `children` prop. One such element per component at most, named in its design doc (`Select.Value`). |
 | Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
-| ARIA state the platform changes for browser-owned state and assistive technology needs explicitly (`aria-expanded` on a Popover Trigger in JS-free mode, where no React state exists) | Render the initial value and keep it current with a DOM write from the platform event through the ref (`toggle`, reading `:popover-open`), never React state. The attribute is owned, so React's value for it never changes in that mode and the DOM write is never overwritten. One attribute per component at most, named in its design doc. |
+| Styling state for a browser-owned open that a static part cannot render (`data-open` on a Popover Trigger in JS-free mode, where no React state exists; until #121 this row was the Trigger's `aria-expanded`, which a `popovertarget` invoker no longer renders because the browser exposes the state itself) | Keep it current with a DOM write from the platform event through the ref (`toggle`, reading `:popover-open`), never React state. The attribute is owned and React renders no value for it in that mode, so the DOM write is never overwritten. A page that never hydrates has `:has(+ :popover-open)` instead, shown on the docs page. One attribute per component at most, named in its design doc. |
 | Styling state for a browser-owned open that CSS must see **at the open's first style recalc** and no pseudo-class carries (Tooltip's `data-instant`, a warm open, #93) | A DOM write from the platform's **synchronous** `beforetoggle` through the ref (`syncPresence`), on every path that can open the element (the native `interestfor` path included, as the interaction hook's only listener there; the placement observer's `toggle`, section 13.2, is separate), never from `toggle` (a task later: the entry transition has started and the write cancels it mid-flight, probe in `design/components/tooltip.md`'s #93 amendment) and never React state (a render cannot be placed before that recalc short of `flushSync` inside the show algorithm). Classified from the DOM at that moment (`beforetoggle` precedes the `auto` / `hint` stacking that hides other popovers), cleared at the close's `beforetoggle`, never rendered by the part (so never in server markup), no `state.<name>` counterpart. One attribute per component at most, named in its design doc. |
 | Roving `tabindex` over children the library did not render (`Toolbar.Root`; a standalone `ToggleGroup.Root`, #66) | The container's engine (`internal/use-roving-focus.ts`) finds the focusable descendants in the DOM and writes `tabindex` (`0` on the current stop, `-1` elsewhere) from a layout effect after each of its commits, a `MutationObserver` on its subtree and its `focusin` / `pointerdown` handlers. Items render no `tabindex` (library item parts omit the prop from their types; a consumer's `tabIndex` on a toolbar item is unsupported), an element whose own `tabindex="-1"` the engine did not write is not an item, the engine records each element's original `tabindex` and restores it when it lets go (the native path after hydration, an element that left the container), and on the native `focusgroup` path nothing is written. Server HTML carries no `tabindex`, so before hydration every item is a Tab stop; after the first layout effect, one. |
 
@@ -2651,7 +2653,7 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 24. **Popover (#38)** accepted 2026-10-17 with all eight questions as recommended
     (`design/components/popover.md`): `<dialog popover="auto" aria-modal="false">` with focus
     moving in and `render={<div />}` for the disclosure variant; part-initiated closes
-    library-owned, dismissals notified; JS-free `aria-expanded` by DOM write; no `Form` /
+    library-owned, dismissals notified; JS-free `aria-expanded` by DOM write (`data-open` since #121); no `Form` /
     `lightDismiss`; `role` an overridable default; the nested focus-return rule; placement
     `bottom` / `center`; Trigger-less popovers unanchored. Dialog's view-transition close is
     issue #46. The conventions changes it asked for (the top-layer boundary rule in 3.5 / 5.1,
@@ -2843,7 +2845,7 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     components; "JS-free" means no behaviour JS on the native path and works before and without
     hydration, not "no client bundle"; native-HTML recipes on the form-control docs pages
     (Switch, Checkbox, RadioGroup, Slider, NumberField, Select); Tooltip not viable natively
-    outside Chromium; Popover blocked on the `aria-expanded` gap; option B
+    outside Chromium; Popover blocked on the `aria-expanded` gap (closed by #121, question 41); option B
     (`@funstack/ui/accordion/native`) recorded as a ready plan, not scheduled. Supersedes the
     "tracked in #19" notes in the component documents (Accordion feedback 1, Tooltip 14.1,
     RadioGroup, CheckboxGroup, Switch, Select, Slider, NumberField). The server `useId`
@@ -2901,6 +2903,39 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     (dismissal window, pre-hydration `defaultOpen`, platform path) are gone. Consequence:
     `defaultOpen` server-renders `aria-expanded="false"` (the popup is not shown before
     hydration). JS-free mode keeps its DOM write (7.4). Not exposed in render-prop state.
+    **Superseded for `<button>` Triggers by 41 (#121)**: they render no `aria-expanded`; the
+    `shown` mirror stays the source where the attribute is still rendered.
+41. **Overlay Triggers are `popovertarget` invokers and render no `aria-expanded` (#121)**,
+    decided by the architect and approved by the user through the product owner, 2026-10-24.
+    `Popover.Trigger`, `Menu.Trigger` and `Menu.SubmenuTrigger` render `popoverTarget={popupId}`
+    (default action `toggle`) instead of `commandfor` + `command="toggle-popover"`;
+    `Combobox.Trigger` writes `popovertarget` through its ref after hydration as it wrote the pair
+    (#112). On a `<button>` no `aria-expanded` is rendered: HTML-AAM maps a `popovertarget`
+    invoker to its popover's state and Chromium, Firefox and WebKit all expose it (measured,
+    `memo/architect/probes/121-popovertarget/`; `role="menuitem"` included), ARIA in HTML #514
+    forbids the explicit attribute there, and Firefox ORs an explicit value in. Sub-decisions:
+    (1) adopted now, before 0.1.0, not waiting for #514 (stale; the engines already behave as it
+    says); (2) a non-button `render` (no invoker, #115) keeps `aria-expanded` from the Root's
+    `shown` mirror (#118); (3) JS-free mode's `toggle` listener writes `data-open` on the Trigger
+    instead of `aria-expanded`, so `[data-open]` is the styling hook in both modes, with a
+    `:has(+ :popover-open)` recipe for pages that never hydrate; (4) #125 classifies a foreign
+    `popovertarget` invoker's close as `"activate"` from `ToggleEvent.source`; (5) a
+    native-disabled Trigger with its popup shown exposes no state (a disabled button is no
+    invoker): accepted as transient. Unchanged: `Popover.Close` (`commandfor` + `hide-popover`:
+    Chromium and Firefox expose no state for an invoker inside its own popover with either
+    attribute, and the `command` event carries a foreign hide's reason), Dialog (`popovertarget`
+    cannot open a modal `<dialog>`; its Trigger has no `aria-expanded`), `Combobox.Input` (explicit
+    attribute, `role="combobox"`), the Popup's `onCommand` for foreign `commandfor` invokers.
+    Verified identical for both attributes (Chromium and Firefox measured, WebKit source): the
+    light-dismiss exemption (#112), cancelled-click suppression (mouse, Enter, Space), the
+    implicit anchor, nested stacking, `ToggleEvent.source`. **Breaking (DOM only, in the
+    0.1.0-alpha line):** `aria-expanded` disappears from the four Triggers (consumers move CSS
+    from `[aria-expanded="true"]` to `[data-open]`) and `commandfor` / `command` become
+    `popovertarget`; no prop or type change (`commandfor` / `command` stay omitted as reserved,
+    `popoverTarget` / `popoverTargetAction` join the omitted keys). Evaluation:
+    `memo/architect/eval-121-popovertarget.md`. Applied: decision 7, 3.2, 3.5, 7.3, 7.4;
+    `popover.md`, `menu.md` and `combobox.md` edited in place plus an amendment each (Popover's
+    carries the implementation and test plan).
 
 ## Open questions
 

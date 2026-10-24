@@ -286,3 +286,14 @@ Gecko: no implicit state for `commandfor` invokers (E makes it moot for the libr
 but `Popover.Close` and Dialog still render `commandfor`; Close expects no state anyway). WebKit:
 an invoker inside its own popover exposed as expanded (affects `Popover.Close` whichever
 attribute; Firefox was measured here to exclude it, so WebKit is the only engine with the quirk).
+
+## Outcome (2026-10-24, later the same day)
+
+User-approved through the product owner: adopt now with all five sub-decisions of section 8.
+Design amendment written: `design/components/popover.md` (amendment with the implementation and
+test plan), `menu.md`, `combobox.md`, `design/conventions.md` (decision-table row 7, 3.2, 3.5,
+7.3, 7.4, resolved question 41; 40 marked superseded for `<button>` Triggers). Follow-up for
+`ToggleEvent.source`: #125. Note for the implementation: `Omit` lists keep `commandfor` /
+`command` as reserved keys and add `popoverTarget` / `popoverTargetAction`; the JS-free `toggle`
+write becomes `data-open`; the one place the `shown` mirror is still rendered on a Popover or
+Menu part is a non-button `render`.

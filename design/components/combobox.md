@@ -114,7 +114,7 @@ Rendered HTML (closed, `value` is `"jp"`, text "Japan"; ids come from one `useId
 | `Root` | none, or `input[type=hidden]` when `name` is given | | `state` in `children(state)` | Owns `useId`, both state hooks, the deferred query, the active option, the open state (`useOverlayRoot`), the Option and Status registries, the label cache, the form-reset listener. No `ref`, `className`, `style`. |
 | `Label` | `label` | | | `htmlFor` → the Input's id (owned); `id` → the List's `aria-labelledby`. |
 | `Input` | `input` | `combobox` | **urgent** text, optimistic `value` for `data-selected`, optimistic open for `data-open`, shown open (the Root's `shown` mirror) for `aria-expanded` (#118) | `aria-autocomplete="list"`, `aria-controls`, `aria-activedescendant`, `autocomplete="off"`, `data-open`, `data-pending`, `data-selected`, `data-disabled`. The Root's `pending` lands here (the owner renders no element). |
-| `Trigger` | `button` | button | optimistic open (`data-open`); shown open (`aria-expanded`, #118) | Optional. `tabindex="-1"` (APG: not in the Tab sequence), `aria-expanded`, `aria-controls`; click toggles and focuses the input. `commandfor` / `command="toggle-popover"` written through the ref after hydration, never server-rendered, every click cancelled (section 1, 3.3, #112). |
+| `Trigger` | `button` | button | optimistic open (`data-open`); no `aria-expanded` on a `<button>` (#121: the browser exposes the listbox's state once `popovertarget` is written) | Optional. `tabindex="-1"` (APG: not in the Tab sequence), `aria-controls`; click toggles and focuses the input. `popovertarget` written through the ref after hydration, never server-rendered, every click cancelled (section 1, 3.3, #112 / #121). |
 | `Clear` | `button` | button | | Optional. `tabindex="-1"`; click empties the text (urgent) and dispatches `valueChangeAction(null)`. Rendered only while there is text or a value? No: always rendered; consumers hide it with `:has(input[data-selected])` or `state`. |
 | `Popup` | `div` | none (a container) | committed open | `popover="auto"`, `id`, inline placement, `data-stale`, `data-open` never (`:popover-open`). The content region; children render from committed open. Must be a DOM sibling of the Input where possible (section 7). |
 | `List` | `div` | `listbox` | `query` (deferred) | `id`, `aria-labelledby` → Label while one is mounted (token-merged), `data-stale` while stale, `aria-busy="true"` while stale or loading, `data-empty`. Function `children` receive `{ query }`. Its accessibility children are `Option`s and `Group`s only (ARIA content model): `Empty` lives in the Popup, outside it, and a `Status` rendered inside it (the Suspense fallback) is role-less and marks the List as loading (6.3). |
@@ -144,11 +144,11 @@ Why this shape:
   should be named by the same text; the part wires `for` and `aria-labelledby` from one id.
   It is the conventions' `Label` ("names the owner"): here the owner's name belongs on the
   Input.
-- **`Trigger` renders no `commandfor`, and becomes an invoker after hydration (#112).** A
-  declarative command in the server HTML would run before hydration: a click would open an
+- **`Trigger` renders no invoker attribute, and becomes an invoker after hydration (#112; `popovertarget` since #121).** A
+  declarative invoker in the server HTML would act before hydration: a click would open an
   empty popup anchored to the button, with the button's `anchor-size(width)`. So the server HTML
-  has none. After hydration the Trigger writes `commandfor` (the Popup's id) and
-  `command="toggle-popover"` through its ref and cancels every click, so the command never runs
+  has none. After hydration the Trigger writes `popovertarget` (the Popup's id)
+  through its ref and cancels every click, so the activation never runs
   (the popup is always opened by the library with `source: input`) and, because the button names
   the shown popover, a press on it is **not a light dismiss** (HTML's "topmost clicked popover";
   conventions 3.5). Without the attributes the browser hid the listbox at `pointerup`, before
@@ -427,7 +427,7 @@ visible field for the raw text; the selection's `name` is the Root's). `placehol
 ```ts
 export interface ComboboxTriggerState { readonly open: boolean; readonly pending: boolean; readonly disabled: boolean; }
 export interface ComboboxTriggerProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "onPointerDown" | "onMouseDown" | "commandfor" | "command" | "tabIndex" | "aria-expanded" | "aria-controls" | "disabled" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "onPointerDown" | "onMouseDown" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "tabIndex" | "aria-expanded" | "aria-controls" | "disabled" | "className" | "style" | "children"> {
   disabled?: boolean;
   className?: StateValue<string | undefined, ComboboxTriggerState>;
   style?: StateValue<CSSProperties | undefined, ComboboxTriggerState>;
@@ -447,15 +447,19 @@ prop or Root's). Both buttons sit outside the popup. A press on **Clear** while 
 open is a **light dismiss** that the browser runs before the `click`; a press on the **Trigger**
 is not, because after hydration the Trigger is an invoker of the popup (next paragraph, #112).
 
-Trigger: `aria-expanded`, `aria-controls`, `data-open`, `data-pending`; click toggles the
-listbox and focuses the input. After hydration the Trigger writes `commandfor` (the Popup's id)
-and `command="toggle-popover"` through its ref callback, onto a `<button>` only (HTML defines
+Trigger: `aria-controls`, `data-open`, `data-pending`, and **no `aria-expanded` on a `<button>`**
+(#121: once `popovertarget` is written every engine exposes the listbox's shown state from the
+popover itself; before hydration the button has no state, and the Input, the widget's primary
+control, keeps its explicit `aria-expanded`; a non-button `render` renders `aria-expanded` from
+`popover.shown`, #118); click toggles the
+listbox and focuses the input. After hydration the Trigger writes `popovertarget` (the Popup's id)
+through its ref callback (`setAttribute("popovertarget", id)`, lowercase), onto a `<button>` only (HTML defines
 the invoker exemption below for buttons; a `render` that produces another element gets a dev
 warning and keeps a browser-shaped close), and **every click is cancelled** (`preventDefault()`),
-so the command never runs: the listbox is still opened by the library with `source: input` and
-keeps the input's anchor and width. The attributes are never in the server HTML (a
-pre-hydration command would open an empty, button-anchored popup, 11.2); `commandfor` and
-`command` are owned keys. A press on a button that names the shown popover is **not a light
+so the activation never runs: the listbox is still opened by the library with `source: input` and
+keeps the input's anchor and width. The attribute is never in the server HTML (a
+pre-hydration activation would open an empty, button-anchored popup, 11.2); `popoverTarget` /
+`popoverTargetAction` are owned keys and `commandfor` / `command` stay omitted as reserved. A press on a button that names the shown popover is **not a light
 dismiss** (HTML "topmost clicked popover": the invoker's popover is the clicked popover;
 Chromium, Firefox and WebKit all consult `commandfor` and `popovertarget` there), so the state
 at `click` is the state the user saw and the toggle is judged against `intended()`, as Popover's
@@ -1017,7 +1021,7 @@ Typeahead does not exist (the input *is* the typeahead).
 | --- | --- |
 | Input | `role="combobox"`, `aria-autocomplete="list"`, `aria-expanded` (shown: the listbox is in the top layer, #118), `aria-controls` → List id, `aria-activedescendant` → the active Option id or absent, `autocomplete="off"`, `id` (the Label's `for`), `required` / `aria-describedby` pass through |
 | Label | `for` → Input id, `id` |
-| Trigger | `tabindex="-1"`, `aria-expanded` (shown, #118), `aria-controls` → List id, `aria-label` from the consumer (dev warning without a name) |
+| Trigger | `tabindex="-1"`, `popovertarget` after hydration and **no `aria-expanded`** on a `<button>` (#121; a non-button `render` renders it from `shown`, #118), `aria-controls` → List id, `aria-label` from the consumer (dev warning without a name) |
 | Clear | `tabindex="-1"`, `aria-label` from the consumer |
 | Popup | `popover="auto"`, `id`; no role |
 | List | `role="listbox"`, `id`, `aria-labelledby` → Label id while a `Label` is mounted (the Label registers with the Root; token-merged with the consumer's; never a dangling IDREF), otherwise the consumer's `aria-label` on the List names it (pass-through; dev warning when it has neither), `aria-busy="true"` while stale or loading; no `aria-multiselectable` in v1 |
@@ -1142,9 +1146,9 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
 
 17. **Trigger click while open, slow close (#112).** The listbox is open, `openChangeAction(false)`
     takes 300 ms. `pointerdown` / `mousedown` prevented (focus stays in the input); the Trigger
-    carries `commandfor` → the press is not a light dismiss, nothing hides at `pointerup`;
+    carries `popovertarget` (#121) → the press is not a light dismiss, nothing hides at `pointerup`;
     `click` → `preventDefault()` (no command), `requestClose(click, "activate")`,
-    `data-pending` and no `data-open` on the Trigger (`aria-expanded` stays `"true"`, #118), the
+    `data-pending` and no `data-open` on the Trigger (exposed as expanded while shown, #121), the
     listbox still shown with its options. 300 ms later the close commits: `hidePopover()` in the apply effect, the
     `<ViewTransition>` exit if set. A controlled parent that leaves `open={true}` instead: the
     optimistic `false` snaps back, the apply effect finds the popup shown and does nothing, no
@@ -1187,7 +1191,7 @@ every part and pass Server Functions to `valueChangeAction` and `openChangeActio
 (`onInputValueChange` too, but an urgent handler that is a network call makes no sense and
 is documented against). What the server HTML contains: the hidden input with the default value,
 the Label, the Input with `defaultInputValue` as its `value`, the Trigger and Clear (inert until
-hydration: the Trigger's `commandfor` / `command` are written after hydration, 3.3, so a
+hydration: the Trigger's `popovertarget` is written after hydration, 3.3, so a
 pre-hydration click on it opens nothing), the empty `<div popover>`. Before hydration the user can type, and the text is
 adopted at mount (walkthrough 11); nothing opens, nothing is selectable. A form submitted before
 hydration posts the default selection (and, with a `name` on the Input, the raw text). This is
@@ -1268,7 +1272,7 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Empty and Status | `Empty` renders only with zero mounted options, not stale and not loading: hidden during the Suspense fallback (a `Status` inside the List) and while stale old results show; `data-empty` on the List likewise; the List is `aria-busy="true"` while loading and while stale; a Status in the Popup is `role=status` and does not count as loading. |
 | Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with the default message (`"No results"` / `"1 result"` / `"3 results"`) or the consumer's `announce(count)`; not while stale; **with a `Status` fallback inside the List: zero calls until the results resolve, then one** (review H1); not for an unchanged count; never when `announce` returns `null`. |
 | Clear | Writes `""`, dispatches `null` (`"activate"`, the `click`), no dispatch when already `null`, input keeps focus; while open, the light dismiss (shim) closes the listbox and it is not re-opened. |
-| Trigger | Toggles against `intended()`; every click is `defaultPrevented`; after mount a `<button>` Trigger carries `commandfor` equal to the Popup's `id` and `command="toggle-popover"`, `renderToString` output carries neither, a non-button `render` gets neither and a dev warning; a controlled `open={true}` parent whose action leaves `open` alone keeps the listbox shown with one `(false, "activate")` dispatch (#112). |
+| Trigger | Toggles against `intended()`; every click is `defaultPrevented`; after mount a `<button>` Trigger carries `popovertarget` equal to the Popup's `id` and no `aria-expanded` (#121), `renderToString` output carries no `popovertarget`, a non-button `render` gets none, renders `aria-expanded` from `shown` and gets a dev warning; a controlled `open={true}` parent whose action leaves `open` alone keeps the listbox shown with one `(false, "activate")` dispatch (#112). |
 | Platform path (both) | Mount reconciliation: `renderToString`, set `input.value = "jap"` before `hydrateRoot` → one `onInputValueChange("jap", { reason: "platform", event: undefined })`, no open, StrictMode still one; no `valueChangeAction`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → one `valueChangeAction(resetTarget, "platform")` with the `reset` event and one text write; the reset target is the JS-computed one (uncontrolled: latest `defaultValue`; controlled: mount-time); the visible input's `defaultValue` attribute is the mirror at the time of the `reset` event (uncontrolled: latest `defaultInputValue`; controlled: mount-time); the hidden input carries no `defaultValue`. |
 | Suspending content (both) | Dependent content keyed on `value` suspends on accept: old content stays, Input `data-pending`, no fallback above; then new content. Results boundary outside the List: the open waits with `data-pending` on Input and Trigger, `showPopover` not called until resolve. |
 | Function props / `render` | Every part's documented state; `render={<input type="search" />}` keeps the role and handlers; a `render={<button />}` Input warns; Popup `render={<div className />}` merges. |
@@ -1292,9 +1296,9 @@ Element.prototype` (all three stable engines; asserted true, branch kept for Pla
 | Enter submits with the new value | `allowCustomValue` inside a `<form>` with a submit spy: Enter while closed posts the typed text in `FormData` (hidden input updated before the implicit submission). | all three; document any engine where the sync flush lands after submission |
 | Nested in Popover / Dialog | Opening the listbox keeps the outer open; light dismiss closes the stack; **WebKit 302008 row**: `browserName === "webkit"`, open the listbox inside an open `Popover.Popup` twice with the default `flip-block` under a 15 s timeout so a hang fails instead of stalling. | WebKit row runs regardless |
 | Announcements | `ariaNotify` spied on the List: one call per settled result set with the default or the `announce` string; none while stale. | `supportsAriaNotify`; otherwise assert no throw |
-| Trigger close (#112) | Real mouse (`mouse.down` / `mouse.up`) on the Trigger of an open listbox with `openChangeAction` resolving after 300 ms: at `pointerup` + 20 ms the popup still matches `:popover-open`, `document.activeElement` is the input, the Trigger has `data-pending`, no `data-open` and `aria-expanded="true"` (#118); after the action: hidden, exactly one dispatch `(false, { reason: "activate" })` whose `event` is the `click`. Controlled `open={true}` parent that refuses (async and sync action): `:popover-open` sampled every frame from the press to + 400 ms is never false. With `transition`: `startViewTransition` called once for the Trigger close with a `::view-transition-old` of the popup. A click while closed opens with the popup's inline-start edge on the input's and width `>= input width` (the command never ran; the anchor is still the input). | none: all three engines run the same assertions. WebKit is checked by its CI job (`FUNSTACK_BROWSERS=webkit`); if that job alone fails the + 20 ms assertion, the engine's invoker check does not cover `commandfor` yet and the fallback is `popovertarget` (same exemption, older attribute), recorded in the amendment |
+| Trigger close (#112) | Real mouse (`mouse.down` / `mouse.up`) on the Trigger of an open listbox with `openChangeAction` resolving after 300 ms: at `pointerup` + 20 ms the popup still matches `:popover-open`, `document.activeElement` is the input, the Trigger has `data-pending`, no `data-open` and no `aria-expanded` (#121; the Chromium branch asserts the Trigger's AX `expanded=true` through `getAXNodes()` at the same sample); after the action: hidden, exactly one dispatch `(false, { reason: "activate" })` whose `event` is the `click`. Controlled `open={true}` parent that refuses (async and sync action): `:popover-open` sampled every frame from the press to + 400 ms is never false. With `transition`: `startViewTransition` called once for the Trigger close with a `::view-transition-old` of the popup. A click while closed opens with the popup's inline-start edge on the input's and width `>= input width` (the command never ran; the anchor is still the input). | none: all three engines run the same DOM assertions; the AX assertion is Chromium only. WebKit is checked by its CI job (`FUNSTACK_BROWSERS=webkit`); its `handlePopoverLightDismiss` checks `popoverTargetElement()` (`Document.cpp`, main, #121 evaluation) |
 | Input press (#123) | The #117 row, now passing: a real press (`mouse.down` / 20 ms / `mouse.up`) on the input of an open listbox: at the press and 80 ms after the release the popup matches `:popover-open`, `document.activeElement` is the input, the text is unchanged, nothing dispatched; the `click` landed on the Popup (`openOnClick` neither re-opens nor dispatches). Caret: a press after the third character leaves `selectionStart === selectionEnd === 3`. Nested inside an open `Popover.Popup`: both stay open. Touch (a `hasTouch` context, `touchscreen.tap`, or CDP `Input.dispatchTouchEvent`): stays open at top level; under vitest's runner the page is a frame, where Chromium closes it (#124): the row asserts the close in Chromium with the issue named, so it fails the day Chromium changes. It runs in Chromium only: the harness creates no `hasTouch` context, and CDP touch input is Chromium's (as the Menu and NumberField touch rows); Firefox's touch outcome comes from the plain-DOM probe (open, top level and frame). Drag-to-select from the second to the eighth character while open: `[2, 8]` where the engine's selection drag ignores pointer capture; Firefox: `[2, 2]`, asserted as the documented cost, never skipped. | Touch row: `browserName === "chromium"` (CDP), branching on `window === window.top` (the frame is #124's trigger; vitest's runner is always a frame) with #124 named. Drag row: `browserName === "firefox"` with the finding named (conventions 13.3: no feature check fits a drag). WebKit's expectation is `[2, 8]`; if its CI job alone disagrees, record it in the amendment and branch |
-| Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration, one `"platform"` text dispatch, no `valueChangeAction`, nothing opened; the server HTML's Trigger has no `commandfor`, a real click on it before `hydrateRoot` opens nothing, after hydration it carries `commandfor` (#112). | The "keyboard did not reach the iframe" fallback is allowed for WebKit only (the engine not probed locally, review L4); Chromium and Firefox must reach it |
+| Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration, one `"platform"` text dispatch, no `valueChangeAction`, nothing opened; the server HTML's Trigger has no `popovertarget`, a real click on it before `hydrateRoot` opens nothing, after hydration it carries `popovertarget` (#112, #121). | The "keyboard did not reach the iframe" fallback is allowed for WebKit only (the engine not probed locally, review L4); Chromium and Firefox must reach it |
 | ViewTransition | With `transition={{ …, default: "none" }}`: open calls `startViewTransition` once, accept-close once with a `::view-transition-old` of the popup present, a deferred results change zero times; with `transition="pop"` a results change calls it once (documents the cost); without `transition` zero calls. | none |
 | IME | Composition (`compositionstart` … `compositionend` through Playwright's `insertText` / keyboard IME where available): the text updates per composition update, the listbox opens, Enter during composition does not accept. | Chromium (Playwright IME support); others assert the non-composition path |
 
@@ -1400,8 +1404,8 @@ packages/ui/src/internal/
   `preventDefault()`, `data-stale`, inline `style` (consumer wins per property); content through
   `renderContent` as Popover 14.4.
 - **Trigger.** `onPointerDown` and `onMouseDown` → `preventDefault()` (focus stays in the
-  input); ref callback → when `element.tagName === "BUTTON"`, `setAttribute("commandfor",
-  ids.popup)` and `setAttribute("command", "toggle-popover")`, both removed in the cleanup
+  input); ref callback → when `element.tagName === "BUTTON"`, `setAttribute("popovertarget",
+  ids.popup)` (#121; `commandfor` + `command` at #112), removed in the cleanup
   (otherwise a dev warning); `onClick` → `preventDefault()` first (the command never runs), then
   `disabled` check, toggle against `intended()`, focus the input. No `onPointerCancel`, no
   `pointerdown` snapshot (#112).
@@ -1454,7 +1458,7 @@ packages/ui/src/internal/
    results are for an older text; `aria-busy` equivalent on the listbox), `empty` (the list
    has no options), `selected` row gains `Combobox.Option` and `Combobox.Input`
    (`data-selected` = a non-null optimistic value), `open` row gains `Combobox.Input` /
-   `Trigger` (optimistic `data-open`, and `aria-expanded`, the shown state since #118; Popup none).
+   `Trigger` (optimistic `data-open`; no `aria-expanded` on a `<button>` since #121, the browser exposes the state; Popup none).
 7. **5.1 ViewTransition.** Note that updates from `useDeferredValue` activate a boundary like
    transitions do, so a part whose content re-renders from a deferred value (Combobox.Popup)
    documents the `default: "none"` type-map form as the recommended spelling.
@@ -1509,9 +1513,9 @@ packages/ui/src/internal/
    show the one-liner next to every example. Flagging because it is an accessibility default
    that is off until the consumer acts.
 7. **`multiple` deferred** (section 13) with the anatomy leaving room for `Chips`. Confirm.
-8. **No JS-free mode; the Trigger renders no `commandfor`** (section 1, 2.4): a pre-hydration
+8. **No JS-free mode; the Trigger server-renders no invoker attribute** (section 1, 2.4): a pre-hydration
    Trigger click does nothing, a pre-hydration keystroke is adopted at mount. Alternative:
-   `commandfor` on the Trigger for a pre-hydration open of an empty, button-anchored popup
+   a server-rendered invoker attribute on the Trigger for a pre-hydration open of an empty, button-anchored popup
    (Menu's shape), at the cost of wrong anchoring and width after hydration unless the library
    re-opens with `source: input`. Recommendation: as designed.
 9. **Escape is left to the platform** (5.4): the library never intercepts it, so Escape when the
@@ -1528,7 +1532,7 @@ packages/ui/src/internal/
 Questions 1 to 5 and 7 to 11 accepted as recommended: one component with `allowCustomValue`;
 `inputValueChangeAction: UrgentChangeAction` as the library-wide urgent convention; two explicit
 states and no `itemToString`; stay open with `data-pending` on the option and close on settle
-(consistent with Menu); Tab does not accept; `multiple` deferred; no `commandfor` on the Trigger
+(consistent with Menu); Tab does not accept; `multiple` deferred; no server-rendered invoker attribute on the Trigger
 and no JS-free mode; Escape not intercepted; the WebKit 302008 row with the
 `positionTryFallbacks` escape hatch; the conventions changes applied (feedback 1 to 12).
 
@@ -1815,13 +1819,13 @@ snapshot existed only to make the click toggle in the right direction after that
 
 | | Before (every engine) | After (every engine) |
 | --- | --- | --- |
-| Press on the Trigger of an open listbox | light dismiss hides the popup at `pointerup` | not a light dismiss: the Trigger names the popup (`commandfor` + `command="toggle-popover"`, written after hydration) |
+| Press on the Trigger of an open listbox | light dismiss hides the popup at `pointerup` | not a light dismiss: the Trigger names the popup (`popovertarget` since #121, `commandfor` + `command="toggle-popover"` at #112; written after hydration) |
 | Dispatch | `(false, "activate")` from the click, the hide's `toggle` an echo; the toggle direction from the `pointerdown` snapshot | `(false, "activate")` from the click, judged against `intended()` |
-| While `openChangeAction(false)` runs | listbox gone; Trigger `data-pending` | listbox shown, options visible, input focused; Trigger `data-pending`, no `data-open` (`aria-expanded` stays `"true"` since #118) |
+| While `openChangeAction(false)` runs | listbox gone; Trigger `data-pending` | listbox shown, options visible, input focused; Trigger `data-pending`, no `data-open` (exposed as expanded while shown, #121) |
 | Controlled parent keeps `open={true}` | hidden, then re-shown when the action settles (a blink; exit and entry animations replay) | snap-back, nothing hidden (Popover 2.3's veto) |
 | Rejection | listbox already gone, re-opened by the apply effect | listbox stays shown |
 | `transition` exit | none (the popup was hidden before the close commit) | view transition |
-| Before hydration | the Trigger is inert | unchanged: no `commandfor` in the server HTML, the attributes arrive with the hydration commit |
+| Before hydration | the Trigger is inert | unchanged: no invoker attribute in the server HTML; it arrives with the hydration commit |
 
 Why the invoker attributes and not the other way round (accept the browser shape and correct 5.4
 and the docs): conventions 3.5 says a part's library-owned close is the single source of that
@@ -1836,12 +1840,14 @@ Why written through the ref rather than rendered: product-owner decision 8 (no `
 the server HTML; a pre-hydration click must not open an empty, button-anchored popup) stands.
 The invoker relationship is only needed for light dismiss, which only exists once the library
 has opened the popup, which only happens after hydration. The precedent is conventions 7.4's
-`hidden="until-found"` upgrade and the JS-free Popover Trigger's `aria-expanded` write. The
+`hidden="until-found"` upgrade and the JS-free Popover Trigger's `toggle`-driven DOM write. The
 click is cancelled before anything else in the handler, so the command never runs, no matter
 what the handler does afterwards; a consumer cannot pass `commandfor` / `command` (owned keys).
 
-Why `commandfor` + `command="toggle-popover"` rather than `popovertarget`: it is the attribute
-pair every other overlay Trigger renders (`usePopoverTrigger`) and the one conventions 7.4
+**Superseded by #121 (2026-10-24): the Trigger now writes `popovertarget`, the attribute every
+other overlay Trigger renders; the exemption is the same, as this paragraph established.** Why
+`commandfor` + `command="toggle-popover"` rather than `popovertarget`, at #112: it was the attribute
+pair every other overlay Trigger rendered (`usePopoverTrigger`) and the one conventions 7.4
 types. Both are exempt from light dismiss: HTML's "topmost clicked popover" takes the invoker's
 popover from the button's popover target (`popovertarget`, or `commandfor` with a popover
 command), and WebKit's `handlePopoverLightDismiss` checks `commandForElement()` and
@@ -1879,7 +1885,7 @@ Considered and left alone:
   library-owned closes, does not apply, and it behaves the same on every engine. Making Clear an
   invoker would change the designed outcome (the listbox would stay open after clearing), a
   separate product question, not a bug.
-- **Other overlays with a Trigger.** Popover and Menu Triggers render `commandfor`: exempt
+- **Other overlays with a Trigger.** Popover and Menu Triggers render `popovertarget` (#121; `commandfor` before): exempt
   through it (they are also the popover's `source`, which is no exemption, #123; popover.md's
   "Click on the Trigger" row; #110 was the focus trap, not this one). Dialog's Trigger is the dialog's invoker (`commandfor`,
   cancelled click), and the audit confirmed a non-modal light dismiss excludes it. Select's
@@ -1945,7 +1951,7 @@ popover.shown` (was `popover.optimistic`, then `popover.committed` on the #118 b
 pending and after), the pending open on the input (`"false"` while pending, `"true"` after the
 commit); `combobox.browser.test.tsx`, the #112 Trigger-close row (`"true"` at `pointerup` +
 20 ms). `ComboboxPage.tsx`: the pending sentence and the `data-open` row's `aria-expanded`
-aside. The Trigger's `commandfor` write (#112) is unchanged.
+aside. The Trigger's `commandfor` write (#112) is unchanged (it became a `popovertarget` write with #121).
 
 Revision (review M1, 2026-10-24): `committed` was wrong for the Input. It is no invoker, so every
 engine reads its attribute, and after Escape or a light dismiss it said "expanded" over the
@@ -2116,3 +2122,46 @@ Consequences, stated:
    focus and its text"), then add the 12.2 "Input press" row's extras: caret at 3, nested in
    `Popover.Popup`, touch tap, and the drag-selection row with the Firefox branch. Firefox runs
    browser files serially (#62), so the drag's pointer input is safe there.
+
+## Amendment: `popovertarget` Trigger, no `aria-expanded` (#121, 2026-10-24)
+
+Status: architect decision, user-approved through the product owner. **Breaking (DOM attributes
+only; no prop or type change beyond two more omitted keys).** After hydration a `<button>`
+`Combobox.Trigger` writes `popovertarget` (the Popup's id) through its ref instead of
+`commandfor` + `command="toggle-popover"` (#112's mechanism, same timing, same cleanup), and it
+renders **no `aria-expanded`**: once the attribute is there, Chromium, Firefox and WebKit expose
+the listbox's shown state from the popover itself (HTML-AAM `popovertarget` mapping; measured in
+`memo/architect/probes/121-popovertarget/`), ARIA in HTML #514 forbids the explicit attribute on
+such a button, and Firefox ORs an explicit value in. Before hydration the button exposes no
+state (it has neither attribute); the **Input keeps its explicit `aria-expanded` from
+`popover.shown`** (`role="combobox"` requires it; it is no invoker) and is the widget's primary
+control, so the pre-hydration gap on a `tabindex="-1"` button is accepted. A non-button `render`
+is no invoker (#112's warning) and renders `aria-expanded` from `popover.shown` (#118) so a
+link-shaped Trigger still exposes the state. `ComboboxTriggerProps` omits `popoverTarget` /
+`popoverTargetAction` as owned keys next to the reserved `commandfor` / `command`. Grounds and
+trade-offs: `memo/architect/eval-121-popovertarget.md`; the cross-component rule is conventions
+decision 41; Popover's amendment of the same date carries the full implementation and test plan.
+Edited in place: the anatomy table, section 1's Trigger bullet, 3.3 (props type and prose), the
+11 walkthroughs' Trigger lines, 12.1's Trigger row, 12.2's Trigger-close and pre-hydration rows,
+the deviations list, and the #112 amendment (its table and the "why `commandfor`" paragraph,
+marked superseded).
+
+Verified unchanged for `popovertarget` (the #112 guarantee): a press on the Trigger of the open
+listbox is not a light dismiss in Chromium and Firefox (real pointer, popup shown with
+`source: input`, click cancelled: `:popover-open` at `pointerup` + 20 ms and after) and in WebKit
+by source (`handlePopoverLightDismiss` checks `commandForElement()` then
+`popoverTargetElement()`); a native-disabled Trigger is still not exempt; a cancelled click never
+runs the activation, with a mouse, Enter or Space; the listbox stays anchored to the input.
+
+Combobox-specific implementation: `combobox-trigger.tsx`'s ref callback writes
+`element.setAttribute("popovertarget", popupId)` on a `<button>` and removes it in the cleanup
+(the `command` write and removal go); `libraryProps` drops `"aria-expanded"` for a button render
+and keeps `popover.shown` for a non-button one (`rendersButton(render)`, as `usePopoverTrigger`);
+the `Omit` list gains `"popoverTarget" | "popoverTargetAction"`. `combobox-input.tsx` is unchanged.
+Tests: `combobox.test.tsx` asserts `popovertarget` after mount, none in `renderToString`, none on a
+non-button render (which asserts `aria-expanded` from `shown` instead), and **no `aria-expanded`**
+on the button Trigger in the controlled refused-close, pending-open and Escape rows, whose Input
+assertions are unchanged (22 attribute sites, about half of them the Input's and kept);
+`combobox.browser.test.tsx`'s Trigger-close and pre-hydration rows swap the attribute name and
+add the Chromium AX sample. `ComboboxPage.tsx`: the overview sentence, the owned keys and the
+`data-open` row's `aria-expanded` aside.
