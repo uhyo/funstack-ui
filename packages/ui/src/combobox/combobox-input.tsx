@@ -147,6 +147,9 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
       ctx.keyDown(event.nativeEvent);
     },
+    onFocus: (event: FocusEvent<HTMLInputElement>) => {
+      ctx.focusIn(event.nativeEvent);
+    },
     onBlur: (event: FocusEvent<HTMLInputElement>) => {
       ctx.focusOut(event.nativeEvent);
     },

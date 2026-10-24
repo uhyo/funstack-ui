@@ -10,7 +10,9 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { StrictMode, Suspense, startTransition, use, useState, useTransition } from "react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { afterEach, describe, expect, expectTypeOf, it, onTestFinished, vi } from "vitest";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
   createSuspender,
@@ -1542,6 +1544,105 @@ describe("Combobox", () => {
         fireEvent.pointerCancel(document.body);
         await flushTasks(3);
         expect(input().value).toBe("");
+      });
+
+      it("waits for the last of several pointers", async () => {
+        const user = setupUser();
+        render(<Harness />);
+        await typeText(user, "ja");
+        fireEvent.pointerDown(document.body, { pointerId: 1 });
+        fireEvent.pointerDown(document.body, { pointerId: 2 });
+        input().blur();
+        fireEvent.pointerUp(document.body, { pointerId: 1 });
+        await flushTasks(3);
+        expect(input().value).toBe("ja");
+        fireEvent.pointerUp(document.body, { pointerId: 2 });
+        await flushTasks(3);
+        expect(input().value).toBe("");
+      });
+
+      it("a window blur forgets the presses: a swallowed release does not hold the check", async () => {
+        const user = setupUser();
+        render(<Harness />);
+        await typeText(user, "ja");
+        fireEvent.pointerDown(document.body);
+        input().blur();
+        await flushTasks(3);
+        expect(input().value).toBe("ja");
+        fireEvent.blur(window);
+        await flushTasks(3);
+        expect(input().value).toBe("");
+      });
+
+      it("focus arriving in the input forgets a press whose release never came", async () => {
+        const user = setupUser();
+        render(<Harness />);
+        await typeText(user, "ja");
+        fireEvent.pointerDown(document.body);
+        input().blur();
+        input().focus();
+        input().blur();
+        await flushTasks(3);
+        expect(input().value).toBe("");
+      });
+
+      it("presses are tracked only while the input is focused, until the leave is decided", async () => {
+        const add = vi.spyOn(document, "addEventListener");
+        const remove = vi.spyOn(document, "removeEventListener");
+        onTestFinished(() => {
+          add.mockRestore();
+          remove.mockRestore();
+        });
+        const watched = (spy: typeof add) =>
+          spy.mock.calls.filter(([type]) => type === "pointerdown").length;
+        const user = setupUser();
+        const { unmount } = render(<Harness />);
+        expect(watched(add)).toBe(0);
+        await typeText(user, "ja");
+        expect(watched(add)).toBe(1);
+        // A leave decided at once stops watching; focus starts again.
+        input().blur();
+        await flushTasks(3);
+        expect(watched(remove)).toBe(1);
+        input().focus();
+        expect(watched(add)).toBe(2);
+        // A leave deferred to a release keeps watching until the release.
+        fireEvent.pointerDown(document.body);
+        input().blur();
+        expect(watched(remove)).toBe(1);
+        fireEvent.pointerUp(document.body);
+        expect(watched(remove)).toBe(2);
+        input().focus();
+        expect(watched(add)).toBe(3);
+        // Focus moving to another element stops watching.
+        await user.click(screen.getByTestId("next"));
+        expect(watched(remove)).toBe(3);
+        await user.click(input());
+        expect(watched(add)).toBe(4);
+        // Unmounting while focused stops watching.
+        unmount();
+        expect(watched(remove)).toBe(4);
+      });
+
+      it("an input focused before hydration (no focus event) is watched from the mount", async () => {
+        const ui = <Harness root={{ defaultValue: "fr", defaultInputValue: "France" }} />;
+        const host = document.createElement("div");
+        host.innerHTML = renderToString(ui);
+        document.body.append(host);
+        onTestFinished(() => host.remove());
+        const field = host.querySelector<HTMLInputElement>('[role="combobox"]')!;
+        field.focus();
+        const root = await act(async () => hydrateRoot(host, ui));
+        onTestFinished(() => act(() => root.unmount()));
+        fireEvent.change(field, { target: { value: "Ja" } });
+        await flushTasks(3);
+        fireEvent.pointerDown(document.body);
+        field.blur();
+        await flushTasks(3);
+        expect(field.value).toBe("Ja");
+        fireEvent.pointerUp(document.body);
+        await flushTasks(3);
+        expect(field.value).toBe("France");
       });
 
       it("without a press, focus to <body> decides one task later", async () => {

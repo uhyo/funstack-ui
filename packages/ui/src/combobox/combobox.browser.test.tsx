@@ -445,6 +445,49 @@ describe("Combobox (browser)", () => {
       expect(texts.mock.lastCall![1].event?.type).toBe("focusout");
     });
 
+    it("a press on the label dragged off and released on the page reverts (no label click)", async () => {
+      const texts = vi.fn<TextAction>();
+      render(
+        <>
+          <Harness
+            root={{ defaultValue: "fr", defaultInputValue: "France", onInputValueChange: texts }}
+          />
+          <div data-testid="page" style={{ height: 80 }}>
+            page
+          </div>
+        </>,
+      );
+      await user.click(input());
+      await user.clear(input());
+      await user.keyboard("Ja");
+      await settle(() => expect(isOpen()).toBe(true));
+      const l = screen.getByText("Country", { selector: "label" }).getBoundingClientRect();
+      const p = screen.getByTestId("page").getBoundingClientRect();
+      await mouse.down(l.left + 4, l.top + 4);
+      await mouse.move(p.left + 4, p.top + 4);
+      await flushFor(40);
+      expect(input().value).toBe("Ja");
+      await mouse.up(p.left + 4, p.top + 4);
+      await settle(() => expect(input().value).toBe("France"));
+      expect(document.activeElement).not.toBe(input());
+      expect(isOpen()).toBe(false);
+      expect(texts.mock.lastCall![1].reason).toBe("dismiss");
+    });
+
+    it("openOnClick: a label click keeps the text and does not reopen", async () => {
+      const action = vi.fn<ValueAction>();
+      render(<Box root={{ openOnClick: true, valueChangeAction: action }} />);
+      await typeInto("Ja");
+      expect(isOpen()).toBe(true);
+      await press(screen.getByText("Country", { selector: "label" }), 0);
+      await settle(() => expect(document.activeElement).toBe(input()));
+      await flushFor(60);
+      expect(input().value).toBe("Ja");
+      expect(action).not.toHaveBeenCalled();
+      // Light dismiss closed it; the label's activation focuses the input but is no click in it.
+      expect(isOpen()).toBe(false);
+    });
+
     it("allowCustomValue: a quick click on the page commits the text", async () => {
       const action = vi.fn<ValueAction>();
       render(
