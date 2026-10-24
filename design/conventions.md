@@ -1155,9 +1155,10 @@ Rules:
   `popup.setPointerCapture(pointerId)` at the part's `pointerdown` (primary button, popover
   shown) makes the release count as inside the popup and nothing hides, with a mouse, a pen or a
   finger, wherever the release lands (one engine hole: Chromium ignores the capture for a touch
-  tap inside a same-origin iframe, #124 upstream). The compat `mousedown` is not retargeted (the caret still
-  lands where the user pressed); `pointerup`, `mouseup` and the `click` land on the popup, so the
-  part's own `onClick` does not fire for that press. Known cost: Firefox routes the mouse drag to
+  tap inside a same-origin iframe, #124 upstream). The compat `mousedown` is not retargeted (the
+  caret still lands where the user pressed); for a mouse or pen press `pointerup`, `mouseup` and
+  the `click` land on the popup, so the part's own `onClick` does not fire for that press (a touch
+  tap's compat `click` comes after the release and is hit-tested: it reaches the part). Known cost: Firefox routes the mouse drag to
   the capturing element, so a drag-to-select in the field does not extend while the popover is
   open (Chromium's selection drag ignores capture; WebKit is decided by CI). Prevented
   `pointerdown`, `pointerup` or `click` change nothing: light dismiss is not cancelable, in the
