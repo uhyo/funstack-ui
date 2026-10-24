@@ -318,3 +318,23 @@ Mutations (reverted):
 2. radio-group-root.tsx: types `fsui-radio` instead of `fsui-radio-group`: the 3 type rows fail.
 3. radio-group-root.tsx: an extra serialisable details field: 4 suite rows fail (both sync rows and
    both details rows).
+## Status (stopped early on the coordinator's request: usage limit)
+
+Done and committed: 1 `hydrateFromServer`, 2 `sequencedDeferreds`, 3 value-action suite with
+Toggle, Tabs, ToggleGroup, Accordion (multiple + exclusive) and RadioGroup migrated, each with its
+transition-type file (T19 closed for those five; Toggle, Accordion and RadioGroup had none).
+jsdom: 2923 -> 3055 tests, all pass (per-commit title diffs above).
+
+Left (#106):
+
+- T2: CheckboxGroup and Select are not on the suite yet (driver + row mapping + transition-types:
+  CheckboxGroup already has a mocked file to switch to the shared spy; Select has none). Expect
+  CheckboxGroup to need `commit` patching like ToggleGroup and `orderIndependentCommit`; Select's
+  gesture is a `change` event (`eventType`), and its transition types are `fsui-select` only.
+- T3: native-group platform suite (form reset, hydration reconciliation) for RadioGroup,
+  CheckboxGroup, Select and the checkable inputs: not started.
+- T13: trimming internal hook tests: not started (it depends on T3).
+- dialog.test.tsx / popover.test.tsx still carry private `hydrate()` copies (out of scope here).
+- Not run: the full gate after the RadioGroup commit (typecheck --noUnusedLocals and jsdom ran
+  for every commit; lint/format were clean as of the ToggleGroup commit), shuffled jsdom runs,
+  browser tests after step 1, CI.
