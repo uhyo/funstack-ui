@@ -41,6 +41,7 @@ import type {
   ComboboxOpenChangeDetails,
   ComboboxPopupProps,
   ComboboxRootProps,
+  ComboboxTriggerProps,
   ComboboxValueChangeDetails,
 } from "./index.js";
 import {
@@ -89,14 +90,15 @@ interface HarnessProps {
   root?: Partial<ComboboxRootProps>;
   popup?: Partial<ComboboxPopupProps>;
   results?: (query: string) => ReactNode;
+  trigger?: Partial<ComboboxTriggerProps>;
 }
 
-function Box({ root, popup, results }: HarnessProps) {
+function Box({ root, popup, results, trigger }: HarnessProps) {
   return (
     <Combobox.Root {...root}>
       <Combobox.Label style={labelStyle}>Country</Combobox.Label>
       <Combobox.Input data-testid="input" style={{ width: 200 }} />
-      <Combobox.Trigger data-testid="trigger" aria-label="Show all">
+      <Combobox.Trigger data-testid="trigger" aria-label="Show all" {...trigger}>
         ▾
       </Combobox.Trigger>
       <Combobox.Clear data-testid="clear" aria-label="Clear">
@@ -974,6 +976,10 @@ describe("Trigger close (#112, browser)", () => {
       render(<Refusing action={openAction} />);
       await expect.poll(() => isOpen()).toBe(true);
       input().focus();
+      // Firefox lands a hide and re-show in one frame, which the sampler cannot see (and which
+      // still replays the animations): no `beforetoggle` "closed" at all.
+      const toggles: string[] = [];
+      popup().addEventListener("beforetoggle", (event) => toggles.push(event.newState));
       const frames = sampleFrames();
       try {
         await pressTrigger();
@@ -983,10 +989,41 @@ describe("Trigger close (#112, browser)", () => {
       }
       expect(frames.samples.length).toBeGreaterThan(5);
       expect(frames.samples.every(Boolean)).toBe(true);
+      expect(toggles).toEqual([]);
       expect(isOpen()).toBe(true);
       expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "activate"]]);
     });
   }
+
+  it("a link render pressed while open: light-dismissed at the press, one (false, activate), no re-open", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const openAction = vi.fn<OpenAction>();
+    render(
+      <Harness root={{ openChangeAction: openAction }} trigger={{ render: <a href="#" /> }} />,
+    );
+    expect(trigger().tagName).toBe("A");
+    expect(trigger()).not.toHaveAttribute("commandfor");
+    await pressTrigger();
+    await expect.poll(() => isOpen()).toBe(true);
+    await flushFor();
+    openAction.mockClear();
+    const toggles: string[] = [];
+    popup().addEventListener("beforetoggle", (event) => toggles.push(event.newState));
+    await pressTrigger();
+    await expect.poll(() => isOpen()).toBe(false);
+    const frames = sampleFrames();
+    try {
+      await quietPeriod(200, "the listbox must not re-open");
+    } finally {
+      frames.stop();
+    }
+    expect(frames.samples.some(Boolean)).toBe(false);
+    expect(toggles).toEqual(["closed"]);
+    expect(openAction.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
+      [false, "activate", "click"],
+    ]);
+    expect(location.hash).toBe("");
+  });
 
   it("a click while closed opens once, anchored to the input, at least as wide (no command ran)", async () => {
     const openAction = vi.fn<OpenAction>();

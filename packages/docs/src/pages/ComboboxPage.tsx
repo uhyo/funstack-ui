@@ -75,10 +75,11 @@ export function ComboboxPage() {
         </li>
         <li>
           The listbox is always anchored to the input and opened by the library. The server HTML
-          gives the Trigger no <code>commandfor</code>; after hydration it names the listbox as its
-          invoker (with every click cancelled), so pressing it while the listbox is open is not a
-          light dismiss. Before hydration the input is a plain text field; text typed then is kept
-          and adopted at mount, and nothing opens until the next keystroke.
+          gives the Trigger no <code>commandfor</code>; after hydration a <code>{"<button>"}</code>{" "}
+          Trigger names the listbox as its invoker (with every click cancelled), so pressing it
+          while the listbox is open is not a light dismiss. Before hydration the input is a plain
+          text field; text typed then is kept and adopted at mount, and nothing opens until the next
+          keystroke.
         </li>
       </ul>
 
@@ -367,7 +368,7 @@ export function ComboboxPage() {
           "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded`, `aria-controls`, `commandfor`, `command` (written after hydration on a `<button>`), `data-open`, `data-pending`."
         }
         note={
-          "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
+          "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). Any other element is light-dismissed at the press and warns in development. Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
         }
       />
 

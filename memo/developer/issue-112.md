@@ -23,3 +23,27 @@ Branch `fix/112-combobox-trigger-close`.
 - Real click into an srcdoc iframe: `commands.mouse("click")` at `toPagePoint(frameRect +
   elementRect)`, waiting on the iframe window's `pointerup` (browser-commands' `mouse` waits on
   the test window and would hit its 5 s fallback).
+
+## Review follow-ups (memo/reviewer/issue-112-review.md)
+
+- F3: refusal rows also assert no `beforetoggle` "closed"; the unfixed Trigger now fails both
+  refusal rows on Chromium and Firefox (Firefox's sync row was blind before).
+- F4: link-render row (`render={<a href="#" />}`): light-dismissed at the press, one
+  `(false, activate, click)`, no re-open over 200 ms. Mutation "judge on the DOM's
+  `:popover-open` instead of `intended()`" fails it on both engines.
+- F5: jsdom render-swap row (button -> span) checks the old button loses both attributes;
+  removing the cleanup fails it. Plus a `@ts-expect-error` owned-key row for `commandfor` /
+  `command`.
+- F6: docs say "a `<button>` Trigger"; the non-button warning uses #115's wording.
+- F1/F7: design text edited in a separate `docs(design)` commit (one-off PO approval).
+- Rebase onto #111 duplicated two imports (`renderToString`, `mouse`) in the test files (review
+  F8); folded into the first commit so every commit type-checks.
+
+## Release notes: type-level breaking change
+
+`ComboboxTriggerProps` no longer accepts `commandfor` or `command` (owned: written by the
+library after hydration on a `<button>`). `onPointerCancel` is no longer owned and is accepted
+again (passed through to the element). Behaviour: a `<button>` Trigger click while open now
+keeps the listbox shown until `openChangeAction(false)` settles; a controlled parent that keeps
+`open={true}` sees no flicker; the close runs the `<ViewTransition>` exit. A non-button Trigger
+warns in development.

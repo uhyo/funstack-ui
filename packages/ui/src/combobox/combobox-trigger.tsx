@@ -89,8 +89,10 @@ export function ComboboxTrigger({
         element.tagName === "BUTTON"
           ? null
           : `Combobox.Trigger: rendered a <${element.tagName.toLowerCase()}>. Only a <button> ` +
-            "can name the listbox as its invoker; a press on this element while the listbox is " +
-            "open light-dismisses it before the click."),
+            "is the listbox's invoker: a press on this element while the listbox is open closes " +
+            "it through light dismiss before the click, so the close is not awaited, " +
+            "openChangeAction(false) cannot veto it and there is no exit transition. Render a " +
+            "<button>."),
   );
   const popupId = popover.ids.popup;
   // After hydration a `<button>` becomes the popup's invoker (design 3.3, #112): the platform's

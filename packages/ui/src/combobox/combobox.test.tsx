@@ -44,6 +44,7 @@ import type {
   ComboboxPopupState,
   ComboboxRootProps,
   ComboboxRootState,
+  ComboboxTriggerProps,
   ComboboxTriggerState,
   ComboboxValueChangeDetails,
 } from "./index.js";
@@ -2071,6 +2072,44 @@ describe("Combobox", () => {
       expect(
         messages.filter((m) => m.includes("Combobox.Trigger: rendered a <span>. Only a <button>")),
       ).toHaveLength(1);
+    });
+
+    it("removes both attributes when the Trigger's element goes away (a render swap)", () => {
+      const error = silenceErrors();
+      function Swap({ span }: { span: boolean }) {
+        return (
+          <Combobox.Root>
+            <Combobox.Input aria-label="Country" />
+            <Combobox.Trigger
+              data-testid="trigger"
+              aria-label="Show all"
+              render={span ? <span /> : undefined}
+            />
+            <Combobox.Popup data-testid="popup">
+              <Combobox.List aria-label="Countries">
+                {({ query }) => <Options query={query} />}
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Root>
+        );
+      }
+      const { rerender } = render(<Swap span={false} />);
+      const button = trigger();
+      expect(button).toHaveAttribute("commandfor", popup().id);
+      rerender(<Swap span />);
+      expect(trigger()).not.toBe(button);
+      expect(button).not.toHaveAttribute("commandfor");
+      expect(button).not.toHaveAttribute("command");
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(error).toHaveBeenCalled();
+    });
+
+    it("commandfor and command are owned keys", () => {
+      // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
+      const commandfor: ComboboxTriggerProps = { commandfor: "elsewhere" };
+      // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
+      const command: ComboboxTriggerProps = { command: "show-popover" };
+      expect([commandfor, command]).toHaveLength(2);
     });
 
     it("every click is cancelled, closed and open (the command never runs)", async () => {
