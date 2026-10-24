@@ -11,6 +11,8 @@ import {
 } from "./combobox-context.js";
 import type { ComboboxListState } from "./combobox-list.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** `Combobox.Group`, `Combobox.GroupLabel` and `Combobox.Status` have no state of their own. */
 export type ComboboxGroupState = Record<string, never>;
 export type ComboboxGroupLabelState = Record<string, never>;
@@ -73,7 +75,7 @@ export function ComboboxGroupLabel({
   const labelId = use(ComboboxGroupContext);
   useDevWarning(
     labelId === null,
-    "Combobox.GroupLabel: rendered outside a Combobox.Group; it names nothing.",
+    isDev && "Combobox.GroupLabel: rendered outside a Combobox.Group; it names nothing.",
   );
   return useRender<ComponentPropsWithRef<"div">, ComboboxGroupLabelState>({
     defaultElement: "div",

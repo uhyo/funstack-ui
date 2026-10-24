@@ -7,6 +7,8 @@ import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { fieldDataAttributes } from "./field-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface FieldLabelProps extends Omit<
   ComponentPropsWithRef<"label">,
   "htmlFor" | "id" | "className" | "style" | "children"
@@ -28,11 +30,13 @@ export interface FieldLabelProps extends Omit<
  */
 export function FieldLabel({ className, style, children, render, ...rest }: FieldLabelProps) {
   const ctx = useFieldContext("Field.Label");
-  const ref = useElementCheck((el) =>
-    el.tagName !== "LABEL"
-      ? `Field.Label: expected to render a <label> element but got <${el.tagName.toLowerCase()}>. ` +
-        "Label activation and the control's accessible name need a real <label>."
-      : null,
+  const ref = useElementCheck(
+    isDev &&
+      ((el) =>
+        el.tagName !== "LABEL"
+          ? `Field.Label: expected to render a <label> element but got <${el.tagName.toLowerCase()}>. ` +
+            "Label activation and the control's accessible name need a real <label>."
+          : null),
   );
   return useRender<ComponentPropsWithRef<"label">, FieldState>({
     defaultElement: "label",

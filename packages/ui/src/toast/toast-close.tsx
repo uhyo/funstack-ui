@@ -1,11 +1,13 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useNameWarning } from "../internal/use-name-warning.js";
+import { TEXT_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastItem } from "./toast.js";
 import { useToastRootContext } from "./toast-context.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export interface ToastCloseState {
   readonly toast: ToastItem;
@@ -21,8 +23,6 @@ export interface ToastCloseProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"button">, ToastCloseState>;
 }
 
-const TEXT_NAME = { text: true } as const;
-
 /**
  * Dismisses the toast (`reason: "dismiss"`, the same as Escape). Label it yourself (`aria-label`
  * or text). No Invoker Command: `hide-popover` would hide the whole region.
@@ -33,7 +33,7 @@ export function ToastClose({ children, className, style, render, ...rest }: Toas
   const root = useToastRootContext("Toast.Close");
 
   const devRef = useNameWarning(
-    "Toast.Close: the button has no accessible name. Give it text or an `aria-label`.",
+    isDev && "Toast.Close: the button has no accessible name. Give it text or an `aria-label`.",
     TEXT_NAME,
   );
 

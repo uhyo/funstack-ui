@@ -831,8 +831,9 @@ export function ToastViewport({
   const insideDialog = use(DialogContext) !== null;
   useDevWarning(
     insideDialog,
-    "Toast.Viewport: rendered inside a Dialog. The region would close with the dialog; render " +
-      "the Viewport once near the root of the app (it moves into open modal Dialogs by itself).",
+    isDev &&
+      "Toast.Viewport: rendered inside a Dialog. The region would close with the dialog; render " +
+        "the Viewport once near the root of the app (it moves into open modal Dialogs by itself).",
   );
 
   // --- Render ---------------------------------------------------------------------------------

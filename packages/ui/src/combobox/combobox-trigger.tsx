@@ -14,6 +14,8 @@ import { isHostButton, rendersButton, useRender } from "../internal/use-render.j
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface ComboboxTriggerState {
   /** Optimistic open state. */
   readonly open: boolean;
@@ -76,7 +78,7 @@ export function ComboboxTrigger({
   const openAtPress = useRef<boolean | null>(null);
   // Development check (design 9): an icon-only Trigger needs a name from the consumer.
   const ref = useNameWarning(
-    "Combobox.Trigger: the button has no accessible name. Give it an `aria-label`.",
+    isDev && "Combobox.Trigger: the button has no accessible name. Give it an `aria-label`.",
     BUTTON_NAME,
   );
 

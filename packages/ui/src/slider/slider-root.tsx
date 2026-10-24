@@ -339,8 +339,9 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   const rootRef = thumbCount > 1 ? field.ref : undefined;
   useDevWarning(
     field.inField && field.required,
-    "Slider.Root: a range is never empty, so `required` on the enclosing Field.Root has no " +
-      "effect on the slider.",
+    isDev &&
+      "Slider.Root: a range is never empty, so `required` on the enclosing Field.Root has no " +
+        "effect on the slider.",
   );
   /**
    * The reason of the latest change the user or the platform made, consumed by the Field
@@ -778,32 +779,36 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   useDevWarning(
     !stepValid,
-    `Slider.Root: \`step\` must be a positive number (got ${String(stepProp)}); using 1.`,
+    isDev && `Slider.Root: \`step\` must be a positive number (got ${String(stepProp)}); using 1.`,
   );
   useDevWarning(
     stepValid && !isMaxReachable(min, max, step),
-    `Slider.Root: \`max\` (${max}) is not on the step grid from \`min\` (${min}) with \`step\` ` +
-      `${step}: it is unreachable, as on a native range. The last reachable value is the last ` +
-      `step below \`max\`.`,
+    isDev &&
+      `Slider.Root: \`max\` (${max}) is not on the step grid from \`min\` (${min}) with \`step\` ` +
+        `${step}: it is unreachable, as on a native range. The last reachable value is the last ` +
+        `step below \`max\`.`,
   );
   const given = value ?? defaultValue;
   const givenValues = given === undefined ? [] : toArray(given);
   useDevWarning(
     givenValues.some((v) => !isOnGrid(v, min, max, step)),
-    `Slider.Root: the ${value !== undefined ? "`value`" : "`defaultValue`"} ` +
-      `(${givenValues.join(", ")}) is off the step grid or outside \`min\` / \`max\`. It is ` +
-      `rendered as given and the browser sanitises it; the first user step snaps it.`,
+    isDev &&
+      `Slider.Root: the ${value !== undefined ? "`value`" : "`defaultValue`"} ` +
+        `(${givenValues.join(", ")}) is off the step grid or outside \`min\` / \`max\`. It is ` +
+        `rendered as given and the browser sanitises it; the first user step snaps it.`,
   );
   useDevWarning(
     givenValues.some((v, i) => i > 0 && v < (givenValues[i - 1] as number)),
-    `Slider.Root: the values (${givenValues.join(", ")}) must be in ascending order; the thumbs ` +
-      `would be rendered crossed.`,
+    isDev &&
+      `Slider.Root: the values (${givenValues.join(", ")}) must be in ascending order; the thumbs ` +
+        `would be rendered crossed.`,
   );
   const currentShape = shapeOf(given);
   useDevWarning(
     currentShape !== undefined && currentShape !== shape,
-    `Slider.Root: the value changed shape between a number and an array after mount. The shape ` +
-      `is fixed at mount; remount the Slider (a \`key\`) to change the number of thumbs.`,
+    isDev &&
+      `Slider.Root: the value changed shape between a number and an array after mount. The shape ` +
+        `is fixed at mount; remount the Slider (a \`key\`) to change the number of thumbs.`,
   );
   // Inside a Field, `Field.Label` names the group (design 9.4.2).
   const unnamedGroup =

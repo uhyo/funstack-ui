@@ -9,6 +9,8 @@ import { isHostButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */
@@ -82,12 +84,14 @@ export function usePopoverTrigger<State>(
     disabled,
   };
 
-  const checkElement = useElementCheck((element) =>
-    !isLibrary && element.tagName !== "BUTTON"
-      ? `${part}: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
-        '<button> runs `command="toggle-popover"`; this trigger will not open the popover. ' +
-        "Render a <button>, or put the component in library mode (`defaultOpen={false}`)."
-      : null,
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        !isLibrary && element.tagName !== "BUTTON"
+          ? `${part}: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
+            '<button> runs `command="toggle-popover"`; this trigger will not open the popover. ' +
+            "Render a <button>, or put the component in library mode (`defaultOpen={false}`)."
+          : null),
   );
   const ref = useCallback(
     (element: HTMLElement) => {

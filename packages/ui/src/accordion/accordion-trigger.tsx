@@ -16,6 +16,8 @@ import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 import type { AccordionItemState } from "./accordion-item.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** The trigger is the item's control; it renders the item's state object. */
 export type AccordionTriggerState = AccordionItemState;
 
@@ -83,16 +85,19 @@ export function AccordionTrigger({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Accordion.Trigger: `transition` has no effect in JS-free mode; the browser toggles the item " +
-      "outside any React transition.",
+    isDev &&
+      "Accordion.Trigger: `transition` has no effect in JS-free mode; the browser toggles the item " +
+        "outside any React transition.",
   );
 
   const registerTrigger = item.registerTrigger;
-  const checkElement = useElementCheck((element) =>
-    element.tagName !== "SUMMARY"
-      ? `Accordion.Trigger: expected to render a <summary> element but got <${element.tagName.toLowerCase()}>. ` +
-        "Only a <summary> toggles its parent <details>."
-      : null,
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "SUMMARY"
+          ? `Accordion.Trigger: expected to render a <summary> element but got <${element.tagName.toLowerCase()}>. ` +
+            "Only a <summary> toggles its parent <details>."
+          : null),
   );
   const libraryRef = useCallback(
     (element: HTMLElement) => {

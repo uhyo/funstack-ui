@@ -6,6 +6,8 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface FormSubmitState {
   /** The enclosing form's submission is in flight (`useFormStatus().pending`). */
   readonly pending: boolean;
@@ -45,15 +47,18 @@ export function FormSubmit({
   ...rest
 }: FormSubmitProps) {
   const { pending } = useFormStatus();
-  const ref = useElementCheck((el) => {
-    const submitter =
-      el.tagName === "BUTTON" ||
-      (el.tagName === "INPUT" && ["submit", "image"].includes((el as HTMLInputElement).type));
-    return submitter
-      ? null
-      : `Form.Submit: expected to render a <button> (or <input type="submit">) but got ` +
-          `<${el.tagName.toLowerCase()}>. Only a submit button submits the form natively.`;
-  });
+  const ref = useElementCheck(
+    isDev &&
+      ((el) => {
+        const submitter =
+          el.tagName === "BUTTON" ||
+          (el.tagName === "INPUT" && ["submit", "image"].includes((el as HTMLInputElement).type));
+        return submitter
+          ? null
+          : `Form.Submit: expected to render a <button> (or <input type="submit">) but got ` +
+              `<${el.tagName.toLowerCase()}>. Only a submit button submits the form natively.`;
+      }),
+  );
   const state: FormSubmitState = { pending, disabled };
   return useRender<ComponentPropsWithRef<"button">, FormSubmitState>({
     defaultElement: "button",

@@ -14,6 +14,8 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { hasAnyError } from "../internal/validity.js";
 import type { FormErrors } from "../internal/validity.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export type { FieldErrorValue, FormErrors } from "../internal/validity.js";
 
 export interface FormRootState {
@@ -97,10 +99,12 @@ export function FormRoot({
 
   // A native capture listener sees every submission, React's path included (a submitter with its
   // own `formAction`), before React's `onSubmit` runs and marks it intercepted.
-  const checkElement = useElementCheck<HTMLFormElement>((form) =>
-    form.tagName !== "FORM"
-      ? `Form.Root: expected to render a <form> element but got <${form.tagName.toLowerCase()}>.`
-      : null,
+  const checkElement = useElementCheck<HTMLFormElement>(
+    isDev &&
+      ((form) =>
+        form.tagName !== "FORM"
+          ? `Form.Root: expected to render a <form> element but got <${form.tagName.toLowerCase()}>.`
+          : null),
   );
   const libraryRef = useCallback(
     (form: HTMLFormElement) => {

@@ -9,6 +9,8 @@ import { useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import { useLatest } from "./use-latest.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /**
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
  * opening and part-initiated closing are library-owned (transitions keyed on committed state);
@@ -147,9 +149,10 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   const isLibrary = mode === "library";
   useDevWarning(
     isLibrary !== isLibraryNow,
-    `${part}: the mode changed after mount (\`open\`, \`defaultOpen\` and \`openChangeAction\` ` +
-      "were all absent on one render and present on another). Switching between JS-free and " +
-      "library mode is not supported.",
+    isDev &&
+      `${part}: the mode changed after mount (\`open\`, \`defaultOpen\` and \`openChangeAction\` ` +
+        "were all absent on one render and present on another). Switching between JS-free and " +
+        "library mode is not supported.",
   );
 
   // Hooks cannot be conditional: JS-free mode calls the hook too and never dispatches.

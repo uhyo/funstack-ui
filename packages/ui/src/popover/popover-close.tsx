@@ -10,6 +10,8 @@ import { isHostButton, rendersButton, useRender } from "../internal/use-render.j
 import type { DataAttributes } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface PopoverCloseState {
   /** The `action` is in flight. */
   readonly pending: boolean;
@@ -80,12 +82,13 @@ export function PopoverClose({
   const state: PopoverCloseState = { pending, disabled };
 
   const devRef = useElementCheck(
-    (element) =>
-      !installClick && element.tagName !== "BUTTON"
-        ? `Popover.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
-          '`action`. Only a <button> runs `command="hide-popover"`; this element will not ' +
-          "close the popover."
-        : null,
+    isDev &&
+      ((element) =>
+        !installClick && element.tagName !== "BUTTON"
+          ? `Popover.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
+            '`action`. Only a <button> runs `command="hide-popover"`; this element will not ' +
+            "close the popover."
+          : null),
     [installClick],
   );
 

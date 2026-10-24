@@ -21,6 +21,8 @@ import { openMenuWithFocus } from "./menu-trigger.js";
 import type { MenuTriggerState } from "./menu-trigger.js";
 import { useMenuItem } from "./use-menu-item.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export type MenuSubmenuTriggerState = MenuTriggerState;
 
 export interface MenuSubmenuTriggerProps extends Omit<
@@ -67,8 +69,9 @@ export function MenuSubmenuTrigger({
   const menu = useMenuContext("Menu.SubmenuTrigger");
   useDevWarning(
     !menu.submenu,
-    "Menu.SubmenuTrigger: rendered in a top-level Menu.Root. Use Menu.Trigger, or put this Root " +
-      "inside the parent's Menu.Popup.",
+    isDev &&
+      "Menu.SubmenuTrigger: rendered in a top-level Menu.Root. Use Menu.Trigger, or put this Root " +
+        "inside the parent's Menu.Popup.",
   );
 
   const open = (event: Event) => openMenuWithFocus(menu, event, "first");

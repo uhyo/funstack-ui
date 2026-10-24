@@ -19,6 +19,8 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { ComboboxPopupContext, useComboboxContext } from "./combobox-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface ComboboxPopupState {
   /** Committed open state. Read `:popover-open` for the DOM truth. */
   readonly open: boolean;
@@ -95,11 +97,13 @@ export function ComboboxPopup({
     transition,
   });
 
-  const devRef = useElementCheck((element) =>
-    element.tagName !== "DIV"
-      ? `Combobox.Popup: rendered a <${element.tagName.toLowerCase()}>. Render a <div>: a ` +
-        "<dialog popover> runs the dialog focusing steps and takes focus out of the input."
-      : null,
+  const devRef = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DIV"
+          ? `Combobox.Popup: rendered a <${element.tagName.toLowerCase()}>. Render a <div>: a ` +
+            "<dialog popover> runs the dialog focusing steps and takes focus out of the input."
+          : null),
   );
   const ref = useMergedRefs(setElement, devRef);
 

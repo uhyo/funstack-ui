@@ -643,9 +643,10 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   );
   useDevWarning(
     missingText,
-    "Combobox.Root: `value` / `defaultValue` is set but neither `inputValue` nor " +
-      "`defaultInputValue` is: the input will show no text for the selection. The library never " +
-      "derives the text from the value; pass the selected option's label as well.",
+    isDev &&
+      "Combobox.Root: `value` / `defaultValue` is set but neither `inputValue` nor " +
+        "`defaultInputValue` is: the input will show no text for the selection. The library never " +
+        "derives the text from the value; pass the selected option's label as well.",
   );
 
   // --- Interaction (design 5, 8) -------------------------------------------------------------

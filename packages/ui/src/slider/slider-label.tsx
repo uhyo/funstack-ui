@@ -7,6 +7,8 @@ import { useRender } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderRootState, SliderValue } from "./slider-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** `T` defaults to `SliderValue`; pass it to narrow the state (`<Slider.Label<number>>`). */
 export interface SliderLabelProps<T extends SliderValue = SliderValue> extends Omit<
   ComponentPropsWithRef<"label">,
@@ -37,11 +39,12 @@ export function SliderLabel<T extends SliderValue = SliderValue>({
 
   const single = ctx.shown.length === 1;
   const libraryRef = useElementCheck(
-    (element) =>
-      single && element.tagName !== "LABEL"
-        ? `Slider.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
-          `With one thumb the Label names the input through \`for\`, which only a <label> has.`
-        : null,
+    isDev &&
+      ((element) =>
+        single && element.tagName !== "LABEL"
+          ? `Slider.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
+            `With one thumb the Label names the input through \`for\`, which only a <label> has.`
+          : null),
     [single],
   );
 

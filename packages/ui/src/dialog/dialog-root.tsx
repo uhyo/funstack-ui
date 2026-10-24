@@ -11,6 +11,8 @@ import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
 import type { DialogCloseIntent, DialogContextValue, DialogMode } from "./dialog-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** Details passed as the second argument of `openChangeAction`. */
 export interface DialogOpenChangeDetails extends ActionDetails {
   /**
@@ -110,9 +112,10 @@ export function DialogRoot({
   const isLibrary = mode === "library";
   useDevWarning(
     isLibrary !== isLibraryNow,
-    "Dialog.Root: the mode changed after mount (`open`, `defaultOpen` and `openChangeAction` " +
-      "were all absent on one render and present on another). Switching between JS-free and " +
-      "library mode is not supported.",
+    isDev &&
+      "Dialog.Root: the mode changed after mount (`open`, `defaultOpen` and `openChangeAction` " +
+        "were all absent on one render and present on another). Switching between JS-free and " +
+        "library mode is not supported.",
   );
 
   // Hooks cannot be conditional: static mode calls the hook too and never dispatches.

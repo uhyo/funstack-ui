@@ -11,6 +11,8 @@ import { useMenuContext } from "./menu-context.js";
 import type { MenuContextValue } from "./menu-context.js";
 import { edgeItem, focusItem, hasModifier, isRtl } from "./menu-dom.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export type MenuTriggerState = PopoverTriggerHookState;
 
 export interface MenuTriggerProps extends Omit<
@@ -78,8 +80,9 @@ export function MenuTrigger({
   const menu = useMenuContext("Menu.Trigger");
   useDevWarning(
     menu.submenu,
-    "Menu.Trigger: rendered in a submenu. Use Menu.SubmenuTrigger, which is also an item of the " +
-      "parent menu.",
+    isDev &&
+      "Menu.Trigger: rendered in a submenu. Use Menu.SubmenuTrigger, which is also an item of the " +
+        "parent menu.",
   );
 
   // Inside a vertical Toolbar, ArrowDown / ArrowUp are the Toolbar's: the trigger opens on the

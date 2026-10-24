@@ -239,12 +239,14 @@ export function RadioGroupRoot({
     [onItemMounted],
   );
 
-  const checkElement = useElementCheck<HTMLFieldSetElement>((el) =>
-    el.tagName !== "FIELDSET"
-      ? `RadioGroup.Root: expected to render a <fieldset> element but got ` +
-        `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
-        `inheritance, form reset) need a real <fieldset>.`
-      : null,
+  const checkElement = useElementCheck<HTMLFieldSetElement>(
+    isDev &&
+      ((el) =>
+        el.tagName !== "FIELDSET"
+          ? `RadioGroup.Root: expected to render a <fieldset> element but got ` +
+            `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
+            `inheritance, form reset) need a real <fieldset>.`
+          : null),
   );
   const libraryRef = useCallback(
     (el: HTMLFieldSetElement) => {

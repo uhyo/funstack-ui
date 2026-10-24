@@ -13,6 +13,8 @@ import {
   useComboboxContext,
 } from "./combobox-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface ComboboxListState {
   /** The deferred text the results are for: render the Options for it. */
   readonly query: string;
@@ -51,15 +53,17 @@ export function ComboboxList({ className, style, children, render, ...rest }: Co
   const inPopup = use(ComboboxPopupContext);
   useDevWarning(
     !inPopup,
-    "Combobox.List: rendered outside a Combobox.Popup. The listbox must be inside the Popup, " +
-      "which is the element the library shows and hides.",
+    isDev &&
+      "Combobox.List: rendered outside a Combobox.Popup. The listbox must be inside the Popup, " +
+        "which is the element the library shows and hides.",
   );
   const { listRef } = ctx;
   // A mounted Label registers in a layout effect whose re-render is flushed before the check's
   // microtask, so `aria-labelledby` is in the DOM by then if it ever will be.
   const checkName = useNameWarning(
-    "Combobox.List: the listbox has no accessible name. Render a Combobox.Label, or give " +
-      "the List an `aria-label` / `aria-labelledby`.",
+    isDev &&
+      "Combobox.List: the listbox has no accessible name. Render a Combobox.Label, or give " +
+        "the List an `aria-label` / `aria-labelledby`.",
   );
 
   const ref = useCallback(

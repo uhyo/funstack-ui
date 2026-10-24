@@ -273,12 +273,13 @@ export function MenuContextTrigger({
   const { popover } = menu;
   useDevWarning(
     menu.submenu,
-    "Menu.ContextTrigger: rendered in a submenu. A Menu.Root inside a Menu.Popup is a submenu; a " +
-      "context menu region belongs to a top-level Menu.Root.",
+    isDev &&
+      "Menu.ContextTrigger: rendered in a submenu. A Menu.Root inside a Menu.Popup is a submenu; a " +
+        "context menu region belongs to a top-level Menu.Root.",
   );
   useDevWarning(
     longPressDelay < 0,
-    "Menu.ContextTrigger: `longPressDelay` is negative; it is a number of milliseconds.",
+    isDev && "Menu.ContextTrigger: `longPressDelay` is negative; it is a number of milliseconds.",
   );
 
   // Modality bookkeeping (design 2.1): a sequence number, not a clock, so two events in the same

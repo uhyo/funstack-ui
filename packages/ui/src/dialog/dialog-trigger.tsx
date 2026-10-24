@@ -73,12 +73,14 @@ export function DialogTrigger({
     disabled,
   };
 
-  const checkElement = useElementCheck((element) =>
-    !isLibrary && modal && element.tagName !== "BUTTON"
-      ? `Dialog.Trigger: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
-        '<button> runs `command="show-modal"`; this trigger will not open the dialog. Render ' +
-        "a <button>, or put the Dialog in library mode (`defaultOpen={false}`)."
-      : null,
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        !isLibrary && modal && element.tagName !== "BUTTON"
+          ? `Dialog.Trigger: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
+            '<button> runs `command="show-modal"`; this trigger will not open the dialog. Render ' +
+            "a <button>, or put the Dialog in library mode (`defaultOpen={false}`)."
+          : null),
   );
   const libraryRef = useCallback(
     (element: HTMLElement) => {

@@ -9,6 +9,8 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { hasAnyError } from "../internal/validity.js";
 import { useDialogContext } from "./dialog-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface DialogFormState {
   /** `useFormStatus().pending` of this form, exposed for `className` / `children` functions. */
   readonly pending: boolean;
@@ -196,9 +198,10 @@ function DialogFormSettle({
   const form = use(FormContext);
   useDevWarning(
     form !== null && missingAction,
-    "`Dialog.Form` rendered as a `Form.Root` needs a function `action`; without one the form " +
-      "navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a " +
-      '`method="dialog"` form.',
+    isDev &&
+      "`Dialog.Form` rendered as a `Form.Root` needs a function `action`; without one the form " +
+        "navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a " +
+        '`method="dialog"` form.',
   );
   const isForm = form !== null;
   const errors = form?.errors;

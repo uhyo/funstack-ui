@@ -20,6 +20,8 @@ import { hiddenText } from "./number-field-root.js";
 import type { NumberFieldState } from "./number-field-root.js";
 import { useNumberFieldContext } from "./number-field-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface NumberFieldInputProps extends Omit<
   ComponentPropsWithRef<"input">,
   | "value"
@@ -101,18 +103,22 @@ export function NumberFieldInput({
   const restName = (rest as { name?: unknown }).name;
   useDevWarning(
     restName !== undefined,
-    "NumberField.Input: `name` belongs on NumberField.Root (it goes to the hidden number input); " +
-      "on the visible input it would post the formatted text.",
+    isDev &&
+      "NumberField.Input: `name` belongs on NumberField.Root (it goes to the hidden number input); " +
+        "on the visible input it would post the formatted text.",
   );
 
-  const checkElement = useElementCheck((element) => {
-    const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
-    return !TEXT_TYPES.includes(type)
-      ? `NumberField.Input: rendered <${element.tagName.toLowerCase()}` +
-          `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text", ` +
-          '"search" or "tel": a number input would re-introduce the native parser.'
-      : null;
-  });
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) => {
+        const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
+        return !TEXT_TYPES.includes(type)
+          ? `NumberField.Input: rendered <${element.tagName.toLowerCase()}` +
+              `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text", ` +
+              '"search" or "tel": a number input would re-introduce the native parser.'
+          : null;
+      }),
+  );
   const libraryRef = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);
@@ -175,9 +181,10 @@ export function NumberFieldInput({
   const type = renderType !== undefined && TEXT_TYPES.includes(renderType) ? renderType : "text";
   useDevWarning(
     renderType !== undefined && !TEXT_TYPES.includes(renderType),
-    `NumberField.Input: \`render\` has type="${renderType ?? ""}"; the visible input is ` +
-      'rendered as type "text". A number input would re-introduce the native parser the ' +
-      "NumberField exists to avoid.",
+    isDev &&
+      `NumberField.Input: \`render\` has type="${renderType ?? ""}"; the visible input is ` +
+        'rendered as type "text". A number input would re-introduce the native parser the ' +
+        "NumberField exists to avoid.",
   );
 
   const dataInvalid =

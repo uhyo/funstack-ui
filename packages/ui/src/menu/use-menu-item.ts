@@ -7,6 +7,8 @@ import type { DataAttributes } from "../internal/use-render.js";
 import { MenuListContext } from "./menu-context.js";
 import { hasModifier } from "./menu-dom.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface MenuItemBaseOptions {
   /** Public name of the part for development warnings. */
   readonly part: string;
@@ -41,7 +43,7 @@ export interface MenuItemBase {
 export function useMenuItem(options: MenuItemBaseOptions): MenuItemBase {
   const { part, role, disabled, label, activate } = options;
   const list = use(MenuListContext);
-  useDevWarning(list === null, `${part}: rendered outside a Menu.Popup.`);
+  useDevWarning(list === null, isDev && `${part}: rendered outside a Menu.Popup.`);
 
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (disabled) {

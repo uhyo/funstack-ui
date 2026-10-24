@@ -20,6 +20,8 @@ import type {
 } from "./menu-context.js";
 import { isRtl } from "./menu-dom.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** Details passed as the second argument of `Menu.Root`'s `openChangeAction`. */
 export interface MenuOpenChangeDetails extends ActionDetails {
   /**
@@ -102,14 +104,16 @@ export function MenuRoot({
 
   useDevWarning(
     !submenu && (delay !== undefined || closeDelay !== undefined),
-    "Menu.Root: `delay` and `closeDelay` only apply to a submenu (a Menu.Root inside a " +
-      "Menu.Popup); a top-level menu does not open on hover.",
+    isDev &&
+      "Menu.Root: `delay` and `closeDelay` only apply to a submenu (a Menu.Root inside a " +
+        "Menu.Popup); a top-level menu does not open on hover.",
   );
   const inRegion = use(MenuRegionContext);
   useDevWarning(
     parent !== null && !submenu && !inRegion,
-    "Menu.Root: rendered inside another Menu.Root but outside its Menu.Popup. A submenu's Root " +
-      "goes inside the parent's Menu.Popup.",
+    isDev &&
+      "Menu.Root: rendered inside another Menu.Root but outside its Menu.Popup. A submenu's Root " +
+        "goes inside the parent's Menu.Popup.",
   );
 
   const timers = useDelayedPair();

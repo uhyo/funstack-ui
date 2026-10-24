@@ -243,20 +243,24 @@ export function DialogPopup({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Dialog.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
-      "dialog outside any React transition. Animate it with CSS (`@starting-style`).",
+    isDev &&
+      "Dialog.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
+        "dialog outside any React transition. Animate it with CSS (`@starting-style`).",
   );
   useDevWarning(
     !isLibrary && keepMounted === false,
-    "Dialog.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
-      "always mounted so that the server HTML is complete.",
+    isDev &&
+      "Dialog.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
+        "always mounted so that the server HTML is complete.",
   );
 
-  const checkElement = useElementCheck<HTMLDialogElement>((element) =>
-    element.tagName !== "DIALOG"
-      ? `Dialog.Popup: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
-        "Top layer, backdrop, focus and Escape all come from a real <dialog>."
-      : null,
+  const checkElement = useElementCheck<HTMLDialogElement>(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DIALOG"
+          ? `Dialog.Popup: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
+            "Top layer, backdrop, focus and Escape all come from a real <dialog>."
+          : null),
   );
   const libraryRef = useCallback(
     (element: HTMLDialogElement) => {
@@ -634,8 +638,9 @@ export function DialogPopup({
   useShownNameWarning(
     dialog,
     !isLibrary || ctx.committed,
-    "Dialog.Popup: the dialog has no accessible name. Render a Dialog.Title, or give the " +
-      "Popup an `aria-label`.",
+    isDev &&
+      "Dialog.Popup: the dialog has no accessible name. Render a Dialog.Title, or give the " +
+        "Popup an `aria-label`.",
   );
 
   const state: DialogPopupState = { open: ctx.committed, modal };

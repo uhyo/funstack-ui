@@ -402,11 +402,13 @@ export function usePopoverPopup(
   // the element (no passive-effect window, no extra render). JS-free mode: there is no "right
   // before showPopover()" (the browser runs the command), so the `autofocus` attribute stays on
   // the `initialFocus` target while it is mounted (as Dialog).
-  const checkElement = useElementCheck((element) =>
-    element.tagName !== "DIALOG" && element.tagName !== "DIV"
-      ? `${part}: expected to render a <dialog> or a <div> but got ` +
-        `<${element.tagName.toLowerCase()}>.`
-      : null,
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DIALOG" && element.tagName !== "DIV"
+          ? `${part}: expected to render a <dialog> or a <div> but got ` +
+            `<${element.tagName.toLowerCase()}>.`
+          : null),
   );
   const setElement = useCallback(
     (element: HTMLElement) => {
@@ -442,8 +444,9 @@ export function usePopoverPopup(
   useShownNameWarning(
     popupRef,
     !isLibrary || ctx.committed,
-    `${part}: the popup has no accessible name. Render a Title, or give the Popup an ` +
-      "`aria-label`.",
+    isDev &&
+      `${part}: the popup has no accessible name. Render a Title, or give the Popup an ` +
+        "`aria-label`.",
     needsName,
   );
 

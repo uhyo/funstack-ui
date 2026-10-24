@@ -18,6 +18,9 @@ export interface NameRules {
 /** A button is also named by its text or `title`. */
 export const BUTTON_NAME: NameRules = { text: true, title: true };
 
+/** Text content names it too (`title` does not). */
+export const TEXT_NAME: NameRules = { text: true };
+
 /** Whether `element` has an accessible name by `rules` (development checks only). */
 function hasName(element: Element, rules: NameRules): boolean {
   if (element.hasAttribute("aria-label")) return true;
@@ -37,11 +40,22 @@ function hasName(element: Element, rules: NameRules): boolean {
  * Development check that a part the consumer must name (an icon-only button, a listbox) has an
  * accessible name: a microtask after the element attaches (the text may come from children
  * rendered in the same commit, and a Label's registration re-render is flushed by then), once
- * per instance. The result is a callback ref, or a function to call from the part's own ref;
- * `undefined` in production.
+ * per instance. The result is a callback ref, or a function to call from the part's own ref.
+ *
+ * Pass `message` as `isDev && "..."` with the calling module's own `isDev` constant, so the text
+ * folds away in a production build; there the hook is a no-op that returns `undefined`.
  */
-export function useNameWarning(
-  message: string,
+export const useNameWarning: (
+  message: string | false,
+  rules?: NameRules,
+) => ElementCheck<HTMLElement> | undefined = isDev ? useNameWarningDev : noop;
+
+function noop(): undefined {
+  return undefined;
+}
+
+function useNameWarningDev(
+  message: string | false,
   rules: NameRules = {},
 ): ElementCheck<HTMLElement> | undefined {
   const warned = useRef(false);
@@ -59,23 +73,30 @@ export function useNameWarning(
     },
     [message, resolveIds, text, title],
   );
-  return isDev ? check : undefined;
+  return message === false ? undefined : check;
 }
 
 /**
  * Development check that a popup has an accessible name once it is (or can be) shown: in an
  * effect while `shown`, once per instance. `applies` limits it to the elements that need a name
- * (a role).
+ * (a role). Pass `message` as `isDev && "..."`, as for `useNameWarning`; a no-op in production.
  */
-export function useShownNameWarning(
+export const useShownNameWarning: (
   element: RefObject<Element | null> | Element | null,
   shown: boolean,
-  message: string,
+  message: string | false,
+  applies?: (element: Element) => boolean,
+) => void = isDev ? useShownNameWarningDev : noop;
+
+function useShownNameWarningDev(
+  element: RefObject<Element | null> | Element | null,
+  shown: boolean,
+  message: string | false,
   applies?: (element: Element) => boolean,
 ): void {
   const warned = useRef(false);
   useEffect(() => {
-    if (!isDev || !shown || warned.current) return;
+    if (message === false || !shown || warned.current) return;
     const target = element !== null && "current" in element ? element.current : element;
     if (target === null || hasName(target, { resolveIds: true })) return;
     if (applies !== undefined && !applies(target)) return;

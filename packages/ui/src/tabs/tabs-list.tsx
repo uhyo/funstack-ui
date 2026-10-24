@@ -16,6 +16,8 @@ import { useRender } from "../internal/use-render.js";
 import { TabsListContext, useTabsContext } from "./tabs-context.js";
 import type { TabsListContextValue, TabsOrientation } from "./tabs-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface TabsListState {
   readonly orientation: TabsOrientation;
   readonly disabled: boolean;
@@ -87,8 +89,9 @@ export function TabsList({
   }, [optimistic, children, unmatched]);
   useDevWarning(
     unmatched,
-    `Tabs: the value ${JSON.stringify(optimistic)} matches no Tabs.Tab. No tab is selected; the ` +
-      "tablist itself is the tab stop. Pass null to select nothing on purpose.",
+    isDev &&
+      `Tabs: the value ${JSON.stringify(optimistic)} matches no Tabs.Tab. No tab is selected; the ` +
+        "tablist itself is the tab stop. Pass null to select nothing on purpose.",
   );
   const listIsTabStop = optimistic === null || unmatched;
 

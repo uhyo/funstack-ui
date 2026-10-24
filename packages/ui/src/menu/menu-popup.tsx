@@ -49,6 +49,8 @@ import {
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type MenuSide = AnchorSide;
 export type MenuAlign = AnchorAlign;
@@ -403,11 +405,13 @@ export function MenuPopup({
     }
   });
 
-  const checkElement = useElementCheck((element) =>
-    element.tagName === "DIALOG"
-      ? "Menu.Popup: rendered a <dialog>. Render a <div>: a <dialog popover> runs the dialog " +
-        "focusing steps, which fight the menu's item focus."
-      : null,
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName === "DIALOG"
+          ? "Menu.Popup: rendered a <dialog>. Render a <div>: a <dialog popover> runs the dialog " +
+            "focusing steps, which fight the menu's item focus."
+          : null),
   );
   const devRef = useCallback(
     (element: HTMLElement) => {

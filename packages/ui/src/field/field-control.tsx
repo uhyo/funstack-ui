@@ -9,6 +9,8 @@ import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useRender } from "../internal/use-render.js";
 import { fieldDataAttributes } from "./field-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface FieldControlProps extends Omit<
   ComponentPropsWithRef<"input">,
   "id" | "aria-invalid" | "className" | "style" | "children"
@@ -58,12 +60,14 @@ export function FieldControl({
     id: consumerId,
     component: "Field.Control",
   });
-  const checkElement = useElementCheck((el) =>
-    !CONTROL_TAGS.has(el.tagName)
-      ? "Field.Control: expected to render an <input>, <textarea> or <select> but got " +
-        `<${el.tagName.toLowerCase()}>. Validation, labelling and form participation need a ` +
-        "native form control."
-      : null,
+  const checkElement = useElementCheck(
+    isDev &&
+      ((el) =>
+        !CONTROL_TAGS.has(el.tagName)
+          ? "Field.Control: expected to render an <input>, <textarea> or <select> but got " +
+            `<${el.tagName.toLowerCase()}>. Validation, labelling and form participation need a ` +
+            "native form control."
+          : null),
   );
   const ref = useMergedRefs<HTMLElement>(checkElement, field.ref);
 

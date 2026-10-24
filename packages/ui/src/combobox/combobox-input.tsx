@@ -17,6 +17,8 @@ import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { optionId, useComboboxContext } from "./combobox-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface ComboboxInputState {
   /** Optimistic selection. */
   readonly value: string | null;
@@ -85,14 +87,17 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     disabled: ctx.disabled,
   };
 
-  const checkElement = useElementCheck((element) => {
-    const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
-    return type !== "text" && type !== "search"
-      ? `Combobox.Input: rendered <${element.tagName.toLowerCase()}` +
-          `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text" or ` +
-          '"search": `role="combobox"`, `aria-activedescendant` and the caret keys depend on it.'
-      : null;
-  });
+  const checkElement = useElementCheck(
+    isDev &&
+      ((element) => {
+        const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
+        return type !== "text" && type !== "search"
+          ? `Combobox.Input: rendered <${element.tagName.toLowerCase()}` +
+              `${type === "" ? "" : ` type="${type}"`}>. Render an <input> of type "text" or ` +
+              '"search": `role="combobox"`, `aria-activedescendant` and the caret keys depend on it.'
+          : null;
+      }),
+  );
   const ref = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);

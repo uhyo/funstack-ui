@@ -16,18 +16,32 @@ export type ElementCheck<E extends Element> = (element: E) => () => void;
  * The result is a callback ref (merge it with the part's own) or a function to call from the
  * part's own ref (`check?.(element)`). Ref callbacks run in the layout phase, when the element's
  * siblings are in place. As a ref, `deps` re-run the check when they change (the callback is
- * re-created, as a `useCallback` ref would be). `undefined` in production.
+ * re-created, as a `useCallback` ref would be).
+ *
+ * Pass `message` as `isDev && ((element) => ...)` with the calling module's own `isDev`
+ * constant, so its texts fold away in a production build; there the hook is a no-op that
+ * returns `undefined`.
  */
-export function useElementCheck<E extends Element = HTMLElement>(
-  message: (element: E) => string | null,
+export const useElementCheck: <E extends Element = HTMLElement>(
+  message: false | ((element: E) => string | null),
+  deps?: DependencyList,
+) => ElementCheck<E> | undefined = isDev ? useElementCheckDev : noop;
+
+function noop(): undefined {
+  return undefined;
+}
+
+function useElementCheckDev<E extends Element = HTMLElement>(
+  message: false | ((element: E) => string | null),
   deps: DependencyList = [],
 ): ElementCheck<E> | undefined {
   const warned = useRef(false);
   const latest = useLatest(message);
   const check = useCallback(
     (element: E) => {
-      if (!warned.current) {
-        const text = latest.current(element);
+      const current = latest.current;
+      if (!warned.current && current !== false) {
+        const text = current(element);
         if (text !== null) {
           warned.current = true;
           console.error(text);
@@ -39,5 +53,5 @@ export function useElementCheck<E extends Element = HTMLElement>(
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- `deps` decide when to re-check
     [latest, ...deps],
   );
-  return isDev ? check : undefined;
+  return message === false ? undefined : check;
 }

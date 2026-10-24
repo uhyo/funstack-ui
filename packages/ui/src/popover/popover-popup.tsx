@@ -20,6 +20,8 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type PopoverSide = AnchorSide;
 export type PopoverAlign = AnchorAlign;
@@ -140,13 +142,15 @@ export function PopoverPopup({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Popover.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
-      "popover outside any React transition. Animate it with CSS (`@starting-style`).",
+    isDev &&
+      "Popover.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
+        "popover outside any React transition. Animate it with CSS (`@starting-style`).",
   );
   useDevWarning(
     !isLibrary && keepMounted === false,
-    "Popover.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
-      "always mounted so that the server HTML is complete.",
+    isDev &&
+      "Popover.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
+        "always mounted so that the server HTML is complete.",
   );
 
   const { setElement, visible, wrapContent } = usePopoverPopup(ctx, {

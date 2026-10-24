@@ -8,6 +8,8 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface AccordionPanelState {
   readonly value: string;
   /** Committed open state. `undefined` in JS-free mode. */
@@ -59,8 +61,9 @@ export function AccordionPanel({
 
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Accordion.Panel: `transition` has no effect in JS-free mode; the browser toggles the item " +
-      "outside any React transition.",
+    isDev &&
+      "Accordion.Panel: `transition` has no effect in JS-free mode; the browser toggles the item " +
+        "outside any React transition.",
   );
 
   const state: AccordionPanelState = {

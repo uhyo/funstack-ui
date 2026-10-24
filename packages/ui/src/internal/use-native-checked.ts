@@ -65,12 +65,14 @@ export interface UseNativeCheckedOptions {
 export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<HTMLInputElement> {
   const { type, component, checked, defaultChecked, indeterminate, group = false } = options;
   const node = useRef<HTMLInputElement | null>(null);
-  const checkElement = useElementCheck<HTMLInputElement>((el) =>
-    isInputOfType(el, type)
-      ? null
-      : `${component}: expected to render an \`<input type="${type}">\` but got ` +
-        `${describeElement(el)}; the platform semantics (form participation, labels, ` +
-        `keyboard, reset) need a real input. A \`render\` element must keep the input.`,
+  const checkElement = useElementCheck<HTMLInputElement>(
+    isDev &&
+      ((el) =>
+        isInputOfType(el, type)
+          ? null
+          : `${component}: expected to render an \`<input type="${type}">\` but got ` +
+            `${describeElement(el)}; the platform semantics (form participation, labels, ` +
+            `keyboard, reset) need a real input. A \`render\` element must keep the input.`),
   );
 
   const ref = useCallback(

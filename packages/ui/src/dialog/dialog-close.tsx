@@ -9,6 +9,8 @@ import { isHostButton, rendersButton, useRender } from "../internal/use-render.j
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface DialogCloseState {
   /** The `action` is in flight. */
   readonly pending: boolean;
@@ -91,12 +93,13 @@ export function DialogClose({
   const state: DialogCloseState = { pending, disabled };
 
   const devRef = useElementCheck(
-    (element) =>
-      !installClick && element.tagName !== "BUTTON"
-        ? `Dialog.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
-          '`action`. Only a <button> runs `command="request-close"`; this element will not ' +
-          "close the dialog."
-        : null,
+    isDev &&
+      ((element) =>
+        !installClick && element.tagName !== "BUTTON"
+          ? `Dialog.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
+            '`action`. Only a <button> runs `command="request-close"`; this element will not ' +
+            "close the dialog."
+          : null),
     [installClick],
   );
 

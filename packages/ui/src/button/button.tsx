@@ -17,6 +17,8 @@ import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** Details passed to `Button`'s `action`. Serialisable; `event` is virtual (conventions 2.2). */
 export interface ButtonActionDetails extends ActionDetails {}
 
@@ -128,14 +130,16 @@ export function Button({
 
   useDevWarning(
     action !== undefined && formAction !== undefined,
-    "Button: `action` and `formAction` were both given. One click would run two actions; the " +
-      "Button runs `action` and leaves `formAction` to the form submission. Pass one of them.",
+    isDev &&
+      "Button: `action` and `formAction` were both given. One click would run two actions; the " +
+        "Button runs `action` and leaves `formAction` to the form submission. Pass one of them.",
   );
   useDevWarning(
     action !== undefined && (type === "submit" || type === "reset"),
-    `Button: \`action\` together with type="${type}". One click would run \`action\` in a ` +
-      `transition and ${type === "reset" ? "reset" : "submit"} the form. Use \`formAction\` ` +
-      `for a submitter, or drop \`type\`.`,
+    isDev &&
+      `Button: \`action\` together with type="${type}". One click would run \`action\` in a ` +
+        `transition and ${type === "reset" ? "reset" : "submit"} the form. Use \`formAction\` ` +
+        `for a submitter, or drop \`type\`.`,
   );
 
   const state: ButtonState = { pending, disabled };

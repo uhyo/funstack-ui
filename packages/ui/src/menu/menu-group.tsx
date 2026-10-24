@@ -6,6 +6,8 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { MenuGroupContext } from "./menu-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /** `Menu.Group`, `Menu.GroupLabel` and `Menu.Separator` have no state. */
 export type MenuGroupState = Record<string, never>;
 export type MenuGroupLabelState = Record<string, never>;
@@ -69,7 +71,7 @@ export function MenuGroupLabel({
   const group = use(MenuGroupContext);
   useDevWarning(
     group === null,
-    "Menu.GroupLabel: rendered outside a Menu.Group or Menu.RadioGroup; it names nothing.",
+    isDev && "Menu.GroupLabel: rendered outside a Menu.Group or Menu.RadioGroup; it names nothing.",
   );
   return useRender<ComponentPropsWithRef<"div">, MenuGroupLabelState>({
     defaultElement: "div",

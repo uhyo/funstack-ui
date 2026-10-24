@@ -8,6 +8,8 @@ import { useRender } from "../internal/use-render.js";
 import { useNumberFieldContext } from "./number-field-context.js";
 import type { NumberFieldState } from "./number-field-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface NumberFieldLabelProps extends Omit<
   ComponentPropsWithRef<"label">,
   "htmlFor" | "id" | "className" | "style" | "children"
@@ -36,11 +38,13 @@ export function NumberFieldLabel({
   const { registerLabel } = ctx;
   useLayoutEffect(registerLabel, [registerLabel]);
 
-  const libraryRef = useElementCheck((element) =>
-    element.tagName !== "LABEL"
-      ? `NumberField.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
-        "The Label names the input through `for`, which only a <label> has."
-      : null,
+  const libraryRef = useElementCheck(
+    isDev &&
+      ((element) =>
+        element.tagName !== "LABEL"
+          ? `NumberField.Label: expected a <label> element but got <${element.tagName.toLowerCase()}>. ` +
+            "The Label names the input through `for`, which only a <label> has."
+          : null),
   );
 
   return useRender<ComponentPropsWithRef<"label">, NumberFieldState>({

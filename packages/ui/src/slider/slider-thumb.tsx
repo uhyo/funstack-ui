@@ -19,6 +19,8 @@ import { percent, thumbBounds } from "./slider-arithmetic.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderOrientation } from "./slider-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface SliderThumbState {
   readonly index: number;
   /** The value this thumb shows. */
@@ -163,20 +165,23 @@ export function SliderThumb({
 
   useDevWarning(
     !inRange,
-    `Slider.Thumb: \`index={${index}}\` is outside the value (${ctx.shown.length} ` +
-      `${ctx.shown.length === 1 ? "value" : "values"}). The Thumb renders nothing.`,
+    isDev &&
+      `Slider.Thumb: \`index={${index}}\` is outside the value (${ctx.shown.length} ` +
+        `${ctx.shown.length === 1 ? "value" : "values"}). The Thumb renders nothing.`,
   );
   useDevWarning(
     inRange && ctx.shown.length > 1 && ariaLabel === undefined && ariaLabelledBy === undefined,
-    `Slider.Thumb: each thumb of a multi-thumb slider needs its own name (\`aria-label\` or ` +
-      `\`aria-labelledby\`), e.g. "Minimum price"; the thumb at index ${index} has none.`,
+    isDev &&
+      `Slider.Thumb: each thumb of a multi-thumb slider needs its own name (\`aria-label\` or ` +
+        `\`aria-labelledby\`), e.g. "Minimum price"; the thumb at index ${index} has none.`,
   );
 
   const fieldName = ctx.field?.name;
   useDevWarning(
     inRange && name !== undefined && fieldName !== undefined && name !== fieldName,
-    `Slider.Thumb: its \`name\` ("${name}") differs from the Field.Root's ("${fieldName}"). ` +
-      "The Field reads server errors and `validate`'s value by the Field's name.",
+    isDev &&
+      `Slider.Thumb: its \`name\` ("${name}") differs from the Field.Root's ("${fieldName}"). ` +
+        "The Field reads server errors and `validate`'s value by the Field's name.",
   );
 
   const pending = ctx.pending && ctx.pendingThumb === index;

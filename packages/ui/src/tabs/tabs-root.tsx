@@ -18,6 +18,8 @@ import { TabsContext } from "./tabs-context.js";
 import type { TabsActivationMode, TabsContextValue, TabsOrientation } from "./tabs-context.js";
 import { tabId } from "./tabs-ids.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export type { TabsActivationMode, TabsOrientation } from "./tabs-context.js";
 
 /** Details passed as the second argument of `valueChangeAction`. */
@@ -133,8 +135,9 @@ export function TabsRoot({
   // of an empty Tabs (design/components/tabs.md, resolved question 2).
   useDevWarning(
     value === undefined && defaultValue === undefined,
-    "Tabs.Root: neither `value` nor `defaultValue` was passed, so no tab is selected and no " +
-      "panel is shown. Pass `defaultValue`, or `defaultValue={null}` to start with no selection.",
+    isDev &&
+      "Tabs.Root: neither `value` nor `defaultValue` was passed, so no tab is selected and no " +
+        "panel is shown. Pass `defaultValue`, or `defaultValue={null}` to start with no selection.",
   );
 
   // Memoised: `dispatch` is stable, so this changes only with the state and the props below.

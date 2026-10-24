@@ -13,6 +13,8 @@ import { isHostButton, rendersButton, useRender } from "../internal/use-render.j
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface ComboboxClearState {
   /** Optimistic selection. */
   readonly value: string | null;
@@ -64,7 +66,7 @@ export function ComboboxClear({
   const ctx = useComboboxContext("Combobox.Clear");
   const disabled = ownDisabled || ctx.disabled;
   const ref = useNameWarning(
-    "Combobox.Clear: the button has no accessible name. Give it an `aria-label`.",
+    isDev && "Combobox.Clear: the button has no accessible name. Give it an `aria-label`.",
     BUTTON_NAME,
   );
   // A link or component render: native `disabled` would mean nothing on a link; the click

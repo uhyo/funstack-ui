@@ -3,6 +3,8 @@ import { useCallback, useRef } from "react";
 import type { RefCallback, RefObject } from "react";
 import { useElementCheck } from "../internal/use-element-check.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface SelectPartRef<E extends Element> {
   /** The library ref to pass to `useRender`. */
   readonly ref: RefCallback<E>;
@@ -23,17 +25,22 @@ export function useSelectPartRef<E extends Element>(
   position?: (el: E) => string | null,
 ): SelectPartRef<E> {
   const node = useRef<E | null>(null);
-  const checkTag = useElementCheck<E>((el) =>
-    el.tagName !== tag.toUpperCase()
-      ? `${component}: expected to render a <${tag}> element but got ` +
-        `<${el.tagName.toLowerCase()}>. The parser, the picker and <selectedcontent> cloning ` +
-        `key on the native element; a \`render\` element must keep it.`
-      : null,
+  const checkTag = useElementCheck<E>(
+    isDev &&
+      ((el) =>
+        el.tagName !== tag.toUpperCase()
+          ? `${component}: expected to render a <${tag}> element but got ` +
+            `<${el.tagName.toLowerCase()}>. The parser, the picker and <selectedcontent> cloning ` +
+            `key on the native element; a \`render\` element must keep it.`
+          : null),
   );
-  const checkPosition = useElementCheck<E>((el) => {
-    const message = position?.(el) ?? null;
-    return message === null ? null : `${component}: ${message}`;
-  });
+  const checkPosition = useElementCheck<E>(
+    isDev &&
+      ((el) => {
+        const message = position?.(el) ?? null;
+        return message === null ? null : `${component}: ${message}`;
+      }),
+  );
   const ref = useCallback(
     (el: E) => {
       node.current = el;

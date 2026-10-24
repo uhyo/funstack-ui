@@ -176,17 +176,20 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
   const inToolbar = toolbar !== null;
   useDevWarning(
     inToolbar && orientationProp !== undefined,
-    "ToggleGroup.Root: `orientation` is ignored inside a Toolbar.Root; the group follows the " +
-      "Toolbar's orientation.",
+    isDev &&
+      "ToggleGroup.Root: `orientation` is ignored inside a Toolbar.Root; the group follows the " +
+        "Toolbar's orientation.",
   );
   useDevWarning(
     inToolbar && loopProp !== undefined,
-    "ToggleGroup.Root: `loop` is ignored inside a Toolbar.Root; the Toolbar's `loop` applies.",
+    isDev &&
+      "ToggleGroup.Root: `loop` is ignored inside a Toolbar.Root; the Toolbar's `loop` applies.",
   );
   useDevWarning(
     inToolbar && focusgroupProp === true,
-    "ToggleGroup.Root: `experimental_focusgroup` is ignored inside a Toolbar.Root. A nested " +
-      "focusgroup would split the Toolbar's single Tab stop; set the flag on the Toolbar.Root.",
+    isDev &&
+      "ToggleGroup.Root: `experimental_focusgroup` is ignored inside a Toolbar.Root. A nested " +
+        "focusgroup would split the Toolbar's single Tab stop; set the flag on the Toolbar.Root.",
   );
   const orientation: ToggleGroupOrientation =
     toolbar?.orientation ?? orientationProp ?? "horizontal";
@@ -197,8 +200,9 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
   const [mountExclusive] = useState(exclusive);
   useDevWarning(
     mountExclusive !== exclusive,
-    "ToggleGroup.Root: `exclusive` changed after mount. Switching between exclusive and " +
-      "multiple mode is not supported; the group keeps the mode it mounted with.",
+    isDev &&
+      "ToggleGroup.Root: `exclusive` changed after mount. Switching between exclusive and " +
+        "multiple mode is not supported; the group keeps the mode it mounted with.",
   );
 
   // Committed set keyed on the contents, so an inline `value={["a"]}` does not re-base every render.

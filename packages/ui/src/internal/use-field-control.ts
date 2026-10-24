@@ -7,6 +7,8 @@ import type { FieldState } from "./field-context.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import type { ValidatableElement } from "./validity.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface UseFieldControlOptions {
   /** `<label for>` can target the element (input, select, textarea). Groups pass `false`. */
   readonly labelable: boolean;
@@ -103,13 +105,15 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
 
   useDevWarning(
     field !== null && id !== undefined,
-    `${component}: the \`id\` prop is ignored inside a Field.Root; the Field owns the control's ` +
-      "id so that Field.Label can point at it.",
+    isDev &&
+      `${component}: the \`id\` prop is ignored inside a Field.Root; the Field owns the control's ` +
+        "id so that Field.Label can point at it.",
   );
   useDevWarning(
     field !== null && name !== undefined && field.name !== undefined && name !== field.name,
-    `${component}: its \`name\` ("${name}") differs from the Field.Root's ("${field?.name}"). ` +
-      "The Field reads server errors and `validate`'s value by the Field's name.",
+    isDev &&
+      `${component}: its \`name\` ("${name}") differs from the Field.Root's ("${field?.name}"). ` +
+        "The Field reads server errors and `validate`'s value by the Field's name.",
   );
 
   if (field === null) {

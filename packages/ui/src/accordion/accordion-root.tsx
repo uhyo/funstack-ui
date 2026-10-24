@@ -29,6 +29,8 @@ import type { ValueSet } from "../internal/value-set.js";
 import { AccordionRootContext } from "./accordion-context.js";
 import type { AccordionMode, AccordionRootContextValue } from "./accordion-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface AccordionRootState {
   /** An action dispatched through this Accordion is in flight (library mode only). */
   readonly pending: boolean;
@@ -201,9 +203,10 @@ export function AccordionRoot(props: AccordionRootProps) {
   const [mode] = useState<AccordionMode>(isLibraryNow ? "library" : "static");
   useDevWarning(
     (mode === "library") !== isLibraryNow,
-    "Accordion.Root: the mode changed after mount (`value`, `defaultValue` and `valueChangeAction` " +
-      "were all absent on one render and present on another). Switching between JS-free and " +
-      "library mode is not supported.",
+    isDev &&
+      "Accordion.Root: the mode changed after mount (`value`, `defaultValue` and `valueChangeAction` " +
+        "were all absent on one render and present on another). Switching between JS-free and " +
+        "library mode is not supported.",
   );
 
   // Both prop variants are narrowed by `exclusive` at the call site; internally one signature.

@@ -16,6 +16,8 @@ import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext, AccordionRootContext } from "./accordion-context.js";
 import type { AccordionItemContextValue } from "./accordion-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export interface AccordionItemState {
   readonly value: string;
   /** Optimistic open state. `undefined` in JS-free mode (browser-owned, unknown to React). */
@@ -87,21 +89,25 @@ export function AccordionItem({
 
   useDevWarning(
     isLibrary && defaultOpen,
-    "Accordion.Item: `defaultOpen` is ignored in library mode. Use `defaultValue` or `value` on " +
-      "Accordion.Root instead.",
+    isDev &&
+      "Accordion.Item: `defaultOpen` is ignored in library mode. Use `defaultValue` or `value` on " +
+        "Accordion.Root instead.",
   );
   useDevWarning(
     !isLibrary && transition !== undefined,
-    "Accordion.Item: `transition` has no effect in JS-free mode; the browser toggles the item " +
-      "outside any React transition. Animate `::details-content` with CSS instead.",
+    isDev &&
+      "Accordion.Item: `transition` has no effect in JS-free mode; the browser toggles the item " +
+        "outside any React transition. Animate `::details-content` with CSS instead.",
   );
 
   const registerItem = root?.registerItem;
-  const checkElement = useElementCheck<HTMLDetailsElement>((element) =>
-    element.tagName !== "DETAILS"
-      ? `Accordion.Item: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
-        "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>."
-      : null,
+  const checkElement = useElementCheck<HTMLDetailsElement>(
+    isDev &&
+      ((element) =>
+        element.tagName !== "DETAILS"
+          ? `Accordion.Item: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
+            "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>."
+          : null),
   );
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
