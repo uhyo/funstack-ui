@@ -527,6 +527,27 @@ describe("Popover", () => {
       expect(details.reason).toBe("activate");
       expect(details.event!.type).toBe("command");
     });
+
+    it("a hide-popover command that does not close leaves no intent: a later dismissal is 'dismiss'", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      await openThroughTrigger(user);
+      // A foreign close command whose hide never happens (a later listener cancelled it): the
+      // recorded intent is stale and is dropped a task later (design 2.3).
+      act(() => {
+        dispatchCommand(popup(), "hide-popover", screen.getByTestId("elsewhere"));
+      });
+      await flushTasks(1);
+      expect(isOpen()).toBe(true);
+      await act(async () => popup().hidePopover());
+      await flushTasks(2);
+      expect(action).toHaveBeenCalledTimes(2);
+      const [next, details] = action.mock.calls[1]!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("dismiss");
+      expect(details.event!.type).toBe("toggle");
+    });
   });
 
   renderBoth("async action", (mode) => {

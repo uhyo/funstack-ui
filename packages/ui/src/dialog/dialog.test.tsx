@@ -23,6 +23,7 @@ import {
   StrictMode,
   Suspense,
   startTransition,
+  use,
   useActionState,
   useEffect,
   useRef,
@@ -45,6 +46,8 @@ import {
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { DialogContext } from "./dialog-context.js";
+import type { DialogContextValue } from "./dialog-context.js";
 import { Dialog } from "./index.js";
 import type {
   DialogCloseState,
@@ -334,6 +337,38 @@ describe("Dialog", () => {
       expect(trigger()).toBeDisabled();
       await user.click(trigger());
       expect(popup().open).toBe(false);
+    });
+
+    // Close intents are recorded only in JS-free mode (a native close command, a Close with
+    // `action`, a `method="dialog"` submit), where nothing reports them, so the stale-intent clear
+    // (design/components/popover.md 2.3, through the Root's `isShown`: `dialog.open`, not
+    // `:popover-open`) is pinned on the context itself.
+    it("a close intent is dropped a task later while the dialog stays open, kept once closed", async () => {
+      let ctx: DialogContextValue | null = null;
+      function Probe() {
+        ctx = use(DialogContext);
+        return null;
+      }
+      render(
+        <Dialog.Root>
+          <Dialog.Popup data-testid="popup" aria-label="Probe">
+            <Probe />
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      const root = ctx! as DialogContextValue;
+      act(() => popup().showModal());
+      // A close that was cancelled (a prevented `cancel`): the dialog is still open.
+      root.recordCloseIntent({ reason: "activate", event: undefined });
+      await flushTasks(1);
+      expect(root.takeCloseIntent()).toBeUndefined();
+      // A closed dialog: the intent is not stale (it waits for its `close` event).
+      act(() => popup().close());
+      await flushTasks(1);
+      const intent = { reason: "activate", event: undefined } as const;
+      root.recordCloseIntent(intent);
+      await flushTasks(1);
+      expect(root.takeCloseIntent()).toBe(intent);
     });
   });
 
