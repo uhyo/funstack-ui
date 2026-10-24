@@ -223,7 +223,7 @@ export function ComboboxPage() {
             name: "openChangeAction",
             type: "ChangeAction<boolean, ComboboxOpenChangeDetails>",
             description:
-              'Awaited for opens and for the closes the library performs (an accepted option, the Trigger); a notification for dismissals (Escape, a click outside, focus leaving). A `popovertarget` or `commandfor` button of your own for the popup closes it as `"activate"` (a notification) and never moves focus out of the input, so the text is left as typed.',
+              'Awaited for opens and for the closes the library performs (an accepted option, the Trigger); a notification for dismissals (Escape, a click outside, focus leaving). A `popovertarget` or `commandfor` button of your own for the popup closes it as `"activate"` (a notification); pressing it never moves focus out of the input, so the text is left as typed.',
           },
           {
             name: "allowCustomValue",

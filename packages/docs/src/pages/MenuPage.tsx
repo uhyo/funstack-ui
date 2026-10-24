@@ -217,7 +217,7 @@ export function MenuPage() {
                 <code>"platform"</code> (found open on hydration; <code>event</code> is{" "}
                 <code>undefined</code>). A <code>popovertarget</code> or <code>commandfor</code>{" "}
                 button of your own for the popup closes it as <code>"activate"</code> (a
-                notification) and never moves focus out of the menu.
+                notification); pressing it never moves focus out of the menu.
               </>
             ),
           },

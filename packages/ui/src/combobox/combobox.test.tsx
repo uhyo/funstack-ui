@@ -2334,6 +2334,68 @@ describe("Combobox", () => {
       expect(isOpen()).toBe(true);
       expect(fireEvent.mouseDown(screen.getByTestId("elsewhere"), { button: 0 })).toBe(true);
     });
+
+    it("an <input type=button popovertarget> is guarded too", async () => {
+      const user = setupUser();
+      render(<Harness />);
+      await typeText(user, "j");
+      const foreign = document.createElement("input");
+      foreign.type = "button";
+      foreign.setAttribute("popovertarget", popup().id);
+      document.body.append(foreign);
+      onTestFinished(() => foreign.remove());
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+      foreign.type = "reset";
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+      foreign.type = "text";
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+    });
+
+    // HTML's invoker relationship: a submit button with a form owner invokes nothing, so its press
+    // is an outside press (#126 review F1).
+    it("a submit button in a form naming the popup: focus leaves, 'dismiss', the text reverts", async () => {
+      const openAction = vi.fn<OpenAction>();
+      const user = setupUser();
+      render(<Harness root={{ openChangeAction: openAction }} />);
+      const form = document.createElement("form");
+      form.addEventListener("submit", (event) => event.preventDefault());
+      const foreign = document.createElement("button");
+      foreign.textContent = "Submit";
+      foreign.setAttribute("popovertarget", popup().id);
+      form.append(foreign);
+      document.body.append(form);
+      onTestFinished(() => form.remove());
+      await typeText(user, "Jamaicax");
+      expect(isOpen()).toBe(true);
+      openAction.mockClear();
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+      await user.click(foreign);
+      await flushTasks(2);
+      expect(foreign).toHaveFocus();
+      expect(isOpen()).toBe(false);
+      expect(input().value).toBe("");
+      expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "dismiss"]]);
+    });
+
+    it("unmounting while shown removes the listener", async () => {
+      const added: EventListenerOrEventListenerObject[] = [];
+      const user = setupUser();
+      const { unmount } = render(<Harness />);
+      const add = vi.spyOn(document, "addEventListener").mockImplementation(function (
+        this: Document,
+        ...args: Parameters<Document["addEventListener"]>
+      ) {
+        if (args[0] === "mousedown" && args[2] === true) added.push(args[1]!);
+        return EventTarget.prototype.addEventListener.apply(this, args);
+      });
+      await typeText(user, "j");
+      expect(isOpen()).toBe(true);
+      add.mockRestore();
+      expect(added).toHaveLength(1);
+      const remove = vi.spyOn(document, "removeEventListener");
+      unmount();
+      expect(remove).toHaveBeenCalledWith("mousedown", added[0], true);
+    });
   });
 
   describe("Input press (#123)", () => {

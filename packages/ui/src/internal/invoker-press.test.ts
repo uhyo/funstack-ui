@@ -70,6 +70,72 @@ describe("isPopoverInvoker", () => {
   });
 });
 
+function inputButton(type: string, form?: HTMLFormElement) {
+  const element = document.createElement("input");
+  element.type = type;
+  element.setAttribute("popovertarget", "popup");
+  (form ?? document.body).append(element);
+  return element;
+}
+
+describe("isPopoverInvoker: HTML's invoker relationship (#126 review)", () => {
+  it("an <input> of a button type is one; another <input> is not", () => {
+    const { popup } = setup();
+    for (const type of ["button", "reset", "submit", "image"]) {
+      expect(isPopoverInvoker(inputButton(type), popup)).toBe(true);
+    }
+    expect(isPopoverInvoker(inputButton("text"), popup)).toBe(false);
+    expect(isPopoverInvoker(inputButton("checkbox"), popup)).toBe(false);
+    // `commandfor` is a <button> attribute.
+    const input = inputButton("button");
+    input.removeAttribute("popovertarget");
+    input.setAttribute("commandfor", "popup");
+    input.setAttribute("command", "toggle-popover");
+    expect(isPopoverInvoker(input, popup)).toBe(false);
+  });
+
+  it("a disabled button is not one", () => {
+    const { popup } = setup();
+    const disabled = button({ popovertarget: "popup" });
+    disabled.disabled = true;
+    expect(isPopoverInvoker(disabled, popup)).toBe(false);
+    const command = button({ commandfor: "popup", command: "hide-popover" });
+    command.disabled = true;
+    expect(isPopoverInvoker(command, popup)).toBe(false);
+    const input = inputButton("button");
+    input.disabled = true;
+    expect(isPopoverInvoker(input, popup)).toBe(false);
+  });
+
+  it("a submit button with a form owner is not one; outside a form it is", () => {
+    const { popup } = setup();
+    const form = document.createElement("form");
+    document.body.append(form);
+    // No `type`: a <button> is a submit button.
+    const inForm = document.createElement("button");
+    inForm.setAttribute("popovertarget", "popup");
+    form.append(inForm);
+    expect(isPopoverInvoker(inForm, popup)).toBe(false);
+    const command = document.createElement("button");
+    command.setAttribute("commandfor", "popup");
+    command.setAttribute("command", "toggle-popover");
+    form.append(command);
+    expect(isPopoverInvoker(command, popup)).toBe(false);
+    expect(isPopoverInvoker(inputButton("submit", form), popup)).toBe(false);
+    expect(isPopoverInvoker(inputButton("image", form), popup)).toBe(false);
+    // Not submit buttons: invokers in a form too.
+    inForm.type = "button";
+    expect(isPopoverInvoker(inForm, popup)).toBe(true);
+    expect(isPopoverInvoker(inputButton("reset", form), popup)).toBe(true);
+    expect(isPopoverInvoker(inputButton("button", form), popup)).toBe(true);
+    // A submit button with no form owner.
+    const loose = document.createElement("button");
+    loose.setAttribute("popovertarget", "popup");
+    document.body.append(loose);
+    expect(isPopoverInvoker(loose, popup)).toBe(true);
+  });
+});
+
 describe("listenInvokerPresses", () => {
   it("prevents a primary press on an invoker until the cleanup", () => {
     const { popup } = setup();

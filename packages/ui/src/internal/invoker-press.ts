@@ -7,20 +7,28 @@ interface InvokerButton {
   readonly command?: string;
 }
 
+/** The `<input>` types HTML counts as buttons: the ones `popovertarget` applies to. */
+const INPUT_BUTTON_TYPES = new Set(["submit", "image", "reset", "button"]);
+
 /**
- * Whether a press on `target` is a press on a foreign invoker of `popup`: its closest `<button>`
- * is outside the popup and names it through `popovertarget`, or through `commandfor` with a
- * popover command (`toggle-popover`, `show-popover`, `hide-popover`). The relationship light
- * dismiss exempts (conventions 3.5, #126). Read through the IDL, so an engine without it has no
- * such invoker.
+ * Whether a press on `target` is a press on a foreign invoker of `popup`: its closest button (a
+ * `<button>`, or an `<input>` of a button type) is outside the popup and names it through
+ * `popovertarget`, or (a `<button>`) through `commandfor` with a popover command
+ * (`toggle-popover`, `show-popover`, `hide-popover`). HTML's invoker relationship, the one light
+ * dismiss exempts (conventions 3.5, #126): a disabled button and a submit button with a form owner
+ * invoke nothing. Read through the IDL, so an engine without it has no such invoker.
  */
 export function isPopoverInvoker(target: EventTarget | null, popup: Element): boolean {
   if (!(target instanceof Element)) return false;
-  const button = target.closest("button");
+  const button = target.closest<HTMLButtonElement | HTMLInputElement>("button, input");
   if (button === null || popup.contains(button)) return false;
+  const isInput = button.tagName === "INPUT";
+  if (isInput && !INPUT_BUTTON_TYPES.has(button.type)) return false;
+  if (button.disabled) return false;
+  if (button.form !== null && (button.type === "submit" || button.type === "image")) return false;
   const invoker = button as InvokerButton;
   if (invoker.popoverTargetElement === popup) return true;
-  return invoker.commandForElement === popup && /-popover$/.test(invoker.command ?? "");
+  return !isInput && invoker.commandForElement === popup && /-popover$/.test(invoker.command ?? "");
 }
 
 /**

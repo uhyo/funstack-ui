@@ -59,3 +59,25 @@ combobox and menu-context-trigger files, 297 passed / 7 skipped. WebKit: branch 
 - Menu and Combobox: pressing your own `popovertarget` / `commandfor` button for an open menu or
   listbox no longer closes it as `"dismiss"` at the press (and re-opens it on Firefox); focus stays
   put, the button's click closes it as `"activate"`, and a Combobox keeps the typed text (#126).
+
+## Review fixes (memo/reviewer/issue-126-review.md)
+
+- F1: `isPopoverInvoker` follows HTML's invoker relationship: a disabled button and a submit
+  button (`<button>` submit, `<input type=submit|image>`) with a form owner are not invokers. Unit
+  negatives; Combobox jsdom row: a `<form><button popovertarget>` press is not prevented, focus
+  leaves, `(false, "dismiss")`, "Jamaicax" reverts to "".
+- F4: `<input>` of a button type (`button`, `reset`, and `submit` / `image` outside a form, which
+  HTML also counts) with `popovertarget` is covered (`closest("button, input")` + type check);
+  `commandfor` stays `<button>`-only (HTML has no `command` on `<input>`). Slightly wider than the
+  lead's "button|reset": submit / image without a form owner are invokers in HTML too.
+- F2 (PO: keep): browser row "a second press during the pending close keeps the menu shown"
+  (no `beforetoggle` closed, dispatches `[(false, activate), (true, activate)]`); fails on Chromium
+  and Firefox with the listener removed. One sentence added to menu.md decision 10.
+  **For the architect:** the design amendment's rule text still says "closest `<button>`" and does
+  not name the disabled / form-owner exclusions or `<input>` buttons; conventions 3.5 likewise.
+  Not edited by me beyond decision 10.
+- F3: Combobox jsdom row: unmount while shown removes the capture `mousedown` listener (spied
+  add / remove; the reviewer's suggested behavioural check cannot fail, since after the unmount
+  `popoverTargetElement` no longer resolves to the detached popup). Fails with the unmount effect
+  removed.
+- F5: docs wording "pressing it never moves focus out of the menu / input".

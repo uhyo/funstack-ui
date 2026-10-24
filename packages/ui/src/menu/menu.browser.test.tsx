@@ -1130,6 +1130,46 @@ describe("Trigger click while open (browser, #110)", () => {
     expect(action).toHaveBeenCalledTimes(calls + 1);
   });
 
+  // #126 review F2: the Trigger is a `popovertarget` invoker of the root popup, so the root
+  // Popup's foreign-invoker guard also covers it while the menu is shown, including the pending
+  // close, where `intended()` is false and the Trigger's own `onMouseDown` does not prevent.
+  it("a second press during the pending close keeps the menu shown (no hide and re-show)", async () => {
+    const { work, action } = setup();
+    await openWithKeyboard();
+    const calls = action.mock.calls.length;
+    await user.click(trigger());
+    await flushFor();
+    await expectPendingClose(action, calls + 1);
+    const hides: string[] = [];
+    popup().addEventListener("beforetoggle", (event) => {
+      if ((event as ToggleEvent).newState === "closed") hides.push("hide");
+    });
+    const { x, y } = (() => {
+      const box = trigger().getBoundingClientRect();
+      return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
+    })();
+    await act(async () => {
+      await mouse.down(x, y);
+    });
+    await flushFor();
+    expect(document.activeElement).toBe(item("rename"));
+    expect(isOpen()).toBe(true);
+    await act(async () => {
+      await mouse.up(x, y);
+    });
+    await flushFor();
+    expect(isOpen()).toBe(true);
+    expect(document.activeElement).toBe(item("rename"));
+    await act(async () => work.resolve());
+    await flushFor(100);
+    expect(isOpen()).toBe(true);
+    expect(hides).toEqual([]);
+    expect(action.mock.calls.slice(calls).map(([next, d]) => [next, d.reason])).toEqual([
+      [false, "activate"],
+      [true, "activate"],
+    ]);
+  });
+
   it("while closed the press is not prevented: it focuses the Trigger as a plain button", async () => {
     render(<Basic />);
     // Baseline: whether this engine focuses a clicked button (Chromium, Firefox and Playwright's
