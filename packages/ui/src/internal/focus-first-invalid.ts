@@ -3,6 +3,8 @@ import type { AriaNotifyTarget } from "./announce.js";
 import { sortByDocumentOrder } from "./dom-order.js";
 
 interface Batch {
+  /** The elements whose `invalid` event was collected (a group's members, not its target). */
+  readonly sources: Set<Element>;
   readonly targets: HTMLElement[];
   /** The message each target's Field shows, for the announcement when focus does not move. */
   readonly messages: Map<HTMLElement, string>;
@@ -31,9 +33,9 @@ export function announce(element: HTMLElement, message: string): void {
 let batch: Batch | null = null;
 
 /**
- * Adds a control whose `invalid` event a Field cancelled during a submission attempt, and
- * focuses the first collected control in document order in a microtask, so the result does not
- * depend on the browser's dispatch order or on how many forms are on the page.
+ * Adds a control whose `invalid` event (fired on `source`) a Field cancelled during a submission
+ * attempt, and focuses the first collected control in document order in a microtask, so the
+ * result does not depend on the browser's dispatch order or on how many forms are on the page.
  *
  * The batch lives until the end of the task (a `setTimeout`), not just one microtask: when the
  * browser dispatches the `invalid` events itself (a click on a submit button), it runs a
@@ -41,25 +43,34 @@ let batch: Batch | null = null;
  * second event fires. Every add therefore queues a focus of the batch's first target; later ones
  * re-focus the same element, which is a no-op.
  *
+ * A second `invalid` for the same `source` (the element the event fired on) starts a new batch:
+ * one validation fires it once per element, so it belongs to the next attempt, even when that
+ * attempt comes before the timer (two attempts in one task, or a test that does not yield to
+ * timers between them). Joining the old batch would compare focus with the old attempt's.
+ *
  * Skips the focus when focus moved during the attempt to an element that is not one of the
  * collected targets: a plain `<input required>` with no Field kept the platform's behaviour
  * (bubble and focus), and the library does not fight it.
  */
-export function collectInvalid(target: HTMLElement | null, message = ""): void {
+export function collectInvalid(target: HTMLElement | null, message: string, source: Element): void {
   if (target === null) return;
+  if (batch !== null && batch.sources.has(source)) batch = null;
   if (batch === null) {
-    batch = {
+    const created: Batch = {
+      sources: new Set(),
       targets: [],
       messages: new Map(),
       activeBefore: target.ownerDocument.activeElement,
       moved: false,
       announced: null,
     };
+    batch = created;
     setTimeout(() => {
-      batch = null;
+      if (batch === created) batch = null;
     }, 0);
   }
   const current = batch;
+  current.sources.add(source);
   if (!current.targets.includes(target)) current.targets.push(target);
   current.messages.set(target, message);
   queueMicrotask(() => focusFirst(current));
