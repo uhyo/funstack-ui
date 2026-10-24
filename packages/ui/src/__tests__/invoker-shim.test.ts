@@ -134,3 +134,22 @@ describe("invoker shim: popovertarget (#121)", () => {
     ]);
   });
 });
+
+describe("invoker shim: IDL (#126)", () => {
+  it("reflects popoverTargetElement, commandForElement and command", () => {
+    const { popover, button } = setup({
+      popovertarget: "target",
+      commandfor: "target",
+      command: "Hide-Popover",
+    });
+    expect(button.popoverTargetElement).toBe(popover);
+    expect(button.commandForElement).toBe(popover);
+    expect(button.command).toBe("hide-popover");
+    const plain = document.createElement("button");
+    plain.setAttribute("popovertarget", "missing");
+    document.body.append(plain);
+    expect(plain.popoverTargetElement).toBeNull();
+    expect(plain.commandForElement).toBeNull();
+    expect(plain.command).toBe("");
+  });
+});

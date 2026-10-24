@@ -2286,8 +2286,7 @@ describe("Combobox", () => {
       openAction.mockClear();
       const foreign = screen.getByTestId("elsewhere");
       foreign.setAttribute("popovertarget", popup().id);
-      // A press that moves focus out of the input closes the listbox at the focusout first
-      // (design 5.4); a click that moves none reaches the invoker's close.
+      // The click alone: the press keeps focus in the input (#126, the guard rows below).
       act(() => foreign.click());
       await flushTasks(2);
       expect(isOpen()).toBe(false);
@@ -2297,6 +2296,43 @@ describe("Combobox", () => {
       expect(details.reason).toBe("activate");
       expect(details.event!.type).toBe("beforetoggle");
       expect((details.event as ToggleEvent & { source?: unknown }).source).toBe(foreign);
+    });
+  });
+
+  describe("a press on a foreign invoker of the shown listbox (#126)", () => {
+    // The Popup's document capture `mousedown` guard: the input keeps focus, so its focusout never
+    // pre-empts the click's own toggle and the text is left alone (design 5.4, conventions 3.5).
+    it("a popovertarget or commandfor button: prevented while shown, the input keeps focus", async () => {
+      const user = setupUser();
+      render(<Harness />);
+      const foreign = screen.getByTestId("elsewhere");
+      foreign.setAttribute("popovertarget", popup().id);
+      // Closed: an ordinary press.
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+      await typeText(user, "j");
+      expect(isOpen()).toBe(true);
+      expect(fireEvent.mouseDown(foreign, { button: 2 })).toBe(true);
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+      foreign.removeAttribute("popovertarget");
+      foreign.setAttribute("commandfor", popup().id);
+      foreign.setAttribute("command", "hide-popover");
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+      expect(input()).toHaveFocus();
+      expect(input().value).toBe("j");
+      expect(isOpen()).toBe(true);
+      // Closed again (a dismissal: `hidePopover()` in jsdom): the guard is gone.
+      act(() => popup().hidePopover());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+    });
+
+    it("a plain button is an outside press", async () => {
+      const user = setupUser();
+      render(<Harness />);
+      await typeText(user, "j");
+      expect(isOpen()).toBe(true);
+      expect(fireEvent.mouseDown(screen.getByTestId("elsewhere"), { button: 0 })).toBe(true);
     });
   });
 

@@ -18,6 +18,10 @@
 // a hidden popover do nothing), there is **no `command` event**, and the same disabled and
 // submit-button exclusions apply. It runs through the popover shim's registered command, with the
 // button as the `source` of both the show and the hide (`ToggleEvent.source`, #125).
+//
+// `commandForElement` and `command` are reflected too, for the library's read of a foreign invoker
+// (#126): the element the id names in the button's tree, and the `command` attribute lowercased
+// (`""` without one). The popover shim reflects `popoverTargetElement`.
 
 /** One kind of command target (dialogs, popovers). */
 export interface CommandHandler {
@@ -52,6 +56,7 @@ export function installInvokerShim(): void {
   if (installed || typeof document === "undefined") return;
   if (typeof HTMLButtonElement !== "undefined" && "command" in HTMLButtonElement.prototype) return;
   installed = true;
+  installInvokerIdl();
   document.addEventListener("click", (event) => {
     if (event.defaultPrevented) return;
     const button = event.target instanceof Element ? event.target.closest("button") : null;
@@ -87,4 +92,29 @@ function runPopoverTarget(button: HTMLButtonElement): void {
   const command =
     action === "show" ? "show-popover" : action === "hide" ? "hide-popover" : "toggle-popover";
   handlers.find((h) => h.isValid(target, command))?.run(target, command, button);
+}
+
+/** `commandForElement`: the element `commandfor` names in the button's tree. */
+function commandForElement(button: HTMLButtonElement): Element | null {
+  const id = button.getAttribute("commandfor");
+  if (id === null) return null;
+  const root = button.getRootNode();
+  return root instanceof Document || root instanceof ShadowRoot ? root.getElementById(id) : null;
+}
+
+/** Reflects `commandForElement` and `command` on every button. */
+function installInvokerIdl(): void {
+  const proto = HTMLButtonElement.prototype;
+  Object.defineProperty(proto, "commandForElement", {
+    configurable: true,
+    get(this: HTMLButtonElement) {
+      return commandForElement(this);
+    },
+  });
+  Object.defineProperty(proto, "command", {
+    configurable: true,
+    get(this: HTMLButtonElement) {
+      return this.getAttribute("command")?.toLowerCase() ?? "";
+    },
+  });
 }

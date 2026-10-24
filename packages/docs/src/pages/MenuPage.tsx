@@ -215,7 +215,9 @@ export function MenuPage() {
                 parent menu closing). Runs in the Root's transition; may be a Server Function.{" "}
                 <code>details.reason</code>: <code>"activate"</code>, <code>"dismiss"</code> or{" "}
                 <code>"platform"</code> (found open on hydration; <code>event</code> is{" "}
-                <code>undefined</code>).
+                <code>undefined</code>). A <code>popovertarget</code> or <code>commandfor</code>{" "}
+                button of your own for the popup closes it as <code>"activate"</code> (a
+                notification) and never moves focus out of the menu.
               </>
             ),
           },

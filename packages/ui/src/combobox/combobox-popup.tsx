@@ -1,4 +1,5 @@
 "use client";
+import { useCallback, useEffect, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -8,6 +9,8 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
+import { listenInvokerPresses } from "../internal/invoker-press.js";
+import { isPopoverOpen } from "../internal/popover-open.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
@@ -66,8 +69,10 @@ const preventDefault = (event: { preventDefault(): void }) => event.preventDefau
  * The listbox's container: `<div popover="auto">`, opened by the library with
  * `showPopover({ source: input })` and placed below (or, flipped, above) the input with CSS
  * Anchor Positioning, at least as wide as the input. Focus never enters it: a press anywhere in
- * it is `preventDefault()`ed so the input keeps focus (design 7.1). Holds the `List` and, outside
- * it, `Empty` and `Status`. Style it with `:popover-open`; it emits `data-stale` but no
+ * it is `preventDefault()`ed so the input keeps focus (design 7.1), and so is a press on a button
+ * of the consumer's that names the popup (`popovertarget`, `commandfor`) while it is shown: its
+ * click closes the listbox as `"activate"` with the text untouched (#126). Holds the `List` and,
+ * outside it, `Empty` and `Status`. Style it with `:popover-open`; it emits `data-stale` but no
  * `data-open`.
  *
  * Owned keys (conventions 1.2): `id`, `popover`, `onPointerDown`, `onMouseDown`, `data-stale`.
@@ -86,12 +91,29 @@ export function ComboboxPopup({
   const ctx = useComboboxContext("Combobox.Popup");
   const { popover } = ctx;
 
+  // While shown, a press on a foreign invoker of the popup keeps focus in the input (design 5.4,
+  // #126).
+  const invokerPresses = useRef<(() => void) | null>(null);
+  const stopInvokerPresses = useCallback(() => {
+    invokerPresses.current?.();
+    invokerPresses.current = null;
+  }, []);
+  useEffect(() => stopInvokerPresses, [stopInvokerPresses]);
+
   const { setElement, renderContent } = usePopoverPopup(popover, {
     part: "Combobox.Popup",
     // Focus stays in the input: nothing inside the popup is ever focused.
     resolveInitialFocus: () => null,
     keepMounted,
     transition,
+    onToggle: (event) => {
+      const element = popover.popupRef.current;
+      if (event.newState === "open" && element !== null && isPopoverOpen(element)) {
+        invokerPresses.current ??= listenInvokerPresses(element);
+      } else if (event.newState === "closed") {
+        stopInvokerPresses();
+      }
+    },
   });
 
   const devRef = useElementCheck(

@@ -11,6 +11,7 @@ import type {
 } from "react";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
+import { listenInvokerPresses } from "../internal/invoker-press.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
@@ -130,7 +131,9 @@ const FOCUSABLE_SELECTOR =
  * placed against its Trigger with CSS Anchor Positioning. Owns the keyboard model (design 5):
  * ArrowUp / ArrowDown / Home / End move focus between items (or the browser does, with
  * `experimental_focusgroup` where supported), printable characters run typeahead, ArrowLeft
- * closes a submenu. The top-level popup closes the whole menu at once when focus leaves it (Tab).
+ * closes a submenu. The top-level popup closes the whole menu at once when focus leaves it (Tab);
+ * a press on a button of the consumer's that names it (`popovertarget`, `commandfor`) moves no
+ * focus, so that button's click closes the menu as `"activate"` (#126).
  * Style it with `:popover-open`; it emits `data-side` / `data-align` but no `data-open`. While
  * shown, those are where the browser placed it (conventions 13.2), otherwise the requested
  * values.
@@ -180,7 +183,8 @@ export function MenuPopup({
   const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
   const { onKeyDown, typingAhead } = useMenuKeyboard(menu, nativeFocusgroup);
 
-  // The outside right- / middle-click listeners of a top-level menu, while it is shown.
+  // The outside right- / middle-click listeners and the foreign invoker press guard (#126) of a
+  // top-level menu, while it is shown.
   const outside = useRef<(() => void) | null>(null);
   const stopOutside = useCallback(() => {
     outside.current?.();
@@ -207,7 +211,14 @@ export function MenuPopup({
       if (submenu) return;
       const element = popover.popupRef.current;
       if (event.newState === "open" && element !== null && isPopoverOpen(element)) {
-        outside.current ??= listenOutside(element, menu, () => latestPlacement.current);
+        if (outside.current === null) {
+          const stopListening = listenOutside(element, menu, () => latestPlacement.current);
+          const stopPresses = listenInvokerPresses(element);
+          outside.current = () => {
+            stopListening();
+            stopPresses();
+          };
+        }
       } else if (event.newState === "closed") {
         stopOutside();
       }

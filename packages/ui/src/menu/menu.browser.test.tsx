@@ -1022,9 +1022,9 @@ describe("foreign popovertarget invoker (browser, #125)", () => {
       <Basic
         root={{ openChangeAction: action }}
         after={
-          // A toolbar-style button that takes no focus on press: a press that moves focus out of
-          // the tree closes the menu at the focusout first (design 2.2).
-          <button type="button" data-testid="foreign" onMouseDown={(e) => e.preventDefault()}>
+          // A plain button: the root Popup keeps its press from moving focus out of the menu
+          // (#126; the press rows are in "a press on a foreign invoker while open").
+          <button type="button" data-testid="foreign">
             Foreign
           </button>
         }
@@ -1144,6 +1144,119 @@ describe("Trigger click while open (browser, #110)", () => {
     // Focused on mousedown, before the open, exactly as the plain button was.
     expect(focusedWhileClosed).toEqual(focusesButtons ? [true] : []);
     expect(item("rename")).toHaveFocus();
+  });
+});
+
+// #126: a consumer's own invoker of the root popup (`popovertarget`, or `commandfor` with a
+// popover command) pressed while the menu is open. The root Popup prevents the press's
+// `mousedown`, so focus stays in the menu, the focusout close never runs, and the click's native
+// toggle closes the menu as "activate"; the platform's hide returns focus to the Trigger (design
+// 2.2, conventions 3.5). Without the guard Chromium and Firefox (and Playwright's Linux WebKit,
+// which focuses a clicked button) hid the menu at the press as "dismiss", and the click's toggle
+// re-showed it on Firefox. One outcome on every engine.
+describe("a press on a foreign invoker while open (browser, #126)", () => {
+  afterEach(async () => {
+    await mouse.releaseHeld();
+  });
+
+  /**
+   * The foreign button is the next tab stop after the menu (the popover follows its Trigger), on
+   * the Trigger's line, clear of the menu below it.
+   */
+  function setup(attributes: Record<string, string>) {
+    const action = vi.fn<OpenAction>();
+    render(
+      <Basic
+        root={{ openChangeAction: action }}
+        after={
+          <button type="button" data-testid="foreign">
+            Foreign
+          </button>
+        }
+      />,
+    );
+    for (const [name, value] of Object.entries(attributes)) {
+      item("foreign").setAttribute(name, value.replace("{popup}", popup().id));
+    }
+    return action;
+  }
+
+  function centre(target: Element) {
+    const r = target.getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  }
+
+  /** Opens with the keyboard (the first item focused) and returns the dispatches so far. */
+  async function open(action: ReturnType<typeof setup>) {
+    await openWithKeyboard();
+    expect(item("rename")).toHaveFocus();
+    return action.mock.calls.length;
+  }
+
+  for (const [kind, attributes, eventType] of [
+    ["popovertarget", { popovertarget: "{popup}" }, "beforetoggle"],
+    [
+      "commandfor + toggle-popover",
+      { commandfor: "{popup}", command: "toggle-popover" },
+      "command",
+    ],
+  ] as const) {
+    it(`${kind}: focus stays in the menu, one (false, activate), focus returns to the Trigger`, async () => {
+      const action = setup(attributes);
+      const calls = await open(action);
+      const foreign = item("foreign");
+      const { x, y } = centre(foreign);
+      await act(async () => {
+        await mouse.down(x, y);
+      });
+      await flushFor();
+      expect(document.activeElement).toBe(item("rename"));
+      expect(isOpen()).toBe(true);
+      await act(async () => {
+        await mouse.up(x, y);
+      });
+      await settle(() => expect(isOpen()).toBe(false));
+      await settle(() => expect(action).toHaveBeenCalledTimes(calls + 1));
+      const [next, details] = action.mock.calls.at(-1)!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("activate");
+      expect(details.event!.type).toBe(eventType);
+      expect((details.event as Event & { source?: Element | null }).source).toBe(foreign);
+      if (eventType === "beforetoggle") expect(details.event).toBeInstanceOf(ToggleEvent);
+      expect(document.activeElement).toBe(trigger());
+      await flushFor(100);
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(calls + 1);
+    });
+  }
+
+  it("a dragged-off press: the menu stays open, the item focused, nothing dispatched", async () => {
+    const action = setup({ popovertarget: "{popup}" });
+    const calls = await open(action);
+    const foreign = item("foreign");
+    const { x, y } = centre(foreign);
+    // Further along the Trigger's line, clear of the menu below it.
+    const off = Math.round(foreign.getBoundingClientRect().right + 300);
+    await act(async () => {
+      await mouse.down(x, y);
+      await mouse.move(off, y);
+      await mouse.up(off, y);
+    });
+    await flushFor(100);
+    expect(isOpen()).toBe(true);
+    expect(document.activeElement).toBe(item("rename"));
+    expect(action).toHaveBeenCalledTimes(calls);
+  });
+
+  it("Tab from the last item onto the foreign invoker still closes the menu ('dismiss')", async () => {
+    const action = setup({ popovertarget: "{popup}" });
+    const calls = await open(action);
+    item("delete").focus();
+    await user.tab();
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(document.activeElement).toBe(item("foreign"));
+    expect(action).toHaveBeenCalledTimes(calls + 1);
+    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
 });
 

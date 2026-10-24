@@ -16,6 +16,7 @@ import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, use, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { onCleanup } from "../__tests__/cleanups.js";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
@@ -1764,8 +1765,7 @@ describe("Menu.Root", () => {
     expect(isOpen()).toBe(true);
     const foreign = screen.getByTestId("elsewhere");
     foreign.setAttribute("popovertarget", popup().id);
-    // A click that moves no focus (a press that moves it out of the tree closes the menu at the
-    // focusout first, design 2.2).
+    // The click alone: the press moves no focus out of the menu (#126, the guard rows below).
     act(() => foreign.click());
     await flushTasks(2);
     expect(isOpen()).toBe(false);
@@ -2298,6 +2298,63 @@ describe("submenus", () => {
     expect(fireEvent.mouseDown(trigger(), { button: 0 })).toBe(false);
     expect(item("rename")).toHaveFocus();
     expect(isOpen()).toBe(true);
+  });
+
+  describe("a press on a foreign invoker of the open menu (#126)", () => {
+    // The root Popup's document capture `mousedown` guard: the press moves no focus, so the
+    // focusout never pre-empts the click's own toggle (design 2.2, conventions 3.5).
+    function foreignInvoker(attributes: Record<string, string>) {
+      const foreign = screen.getByTestId("elsewhere");
+      for (const [name, value] of Object.entries(attributes)) foreign.setAttribute(name, value);
+      return foreign;
+    }
+
+    it("a popovertarget button: prevented while the menu is shown, focus stays on the item", async () => {
+      const user = setupUser();
+      render(<Harness />);
+      const foreign = foreignInvoker({ popovertarget: popup().id });
+      // Closed: an ordinary press.
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+      await openMenu(user);
+      expect(item("rename")).toHaveFocus();
+      expect(fireEvent.mouseDown(foreign, { button: 2 })).toBe(true);
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+      expect(item("rename")).toHaveFocus();
+      expect(isOpen()).toBe(true);
+      // Closed again (a dismissal: `hidePopover()` in jsdom): the guard is gone.
+      act(() => popup().hidePopover());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+    });
+
+    it("a commandfor button with a popover command is guarded, a custom command is not", async () => {
+      const user = setupUser();
+      render(<Harness />);
+      const foreign = foreignInvoker({ commandfor: popup().id, command: "hide-popover" });
+      await openMenu(user);
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+      foreign.setAttribute("command", "toggle-popover");
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+      foreign.setAttribute("command", "--my-cmd");
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+      expect(isOpen()).toBe(true);
+    });
+
+    it("a plain button or one naming another popover is an outside press", async () => {
+      const user = setupUser();
+      render(<Harness />);
+      const other = document.createElement("div");
+      other.id = "other-popover";
+      other.setAttribute("popover", "auto");
+      document.body.append(other);
+      onCleanup(() => other.remove());
+      const foreign = screen.getByTestId("elsewhere");
+      await openMenu(user);
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+      foreign.setAttribute("popovertarget", other.id);
+      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
+    });
   });
 
   describe("a Trigger click while open closes through the action (#110)", () => {
