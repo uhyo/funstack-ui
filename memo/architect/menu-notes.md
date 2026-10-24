@@ -125,3 +125,41 @@ Things I settled while writing, worth remembering:
   `flip-inline`. The other WebKit submenu rows still use `side={null}`; relax when convenient.
 - M2 nuance: in library mode the entangled re-open means `dialog.open` is false when `then`
   runs, so the guard is only load-bearing for JS-free / native re-opens. Still right to have.
+
+## #110: Trigger click while open with an async close (2026-10-24)
+
+Finding (wave 16 review L1): Chromium/Firefox focus a button on `mousedown`, so a click on the
+Trigger of an open menu moved focus out of the popup and the root Popup's `focusout` hid the menu
+at once; WebKit never focuses a button on click, so the click's `requestClose` ran and the menu
+stayed shown until `openChangeAction(false)` settled.
+
+Decision: WebKit's path is the intended one. It is Popover 2.3 (Popup visibility follows
+committed state in every overlay; optimistic feedback lives on the Trigger), it keeps the
+view-transition exit and the controlled veto, and it is the item-activation timing (2.3) applied
+to the Trigger. Fix: `Menu.Trigger` owns `onMouseDown` and prevents the default for the primary
+button while `intended()` is `true`. Not while closed: an opening click must focus the Trigger,
+which the popover records as the element to return focus to.
+
+Options weighed:
+- (a) Prevent `mousedown` while open (chosen). One line, no cross-part flag, every engine ends in
+  WebKit's state during the pending window (focus on the item, menu shown). Same rule the Popup
+  applies to non-item space (6.2) and Combobox's buttons apply always.
+- (b) Trigger sets a "pressing" flag the Popup's `focusout` consults. Keeps native focus on the
+  Trigger, but Chromium then holds focus outside the open menu during the pending close and after
+  a press that never clicks (dragged off), with no `focusout` left to catch a Tab: a new
+  engine-specific state instead of the old one.
+- (c) Hide at once on every engine. Makes the Trigger's close browser-shaped: CSS exit only, no
+  veto, contradicts Popover 2.3 and the "pending state exposed" argument that chose the
+  item-activation timing.
+- (d) Never close on `focusout` to the Trigger. Breaks Shift+Tab-closes (APG, browser row) and
+  leaks: Tab from the Trigger then leaves the menu open with focus elsewhere.
+
+Likely worse than the issue says: in a real browser the `toggle` task of the focusout hide runs
+before the `click` (the user holds the button longer than a task), so Chromium/Firefox reported
+`(false, "dismiss")` with the ToggleEvent and the click's `requestClose` was a no-op. jsdom
+dispatches mousedown/mouseup/click in one task, so the suite row saw `"activate"` and passed.
+No browser row covered the Trigger close; the new one asserts the reason and will confirm.
+
+Not touched: ContextTrigger region presses while a menu is open (a move, #45); Combobox's own
+`openAtPress` snapshot (its buttons are not the popover's `source`, so a press there is a light
+dismiss; Menu's Trigger is the `source`, so it is not).
