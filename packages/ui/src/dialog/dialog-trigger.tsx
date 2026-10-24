@@ -4,7 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
-import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 
@@ -106,14 +106,9 @@ export function DialogTrigger({
   // Library mode (both modal and non-modal) and non-modal JS-free mode need a click handler;
   // modal JS-free mode is the browser's command.
   const installClick = isLibrary || !modal;
-  // A link or component render whose click this part handles: native `disabled` would mean
-  // nothing on a link; the handler refuses and cancels, so `aria-disabled` is safe. The modal
-  // JS-free command needs native `disabled` to stop it.
-  const focusable = installClick && !isHostButton(render);
-  // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
-  // `disabled` the element would still be a live invoker before hydration (a component render
-  // spreading onto a real <button>), and the command would run.
-  const invoker = modal && !(focusable && disabled);
+  // The modal JS-free command needs native `disabled` to stop it.
+  const disabledProps = disabledButton(render, disabled, { handlesClick: installClick });
+  const invoker = modal && disabledProps.invoker;
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (isLibrary) {
       // Cancelling the click cancels the command (it runs as the button's activation
@@ -136,9 +131,8 @@ export function DialogTrigger({
     // `type` only applies to a <button>; on any other element the key is not owned.
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the
-    // browser would run its command). Owned as absent in the focusable branch.
-    disabled: focusable ? undefined : disabled,
-    ...(focusable && { "aria-disabled": disabled ? true : undefined }),
+    // browser would run its command).
+    ...disabledProps.props,
     commandfor: invoker ? ids.dialog : undefined,
     command: invoker ? "show-modal" : undefined,
     // Only owned when installed, so a render element keeps its own `onClick` in modal JS-free

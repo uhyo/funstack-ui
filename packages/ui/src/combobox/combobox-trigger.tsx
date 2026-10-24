@@ -10,7 +10,7 @@ import type {
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
-import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
 
@@ -82,10 +82,6 @@ export function ComboboxTrigger({
     BUTTON_NAME,
   );
 
-  // A link or component render: native `disabled` would mean nothing on a link; the click
-  // handler refuses, so `aria-disabled`.
-  const focusable = !isHostButton(render);
-
   const state: ComboboxTriggerState = {
     open: popover.optimistic,
     pending: popover.pending,
@@ -95,8 +91,7 @@ export function ComboboxTrigger({
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     tabIndex: -1,
-    disabled: focusable ? undefined : disabled,
-    ...(focusable && { "aria-disabled": disabled ? true : undefined }),
+    ...disabledButton(render, disabled).props,
     "aria-expanded": popover.optimistic,
     "aria-controls": ctx.ids.list,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {

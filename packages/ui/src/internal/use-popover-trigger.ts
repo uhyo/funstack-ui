@@ -5,7 +5,7 @@ import { dataAttr } from "./data-attr.js";
 import { isPopoverOpen } from "./popover-open.js";
 import type { RenderProp } from "./types.js";
 import { useElementCheck } from "./use-element-check.js";
-import { isHostButton, rendersButton } from "./use-render.js";
+import { disabledButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 
@@ -137,24 +137,21 @@ export function usePopoverTrigger<State>(
             onClick(event);
           };
   }
-  // A link or component render in library mode: the click handler (installed only there) cancels
-  // and refuses, so `aria-disabled` is safe and native `disabled` would mean nothing. In JS-free
-  // mode the command needs native `disabled` to stop it.
-  const ariaDisabled = disabledAs === "aria" || (isLibrary && !isHostButton(render));
-  // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
-  // `disabled` the element would still be a live invoker before hydration (a component render
-  // spreading onto a real <button>), and the command would run.
-  const noInvoker = ariaDisabled && disabled;
+  // The click handler is installed in library mode only; in JS-free mode the command needs
+  // native `disabled` to stop it.
+  const disabledProps = disabledButton(render, disabled, {
+    handlesClick: isLibrary,
+    focusable: disabledAs === "aria",
+  });
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     // `type` only applies to a <button>; on any other element the key is not owned.
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the browser
-    // would run its command). In the `aria-disabled` branch it is owned as absent.
-    disabled: ariaDisabled ? undefined : disabled,
-    ...(ariaDisabled && { "aria-disabled": disabled ? true : undefined }),
-    commandfor: noInvoker ? undefined : ids.popup,
-    command: noInvoker ? undefined : "toggle-popover",
+    // would run its command).
+    ...disabledProps.props,
+    commandfor: disabledProps.invoker ? ids.popup : undefined,
+    command: disabledProps.invoker ? "toggle-popover" : undefined,
     // Library mode: optimistic. JS-free mode: "false" in React; the Popup's `toggle` listener
     // writes the DOM value, and React never rewrites an unchanged prop.
     "aria-expanded": isLibrary ? state.open : false,

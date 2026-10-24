@@ -10,7 +10,7 @@ import type {
 import { dataAttr } from "../internal/data-attr.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import { useToggleGroupContext } from "./toggle-group-context.js";
 import type { ToggleGroupOrientation } from "./toggle-group-context.js";
 
@@ -79,9 +79,8 @@ export function ToggleGroupItem({
   const { register } = ctx;
   const registerRef = useCallback((el: HTMLElement) => register(el, value), [register, value]);
 
-  // Not a host <button> (a link, a component): `aria-disabled`, enforced by the click handler.
-  // The roving engine skips `:disabled` only, so such an Item is reached by the arrows.
-  const focusable = !isHostButton(render);
+  // A link or component Item is `aria-disabled` (`disabledButton`): the roving engine skips
+  // `:disabled` only, so such an Item is reached by the arrows.
 
   const state: ToggleGroupItemState = {
     pressed,
@@ -100,9 +99,7 @@ export function ToggleGroupItem({
     // Pass-through layer, as Toggle: a `render` element's own `type` wins.
     props: rendersButton(render) ? { ...rest, type: "button" } : rest,
     libraryProps: {
-      disabled: focusable ? undefined : disabled,
-      // Owned only in the focusable branch: a host button keeps a consumer's own.
-      ...(focusable && { "aria-disabled": disabled ? true : undefined }),
+      ...disabledButton(render, disabled).props,
       "aria-pressed": pressed,
       "data-pressed": dataAttr(pressed),
       "data-pending": dataAttr(pending),

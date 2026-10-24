@@ -12,7 +12,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
-import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
 export interface ToggleState {
   /** Optimistic pressed state: what the user sees, including an in-flight change. */
@@ -98,9 +98,6 @@ export function Toggle({
   });
 
   const state: ToggleState = { pressed: optimistic, pending, disabled };
-  // Not a host <button> (a link, a component): native `disabled` would mean nothing to a link and
-  // hide the state from AT, so `aria-disabled`; the click handler enforces it.
-  const focusable = !isHostButton(render);
 
   const element = useRender<ComponentPropsWithRef<"button">, ToggleState>({
     defaultElement: "button",
@@ -116,10 +113,7 @@ export function Toggle({
     libraryProps: {
       // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
       // `render` element cannot re-enable (`disabled={false}`) or disable the button on its own.
-      // `undefined` (not `false`) in the focusable branch, so a render element's own is removed.
-      disabled: focusable ? undefined : disabled,
-      // Owned only in the focusable branch: a host button keeps a consumer's own.
-      ...(focusable && { "aria-disabled": disabled ? true : undefined }),
+      ...disabledButton(render, disabled).props,
       "aria-pressed": optimistic,
       "data-pressed": dataAttr(optimistic),
       "data-pending": dataAttr(pending),

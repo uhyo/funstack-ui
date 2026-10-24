@@ -9,7 +9,7 @@ import type {
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
-import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
 
@@ -69,16 +69,12 @@ export function ComboboxClear({
     isDev && "Combobox.Clear: the button has no accessible name. Give it an `aria-label`.",
     BUTTON_NAME,
   );
-  // A link or component render: native `disabled` would mean nothing on a link; the click
-  // handler refuses, so `aria-disabled`.
-  const focusable = !isHostButton(render);
   const state: ComboboxClearState = { value: ctx.value, inputValue: ctx.inputValue, disabled };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     tabIndex: -1,
-    disabled: focusable ? undefined : disabled,
-    ...(focusable && { "aria-disabled": disabled ? true : undefined }),
+    ...disabledButton(render, disabled).props,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
     },

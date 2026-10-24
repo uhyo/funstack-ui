@@ -70,6 +70,53 @@ export function isHostButton<Props, State>(render: RenderProp<Props, State> | un
   return isValidElement(render) && render.type === "button";
 }
 
+export interface DisabledButton {
+  /**
+   * The `aria-disabled` branch: the element may not be a host `<button>` and the part's own click
+   * handler refuses (and cancels) while disabled, so the element stays focusable.
+   */
+  readonly focusable: boolean;
+  /**
+   * Owned keys, spread where `disabled` goes: `disabled` (owned as absent in the focusable
+   * branch, so a render element's own is removed), and in that branch only `aria-disabled` (a
+   * host button keeps a consumer's own).
+   */
+  readonly props: {
+    readonly disabled: boolean | undefined;
+    readonly "aria-disabled"?: true | undefined;
+  };
+  /**
+   * Whether an invoker part may render `commandfor` / `command`: not when disabled in the
+   * focusable branch, where nothing native stops the command (a component render spreading onto
+   * a real `<button>` would be a live invoker before hydration).
+   */
+  readonly invoker: boolean;
+}
+
+/**
+ * The disabled rule of a button-like part that accepts an arbitrary `render`
+ * (conventions 1.2, design/components/button.md 17): native `disabled` on a host `<button>`, or
+ * where the browser handles the click (`handlesClick: false`: a JS-free command, which only
+ * native `disabled` stops); `aria-disabled` otherwise. `focusable: true` always takes the
+ * `aria-disabled` branch (a menu item stays focusable).
+ */
+export function disabledButton<Props, State>(
+  render: RenderProp<Props, State> | undefined,
+  disabled: boolean,
+  options: { readonly handlesClick?: boolean; readonly focusable?: boolean } = {},
+): DisabledButton {
+  const { handlesClick = true, focusable: always = false } = options;
+  const focusable = always || (handlesClick && !isHostButton(render));
+  return {
+    focusable,
+    props: {
+      disabled: focusable ? undefined : disabled,
+      ...(focusable && { "aria-disabled": disabled ? true : undefined }),
+    },
+    invoker: !(focusable && disabled),
+  };
+}
+
 /**
  * The ref of a part with no library ref, merged from the consumer's `ref` and a `render`
  * element's ref without memoisation (a directive-free part cannot `useMemo`, design
