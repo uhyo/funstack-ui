@@ -514,8 +514,9 @@ component render only: another element is no invoker, #115; `popoverTargetAction
 and never written: the default `toggle`, which a `render` element cannot change; #121 review F7), `disabled`, `aria-expanded`, `data-open`, `data-pending`,
 `data-disabled`, and `onClick` only when installed (library mode; in JS-free mode the Trigger
 installs no handler and a `render` element's own `onClick` passes through). `commandfor` and
-`command` are omitted from the type as reserved keys (a second activation behaviour on the
-Trigger's button would conflict with its `popovertarget`; #121). `aria-haspopup` is not rendered
+`command` are omitted from the type as reserved keys and owned as `undefined` at runtime, so a
+`render` element's own values are stripped too (a second activation behaviour on the Trigger's
+button would conflict with its `popovertarget`, and Invoker Commands win over it; #121 review F1). `aria-haspopup` is not rendered
 and passes through (a consumer may set `"dialog"`; Menu's trigger sets `"menu"`). `aria-expanded`
 is owned in both modes and **rendered only when no `popoverTarget` is** (a non-button `render`):
 there it is the shown state (the Root's `shown` mirror of the popup's `toggle`, #118) in library
