@@ -275,3 +275,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 ## WAVE 15 (#99 docs polish) — IN PROGRESS
 - User refined concept rule: several components on a concept page are fine; naming components that don't help understand the concept is bad. Updated technical-writer.md rule 1, commented on #99.
 - Writer implementing #99 on wave15-docs (worktree ../funstack-ui-wave15-docs): M4 State/Owned lines + shared rows, multi-part tables, Action props example convention, concept-page sweep under refined rule. Then reviewer → merge → docs deploy (docs-only: workflow_dispatch deploy-docs, no release needed).
+- #99 merged (..bc02380), closed. Reviews memo/reviewer/wave15-docs-review.md (0592334). PO allowed writer a one-off comment-only edit in packages/ui. Docs deploy via workflow_dispatch after master CI. WAVE 15 DONE.
