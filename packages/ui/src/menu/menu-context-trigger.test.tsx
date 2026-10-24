@@ -398,7 +398,7 @@ describe("Menu.ContextTrigger", () => {
       expect(calls[0]!.autofocus).toBe(item("rename"));
     });
 
-    it("a pointerdown a descendant stops still counts (capture phase, review L2)", async () => {
+    it("a pointerdown a descendant stops still counts (capture phase)", async () => {
       const quiet = watchQuietFocus();
       render(
         <Harness
@@ -794,7 +794,7 @@ describe("Menu.ContextTrigger", () => {
       expect(isOpen()).toBe(false);
     });
 
-    describe("the click swallow is scoped to the release (review H1)", () => {
+    describe("the click swallow is scoped to the release", () => {
       function withAction() {
         const activate = vi.fn();
         render(
@@ -893,7 +893,7 @@ describe("Menu.ContextTrigger", () => {
       });
     });
 
-    it("a long-press on an item of another menu inside the region does not open the region's menu (review M1)", async () => {
+    it("a long-press on an item of another menu inside the region does not open the region's menu", async () => {
       const user = setupUser();
       const outerAction = vi.fn<OpenAction>();
       render(
@@ -1663,7 +1663,7 @@ describe("Menu.ContextTrigger", () => {
       expect(open.mock.calls.at(-1)![1].reason).toBe("dismiss");
     });
 
-    it("the 500 ms count from the show, not the press: a pending openChangeAction (review M2)", async () => {
+    it("the 500 ms count from the show, not the press: a pending openChangeAction", async () => {
       let settle: () => void = () => {};
       // Only the open is slow.
       const open = vi.fn<OpenAction>().mockImplementationOnce(
@@ -1790,7 +1790,7 @@ describe("Menu.ContextTrigger", () => {
         expect(isOpen()).toBe(true);
       });
 
-      it("another finger's lift does not end the guard; the gesture finger's does (review L4)", async () => {
+      it("another finger's lift does not end the guard; the gesture finger's does", async () => {
         render(<Harness content={<DragItems />} />);
         await longPress();
         // A second finger taps and lifts while the first is still down: its touchend is
@@ -1960,7 +1960,7 @@ describe("Menu.ContextTrigger", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("a scroll in flight at the open is ignored until a frame passes without one (review L6)", async () => {
+    it("a scroll in flight at the open is ignored until a frame passes without one", async () => {
       render(<Harness />);
       await rightClick(region());
       // A smooth scroll or momentum: one scroll event per frame.
@@ -2013,7 +2013,7 @@ describe("Menu.ContextTrigger", () => {
       },
     );
 
-    it("a zoom (Ctrl+wheel, trackpad pinch) is never prevented (review L3)", async () => {
+    it("a zoom (Ctrl+wheel, trackpad pinch) is never prevented", async () => {
       render(<Harness />);
       await rightClick(region());
       expect(wheel(item("archive"), 10, { ctrlKey: true }).defaultPrevented).toBe(false);
@@ -2201,7 +2201,7 @@ describe("Menu.ContextTrigger", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("a refused point open leaves no point placement; a later open with no dispatch is anchored (review L1)", async () => {
+    it("a refused point open leaves no point placement; a later open with no dispatch is anchored", async () => {
       const seen: MenuPopupState[] = [];
       function Refusing() {
         const [open, setOpen] = useState(false);

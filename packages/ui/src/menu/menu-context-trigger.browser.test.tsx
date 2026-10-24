@@ -1009,7 +1009,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     await expect.poll(() => isOpen()).toBe(false);
   });
 
-  it("review L4: a held-button move released off the menu stays open before 500 ms and closes after", async () => {
+  it("a held-button move released off the menu stays open before 500 ms and closes after", async () => {
     const action = vi.fn<OpenAction>();
     const time = watchGestureTime();
     render(<Harness root={{ openChangeAction: action }} />);

@@ -610,3 +610,11 @@ Their platform rows are already shared by `describeCheckableInput`, and they go 
 `useNativeChecked`, not the group hook; moving them would only re-home rows. Late-hydration rows
 stay per component (different warnings and structures).
 Not merged: waiting for review.
+
+### Review ids out of the menu-context-trigger titles (commit 3l)
+
+On the coordinator's request, titles only: "(review L2/H1/M1/M2/L4/L6/L3/L1)" suffixes and the
+"review L4: " prefix (browser file) removed; "(capture phase, review L2)" -> "(capture phase)".
+Mapping is suffix/prefix removal only (8 titles in menu-context-trigger.test.tsx, 12 jsdom tests
+since the H1 describe holds 5 rows; 1 in the browser file). Counts unchanged (3172 jsdom; the
+browser file 78 passed + 2 skipped on Chromium/Firefox).
