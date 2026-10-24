@@ -175,8 +175,9 @@ export function PopoverPage() {
                 Server Function; rejections reach the nearest Error Boundary above the Root.{" "}
                 <code>details.reason</code>: <code>"activate"</code> (Trigger, Close, a foreign
                 invoker), <code>"dismiss"</code> (Escape, a click outside, script, another popover
-                or modal dialog) or <code>"platform"</code> (found open on hydration;{" "}
-                <code>event</code> is <code>undefined</code>). Selects library mode.
+                or modal dialog, lost interest on an <code>interestfor</code> button) or{" "}
+                <code>"platform"</code> (found open on hydration; <code>event</code> is{" "}
+                <code>undefined</code>). Selects library mode.
               </>
             ),
           },
@@ -666,6 +667,20 @@ html:active-view-transition .popover { transition: none; }
             <code>beforetoggle</code> <code>ToggleEvent</code>, whose <code>source</code> is the
             button. Escape, a click outside and a script <code>hidePopover()</code> stay{" "}
             <code>"dismiss"</code>.
+          </li>
+          <li>
+            <strong>Hover card (Chromium):</strong> a <code>&lt;button interestfor&gt;</code> naming
+            the Popup (your own button, or the Trigger with <code>interestfor</code> added) opens it
+            on interest (hover or keyboard focus) through the library, and in library mode the Popup
+            hides again on lost interest: <code>openChangeAction(false)</code> is a{" "}
+            <code>"dismiss"</code> notification whose <code>details.event</code> is the{" "}
+            <code>loseinterest</code> event (its <code>source</code> is the button). Lost interest
+            while the open is still pending cancels it, so the card never appears under a pointer
+            that has left. A Trigger-click open stays open on lost interest, as in the platform. As
+            with the platform's own lost-interest hide, focus is not returned to the Trigger.
+            Firefox and Safari ignore <code>interestfor</code>, so give the button a click path
+            (make it the Trigger) when the card must open everywhere. For a name or description (
+            <code>role="tooltip"</code> content), use <a href="/components/tooltip">Tooltip</a>.
           </li>
         </ul>
       </BehaviourSection>

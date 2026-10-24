@@ -21,6 +21,11 @@ import { startTransition, use, useRef, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  dispatchInterest,
+  dispatchLoseInterest,
+  gainInterest,
+} from "../__tests__/interest-shim.js";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
@@ -810,6 +815,194 @@ describe("Popover", () => {
       expect(next).toBe(false);
       expect(details.reason).toBe("dismiss");
       expect(details.event!.type).toBe("toggle");
+    });
+  });
+
+  renderBoth("interestfor (#127)", (mode) => {
+    // Chromium's interest show and lost interest, emulated (`__tests__/interest-shim.ts`).
+    const foreignButton = () => {
+      const foreign = screen.getByTestId("elsewhere");
+      foreign.setAttribute("interestfor", popup().id);
+      return foreign;
+    };
+    const interestOpen = async (foreign: HTMLElement) => {
+      await act(async () => gainInterest(popup(), foreign));
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+    };
+
+    it("lost interest after an interest open hides the popup: one 'dismiss' with the loseinterest event", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      await interestOpen(foreign);
+      expect(screen.getByTestId("close")).toHaveFocus();
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls[0]![1].reason).toBe("activate");
+      expect(popoverSource(popup())).toBe(trigger());
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      // The hide waits one task (a hide inside `loseinterest` re-enters Chromium's hide).
+      expect(isOpen()).toBe(true);
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      // The open's focusing steps moved focus inside; no Trigger fallback after this hide (the
+      // platform never focuses the invoker; a Trigger with `interestfor` would re-open).
+      expect(trigger()).not.toHaveFocus();
+      expect(action).toHaveBeenCalledTimes(2);
+      const [next, details] = action.mock.calls[1]!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("dismiss");
+      expect(details.event!.type).toBe("loseinterest");
+      expect((details.event as Event & { source?: unknown }).source).toBe(foreign);
+      expect(committedText()).toBe("false");
+    });
+
+    it("lost interest during a pending interest open cancels it: the popup never shows", async () => {
+      const opening = deferred();
+      const closing = deferred();
+      const action = vi.fn<ActionFn>();
+      action.mockImplementationOnce(() => opening.promise);
+      action.mockImplementationOnce(() => closing.promise);
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      const shows: string[] = [];
+      popup().addEventListener("toggle", (event) => shows.push((event as ToggleEvent).newState));
+      await act(async () => gainInterest(popup(), foreign));
+      expect(isOpen()).toBe(false);
+      expectPending(trigger());
+      await act(async () => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      expect(action).toHaveBeenCalledTimes(2);
+      const [next, details] = action.mock.calls[1]!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("dismiss");
+      expect(details.event!.type).toBe("loseinterest");
+      expectPending(trigger());
+      // In order, so a controlled parent adopting each resolution ends with `false` too.
+      await act(async () => opening.resolve());
+      await flushTasks(3);
+      expectPending(trigger());
+      expect(isOpen()).toBe(false);
+      await act(async () => closing.resolve());
+      await flushTasks(3);
+      expectNotPending(trigger());
+      expect(isOpen()).toBe(false);
+      expect(shows).toEqual([]);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(committedText()).toBe("false");
+    });
+
+    it("lost interest after a Trigger-click open does nothing", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      await openThroughTrigger(user);
+      const foreign = foreignButton();
+      // The popup is shown: the interest show is a no-op, as in Chromium.
+      await act(async () => gainInterest(popup(), foreign));
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it("lost interest with nothing pending or shown does nothing", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      act(() => {
+        dispatchInterest(popup(), foreign);
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it("loseinterest fired from inside another hide (Escape) notifies that hide once", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      await interestOpen(foreign);
+      // Chromium's Escape while the button has interest: `loseinterest` from inside the hide,
+      // before the state flips.
+      await act(async () => {
+        dispatchLoseInterest(popup(), foreign);
+        popup().hidePopover();
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![0]).toBe(false);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
+    });
+
+    it("lost interest after the library's own close began does not hide again", async () => {
+      const user = setupUser();
+      const closing = deferred();
+      const action = vi.fn<ActionFn>((next) => (next ? undefined : closing.promise));
+      render(<Harness mode={mode} action={action} />);
+      const foreign = foreignButton();
+      await interestOpen(foreign);
+      // The Trigger's close is pending (the popup stays shown until it settles).
+      await user.click(trigger());
+      expect(isOpen()).toBe(true);
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(true);
+      await act(async () => closing.resolve());
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("activate");
+    });
+  });
+
+  describe("interestfor without a Trigger (#127)", () => {
+    it("a controlled Trigger-less Popup hides on lost interest and cancels a pending open", async () => {
+      const opening = deferred();
+      const closing = deferred();
+      let slow = false;
+      const action = vi.fn<ActionFn>((next) =>
+        slow ? (next ? opening.promise : closing.promise) : undefined,
+      );
+      render(<Harness mode="controlled" action={action} trigger={false} />);
+      const foreign = screen.getByTestId("elsewhere");
+      foreign.setAttribute("interestfor", popup().id);
+      await act(async () => gainInterest(popup(), foreign));
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(popoverSource(popup())).toBe(null);
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(action.mock.calls[1]![1].event!.type).toBe("loseinterest");
+
+      slow = true;
+      await act(async () => gainInterest(popup(), foreign));
+      await act(async () => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await act(async () => opening.resolve());
+      await act(async () => closing.resolve());
+      await flushTasks(3);
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(4);
+      expect(action.mock.calls[3]![0]).toBe(false);
+      expect(action.mock.calls[3]![1].reason).toBe("dismiss");
+      expect(committedText()).toBe("false");
     });
   });
 

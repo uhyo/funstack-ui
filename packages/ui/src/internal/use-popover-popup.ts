@@ -141,9 +141,10 @@ function insideHiddenPopover(element: Element): boolean {
 
 /**
  * Everything in a popover-like Popup except rendering (design/components/popover.md 14.2): mount
- * reconciliation, the apply effect, the native `beforetoggle` / `toggle` / `command` listeners,
- * close intents, the focus-return fallback, the JS-free `data-open` sync, the deferred
- * unmount while a hide animates, and `initialFocus`. Shared by Popover and Menu.
+ * reconciliation, the apply effect, the native `beforetoggle` / `toggle` / `command` listeners
+ * (and `interest` / `loseinterest`, #127), close intents, the focus-return fallback, the JS-free
+ * `data-open` sync, the deferred unmount while a hide animates, and `initialFocus`. Shared by
+ * Popover and Menu.
  */
 export function usePopoverPopup(
   ctx: PopoverRootValue,
@@ -165,6 +166,13 @@ export function usePopoverPopup(
   // Whether focus was inside the popup when its last close began (design 6.2 rule 1).
   const focusWasInside = useRef(false);
   const initialFocusTarget = useInitialFocusTarget(part, "popup");
+  // `interestfor` (library mode, amendment #127): the button that has interest in the popup
+  // (`InterestEvent.source`), whether the current open was that button's interest open, the
+  // task that hides the popup on its lost interest, and whether the hide in flight is that one.
+  const interestInvoker = useRef<Element | null>(null);
+  const interestOpen = useRef(false);
+  const interestHideTask = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const interestHide = useRef(false);
 
   // `held`: children stay mounted while the hide animates (design 4.4).
   const exit = useCloseHold(ctx.committed, isLibrary, transition);
@@ -302,6 +310,10 @@ export function usePopoverPopup(
       // a foreign `show-popover` / `toggle-popover` invoker, a script `showPopover()`.
       if (isLibrary && !opening.current) {
         event.preventDefault();
+        // Chromium dispatches `interest` and then the interest show in one step, so a show whose
+        // `source` is the remembered interest invoker is that button's interest open (#127).
+        const source = (toggle as ToggleEvent & { readonly source?: Element | null }).source;
+        interestOpen.current = source != null && source === interestInvoker.current;
         ctx.requestOpen(event, "activate");
       } else if (!reshowing.current) {
         // A Close action that resolves after this open must not close it (design 3.4). A re-show
@@ -331,17 +343,22 @@ export function usePopoverPopup(
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
     awaitingClose.current = false;
+    const lostInterest = interestHide.current;
+    interestHide.current = false;
     // JS-free mode writes the Trigger's `data-open` (#121); library mode mirrors into the Root,
     // which non-button Triggers and the Combobox Input render as `aria-expanded` (#118).
     if (isLibrary) setShown(isPopoverOpen(element));
     else syncOpen(element);
 
     if (!isPopoverOpen(element)) {
+      interestOpen.current = false;
       // Focus return for what the platform leaves out (design 6.2): a nested popover restores
-      // nothing, and an opener that is gone leaves focus inside the hidden popup.
+      // nothing, and an opener that is gone leaves focus inside the hidden popup. Not after a
+      // lost-interest hide: the platform never focuses the invoker there, and focusing a Trigger
+      // with `interestfor` would give it interest again and re-open the popup (#127).
       const wasInside = focusWasInside.current;
       focusWasInside.current = false;
-      if (wasInside) returnFocus(element);
+      if (wasInside && !lostInterest) returnFocus(element);
 
       const intent = ctx.takeCloseIntent();
       if (isLibrary) {
@@ -367,10 +384,54 @@ export function usePopoverPopup(
     }
   };
 
+  /** The `source` of an `interest` / `loseinterest` event (`InterestEvent`, not in the DOM lib). */
+  const interestSource = (event: Event): Element | null =>
+    (event as Event & { readonly source?: Element | null }).source ?? null;
+
+  const onInterest = (event: Event): void => {
+    const element = popupRef.current;
+    if (!isLibrary || element === null || event.target !== element) return;
+    interestInvoker.current = interestSource(event);
+  };
+
+  /**
+   * Lost interest of an `interestfor` button naming the popup (Chromium; amendment #127). The
+   * platform hides only a popover its own interest show opened (`invokedVia == kInterest`), and
+   * the library cancels that show and re-shows with `showPopover({ source })`, so the platform
+   * never hides: the library does, as a dismissal. Chromium also fires `loseinterest` from
+   * inside every hide of the popup while the button has interest (Escape, script, the library's
+   * own close), before the state flips, and a `hidePopover()` called from there re-enters the
+   * hide and loses its `toggle`: the hide waits one task and runs only if the popup is still
+   * shown and still meant to be open, and returns no focus to the Trigger. A pending interest
+   * open is cancelled instead.
+   */
+  const onLoseInterest = (event: Event): void => {
+    const element = popupRef.current;
+    if (!isLibrary || element === null || event.target !== element) return;
+    const source = interestSource(event);
+    if (source === null || source !== interestInvoker.current) return;
+    interestInvoker.current = null;
+    if (!interestOpen.current) return;
+    if (isPopoverOpen(element)) {
+      clearTimeout(interestHideTask.current);
+      interestHideTask.current = setTimeout(() => {
+        interestHideTask.current = undefined;
+        if (!isPopoverOpen(element) || !ctx.intended()) return;
+        // Recorded right before the hide, so its one-task clear cannot run first.
+        ctx.recordCloseIntent({ reason: "dismiss", event });
+        interestHide.current = true;
+        element.hidePopover();
+      }, 0);
+    } else if (ctx.intended()) {
+      interestOpen.current = false;
+      ctx.requestClose(event, "dismiss");
+    }
+  };
+
   // The listeners the callback ref attaches call the latest render's handlers. An insertion
   // effect publishes them before refs attach and before any layout effect (whose
   // `hidePopover()` dispatches `beforetoggle` synchronously).
-  const handlers = useLatest({ onBeforeToggle, onToggle, onCommand });
+  const handlers = useLatest({ onBeforeToggle, onToggle, onCommand, onInterest, onLoseInterest });
 
   // --- Element ------------------------------------------------------------------------------
 
@@ -394,6 +455,9 @@ export function usePopoverPopup(
         ["beforetoggle", (event) => handlers.current.onBeforeToggle(event)],
         ["toggle", (event) => handlers.current.onToggle(event)],
         ["command", (event) => handlers.current.onCommand(event)],
+        // Fired only where `interestfor` exists (Chromium).
+        ["interest", (event) => handlers.current.onInterest(event)],
+        ["loseinterest", (event) => handlers.current.onLoseInterest(event)],
       ];
       for (const [type, listener] of listeners) element.addEventListener(type, listener);
       // A pre-hydration open is shown from the first commit; a popup removed while open fires no
@@ -411,6 +475,11 @@ export function usePopoverPopup(
 
       return () => {
         for (const [type, listener] of listeners) element.removeEventListener(type, listener);
+        clearTimeout(interestHideTask.current);
+        interestHideTask.current = undefined;
+        interestHide.current = false;
+        interestInvoker.current = null;
+        interestOpen.current = false;
         if (isLibrary) setShown(false);
         autofocused?.removeAttribute("autofocus");
         if (popupRef.current === element) popupRef.current = null;

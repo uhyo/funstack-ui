@@ -88,12 +88,15 @@ function Library({
   popup: popupProps,
   children,
   before,
+  after,
 }: {
   action?: ActionFn;
   popup?: Partial<PopoverPopupProps>;
   children?: ReactNode;
   /** Rendered before the Root (an outside button). */
   before?: ReactNode;
+  /** Rendered after the Root. */
+  after?: ReactNode;
 }) {
   return (
     <div style={{ padding: "40px 160px" }}>
@@ -116,6 +119,7 @@ function Library({
           )}
         </Popover.Popup>
       </Popover.Root>
+      {after}
     </div>
   );
 }
@@ -492,23 +496,10 @@ describe("library mode (browser)", () => {
       await user.hover(foreign);
       await settle(() => expect(isOpen()).toBe(true));
       expect(action.mock.calls[0]![1].reason).toBe("activate");
-      // Chromium 156 hides a plain popover on lost interest with the button as `source`, but not
-      // one the library re-showed (its invoker is the Trigger): any close is a dismissal.
+      // Chromium 156 hides a plain popover on lost interest with the button as `source`; the
+      // library hides the one it re-showed itself (#127): either way a dismissal.
       await user.hover(screen.getByTestId("outside"));
-      await sleep(300);
-      if (isOpen()) {
-        // The lost-interest close's shape, then the hide.
-        await act(async () => {
-          const lost = new ToggleEvent("beforetoggle", {
-            oldState: "open",
-            newState: "closed",
-            source: foreign,
-          } as ToggleEventInit);
-          popup().dispatchEvent(lost);
-          popup().hidePopover();
-        });
-      }
-      await settle(() => expect(isOpen()).toBe(false));
+      await settle(() => expect(isOpen()).toBe(false), 500);
       expect(action).toHaveBeenCalledTimes(2);
       expect(action.mock.calls[1]![1].reason).toBe("dismiss");
     },
@@ -1384,4 +1375,186 @@ describe("a real press on a Close with action (browser, #117)", () => {
     expect(isOpen()).toBe(false);
     expect(action).toHaveBeenCalledTimes(calls + 1);
   });
+});
+
+describe("interestfor naming a library Popover (browser, #127)", () => {
+  /** Renders `Library` with a foreign button before the Root; `interestfor` on `on`. */
+  function setUp(action: ActionFn, on: "foreign" | "trigger" = "foreign") {
+    render(
+      <Library
+        action={action}
+        before={
+          <button type="button" data-testid="foreign" style={{ display: "block" }}>
+            Foreign
+          </button>
+        }
+      />,
+    );
+    const button = screen.getByTestId(on === "foreign" ? "foreign" : "trigger");
+    button.setAttribute("interestfor", popup().id);
+    button.style.setProperty("interest-delay", "0s");
+    return button;
+  }
+
+  it.runIf(supportsInterestFor)(
+    "hover opens through the library, anchored to the Trigger; hover-out hides it ('dismiss', the loseinterest event)",
+    async () => {
+      const action = vi.fn<ActionFn>();
+      const foreign = setUp(action);
+      await user.hover(foreign);
+      await settle(() => expect(isOpen()).toBe(true));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls[0]![1].reason).toBe("activate");
+      // Shown with the Trigger as `source`: placed below it, not below the foreign button.
+      const t = trigger().getBoundingClientRect();
+      const p = popup().getBoundingClientRect();
+      expect(p.top).toBeGreaterThanOrEqual(t.bottom - 1);
+      // The dialog focusing steps focused the input (nothing was focused before the hover).
+      expect(screen.getByRole("textbox")).toHaveFocus();
+      await user.hover(screen.getByTestId("outside"));
+      await settle(() => expect(isOpen()).toBe(false), 500);
+      // As the platform's lost-interest hide: no focus return to the Trigger.
+      expect(document.activeElement).toBe(document.body);
+      expect(action).toHaveBeenCalledTimes(2);
+      const [next, details] = action.mock.calls[1]!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("dismiss");
+      expect(details.event!.type).toBe("loseinterest");
+      expect((details.event as Event & { source?: unknown }).source).toBe(foreign);
+      await quietPeriod(100, "no re-open and no second dispatch");
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.runIf(supportsInterestFor)(
+    "Tab to the button opens; Tab away hides, focus on the next element",
+    async () => {
+      const action = vi.fn<ActionFn>();
+      // Nothing focusable inside: the dialog focusing steps would move focus into the popup.
+      render(
+        <Library
+          action={action}
+          before={
+            <button type="button" data-testid="foreign" style={{ display: "block" }}>
+              Foreign
+            </button>
+          }
+          after={
+            <button type="button" data-testid="next">
+              Next
+            </button>
+          }
+        >
+          <p>Preview</p>
+        </Library>,
+      );
+      const foreign = screen.getByTestId("foreign");
+      foreign.setAttribute("interestfor", popup().id);
+      foreign.style.setProperty("interest-delay", "0s");
+      screen.getByTestId("outside").focus();
+      await user.tab();
+      await settle(() => expect(isOpen()).toBe(true));
+      // The dialog focusing steps moved focus into the popup (6.1); interest stays.
+      expect(popup()).toHaveFocus();
+      // Tab leaves the popup for the element after it.
+      await user.tab();
+      await settle(() => expect(isOpen()).toBe(false), 500);
+      expect(screen.getByTestId("next")).toHaveFocus();
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(action.mock.calls[1]![1].event!.type).toBe("loseinterest");
+    },
+  );
+
+  it.runIf(supportsInterestFor)(
+    "lost interest during a 600 ms open action cancels it: the popup never shows",
+    async () => {
+      const action = vi.fn<ActionFn>((next) => (next ? sleep(600) : undefined));
+      const foreign = setUp(action);
+      const states: string[] = [];
+      popup().addEventListener("toggle", (event) => states.push((event as ToggleEvent).newState));
+      await user.hover(foreign);
+      await flushFor(300);
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(false);
+      await user.hover(screen.getByTestId("outside"));
+      await settle(() => expect(action).toHaveBeenCalledTimes(2), 500);
+      expect(action.mock.calls[1]![0]).toBe(false);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(action.mock.calls[1]![1].event!.type).toBe("loseinterest");
+      await settle(() => expect(trigger()).not.toHaveAttribute("data-pending"), 1500);
+      await quietPeriod(100, "the superseded open must not show the popup");
+      expect(isOpen()).toBe(false);
+      expect(states).toEqual([]);
+    },
+  );
+
+  it.runIf(supportsInterestFor)(
+    "Escape while hovered notifies once; a later hover-out does nothing",
+    async () => {
+      const action = vi.fn<ActionFn>();
+      const foreign = setUp(action);
+      const toggles: string[] = [];
+      popup().addEventListener("toggle", (event) => toggles.push((event as ToggleEvent).newState));
+      await user.hover(foreign);
+      await settle(() => expect(isOpen()).toBe(true));
+      await user.keyboard("{Escape}");
+      await settle(() => expect(isOpen()).toBe(false));
+      // The hide's `toggle` arrives (a hide re-entered from `loseinterest` loses it).
+      await settle(() => expect(toggles).toEqual(["open", "closed"]));
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
+      await user.hover(screen.getByTestId("outside"));
+      await quietPeriod(200, "no second close notification and no re-open");
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.runIf(supportsInterestFor)(
+    "the Trigger with interestfor: hover opens, hover-out hides, a click while open is 'activate'",
+    async () => {
+      const action = vi.fn<ActionFn>();
+      setUp(action, "trigger");
+      await user.hover(trigger());
+      await settle(() => expect(isOpen()).toBe(true));
+      expect(screen.getByRole("textbox")).toHaveFocus();
+      await user.hover(screen.getByTestId("outside"));
+      await settle(() => expect(isOpen()).toBe(false), 500);
+      // Focus is not returned to the Trigger, whose focus would grant it interest and re-open.
+      expect(document.activeElement).toBe(document.body);
+      await quietPeriod(100, "no re-open after the lost-interest hide");
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(action.mock.calls[1]![1].event!.type).toBe("loseinterest");
+      await user.hover(trigger());
+      await settle(() => expect(isOpen()).toBe(true));
+      expect(action).toHaveBeenCalledTimes(3);
+      await user.click(trigger());
+      await settle(() => expect(isOpen()).toBe(false));
+      expect(action).toHaveBeenCalledTimes(4);
+      expect(action.mock.calls[3]![0]).toBe(false);
+      expect(action.mock.calls[3]![1].reason).toBe("activate");
+      await quietPeriod(200, "no re-open while the pointer stays on the Trigger");
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(4);
+    },
+  );
+
+  it.runIf(!supportsInterestFor)(
+    "without Interest Invokers (Firefox, WebKit) the attribute is inert: hover and Tab open nothing",
+    async () => {
+      const action = vi.fn<ActionFn>();
+      const foreign = setUp(action);
+      await user.hover(foreign);
+      screen.getByTestId("outside").focus();
+      await user.tab();
+      await quietPeriod(200, "nothing may open the popup");
+      expect(isOpen()).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+    },
+  );
 });
