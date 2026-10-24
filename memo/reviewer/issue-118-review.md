@@ -136,3 +136,68 @@ else is low severity.
   are consistent with the 3.2 bounded rule.
 - **Docs pages:** the Popover, Menu and Combobox pages are accurate (apart from L2 and L3).
   ContextMenuPage:383 ("button shows aria-expanded=true while context-open") is still true.
+
+## Addendum: re-review of 5fcf35c (L1-L4) and 210e4e7 (M1, the `shown` mirror), 2026-10-24
+
+The branch is rebased on 1c1945e. I re-probed on Chromium and Firefox in a private worktree
+(removed afterwards).
+
+**Verdict: acceptable. M1 and L1-L5 are closed. No new findings above nit.**
+
+### M1: closed
+- Same Escape and click-outside probe as before, with a 300 ms close action, under StrictMode,
+  sampled 60 ms after the dismissal:
+  - **Combobox.Input:** DOM `"false"` with the listbox hidden while `data-pending` is set, on
+    Chromium and Firefox. Chromium's accessibility tree also says collapsed.
+  - **Non-button Trigger** (`render={<span role="button">}`): the same results on both engines.
+- **Open lag** (from `:popover-open` to `aria-expanded="true"`, i.e. the `toggle` task): 1.4-4.3
+  ms on Chromium and 4-9 ms on Firefox. This is the one remaining difference from the popup
+  state, and the revision table documents it.
+- **Mutation:** dropping `setShown(false)` from the ref detach fails exactly the "Popup unmounted
+  while open" row. The `toggle` write and the attach write are covered by the suite and
+  platform-path rows.
+
+### Hydration
+- In jsdom, under StrictMode, I hydrated server HTML with `defaultOpen` for Popover, Menu and
+  Combobox. There were no `console.error` or `console.warn` calls and no mismatch. After the
+  `toggle`, the Trigger (and the Input) end at `"true"`.
+- The server HTML now says `"false"`, which matches the client's first render (`useState(false)`).
+- My pre-hydration-open probe reported a mismatch. It comes only from the jsdom popover shim's
+  `data-popover-shim-open` attribute, which my probe added by calling `showPopover()` on the
+  server markup. It is an artefact of the probe, not of the library. The real platform-path row
+  (`popover.test.tsx`, "expanded from the first commit...") uses the suite's own `hydrate` and
+  passes.
+
+### Extra renders and loop risk
+- Under StrictMode, counting renders of a Root context consumer:
+  - mount: 3 (StrictMode doubles them);
+  - open: 6, i.e. 3 commits doubled (optimistic+pending, the open commit, the `toggle` mirror);
+  - close: 6;
+  - idle after the open and after the close: 0 extra renders over 5 task flushes.
+- There is no loop. Every write is `setShown(isPopoverOpen(el))` with a boolean, so the same
+  value bails out.
+- The double attach/detach in StrictMode writes false, false, then the real value.
+- The memoised Root value keeps the Popup from re-rendering unless `shown` flips.
+
+### Test robustness
+- The #118 browser rows (Popover and Combobox) passed 3/3 on Chromium and Firefox.
+- The jsdom Popover, Menu, Combobox and Dialog files passed 3/3 (837 tests).
+- **L1 pins** (suite rows at 455 and 639): they assert after `flushTasks(2)`, the shim's queued
+  `toggle`, so they are deterministic.
+- **Render-count row** (`popover.test.tsx`, "the mirror costs one render per show and per
+  hide"): exact `[committed, pending, shown]` sequences, deterministic in jsdom. Two caveats,
+  neither a defect:
+  - It is not run under StrictMode. My probe covers that case.
+  - It encodes React's current batching: the `toggle` render is separate from the commit
+    render. A React upgrade could legitimately change that.
+
+### Docs
+- **Popover, Menu, Combobox and PendingOptimistic pages:** accurate. L3 is fixed ("Chromium and
+  Safari report it ... the library mirrors the popup's toggle").
+- **`defaultOpen` prop text:** updated to `"false"` until the popup is shown.
+- **Demo CSS:** `[data-open], [aria-expanded="true"]:not([data-pending])` gives the instant flip
+  for both a pending open and a pending close, and still covers JS-free mode. L2 is fixed.
+- **Nit, design only, no action needed:** the revision table's "pre-hydration open" row describes
+  the state from mount onwards. Before hydration, the server HTML's `"false"` sits over a natively
+  shown popup: Firefox and non-invokers say collapsed, while Chromium and WebKit compute
+  expanded. This was unavoidable without JS and is unchanged.
