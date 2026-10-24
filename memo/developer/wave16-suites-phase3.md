@@ -642,3 +642,5 @@ browser file 78 passed + 2 skipped on Chromium/Firefox).
 - N2: view-transition-mount.tsx unmounts and restores the spy in a `finally`.
 jsdom 3172 -> 3177 (+4 L3, +1 N1). Gate, a shuffled jsdom run and the browser files of Button,
 Toolbar, ToggleGroup, CheckboxGroup, Checkbox, Switch (Chromium, Firefox) pass.
+Branch CI run 40080096068: success (ci, browser chromium / firefox / webkit). master
+fast-forwarded to b5088b7; wave16/suites deleted locally and on origin.
