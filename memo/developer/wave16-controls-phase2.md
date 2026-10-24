@@ -1,7 +1,6 @@
 # Wave 16 source refactor, phase 2: controls (#105, tracker #100)
 
-Branch `wave16/controls` (C2, C6, C11, C13, C3 follow-up, C5, C9). C1 is on its own branch
-`wave16/controls-c1` (one commit on top) because it is not behaviour-identical (see C1 below).
+Branch `wave16/controls` (C2, C6, C11, C13, C3 follow-up, C5, C9, the cross-channel fix).
 Audit: `memo/reviewer/refactor-audit-controls.md`. Rebased onto master after #101 landed.
 
 ## Done (one commit per finding; C9 as several)
@@ -30,20 +29,29 @@ Audit: `memo/reviewer/refactor-audit-controls.md`. Rebased onto master after #10
   `useNumberFieldDevWarnings`, `readVisible`; `fieldDataAttributes` -> field-context.ts;
   `useServerErrorVisibility`, `useFieldListeners`. Hooks sit where their code was.
 
-## C1 (branch wave16/controls-c1)
+## C1: dropped (PO decision); the cross-channel fix instead
 
-`internal/use-step-commit.ts`. Everything matches except hook order: a single hook must call
-`useActionTrigger` and `useControllableAction` in one order; NumberField had trigger first, Slider
-commit first. Each hook throws its superseded rejection before its own `useTransition`, but after
-the other channel's when that one comes first; React's errored-render retry then suspends on the
-earlier channel's pending action. With trigger first (chosen): Slider's step-superseded errors now
-surface at once (they waited for a pending commit before), commit-superseded errors wait for a
-pending step (they were prompt). NumberField unchanged. Exact fix for both: one
-`useSupersededRejection` shared by both channels, thrown before both transitions (needs the two
-hooks to accept an external capture). Left to the coordinator.
+C1 (`useStepCommit`) moved a latent defect instead of fixing it: a superseded rejection thrown
+after the other channel's `useTransition` waited for that channel's pending action (React's
+errored-render retry suspends there). Slider: step rejection while commits pend (case A);
+NumberField: commit rejection while a step pends (case B). Branch `wave16/controls-c1` deleted.
 
-`live` is stored wrapped (`{ value }`) for both; Slider's `shown` keeps the same array identity.
-NumberField's step now clears the draft after `setPendingSource` instead of before (same batch).
+Fix (`fix(ui)` commit): `useControllableAction` / `useActionTrigger` take an optional
+`captureSuperseded`; both Roots call one `useSupersededRejection()` before both hooks. The hooks
+still call their own (never set when external), so no conditional hook call. Tests "superseded
+rejection across channels" in slider.test.tsx and number-field.test.tsx (both cases each); before
+the fix Slider's step case and NumberField's commit case failed (boundary not called).
+
+## Review follow-ups (memo/reviewer/wave16-controls-review.md)
+
+- Tests for the gaps: CheckboxGroup late Item / Parent attribute sync (a hydrated Item click
+  with the action settled before the gate opens: with a pending action jsdom never hydrated the
+  boundary), two unnamed groups' distinct names (both groups), direct superseded rows in
+  use-controllable-action.test.tsx and use-action-trigger.test.tsx (burst, unmount guard,
+  external capture). Each checked by breaking the helper once.
+- use-field-listeners inlined back; `effectiveDisabled`; `own`; NumberField's Label count inline;
+  dev-warning options with one doc line.
+- C12 follow-up (NumberField step buttons -> `disabledButton`): waits for wave16/overlays.
 
 ## Not done / deferred
 
@@ -55,7 +63,7 @@ NumberField's step now clears the draft after `setPendingSource` instead of befo
   developer's C12 / overlay files.
 - C13 controlled-value identity (Accordion / ToggleGroup JSON key vs CheckboxGroup identity):
   design decision, recorded only.
-- Line count: packages/ui/src non-test 26943 -> 27290 (controls) / 27373 (with C1). The dedupes
+- Line count (non-test packages/ui/src): 26943 on master -> 27274. The dedupes
   remove the duplicated bodies, but the C9 splits and typed option interfaces add more lines than
   they remove.
 - WebKit cannot launch locally (missing host libraries); Chromium + Firefox ran, CI covers WebKit.
