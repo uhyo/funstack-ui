@@ -618,6 +618,79 @@ describe("CheckboxGroup", () => {
   });
 
   describe("value model", () => {
+    describe("controlled value compared by content (#108)", () => {
+      /** Renders the Root under a parent that re-renders on "tick" and sets `next` on "change". */
+      function setup(next: string[]) {
+        const rootStates: CheckboxGroupRootState[] = [];
+        let itemRenders = 0;
+        // Created once: the Items re-render only when the context they read changes.
+        const children = (
+          <>
+            <CheckboxGroup.Item
+              value="a"
+              aria-label="a"
+              className={() => {
+                itemRenders++;
+                return undefined;
+              }}
+            />
+            <CheckboxGroup.Item value="b" aria-label="b" />
+          </>
+        );
+        function Parent() {
+          const [, setTick] = useState(0);
+          const [value, setValue] = useState<string[] | null>(null);
+          return (
+            <>
+              <button type="button" onClick={() => setTick((t) => t + 1)}>
+                tick
+              </button>
+              <button type="button" onClick={() => setValue(next)}>
+                change
+              </button>
+              <CheckboxGroup.Root
+                aria-label="T"
+                // A fresh inline array on every render.
+                value={value ?? ["a"]}
+                className={(state) => {
+                  rootStates.push(state);
+                  return undefined;
+                }}
+              >
+                {children}
+              </CheckboxGroup.Root>
+            </>
+          );
+        }
+        render(<Parent />);
+        return { rootStates, itemRenders: () => itemRenders };
+      }
+
+      it("an inline array with the same contents keeps the state and does not re-render Items", async () => {
+        const { rootStates, itemRenders } = setup(["a"]);
+        const user = setupUser();
+        const states = rootStates.length;
+        const renders = itemRenders();
+        await user.click(screen.getByRole("button", { name: "tick" }));
+        await user.click(screen.getByRole("button", { name: "change" }));
+        expect(rootStates.length).toBe(states + 2);
+        expect(rootStates.at(-1)).toBe(rootStates[states - 1]);
+        expect(itemRenders()).toBe(renders);
+        expect(checkedValues()).toEqual(["a"]);
+      });
+
+      it("an array with different contents updates the state and the Items", async () => {
+        const { rootStates, itemRenders } = setup(["b", "a"]);
+        const user = setupUser();
+        const renders = itemRenders();
+        await user.click(screen.getByRole("button", { name: "change" }));
+        expect(rootStates.at(-1)?.value).toEqual(["a", "b"]);
+        expect(itemRenders()).toBeGreaterThan(renders);
+        expect(checkedValues()).toEqual(["a", "b"]);
+        expect(dataChecked()).toEqual(["a", "b"]);
+      });
+    });
+
     it("ignores duplicates in value and defaultValue", async () => {
       const action = vi.fn<ActionFn>();
       const first = render(
@@ -1469,12 +1542,15 @@ describe("CheckboxGroup", () => {
       action,
       initial = ["a"],
       lateParent = false,
+      lateDisabled = false,
     }: {
       gate: Promise<void>;
       mode: ControlMode;
       action: ActionFn;
       initial?: string[];
       lateParent?: boolean;
+      /** Also a late Item with its own `disabled`: its registration changes the context. */
+      lateDisabled?: boolean;
     }) {
       const [value, setValue] = useState<string[]>(initial);
       return (
@@ -1492,6 +1568,7 @@ describe("CheckboxGroup", () => {
               {lateParent && <CheckboxGroup.Parent values={["a", "b", "c"]} aria-label="all" />}
               <CheckboxGroup.Item value="b" aria-label="b" />
               <CheckboxGroup.Item value="c" aria-label="c" />
+              {lateDisabled && <CheckboxGroup.Item value="d" aria-label="d" disabled />}
             </Gate>
           </Suspense>
         </CheckboxGroup.Root>
@@ -1533,6 +1610,21 @@ describe("CheckboxGroup", () => {
         expect(dataChecked()).toEqual(["a", "b", "c"]);
         // No partial-hydration warning (design 8.3): nothing logged at all.
         expect(consoleError).not.toHaveBeenCalled();
+      });
+
+      it("pre-hydration clicks survive the re-render a late disabled Item's registration causes", async () => {
+        // The registration changes `disabledItems`, so every Item re-renders and React re-applies
+        // its `checked` before the reconciliation's microtask: the mount snapshot keeps the clicks.
+        const action = vi.fn<ActionFn>();
+        const { container, g } = await hydrateLate({ mode, action, lateDisabled: true });
+        container.querySelector<HTMLInputElement>('input[value="b"]')!.checked = true;
+        container.querySelector<HTMLInputElement>('input[value="c"]')!.checked = true;
+        await act(async () => {
+          g.open();
+        });
+        await flushMicrotasks();
+        expect(calls(action)).toEqual([[["a", "b", "c"], "platform", ["b", "c"], []]]);
+        expect(checkedValues()).toEqual(["a", "b", "c"]);
       });
 
       it("a late Parent clicked before hydration reports through the late path", async () => {

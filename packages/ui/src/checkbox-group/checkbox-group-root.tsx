@@ -17,6 +17,7 @@ import { useFieldsetGroup } from "../internal/use-fieldset-group.js";
 import { useItemOrder } from "../internal/use-item-order.js";
 import type { ItemLayout } from "../internal/use-item-order.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import { applyPatch, EMPTY_SET, setsEqual, sortByOrder, toSet } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
@@ -211,10 +212,16 @@ export function CheckboxGroupRoot({
   }, []);
   const disabledItems = useMemo(() => disabledOf(items), [items]);
 
-  const controlledSet = useMemo(() => (value === undefined ? undefined : toSet(value)), [value]);
+  // Keyed on the contents, so an inline `value={["a"]}` does not re-base every render.
+  const controlledKey = value === undefined ? undefined : JSON.stringify(value);
+  const controlledSet = useMemo(
+    () => (controlledKey === undefined ? undefined : toSet(JSON.parse(controlledKey) as string[])),
+    [controlledKey],
+  );
+  const defaultKey = defaultValue === undefined ? undefined : JSON.stringify(defaultValue);
   const defaultSet = useMemo(
-    () => (defaultValue === undefined ? undefined : toSet(defaultValue)),
-    [defaultValue],
+    () => (defaultKey === undefined ? undefined : toSet(JSON.parse(defaultKey) as string[])),
+    [defaultKey],
   );
 
   /** Sorts by the Items' current document order. Reads the DOM: handlers and effects only. */
@@ -371,37 +378,69 @@ export function CheckboxGroupRoot({
   // `aria-describedby`, read when focus enters the group.
   const { "aria-invalid": fieldInvalid, ...groupAttributes } = field.attributes;
 
-  const state: CheckboxGroupRootState = { value: renderedValue, pending, disabled };
+  // `renderedValue` is a fresh array on every render: keyed on its contents.
+  const renderedKey = JSON.stringify(renderedValue);
+  const state = useMemo<CheckboxGroupRootState>(
+    () => ({ value: JSON.parse(renderedKey) as string[], pending, disabled }),
+    [renderedKey, pending, disabled],
+  );
 
-  const context: CheckboxGroupContextValue = {
-    name,
-    form,
-    fieldInvalid,
-    required: itemsRequired,
-    disabledItems,
-    registerItem,
-    optimistic,
-    committed,
-    state,
-    defaultValue: value === undefined ? (defaultSet ?? EMPTY_SET) : undefined,
-    onItemMounted,
-    reportParent: (values, checked) => {
-      parentReports.current.push({ values, checked });
-    },
-    sortByDocument,
-    toggle: (item, checked, event) => {
-      // No-op rule against the optimistic set (conventions 2.3 item 8).
-      if (optimistic.has(item) === checked) return;
-      const patch = checked ? { added: [item], removed: [] } : { added: [], removed: [item] };
-      dispatchPatch(optimistic, patch, "activate", event);
-    },
-    apply: (patch, event) => {
-      const added = patch.added.filter((v) => !optimistic.has(v));
-      const removed = patch.removed.filter((v) => optimistic.has(v));
-      if (added.length === 0 && removed.length === 0) return;
-      dispatchPatch(optimistic, { added, removed }, "activate", event);
-    },
-  };
+  // The context's callbacks are stable (handlers and member effects only: they read the last
+  // committed render), so the context changes only with the values below.
+  const latest = useLatest({ optimistic, onItemMounted, sortByDocument, dispatchPatch });
+  const callbacks = useMemo(
+    () => ({
+      onItemMounted: (el: HTMLInputElement | null) => latest.current.onItemMounted(el),
+      reportParent: (values: readonly string[], checked: boolean) => {
+        parentReports.current.push({ values, checked });
+      },
+      sortByDocument: (values: Iterable<string>) => latest.current.sortByDocument(values),
+      toggle: (item: string, checked: boolean, event: Event) => {
+        const { optimistic, dispatchPatch } = latest.current;
+        // No-op rule against the optimistic set (conventions 2.3 item 8).
+        if (optimistic.has(item) === checked) return;
+        const patch = checked ? { added: [item], removed: [] } : { added: [], removed: [item] };
+        dispatchPatch(optimistic, patch, "activate", event);
+      },
+      apply: (patch: CheckboxGroupPatch, event: Event) => {
+        const { optimistic, dispatchPatch } = latest.current;
+        const added = patch.added.filter((v) => !optimistic.has(v));
+        const removed = patch.removed.filter((v) => optimistic.has(v));
+        if (added.length === 0 && removed.length === 0) return;
+        dispatchPatch(optimistic, { added, removed }, "activate", event);
+      },
+    }),
+    [latest],
+  );
+  const contextDefault = value === undefined ? (defaultSet ?? EMPTY_SET) : undefined;
+  const context = useMemo<CheckboxGroupContextValue>(
+    () => ({
+      name,
+      form,
+      fieldInvalid,
+      required: itemsRequired,
+      disabledItems,
+      registerItem,
+      optimistic,
+      committed,
+      state,
+      defaultValue: contextDefault,
+      ...callbacks,
+    }),
+    [
+      name,
+      form,
+      fieldInvalid,
+      itemsRequired,
+      disabledItems,
+      registerItem,
+      optimistic,
+      committed,
+      state,
+      contextDefault,
+      callbacks,
+    ],
+  );
 
   const element = useRender<ComponentPropsWithRef<"fieldset">, CheckboxGroupRootState>({
     defaultElement: "fieldset",
