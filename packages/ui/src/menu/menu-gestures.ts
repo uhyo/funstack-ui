@@ -186,3 +186,47 @@ export function guardTouch(doc: Document, pointerId: number): () => void {
   doc.addEventListener("pointercancel", onPointerCancel, true);
   return end;
 }
+
+/**
+ * One-shot swallow of the `click` an engine may synthesise when the long-press ends (2.2),
+ * scoped to that release: the click comes in the same task as the `pointerup` of
+ * `pointerId`, so the swallow ends one task after that `pointerup` (or `pointercancel`), and at
+ * once on any `keydown`, the next `pointerdown`, or the menu closing. iOS synthesises no click
+ * after a long-press; a swallow left armed would eat the next keyboard activation
+ * (`element.click()`). `slot` holds the disarm of the armed swallow (one per region).
+ */
+export function armClickSwallow(
+  slot: { current: (() => void) | null },
+  doc: Document,
+  pointerId: number,
+  releasing = false,
+): void {
+  slot.current?.();
+  let released: ReturnType<typeof setTimeout> | undefined;
+  const onClick = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    disarm();
+  };
+  const onRelease = (event: Event) => {
+    if ((event as globalThis.PointerEvent).pointerId !== pointerId) return;
+    if (released === undefined) released = setTimeout(disarm, 0);
+  };
+  const disarm = () => {
+    if (released !== undefined) clearTimeout(released);
+    doc.removeEventListener("click", onClick, true);
+    doc.removeEventListener("pointerdown", disarm, true);
+    doc.removeEventListener("keydown", disarm, true);
+    doc.removeEventListener("pointerup", onRelease, true);
+    doc.removeEventListener("pointercancel", onRelease, true);
+    if (slot.current === disarm) slot.current = null;
+  };
+  doc.addEventListener("click", onClick, true);
+  doc.addEventListener("pointerdown", disarm, true);
+  doc.addEventListener("keydown", disarm, true);
+  doc.addEventListener("pointerup", onRelease, true);
+  doc.addEventListener("pointercancel", onRelease, true);
+  slot.current = disarm;
+  // Armed from inside the release itself (a drag activation): the click comes in this task.
+  if (releasing) released = setTimeout(disarm, 0);
+}

@@ -20,7 +20,14 @@ import {
   useMenuContext,
 } from "./menu-context.js";
 import { capturePointer, isEditableTarget } from "./menu-dom.js";
-import { DRAG_SLOP, guardTouch, isTouchLike, LONG_PRESS_SLOP, startDrag } from "./menu-gestures.js";
+import {
+  armClickSwallow,
+  DRAG_SLOP,
+  guardTouch,
+  isTouchLike,
+  LONG_PRESS_SLOP,
+  startDrag,
+} from "./menu-gestures.js";
 import type { MenuTriggerState } from "./menu-trigger.js";
 
 export type MenuContextTriggerState = MenuTriggerState;
@@ -174,45 +181,6 @@ export function MenuContextTrigger({
   };
 
   /**
-   * One-shot swallow of the `click` an engine may synthesise when the long-press ends (2.2),
-   * scoped to that release: the click comes in the same task as the `pointerup` of
-   * `pointerId`, so the swallow ends one task after that `pointerup` (or `pointercancel`), and at
-   * once on any `keydown`, the next `pointerdown`, or the menu closing. iOS synthesises no click
-   * after a long-press; a swallow left armed would eat the next keyboard activation
-   * (`element.click()`).
-   */
-  const armClickSwallow = (doc: Document, pointerId: number, releasing = false) => {
-    disarmSwallow.current?.();
-    let released: ReturnType<typeof setTimeout> | undefined;
-    const onClick = (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      disarm();
-    };
-    const onRelease = (event: Event) => {
-      if ((event as globalThis.PointerEvent).pointerId !== pointerId) return;
-      if (released === undefined) released = setTimeout(disarm, 0);
-    };
-    const disarm = () => {
-      if (released !== undefined) clearTimeout(released);
-      doc.removeEventListener("click", onClick, true);
-      doc.removeEventListener("pointerdown", disarm, true);
-      doc.removeEventListener("keydown", disarm, true);
-      doc.removeEventListener("pointerup", onRelease, true);
-      doc.removeEventListener("pointercancel", onRelease, true);
-      if (disarmSwallow.current === disarm) disarmSwallow.current = null;
-    };
-    doc.addEventListener("click", onClick, true);
-    doc.addEventListener("pointerdown", disarm, true);
-    doc.addEventListener("keydown", disarm, true);
-    doc.addEventListener("pointerup", onRelease, true);
-    doc.addEventListener("pointercancel", onRelease, true);
-    disarmSwallow.current = disarm;
-    // Armed from inside the release itself (a drag activation): the click comes in this task.
-    if (releasing) released = setTimeout(disarm, 0);
-  };
-
-  /**
    * Starts the press-drag-release gesture of 2.6 on the pointer the popup captured at this open
    * or move (a new one replaces the running one), with the touch guard for a finger.
    */
@@ -233,7 +201,7 @@ export function MenuContextTrigger({
       activate: (item) => {
         disarmSwallow.current?.();
         item.click();
-        armClickSwallow(doc, pointerId, true);
+        armClickSwallow(disarmSwallow, doc, pointerId, true);
       },
     });
     const unguard = pointerType === "touch" ? guardTouch(doc, pointerId) : null;
@@ -328,7 +296,7 @@ export function MenuContextTrigger({
         if (capturePointer(popup, pointerId)) {
           beginDrag(popup, pointerId, point, pointerType, LONG_PRESS_SLOP);
         }
-        armClickSwallow(source.ownerDocument, pointerId);
+        armClickSwallow(disarmSwallow, source.ownerDocument, pointerId);
         menu.openAt(point, { source, event: native, pointer: true, pointerId, offset: true });
       },
       Math.max(0, longPressDelay),
