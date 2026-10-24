@@ -54,3 +54,21 @@ table (foreign opens are "activate"). But a real press on a plain foreign button
 
 Branch run 40107078736 (workflow_dispatch on `feat/125-toggle-source`): ci, browser chromium,
 firefox and webkit all green (WebKit covers ToggleEvent.source from Safari 26.5).
+
+## Review fixes (memo/reviewer/issue-125-review.md)
+
+- F1: record only when `source` is a button/input whose `popoverTargetElement` is the popup
+  (`closedByPopoverTarget`). jsdom shim reflects `popoverTargetElement`. Measured on Chromium 156:
+  a library Popover opened by a foreign `interestfor` button (or a Trigger with `interestfor`, or
+  Trigger-less) is NOT hidden on lost interest (hover-out, focus) — the library re-shows it with
+  the Trigger as source; a plain popover is hidden with `source` = the button. So the Chromium
+  row hovers out and, if still open, dispatches the lost-interest shape (a real ToggleEvent with
+  `source`) before `hidePopover()`; the jsdom row uses the same shape plus a popovertarget naming
+  another popover.
+- F2: `onCommand` records for hide-popover / toggle-popover only while shown; Dialog's JS-free
+  close/request-close record only while `open` (row via the context's `takeCloseIntent`). Shims:
+  command validity ignores state (HTML), run steps check it.
+- F3 (describe order), F4 (doc comment).
+- Mutations: F1 check -> jsdom row x2 + Chromium row; F2 popover guard -> jsdom x2 + browser x2;
+  Dialog guard -> dialog row; `unlessRecorded` -> commandfor rows (they now carry popovertarget
+  too) in jsdom and browser.
