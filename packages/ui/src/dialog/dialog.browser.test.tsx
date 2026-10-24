@@ -348,7 +348,6 @@ describe("library mode (browser)", () => {
     expect(action.mock.calls[1]![1].returnValue).toBe("save");
   });
 
-  // review M2 (memo/reviewer/dialog.md).
   it("non-modal: Escape inside a popover closes the popover only", async () => {
     render(
       <Dialog.Root defaultOpen={false} modal={false}>
@@ -445,7 +444,6 @@ describe("light dismiss (browser)", () => {
     expect(popup().open).toBe(false);
   });
 
-  // review M1 (memo/reviewer/dialog.md).
   it("lightDismiss (JS baseline): a drag from inside that ends on the backdrop does not close", async () => {
     const action = vi.fn<ActionFn>();
     render(
@@ -470,7 +468,6 @@ describe("light dismiss (browser)", () => {
   });
 });
 
-// review H1 (memo/reviewer/dialog.md).
 describe("nested confirm (browser)", () => {
   /** Design 12.5 as reworked: no action awaits user input. */
   function Editor({ discard }: { discard: () => Promise<void> }) {

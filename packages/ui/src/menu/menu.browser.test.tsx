@@ -250,7 +250,7 @@ describe("keyboard end to end (browser)", () => {
   });
 });
 
-describe("non-item space (browser, review M1)", () => {
+describe("non-item space (browser)", () => {
   it("a click on a Separator, a GroupLabel or the padding keeps focus on the item; arrows work", async () => {
     render(
       <Basic>

@@ -80,7 +80,7 @@ describeOverlayOpenState<DialogOpenChangeDetails>({
   partClose: (user) => user.click(screen.getByTestId("close")),
   partCloseCancelsClick: true,
   partCloseArgs: ["x"],
-  returnValue: true,
+  partCloseReturnsFocus: true,
   detailsKeys: ["reason", "returnValue"],
   triggerToggles: false,
   ariaExpanded: false,
@@ -293,7 +293,6 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
     });
 
-    // review M2 (memo/reviewer/dialog.md).
     it("non-modal: Escape is left to an open popover inside the dialog", async () => {
       const user = setupUser();
       render(
@@ -455,7 +454,6 @@ describe("Dialog", () => {
       await flushTasks(2);
     });
 
-    // review L2 (memo/reviewer/dialog.md).
     it("Root state.pending is true while a re-open waits for a dismissal's notification", async () => {
       const user = setupUser();
       const closing = deferred();
@@ -656,7 +654,6 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
     });
 
-    // review M1 (memo/reviewer/dialog.md).
     it("modal: a drag from inside that ends on the backdrop does not close", async () => {
       const user = setupUser();
       const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
@@ -680,7 +677,6 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
     });
 
-    // review M1 (memo/reviewer/dialog.md).
     it("non-modal: a drag from inside that ends outside does not close", async () => {
       const user = setupUser();
       render(<Harness mode="uncontrolled" modal={false} popup={{ lightDismiss: true }} />);
@@ -804,7 +800,6 @@ describe("Dialog", () => {
     });
   });
 
-  // review H1 (memo/reviewer/dialog.md).
   describe("nested confirm dialog", () => {
     function Unrelated() {
       const [count, setCount] = useState(0);

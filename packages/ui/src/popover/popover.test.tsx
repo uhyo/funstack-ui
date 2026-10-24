@@ -47,10 +47,11 @@ import type {
   PopoverTriggerProps,
   PopoverTriggerState,
 } from "./index.js";
-import { recordClicks, spyHide, spyShow } from "../__tests__/overlay-helpers.js";
+import { recordClicks, spyHide } from "../__tests__/overlay-helpers.js";
 import {
   createOverlayHarness,
   describeOverlayOpenState,
+  popoverLikeDriver,
 } from "../__tests__/overlay-open-state-suite.js";
 import type { OverlayHarnessMode } from "../__tests__/overlay-open-state-suite.js";
 
@@ -118,36 +119,13 @@ afterEach(() => {
 });
 
 describeOverlayOpenState<PopoverOpenChangeDetails>({
+  ...popoverLikeDriver(),
   name: "Popover",
   Harness,
-  isOpen: () => isOpen(),
-  spyOpen: spyShow,
-  spyClose: spyHide,
-  openArgs: () => [{ source: trigger() }],
-  dismiss: () => popup().hidePopover(),
-  dismissEvent: "toggle",
   partClose: (user) => user.click(trigger()),
   partCloseCancelsClick: true,
   partCloseArgs: [],
-  returnValue: false,
-  detailsKeys: ["reason"],
-  triggerToggles: true,
-  ariaExpanded: true,
-  // A script's showPopover(): cancelled at `beforetoggle`, which is the dispatched event.
-  foreignOpen: () => {
-    let before!: Event;
-    popup().addEventListener("beforetoggle", (event) => (before = event), { once: true });
-    popup().showPopover();
-    return before;
-  },
-  foreignOpenCallsOpen: true,
-  // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
-  openBeforeHydration: async (element) => {
-    element.showPopover();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  },
-  controlledOpenArgs: [undefined],
-  controlledCloseArgs: [],
+  partCloseReturnsFocus: false,
   closeIntents: {
     render: (probe) => (
       <Popover.Root>
@@ -1009,7 +987,7 @@ describe("Popover", () => {
     });
   });
 
-  describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
+  describe("disabled on link and component renders (design/components/button.md 17.3)", () => {
     it("Trigger: a host <button> render keeps its own aria-disabled (not owned there)", () => {
       render(<Harness mode="uncontrolled" trigger={{ render: <button aria-disabled="true" /> }} />);
       expect(trigger()).toHaveAttribute("aria-disabled", "true");
@@ -1098,7 +1076,7 @@ describe("Popover", () => {
       });
     });
 
-    it("library mode, disabled component renders are no invokers: no commandfor / command (review M1)", async () => {
+    it("library mode, disabled component renders are no invokers: no commandfor / command", async () => {
       render(
         <Harness
           mode="uncontrolled"
@@ -1114,7 +1092,7 @@ describe("Popover", () => {
       }
     });
 
-    it("JS-free mode with action, a disabled component-render Close is no invoker (review M1)", async () => {
+    it("JS-free mode with action, a disabled component-render Close is no invoker", async () => {
       const user = setupUser();
       render(
         <Harness
@@ -1367,7 +1345,7 @@ describe("Popover", () => {
       });
     });
 
-    describe("a library-driven close from inside the popup with transition (H1)", () => {
+    describe("a library-driven close from inside the popup with transition", () => {
       // With `transition` the close commit unmounts the content (no hold), which drops focus on
       // <body> before `hidePopover()` runs; the platform then restores nothing.
       renderBoth("Close part", (mode) => {

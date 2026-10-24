@@ -481,7 +481,6 @@ describe("Dialog", () => {
       expect(popup().returnValue).toBe("");
     });
 
-    // review L4 (memo/reviewer/dialog-46.md).
     it("a re-open between the library's close() and its close event is not superseded", async () => {
       const action = vi.fn<ActionFn>();
       let setOpen!: (open: boolean) => void;
@@ -552,7 +551,6 @@ describe("Dialog", () => {
       expect(committedText()).toBe("false");
     });
 
-    // review P2 (memo/reviewer/dialog-46.md).
     // Uncontrolled: a controlled parent that adopts every resolution in arrival order ends
     // with the slower, superseded `false` (conventions 2.5).
     describe("re-open during a pending part close", () => {
@@ -664,7 +662,6 @@ describe("Dialog", () => {
       );
     }
 
-    // review M1 (memo/reviewer/dialog-46.md).
     it("an Escape during the pending close, then the veto: the dismissal is notified, not undone", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
@@ -700,7 +697,6 @@ describe("Dialog", () => {
       expect(trigger()).not.toHaveAttribute("data-open");
     });
 
-    // review M1 (memo/reviewer/dialog-46.md).
     it("an Escape during the pending close, then a re-open through the Trigger: superseded", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();

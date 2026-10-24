@@ -223,7 +223,6 @@ describe("Dialog", () => {
       expect(trigger()).not.toHaveAttribute("aria-disabled");
     });
 
-    // review L1 (memo/reviewer/dialog.md).
     it("disabled is owned: a render element cannot re-enable Trigger or Close", async () => {
       const user = setupUser();
       const closeAction = vi.fn();

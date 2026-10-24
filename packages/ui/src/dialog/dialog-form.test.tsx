@@ -131,7 +131,6 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
     });
 
-    // review L4 (memo/reviewer/dialog.md).
     it("keeps `method` with a string action; owns it otherwise", () => {
       render(
         <Harness
@@ -149,7 +148,6 @@ describe("Dialog", () => {
       expect(screen.getByTestId("closing")).toHaveAttribute("method", "dialog");
     });
 
-    // review M3 (memo/reviewer/dialog.md).
     describe("closeOnSettle", () => {
       function ValidatingForm({ closeOnSettle }: { closeOnSettle?: boolean }) {
         const [error, formAction] = useActionState(
@@ -374,7 +372,6 @@ describe("Dialog", () => {
       expect(action.mock.calls[1]![1]).toMatchObject({ reason: "dismiss", returnValue: "ok" });
     });
 
-    // review M3 (memo/reviewer/dialog-46.md).
     it("a document listener that runs first and stops propagation opts out (React root on the document)", async () => {
       const user = setupUser();
       silenceErrors(); // jsdom: "Not implemented: requestSubmit()" for the uncancelled submit
@@ -408,7 +405,6 @@ describe("Dialog", () => {
       }
     });
 
-    // review L1 (memo/reviewer/dialog-46.md).
     it("a method='dialog' submit inside a shadow root goes through the Root", async () => {
       const host = document.createElement("div");
       document.body.append(host);
@@ -563,7 +559,6 @@ describe("Dialog", () => {
       });
     });
 
-    // review L2 (memo/reviewer/dialog.md).
     renderBoth("re-open while a dismissal's notification waits for a Form save", (mode) => {
       it("Escape, then the Trigger: pending until the save settles, then open; no extra close", async () => {
         const user = setupUser();

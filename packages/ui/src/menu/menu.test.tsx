@@ -45,10 +45,11 @@ import type {
   MenuRootState,
   MenuTriggerState,
 } from "./index.js";
-import { recordClicks, spyHide, spyShow, watchShow } from "../__tests__/overlay-helpers.js";
+import { recordClicks, spyHide, watchShow } from "../__tests__/overlay-helpers.js";
 import {
   createOverlayHarness,
   describeOverlayOpenState,
+  popoverLikeDriver,
 } from "../__tests__/overlay-open-state-suite.js";
 import { MenuContext } from "./menu-context.js";
 
@@ -176,36 +177,13 @@ const OpenStateHarness = createOverlayHarness<MenuOpenChangeDetails, OpenStateHa
 // `hidePopover()` (Escape, light dismiss). Item actions, submenus and hover intent have their own
 // rows below.
 describeOverlayOpenState<MenuOpenChangeDetails>({
+  ...popoverLikeDriver(),
   name: "Menu",
   Harness: OpenStateHarness,
-  isOpen: () => isOpen(),
-  spyOpen: spyShow,
-  spyClose: spyHide,
-  openArgs: () => [{ source: trigger() }],
-  dismiss: () => popup().hidePopover(),
-  dismissEvent: "toggle",
   partClose: (user) => user.click(screen.getByTestId("close")),
   partCloseCancelsClick: false,
   partCloseArgs: [],
-  returnValue: false,
-  detailsKeys: ["reason"],
-  triggerToggles: true,
-  ariaExpanded: true,
-  // A script's showPopover(): cancelled at `beforetoggle`, which is the dispatched event.
-  foreignOpen: () => {
-    let before!: Event;
-    popup().addEventListener("beforetoggle", (event) => (before = event), { once: true });
-    popup().showPopover();
-    return before;
-  },
-  foreignOpenCallsOpen: true,
-  // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
-  openBeforeHydration: async (element) => {
-    element.showPopover();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  },
-  controlledOpenArgs: [undefined],
-  controlledCloseArgs: [],
+  partCloseReturnsFocus: true,
   closeIntents: {
     // Library mode (Menu has no JS-free mode): `defaultOpen`; the popup's content is mounted only
     // while open, so the probe is a child of the Root.
@@ -485,7 +463,7 @@ describe("Menu", () => {
       },
     );
 
-    it("a disabled Trigger with a component render is no invoker: no commandfor / command (review M1)", () => {
+    it("a disabled Trigger with a component render is no invoker: no commandfor / command", () => {
       render(
         <Menu.Root>
           <Menu.Trigger data-testid="trigger" disabled render={<PlainButton />}>
@@ -500,7 +478,7 @@ describe("Menu", () => {
       expect(trigger()).not.toHaveAttribute("command");
     });
 
-    it("server HTML: a disabled Trigger with a component render is an enabled button with no command (review M1)", () => {
+    it("server HTML: a disabled Trigger with a component render is an enabled button with no command", () => {
       const container = document.createElement("div");
       container.innerHTML = renderToString(
         <Menu.Root>
@@ -528,7 +506,7 @@ describe("Menu", () => {
       expect(container.querySelector("button")).toHaveAttribute("command", "toggle-popover");
     });
 
-    it("a disabled Trigger with a host <button> render stays natively disabled (#83)", () => {
+    it("a disabled Trigger with a host <button> render stays natively disabled", () => {
       render(
         <Menu.Root>
           <Menu.Trigger data-testid="trigger" disabled render={<button type="button" />}>
@@ -596,7 +574,7 @@ describe("Menu", () => {
       expect(item("archive")).toHaveFocus();
     });
 
-    it("a press on non-item space keeps focus on the current item (M1)", async () => {
+    it("a press on non-item space keeps focus on the current item", async () => {
       const user = setupUser();
       render(
         <Harness
@@ -645,7 +623,7 @@ describe("Menu", () => {
       expect(item("field")).toHaveFocus();
     });
 
-    it("with focus on the popup itself, ArrowDown / Home go to the first item, ArrowUp / End to the last (M1)", async () => {
+    it("with focus on the popup itself, ArrowDown / Home go to the first item, ArrowUp / End to the last", async () => {
       const user = setupUser();
       render(<Harness root={{ loop: false }} />);
       await openMenu(user);
@@ -993,7 +971,7 @@ describe("Menu.Item actions", () => {
   });
 
   describe("re-entry (#81, design/components/button.md 16.4)", () => {
-    it("M1: a second Enter, Space and click while pending are ignored and cancelled; one close", async () => {
+    it("a second Enter, Space and click while pending are ignored and cancelled; one close", async () => {
       const user = setupUser();
       const work = deferred();
       const action = vi.fn(() => work.promise);
@@ -1038,7 +1016,7 @@ describe("Menu.Item actions", () => {
       expect(archive).not.toHaveAttribute("aria-disabled");
     });
 
-    it("M1: two activations in one task call the action once", async () => {
+    it("two activations in one task call the action once", async () => {
       const user = setupUser();
       const work = deferred();
       const action = vi.fn(() => work.promise);
@@ -1064,7 +1042,7 @@ describe("Menu.Item actions", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("M2: closeOnActivate={false}, the second activation is ignored; after settle the next one runs", async () => {
+    it("closeOnActivate={false}, the second activation is ignored; after settle the next one runs", async () => {
       const user = setupUser();
       const runs = [deferred(), deferred()];
       let call = 0;
@@ -1096,7 +1074,7 @@ describe("Menu.Item actions", () => {
       await act(async () => runs[1]!.resolve());
     });
 
-    it("M3: a pending item is still an enabled item for the arrows, Home / End and typeahead", async () => {
+    it("a pending item is still an enabled item for the arrows, Home / End and typeahead", async () => {
       const user = setupUser();
       const work = deferred();
       render(
@@ -1131,7 +1109,7 @@ describe("Menu.Item actions", () => {
       await act(async () => work.resolve());
     });
 
-    it("M4: a rejection reaches the boundary above the item; the menu stays open; after a reset it runs again", async () => {
+    it("a rejection reaches the boundary above the item; the menu stays open; after a reset it runs again", async () => {
       const user = setupUser();
       silenceErrors();
       const caught = vi.fn();
@@ -1317,7 +1295,7 @@ describe("Menu.CheckboxItem", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("closeOnActivate: dismissed and re-opened while the change runs, the menu stays open (L1)", async () => {
+    it("closeOnActivate: dismissed and re-opened while the change runs, the menu stays open", async () => {
       const user = setupUser();
       const work = deferred();
       const action = vi.fn((_next: boolean) => work.promise);
@@ -1558,7 +1536,7 @@ describe("Menu.RadioGroup", () => {
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "sort failed" }));
     });
 
-    it("closeOnActivate: dismissed and re-opened while the change runs, the menu stays open (L1)", async () => {
+    it("closeOnActivate: dismissed and re-opened while the change runs, the menu stays open", async () => {
       const user = setupUser();
       const work = deferred();
       const action = vi.fn((_next: string) => work.promise);
@@ -1750,29 +1728,6 @@ describe("Menu.Root", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.autofocus).toBe(item("first"));
     expectNotPending(trigger());
-  });
-
-  it("a controlled parent that adopts after its own await opens and closes", async () => {
-    const user = setupUser();
-    function Controlled() {
-      const [open, setOpen] = useState(false);
-      return (
-        <Harness
-          root={{
-            open,
-            openChangeAction: async (next) => {
-              await Promise.resolve();
-              startTransition(() => setOpen(next));
-            },
-          }}
-        />
-      );
-    }
-    render(<Controlled />);
-    await openMenu(user);
-    await user.click(item("rename"));
-    await flushTasks(2);
-    expect(isOpen()).toBe(false);
   });
 
   it("a controlled open flip shows and hides with no dispatch", async () => {

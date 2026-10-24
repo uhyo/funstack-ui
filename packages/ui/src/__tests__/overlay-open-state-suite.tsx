@@ -30,6 +30,7 @@ import {
   silenceErrors,
 } from "./helpers.js";
 import type { ControlMode, Deferred } from "./helpers.js";
+import { spyHide, spyShow } from "./overlay-helpers.js";
 
 /** `"static"`: no open-state props, JS-free mode (Dialog, Popover). */
 export type OverlayHarnessMode = ControlMode | "static";
@@ -180,15 +181,22 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
   /** The arguments of the library's close call after `partClose` (Dialog: the Close's `"x"`). */
   readonly partCloseArgs: readonly unknown[];
   /**
-   * Dialog: `details.returnValue` is asserted (undefined for an open, the part's or the
-   * dismissal's value for a close) and so is the dialog's `returnValue` after a part close.
+   * `partClose`'s part is inside the popup, so the close moves focus back to the Trigger (Dialog:
+   * the platform's dialog close; Menu: the library). `false` for Popover, whose part is the
+   * Trigger itself.
    */
-  readonly returnValue: boolean;
-  /** The sorted keys of a Trigger click's `details` (`event` is virtual, conventions 2.2). */
+  readonly partCloseReturnsFocus: boolean;
+  /**
+   * The sorted keys of a Trigger click's `details` (`event` is virtual, conventions 2.2). With
+   * `"returnValue"` (Dialog), `details.returnValue` is asserted (undefined for an open, the part's
+   * or the dismissal's value for a close) and so is the dialog's `returnValue` after a part close.
+   */
   readonly detailsKeys: readonly string[];
   /**
    * A Trigger click while open closes (Popover, Menu: library-owned, `"activate"`); `false`: the
-   * Trigger only opens (Dialog), so a second click while optimistically open does nothing.
+   * Trigger only opens (Dialog), so a second click while optimistically open does nothing. For
+   * Menu the Trigger's mousedown moves focus out of the popup and its `focusout` close hides the
+   * menu before the click, which then dispatches the same library-owned close.
    */
   readonly triggerToggles: boolean;
   /** The Trigger carries `aria-expanded` (Popover, Menu; not Dialog). */
@@ -220,10 +228,51 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
   };
 }
 
+/** The driver fields Popover and Menu share: a `popover` popup opened by a toggling Trigger. */
+export function popoverLikeDriver<D extends OverlayDetailsLike>(): Omit<
+  OverlayOpenStateConfig<D>,
+  | "name"
+  | "Harness"
+  | "partClose"
+  | "partCloseCancelsClick"
+  | "partCloseArgs"
+  | "partCloseReturnsFocus"
+  | "closeIntents"
+> {
+  const popup = () => screen.getByTestId("popup");
+  return {
+    isOpen: () => popup().matches(":popover-open"),
+    spyOpen: spyShow,
+    spyClose: spyHide,
+    openArgs: () => [{ source: screen.getByTestId("trigger") }],
+    dismiss: () => popup().hidePopover(),
+    dismissEvent: "toggle",
+    detailsKeys: ["reason"],
+    triggerToggles: true,
+    ariaExpanded: true,
+    // A script's showPopover(): cancelled at `beforetoggle`, which is the dispatched event.
+    foreignOpen: () => {
+      let before!: Event;
+      popup().addEventListener("beforetoggle", (event) => (before = event), { once: true });
+      popup().showPopover();
+      return before;
+    },
+    foreignOpenCallsOpen: true,
+    // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+    openBeforeHydration: async (element) => {
+      element.showPopover();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+    controlledOpenArgs: [undefined],
+    controlledCloseArgs: [],
+  };
+}
+
 export function describeOverlayOpenState<D extends OverlayDetailsLike>(
   config: OverlayOpenStateConfig<D>,
 ): void {
   const { Harness, isOpen, spyOpen, spyClose, dismiss, partClose } = config;
+  const hasReturnValue = config.detailsKeys.includes("returnValue");
   type Action = OpenChangeFn<D>;
 
   const trigger = () => screen.getByTestId("trigger");
@@ -254,7 +303,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         const [next, details] = action.mock.calls[0]!;
         expect(next).toBe(true);
         expect(details.reason).toBe("activate");
-        if (config.returnValue) expect(returnValueOf(details)).toBeUndefined();
+        if (hasReturnValue) expect(returnValueOf(details)).toBeUndefined();
         expect(details.event).toBeInstanceOf(MouseEvent);
         expect(details.event!.type).toBe("click");
         // The command was cancelled: the library opens the popup, not the browser.
@@ -370,7 +419,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         const [next, details] = action.mock.calls[1]!;
         expect(next).toBe(false);
         expect(details.reason).toBe("activate");
-        if (config.returnValue) expect(returnValueOf(details)).toBe("x");
+        if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
         expect(details.event!.type).toBe("click");
         expect(details.event!.defaultPrevented).toBe(config.partCloseCancelsClick);
         // Still open while the action runs; the Trigger shows the Root's pending.
@@ -380,6 +429,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expectPending(trigger());
         expect(trigger()).not.toHaveAttribute("data-open");
         expectExpanded(false);
+        if (config.partCloseReturnsFocus) expect(trigger()).not.toHaveFocus();
         await flushTasks(2);
         expect(isOpen()).toBe(true);
         expect(close).not.toHaveBeenCalled();
@@ -389,14 +439,15 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(close).toHaveBeenCalledTimes(1);
         expect(close).toHaveBeenCalledWith(...config.partCloseArgs);
         expect(isOpen()).toBe(false);
-        if (config.returnValue) expect((popup() as HTMLDialogElement).returnValue).toBe("x");
+        if (hasReturnValue) expect((popup() as HTMLDialogElement).returnValue).toBe("x");
         expect(committedText()).toBe("false");
         expectNotPending(trigger());
         await flushTasks(2);
         expect(content()).toBeNull();
         // The close event is an echo: no second notification.
         expect(action).toHaveBeenCalledTimes(2);
-        expect(trigger()).toHaveFocus();
+        // Focus moved back from the part to the Trigger.
+        if (config.partCloseReturnsFocus) expect(trigger()).toHaveFocus();
       });
 
       it("dismissal: notified as (false, 'dismiss') with the platform's event; pending meanwhile", async () => {
@@ -415,7 +466,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         const [next, details] = action.mock.calls[1]!;
         expect(next).toBe(false);
         expect(details.reason).toBe("dismiss");
-        if (config.returnValue) expect(returnValueOf(details)).toBe("x");
+        if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
         expect(details.event!.type).toBe(config.dismissEvent);
         expectPending(trigger());
         expect(trigger()).not.toHaveAttribute("data-open");
@@ -855,7 +906,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           expect(next).toBe(true);
           expect(details.reason).toBe("platform");
           expect(details.event).toBeUndefined();
-          if (config.returnValue) expect(returnValueOf(details)).toBeUndefined();
+          if (hasReturnValue) expect(returnValueOf(details)).toBeUndefined();
           expect(content()).toBeInTheDocument();
           expect(isOpen()).toBe(true);
           expect(open).not.toHaveBeenCalled();
