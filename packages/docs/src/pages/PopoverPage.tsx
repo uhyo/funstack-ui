@@ -1,23 +1,19 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { PopoverActions } from "../examples/PopoverActions.js";
-import popoverActionsSource from "../examples/PopoverActions.tsx?raw";
 import { PopoverShare } from "../examples/PopoverShare.js";
-import popoverShareSource from "../examples/PopoverShare.tsx?raw";
-import popoverCss from "../examples/popover.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function PopoverPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Popover"
-        description="A non-modal popover on the Popover API and Invoker Commands: JS-free when you need no state; a transition-driven open, library-owned closes with a ViewTransition exit in every engine, and Suspense-ready content when you do."
-      />
-      <h2>Popover</h2>
+    <DocPage
+      title="Popover"
+      description="A non-modal popover on the Popover API and Invoker Commands: JS-free when you need no state; a transition-driven open, library-owned closes with a ViewTransition exit in every engine, and Suspense-ready content when you do."
+    >
       <p className="page-intro">
         Built on <code>popover="auto"</code>, a <code>&lt;dialog&gt;</code> element and Invoker
         Commands. The platform supplies the top layer, light dismiss, Escape, one-at-a-time stacking
@@ -29,12 +25,7 @@ export function PopoverPage() {
         well.
       </p>
 
-      <Example
-        source={popoverShareSource}
-        fileName="PopoverShare.tsx"
-        css={popoverCss}
-        cssFileName="popover.css"
-      >
+      <Example file="PopoverShare.tsx" css="popover.css">
         <PopoverShare />
       </Example>
       <p>
@@ -548,12 +539,7 @@ html:active-view-transition .popover { transition: none; }
         }
       >
         <h4>Walkthrough (library mode)</h4>
-        <Example
-          source={popoverActionsSource}
-          fileName="PopoverActions.tsx"
-          css={popoverCss}
-          cssFileName="popover.css"
-        >
+        <Example file="PopoverActions.tsx" css="popover.css">
           <PopoverActions />
         </Example>
         <ol>
@@ -691,6 +677,6 @@ html:active-view-transition .popover { transition: none; }
         <code>position-try-fallbacks</code> can hang (WebKit bug 302008): give the inner Popup{" "}
         <code>side={"{null}"}</code> and place it in CSS if you hit it.
       </p>
-    </div>
+    </DocPage>
   );
 }

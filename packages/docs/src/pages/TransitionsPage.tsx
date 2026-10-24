@@ -1,16 +1,14 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample, Terms } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { Table } from "../components/Tables.js";
 
 export function TransitionsPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Transitions & ViewTransition"
-        description="Every state change in FUNSTACK UI is a transition. Parts whose content is driven by library state take a transition prop that renders a <ViewTransition>, and changes are tagged with fsui-* transition types."
-      />
-      <h2>Transitions & ViewTransition</h2>
+    <DocPage
+      title="Transitions & ViewTransition"
+      description="Every state change in FUNSTACK UI is a transition. Parts whose content is driven by library state take a transition prop that renders a <ViewTransition>, and changes are tagged with fsui-* transition types."
+    >
       <p className="page-intro">
         Every state change the library makes is a React transition. That is what lets React keep old
         content on screen, and it is also what lets <code>&lt;ViewTransition&gt;</code> animate the
@@ -183,6 +181,6 @@ export function TransitionsPage() {
           boundaries get enter and exit animations.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

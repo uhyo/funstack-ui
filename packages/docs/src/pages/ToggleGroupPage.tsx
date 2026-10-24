@@ -1,23 +1,19 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleGroupAlignment } from "../examples/ToggleGroupAlignment.js";
-import toggleGroupAlignmentSource from "../examples/ToggleGroupAlignment.tsx?raw";
 import { ToggleGroupStyles } from "../examples/ToggleGroupStyles.js";
-import toggleGroupStylesSource from "../examples/ToggleGroupStyles.tsx?raw";
-import toggleGroupCss from "../examples/toggle-group.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function ToggleGroupPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="ToggleGroup"
-        description="A set of aria-pressed toggle buttons sharing one value: several pressed, or at most one with exclusive. Optimistic, with pending state."
-      />
-      <h2>ToggleGroup</h2>
+    <DocPage
+      title="ToggleGroup"
+      description="A set of aria-pressed toggle buttons sharing one value: several pressed, or at most one with exclusive. Optimistic, with pending state."
+    >
       <p className="page-intro">
         A set of toggle buttons that share one value: any number pressed by default, at most one
         with <code>exclusive</code>. Every Item is the <a href="/components/toggle">Toggle</a>{" "}
@@ -26,12 +22,7 @@ export function ToggleGroupPage() {
         join the toolbar's sequence.
       </p>
 
-      <Example
-        source={toggleGroupStylesSource}
-        fileName="ToggleGroupStyles.tsx"
-        css={toggleGroupCss}
-        cssFileName="toggle-group.css"
-      >
+      <Example file="ToggleGroupStyles.tsx" css="toggle-group.css">
         <ToggleGroupStyles />
       </Example>
       <p>
@@ -69,7 +60,7 @@ export function ToggleGroupPage() {
 
       <h3 id="how-it-works">How it works</h3>
       <h4>Exclusive mode</h4>
-      <Example source={toggleGroupAlignmentSource} fileName="ToggleGroupAlignment.tsx">
+      <Example file="ToggleGroupAlignment.tsx">
         <ToggleGroupAlignment />
       </Example>
       <p>
@@ -354,6 +345,6 @@ export function ToggleGroupPage() {
         <a href="/concepts/action-props#await-only">Await only what the UI must wait for</a>); for a
         fire-and-forget save, call <code>void save(next)</code> without awaiting it.
       </p>
-    </div>
+    </DocPage>
   );
 }

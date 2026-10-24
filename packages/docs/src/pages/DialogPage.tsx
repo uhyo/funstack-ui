@@ -1,25 +1,20 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { DialogConfirm } from "../examples/DialogConfirm.js";
-import dialogConfirmSource from "../examples/DialogConfirm.tsx?raw";
 import { DialogOrders } from "../examples/DialogOrders.js";
-import dialogOrdersSource from "../examples/DialogOrders.tsx?raw";
 import { DialogProfile } from "../examples/DialogProfile.js";
-import dialogProfileSource from "../examples/DialogProfile.tsx?raw";
-import dialogCss from "../examples/dialog.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function DialogPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Dialog"
-        description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state; a transition-driven open with a pending trigger, Suspense-ready content, and library-owned closes with a ViewTransition exit in every engine when you do."
-      />
-      <h2>Dialog</h2>
+    <DocPage
+      title="Dialog"
+      description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state; a transition-driven open with a pending trigger, Suspense-ready content, and library-owned closes with a ViewTransition exit in every engine when you do."
+    >
       <p className="page-intro">
         Built on <code>&lt;dialog&gt;</code>, <code>showModal()</code> and Invoker Commands. The
         platform supplies the top layer, the backdrop, the inert page, Escape, initial focus and
@@ -29,12 +24,7 @@ export function DialogPage() {
         animate with a view transition.
       </p>
 
-      <Example
-        source={dialogConfirmSource}
-        fileName="DialogConfirm.tsx"
-        css={dialogCss}
-        cssFileName="dialog.css"
-      >
+      <Example file="DialogConfirm.tsx" css="dialog.css">
         <DialogConfirm />
       </Example>
       <p>
@@ -280,7 +270,6 @@ export function DialogPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: "–",
             description:
               "Library mode only. Forwarded to the `<ViewTransition>` around the dialog; without it no boundary is rendered. Animates the opening commit, content swaps while open, and every library-driven close (a Close part, a Form submit or settled action, a foreign close command, a controlled `open={false}`) in all engines. Dismissals (Escape, a click outside) are the browser's and animate with CSS only. Keep it static; any value makes a Root inserted by a transition run the page cross-fade.",
           },
@@ -619,12 +608,7 @@ html:active-view-transition .dialog { transition: none; }
         }
       >
         <h4>Walkthrough (library mode)</h4>
-        <Example
-          source={dialogOrdersSource}
-          fileName="DialogOrders.tsx"
-          css={dialogCss}
-          cssFileName="dialog.css"
-        >
+        <Example file="DialogOrders.tsx" css="dialog.css">
           <DialogOrders />
         </Example>
         <ol>
@@ -730,12 +714,7 @@ html:active-view-transition .dialog { transition: none; }
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={dialogProfileSource}
-        fileName="DialogProfile.tsx"
-        css={dialogCss}
-        cssFileName="dialog.css"
-      >
+      <Example file="DialogProfile.tsx" css="dialog.css">
         <DialogProfile />
       </Example>
       <ol>
@@ -807,6 +786,6 @@ html:active-view-transition .dialog { transition: none; }
         that happens when the content mounts parts that render one, such as a nested Dialog or a
         control with <code>transition</code> set.
       </p>
-    </div>
+    </DocPage>
   );
 }

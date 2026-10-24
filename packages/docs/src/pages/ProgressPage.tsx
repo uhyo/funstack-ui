@@ -1,15 +1,12 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ProgressForm } from "../examples/ProgressForm.js";
-import progressFormSource from "../examples/ProgressForm.tsx?raw";
 import { ProgressJobs } from "../examples/ProgressJobs.js";
-import progressJobsSource from "../examples/ProgressJobs.tsx?raw";
 import { ProgressUpload } from "../examples/ProgressUpload.js";
-import progressUploadSource from "../examples/ProgressUpload.tsx?raw";
-import progressCss from "../examples/progress.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 const partProps = (element: string) => [
@@ -19,12 +16,10 @@ const partProps = (element: string) => [
 
 export function ProgressPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Progress"
-        description="A progress bar on div[role=progressbar]: the display of someone else's action, correct in every lane, localised aria-valuetext, and a Root that is itself a Server Component."
-      />
-      <h2>Progress</h2>
+    <DocPage
+      title="Progress"
+      description="A progress bar on div[role=progressbar]: the display of someone else's action, correct in every lane, localised aria-valuetext, and a Root that is itself a Server Component."
+    >
       <p className="page-intro">
         A progress bar (WAI-ARIA <code>progressbar</code>) and the library's first{" "}
         <strong>output-only</strong> component: nothing is pressed or typed, so there is no action,
@@ -34,12 +29,7 @@ export function ProgressPage() {
         client parts still ship; see <a href="#server-components">Server Components</a>).
       </p>
 
-      <Example
-        source={progressUploadSource}
-        fileName="ProgressUpload.tsx"
-        css={progressCss}
-        cssFileName="progress.css"
-      >
+      <Example file="ProgressUpload.tsx" css="progress.css">
         <ProgressUpload />
       </Example>
 
@@ -326,12 +316,7 @@ export function ProgressPage() {
           the Root through a context, so they are small client modules; which of them reach the
           browser depends on how your bundler emits client references.
         </p>
-        <Example
-          source={progressJobsSource}
-          fileName="ProgressJobs.tsx"
-          css={progressCss}
-          cssFileName="progress.css"
-        >
+        <Example file="ProgressJobs.tsx" css="progress.css">
           <ProgressJobs />
         </Example>
       </BehaviourSection>
@@ -344,12 +329,7 @@ export function ProgressPage() {
         the bar with <code>aria-describedby</code> (the APG's advice). Progress does not read the
         form status by itself, so a Progress inside a form is not tied to it by accident.
       </p>
-      <Example
-        source={progressFormSource}
-        fileName="ProgressForm.tsx"
-        css={progressCss}
-        cssFileName="progress.css"
-      >
+      <Example file="ProgressForm.tsx" css="progress.css">
         <ProgressForm />
       </Example>
 
@@ -367,6 +347,6 @@ export function ProgressPage() {
           attributes, and Field registration.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

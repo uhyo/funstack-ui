@@ -1,13 +1,11 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MenuRowActions } from "../examples/MenuRowActions.js";
-import menuRowActionsSource from "../examples/MenuRowActions.tsx?raw";
 import { MenuViewOptions } from "../examples/MenuViewOptions.js";
-import menuViewOptionsSource from "../examples/MenuViewOptions.tsx?raw";
-import menuCss from "../examples/menu.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 const itemRows = (state: string, closeDefault: string, closeNote: string) => [
@@ -36,12 +34,10 @@ const itemRows = (state: string, closeDefault: string, closeNote: string) => [
 
 export function MenuPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Menu"
-        description="A menu button on the Popover API: items whose actions run in their own transition with pending state, optimistic checkbox and radio items, the APG keyboard model with typeahead, and submenus with hover intent."
-      />
-      <h2>Menu</h2>
+    <DocPage
+      title="Menu"
+      description="A menu button on the Popover API: items whose actions run in their own transition with pending state, optimistic checkbox and radio items, the APG keyboard model with typeahead, and submenus with hover intent."
+    >
       <p className="page-intro">
         The WAI-ARIA menu button. There is no native menu element, so the platform gives the popover
         half (<code>popover="auto"</code>: the top layer, light dismiss, Escape, nesting for
@@ -53,12 +49,7 @@ export function MenuPage() {
         clicked and the menu leaves with a view transition in every engine.
       </p>
 
-      <Example
-        source={menuRowActionsSource}
-        fileName="MenuRowActions.tsx"
-        css={menuCss}
-        cssFileName="menu.css"
-      >
+      <Example file="MenuRowActions.tsx" css="menu.css">
         <MenuRowActions />
       </Example>
 
@@ -162,12 +153,7 @@ export function MenuPage() {
       </ul>
 
       <h4>Checkbox and radio items</h4>
-      <Example
-        source={menuViewOptionsSource}
-        fileName="MenuViewOptions.tsx"
-        css={menuCss}
-        cssFileName="menu.css"
-      >
+      <Example file="MenuViewOptions.tsx" css="menu.css">
         <MenuViewOptions />
       </Example>
       <p>
@@ -743,6 +729,6 @@ export function MenuPage() {
         </li>
         <li>Menubars are not part of Menu.</li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

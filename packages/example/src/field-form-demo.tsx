@@ -1,5 +1,4 @@
-import { Component, useActionState } from "react";
-import type { ReactNode } from "react";
+import { useActionState } from "react";
 import { Checkbox } from "@funstack/ui/checkbox";
 import { Combobox } from "@funstack/ui/combobox";
 import { Field } from "@funstack/ui/field";
@@ -7,9 +6,10 @@ import { Form } from "@funstack/ui/form";
 import type { FormErrors } from "@funstack/ui/form";
 import { RadioGroup } from "@funstack/ui/radio-group";
 import { Select } from "@funstack/ui/select";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./field-form-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 interface State {
   readonly errors?: FormErrors;
@@ -27,28 +27,6 @@ async function signUp(_prev: State, formData: FormData): Promise<State> {
   console.log("[sign-up] result", errors);
   if (Object.keys(errors).length > 0) return { errors };
   return { done: String(formData.get("handle")) };
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="ff-error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 function SignUp() {
@@ -142,16 +120,15 @@ function SignUp() {
 
 export function FieldFormDemo() {
   return (
-    <section>
-      <h2>Field and Form</h2>
+    <Demo title="Field and Form">
       <p>
         Native validation shown with <code>:user-invalid</code> timing, the bubble replaced by{" "}
         <code>Field.Error</code>, the first invalid control focused, server errors routed to their
         fields (dismissed by the next edit), and a reset only after a submission with no errors.
       </p>
-      <DemoErrorBoundary>
+      <DemoErrorBoundary className="ff-error-box">
         <SignUp />
       </DemoErrorBoundary>
-    </section>
+    </Demo>
   );
 }

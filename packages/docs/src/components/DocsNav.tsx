@@ -75,7 +75,7 @@ export function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
                   />
                 ))
               ) : (
-                <li key={group}>
+                <li key={group} className="docs-nav-group">
                   <span className="docs-nav-group-label">{group}</span>
                   <ul className="docs-nav-list" aria-label={group}>
                     {items.map((item) => (

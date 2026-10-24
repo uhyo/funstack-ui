@@ -1,22 +1,22 @@
-import { AccordionDemo } from "./accordion-demo";
-import { ButtonDemo } from "./button-demo";
-import { ToggleDemo } from "./toggle-demo";
-import { TabsDemo } from "./tabs-demo";
-import { TooltipDemo } from "./tooltip-demo";
-import { SwitchCheckboxDemo } from "./switch-checkbox-demo";
-import { DialogDemo } from "./dialog-demo";
-import { PopoverDemo } from "./popover-demo";
-import { MenuDemo } from "./menu-demo";
-import { RadioGroupDemo } from "./radio-group-demo";
-import { CheckboxGroupDemo } from "./checkbox-group-demo";
-import { SelectDemo } from "./select-demo";
-import { ComboboxDemo } from "./combobox-demo";
-import { Notifications, ToastDemo } from "./toast-demo";
-import { SliderDemo } from "./slider-demo";
-import { FieldFormDemo } from "./field-form-demo";
-import { ProgressMeterDemo } from "./progress-meter-demo";
-import { ToolbarDemo } from "./toolbar-demo";
-import { NumberFieldDemo } from "./number-field-demo";
+import { AccordionDemo } from "./accordion-demo.js";
+import { ButtonDemo } from "./button-demo.js";
+import { ToggleDemo } from "./toggle-demo.js";
+import { TabsDemo } from "./tabs-demo.js";
+import { TooltipDemo } from "./tooltip-demo.js";
+import { SwitchCheckboxDemo } from "./switch-checkbox-demo.js";
+import { DialogDemo } from "./dialog-demo.js";
+import { PopoverDemo } from "./popover-demo.js";
+import { MenuDemo } from "./menu-demo.js";
+import { RadioGroupDemo } from "./radio-group-demo.js";
+import { CheckboxGroupDemo } from "./checkbox-group-demo.js";
+import { SelectDemo } from "./select-demo.js";
+import { ComboboxDemo } from "./combobox-demo.js";
+import { Notifications, ToastDemo } from "./toast-demo.js";
+import { SliderDemo } from "./slider-demo.js";
+import { FieldFormDemo } from "./field-form-demo.js";
+import { ProgressMeterDemo } from "./progress-meter-demo.js";
+import { ToolbarDemo } from "./toolbar-demo.js";
+import { NumberFieldDemo } from "./number-field-demo.js";
 
 export function App() {
   return (
@@ -26,26 +26,28 @@ export function App() {
         Each demo below exercises one component of <code>@funstack/ui</code>. Open the console to
         follow the fake backend calls.
       </p>
+      {/* Same order as the docs sidebar: buttons, disclosure, overlays, forms, output. */}
       <ButtonDemo />
       <ToggleDemo />
-      <AccordionDemo />
+      <ToolbarDemo />
       <TabsDemo />
+      <AccordionDemo />
       <TooltipDemo />
-      <SwitchCheckboxDemo />
-      <DialogDemo />
       <PopoverDemo />
+      <DialogDemo />
       <MenuDemo />
-      <RadioGroupDemo />
-      <CheckboxGroupDemo />
-      <SelectDemo />
-      <ComboboxDemo />
       <ToastDemo />
       <FieldFormDemo />
-      <Notifications />
+      <SwitchCheckboxDemo />
+      <CheckboxGroupDemo />
+      <RadioGroupDemo />
+      <SelectDemo />
+      <ComboboxDemo />
       <SliderDemo />
-      <ProgressMeterDemo />
-      <ToolbarDemo />
       <NumberFieldDemo />
+      <ProgressMeterDemo />
+      {/* The toast region (a Toast.Viewport) that renders the toasts ToastDemo queues. */}
+      <Notifications />
     </main>
   );
 }

@@ -1,44 +1,15 @@
-import { Component, Suspense, startTransition, use, useState } from "react";
-import type { ReactNode } from "react";
+import { Suspense, startTransition, use, useState } from "react";
 import { Select } from "@funstack/ui/select";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
+import { Spinner } from "./shared/Spinner.js";
 import "./select-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fake backend: resolves after 800 ms; rejects when asked to. */
-async function fakeSave(label: string, value: unknown, { fail = false } = {}): Promise<void> {
-  console.log(`[${label}] saving ${JSON.stringify(value)}`);
-  await sleep(800);
-  if (fail) throw new Error(`[${label}] the server rejected ${JSON.stringify(value)}`);
-  console.log(`[${label}] saved ${JSON.stringify(value)}`);
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="sl-error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 /** A decorative swatch: an SVG with no text, so the option still reads as plain text. */
 function Swatch({ color }: { color: string }) {
   return (
-    <svg className="sl-swatch" viewBox="0 0 10 10" aria-hidden="true">
+    <svg className="sel-swatch" viewBox="0 0 10 10" aria-hidden="true">
       <circle cx="5" cy="5" r="5" fill={color} />
     </svg>
   );
@@ -56,7 +27,7 @@ function FruitPicker() {
         are not rendered; <code>select[data-pending]</code> still styles the select).
       </p>
       <Select.Root
-        className="sl-select"
+        className="sel-select"
         name="fruit"
         defaultValue=""
         required
@@ -65,11 +36,11 @@ function FruitPicker() {
           startTransition(() => setSaved(next));
         }}
       >
-        <Select.Trigger className="sl-trigger">
+        <Select.Trigger className="sel-trigger">
           {({ pending }) => (
             <>
               <Select.Value />
-              {pending && <span className="sl-spinner" aria-hidden />}
+              {pending && <Spinner className="sel-spinner" />}
             </>
           )}
         </Select.Trigger>
@@ -110,13 +81,13 @@ function RejectingDemo() {
         Picking <em>Large</em> fails after 800 ms: the error reaches the boundary and the select
         rolls back.
       </p>
-      <DemoErrorBoundary>
+      <DemoErrorBoundary className="sel-error-box">
         <Select.Root
-          className="sl-select"
+          className="sel-select"
           defaultValue="m"
           valueChangeAction={(next) => fakeSave("size", next, { fail: next === "l" })}
         >
-          <Select.Trigger className="sl-trigger">
+          <Select.Trigger className="sel-trigger">
             <Select.Value />
           </Select.Trigger>
           <Select.Option value="s">Small</Select.Option>
@@ -153,13 +124,13 @@ function LateOptionsDemo() {
         which React alone would not do.
       </p>
       <Select.Root
-        className="sl-select"
+        className="sel-select"
         value={country}
         valueChangeAction={(next) => {
           setCountry(next);
         }}
       >
-        <Select.Trigger className="sl-trigger">
+        <Select.Trigger className="sel-trigger">
           <Select.Value />
         </Select.Trigger>
         <Suspense
@@ -189,11 +160,11 @@ function ShippingDemo() {
         whenever its content changes.
       </p>
       <Select.Root
-        className="sl-select"
+        className="sel-select"
         defaultValue="standard"
         valueChangeAction={(next) => fakeSave("shipping", next)}
       >
-        <Select.Trigger className="sl-trigger">
+        <Select.Trigger className="sel-trigger">
           <Select.Value />
         </Select.Trigger>
         {["standard", "express"].map((v) => (
@@ -213,8 +184,7 @@ function ShippingDemo() {
 
 export function SelectDemo() {
   return (
-    <section>
-      <h2>Select</h2>
+    <Demo title="Select">
       <p>
         A real <code>&lt;select&gt;</code>. The styled picker is opt-in CSS:{" "}
         <code>appearance: base-select</code> on the select and its <code>::picker(select)</code>{" "}
@@ -224,6 +194,6 @@ export function SelectDemo() {
       <RejectingDemo />
       <LateOptionsDemo />
       <ShippingDemo />
-    </section>
+    </Demo>
   );
 }

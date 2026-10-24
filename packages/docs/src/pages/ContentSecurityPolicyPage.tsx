@@ -1,7 +1,7 @@
 import { STYLE_SHA256 } from "@funstack/ui/csp";
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout } from "../components/Example.js";
-import { PageHead } from "../components/PageHead.js";
+import { Callout } from "../components/Callout.js";
+import { DocPage } from "../components/DocPage.js";
 import { PropsTable, Table } from "../components/Tables.js";
 
 const menuHash = `'sha256-${STYLE_SHA256["@funstack/ui/menu-point"]}'`;
@@ -9,12 +9,10 @@ const tooltipHash = `'sha256-${STYLE_SHA256["@funstack/ui/tooltip-warm"]}'`;
 
 export function ContentSecurityPolicyPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Content Security Policy"
-        description="What a strict style-src needs for FUNSTACK UI: the SHA-256 of the two shipped stylesheets (STYLE_SHA256) or a nonce through CSPProvider, and style-src-attr for server-rendered inline styles."
-      />
-      <h2>Content Security Policy</h2>
+    <DocPage
+      title="Content Security Policy"
+      description="What a strict style-src needs for FUNSTACK UI: the SHA-256 of the two shipped stylesheets (STYLE_SHA256) or a nonce through CSPProvider, and style-src-attr for server-rendered inline styles."
+    >
       <p className="page-intro">
         FUNSTACK UI ships no visual CSS, but it does use inline styles for placement and two tiny
         functional stylesheets. Under a <code>style-src</code> that lists nonces or hashes instead
@@ -152,6 +150,6 @@ renderToReadableStream(<App nonce={nonce} />, { nonce: { script: nonce, style: n
           stylesheet.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

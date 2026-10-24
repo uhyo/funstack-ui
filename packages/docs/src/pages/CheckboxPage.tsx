@@ -1,23 +1,19 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxForm } from "../examples/CheckboxForm.js";
-import checkboxFormSource from "../examples/CheckboxForm.tsx?raw";
 import { CheckboxSelectAll } from "../examples/CheckboxSelectAll.js";
-import checkboxSelectAllSource from "../examples/CheckboxSelectAll.tsx?raw";
-import checkboxCss from "../examples/checkbox.css?raw";
 
 export function CheckboxPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Checkbox"
-        description="A native <input type=checkbox> with an async checkedChangeAction, optimistic checked state, a controlled indeterminate state and native form participation."
-      />
-      <h2>Checkbox</h2>
+    <DocPage
+      title="Checkbox"
+      description="A native <input type=checkbox> with an async checkedChangeAction, optimistic checked state, a controlled indeterminate state and native form participation."
+    >
       <p className="page-intro">
         A checkbox (WAI-ARIA Checkbox pattern, two-state and mixed). It renders a real{" "}
         <code>&lt;input type="checkbox"&gt;</code> and behaves like{" "}
@@ -26,12 +22,7 @@ export function CheckboxPage() {
         a controlled <code>indeterminate</code> state for "select all" parents.
       </p>
 
-      <Example
-        source={checkboxSelectAllSource}
-        fileName="CheckboxSelectAll.tsx"
-        css={checkboxCss}
-        cssFileName="checkbox.css"
-      >
+      <Example file="CheckboxSelectAll.tsx" css="checkbox.css">
         <CheckboxSelectAll />
       </Example>
 
@@ -145,7 +136,6 @@ export function CheckboxPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: "–",
             description:
               "Forwarded to the Checkbox's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the check itself.",
           },
@@ -293,12 +283,7 @@ export function CheckboxPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={checkboxFormSource}
-        fileName="CheckboxForm.tsx"
-        css={checkboxCss}
-        cssFileName="checkbox.css"
-      >
+      <Example file="CheckboxForm.tsx" css="checkbox.css">
         <CheckboxForm />
       </Example>
       <p>
@@ -322,6 +307,6 @@ export function CheckboxPage() {
           posts its value when checked.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

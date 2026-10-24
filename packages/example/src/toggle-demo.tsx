@@ -1,21 +1,10 @@
-import { Component, startTransition, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { startTransition, useRef, useState } from "react";
 import { Toggle } from "@funstack/ui/toggle";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave } from "./shared/fake-backend.js";
+import { Spinner } from "./shared/Spinner.js";
+import { Demo } from "./shared/Demo.js";
 import "./toggle-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fake backend: resolves after 800 ms; rejects when asked to. */
-async function fakeSave(label: string, next: boolean, { fail = false } = {}): Promise<void> {
-  console.log(`[${label}] saving pressed=${next}`);
-  await sleep(800);
-  if (fail) throw new Error(`[${label}] the server rejected pressed=${next}`);
-  console.log(`[${label}] saved pressed=${next}`);
-}
-
-function Spinner() {
-  return <span className="spinner" aria-hidden />;
-}
 
 function StarIcon({ filled }: { filled: boolean }) {
   return (
@@ -23,28 +12,6 @@ function StarIcon({ filled }: { filled: boolean }) {
       {filled ? "★" : "☆"}
     </span>
   );
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 function UncontrolledDemo() {
@@ -208,14 +175,13 @@ function DisabledDemo() {
 
 export function ToggleDemo() {
   return (
-    <article className="demo">
-      <h2>Toggle</h2>
+    <Demo title="Toggle">
       <UncontrolledDemo />
       <ControlledDemo />
       <ControlledVetoDemo />
       <RejectingDemo />
       <TransitionDemo />
       <DisabledDemo />
-    </article>
+    </Demo>
   );
 }

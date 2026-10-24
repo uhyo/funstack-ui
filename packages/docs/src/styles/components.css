@@ -45,24 +45,6 @@
   display: block;
 }
 
-/* Feature Cards */
-.feature-card {
-  padding: 24px;
-  background: var(--color-bg-secondary);
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-}
-
-.feature-card h3 {
-  margin: 0 0 8px;
-  color: var(--color-text);
-}
-
-.feature-card p {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
 /* Props Table */
 /* Wide tables scroll within this container instead of widening the page */
 .table-scroll {
@@ -89,61 +71,4 @@
 
 .props-table td code {
   font-size: 0.85rem;
-}
-
-/* Sub-navigation (API, Learn) */
-.api-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: 32px;
-}
-
-.api-nav a {
-  font-weight: 500;
-}
-
-.api-nav a.active {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.api-nav .nav-group-label {
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-secondary);
-  align-self: center;
-  padding-left: 8px;
-  border-left: 2px solid var(--color-primary);
-}
-
-/* API Item */
-.api-item {
-  padding: 24px 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.api-item:last-child {
-  border-bottom: none;
-}
-
-.api-item h3 {
-  margin: 0 0 12px;
-}
-
-.api-item h3 code {
-  overflow-wrap: anywhere;
-  font-size: 1.1rem;
-  background: var(--color-bg-secondary);
-  padding: 4px 12px;
-}
-
-.api-item h4 {
-  margin: 24px 0 12px;
-  font-size: 1rem;
-  color: var(--color-text-secondary);
 }

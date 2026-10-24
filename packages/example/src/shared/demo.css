@@ -1,0 +1,50 @@
+/* Rules every demo shares. Imported once, from main.tsx, before the demos' own stylesheets. */
+
+.demo section {
+  margin-block: 1.5rem;
+}
+
+.readout {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.inline-error {
+  color: #b91c1c;
+}
+
+/* The default look of DemoErrorBoundary. */
+.error-box {
+  padding: 0.75rem 1rem;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+/* The default look of Spinner. */
+.spinner {
+  inline-size: 1em;
+  block-size: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* View transitions are document-wide, so one reduced-motion rule covers every demo. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

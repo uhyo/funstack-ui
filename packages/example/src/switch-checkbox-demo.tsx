@@ -1,41 +1,11 @@
-import { Component, startTransition, useOptimistic, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { startTransition, useOptimistic, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Checkbox } from "@funstack/ui/checkbox";
 import { Switch } from "@funstack/ui/switch";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./switch-checkbox-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fake backend: resolves after 800 ms; rejects when asked to. */
-async function fakeSave(label: string, value: unknown, { fail = false } = {}): Promise<void> {
-  console.log(`[${label}] saving ${JSON.stringify(value)}`);
-  await sleep(800);
-  if (fail) throw new Error(`[${label}] the server rejected ${JSON.stringify(value)}`);
-  console.log(`[${label}] saved ${JSON.stringify(value)}`);
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 function AutosaveDemo() {
   return (
@@ -260,7 +230,7 @@ function SelectAllDemo() {
         />
         Make the next save fail
       </label>
-      <div className="stack select-all">
+      <div className="stack">
         <label className="row">
           <Checkbox
             className="sc-checkbox"
@@ -311,14 +281,13 @@ function SiblingThumbDemo() {
 
 export function SwitchCheckboxDemo() {
   return (
-    <article className="demo">
-      <h2>Switch and Checkbox</h2>
+    <Demo title="Switch and Checkbox">
       <AutosaveDemo />
       <RejectingDemo />
       <ControlledVetoDemo />
       <FormDemo />
       <SelectAllDemo />
       <SiblingThumbDemo />
-    </article>
+    </Demo>
   );
 }

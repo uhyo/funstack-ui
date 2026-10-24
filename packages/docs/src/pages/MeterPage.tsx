@@ -1,23 +1,18 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MeterStorage } from "../examples/MeterStorage.js";
-import meterStorageSource from "../examples/MeterStorage.tsx?raw";
 import { MeterStrength } from "../examples/MeterStrength.js";
-import meterStrengthSource from "../examples/MeterStrength.tsx?raw";
-import meterCss from "../examples/meter.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function MeterPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Meter"
-        description="A gauge on div[role=meter] with the platform's low / high / optimum regions, localised aria-valuetext, and a Root that is itself a Server Component."
-      />
-      <h2>Meter</h2>
+    <DocPage
+      title="Meter"
+      description="A gauge on div[role=meter] with the platform's low / high / optimum regions, localised aria-valuetext, and a Root that is itself a Server Component."
+    >
       <p className="page-intro">
         A scalar measurement within a known range (WAI-ARIA <code>meter</code>): storage used, a
         password's strength, a battery. Output-only and directive-free like{" "}
@@ -27,12 +22,7 @@ export function MeterPage() {
         decide whether the value is good, not so good, or bad.
       </p>
 
-      <Example
-        source={meterStorageSource}
-        fileName="MeterStorage.tsx"
-        css={meterCss}
-        cssFileName="meter.css"
-      >
+      <Example file="MeterStorage.tsx" css="meter.css">
         <MeterStorage />
       </Example>
       <p>
@@ -250,14 +240,9 @@ export function MeterPage() {
         <code>aria-describedby</code>. A <code>Field.Root</code> whose only content is a Meter is
         not supported: use a plain element with the Meter's own label.
       </p>
-      <Example
-        source={meterStrengthSource}
-        fileName="MeterStrength.tsx"
-        css={meterCss}
-        cssFileName="meter.css"
-      >
+      <Example file="MeterStrength.tsx" css="meter.css">
         <MeterStrength />
       </Example>
-    </div>
+    </DocPage>
   );
 }

@@ -1,10 +1,10 @@
-import { Component, Suspense, startTransition, use, useState } from "react";
-import type { ReactNode } from "react";
+import { Suspense, startTransition, use, useState } from "react";
 import { Combobox } from "@funstack/ui/combobox";
 import { Dialog } from "@funstack/ui/dialog";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./combobox-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 interface Country {
   readonly code: string;
@@ -58,36 +58,6 @@ function searchCountries(query: string): Promise<readonly Country[]> {
   return promise;
 }
 
-/** Fake backend: resolves after 900 ms; rejects when asked to. */
-async function fakeSave(label: string, value: unknown, { fail = false } = {}): Promise<void> {
-  console.log(`[${label}] saving ${JSON.stringify(value)}`);
-  await sleep(900);
-  if (fail) throw new Error(`[${label}] the server rejected ${JSON.stringify(value)}`);
-  console.log(`[${label}] saved ${JSON.stringify(value)}`);
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="cb-error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 function CountryOptions({ query }: { query: string }) {
   const results = use(searchCountries(query));
   return results.map((c) => (
@@ -126,11 +96,11 @@ function CountryPicker() {
         <input type="checkbox" checked={fail} onChange={(e) => setFail(e.target.checked)} /> Make
         the save fail
       </label>
-      <DemoErrorBoundary>
+      <DemoErrorBoundary className="cb-error-box">
         <Combobox.Root
           name="country"
           valueChangeAction={async (next) => {
-            await fakeSave("country", next, { fail });
+            await fakeSave("country", next, { fail, ms: 900 });
             startTransition(() => setSaved(next));
           }}
         >
@@ -256,8 +226,7 @@ function InDialog() {
 
 export function ComboboxDemo() {
   return (
-    <section className="cb-demo">
-      <h2>Combobox</h2>
+    <Demo title="Combobox" className="cb-demo">
       <p>
         Before hydration the input is a plain text field: text typed then is kept and adopted at
         mount (<code>reason: &quot;platform&quot;</code>), and nothing opens until the next
@@ -266,6 +235,6 @@ export function ComboboxDemo() {
       <CountryPicker />
       <TagInput />
       <InDialog />
-    </section>
+    </Demo>
   );
 }

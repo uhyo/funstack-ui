@@ -1,6 +1,6 @@
 /* The opt-in: engines without customizable select keep the native select. Two rules, because an
    engine that does not know `::picker(select)` drops the whole rule. */
-.sl-select {
+.sel-select {
   appearance: base-select;
   min-inline-size: 14em;
   border: 1px solid GrayText;
@@ -8,34 +8,34 @@
   padding: 0.4em 0.6em;
   font: inherit;
 }
-.sl-select::picker(select) {
+.sel-select::picker(select) {
   appearance: base-select;
 }
 
-.sl-select[data-pending] {
+.sel-select[data-pending] {
   cursor: progress;
 }
-.sl-select[data-pending] selectedcontent {
+.sel-select[data-pending] selectedcontent {
   opacity: 0.6;
 }
-.sl-select:user-invalid {
+.sel-select:user-invalid {
   border-color: crimson;
 }
-.sl-select::picker-icon {
+.sel-select::picker-icon {
   content: "▾";
   transition: rotate 120ms;
 }
-.sl-select:open::picker-icon {
+.sel-select:open::picker-icon {
   rotate: 180deg;
 }
 
-.sl-trigger {
+.sel-trigger {
   display: flex;
   align-items: center;
   gap: 0.5em;
 }
 
-.sl-select::picker(select) {
+.sel-select::picker(select) {
   border: 1px solid GrayText;
   border-radius: 8px;
   padding: 4px;
@@ -45,72 +45,72 @@
     overlay 120ms allow-discrete,
     display 120ms allow-discrete;
 }
-.sl-select:open::picker(select) {
+.sel-select:open::picker(select) {
   opacity: 1;
   @starting-style {
     opacity: 0;
   }
 }
 
-.sl-select option {
+.sel-select option {
   padding: 0.4em 0.6em;
   border-radius: 4px;
   display: flex;
   align-items: center;
   gap: 0.5em;
 }
-.sl-select option:hover,
-.sl-select option:focus-visible {
+.sel-select option:hover,
+.sel-select option:focus-visible {
   background: Highlight;
   color: HighlightText;
 }
-.sl-select option:checked {
+.sel-select option:checked {
   font-weight: 600;
 }
-.sl-select option::checkmark {
+.sel-select option::checkmark {
   content: "✓";
   order: 1;
   margin-inline-start: auto;
 }
-.sl-select option[data-pending]::after {
+.sel-select option[data-pending]::after {
   content: "…";
 }
-.sl-select option:disabled {
+.sel-select option:disabled {
   opacity: 0.4;
 }
-.sl-select optgroup legend {
+.sel-select optgroup legend {
   font-size: 0.85em;
   color: GrayText;
 }
 
-.sl-swatch,
-selectedcontent .sl-swatch {
+.sel-swatch,
+selectedcontent .sel-swatch {
   inline-size: 0.8em;
   block-size: 0.8em;
 }
 
-.sl-spinner {
+.sel-spinner {
   inline-size: 0.8em;
   block-size: 0.8em;
   border: 2px solid currentColor;
   border-inline-end-color: transparent;
   border-radius: 50%;
-  animation: sl-spin 0.8s linear infinite;
+  animation: sel-spin 0.8s linear infinite;
 }
-@keyframes sl-spin {
+@keyframes sel-spin {
   to {
     rotate: 1turn;
   }
 }
 
-.sl-error-box {
+.sel-error-box {
   border: 1px solid crimson;
   padding: 0.5em 1em;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sl-select::picker(select),
-  .sl-select::picker-icon {
+  .sel-select::picker(select),
+  .sel-select::picker-icon {
     transition: none;
   }
 }

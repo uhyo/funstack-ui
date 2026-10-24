@@ -1,18 +1,15 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample, Term } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
-import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
 
 export function ServerComponentsPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Server Components"
-        description="FUNSTACK UI parts are client modules that Server Components can render directly. Some behaviour works before hydration."
-      />
-      <h2>Server Components</h2>
+    <DocPage
+      title="Server Components"
+      description="FUNSTACK UI parts are client modules that Server Components can render directly. Some behaviour works before hydration."
+    >
       <p className="page-intro">
         A Server Component can render every FUNSTACK UI <a href="/getting-started#part">part</a>{" "}
         directly. Which behaviour works before hydration depends on how much of it the platform
@@ -160,10 +157,10 @@ import { saveOpenSections } from "./actions"; // "use server"
           page behind a Suspense boundary, which needs a small inline script to reveal it, so here
           it needs JavaScript enabled, but not the library's.)
         </p>
-        <Example source={accordionFaqSource} fileName="AccordionFaq.tsx">
+        <Example file="AccordionFaq.tsx">
           <AccordionFaq />
         </Example>
       </ConceptExample>
-    </div>
+    </DocPage>
   );
 }

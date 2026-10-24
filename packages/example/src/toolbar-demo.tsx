@@ -1,18 +1,20 @@
-import { Component, startTransition, useState } from "react";
+import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@funstack/ui/button";
 import { Menu } from "@funstack/ui/menu";
 import { ToggleGroup } from "@funstack/ui/toggle-group";
 import { Toolbar } from "@funstack/ui/toolbar";
 import { Tooltip } from "@funstack/ui/tooltip";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
+// The tooltip and menu inside the toolbar reuse those demos' .tip and .menu rules.
+import "./menu-demo.css";
+import "./tooltip-demo.css";
 import "./toolbar-demo.css";
 
 const supportsFocusgroup =
   typeof HTMLElement !== "undefined" && "focusGroup" in HTMLElement.prototype;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /** A fake backend that fails when the "fail" switch is on. */
 async function save(label: string, value: unknown, fail: boolean): Promise<void> {
@@ -20,28 +22,6 @@ async function save(label: string, value: unknown, fail: boolean): Promise<void>
   await sleep(800);
   if (fail) throw new Error(`Saving ${label} failed`);
   console.log(`[toolbar] saved ${label}`, value);
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 function BoldIcon() {
@@ -255,8 +235,7 @@ export function ToolbarDemo() {
   const [focusgroup, setFocusgroup] = useState(false);
   const [fail, setFail] = useState(false);
   return (
-    <section>
-      <h2>Toolbar and ToggleGroup</h2>
+    <Demo title="Toolbar and ToggleGroup">
       <fieldset>
         <legend>Options</legend>
         <label>
@@ -284,6 +263,6 @@ export function ToolbarDemo() {
       </DemoErrorBoundary>
       <VerticalToolbar focusgroup={focusgroup} />
       <StandaloneGroup />
-    </section>
+    </Demo>
   );
 }

@@ -1,25 +1,19 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { RadioGroupForm } from "../examples/RadioGroupForm.js";
-import radioGroupFormSource from "../examples/RadioGroupForm.tsx?raw";
 import { RadioGroupRtl } from "../examples/RadioGroupRtl.js";
-import radioGroupRtlSource from "../examples/RadioGroupRtl.tsx?raw";
 import { RadioGroupTheme } from "../examples/RadioGroupTheme.js";
-import radioGroupThemeSource from "../examples/RadioGroupTheme.tsx?raw";
-import radioGroupCss from "../examples/radio-group.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function RadioGroupPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="RadioGroup"
-        description="A radio group of native <input type=radio> in a <fieldset>: native keyboard and forms, an async valueChangeAction, optimistic checked state and data-pending."
-      />
-      <h2>RadioGroup</h2>
+    <DocPage
+      title="RadioGroup"
+      description="A radio group of native <input type=radio> in a <fieldset>: native keyboard and forms, an async valueChangeAction, optimistic checked state and data-pending."
+    >
       <p className="page-intro">
         A radio group (WAI-ARIA Radio Group pattern, native radio variant): a{" "}
         <code>&lt;fieldset&gt;</code> of real <code>&lt;input type="radio"&gt;</code> elements. The
@@ -29,12 +23,7 @@ export function RadioGroupPage() {
         <code>data-pending</code>.
       </p>
 
-      <Example
-        source={radioGroupThemeSource}
-        fileName="RadioGroupTheme.tsx"
-        css={radioGroupCss}
-        cssFileName="radio-group.css"
-      >
+      <Example file="RadioGroupTheme.tsx" css="radio-group.css">
         <RadioGroupTheme />
       </Example>
 
@@ -181,7 +170,6 @@ export function RadioGroupPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: "–",
             description:
               "Forwarded to the Item's `<ViewTransition default>`; without it no boundary is rendered. Fires only on the commit that settles an action or rolls it back, never on the check itself.",
           },
@@ -295,12 +283,7 @@ export function RadioGroupPage() {
           (the browser does the roving).
         </li>
       </ul>
-      <Example
-        source={radioGroupRtlSource}
-        fileName="RadioGroupRtl.tsx"
-        css={radioGroupCss}
-        cssFileName="radio-group.css"
-      >
+      <Example file="RadioGroupRtl.tsx" css="radio-group.css">
         <RadioGroupRtl />
       </Example>
 
@@ -388,12 +371,7 @@ export function RadioGroupPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={radioGroupFormSource}
-        fileName="RadioGroupForm.tsx"
-        css={radioGroupCss}
-        cssFileName="radio-group.css"
-      >
+      <Example file="RadioGroupForm.tsx" css="radio-group.css">
         <RadioGroupForm />
       </Example>
       <ul>
@@ -432,6 +410,6 @@ export function RadioGroupPage() {
         be combined. An action-less group is a working native radio group before hydration and with
         JavaScript off.
       </p>
-    </div>
+    </DocPage>
   );
 }

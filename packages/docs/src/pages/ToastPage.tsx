@@ -1,27 +1,21 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example, ExampleSource } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToastArchive } from "../examples/ToastArchive.js";
-import toastArchiveSource from "../examples/ToastArchive.tsx?raw";
 import { ToastNotifications } from "../examples/ToastNotifications.js";
-import toastNotificationsSource from "../examples/ToastNotifications.tsx?raw";
 import { ToastUndoWindow } from "../examples/ToastUndoWindow.js";
-import toastUndoWindowSource from "../examples/ToastUndoWindow.tsx?raw";
 import { ToastUrgent } from "../examples/ToastUrgent.js";
-import toastUrgentSource from "../examples/ToastUrgent.tsx?raw";
-import toastCss from "../examples/toast.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function ToastPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Toast"
-        description="Notifications fed by a toast() function and rendered by your own Viewport: an urgent queue that shows while the action it reports on is still pending, promise toasts, an Undo action prop, closeAction for the Undo window, ariaNotify announcements, and a region that stays interactive above modal dialogs."
-      />
-      <h2>Toast</h2>
+    <DocPage
+      title="Toast"
+      description="Notifications fed by a toast() function and rendered by your own Viewport: an urgent queue that shows while the action it reports on is still pending, promise toasts, an Undo action prop, closeAction for the Undo window, ariaNotify announcements, and a region that stays interactive above modal dialogs."
+    >
       <p className="page-intro">
         Toasts report on something that already happened or is happening elsewhere. The input is a
         function, <code>toast()</code>, callable from anywhere: an action body, a store, an effect.
@@ -37,12 +31,7 @@ export function ToastPage() {
       {/* The one Viewport of this page; every example below feeds it. */}
       <ToastNotifications />
 
-      <Example
-        source={toastArchiveSource}
-        fileName="ToastArchive.tsx"
-        css={toastCss}
-        cssFileName="toast.css"
-      >
+      <Example file="ToastArchive.tsx" css="toast.css">
         <ToastArchive />
       </Example>
 
@@ -68,7 +57,7 @@ export function ToastPage() {
 // Anywhere on the client:
 toast({ title: "Link copied" });`}</CodeBlock>
       <p>This page's Viewport, which every example on it feeds:</p>
-      <CodeBlock title="ToastNotifications.tsx">{toastNotificationsSource}</CodeBlock>
+      <ExampleSource file="ToastNotifications.tsx" />
       <ul>
         <li>
           <strong>No Provider.</strong> <code>toast</code> is bound to a module-level default
@@ -104,7 +93,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         and shows at once; calls keep their order. Everything a toast <em>drives</em> is a
         transition as usual: its Action's action and its <code>closeAction</code>.
       </p>
-      <Example source={toastUrgentSource} fileName="ToastUrgent.tsx">
+      <Example file="ToastUrgent.tsx">
         <ToastUrgent />
       </Example>
       <p>
@@ -173,7 +162,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         message for its outcome) or <code>"timeout"</code>. That is the "do later, unless undone"
         pattern:
       </p>
-      <Example source={toastUndoWindowSource} fileName="ToastUndoWindow.tsx">
+      <Example file="ToastUndoWindow.tsx">
         <ToastUndoWindow />
       </Example>
 
@@ -585,6 +574,6 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </li>
         <li>No swipe to dismiss yet: Close, Escape and the timer cover WCAG 2.5.1.</li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

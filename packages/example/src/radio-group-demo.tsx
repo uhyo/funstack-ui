@@ -1,40 +1,10 @@
-import { Component, startTransition, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { startTransition, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { RadioGroup } from "@funstack/ui/radio-group";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./radio-group-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fake backend: resolves after 800 ms; rejects when asked to. */
-async function fakeSave(label: string, value: unknown, { fail = false } = {}): Promise<void> {
-  console.log(`[${label}] saving ${JSON.stringify(value)}`);
-  await sleep(800);
-  if (fail) throw new Error(`[${label}] the server rejected ${JSON.stringify(value)}`);
-  console.log(`[${label}] saved ${JSON.stringify(value)}`);
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="rg-error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 const themes = [
   { id: "light", label: "Light" },
@@ -81,7 +51,7 @@ function RejectingDemo() {
     <section>
       <h3>Rejecting action inside an Error Boundary</h3>
       <p>Every save rejects after 800 ms; the boundary around the group shows the error.</p>
-      <DemoErrorBoundary>
+      <DemoErrorBoundary className="rg-error-box">
         <RadioGroup.Root
           className="rg-group"
           defaultValue="light"
@@ -238,13 +208,12 @@ function RtlDemo() {
 
 export function RadioGroupDemo() {
   return (
-    <article className="demo">
-      <h2>RadioGroup</h2>
+    <Demo title="RadioGroup">
       <AutosaveDemo />
       <RejectingDemo />
       <ControlledVetoDemo />
       <FormDemo />
       <RtlDemo />
-    </article>
+    </Demo>
   );
 }

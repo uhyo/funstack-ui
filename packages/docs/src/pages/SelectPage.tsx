@@ -1,25 +1,20 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SelectCountry } from "../examples/SelectCountry.js";
-import selectCountrySource from "../examples/SelectCountry.tsx?raw";
 import { SelectForm } from "../examples/SelectForm.js";
-import selectFormSource from "../examples/SelectForm.tsx?raw";
 import { SelectFruit } from "../examples/SelectFruit.js";
-import selectFruitSource from "../examples/SelectFruit.tsx?raw";
-import selectCss from "../examples/select.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function SelectPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Select"
-        description="A real <select>, progressively enhanced with customizable select (appearance: base-select): native forms, keyboard and pickers, an async valueChangeAction, optimistic selection and data-pending."
-      />
-      <h2>Select</h2>
+    <DocPage
+      title="Select"
+      description="A real <select>, progressively enhanced with customizable select (appearance: base-select): native forms, keyboard and pickers, an async valueChangeAction, optimistic selection and data-pending."
+    >
       <p className="page-intro">
         A real <code>&lt;select&gt;</code>. The platform gives it form participation,{" "}
         <code>required</code>, autofill, typeahead, option groups, the native combobox semantics,
@@ -31,12 +26,7 @@ export function SelectPage() {
         <code>&lt;select&gt;</code>.
       </p>
 
-      <Example
-        source={selectFruitSource}
-        fileName="SelectFruit.tsx"
-        css={selectCss}
-        cssFileName="select.css"
-      >
+      <Example file="SelectFruit.tsx" css="select.css">
         <SelectFruit />
       </Example>
 
@@ -406,12 +396,7 @@ export function SelectPage() {
         }
       >
         <h4 id="options-that-load-later">Options that load later</h4>
-        <Example
-          source={selectCountrySource}
-          fileName="SelectCountry.tsx"
-          css={selectCss}
-          cssFileName="select.css"
-        >
+        <Example file="SelectCountry.tsx" css="select.css">
           <SelectCountry />
         </Example>
         <p>
@@ -472,12 +457,7 @@ export function SelectPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={selectFormSource}
-        fileName="SelectForm.tsx"
-        css={selectCss}
-        cssFileName="select.css"
-      >
+      <Example file="SelectForm.tsx" css="select.css">
         <SelectForm />
       </Example>
       <ul>
@@ -605,6 +585,6 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         <code>@media (pointer: fine)</code> if you need the wheel). Search, free text and async
         loading on open are <a href="/components/combobox">Combobox</a>'s job.
       </p>
-    </div>
+    </DocPage>
   );
 }

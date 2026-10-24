@@ -1,43 +1,10 @@
-import { Component, startTransition, use, useState } from "react";
-import type { ReactNode } from "react";
+import { startTransition, use, useState } from "react";
 import { Accordion } from "@funstack/ui/accordion";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Spinner } from "./shared/Spinner.js";
+import { Demo } from "./shared/Demo.js";
 import "./accordion-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fake backend: resolves after 800 ms; rejects when asked to. */
-async function fakeSave(label: string, next: unknown, { fail = false } = {}): Promise<void> {
-  console.log(`[${label}] saving value=${JSON.stringify(next)}`);
-  await sleep(800);
-  if (fail) throw new Error(`[${label}] the server rejected value=${JSON.stringify(next)}`);
-  console.log(`[${label}] saved value=${JSON.stringify(next)}`);
-}
-
-function Spinner() {
-  return <span className="spinner" aria-hidden />;
-}
-
-class DemoErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div role="alert" className="error-box">
-          <p>Error Boundary caught: {this.state.error.message}</p>
-          <button type="button" onClick={() => this.setState({ error: null })}>
-            Reset
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 const faq = [
   {
@@ -358,8 +325,7 @@ function InterpolateSizeDemo() {
 
 export function AccordionDemo() {
   return (
-    <article className="demo">
-      <h2>Accordion</h2>
+    <Demo title="Accordion">
       <p>
         Built on <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code>.
         ArrowUp/ArrowDown/Home/End move between triggers in every section; Enter/Space toggle
@@ -372,6 +338,6 @@ export function AccordionDemo() {
       <RejectingDemo />
       <TransitionDemo />
       <InterpolateSizeDemo />
-    </article>
+    </Demo>
   );
 }

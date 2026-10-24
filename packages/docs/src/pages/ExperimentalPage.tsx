@@ -1,15 +1,13 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { Table } from "../components/Tables.js";
 
 export function ExperimentalPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Experimental features"
-        description="Platform features that are not in every engine yet are opt-in through experimental_* props on the part that uses them."
-      />
-      <h2>Experimental features</h2>
+    <DocPage
+      title="Experimental features"
+      description="Platform features that are not in every engine yet are opt-in through experimental_* props on the part that uses them."
+    >
       <p className="page-intro">
         FUNSTACK UI supports the latest stable Blink, WebKit and Gecko, with no fallbacks for older
         browsers. Features that have not shipped in all three yet are still used, but only when you
@@ -101,6 +99,6 @@ export function ExperimentalPage() {
         <code>@funstack/ui/experimental</code> subpath. None does yet: every current component has a
         baseline that works in all engines.
       </p>
-    </div>
+    </DocPage>
   );
 }

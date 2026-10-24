@@ -1,25 +1,20 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SliderField } from "../examples/SliderField.js";
-import sliderFieldSource from "../examples/SliderField.tsx?raw";
 import { SliderPrice } from "../examples/SliderPrice.js";
-import sliderPriceSource from "../examples/SliderPrice.tsx?raw";
 import { SliderVolume } from "../examples/SliderVolume.js";
-import sliderVolumeSource from "../examples/SliderVolume.tsx?raw";
-import sliderCss from "../examples/slider.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function SliderPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Slider"
-        description="A slider on a visually hidden native <input type=range> per thumb: every step a transition, each gesture saved once with rollback, multi-thumb, vertical and RTL."
-      />
-      <h2>Slider</h2>
+    <DocPage
+      title="Slider"
+      description="A slider on a visually hidden native <input type=range> per thumb: every step a transition, each gesture saved once with rollback, multi-thumb, vertical and RTL."
+    >
       <p className="page-intro">
         A slider (WAI-ARIA Slider and Slider (Multi-Thumb) patterns) and the library's first
         continuous control. Each thumb is a styleable element containing a visually hidden native{" "}
@@ -30,12 +25,7 @@ export function SliderPage() {
         <strong>commit</strong>.
       </p>
 
-      <Example
-        source={sliderVolumeSource}
-        fileName="SliderVolume.tsx"
-        css={sliderCss}
-        cssFileName="slider.css"
-      >
+      <Example file="SliderVolume.tsx" css="slider.css">
         <SliderVolume />
       </Example>
 
@@ -507,22 +497,12 @@ export function SliderPage() {
 
       <h3 id="recipes">Recipes</h3>
       <h4>A live filter</h4>
-      <Example
-        source={sliderPriceSource}
-        fileName="SliderPrice.tsx"
-        css={sliderCss}
-        cssFileName="slider.css"
-      >
+      <Example file="SliderPrice.tsx" css="slider.css">
         <SliderPrice />
       </Example>
 
       <h4 id="inside-a-field">Inside a Field</h4>
-      <Example
-        source={sliderFieldSource}
-        fileName="SliderField.tsx"
-        css={sliderCss}
-        cssFileName="slider.css"
-      >
+      <Example file="SliderField.tsx" css="slider.css">
         <SliderField />
       </Example>
       <ul>
@@ -556,6 +536,6 @@ export function SliderPage() {
           Slider's own save is its <code>data-pending</code>, the form's submission is the Field's.
         </li>
       </ul>
-    </div>
+    </DocPage>
   );
 }

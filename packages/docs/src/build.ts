@@ -2,8 +2,9 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BuildEntryFunction } from "@funstack/static/server";
+import { checkInternalLinks } from "./checkLinks.js";
 import { collectSitePaths } from "./entries.js";
-import { SITE_URL } from "./pageMeta.js";
+import { SITE_URL } from "./site.js";
 
 function generateSitemap(): string {
   const pagePaths = collectSitePaths().filter((p) => p !== "/*");
@@ -21,4 +22,8 @@ export default (async ({ build, outDir }) => {
   // Render errors (RSC, deferred components, prerendering) fail the build in @funstack/static
   // itself: `failOnRenderError` is on by default since 1.3.3 (#72).
   await Promise.all([build(), writeFile(path.join(outDir, "sitemap.xml"), generateSitemap())]);
+  const brokenLinks = await checkInternalLinks(outDir);
+  if (brokenLinks.length > 0) {
+    throw new Error(`Broken internal links:\n${brokenLinks.join("\n")}`);
+  }
 }) satisfies BuildEntryFunction;

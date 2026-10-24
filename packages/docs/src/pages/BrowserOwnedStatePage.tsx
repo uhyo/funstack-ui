@@ -1,16 +1,14 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample, Terms } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { Table } from "../components/Tables.js";
 
 export function BrowserOwnedStatePage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Browser-owned state"
-        description="Some state belongs to the browser: the popover top layer, <details open>, dismissing a <dialog>, a native input before React hears about it. FUNSTACK UI observes it instead of driving it."
-      />
-      <h2>Browser-owned state</h2>
+    <DocPage
+      title="Browser-owned state"
+      description="Some state belongs to the browser: the popover top layer, <details open>, dismissing a <dialog>, a native input before React hears about it. FUNSTACK UI observes it instead of driving it."
+    >
       <p className="page-intro">
         "Transition by default" is about state the library owns. Some state belongs to the browser,
         which changes it before React hears about it. FUNSTACK UI prefers that state whenever the
@@ -229,6 +227,6 @@ export function BrowserOwnedStatePage() {
           because the browser clears it on the click.
         </p>
       </ConceptExample>
-    </div>
+    </DocPage>
   );
 }

@@ -1,23 +1,19 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToolbarEditor } from "../examples/ToolbarEditor.js";
-import toolbarEditorSource from "../examples/ToolbarEditor.tsx?raw";
 import { ToolbarVertical } from "../examples/ToolbarVertical.js";
-import toolbarVerticalSource from "../examples/ToolbarVertical.tsx?raw";
-import toolbarCss from "../examples/toolbar.css?raw";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ToolbarPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Toolbar"
-        description="A WAI-ARIA toolbar with one Tab stop and arrow keys over any focusable children: toggles, menu buttons, links, inputs. No wrapper parts."
-      />
-      <h2>Toolbar</h2>
+    <DocPage
+      title="Toolbar"
+      description="A WAI-ARIA toolbar with one Tab stop and arrow keys over any focusable children: toggles, menu buttons, links, inputs. No wrapper parts."
+    >
       <p className="page-intro">
         A <code>role="toolbar"</code> container (WAI-ARIA APG Toolbar pattern) with one Tab stop and
         arrow keys between its controls. Its items are its focusable descendants, found in the DOM:
@@ -28,12 +24,7 @@ export function ToolbarPage() {
         focusable when disabled inside a toolbar.
       </p>
 
-      <Example
-        source={toolbarEditorSource}
-        fileName="ToolbarEditor.tsx"
-        css={toolbarCss}
-        cssFileName="toolbar.css"
-      >
+      <Example file="ToolbarEditor.tsx" css="toolbar.css">
         <ToolbarEditor />
       </Example>
       <p>
@@ -321,7 +312,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
 
       <h3 id="recipes">Recipes</h3>
       <h4>Vertical toolbar</h4>
-      <Example source={toolbarVerticalSource} fileName="ToolbarVertical.tsx">
+      <Example file="ToolbarVertical.tsx">
         <ToolbarVertical />
       </Example>
       <p>
@@ -330,6 +321,6 @@ import { Toolbar } from "@funstack/ui/toolbar";
         on that side: <code>side="inline-end"</code>, the right in LTR and the left in a
         right-to-left page or container. ArrowDown moves on to the next tool.
       </p>
-    </div>
+    </DocPage>
   );
 }

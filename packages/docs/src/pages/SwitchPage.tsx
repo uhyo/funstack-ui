@@ -1,23 +1,18 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SwitchForm } from "../examples/SwitchForm.js";
-import switchFormSource from "../examples/SwitchForm.tsx?raw";
 import { SwitchSettings } from "../examples/SwitchSettings.js";
-import switchSettingsSource from "../examples/SwitchSettings.tsx?raw";
-import switchCss from "../examples/switch.css?raw";
 
 export function SwitchPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Switch"
-        description="An on/off switch rendered as a native <input type=checkbox role=switch>: optimistic checked state, data-pending while checkedChangeAction runs, native form participation."
-      />
-      <h2>Switch</h2>
+    <DocPage
+      title="Switch"
+      description="An on/off switch rendered as a native <input type=checkbox role=switch>: optimistic checked state, data-pending while checkedChangeAction runs, native form participation."
+    >
       <p className="page-intro">
         An on/off switch (WAI-ARIA Switch pattern, HTML checkbox variant). It is a real{" "}
         <code>&lt;input type="checkbox" role="switch"&gt;</code>: the DOM <code>checked</code> is
@@ -25,12 +20,7 @@ export function SwitchPage() {
         <code>checkedChangeAction</code> runs, and it takes part in forms like any checkbox.
       </p>
 
-      <Example
-        source={switchSettingsSource}
-        fileName="SwitchSettings.tsx"
-        css={switchCss}
-        cssFileName="switch.css"
-      >
+      <Example file="SwitchSettings.tsx" css="switch.css">
         <SwitchSettings />
       </Example>
 
@@ -97,7 +87,6 @@ export function SwitchPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: "–",
             description:
               "Forwarded to the Switch's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the flip; animate the flip with CSS on `:checked`.",
           },
@@ -280,12 +269,7 @@ export function SwitchPage() {
       </BehaviourSection>
 
       <h3 id="forms">Forms</h3>
-      <Example
-        source={switchFormSource}
-        fileName="SwitchForm.tsx"
-        css={switchCss}
-        cssFileName="switch.css"
-      >
+      <Example file="SwitchForm.tsx" css="switch.css">
         <SwitchForm />
       </Example>
       <p>
@@ -328,6 +312,6 @@ export function SwitchPage() {
         A Switch with no action and no <code>checked</code> is a working native input before
         hydration and with JavaScript off.
       </p>
-    </div>
+    </DocPage>
   );
 }

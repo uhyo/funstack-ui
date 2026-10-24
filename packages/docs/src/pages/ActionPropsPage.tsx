@@ -1,19 +1,17 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample, Term, Terms } from "../components/Concept.js";
-import { Callout, Example } from "../components/Example.js";
-import { PageHead } from "../components/PageHead.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
+import { DocPage } from "../components/DocPage.js";
 import { Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
-import toggleErrorsSource from "../examples/ToggleErrors.tsx?raw";
 
 export function ActionPropsPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Action props"
-        description="FUNSTACK UI components take action props instead of event handlers. Actions run inside the component's transition, may be async, and report errors to Error Boundaries."
-      />
-      <h2>Action props</h2>
+    <DocPage
+      title="Action props"
+      description="FUNSTACK UI components take action props instead of event handlers. Actions run inside the component's transition, may be async, and report errors to Error Boundaries."
+    >
       <p className="page-intro">
         FUNSTACK UI has no <code>onClick</code>, <code>onChange</code> or <code>onValueChange</code>
         , with <a href="#urgent-lane">one exception, below</a>. Interactive props are{" "}
@@ -249,7 +247,7 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
         <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
-        <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
+        <Example file="ToggleErrors.tsx">
           <ToggleErrors />
         </Example>
       </ConceptExample>
@@ -383,6 +381,6 @@ type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> =
         <code>onClick</code> on a Toggle) are removed from its props type so they cannot be
         clobbered by accident.
       </p>
-    </div>
+    </DocPage>
   );
 }

@@ -1,17 +1,15 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { Term } from "../components/Concept.js";
-import { Callout } from "../components/Example.js";
-import { PageHead } from "../components/PageHead.js";
+import { Callout } from "../components/Callout.js";
+import { DocPage } from "../components/DocPage.js";
 import { Table } from "../components/Tables.js";
 
 export function GettingStartedPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Getting started"
-        description="Install @funstack/ui, import a component from its subpath, and style it with data attributes and CSS."
-      />
-      <h2>Getting started</h2>
+    <DocPage
+      title="Getting started"
+      description="Install @funstack/ui, import a component from its subpath, and style it with data attributes and CSS."
+    >
       <p className="page-intro">
         Install the package, import a component from its subpath, and style it with CSS. There is no
         provider, no theme and no stylesheet to import.
@@ -170,6 +168,6 @@ export function FavoriteButton({ postId, initial }: { postId: string; initial: b
           ["`experimental_*`", "Opt-in use of a platform feature that is not in every engine yet."],
         ]}
       />
-    </div>
+    </DocPage>
   );
 }

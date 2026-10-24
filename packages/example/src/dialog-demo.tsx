@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Dialog } from "@funstack/ui/dialog";
 import type { DialogOpenChangeDetails } from "@funstack/ui/dialog";
+import { sleep } from "./shared/fake-backend.js";
+import { Spinner } from "./shared/Spinner.js";
+import { Demo } from "./shared/Demo.js";
 import "./dialog-demo.css";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function logChange(label: string) {
   return (open: boolean, { reason, returnValue }: DialogOpenChangeDetails) => {
@@ -13,10 +14,6 @@ function logChange(label: string) {
       `[${label}] open=${open} reason=${reason} returnValue=${JSON.stringify(returnValue)}`,
     );
   };
-}
-
-function Spinner() {
-  return <span className="dlg-spinner" aria-hidden />;
 }
 
 class InlineErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -114,7 +111,7 @@ function OrderRow({ id }: { id: string }) {
       <span>Order #{id}</span>
       <Dialog.Root defaultOpen={false} openChangeAction={logChange(`order ${id}`)}>
         <Dialog.Trigger className="dlg-btn">
-          {({ pending }) => (pending ? <Spinner /> : "Details")}
+          {({ pending }) => (pending ? <Spinner className="dlg-spinner" /> : "Details")}
         </Dialog.Trigger>
         <Dialog.Popup className="dlg" initialFocus="[data-initial-focus]">
           <Dialog.Title>Order #{id}</Dialog.Title>
@@ -154,7 +151,7 @@ function SaveButton() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className="dlg-btn dlg-primary" value="save">
-      {pending ? <Spinner /> : null} Save
+      {pending ? <Spinner className="dlg-spinner" /> : null} Save
     </button>
   );
 }
@@ -344,7 +341,7 @@ function NestedDemo() {
                       });
                     }}
                   >
-                    {({ pending }) => (pending ? <Spinner /> : "Discard")}
+                    {({ pending }) => (pending ? <Spinner className="dlg-spinner" /> : "Discard")}
                   </Dialog.Close>
                 </div>
               </Dialog.Popup>
@@ -401,7 +398,7 @@ function TransitionDemo() {
         }}
       >
         <Dialog.Trigger className="dlg-btn">
-          {({ pending }) => (pending ? <Spinner /> : "Open")}
+          {({ pending }) => (pending ? <Spinner className="dlg-spinner" /> : "Open")}
         </Dialog.Trigger>
         <Dialog.Popup
           className="dlg dlg-vt"
@@ -419,7 +416,7 @@ function TransitionDemo() {
           </p>
           <Dialog.Form className="dlg-actions">
             <Dialog.Close className="dlg-btn" value="cancel">
-              {({ pending }) => (pending ? <Spinner /> : "Cancel")}
+              {({ pending }) => (pending ? <Spinner className="dlg-spinner" /> : "Cancel")}
             </Dialog.Close>
             <button
               type="button"
@@ -440,8 +437,7 @@ function TransitionDemo() {
 
 export function DialogDemo() {
   return (
-    <section className="dlg-demo">
-      <h2>Dialog</h2>
+    <Demo title="Dialog">
       <p>
         Built on <code>&lt;dialog&gt;</code> and Invoker Commands. The stylesheet carries the
         documented recipes: enter/exit animation with <code>@starting-style</code> and{" "}
@@ -455,6 +451,6 @@ export function DialogDemo() {
       <DismissDemo />
       <NestedDemo />
       <TransitionDemo />
-    </section>
+    </Demo>
   );
 }

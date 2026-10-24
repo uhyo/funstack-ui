@@ -1,35 +1,26 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
-import toggleErrorsSource from "../examples/ToggleErrors.tsx?raw";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
-import toggleFavoriteSource from "../examples/ToggleFavorite.tsx?raw";
-import toggleCss from "../examples/toggle.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function TogglePage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Toggle"
-        description="A two-state button with an async pressedChangeAction, optimistic aria-pressed and data-pending."
-      />
-      <h2>Toggle</h2>
+    <DocPage
+      title="Toggle"
+      description="A two-state button with an async pressedChangeAction, optimistic aria-pressed and data-pending."
+    >
       <p className="page-intro">
         A two-state button (WAI-ARIA Button pattern, toggle variant). The pressed state flips
         optimistically and the button carries <code>data-pending</code> while{" "}
         <code>pressedChangeAction</code> runs.
       </p>
 
-      <Example
-        source={toggleFavoriteSource}
-        fileName="ToggleFavorite.tsx"
-        css={toggleCss}
-        cssFileName="toggle.css"
-      >
+      <Example file="ToggleFavorite.tsx" css="toggle.css">
         <ToggleFavorite />
       </Example>
 
@@ -164,7 +155,7 @@ export function TogglePage() {
             value, so the second click undoes the first. Only the latest dispatch commits.
           </li>
         </ol>
-        <Example source={toggleErrorsSource} fileName="ToggleErrors.tsx">
+        <Example file="ToggleErrors.tsx">
           <ToggleErrors />
         </Example>
         <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
@@ -211,6 +202,6 @@ export function TogglePage() {
           <code>aria-busy</code> yourself.
         </p>
       </Callout>
-    </div>
+    </DocPage>
   );
 }

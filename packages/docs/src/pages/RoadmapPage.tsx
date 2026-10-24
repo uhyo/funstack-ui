@@ -1,16 +1,14 @@
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { GITHUB_URL, ISSUES_URL } from "../navigation.js";
 
 const issue = (n: number) => `${GITHUB_URL}/issues/${n}`;
 
 export function RoadmapPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Roadmap & changelog"
-        description="Where FUNSTACK UI is heading, and where to follow changes."
-      />
-      <h2>Roadmap & changelog</h2>
+    <DocPage
+      title="Roadmap & changelog"
+      description="Where FUNSTACK UI is heading, and where to follow changes."
+    >
       <p className="page-intro">
         FUNSTACK UI is experimental; alpha releases are on npm. Planning happens in{" "}
         <a href={ISSUES_URL}>GitHub issues</a>; this page is a short summary.
@@ -191,6 +189,6 @@ export function RoadmapPage() {
       <p>
         Ideas and bug reports are welcome as <a href={`${ISSUES_URL}/new`}>new issues</a>.
       </p>
-    </div>
+    </DocPage>
   );
 }

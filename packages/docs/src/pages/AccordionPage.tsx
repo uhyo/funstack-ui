@@ -1,23 +1,19 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
-import { PageHead } from "../components/PageHead.js";
+import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { AccordionFaq } from "../examples/AccordionFaq.js";
-import accordionFaqSource from "../examples/AccordionFaq.tsx?raw";
 import { AccordionThreads } from "../examples/AccordionThreads.js";
-import accordionThreadsSource from "../examples/AccordionThreads.tsx?raw";
-import accordionCss from "../examples/accordion.css?raw";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function AccordionPage() {
   return (
-    <div className="learn-content">
-      <PageHead
-        title="Accordion"
-        description="An accordion built on <details>/<summary>: no JavaScript when you need no state; actions, optimistic data-open and Suspense-friendly panels when you do."
-      />
-      <h2>Accordion</h2>
+    <DocPage
+      title="Accordion"
+      description="An accordion built on <details>/<summary>: no JavaScript when you need no state; actions, optimistic data-open and Suspense-friendly panels when you do."
+    >
       <p className="page-intro">
         Built on <code>&lt;details&gt;</code> and <code>&lt;summary&gt;</code>. Without value props
         its behaviour needs no JavaScript (the parts still ship as client modules; see{" "}
@@ -26,12 +22,7 @@ export function AccordionPage() {
         optimistic <code>data-open</code> and Suspense-friendly panels.
       </p>
 
-      <Example
-        source={accordionFaqSource}
-        fileName="AccordionFaq.tsx"
-        css={accordionCss}
-        cssFileName="accordion.css"
-      >
+      <Example file="AccordionFaq.tsx" css="accordion.css">
         <AccordionFaq />
       </Example>
 
@@ -323,12 +314,7 @@ export function AccordionPage() {
         }
       >
         <h4 id="async-walkthrough">Walkthrough (library mode)</h4>
-        <Example
-          source={accordionThreadsSource}
-          fileName="AccordionThreads.tsx"
-          css={accordionCss}
-          cssFileName="accordion.css"
-        >
+        <Example file="AccordionThreads.tsx" css="accordion.css">
           <AccordionThreads />
         </Example>
         <ol>
@@ -395,6 +381,6 @@ export function AccordionPage() {
         Use either the <code>transition</code> prop or a <code>::details-content</code> CSS
         transition for a given change, not both.
       </p>
-    </div>
+    </DocPage>
   );
 }
