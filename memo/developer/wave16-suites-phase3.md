@@ -593,3 +593,20 @@ Mutations (reverted):
    row 21's defaultChecked target).
 The group-hook mutations of T3 above (no mount reconciliation, reset without event, equals,
 cancelled reset, base) are the coverage of the removed group rows.
+
+## Status (resume 3, done)
+
+All of the hand-off list is done: CheckboxGroup and Select on the value-action suite, the native
+platform suite (T3), the hook trims (T13), and the post-merge items (overlay `hydrate` copies, T7
+rows). Branch rebased on origin/master 3f65d32 (nothing newer at the end). Session totals in
+packages/ui/src: +978 / -1975 lines (18 files); jsdom 3055 -> 3172 tests (the suites add rows
+the components did not have).
+Gate in the worktree: typecheck, lint, format:check, test:jsdom (3172), build all pass; three
+`--sequence.shuffle` jsdom runs pass; browser files of the touched components on Chromium and
+Firefox pass (WebKit does not launch on this machine). CI run 40078582625 on wave16/suites:
+success (ci, browser chromium / firefox / webkit).
+Not done, by choice: the checkable inputs (Checkbox, Switch) are not on the native platform suite.
+Their platform rows are already shared by `describeCheckableInput`, and they go through
+`useNativeChecked`, not the group hook; moving them would only re-home rows. Late-hydration rows
+stay per component (different warnings and structures).
+Not merged: waiting for review.
