@@ -4,14 +4,14 @@
 // the library's focus return, anchoring and the inline flip, real hover timing, exit animations,
 // ViewTransition around the top-layer element, and stacking with Tooltip and Dialog. Real input
 // comes from Playwright through `user` (`userEvent` inside `act`); the ViewTransition rows click
-// in-page outside `act`, as popover.browser.test.tsx does.
+// in-page outside `act`, as popover.browser.test.tsx does. Escape with its focus return, the exit
+// rows and the ViewTransition rows Menu shares with Dialog and Popover are in
+// __tests__/overlay-browser-suite.tsx.
 //
 // Engine branches (src/__tests__/engine.ts, memo/developer/cross-engine.md):
 // - `supportsFocusgroup` (Chromium): the native path moves focus without the library's
 //   `preventDefault()` and items have no `tabindex`; elsewhere the JS path prevents the keydown.
 //   Both assert the same focus outcome.
-// - Firefox animates no CSS exit of a popover: the exit rows branch on what `getAnimations()`
-//   found when the popup was hidden.
 // - WebKit 302008 (`position-try-fallbacks` on a nested popover hangs / spins): it did not bite
 //   the submenu's default placement on WebKit CI (review M3), so every submenu row, the
 //   inline-flip row included, uses the shipped placement on all three engines (issue #49). One
@@ -22,7 +22,7 @@
 // - `popover="hint"` (`supportsPopoverHint`): the Tooltip row expects the same either way.
 import { act, render, screen } from "@testing-library/react";
 import { userEvent } from "vitest/browser";
-import type { ReactNode, ViewTransitionClass } from "react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
@@ -42,6 +42,11 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
+import { describeOverlayInBrowser } from "../__tests__/overlay-browser-suite.js";
+import type {
+  OverlayBrowserHarnessProps,
+  OverlayViewTransitionProps,
+} from "../__tests__/overlay-browser-suite.js";
 import { Menu } from "./index.js";
 import type { MenuOpenChangeDetails, MenuPopupProps, MenuRootProps } from "./index.js";
 import {
@@ -52,7 +57,6 @@ import {
   runCleanups,
   sleep,
   leaveActEnvironment,
-  spyViewTransitions,
   quietPeriod,
   settle,
 } from "../__tests__/browser-helpers.js";
@@ -160,6 +164,66 @@ async function openWithKeyboard(key = "{ArrowDown}") {
   await expect.poll(() => isOpen()).toBe(true);
 }
 
+/** The shared suite's harness: the `content` item (focused by a keyboard open), then `inside`. */
+function SuiteHarness({
+  action,
+  className,
+  inside,
+}: OverlayBrowserHarnessProps<MenuOpenChangeDetails>) {
+  return (
+    <Basic root={{ openChangeAction: action }} popup={{ className }}>
+      <Menu.Item data-testid="content">Rename</Menu.Item>
+      <Menu.Item data-testid="delete">Delete</Menu.Item>
+      {inside}
+    </Basic>
+  );
+}
+
+/** No wrapper element: the Popup's boundary is the top of what a transition inserts. */
+function Plain({ transition, className }: OverlayViewTransitionProps) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger data-testid="trigger">Actions</Menu.Trigger>
+      <Menu.Popup
+        data-testid="popup"
+        transition={transition}
+        className={className}
+        style={popupStyle}
+      >
+        <Menu.Item data-testid="content">Rename</Menu.Item>
+        <Menu.Item data-testid="delete">Delete</Menu.Item>
+      </Menu.Popup>
+    </Menu.Root>
+  );
+}
+
+// The part-initiated close is an item's activation (Enter on the item a keyboard open focused; a
+// click in the ViewTransition rows); a dismissal there is a `hidePopover()` (what Escape or a
+// light dismiss does). The Trigger click while open is left to this file (#110).
+describeOverlayInBrowser<MenuOpenChangeDetails>({
+  name: "Menu",
+  Harness: SuiteHarness,
+  isOpen: (element) => element.matches(":popover-open"),
+  openPseudo: ":popover-open",
+  open: () => openWithKeyboard(),
+  partClose: () => user.keyboard("{Enter}"),
+  dismissEvent: "toggle",
+  ariaExpanded: true,
+  viewTransition: {
+    Plain,
+    partCloses: [
+      {
+        name: "an item activation",
+        close: () => item("content").click(),
+        // The items unmounted in the close commit, before `hidePopover()`; focus still returns.
+        afterClose: () => expect.poll(() => document.activeElement).toBe(trigger()),
+      },
+    ],
+    dismiss: () => popup().hidePopover(),
+    afterOpen: () => expect(item("content")).toHaveFocus(),
+  },
+});
+
 describe("keyboard end to end (browser)", () => {
   it("ArrowDown opens with real focus on the first enabled item; ArrowUp on the last", async () => {
     render(<Basic />);
@@ -198,16 +262,6 @@ describe("keyboard end to end (browser)", () => {
     expect(trigger()).toHaveFocus();
     expect(action.mock.calls.at(-1)![0]).toBe(false);
     expect(action.mock.calls.at(-1)![1].reason).toBe("activate");
-  });
-
-  it("Escape closes ('dismiss') with focus on the Trigger", async () => {
-    const action = vi.fn<OpenAction>();
-    render(<Basic root={{ openChangeAction: action }} />);
-    await openWithKeyboard();
-    await user.keyboard("{Escape}");
-    expect(isOpen()).toBe(false);
-    expect(trigger()).toHaveFocus();
-    await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
   });
 
   it("Shift+Tab from the first item lands on the Trigger and closes the menu", async () => {
@@ -703,171 +757,6 @@ describe("checkbox and radio items (browser)", () => {
     await act(async () => resolve());
     await settle(() => expect(isOpen()).toBe(false));
     expect(trigger()).toHaveFocus();
-  });
-});
-
-describe("exit animation (browser)", () => {
-  /**
-   * A fade whose exit outlasts any test (#71): the enter is instant and the exit takes 60 s, so
-   * the "content still there" check cannot race a 300 ms fade against Playwright round trips
-   * under load. The row ends the exit itself with `finish()` and then expects the release.
-   */
-  function heldExitStyle() {
-    addStyle(`
-        .held-exit {
-          opacity: 0;
-          transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
-        }
-        .held-exit:popover-open { opacity: 1; transition-duration: 0s; }
-      `);
-  }
-
-  /**
-   * Resolves with the exit animations the engine runs when the popup is hidden, read in its
-   * `toggle` (a queued task, so the row awaits it rather than assuming one flush ran it).
-   */
-  function watchExit(): Promise<Animation[]> {
-    return new Promise((resolve) => {
-      const element = popup();
-      element.addEventListener("toggle", function listener(event) {
-        if ((event as ToggleEvent).newState !== "closed") return;
-        element.removeEventListener("toggle", listener);
-        void getComputedStyle(element).opacity;
-        resolve(element.getAnimations({ subtree: true }));
-      });
-    });
-  }
-
-  async function expectHeldThenReleased(exit: Promise<Animation[]>) {
-    let animations: Animation[] = [];
-    await act(async () => {
-      animations = await exit;
-    });
-    // Chromium animates the exit: the held branch below must not pass vacuously there.
-    if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
-    if (animations.length > 0) {
-      expect(screen.queryByTestId("rename")).not.toBeNull();
-      await act(async () => {
-        for (const animation of animations) animation.finish();
-        await Promise.allSettled(animations.map((animation) => animation.finished));
-        await sleep(20);
-      });
-      expect(screen.queryByTestId("rename")).toBeNull();
-    } else {
-      // Firefox: no CSS exit for a popover.
-      expect(screen.queryByTestId("rename")).toBeNull();
-    }
-  }
-
-  it("after an item's activation the items stay while the CSS exit runs; none in Firefox", async () => {
-    heldExitStyle();
-    render(<Basic popup={{ className: "held-exit" }} />);
-    await openWithKeyboard();
-    const exit = watchExit();
-    await user.keyboard("{Enter}");
-    await settle(() => expect(isOpen()).toBe(false));
-    await expectHeldThenReleased(exit);
-  });
-
-  it("after Escape likewise", async () => {
-    heldExitStyle();
-    render(<Basic popup={{ className: "held-exit" }} />);
-    await openWithKeyboard();
-    const exit = watchExit();
-    await user.keyboard("{Escape}");
-    await settle(() => expect(isOpen()).toBe(false));
-    await expectHeldThenReleased(exit);
-  });
-});
-
-describe("ViewTransition (browser)", () => {
-  let restoreAct: () => void;
-  let calls: { openAtStart: boolean }[] = [];
-  let transitions: ViewTransition[] = [];
-
-  beforeEach(() => {
-    calls = [];
-    ({ transitions } = spyViewTransitions(() => {
-      const element = document.querySelector("[data-testid=popup]");
-      calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
-    }));
-    restoreAct = leaveActEnvironment();
-    addStyle(`
-        ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
-        ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
-        @keyframes vt-pop-out { to { opacity: 0; } }
-        @keyframes vt-pop-in { from { opacity: 0; } }
-      `);
-  });
-
-  afterEach(async () => {
-    restoreAct();
-    await Promise.allSettled(transitions.map((transition) => transition.finished));
-  });
-
-  /** No wrapper element: the Popup's boundary is the top of what a transition inserts. */
-  function Plain({ transition }: { transition?: ViewTransitionClass }) {
-    return (
-      <Menu.Root>
-        <Menu.Trigger data-testid="trigger">Actions</Menu.Trigger>
-        <Menu.Popup data-testid="popup" transition={transition} style={popupStyle}>
-          <Menu.Item data-testid="rename">Rename</Menu.Item>
-          <Menu.Item data-testid="delete">Delete</Menu.Item>
-        </Menu.Popup>
-      </Menu.Root>
-    );
-  }
-
-  it('transition="pop": the open and an item activation each run one; focus returns to the Trigger', async () => {
-    render(<Plain transition="pop" />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await expect.poll(() => calls.length).toBe(1);
-    expect(calls[0]!.openAtStart).toBe(false);
-    await transitions[0]!.finished;
-    expect(item("rename")).toHaveFocus();
-
-    item("rename").click();
-    await expect.poll(() => calls.length).toBe(2);
-    expect(calls[1]!.openAtStart).toBe(true);
-    await transitions[1]!.ready;
-    const oldImages = document
-      .getAnimations()
-      .filter((animation) =>
-        ((animation.effect as KeyframeEffect | null)?.pseudoElement ?? "").startsWith(
-          "::view-transition-old",
-        ),
-      );
-    expect(oldImages.length).toBeGreaterThan(0);
-    await transitions[1]!.finished;
-    expect(isOpen()).toBe(false);
-    expect(screen.queryByTestId("rename")).toBeNull();
-    // The items unmounted in the close commit, before `hidePopover()`; focus still returns.
-    await expect.poll(() => document.activeElement).toBe(trigger());
-  });
-
-  it('transition="pop": Escape runs one only for the notification commit, popup already hidden', async () => {
-    render(<Plain transition="pop" />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await expect.poll(() => calls.length).toBe(1);
-    await transitions[0]!.finished;
-    popup().hidePopover();
-    await expect.poll(() => calls.length).toBe(2);
-    expect(calls[1]!.openAtStart).toBe(false);
-    await transitions[1]!.finished;
-    await expect.poll(() => screen.queryByTestId("rename")).toBeNull();
-  });
-
-  it("without transition: no view transition for an open or an activation", async () => {
-    render(<Plain />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await quietPeriod(50, "the open must not start a view transition");
-    item("rename").click();
-    await expect.poll(() => isOpen()).toBe(false);
-    await quietPeriod(50, "the activation must not start a view transition");
-    expect(calls).toHaveLength(0);
   });
 });
 

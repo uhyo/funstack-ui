@@ -6,10 +6,10 @@
 // popovers. Real keyboard and pointer input comes from Playwright through `user` (`userEvent`
 // from `vitest/browser` inside `act`); the ViewTransition rows click in-page outside `act`, as
 // `transition-boundary.browser.test.tsx` does, because `act` would flush React's queue itself.
+// Escape with its focus return, the exit rows and the ViewTransition rows Popover shares with
+// Dialog and Menu are in __tests__/overlay-browser-suite.tsx.
 //
 // Engine branches (src/__tests__/engine.ts, memo/developer/cross-engine.md):
-// - Firefox animates no CSS exit of a popover: the exit rows branch on whether `getAnimations()`
-//   found anything when the popup was hidden.
 // - WebKit 302008 (`position-try-fallbacks` on a nested popover hangs / spins): it did not bite
 //   Menu submenus or the nested Combobox listbox on WebKit CI, so the nested rows, the flip row
 //   included, use an inline placement with its `flip-inline` fallback on all three engines
@@ -18,7 +18,7 @@
 //   the same either way.
 import { act, render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
-import type { ReactNode, ViewTransitionClass } from "react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
@@ -36,6 +36,11 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
+import { describeOverlayInBrowser } from "../__tests__/overlay-browser-suite.js";
+import type {
+  OverlayBrowserHarnessProps,
+  OverlayViewTransitionProps,
+} from "../__tests__/overlay-browser-suite.js";
 import { Popover } from "./index.js";
 import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
 import {
@@ -43,10 +48,8 @@ import {
   closeOpenTopLayer,
   flushFor,
   runCleanups,
-  sleep,
   leaveActEnvironment,
   spyViewTransitions,
-  animationsFinished,
   quietPeriod,
   settle,
 } from "../__tests__/browser-helpers.js";
@@ -109,6 +112,62 @@ function Library({
     </div>
   );
 }
+
+/** No wrapper element: inserted by a transition, the Popup's boundary is the subtree's top. */
+function Plain({ transition, className, keepMounted }: OverlayViewTransitionProps) {
+  return (
+    <Popover.Root defaultOpen={false}>
+      <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+      <Popover.Popup
+        data-testid="popup"
+        aria-label="Filters"
+        transition={transition}
+        className={className}
+        keepMounted={keepMounted}
+        style={box(200, 100)}
+      >
+        <span data-testid="content">content</span>
+        <Popover.Close data-testid="close">Rename</Popover.Close>
+      </Popover.Popup>
+    </Popover.Root>
+  );
+}
+
+/** The shared suite's harness: the content, then `inside`, then a Close part. */
+function SuiteHarness({
+  action,
+  className,
+  inside,
+}: OverlayBrowserHarnessProps<PopoverOpenChangeDetails>) {
+  return (
+    <Library action={action} popup={{ className }}>
+      <span data-testid="content">content</span>
+      {inside}
+      <Popover.Close data-testid="close">Done</Popover.Close>
+    </Library>
+  );
+}
+
+// The part-initiated close is a Trigger click while open; a dismissal in the ViewTransition rows
+// is a `hidePopover()` (what Escape or a light dismiss does).
+describeOverlayInBrowser<PopoverOpenChangeDetails>({
+  name: "Popover",
+  Harness: SuiteHarness,
+  isOpen: (element) => element.matches(":popover-open"),
+  openPseudo: ":popover-open",
+  open: async () => {
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+  },
+  partClose: () => user.click(trigger()),
+  dismissEvent: "toggle",
+  ariaExpanded: true,
+  viewTransition: {
+    Plain,
+    partCloses: [{ name: "a Trigger click", close: () => trigger().click() }],
+    dismiss: () => popup().hidePopover(),
+  },
+});
 
 describe("JS-free mode (browser)", () => {
   it("a real toggle-popover click opens and closes; aria-expanded follows; Close hides", async () => {
@@ -189,22 +248,6 @@ describe("library mode (browser)", () => {
     expect(event.type).toBe("beforetoggle");
     expect((event as ToggleEvent & { source?: Element | null }).source).toBe(foreign);
     await settle(() => expect(isOpen()).toBe(true));
-  });
-
-  it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
-    const action = vi.fn<ActionFn>();
-    render(<Library action={action} />);
-    await user.click(trigger());
-    await settle(() => expect(isOpen()).toBe(true));
-    await user.keyboard("{Escape}");
-    expect(isOpen()).toBe(false);
-    expect(trigger()).toHaveFocus();
-    await settle(() => expect(action).toHaveBeenCalledTimes(2));
-    const [next, details] = action.mock.calls[1]!;
-    expect(next).toBe(false);
-    expect(details.reason).toBe("dismiss");
-    expect(details.event?.type).toBe("toggle");
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
   });
 
   it("a click outside light-dismisses ('dismiss'); focus stays on the clicked element", async () => {
@@ -433,143 +476,6 @@ describe("nested popovers (browser)", () => {
   });
 });
 
-describe("exit animation and the deferred unmount (browser)", () => {
-  function fadeStyle() {
-    addStyle(`
-        .fade {
-          opacity: 0;
-          transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
-        }
-        .fade:popover-open { opacity: 1; }
-        @starting-style { .fade:popover-open { opacity: 0; } }
-      `);
-  }
-
-  /**
-   * A fade whose exit outlasts any test (#71): the enter is instant and the exit takes 60 s, so
-   * the "content still there" check cannot race a 300 ms fade against Playwright round trips
-   * under load. The row ends the exit itself with `finish()` and then expects the release.
-   */
-  function heldExitStyle() {
-    addStyle(`
-        .held-exit {
-          opacity: 0;
-          transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
-        }
-        .held-exit:popover-open { opacity: 1; transition-duration: 0s; }
-      `);
-  }
-
-  /**
-   * Resolves with the exit animations the engine runs when the popup is hidden, read in its
-   * `toggle` (a queued task, so the row awaits it rather than assuming one flush ran it).
-   */
-  function watchExit(): Promise<Animation[]> {
-    return new Promise((resolve) => {
-      const element = popup();
-      element.addEventListener("toggle", function listener(event) {
-        if ((event as ToggleEvent).newState !== "closed") return;
-        element.removeEventListener("toggle", listener);
-        void getComputedStyle(element).opacity;
-        resolve(element.getAnimations({ subtree: true }));
-      });
-    });
-  }
-
-  async function expectHeldThenReleased(exit: Promise<Animation[]>) {
-    let animations: Animation[] = [];
-    await act(async () => {
-      animations = await exit;
-    });
-    // Chromium animates the exit: the held branch below must not pass vacuously there.
-    if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
-    if (animations.length > 0) {
-      // Chromium / WebKit: the popup is still fading out; the content stays.
-      expect(screen.queryByTestId("content")).not.toBeNull();
-      // End the exit; the unmount is an update the Popup makes when the animations finish:
-      // inside `act`.
-      await act(async () => {
-        for (const animation of animations) animation.finish();
-        await Promise.allSettled(animations.map((animation) => animation.finished));
-        await sleep(20);
-      });
-      expect(screen.queryByTestId("content")).toBeNull();
-    } else {
-      // Firefox: no CSS exit for a popover; nothing to wait for.
-      expect(screen.queryByTestId("content")).toBeNull();
-    }
-  }
-
-  it("a part-initiated close keeps the content while the CSS exit runs; none in Firefox", async () => {
-    heldExitStyle();
-    render(
-      <Library popup={{ className: "held-exit" }}>
-        <span data-testid="content">content</span>
-      </Library>,
-    );
-    await user.click(trigger());
-    await flushFor();
-    const exit = watchExit();
-    await user.click(trigger());
-    await settle(() => expect(isOpen()).toBe(false));
-    await expectHeldThenReleased(exit);
-  });
-
-  it("a dismissal keeps the content while the CSS exit runs; none in Firefox", async () => {
-    heldExitStyle();
-    render(
-      <Library popup={{ className: "held-exit" }}>
-        <span data-testid="content">content</span>
-        <button type="button">Inside</button>
-      </Library>,
-    );
-    await user.click(trigger());
-    await flushFor();
-    const exit = watchExit();
-    await user.keyboard("{Escape}");
-    await settle(() => expect(isOpen()).toBe(false));
-    await expectHeldThenReleased(exit);
-  });
-
-  // A finite animation already running inside (a progress bar) is not the exit: the release
-  // waits for the CSS exit only, not for the bar (#64). A Web Animations API animation keeps
-  // running on a hidden element in every engine, so without the baseline all three would hold
-  // the content for the bar's 10 s.
-  it.each(["part-initiated close", "dismissal"] as const)(
-    "a %s ignores a finite animation that was already running inside (#64)",
-    async (kind) => {
-      fadeStyle();
-      let bar: Animation | undefined;
-      render(
-        <Library popup={{ className: "fade" }}>
-          <span data-testid="content">content</span>
-          <div
-            ref={(element) => {
-              bar ??= element?.animate([{ width: "0px" }, { width: "100px" }], 10_000);
-            }}
-            style={{ height: 4, background: "currentColor" }}
-          />
-        </Library>,
-      );
-      await user.click(trigger());
-      await flushFor();
-      // The enter fade has run its course (the bar keeps running for 10 s).
-      await animationsFinished(popup(), [bar]);
-      expect(bar?.playState).toBe("running");
-      if (kind === "dismissal") await user.keyboard("{Escape}");
-      else await user.click(trigger());
-      await settle(() => expect(isOpen()).toBe(false));
-      await settle(
-        () => expect(screen.queryByTestId("content")).toBeNull(),
-        3000,
-        () => flushFor(50),
-      );
-      expect(bar?.playState).toBe("running");
-      bar?.cancel();
-    },
-  );
-});
-
 describe("ViewTransition (browser)", () => {
   let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
@@ -595,152 +501,6 @@ describe("ViewTransition (browser)", () => {
     await Promise.allSettled(transitions.map((transition) => transition.finished));
   });
 
-  /** No wrapper element: inserted by a transition, the Popup's boundary is the subtree's top. */
-  function Plain({
-    transition,
-    className,
-    keepMounted,
-  }: {
-    transition?: ViewTransitionClass;
-    className?: string;
-    keepMounted?: boolean;
-  }) {
-    return (
-      <Popover.Root defaultOpen={false}>
-        <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
-        <Popover.Popup
-          data-testid="popup"
-          aria-label="Filters"
-          transition={transition}
-          className={className}
-          keepMounted={keepMounted}
-          style={box(200, 100)}
-        >
-          <span data-testid="content">content</span>
-          <Popover.Close data-testid="close">Rename</Popover.Close>
-        </Popover.Popup>
-      </Popover.Root>
-    );
-  }
-
-  it('transition="pop": the open and the part-initiated close each run one view transition', async () => {
-    render(<Plain transition="pop" />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await expect.poll(() => calls.length).toBe(1);
-    // Started before the popup was shown; shown inside the update callback.
-    expect(calls[0]!.openAtStart).toBe(false);
-    await transitions[0]!.updateCallbackDone;
-    expect(isOpen()).toBe(true);
-    await transitions[0]!.finished;
-
-    trigger().click();
-    await expect.poll(() => calls.length).toBe(2);
-    expect(calls[1]!.openAtStart).toBe(true);
-    await transitions[1]!.ready;
-    // The old snapshot carries the popup (with its content) out, in every engine.
-    const oldImages = document
-      .getAnimations()
-      .filter((animation) =>
-        ((animation.effect as KeyframeEffect | null)?.pseudoElement ?? "").startsWith(
-          "::view-transition-old",
-        ),
-      );
-    expect(oldImages.length).toBeGreaterThan(0);
-    await transitions[1]!.finished;
-    expect(isOpen()).toBe(false);
-    expect(screen.queryByTestId("content")).toBeNull();
-  });
-
-  it('transition="pop": a dismissal runs one only for the notification commit, popup already hidden', async () => {
-    render(<Plain transition="pop" />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await expect.poll(() => calls.length).toBe(1);
-    await transitions[0]!.finished;
-    popup().hidePopover();
-    await expect.poll(() => calls.length).toBe(2);
-    expect(calls[1]!.openAtStart).toBe(false);
-    await transitions[1]!.finished;
-    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
-  });
-
-  it('transition="pop" plus a CSS exit: a dismissal runs one view transition, not two', async () => {
-    addStyle(`
-        .fade {
-          opacity: 0;
-          transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
-        }
-        .fade:popover-open { opacity: 1; }
-        @starting-style { .fade:popover-open { opacity: 0; } }
-      `);
-    render(<Plain transition="pop" className="fade" />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await expect.poll(() => calls.length).toBe(1);
-    await transitions[0]!.finished;
-    await animationsFinished(popup()); // the enter fade
-    popup().hidePopover();
-    // The notification commit (design 4.4); the content may be held for the CSS fade.
-    await expect.poll(() => calls.length).toBe(2);
-    await transitions[1]!.finished;
-    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
-    // Releasing the hold is a normal update: no second document view transition.
-    await quietPeriod(100, "the release of the hold must not start a view transition");
-    expect(calls).toHaveLength(2);
-  });
-
-  // The docs' CSS exit plus `transition` (review M2 of Dialog #46): Chromium keeps a hidden
-  // popover rendered through its fade, so a library-driven close's new snapshot captures it as a
-  // live `::view-transition-new` next to the old image (a double image). The recipe
-  // `html:active-view-transition .x { transition: none }` cuts the fade while a view transition
-  // runs. Firefox hides at once: old image only either way. WebKit (CI, 2026-10): the box is
-  // already `display: none` at `ready` either way, but WebKit lists the group's animation under
-  // `::view-transition-new(<name>)` and none under `old`, so its row asserts `display` only.
-  it.each([
-    [false, "characterisation, without the recipe: a live new image in Chromium"],
-    [true, "with the recipe: the old image only"],
-  ])('transition="pop" plus a CSS exit, a part-initiated close (recipe=%s): %s', async (recipe) => {
-    addStyle(`
-        .fade {
-          opacity: 0;
-          transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
-        }
-        .fade:popover-open { opacity: 1; }
-        @starting-style { .fade:popover-open { opacity: 0; } }
-        ${recipe ? "html:active-view-transition .fade { transition: none; }" : ""}
-      `);
-    render(<Plain transition="pop" className="fade" />);
-    trigger().click();
-    await expect.poll(() => calls.length).toBe(1);
-    await transitions[0]!.finished;
-    await animationsFinished(popup()); // the enter fade
-    trigger().click();
-    await expect.poll(() => calls.length).toBe(2);
-    await transitions[1]!.ready;
-    const names = new Set(
-      document
-        .getAnimations()
-        .map((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? ""),
-    );
-    const popupImages = (kind: "old" | "new") =>
-      [...names].filter(
-        (name) =>
-          name.startsWith(`::view-transition-${kind}(`) &&
-          name !== `::view-transition-${kind}(root)`,
-      );
-    const fading = getComputedStyle(popup()).display !== "none";
-    const seen = JSON.stringify({ names: [...names], fading });
-    const namesReliable = browserName !== "webkit";
-    expect(fading, seen).toBe(!recipe && browserName === "chromium");
-    if (namesReliable) {
-      expect(popupImages("old").length, seen).toBeGreaterThan(0);
-      expect(popupImages("new").length > 0, seen).toBe(fading);
-    }
-    await transitions[1]!.finished;
-    expect(isOpen()).toBe(false);
-  });
-
   // H1: with `transition` the close commit unmounts the focused Close before `hidePopover()`
   // runs, so the platform (which restores focus only from inside the popover) restores nothing.
   describe.each([
@@ -761,16 +521,6 @@ describe("ViewTransition (browser)", () => {
       await Promise.allSettled(transitions.map((t) => t.finished));
       await expect.poll(() => document.activeElement).toBe(trigger());
     });
-  });
-
-  it("without transition: no view transition for an open or a close", async () => {
-    render(<Plain />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(false);
-    await quietPeriod(50, "no part may start a view transition");
-    expect(calls).toHaveLength(0);
   });
 
   it('transition="none": a plain open runs none (shielded); a Root inserted by a transition runs one', async () => {

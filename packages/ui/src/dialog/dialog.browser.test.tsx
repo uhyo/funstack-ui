@@ -9,14 +9,20 @@
 // closes of #46 (design 13.3), and the CSS scroll-lock recipe. Real keyboard and pointer input
 // comes from Playwright through `user` (`userEvent` from `vitest/browser` inside `act`); the
 // ViewTransition rows click in-page outside `act`, as the Popover ones do, because `act` would
-// flush React's queue itself.
+// flush React's queue itself. Escape with its focus return, the exit rows and the ViewTransition
+// rows Dialog shares with Popover and Menu are in __tests__/overlay-browser-suite.tsx.
 import { act, render, screen } from "@testing-library/react";
 import { Suspense, startTransition, useEffect, useRef, useState } from "react";
-import type { ReactNode, ViewTransitionClass } from "react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsDialogClosedBy } from "../__tests__/engine.js";
+import { describeOverlayInBrowser } from "../__tests__/overlay-browser-suite.js";
+import type {
+  OverlayBrowserHarnessProps,
+  OverlayViewTransitionProps,
+} from "../__tests__/overlay-browser-suite.js";
 import { createSuspender, deferred } from "../__tests__/helpers.js";
 import { Dialog } from "./index.js";
 import type { DialogOpenChangeDetails, DialogPopupProps } from "./index.js";
@@ -29,8 +35,6 @@ import {
   sleep,
   leaveActEnvironment,
   spyViewTransitions,
-  animationsFinished,
-  quietPeriod,
 } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
@@ -79,6 +83,108 @@ function Library({
     </div>
   );
 }
+
+/**
+ * No wrapper element above the Root, so a Root inserted by a transition has the Popup's
+ * boundary at the top of the subtree. `controlled` adds an in-page button that closes the
+ * dialog through the parent (it lives inside the dialog: the page is inert while modal).
+ */
+function Plain({
+  transition,
+  className,
+  keepMounted,
+  modal,
+  controlled = false,
+}: OverlayViewTransitionProps & { modal?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const rootProps = controlled
+    ? { open, openChangeAction: (next: boolean) => setOpen(next) }
+    : { defaultOpen: false };
+  return (
+    <Dialog.Root {...rootProps} modal={modal}>
+      <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
+      <Dialog.Popup
+        data-testid="popup"
+        aria-label="Edit"
+        transition={transition}
+        className={className}
+        keepMounted={keepMounted}
+        style={{ width: 240, height: 120 }}
+      >
+        <span data-testid="content">content</span>
+        <Dialog.Close data-testid="close" value="cancel">
+          Cancel
+        </Dialog.Close>
+        <Dialog.Form>
+          <button type="submit" data-testid="ok" value="ok">
+            OK
+          </button>
+        </Dialog.Form>
+        {controlled && (
+          <button
+            type="button"
+            data-testid="parent-close"
+            onClick={() => startTransition(() => setOpen(false))}
+          >
+            Parent close
+          </button>
+        )}
+      </Dialog.Popup>
+    </Dialog.Root>
+  );
+}
+
+/** The shared suite's harness: the content, then `inside`, then a Close part (value "cancel"). */
+function SuiteHarness({
+  action,
+  className,
+  inside,
+}: OverlayBrowserHarnessProps<DialogOpenChangeDetails>) {
+  return (
+    <Library action={action} popup={{ className }}>
+      <span data-testid="content">content</span>
+      {inside}
+      <Dialog.Close data-testid="close" value="cancel">
+        Cancel
+      </Dialog.Close>
+    </Library>
+  );
+}
+
+describeOverlayInBrowser<DialogOpenChangeDetails>({
+  name: "Dialog",
+  Harness: SuiteHarness,
+  isOpen: (element) => (element as HTMLDialogElement).open,
+  openPseudo: ":open",
+  open: openWithTrigger,
+  partClose: () => user.click(screen.getByTestId("close")),
+  dismissEvent: "close",
+  ariaExpanded: false,
+  dismissReturnValue: "",
+  viewTransition: {
+    Plain,
+    partCloses: [
+      {
+        name: "a Dialog.Close",
+        close: () => screen.getByTestId("close").click(),
+        afterClose: () => expect(popup().returnValue).toBe("cancel"),
+      },
+      {
+        name: 'a method="dialog" submit',
+        close: () => screen.getByTestId("ok").click(),
+        afterClose: () => expect(popup().returnValue).toBe("ok"),
+      },
+      {
+        name: "a controlled open={false}",
+        controlled: true,
+        close: () => screen.getByTestId("parent-close").click(),
+        afterClose: () => expect(popup().returnValue).toBe(""),
+      },
+    ],
+    dismiss: () => userEvent.keyboard("{Escape}"),
+    afterOpen: () => expect(popup().matches(":modal")).toBe(true),
+  },
+});
 
 describe("JS-free mode (browser)", () => {
   it("a real command click opens the dialog modally; Escape closes and returns focus", async () => {
@@ -225,21 +331,6 @@ describe("library mode (browser)", () => {
     await act(async () => suspender.resolve("order", "Order #1"));
     expect(popup().open).toBe(true);
     expect(screen.getByTestId("suspender")).toHaveTextContent("Order #1");
-  });
-
-  it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
-    const action = vi.fn<ActionFn>();
-    render(<Library action={action} />);
-    await openWithTrigger();
-    await user.keyboard("{Escape}");
-    expect(popup().open).toBe(false);
-    expect(trigger()).toHaveFocus();
-    await settle(() => expect(action).toHaveBeenCalledTimes(2));
-    const [next, details] = action.mock.calls[1]!;
-    expect(next).toBe(false);
-    expect(details.reason).toBe("dismiss");
-    expect(details.returnValue).toBe("");
-    expect(details.event?.type).toBe("close");
   });
 
   it("initialFocus: focus lands on the target through the deferred showModal()", async () => {
@@ -577,74 +668,6 @@ describe("exit animation and the deferred unmount (browser)", () => {
       await sleep(20);
     });
 
-  it("keeps the content mounted while the exit animation runs; none in Firefox", async () => {
-    heldExitStyle();
-    render(
-      <Library popup={{ className: "held-exit" }}>
-        <span data-testid="content">content</span>
-      </Library>,
-    );
-    await openWithTrigger();
-    expect(popup().open).toBe(true);
-    const exit = watchExit();
-    await user.keyboard("{Escape}");
-    let animations: Animation[] = [];
-    await act(async () => {
-      animations = await exit;
-    });
-    // Chromium animates the exit: the held branch below must not pass vacuously there.
-    if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
-    if (animations.length > 0) {
-      // Chromium / WebKit: the dialog is still fading out; the content stays.
-      expect(screen.queryByTestId("content")).not.toBeNull();
-      await finishExit(animations);
-      expect(screen.queryByTestId("content")).toBeNull();
-    } else {
-      // Firefox: `display` flips at once (bug 1834877); nothing to wait for.
-      expect(screen.queryByTestId("content")).toBeNull();
-    }
-  });
-
-  // A finite animation already running inside (a progress bar) is not the exit: the release
-  // waits for the CSS exit only (#64). The bar is a Web Animations API animation, which keeps
-  // running on a hidden element in every engine.
-  it.each(["Escape", "Close part"] as const)(
-    "%s: the close ignores a finite animation that was already running inside (#64)",
-    async (kind) => {
-      addStyle(`
-          .fade, .fade::backdrop {
-            opacity: 0;
-            transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete;
-          }
-          .fade:open, .fade:open::backdrop { opacity: 1; }
-          @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
-        `);
-      let bar: Animation | undefined;
-      render(
-        <Library popup={{ className: "fade" }}>
-          <span data-testid="content">content</span>
-          <div
-            ref={(element) => {
-              bar ??= element?.animate([{ width: "0px" }, { width: "100px" }], 10_000);
-            }}
-            style={{ height: 4, background: "currentColor" }}
-          />
-          <Dialog.Close data-testid="close">Close</Dialog.Close>
-        </Library>,
-      );
-      await openWithTrigger();
-      // The enter fade has run its course (the bar keeps running for 10 s).
-      await animationsFinished(popup(), [bar]);
-      expect(bar?.playState).toBe("running");
-      if (kind === "Escape") await user.keyboard("{Escape}");
-      else await user.click(screen.getByTestId("close"));
-      await settle(() => expect(popup().open).toBe(false));
-      await settle(() => expect(screen.queryByTestId("content")).toBeNull(), 3000);
-      expect(bar?.playState).toBe("running");
-      bar?.cancel();
-    },
-  );
-
   it("a controlled close without transition keeps the content through the fade, mounted once (#46)", async () => {
     heldExitStyle();
     let mounts = 0;
@@ -698,7 +721,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
   });
 });
 
-// The library-owned closes are captured since #46.
+// The library-owned closes are captured since #46; the shared rows are in the suite above.
 describe("ViewTransition (browser)", () => {
   let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
@@ -735,100 +758,12 @@ describe("ViewTransition (browser)", () => {
       );
   }
 
-  /**
-   * No wrapper element above the Root, so a Root inserted by a transition has the Popup's
-   * boundary at the top of the subtree. `controlled` adds an in-page button that closes the
-   * dialog through the parent (it lives inside the dialog: the page is inert while modal).
-   */
-  function Plain({
-    transition,
-    className,
-    keepMounted,
-    modal,
-    controlled = false,
-  }: {
-    transition?: ViewTransitionClass;
-    className?: string;
-    keepMounted?: boolean;
-    modal?: boolean;
-    controlled?: boolean;
-  }) {
-    const [open, setOpen] = useState(false);
-    const rootProps = controlled
-      ? { open, openChangeAction: (next: boolean) => setOpen(next) }
-      : { defaultOpen: false };
-    return (
-      <Dialog.Root {...rootProps} modal={modal}>
-        <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
-        <Dialog.Popup
-          data-testid="popup"
-          aria-label="Edit"
-          transition={transition}
-          className={className}
-          keepMounted={keepMounted}
-          style={{ width: 240, height: 120 }}
-        >
-          <span data-testid="content">content</span>
-          <Dialog.Close data-testid="close" value="cancel">
-            Cancel
-          </Dialog.Close>
-          <Dialog.Form>
-            <button type="submit" data-testid="ok" value="ok">
-              OK
-            </button>
-          </Dialog.Form>
-          {controlled && (
-            <button
-              type="button"
-              data-testid="parent-close"
-              onClick={() => startTransition(() => setOpen(false))}
-            >
-              Parent close
-            </button>
-          )}
-        </Dialog.Popup>
-      </Dialog.Root>
-    );
-  }
-
   /** Opens through the Trigger and waits for the open's view transition (if any) to finish. */
   async function open(): Promise<void> {
     trigger().click();
     await expect.poll(() => isOpen()).toBe(true);
     await Promise.allSettled(transitions.map((t) => t.finished));
   }
-
-  it.each([
-    ["a Dialog.Close", "close"],
-    ['a method="dialog" submit', "ok"],
-    ["a controlled open={false}", "parent-close"],
-  ])('transition="pop": the open and %s each run one view transition', async (_, testId) => {
-    render(<Plain transition="pop" controlled={testId === "parent-close"} />);
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await expect.poll(() => calls.length).toBe(1);
-    // Started before the dialog was shown; shown inside the update callback.
-    expect(calls[0]!.openAtStart).toBe(false);
-    await transitions[0]!.updateCallbackDone;
-    expect(isOpen()).toBe(true);
-    expect(popup().matches(":modal")).toBe(true);
-    await transitions[0]!.finished;
-
-    screen.getByTestId(testId).click();
-    await expect.poll(() => calls.length).toBe(2);
-    // The library closes inside the update callback, so the dialog is open at the start.
-    expect(calls[1]!.openAtStart).toBe(true);
-    await transitions[1]!.ready;
-    // The old snapshot carries the dialog (with its content) out, in every engine.
-    expect(pseudoAnimations("::view-transition-old").length).toBeGreaterThan(0);
-    await transitions[1]!.finished;
-    expect(isOpen()).toBe(false);
-    expect(screen.queryByTestId("content")).toBeNull();
-    const expected = testId === "close" ? "cancel" : testId === "ok" ? "ok" : "";
-    expect(popup().returnValue).toBe(expected);
-    await quietPeriod(50, "no third view transition");
-    expect(calls).toHaveLength(2);
-  });
 
   it('transition="pop": the opening commit captures the dialog shown by showModal() (10.3)', async () => {
     render(<Plain transition="pop" />);
@@ -840,138 +775,6 @@ describe("ViewTransition (browser)", () => {
     expect(pseudoAnimations("::view-transition-new").length).toBeGreaterThan(0);
     await transitions[0]!.finished;
     expect(isOpen()).toBe(true);
-  });
-
-  it('transition="pop": an Escape runs one only for the notification commit, dialog already closed', async () => {
-    render(<Plain transition="pop" />);
-    await open();
-    expect(calls).toHaveLength(1);
-    await userEvent.keyboard("{Escape}");
-    expect(isOpen()).toBe(false);
-    await expect.poll(() => calls.length).toBe(2);
-    expect(calls[1]!.openAtStart).toBe(false);
-    await transitions[1]!.finished;
-    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
-    await quietPeriod(50, "the release of the held content must not start a view transition");
-    expect(calls).toHaveLength(2);
-  });
-
-  /** The `::view-transition-*` pseudo-elements animating now, by name (read at `ready`). */
-  function pseudoNames(): string[] {
-    return [
-      ...new Set(
-        document
-          .getAnimations()
-          .map((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? "")
-          .filter((name) => name.startsWith("::view-transition-")),
-      ),
-    ].sort();
-  }
-
-  /** The dialog's `new` image: any `::view-transition-new` other than the root's. */
-  const dialogNewImages = () =>
-    pseudoNames().filter(
-      (name) => name.startsWith("::view-transition-new(") && name !== "::view-transition-new(root)",
-    );
-
-  // The CSS exit of design 10.1 on the box, plus the recipe that cuts it while a view transition
-  // runs (review M2 of #46): without the last rule, Chromium keeps the closing dialog rendered
-  // through its fade and captures it as a live `::view-transition-new` next to the old image.
-  // WebKit (CI, Playwright's WebKit build, 2026-10): the box is already `display: none` at
-  // `ready` with or without the recipe, so it cannot have a new image; yet WebKit lists the
-  // animation of the dialog's group under `::view-transition-new(<name>)` and none under `old`.
-  // The names are not reliable there, so the WebKit rows assert the box's `display` only.
-  const namesReliable = browserName !== "webkit";
-  const cssExit = (recipe: boolean) => `
-    .fade, .fade::backdrop {
-      opacity: 0;
-      transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
-    }
-    .fade:open, .fade:open::backdrop { opacity: 1; }
-    @starting-style { .fade:open, .fade:open::backdrop { opacity: 0; } }
-    ${recipe ? "html:active-view-transition .fade { transition: none; }" : ""}
-  `;
-
-  it('transition="pop", a CSS exit and the recipe: an Escape runs one view transition, no new dialog image', async () => {
-    addStyle(cssExit(true));
-    render(<Plain transition="pop" className="fade" />);
-    await open();
-    await animationsFinished(popup()); // the enter fade
-    await userEvent.keyboard("{Escape}");
-    // The notification commit (design 4.4); the content may be held for the CSS fade.
-    await expect.poll(() => calls.length).toBe(2);
-    await transitions[1]!.ready;
-    if (namesReliable) expect(dialogNewImages(), JSON.stringify(pseudoNames())).toEqual([]);
-    await transitions[1]!.finished;
-    await expect.poll(() => screen.queryByTestId("content")).toBeNull();
-    // Releasing the hold is a normal update: no second document view transition.
-    await quietPeriod(100, "the release of the hold must not start a view transition");
-    expect(calls).toHaveLength(2);
-  });
-
-  it.each([
-    ["a Dialog.Close", "close"],
-    ["a controlled open={false}", "parent-close"],
-  ])(
-    'transition="pop" plus a CSS exit and the recipe: %s has the old image only',
-    async (_, testId) => {
-      addStyle(cssExit(true));
-      render(<Plain transition="pop" className="fade" controlled={testId === "parent-close"} />);
-      await open();
-      await animationsFinished(popup()); // the enter fade
-      screen.getByTestId(testId).click();
-      await expect.poll(() => calls.length).toBe(2);
-      await transitions[1]!.ready;
-      const names = pseudoNames();
-      const seen = JSON.stringify({ names, display: getComputedStyle(popup()).display });
-      // Not rendered while the new snapshot is taken: no live image of the fading dialog.
-      expect(getComputedStyle(popup()).display, seen).toBe("none");
-      if (namesReliable) {
-        expect(
-          names.some(
-            (name) =>
-              name.startsWith("::view-transition-old(") && name !== "::view-transition-old(root)",
-          ),
-          seen,
-        ).toBe(true);
-        expect(dialogNewImages(), seen).toEqual([]);
-      }
-      await transitions[1]!.finished;
-      expect(isOpen()).toBe(false);
-      await quietPeriod(100, "the release of the hold must not start a view transition");
-      expect(calls).toHaveLength(2);
-    },
-  );
-
-  it('characterisation: transition="pop" plus a CSS exit without the recipe has a live new image in Chromium', async () => {
-    addStyle(cssExit(false));
-    render(<Plain transition="pop" className="fade" />);
-    await open();
-    await animationsFinished(popup()); // the enter fade
-    screen.getByTestId("close").click();
-    await expect.poll(() => calls.length).toBe(2);
-    await transitions[1]!.ready;
-    // Chromium keeps the closed dialog rendered through its CSS fade, so the new snapshot
-    // captures it: a double image. Firefox closes at once (bug 1834877) and WebKit has the box
-    // `display: none` by `ready`: no new image. If this row starts failing, an engine changed;
-    // re-check the docs' recipe.
-    const fading = getComputedStyle(popup()).display !== "none";
-    const seen = JSON.stringify({ names: pseudoNames(), fading });
-    expect(fading, seen).toBe(browserName === "chromium");
-    if (namesReliable) expect(dialogNewImages().length > 0, seen).toBe(fading);
-    await transitions[1]!.finished;
-  });
-
-  it("without transition: no view transition for an open, a Close close or an Escape", async () => {
-    render(<Plain />);
-    await open();
-    screen.getByTestId("close").click();
-    await expect.poll(() => isOpen()).toBe(false);
-    await open();
-    await userEvent.keyboard("{Escape}");
-    await expect.poll(() => isOpen()).toBe(false);
-    await quietPeriod(50, "no part may start a view transition");
-    expect(calls).toHaveLength(0);
   });
 
   // The close commit unmounts (or hides) the focused Close before `close()` runs; a non-modal

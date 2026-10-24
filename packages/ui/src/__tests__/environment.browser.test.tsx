@@ -53,15 +53,20 @@ describe("browser test environment", () => {
     );
     const popup = screen.getByTestId("popup");
     const states: Array<[string, string]> = [];
-    popup.addEventListener("toggle", (event) => {
-      const { oldState, newState } = event as ToggleEvent;
-      states.push([oldState, newState]);
+    const toggled = new Promise<void>((resolve) => {
+      popup.addEventListener("toggle", (event) => {
+        const { oldState, newState } = event as ToggleEvent;
+        states.push([oldState, newState]);
+        resolve();
+      });
     });
 
     popup.showPopover();
 
-    // `toggle` is dispatched from a queued task, unlike `beforetoggle` which is synchronous.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // `toggle` is dispatched from a queued task, unlike `beforetoggle` which is synchronous. The
+    // row waits for the event: the spec does not order that task against a later timer (#109).
+    expect(states).toEqual([]);
+    await toggled;
     expect(states).toEqual([["closed", "open"]]);
   });
 
