@@ -15,7 +15,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
@@ -23,6 +22,7 @@ import {
   ErrorCatcher,
   expectNotPending,
   expectPending,
+  hydrateFromServer,
   renderBoth,
   setupUser,
   silenceErrors,
@@ -1486,19 +1486,19 @@ describe("Accordion", () => {
 
   describe("hydration: clicks before hydration (design 2.3)", () => {
     /** Server-renders `ui`, "clicks" the given items before hydration, then hydrates. */
-    async function hydrate(ui: ReactNode, preOpen: readonly string[]) {
-      const container = document.createElement("div");
-      container.innerHTML = renderToString(ui);
-      document.body.append(container);
-      for (const v of preOpen) {
-        container.querySelector(`[data-testid="item-${v}"]`)!.setAttribute("open", "");
-      }
-      // The clicks' `toggle` events fire long before hydration in a browser; let jsdom's queued
-      // ones go by too, so they are not mistaken for new platform events after hydration.
-      await new Promise((resolve) => setImmediate(resolve));
-      const result = render(ui, { container, hydrate: true });
-      return { ...result, container };
-    }
+    const hydrate = (ui: ReactNode, preOpen: readonly string[]) =>
+      hydrateFromServer(ui, {
+        mutate: async (container) => {
+          for (const v of preOpen) {
+            container.querySelector(`[data-testid="item-${v}"]`)!.setAttribute("open", "");
+          }
+          // The clicks' `toggle` events fire long before hydration in a browser; let jsdom's
+          // queued ones go by too, so they are not mistaken for new platform events after
+          // hydration.
+          await new Promise((resolve) => setImmediate(resolve));
+        },
+        flush: null,
+      });
 
     afterEach(() => {
       document.body.innerHTML = "";

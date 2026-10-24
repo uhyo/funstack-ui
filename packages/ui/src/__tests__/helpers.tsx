@@ -3,7 +3,9 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
 import { expect, describe, vi } from "vitest";
 import type { MockInstance } from "vitest";
 import { userEvent } from "@testing-library/user-event";
-import { act, configure, getConfig } from "@testing-library/react";
+import { act, configure, getConfig, render } from "@testing-library/react";
+import type { RenderResult } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 
 /** A promise whose settlement the test controls. */
 export interface Deferred<T> {
@@ -232,6 +234,57 @@ export function flushTasks(rounds = 1): Promise<void> {
  */
 export function silenceErrors(): MockInstance<typeof console.error> {
   return vi.spyOn(console, "error").mockImplementation(() => {});
+}
+
+export interface HydrateFromServerOptions {
+  /**
+   * Changes the server HTML before hydration, the way a user gesture before hydration would
+   * (a checked radio, an `open` attribute). May be async, e.g. to let a queued `toggle` go by.
+   */
+  mutate?: (container: HTMLElement) => void | Promise<void>;
+  /** The tree to hydrate, when it differs from the server-rendered `ui`. Defaults to `ui`. */
+  client?: ReactNode;
+  /**
+   * Hydrate inside an async `act()`: needed when the client tree suspends (late Suspense
+   * boundaries), since a render that suspends in a sync `act` never retries in jsdom.
+   */
+  inAct?: boolean;
+  /**
+   * Run after the hydrating render; defaults to `flushMicrotasks()`. Pass `null` to return right
+   * after `render`, or another flush (`() => flushTasks(2)`) where queued events must run.
+   */
+  flush?: (() => Promise<void>) | null;
+}
+
+/**
+ * Server-renders `ui` with `renderToString` into a fresh container appended to `document.body`,
+ * applies `mutate` to that HTML, then hydrates it (`render(…, { hydrate: true })`) and flushes.
+ * Testing Library's `cleanup()` unmounts the root and removes the container after the test.
+ */
+export async function hydrateFromServer(
+  ui: ReactNode,
+  { mutate, client = ui, inAct = false, flush = flushMicrotasks }: HydrateFromServerOptions = {},
+): Promise<RenderResult> {
+  const container = document.createElement("div");
+  document.body.append(container);
+  container.innerHTML = renderToString(ui);
+  try {
+    await mutate?.(container);
+  } catch (error) {
+    // Not rendered yet, so `cleanup()` would not remove it: later tests would see its elements.
+    container.remove();
+    throw error;
+  }
+  let result!: RenderResult;
+  if (inAct) {
+    await act(async () => {
+      result = render(client, { container, hydrate: true });
+    });
+  } else {
+    result = render(client, { container, hydrate: true });
+  }
+  if (flush !== null) await flush();
+  return result;
 }
 
 /** A plain component for `render={<PlainButton />}`: forwards every prop to a `<button>`. */

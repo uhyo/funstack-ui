@@ -14,6 +14,7 @@ import {
   renderBoth,
   setupUser,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
@@ -121,12 +122,11 @@ describe("Checkbox indeterminate", () => {
     expect(html).not.toContain("aria-checked");
     expect(html).not.toMatch(/\sindeterminate=/);
 
-    const container = document.createElement("div");
-    document.body.append(container);
-    container.innerHTML = html;
-    expect((container.querySelector("input") as HTMLInputElement).indeterminate).toBe(false);
-    render(ui, { container, hydrate: true });
-    await flushMicrotasks();
+    await hydrateFromServer(ui, {
+      mutate: (container) => {
+        expect((container.querySelector("input") as HTMLInputElement).indeterminate).toBe(false);
+      },
+    });
     expect(box().indeterminate).toBe(true);
     expect(box()).toHaveAttribute("data-indeterminate", "");
     expect(consoleError).not.toHaveBeenCalled();

@@ -10,7 +10,6 @@
 // the visible input, a real wheel and page scroll, a real hold with focus staying put, the
 // accessibility tree, `startViewTransition` never called.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { renderToString } from "react-dom/server";
 import { Component, StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactElement, ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -23,6 +22,7 @@ import {
   setupUser,
   PlainButton,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
@@ -1447,15 +1447,8 @@ describe("NumberField", () => {
 
   // --- Platform paths ------------------------------------------------------------------------------
 
-  async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
-    const container = document.createElement("div");
-    document.body.append(container);
-    container.innerHTML = renderToString(ui);
-    mutate(container);
-    render(ui, { container, hydrate: true });
-    await flushMicrotasks();
-    return container;
-  }
+  const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
+    hydrateFromServer(ui, { mutate });
 
   const visibleIn = (c: HTMLElement) => c.querySelector('input[type="text"]') as HTMLInputElement;
 

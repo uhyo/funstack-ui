@@ -20,7 +20,6 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
@@ -31,6 +30,7 @@ import {
   renderBoth,
   setupUser,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
@@ -751,15 +751,8 @@ describe("Select", () => {
   });
 
   describe("platform: mount reconciliation", () => {
-    async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      mutate(container);
-      const result = render(ui, { container, hydrate: true });
-      await flushMicrotasks();
-      return result;
-    }
+    const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
+      hydrateFromServer(ui, { mutate });
     const pickC = (c: HTMLElement) => {
       c.querySelector("select")!.value = "c";
     };
@@ -1004,23 +997,20 @@ describe("Select", () => {
         </Select.Root>
       );
     }
+    /** Hydrates with the late options' boundary dehydrated until `g.open()`. */
+    const hydrateLate = (mode: ControlMode, action: ActionFn, g: ReturnType<typeof gate>) =>
+      hydrateFromServer(<LateSelect gate={fulfilled()} mode={mode} action={action} />, {
+        client: <LateSelect gate={g.promise} mode={mode} action={action} />,
+        inAct: true,
+        flush: null,
+      });
 
     renderBoth("late hydration", (mode) => {
       it("a pre-hydration pick of a late option dispatches exactly once when it hydrates", async () => {
         const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
-        const container = document.createElement("div");
-        document.body.append(container);
-        container.innerHTML = renderToString(
-          <LateSelect gate={fulfilled()} mode={mode} action={action} />,
-        );
         const g = gate();
-        await act(async () => {
-          render(<LateSelect gate={g.promise} mode={mode} action={action} />, {
-            container,
-            hydrate: true,
-          });
-        });
+        const { container } = await hydrateLate(mode, action, g);
         expect(action).not.toHaveBeenCalled();
         const c = container.querySelector<HTMLOptionElement>('option[value="c"]')!;
 
@@ -1044,18 +1034,8 @@ describe("Select", () => {
 
       it("late options hydrating with no pick dispatch nothing", async () => {
         const action = vi.fn<ActionFn>();
-        const container = document.createElement("div");
-        document.body.append(container);
-        container.innerHTML = renderToString(
-          <LateSelect gate={fulfilled()} mode={mode} action={action} />,
-        );
         const g = gate();
-        await act(async () => {
-          render(<LateSelect gate={g.promise} mode={mode} action={action} />, {
-            container,
-            hydrate: true,
-          });
-        });
+        await hydrateLate(mode, action, g);
         await act(async () => {
           g.open();
         });

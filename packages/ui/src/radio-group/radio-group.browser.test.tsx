@@ -9,11 +9,15 @@
 import { act, render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
-import { deferred, silenceErrors, flushMicrotasks } from "../__tests__/helpers.js";
+import {
+  deferred,
+  silenceErrors,
+  flushMicrotasks,
+  hydrateFromServer,
+} from "../__tests__/helpers.js";
 import { RadioGroup } from "./index.js";
 import type { RadioGroupValueChangeDetails } from "./index.js";
 
@@ -257,15 +261,14 @@ describe("RadioGroup (browser)", () => {
         <RadioGroup.Item value="c" aria-label="c" />
       </RadioGroup.Root>
     );
-    const container = document.createElement("div");
-    document.body.append(container);
-    container.innerHTML = renderToString(ui);
-    const serverC = container.querySelector<HTMLInputElement>('input[value="c"]')!;
-    await user.click(serverC);
-    expect(serverC.checked).toBe(true);
-
-    render(ui, { container, hydrate: true });
-    await flushMicrotasks();
+    let serverC!: HTMLInputElement;
+    const { container } = await hydrateFromServer(ui, {
+      mutate: async (container) => {
+        serverC = container.querySelector<HTMLInputElement>('input[value="c"]')!;
+        await user.click(serverC);
+        expect(serverC.checked).toBe(true);
+      },
+    });
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]?.[0]).toBe("c");
     expect(action.mock.calls[0]?.[1].reason).toBe("platform");

@@ -29,6 +29,7 @@ import {
   setupUser,
   PlainButton,
   flushTasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { Menu } from "./index.js";
@@ -1772,16 +1773,15 @@ describe("Menu.Root", () => {
         <Harness root={{ openChangeAction: action }} />
       </StrictMode>
     );
-    const container = document.createElement("div");
-    container.innerHTML = renderToString(ui);
-    document.body.append(container);
-    // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
-    container.querySelector<HTMLElement>("[popover]")!.showPopover();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await act(async () => {
-      render(ui, { container, hydrate: true });
+    await hydrateFromServer(ui, {
+      mutate: async (container) => {
+        // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+        container.querySelector<HTMLElement>("[popover]")!.showPopover();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      },
+      inAct: true,
+      flush: () => flushTasks(2),
     });
-    await flushTasks(2);
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![0]).toBe(true);
     expect(action.mock.calls[0]![1].reason).toBe("platform");

@@ -6,13 +6,13 @@
 import { act, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, createContext, startTransition, use, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   deferred,
   renderBoth,
   setupUser,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
@@ -177,15 +177,8 @@ function Harness({
 const radio = (v: string, name = "size") =>
   screen.getByLabelText(`${name} ${v}`) as HTMLInputElement;
 
-async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
-  const container = document.createElement("div");
-  document.body.append(container);
-  container.innerHTML = renderToString(ui);
-  mutate(container);
-  render(ui, { container, hydrate: true });
-  await flushMicrotasks();
-  return container;
-}
+const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
+  hydrateFromServer(ui, { mutate });
 
 describe("useNativeGroupReconciliation", () => {
   renderBoth("mount reconciliation", (mode) => {
@@ -413,17 +406,11 @@ describe("useNativeGroupReconciliation", () => {
       beforeRelease: (container: HTMLElement) => void,
       wrap: (ui: ReactNode) => ReactNode = (ui) => ui,
     ) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(
-        wrap(<Harness mode={mode} initial="s" action={action} late={fulfilled()} />),
-      );
       const gate = deferred();
-      render(wrap(<Harness mode={mode} initial="s" action={action} late={gate.promise} />), {
-        container,
-        hydrate: true,
-      });
-      await flushMicrotasks();
+      const { container } = await hydrateFromServer(
+        wrap(<Harness mode={mode} initial="s" action={action} late={fulfilled()} />),
+        { client: wrap(<Harness mode={mode} initial="s" action={action} late={gate.promise} />) },
+      );
       // The Root and "s" are hydrated; "m" and "l" are still server HTML.
       expect(action).not.toHaveBeenCalled();
       await act(async () => {

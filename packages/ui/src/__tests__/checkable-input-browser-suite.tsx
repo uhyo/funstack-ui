@@ -10,11 +10,10 @@
 import { act, render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { SwitchCheckedChangeDetails, SwitchProps } from "../switch/switch.js";
 import { user } from "./browser-user.js";
-import { deferred, silenceErrors, flushMicrotasks } from "./helpers.js";
+import { deferred, silenceErrors, flushMicrotasks, hydrateFromServer } from "./helpers.js";
 
 type Details = SwitchCheckedChangeDetails;
 type ActionFn = (next: boolean, details: Details) => unknown;
@@ -200,15 +199,14 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       const ui: ReactNode = <Control aria-label="Wi-Fi" checkedChangeAction={action} />;
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      const server = container.querySelector("input")!;
-      await user.click(server);
-      expect(server.checked).toBe(true);
-
-      render(ui, { container, hydrate: true });
-      await flushMicrotasks();
+      let server!: HTMLInputElement;
+      await hydrateFromServer(ui, {
+        mutate: async (container) => {
+          server = container.querySelector("input")!;
+          await user.click(server);
+          expect(server.checked).toBe(true);
+        },
+      });
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe(true);
       expect(action.mock.calls[0]?.[1].reason).toBe("platform");

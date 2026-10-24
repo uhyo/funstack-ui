@@ -1,11 +1,10 @@
 import { act, render, screen } from "@testing-library/react";
 import { StrictMode, startTransition, useState } from "react";
 import type { ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { guardCheckableChange, useNativeChecked } from "./use-native-checked.js";
 import type { UseNativeCheckedOptions } from "./use-native-checked.js";
-import { flushMicrotasks, silenceErrors } from "../__tests__/helpers.js";
+import { flushMicrotasks, hydrateFromServer, silenceErrors } from "../__tests__/helpers.js";
 
 type ProbeProps = Partial<UseNativeCheckedOptions> & {
   as?: "input" | "button";
@@ -38,14 +37,8 @@ function Probe({ as = "input", inputType = "checkbox", tick = 0, ...options }: P
 
 const probe = () => screen.getByLabelText("probe") as HTMLInputElement;
 
-async function hydrate(ui: ReactNode, mutate: (el: HTMLInputElement) => void) {
-  const container = document.createElement("div");
-  document.body.append(container);
-  container.innerHTML = renderToString(ui);
-  mutate(container.querySelector("input")!);
-  render(ui, { container, hydrate: true });
-  await flushMicrotasks();
-}
+const hydrate = (ui: ReactNode, mutate: (el: HTMLInputElement) => void) =>
+  hydrateFromServer(ui, { mutate: (c) => mutate(c.querySelector("input")!) });
 
 describe("useNativeChecked", () => {
   describe("element check (dev)", () => {

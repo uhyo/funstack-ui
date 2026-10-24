@@ -7,7 +7,6 @@
 // vertical Up / Down, Firefox's vertical ArrowRight), a real drag, the hidden input's box and
 // hit-testing, the accessibility tree, the rollback CSS transition.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { renderToString } from "react-dom/server";
 import { Component, StrictMode, Suspense, startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -18,6 +17,7 @@ import {
   expectNotPending,
   expectPending,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
@@ -1694,15 +1694,8 @@ describe("Slider", () => {
 
   // --- Platform paths ------------------------------------------------------------------------------
 
-  async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
-    const container = document.createElement("div");
-    document.body.append(container);
-    container.innerHTML = renderToString(ui);
-    mutate(container);
-    render(ui, { container, hydrate: true });
-    await flushMicrotasks();
-    return container;
-  }
+  const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
+    hydrateFromServer(ui, { mutate });
 
   eachMode("mount reconciliation", (mode) => {
     it("adopts a value stepped before hydration with one platform step + commit", async () => {
@@ -1764,12 +1757,11 @@ describe("Slider", () => {
           </Suspense>
         </Slider.Root>
       );
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      hydrating = true;
-      render(ui, { container, hydrate: true });
-      await flushMicrotasks();
+      const { container } = await hydrateFromServer(ui, {
+        mutate: () => {
+          hydrating = true;
+        },
+      });
       expect(onCommit).not.toHaveBeenCalled();
       (container.querySelectorAll("input")[1] as HTMLInputElement).value = "90";
       await act(async () => gate.resolve());

@@ -7,7 +7,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ComponentType, ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
@@ -21,6 +20,7 @@ import {
   renderBoth,
   setupUser,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "./helpers.js";
 import type { ControlMode } from "./helpers.js";
@@ -1133,15 +1133,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
     });
 
     describe("platform: click before hydration (row 22)", () => {
-      async function hydrate(ui: ReactNode, mutate: (el: HTMLInputElement) => void) {
-        const container = document.createElement("div");
-        document.body.append(container);
-        container.innerHTML = renderToString(ui);
-        mutate(container.querySelector("input")!);
-        const result = render(ui, { container, hydrate: true });
-        await flushMicrotasks();
-        return result;
-      }
+      const hydrate = (ui: ReactNode, mutate: (el: HTMLInputElement) => void) =>
+        hydrateFromServer(ui, { mutate: (c) => mutate(c.querySelector("input")!) });
 
       renderBoth("mount reconciliation", (mode) => {
         it("dispatches the hydrated DOM value once with reason platform", async () => {
@@ -1221,19 +1214,15 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
             const consoleError = silenceErrors();
             const action = vi.fn<ActionFn>();
             const wrap = (ui: ReactNode) => (strict ? <StrictMode>{ui}</StrictMode> : ui);
-            const container = document.createElement("div");
-            document.body.append(container);
             const ready = Object.assign(Promise.resolve(), {
               status: "fulfilled",
               value: undefined,
             });
-            container.innerHTML = renderToString(wrap(<Page gate={ready} action={action} />));
             const gate = deferred();
-            render(wrap(<Page gate={gate.promise} action={action} />), {
-              container,
-              hydrate: true,
-            });
-            await flushMicrotasks();
+            const { container } = await hydrateFromServer(
+              wrap(<Page gate={ready} action={action} />),
+              { client: wrap(<Page gate={gate.promise} action={action} />) },
+            );
             const server = container.querySelector("input")!;
             await act(async () => {
               server.click();

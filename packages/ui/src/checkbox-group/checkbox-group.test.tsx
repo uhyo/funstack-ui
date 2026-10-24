@@ -13,7 +13,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
@@ -24,6 +23,7 @@ import {
   renderBoth,
   setupUser,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
@@ -1144,20 +1144,18 @@ describe("CheckboxGroup", () => {
           <CheckboxGroup.Item value="b" aria-label="b" />
         </CheckboxGroup.Root>
       );
-      const html = renderToString(ui);
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = html;
-      const serverParent = container.querySelector<HTMLInputElement>("input:not([name])")!;
-      expect(serverParent).toHaveAttribute("data-indeterminate", "");
-      expect(serverParent).not.toHaveAttribute("aria-checked");
-      expect(serverParent).not.toHaveAttribute("name");
-      // Never restored by Firefox's form-state restoration (design 8.1).
-      expect(serverParent).toHaveAttribute("autocomplete", "off");
-      expect(serverParent.indeterminate).toBe(false);
-
-      render(ui, { container, hydrate: true });
-      await flushMicrotasks();
+      let serverParent!: HTMLInputElement;
+      await hydrateFromServer(ui, {
+        mutate: (container) => {
+          serverParent = container.querySelector<HTMLInputElement>("input:not([name])")!;
+          expect(serverParent).toHaveAttribute("data-indeterminate", "");
+          expect(serverParent).not.toHaveAttribute("aria-checked");
+          expect(serverParent).not.toHaveAttribute("name");
+          // Never restored by Firefox's form-state restoration (design 8.1).
+          expect(serverParent).toHaveAttribute("autocomplete", "off");
+          expect(serverParent.indeterminate).toBe(false);
+        },
+      });
       expect(parentBox()).toBe(serverParent);
       expect(serverParent.indeterminate).toBe(true);
       expect(parentShows()).toBe("mixed");
@@ -1167,17 +1165,17 @@ describe("CheckboxGroup", () => {
 
   describe("Parent and disabled Items", () => {
     async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void = () => {}) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      const serverParent = container.querySelector<HTMLInputElement>("input:not([name])")!;
-      const server = {
-        checked: serverParent.hasAttribute("data-checked"),
-        indeterminate: serverParent.hasAttribute("data-indeterminate"),
-      };
-      mutate(container);
-      render(ui, { container, hydrate: true });
-      await flushMicrotasks();
+      let server = { checked: false, indeterminate: false };
+      await hydrateFromServer(ui, {
+        mutate: (container) => {
+          const serverParent = container.querySelector<HTMLInputElement>("input:not([name])")!;
+          server = {
+            checked: serverParent.hasAttribute("data-checked"),
+            indeterminate: serverParent.hasAttribute("data-indeterminate"),
+          };
+          mutate(container);
+        },
+      });
       return server;
     }
 
@@ -1489,12 +1487,11 @@ describe("CheckboxGroup", () => {
           </CheckboxGroup.Root>
         </form>
       );
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      expect(container.querySelector('input[value="a"]')).not.toHaveAttribute("required");
-      render(ui, { container, hydrate: true });
-      await flushMicrotasks();
+      await hydrateFromServer(ui, {
+        mutate: (container) => {
+          expect(container.querySelector('input[value="a"]')).not.toHaveAttribute("required");
+        },
+      });
       expect(box("a")).toBeRequired();
       expect(consoleError).not.toHaveBeenCalled();
     });
@@ -1562,15 +1559,8 @@ describe("CheckboxGroup", () => {
   });
 
   describe("platform: mount reconciliation", () => {
-    async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      mutate(container);
-      const result = render(ui, { container, hydrate: true });
-      await flushMicrotasks();
-      return result;
-    }
+    const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
+      hydrateFromServer(ui, { mutate });
     const setChecked =
       (value: string, checked = true) =>
       (c: HTMLElement) => {
@@ -1657,14 +1647,8 @@ describe("CheckboxGroup", () => {
   });
 
   describe("platform: a pre-hydration Parent click", () => {
-    async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      mutate(container);
-      render(ui, { container, hydrate: true });
-      await flushMicrotasks();
-    }
+    const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
+      hydrateFromServer(ui, { mutate });
     const clickParent = (checked: boolean) => (c: HTMLElement) => {
       c.querySelector<HTMLInputElement>("input:not([name])")!.checked = checked;
     };
@@ -1793,13 +1777,11 @@ describe("CheckboxGroup", () => {
       );
     }
     async function hydrateLate(props: Omit<Parameters<typeof LateGroup>[0], "gate">) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(<LateGroup gate={fulfilled()} {...props} />);
       const g = gate();
-      // Inside an async `act`: a render that suspends in a sync `act` never retries in jsdom.
-      await act(async () => {
-        render(<LateGroup gate={g.promise} {...props} />, { container, hydrate: true });
+      const { container } = await hydrateFromServer(<LateGroup gate={fulfilled()} {...props} />, {
+        client: <LateGroup gate={g.promise} {...props} />,
+        inAct: true,
+        flush: null,
       });
       return { container, g };
     }
@@ -1894,12 +1876,11 @@ describe("CheckboxGroup", () => {
           </CheckboxGroup.Root>
         );
       }
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(<Group gate={fulfilled()} />);
       const g = gate();
-      await act(async () => {
-        render(<Group gate={g.promise} />, { container, hydrate: true });
+      await hydrateFromServer(<Group gate={fulfilled()} />, {
+        client: <Group gate={g.promise} />,
+        inAct: true,
+        flush: null,
       });
       await act(async () => {
         g.open();
@@ -1951,12 +1932,11 @@ describe("CheckboxGroup", () => {
           </CheckboxGroup.Root>
         );
       }
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(<Group gate={fulfilled()} />);
       const g = gate();
-      await act(async () => {
-        render(<Group gate={g.promise} />, { container, hydrate: true });
+      await hydrateFromServer(<Group gate={fulfilled()} />, {
+        client: <Group gate={g.promise} />,
+        inAct: true,
+        flush: null,
       });
       // The hydrated Item is checked while the Parent and Item b are still dehydrated: the server
       // rendered them for an empty group (Parent unchecked, b required).

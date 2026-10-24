@@ -7,7 +7,6 @@
 // Tab through the real focus order, implicit submission, nesting in Popover / Dialog (WebKit
 // 302008), ViewTransition, IME, pre-hydration typing with the real keyboard.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { renderToString } from "react-dom/server";
 import * as React from "react";
 import { StrictMode, Suspense, startTransition, use, useState, useTransition } from "react";
 import type { ReactNode } from "react";
@@ -22,6 +21,7 @@ import {
   renderBoth,
   setupUser,
   flushTasks,
+  hydrateFromServer,
   PlainButton,
   silenceErrors,
 } from "../__tests__/helpers.js";
@@ -1895,15 +1895,13 @@ describe("Combobox", () => {
   });
 
   describe("platform: mount reconciliation", () => {
-    async function hydrate(ui: ReactNode, typed: string) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      container.querySelector<HTMLInputElement>('[role="combobox"]')!.value = typed;
-      const result = render(ui, { container, hydrate: true });
-      await flushTasks(2);
-      return result;
-    }
+    const hydrate = (ui: ReactNode, typed: string) =>
+      hydrateFromServer(ui, {
+        mutate: (c) => {
+          c.querySelector<HTMLInputElement>('[role="combobox"]')!.value = typed;
+        },
+        flush: () => flushTasks(2),
+      });
 
     renderBoth("typed before hydration", (mode) => {
       it("adopts the DOM text once with reason platform, opens nothing, dispatches no value", async () => {

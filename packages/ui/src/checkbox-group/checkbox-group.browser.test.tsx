@@ -13,7 +13,12 @@ import { describe, expect, it, vi } from "vitest";
 import { cdp } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
-import { deferred, silenceErrors, flushMicrotasks } from "../__tests__/helpers.js";
+import {
+  deferred,
+  silenceErrors,
+  flushMicrotasks,
+  hydrateFromServer,
+} from "../__tests__/helpers.js";
 import { CheckboxGroup } from "./index.js";
 import type { CheckboxGroupValueChangeDetails } from "./index.js";
 import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
@@ -228,15 +233,13 @@ describe("CheckboxGroup (browser)", () => {
           <CheckboxGroup.Item value="c" aria-label="c" />
         </CheckboxGroup.Root>
       );
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      const serverParent = container.querySelector<HTMLInputElement>("input:not([name])")!;
-      await user.click(serverParent);
-      expect(serverParent.checked).toBe(true);
-
-      render(ui, { container, hydrate: true });
-      await flushMicrotasks();
+      const { container } = await hydrateFromServer(ui, {
+        mutate: async (container) => {
+          const serverParent = container.querySelector<HTMLInputElement>("input:not([name])")!;
+          await user.click(serverParent);
+          expect(serverParent.checked).toBe(true);
+        },
+      });
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toEqual(["a", "b", "c"]);
       expect(action.mock.calls[0]?.[1].reason).toBe("platform");

@@ -12,7 +12,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
@@ -23,6 +22,7 @@ import {
   renderBoth,
   setupUser,
   flushMicrotasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
@@ -783,15 +783,8 @@ describe("RadioGroup", () => {
   });
 
   describe("platform: mount reconciliation", () => {
-    async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      mutate(container);
-      const result = render(ui, { container, hydrate: true });
-      await flushMicrotasks();
-      return result;
-    }
+    const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
+      hydrateFromServer(ui, { mutate });
     const checkC = (c: HTMLElement) => {
       (c.querySelector('input[value="c"]') as HTMLInputElement).checked = true;
     };
@@ -929,21 +922,16 @@ describe("RadioGroup", () => {
       it("a pre-hydration click on a late item dispatches exactly once when it hydrates", async () => {
         const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
-        const container = document.createElement("div");
-        document.body.append(container);
-        container.innerHTML = renderToString(
-          <LateGroup gate={fulfilled()} mode={mode} action={action} />,
-        );
-
         // The Root hydrates; the boundary around b and c stays dehydrated until `gate` resolves.
         const g = gate();
-        // Inside an async `act`: a render that suspends in a sync `act` never retries in jsdom.
-        await act(async () => {
-          render(<LateGroup gate={g.promise} mode={mode} action={action} />, {
-            container,
-            hydrate: true,
-          });
-        });
+        const { container } = await hydrateFromServer(
+          <LateGroup gate={fulfilled()} mode={mode} action={action} />,
+          {
+            client: <LateGroup gate={g.promise} mode={mode} action={action} />,
+            inAct: true,
+            flush: null,
+          },
+        );
         expect(action).not.toHaveBeenCalled();
 
         // The user checks "c" while its boundary is still dehydrated: React sees nothing.
@@ -974,18 +962,15 @@ describe("RadioGroup", () => {
       it("a click on a hydrated radio while siblings are dehydrated: react-dom throws; the state is consistent after hydration", async () => {
         const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
-        const container = document.createElement("div");
-        document.body.append(container);
-        container.innerHTML = renderToString(
-          <LateGroup gate={fulfilled()} mode={mode} action={action} initial="b" />,
-        );
         const g = gate();
-        await act(async () => {
-          render(<LateGroup gate={g.promise} mode={mode} action={action} initial="b" />, {
-            container,
-            hydrate: true,
-          });
-        });
+        const { container } = await hydrateFromServer(
+          <LateGroup gate={fulfilled()} mode={mode} action={action} initial="b" />,
+          {
+            client: <LateGroup gate={g.promise} mode={mode} action={action} initial="b" />,
+            inAct: true,
+            flush: null,
+          },
+        );
 
         // react-dom's restoreStateOfTarget finds the dehydrated same-name radios (no fiber) after
         // the event and throws; the error escapes the event listener as an uncaught error.
@@ -1043,13 +1028,7 @@ describe("RadioGroup", () => {
           </Suspense>
         </StrictMode>
       );
-      const container = document.createElement("div");
-      document.body.append(container);
-      container.innerHTML = renderToString(ui);
-      await act(async () => {
-        render(ui, { container, hydrate: true });
-      });
-      await flushMicrotasks();
+      await hydrateFromServer(ui, { inAct: true });
       expect(screen.getAllByRole("radio")).toHaveLength(2);
       expect(action).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
