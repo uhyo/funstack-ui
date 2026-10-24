@@ -182,9 +182,14 @@ async function inAct<T>(interaction: () => Promise<T>): Promise<T> {
  * A `user-event` instance whose every interaction (`click`, `keyboard`, `tab`, `hover`, `type`,
  * …) runs inside `act()`, so the transitions it starts have committed when the call resolves.
  * Call it in each test, after `render`.
+ *
+ * `delay: null` drops user-event's `setTimeout(0)` between the steps of one interaction (each key
+ * of `keyboard("ab")`, each pointer action): the surrounding `act()` already drains React's work,
+ * so the wait only cost time (#101, audit T1). Pass `delay` to restore it for a row that needs a
+ * task between two steps.
  */
 export function setupUser(options?: Parameters<typeof userEvent.setup>[0]): UserEvent {
-  const user = userEvent.setup(options);
+  const user = userEvent.setup({ delay: null, ...options });
   return new Proxy(user, {
     get(target, key, receiver) {
       const value: unknown = Reflect.get(target, key, receiver);
