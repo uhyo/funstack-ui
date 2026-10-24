@@ -22,6 +22,7 @@ import {
   renderBoth,
   setupUser,
   flushTasks,
+  PlainButton,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
@@ -1824,10 +1825,6 @@ describe("Combobox", () => {
   });
 
   describe("disabled on component renders (#83, design/components/button.md 17.3)", () => {
-    function MyButton(props: React.ComponentPropsWithRef<"button">) {
-      return <button {...props} />;
-    }
-
     function Box({
       disabled,
       render: element,
@@ -1871,7 +1868,7 @@ describe("Combobox", () => {
     });
 
     it("a component render disabled: aria-disabled, tabIndex -1, a click neither opens nor clears", async () => {
-      render(<Box disabled render={<MyButton />} />);
+      render(<Box disabled render={<PlainButton />} />);
       for (const el of [trigger(), clearButton()]) {
         expect(el).toHaveAttribute("aria-disabled", "true");
         expect(el).not.toHaveAttribute("disabled");
