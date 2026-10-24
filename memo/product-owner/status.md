@@ -324,3 +324,11 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #108 merged + design doc 5.1 fixed. #107 merged ad3b232 (jsdom −38%: 30s→18.5s; jsdom-isolated project for vi.mock(react)/stream-render files + guard test; shared pointer-capture shim; test-only resets in announce/use-popover-popup). Firefox toggle-ordering fragility noted on #109.
 - WAVE 16 DONE, #100 closed. Released 0.1.0-alpha.12 (Publish + Deploy Docs running at release time). Final vs 1208aa2: src +562, tests −693 (tests 2865→3182), docs+example −943, bundle −9.7KB min.
 - Open follow-ups: #109 shared browser overlay suite, #110 WebKit async menu close (architect).
+
+## STANDING USER POLICY (2026-10-24)
+- User: "For small follow-ups you can autonomously do without my approval. My overall goal is to always make this library better."
+  → PO picks up small follow-ups (test/infra cleanups, bug fixes, doc fixes, design decisions within existing principles) without asking. Still ask the user for: new components / scope changes, vision changes, anything contradicting docs/vision.md, human-only tasks (upstream reports, device checks).
+
+## WAVE 17 (small follow-ups) — STARTED 2026-10-24
+- #110 architect: decide intended Menu close behaviour with async openChangeAction(false) across engines → then developer.
+- #109 developer: shared browser overlay suite + disabled-render suite; Firefox toggle-order fragility.
