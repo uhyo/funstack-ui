@@ -17,7 +17,7 @@
 // rejection are N/A: the re-entry guard means a Close never has two of its own runs in flight
 // (#79, #81); the Close rows P1-P4 (design/components/button.md 16.4) replace them.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, useRef, useState } from "react";
+import { startTransition, use, useRef, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -25,7 +25,6 @@ import { dispatchCommand } from "../__tests__/invoker-shim.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
-  createSuspender,
   deferred,
   ErrorCatcher,
   expectNotPending,
@@ -36,7 +35,7 @@ import {
   flushTasks,
   silenceErrors,
 } from "../__tests__/helpers.js";
-import type { ControlMode } from "../__tests__/helpers.js";
+import { PopoverContext } from "./popover-context.js";
 import { Popover } from "./index.js";
 import type {
   PopoverCloseProps,
@@ -49,76 +48,26 @@ import type {
   PopoverTriggerState,
 } from "./index.js";
 import { recordClicks, spyHide, spyShow } from "../__tests__/overlay-helpers.js";
+import {
+  createOverlayHarness,
+  describeOverlayOpenState,
+} from "../__tests__/overlay-open-state-suite.js";
+import type { OverlayHarnessMode } from "../__tests__/overlay-open-state-suite.js";
 
 type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
-type Mode = ControlMode | "static";
-const controlModesWithStatic: readonly Mode[] = ["uncontrolled", "controlled", "static"];
+const controlModesWithStatic: readonly OverlayHarnessMode[] = ["uncontrolled", "controlled", "static"];
 
-interface HarnessProps {
-  mode: Mode;
-  /** Initial committed open state. */
-  initialOpen?: boolean;
-  /** The consumer's work, awaited by the harness's `openChangeAction`. */
-  action?: ActionFn;
-  /** Catch errors thrown by `action` (turns a rejection into success for the library). */
-  catchErrors?: boolean;
-  /** Controlled mode: never adopt `false` (a parent that refuses to close). */
-  refuseClose?: boolean;
-  /** Controlled mode: never adopt `true` (a parent that vetoes the open). */
-  refuseOpen?: boolean;
-  /** Wrap the Root in an `ErrorCatcher` that reports to this callback. */
-  boundary?: (error: unknown) => void;
-  /** Wrap everything in a Suspense boundary (above the Root). */
-  suspense?: boolean;
+interface PopoverHarnessProps {
   trigger?: Partial<PopoverTriggerProps> | false;
   popup?: Partial<PopoverPopupProps>;
   close?: Partial<PopoverCloseProps>;
   /** Popup content; default: a span and a Close button. */
   content?: ReactNode;
-  /** Rendered next to the Root (for controlled tests that flip `open` from outside). */
-  outside?: (setOpen: (open: boolean) => void) => ReactNode;
 }
 
-/**
- * Controlled/uncontrolled parity harness. The controlled variant follows "update on success"
- * (`startTransition` after the await, design 2.2).
- */
-function Harness({
-  mode,
-  initialOpen = false,
-  action,
-  catchErrors = false,
-  refuseClose = false,
-  refuseOpen = false,
-  boundary,
-  suspense = false,
-  trigger,
-  popup,
-  close,
-  content,
-  outside,
-}: HarnessProps) {
-  const [open, setOpen] = useState(initialOpen);
-
-  const openChangeAction = async (next: boolean, details: PopoverOpenChangeDetails) => {
-    try {
-      await action?.(next, details);
-    } catch (error) {
-      if (!catchErrors) throw error;
-      return;
-    }
-    if ((next && refuseOpen) || (!next && refuseClose)) return;
-    startTransition(() => setOpen(next));
-  };
-
-  const rootProps =
-    mode === "static"
-      ? {}
-      : mode === "controlled"
-        ? { open, openChangeAction }
-        : { defaultOpen: initialOpen, openChangeAction };
-
-  let popover: ReactNode = (
+/** Controlled/uncontrolled parity harness (`createOverlayHarness`). */
+const Harness = createOverlayHarness<PopoverOpenChangeDetails, PopoverHarnessProps>(
+  (rootProps, { trigger, popup, close, content }) => (
     <Popover.Root {...rootProps}>
       {trigger !== false && (
         <Popover.Trigger data-testid="trigger" {...trigger}>
@@ -138,25 +87,8 @@ function Harness({
         )}
       </Popover.Popup>
     </Popover.Root>
-  );
-  if (boundary) popover = <ErrorCatcher onError={boundary}>{popover}</ErrorCatcher>;
-
-  const body = (
-    <>
-      <button type="button" data-testid="elsewhere">
-        Elsewhere
-      </button>
-      {popover}
-      {outside?.((next) => startTransition(() => setOpen(next)))}
-      <output data-testid="committed">{String(open)}</output>
-    </>
-  );
-  return suspense ? (
-    <Suspense fallback={<span data-testid="fallback">loading</span>}>{body}</Suspense>
-  ) : (
-    body
-  );
-}
+  ),
+);
 
 const trigger = () => screen.getByTestId("trigger");
 const popup = () => screen.getByTestId("popup");
@@ -179,6 +111,49 @@ afterEach(() => {
     if (element.matches(":popover-open")) (element as HTMLElement).hidePopover();
   }
   document.body.innerHTML = "";
+});
+
+describeOverlayOpenState<PopoverOpenChangeDetails>({
+  name: "Popover",
+  Harness,
+  isOpen: () => isOpen(),
+  spyOpen: spyShow,
+  spyClose: spyHide,
+  openArgs: () => [{ source: trigger() }],
+  dismiss: () => popup().hidePopover(),
+  dismissEvent: "toggle",
+  partClose: (user) => user.click(trigger()),
+  partCloseArgs: [],
+  returnValue: false,
+  detailsKeys: ["reason"],
+  triggerToggles: true,
+  ariaExpanded: true,
+  // A script's showPopover(): cancelled at `beforetoggle`, which is the dispatched event.
+  foreignOpen: () => {
+    let before!: Event;
+    popup().addEventListener("beforetoggle", (event) => (before = event), { once: true });
+    popup().showPopover();
+    return before;
+  },
+  foreignOpenCallsOpen: true,
+  // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+  openBeforeHydration: async (element) => {
+    element.showPopover();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  },
+  controlledOpenArgs: [undefined],
+  controlledCloseArgs: [],
+  closeIntents: {
+    render: (probe) => (
+      <Popover.Root>
+        <Popover.Popup data-testid="popup" aria-label="Probe">
+          {probe}
+        </Popover.Popup>
+      </Popover.Root>
+    ),
+    useIntents: () => use(PopoverContext)!,
+    open: (element) => element.showPopover(),
+  },
 });
 
 describe("Popover", () => {
@@ -424,77 +399,6 @@ describe("Popover", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("a Trigger click dispatches (true, details) with the native click, cancelled", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      await user.click(trigger());
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toBe(true);
-      expect(details.reason).toBe("activate");
-      expect(details.event).toBeInstanceOf(MouseEvent);
-      expect(details.event!.type).toBe("click");
-      // The command was cancelled: the library opens the popover, not the browser.
-      expect(details.event!.defaultPrevented).toBe(true);
-      // `details` is serialisable; `event` is virtual (conventions 2.2).
-      expect(Object.keys(details)).toEqual(["reason"]);
-      await flushTasks(2);
-      expect(isOpen()).toBe(true);
-      expect(committedText()).toBe("true");
-    });
-
-    it("a click while open dispatches (false, 'activate'): a library-owned close", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      await openThroughTrigger(user);
-      await user.click(trigger());
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe(false);
-      expect(details.reason).toBe("activate");
-      expect(details.event!.type).toBe("click");
-      expect(details.event!.defaultPrevented).toBe(true);
-      await flushTasks(2);
-      expect(isOpen()).toBe(false);
-      expect(committedText()).toBe("false");
-      // The library's own hide echoes back through `toggle` without a second dispatch.
-      expect(action).toHaveBeenCalledTimes(2);
-    });
-
-    it("a disabled Trigger never dispatches", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} trigger={{ disabled: true }} />);
-      await user.click(trigger());
-      fireEvent.click(trigger());
-      await flushTasks(2);
-      expect(action).not.toHaveBeenCalled();
-      expect(isOpen()).toBe(false);
-      expect(trigger()).toHaveAttribute("data-disabled", "");
-    });
-
-    it("a foreign open (script showPopover) is cancelled at beforetoggle and dispatched", async () => {
-      const action = vi.fn<ActionFn>();
-      const showPopover = spyShow();
-      render(<Harness mode={mode} action={action} />);
-      let before!: Event;
-      popup().addEventListener("beforetoggle", (event) => (before = event), { once: true });
-      await act(async () => popup().showPopover());
-      expect(before.defaultPrevented).toBe(true);
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toBe(true);
-      expect(details.reason).toBe("activate");
-      expect(details.event).toBe(before);
-      await flushTasks(2);
-      expect(isOpen()).toBe(true);
-      // The test's call and the library's own (with the Trigger as source).
-      expect(showPopover).toHaveBeenCalledTimes(2);
-      expect(showPopover).toHaveBeenLastCalledWith({ source: trigger() });
-    });
-
     it("a foreign show-popover invoker is routed through the library", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
@@ -547,369 +451,6 @@ describe("Popover", () => {
       expect(next).toBe(false);
       expect(details.reason).toBe("dismiss");
       expect(details.event!.type).toBe("toggle");
-    });
-  });
-
-  renderBoth("async action", (mode) => {
-    it("open: pending Trigger, popup hidden and content unmounted until it resolves", async () => {
-      const user = setupUser();
-      const showPopover = spyShow();
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} />);
-      await user.click(trigger());
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expectPending(trigger());
-      expect(showPopover).not.toHaveBeenCalled();
-      expect(isOpen()).toBe(false);
-      expect(content()).toBeNull();
-      await act(async () => d.resolve());
-      expect(showPopover).toHaveBeenCalledTimes(1);
-      expect(showPopover).toHaveBeenCalledWith({ source: trigger() });
-      expect(isOpen()).toBe(true);
-      expect(content()).toBeInTheDocument();
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expectNotPending(trigger());
-    });
-
-    it("part-initiated close: the popup stays open while pending, hides on resolve", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      await openThroughTrigger(user);
-      const hidePopover = spyHide();
-      const d = deferred();
-      action.mockImplementation(() => d.promise);
-      await user.click(trigger());
-      await flushTasks(2);
-      expect(isOpen()).toBe(true);
-      expect(content()).toBeInTheDocument();
-      expectPending(trigger());
-      expect(trigger()).not.toHaveAttribute("data-open");
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
-      expect(hidePopover).not.toHaveBeenCalled();
-      await act(async () => d.resolve());
-      expect(hidePopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(false);
-      expectNotPending(trigger());
-      await flushTasks(2);
-      expect(content()).toBeNull();
-      expect(action).toHaveBeenCalledTimes(2);
-    });
-
-    it("dismissal: notified as (false, 'dismiss') with the toggle event; pending meanwhile", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      await openThroughTrigger(user);
-      const d = deferred();
-      action.mockImplementation(() => d.promise);
-      // What Escape or a click outside does: the browser hides the popover.
-      await act(async () => popup().hidePopover());
-      expect(isOpen()).toBe(false);
-      await flushTasks(2);
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe(false);
-      expect(details.reason).toBe("dismiss");
-      expect(details.event!.type).toBe("toggle");
-      expectPending(trigger());
-      expect(trigger()).not.toHaveAttribute("data-open");
-      expect(content()).toBeInTheDocument(); // committed is still true
-      await act(async () => d.resolve());
-      await flushTasks(2);
-      expectNotPending(trigger());
-      expect(content()).toBeNull();
-      expect(committedText()).toBe("false");
-      expect(isOpen()).toBe(false);
-    });
-
-    it("a commit between the native hide and its `toggle` event does not re-open", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      const { rerender } = render(<Harness mode={mode} action={action} />);
-      await openThroughTrigger(user);
-      const showPopover = spyShow();
-      await act(async () => {
-        popup().hidePopover();
-        // A re-render of the Root lands before the queued `toggle` event.
-        rerender(<Harness mode={mode} action={action} popup={{ className: "re-rendered" }} />);
-      });
-      expect(popup()).toHaveClass("re-rendered");
-      expect(isOpen()).toBe(false);
-      await flushTasks(2);
-      expect(showPopover).not.toHaveBeenCalled();
-      expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenLastCalledWith(false, expect.anything());
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("open rejects: the boundary gets it, the popup never opened, no data-open", async () => {
-      const user = setupUser();
-      silenceErrors();
-      const showPopover = spyShow();
-      const d = deferred();
-      const caught = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={caught} />);
-      await user.click(trigger());
-      expect(trigger()).toHaveAttribute("data-open", "");
-      await act(async () => d.reject(new Error("nope")));
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "nope" }));
-      expect(showPopover).not.toHaveBeenCalled();
-      expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
-    });
-
-    it("open rejects, caught inside: resolves and commits (uncontrolled opens)", async () => {
-      const user = setupUser();
-      render(
-        <Harness
-          mode={mode}
-          catchErrors
-          action={async () => {
-            throw new Error("handled");
-          }}
-        />,
-      );
-      await user.click(trigger());
-      await flushTasks(2);
-      // A swallowed error is success: uncontrolled commits; the controlled harness returns early
-      // (does not adopt) so it stays closed.
-      expect(isOpen()).toBe(mode === "uncontrolled");
-      if (mode === "uncontrolled") expect(trigger()).toHaveAttribute("data-open", "");
-      else expect(trigger()).not.toHaveAttribute("data-open");
-    });
-
-    it("part-initiated close rejects: the boundary gets it, the library never hid the popup", async () => {
-      const user = setupUser();
-      silenceErrors();
-      const caught = vi.fn();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} boundary={caught} />);
-      await openThroughTrigger(user);
-      const hidePopover = spyHide();
-      const d = deferred();
-      action.mockImplementation(() => d.promise);
-      await user.click(trigger());
-      expect(isOpen()).toBe(true);
-      await act(async () => d.reject(new Error("save failed")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
-      expect(hidePopover).not.toHaveBeenCalled();
-      // The boundary replaced the component; removing the popover hid it.
-      expect(screen.queryByTestId("popup")).toBeNull();
-    });
-
-    it("part-initiated close rejects, caught inside: uncontrolled closes, controlled stays", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} catchErrors />);
-      await openThroughTrigger(user);
-      action.mockImplementation(async () => {
-        throw new Error("handled");
-      });
-      await user.click(trigger());
-      await flushTasks(2);
-      expect(isOpen()).toBe(mode === "controlled");
-    });
-
-    it("dismissal notification rejects: the boundary gets it (the popup was already hidden)", async () => {
-      const user = setupUser();
-      silenceErrors();
-      const caught = vi.fn();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} boundary={caught} />);
-      await openThroughTrigger(user);
-      action.mockImplementation(async () => {
-        throw new Error("save failed");
-      });
-      await act(async () => popup().hidePopover());
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
-    });
-  });
-
-  describe("controlled refusal and veto", () => {
-    it("a refused dismissal re-opens the popup once the notification settles; not a veto", async () => {
-      const user = setupUser();
-      const d = deferred();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" action={action} refuseClose />);
-      await openThroughTrigger(user);
-      const showPopover = spyShow();
-      action.mockImplementation(() => d.promise);
-      await act(async () => popup().hidePopover());
-      expect(isOpen()).toBe(false);
-      await flushTasks(2);
-      expectPending(trigger());
-      expect(showPopover).not.toHaveBeenCalled();
-      await act(async () => d.resolve());
-      expect(showPopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(true);
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expectNotPending(trigger());
-    });
-
-    it("a refused part-initiated close is a real veto: never hidden, data-open snaps back", async () => {
-      const user = setupUser();
-      const d = deferred();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" action={action} refuseClose />);
-      await openThroughTrigger(user);
-      const hidePopover = spyHide();
-      action.mockImplementation(() => d.promise);
-      await user.click(trigger());
-      expect(trigger()).not.toHaveAttribute("data-open");
-      await act(async () => d.resolve());
-      await flushTasks(2);
-      expect(hidePopover).not.toHaveBeenCalled();
-      expect(isOpen()).toBe(true);
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
-      expect(content()).toBeInTheDocument();
-    });
-
-    it("a vetoed open snaps back and the popup never opens", async () => {
-      const user = setupUser();
-      const showPopover = spyShow();
-      const d = deferred();
-      render(<Harness mode="controlled" action={() => d.promise} refuseOpen />);
-      await user.click(trigger());
-      expect(trigger()).toHaveAttribute("data-open", "");
-      await act(async () => d.resolve());
-      expect(trigger()).not.toHaveAttribute("data-open");
-      expect(showPopover).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("overlap", () => {
-    renderBoth("second click during a pending open (walkthrough 11.7)", (mode) => {
-      it("both actions run, the popup never opens, the latest intent wins", async () => {
-        const user = setupUser();
-        const showPopover = spyShow();
-        const opening = deferred();
-        const closing = deferred();
-        const action = vi.fn<ActionFn>();
-        action.mockImplementationOnce(() => opening.promise);
-        action.mockImplementationOnce(() => closing.promise);
-        render(<Harness mode={mode} action={action} />);
-        await user.click(trigger());
-        await user.click(trigger());
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
-        expect(trigger()).toHaveAttribute("aria-expanded", "false");
-        expectPending(trigger());
-        // Out of order: the close first, then the superseded open.
-        await act(async () => closing.resolve());
-        await act(async () => opening.resolve());
-        await flushTasks(2);
-        expectNotPending(trigger());
-        if (mode === "uncontrolled") {
-          expect(trigger()).toHaveAttribute("aria-expanded", "false");
-          expect(showPopover).not.toHaveBeenCalled();
-          expect(isOpen()).toBe(false);
-        } else {
-          // A controlled parent that adopts every resolution in arrival order ends with the
-          // slower one (conventions 2.5); the DOM follows the parent.
-          expect(committedText()).toBe("true");
-          expect(isOpen()).toBe(true);
-        }
-      });
-    });
-
-    renderBoth("dismissal during a pending part-initiated close (walkthrough 11.8)", (mode) => {
-      it("dispatches nothing more; one openChangeAction(false)", async () => {
-        const user = setupUser();
-        const action = vi.fn<ActionFn>();
-        render(<Harness mode={mode} action={action} />);
-        await openThroughTrigger(user);
-        const d = deferred();
-        action.mockImplementation(() => d.promise);
-        await user.click(trigger());
-        expect(action).toHaveBeenCalledTimes(2);
-        await act(async () => popup().hidePopover());
-        await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(2);
-        const hidePopover = spyHide();
-        await act(async () => d.resolve());
-        await flushTasks(2);
-        expect(hidePopover).not.toHaveBeenCalled(); // already hidden
-        expect(isOpen()).toBe(false);
-        expect(content()).toBeNull();
-      });
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    async function setup() {
-      const user = setupUser();
-      silenceErrors();
-      const caught = vi.fn();
-      const opening = deferred();
-      const closing = deferred();
-      const action = vi.fn<ActionFn>();
-      action.mockImplementationOnce(() => opening.promise);
-      action.mockImplementationOnce(() => closing.promise);
-      render(<Harness mode={mode} action={action} boundary={caught} />);
-      await user.click(trigger());
-      await user.click(trigger());
-      return { caught, opening, closing };
-    }
-
-    it("the older dispatch rejects after the newer resolved: the boundary gets it", async () => {
-      const { caught, opening, closing } = await setup();
-      await act(async () => closing.resolve());
-      await act(async () => opening.reject(new Error("older")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
-    });
-
-    it("the older dispatch rejects while the newer is pending: the boundary gets it", async () => {
-      const { caught, opening, closing } = await setup();
-      await act(async () => opening.reject(new Error("older")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
-      await act(async () => closing.resolve());
-    });
-  });
-
-  renderBoth("suspending content", (mode) => {
-    it("keeps the popup hidden and the Trigger pending until the content is ready", async () => {
-      const user = setupUser();
-      const showPopover = spyShow();
-      const suspender = createSuspender();
-      render(<Harness mode={mode} suspense content={<suspender.Suspender value="filters" />} />);
-      await user.click(trigger());
-      await flushTasks(2);
-      expect(showPopover).not.toHaveBeenCalled();
-      expect(isOpen()).toBe(false);
-      expectPending(trigger());
-      expect(screen.queryByTestId("fallback")).toBeNull();
-      await act(async () => suspender.resolve("filters", "Colour, size"));
-      expect(showPopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(true);
-      expect(screen.getByTestId("suspender")).toHaveTextContent("Colour, size");
-      expectNotPending(trigger());
-    });
-
-    it("keepMounted: content is pre-rendered hidden inside <Activity>", async () => {
-      const user = setupUser();
-      const suspender = createSuspender();
-      suspender.resolve("filters", "Ready");
-      render(
-        <Harness
-          mode={mode}
-          popup={{ keepMounted: true }}
-          content={<suspender.Suspender value="filters" />}
-        />,
-      );
-      await flushTasks(2);
-      const hidden = screen.getByTestId("suspender");
-      expect(hidden).not.toBeVisible();
-      await openThroughTrigger(user);
-      expect(screen.getByTestId("suspender")).toBe(hidden); // same DOM node: state preserved
-      expect(hidden).toBeVisible();
     });
   });
 
@@ -1173,95 +714,10 @@ describe("Popover", () => {
       return render(ui, { container, hydrate: true });
     }
 
-    renderBoth("pre-hydration open", (mode) => {
-      it("one dispatch with reason 'platform' and no event; accepted: content mounts", async () => {
-        const action = vi.fn<ActionFn>();
-        const showPopover = spyShow();
-        await act(async () => {
-          await hydrate(<Harness mode={mode} action={action} />);
-        });
-        // The spy saw the native open of the setup; nothing after it.
-        showPopover.mockClear();
-        await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(1);
-        const [next, details] = action.mock.calls[0]!;
-        expect(next).toBe(true);
-        expect(details.reason).toBe("platform");
-        expect(details.event).toBeUndefined();
-        expect(content()).toBeInTheDocument();
-        expect(isOpen()).toBe(true);
-        expect(showPopover).not.toHaveBeenCalled();
-        expect(trigger()).toHaveAttribute("aria-expanded", "true");
-      });
-
-      it("StrictMode still dispatches once", async () => {
-        const action = vi.fn<ActionFn>();
-        await act(async () => {
-          await hydrate(
-            <StrictMode>
-              <Harness mode={mode} action={action} />
-            </StrictMode>,
-          );
-        });
-        await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    it("a controlled parent refusing the pre-hydration open hides it, with no notification", async () => {
-      const hidePopover = spyHide();
-      const action = vi.fn<ActionFn>();
-      await act(async () => {
-        await hydrate(<Harness mode="controlled" action={action} refuseOpen />);
-      });
-      await flushTasks(2);
-      expect(hidePopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(1);
-    });
-
     it("JS-free mode syncs aria-expanded for a pre-hydration open", async () => {
       await act(async () => {
         await hydrate(<Harness mode="static" />);
       });
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
-    });
-
-    it("a controlled `open` flipped programmatically calls showPopover / hidePopover, no echo dispatch", async () => {
-      const showPopover = spyShow();
-      const hidePopover = spyHide();
-      const action = vi.fn<ActionFn>();
-      let setOpen!: (open: boolean) => void;
-      render(
-        <Harness
-          mode="controlled"
-          action={action}
-          trigger={false}
-          outside={(set) => {
-            setOpen = set;
-            return null;
-          }}
-        />,
-      );
-      await act(async () => setOpen(true));
-      expect(showPopover).toHaveBeenCalledTimes(1);
-      // No Trigger: no source, no implicit anchor (design 2.7).
-      expect(showPopover).toHaveBeenCalledWith(undefined);
-      expect(isOpen()).toBe(true);
-      await act(async () => setOpen(false));
-      expect(hidePopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(false);
-      await flushTasks(2);
-      expect(action).not.toHaveBeenCalled();
-      expect(content()).toBeNull();
-    });
-
-    it("defaultOpen opens after mount", async () => {
-      const showPopover = spyShow();
-      render(<Harness mode="uncontrolled" initialOpen />);
-      expect(showPopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(true);
-      expect(content()).toBeInTheDocument();
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
     });
   });
