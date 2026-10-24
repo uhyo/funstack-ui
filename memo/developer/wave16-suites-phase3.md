@@ -347,3 +347,58 @@ which it did not at 4506f37). Stopped while reading checkbox-group.test.tsx, bef
 nothing new is committed. Next step: CheckboxGroup driver (patch commit + orderIndependentCommit,
 as ToggleGroup; harness initial ["a"]; switch checkbox-group-transition-types.test.tsx to the
 shared spy).
+
+## Resume attempt 3
+
+### CheckboxGroup (commit 3f)
+
+No suite change. Driver: Label, Parent "all" over a, b, c, Items a, b, c, from `["c"]`; gestures
+click a (`next` `["a","c"]`: inserted in document order, stronger than appending), click the
+mixed Parent (check all, `added: ["b"]`), click c (uncheck). `expectShown` = DOM `checked` and
+`data-checked` lists plus the Parent's state (property and attributes agree: checked / mixed /
+unchecked); `pendingOn(i)` = fieldset, Parent and the Items changed by gestures 0..i; `pendingOff`
+the rest; `commit` = the design 2.6 patch, `orderIndependentCommit`; `format` = sorted join (the
+old harness's mirror). #108 (controlled value identity) did not surface: every controlled row
+passes, nothing adapted.
+
+Removed title (checkbox-group.test.tsx, `CheckboxGroup …`) -> suite row
+(`CheckboxGroup.Root: value action conformance …`):
+- sync action (both) calls valueChangeAction(next, details) with a fresh array in document order
+  -> sync action (both) dispatches … (next in document order, details JSON + keys per gesture,
+  checked/data-checked, nothing pending, committed). Its "fresh array" assertion stays local as
+  `sync action (both) passes a fresh \`next\` array on every dispatch` (the same two clicks from
+  ["c"], `calls()` and `not.toBe`).
+- async action (both) shows the optimistic box and data-pending on Root and the clicked Item only
+  until resolve -> async action (both) shows the optimistic value … (pendingOn fieldset, Parent, a;
+  pendingOff b, c: `dataPending()` exactly the clicked Item as before)
+- rejection (both) reaches the Error Boundary and leaves committed state / caught inside the action
+  counts as success -> the suite's rejection rows (checked and data-checked by mode, none pending)
+- overlapping actions click A (slow) then B (fast) … final committed {a, b} (uncontrolled) -> the
+  latest dispatch wins when resolved second then first (+ first then second) and stays pending
+  until every in-flight action settles (both shown throughout, Root pending after the faster
+  resolves, committed `a,b,c` by `orderIndependentCommit`). The second call's details
+  (`added`) are checked by the sync row now, not the overlap row.
+- superseded rejection (both), two rows -> suite rows (newer patch on ["c"]: `b,c`; the old
+  `a,c` was the same patch on ["a"])
+- suspending content (both) -> suspending content (both)
+- details: both rows -> details rows (`{"reason":"activate","added":["a"],"removed":[]}`, keys
+  exact; the old Server Function row used a Parent click: the Parent's details are in the sync
+  row's gesture 1)
+- post-await rule checked and data-pending converge with a functional startTransition -> post-await
+  rule (controlled parent) (Profiler; readShown = checked list + Parent state; the harness's
+  commit is the same functional patch)
+- transition prop Item and Parent render the same markup … -> transition prop markup row (Label,
+  Parent and Items, now also with a type map) + the two dispatch rows
+- dev warnings both set / uncontrolled to controlled -> the suite's (message and exactly one
+  `CheckboxGroup.Root` warning)
+- checkbox-group-transition-types: check / uncheck / a Parent click that checks all -> gesture
+  0 / 2 / 1; the file uses the shared spy now; "a reset that checks and unchecks adds both" stays.
+Kept: rollback of the DOM (veto + focus), the controlled functional-update overlap, clicking A
+twice, disabled / cancelled-click rows, value model, Parent rows, platform rows, forms, function
+props, render, duplicate-value and no-warning rows, Field rows.
+jsdom titles: 3055 -> 3076 (-25, +46).
+
+Mutations (reverted):
+1. checkbox-group-item.tsx: every Item pending while the Root is: 22 rows fail (18 suite rows).
+2. checkbox-group-root.tsx: -check / -uncheck swapped: the 3 suite type rows + the reset row fail.
+3. checkbox-group-parent.tsx: the Parent never pending: 21 rows fail (18 suite rows).

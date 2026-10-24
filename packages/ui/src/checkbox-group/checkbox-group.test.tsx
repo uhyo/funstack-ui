@@ -11,7 +11,7 @@
 // adopt the value (veto, or an error caught inside the action), which is the same optimistic
 // revert and the same settle commit.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
+import { StrictMode, Suspense, startTransition, use, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -27,6 +27,8 @@ import {
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { checkboxGroupDriver } from "../__tests__/drivers/checkbox-group.js";
+import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { CheckboxGroup } from "./index.js";
@@ -180,6 +182,13 @@ function parentShows(el: HTMLInputElement = parentBox()): string {
   if (el.checked && mixed) return "checked+mixed";
   return el.checked ? "checked" : mixed ? "mixed" : "unchecked";
 }
+
+// The action-prop rows shared by every value component (sync and async actions, rejection,
+// overlap, superseded rejection, suspending content, the post-await rule, the controlled veto,
+// `transition`, details, the value/defaultValue warnings) come from
+// __tests__/value-action-suite.tsx with the driver __tests__/drivers/checkbox-group.tsx (a Parent
+// and three Items); the transition types are in checkbox-group-transition-types.test.tsx.
+describeValueAction(checkboxGroupDriver);
 
 describe("CheckboxGroup", () => {
   describe("roles and ARIA", () => {
@@ -457,32 +466,18 @@ describe("CheckboxGroup", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("calls valueChangeAction(next, details) with a fresh array in document order", async () => {
+    it("passes a fresh `next` array on every dispatch", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} initial={["c"]} action={action} />);
       const user = setupUser();
-
       await user.click(box("a"));
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toEqual(["a", "c"]);
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(details.event?.type).toBe("click");
-      expect(details.reason).toBe("activate");
-      expect(details.added).toEqual(["a"]);
-      expect(details.removed).toEqual([]);
-      expect(checkedValues()).toEqual(["a", "c"]);
-      expect(dataChecked()).toEqual(["a", "c"]);
-      expect(dataPending()).toEqual([]);
-      expectNotPending(group());
-      expect(committedText()).toBe("a,c");
-
       await user.click(box("c"));
-      expect(calls(action)[1]).toEqual([["a"], "activate", [], ["c"]]);
-      expect(checkedValues()).toEqual(["a"]);
-      expect(committedText()).toBe("a");
-      // A fresh array on every call.
+      expect(calls(action)).toEqual([
+        [["a", "c"], "activate", ["a"], []],
+        [["a"], "activate", [], ["c"]],
+      ]);
       expect(action.mock.calls[1]![0]).not.toBe(action.mock.calls[0]![0]);
+      expect(committedText()).toBe("a");
     });
 
     it("a disabled Item, any Item under Root disabled, or a disabled Parent never dispatches", async () => {
@@ -549,74 +544,6 @@ describe("CheckboxGroup", () => {
     });
   });
 
-  renderBoth("async action", (mode) => {
-    it("shows the optimistic box and data-pending on Root and the clicked Item only until resolve", async () => {
-      const d = deferred();
-      const action = vi.fn<ActionFn>(() => d.promise);
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(box("b"));
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expect(dataChecked()).toEqual(["a", "b"]);
-      expect(dataPending()).toEqual(["b"]);
-      expectPending(group());
-      expect(committedText()).toBe("a");
-
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(group());
-      expect(dataPending()).toEqual([]);
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expect(committedText()).toBe("a,b");
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("reaches the Error Boundary and leaves committed state", async () => {
-      silenceErrors();
-      const d = deferred();
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(box("b"));
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expectPending(group());
-
-      const err = new Error("save failed");
-      await act(async () => {
-        d.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("group")).not.toBeInTheDocument();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
-      expect(committedText()).toBe("a");
-    });
-
-    it("caught inside the action counts as success", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} catchErrors />);
-      const user = setupUser();
-
-      await user.click(box("b"));
-      expectPending(group());
-      await act(async () => {
-        d.reject(new Error("vetoed"));
-      });
-      expectNotPending(group());
-      expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
-      expect(committedText()).toBe("a");
-      // Only a controlled parent can veto: uncontrolled commits; controlled rolls the DOM back.
-      const expected = mode === "uncontrolled" ? ["a", "b"] : ["a"];
-      expect(checkedValues()).toEqual(expected);
-      expect(dataChecked()).toEqual(expected);
-      expect(dataPending()).toEqual([]);
-    });
-  });
-
   describe("rollback of the DOM", () => {
     it("a controlled parent that does not adopt the value unchecks the box again after settle", async () => {
       const d = deferred();
@@ -641,35 +568,6 @@ describe("CheckboxGroup", () => {
   });
 
   describe("overlapping actions", () => {
-    it("click A (slow) then B (fast): both shown throughout, final committed {a, b} (uncontrolled)", async () => {
-      const deferreds = [deferred(), deferred()];
-      let n = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[n++]!.promise);
-      render(<Harness mode="uncontrolled" initial={[]} action={action} />);
-      const user = setupUser();
-      await user.click(box("a"));
-      await user.click(box("b"));
-      expect(calls(action)).toEqual([
-        [["a"], "activate", ["a"], []],
-        [["a", "b"], "activate", ["b"], []],
-      ]);
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expect(dataPending()).toEqual(["a", "b"]);
-
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expectPending(group());
-      await act(async () => {
-        deferreds[0]!.resolve();
-      });
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expect(dataChecked()).toEqual(["a", "b"]);
-      expect(dataPending()).toEqual([]);
-      expectNotPending(group());
-    });
-
     it("controlled functional-update wrapper ends on {a, b} with B resolving first", async () => {
       const deferreds = [deferred(), deferred()];
       let n = 0;
@@ -711,90 +609,6 @@ describe("CheckboxGroup", () => {
       expect(checkedValues()).toEqual([]);
       expect(committedText()).toBe("");
       expectNotPending(group());
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    function renderTwo(onError: (error: unknown) => void) {
-      const deferreds = [deferred(), deferred()];
-      let n = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[n++]!.promise);
-      render(<Harness mode={mode} action={action} boundary={onError} />);
-      return { deferreds, action };
-    }
-
-    it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds, action } = renderTwo(onError);
-      const user = setupUser();
-      await user.click(box("b"));
-      await user.click(box("c"));
-      expect(action.mock.calls.map(([n]) => n)).toEqual([
-        ["a", "b"],
-        ["a", "b", "c"],
-      ]);
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).not.toHaveBeenCalled();
-
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("group")).not.toBeInTheDocument();
-      // The newer action's outcome is unaffected: it resolved and the harness adopted its patch.
-      expect(committedText()).toBe("a,c");
-    });
-
-    it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds } = renderTwo(onError);
-      const user = setupUser();
-      await user.click(box("b"));
-      await user.click(box("c"));
-      expectPending(group());
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(committedText()).toBe("a,c");
-    });
-  });
-
-  renderBoth("suspending content", (mode) => {
-    it("keeps old content, no fallback, Root pending while the new content loads", async () => {
-      const suspender = createSuspender();
-      suspender.resolve("a");
-      render(<Harness mode={mode} suspender={suspender} />);
-      const user = setupUser();
-      expect(screen.getByTestId("suspender")).toHaveTextContent("a");
-
-      await user.click(box("b"));
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expectPending(group());
-      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
-      expect(screen.getByTestId("suspender")).toHaveTextContent("a");
-
-      await act(async () => {
-        suspender.resolve("a,b");
-      });
-      expect(screen.getByTestId("suspender")).toHaveTextContent("a,b");
-      expect(committedText()).toBe("a,b");
-      expectNotPending(group());
-      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
     });
   });
 
@@ -2316,42 +2130,6 @@ describe("CheckboxGroup", () => {
     });
   });
 
-  describe("details", () => {
-    it("exposes `event` as a virtual, non-own property", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <CheckboxGroup.Root aria-label="T" valueChangeAction={action}>
-          <CheckboxGroup.Item value="a" aria-label="a" />
-        </CheckboxGroup.Root>,
-      );
-      const user = setupUser();
-      await user.click(box("a"));
-      const details = action.mock.calls[0]![1];
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect("event" in details).toBe(true);
-      expect(Object.keys(details)).not.toContain("event");
-      expect(JSON.stringify(details)).toBe('{"reason":"activate","added":["a"],"removed":[]}');
-    });
-
-    it("can be passed straight to a Server-Function-shaped action", async () => {
-      const serverFn = vi.fn(async (_next: string[], _details: Details) => {});
-      render(
-        <CheckboxGroup.Root aria-label="T" valueChangeAction={serverFn}>
-          <CheckboxGroup.Parent values={["a", "b"]} aria-label="all" />
-          <CheckboxGroup.Item value="a" aria-label="a" />
-          <CheckboxGroup.Item value="b" aria-label="b" />
-        </CheckboxGroup.Root>,
-      );
-      const user = setupUser();
-      await user.click(parentBox());
-      const [next, details] = serverFn.mock.calls[0]!;
-      expect(JSON.parse(JSON.stringify([next, details]))).toEqual([
-        ["a", "b"],
-        { reason: "activate", added: ["a", "b"], removed: [] },
-      ]);
-    });
-  });
-
   describe("function props", () => {
     it("className, style and children receive the documented state", async () => {
       const d = deferred();
@@ -2605,105 +2383,7 @@ describe("CheckboxGroup", () => {
     });
   });
 
-  describe("post-await rule", () => {
-    it("checked and data-pending converge with a functional startTransition after the await", async () => {
-      const d = deferred();
-      const snapshots: { checked: string[]; pending: boolean }[] = [];
-      function Recorder() {
-        useLayoutEffect(() => {
-          const boxes = [...document.querySelectorAll<HTMLInputElement>("input[name]")];
-          snapshots.push({
-            checked: boxes.filter((r) => r.checked).map((r) => r.value),
-            pending: document.querySelector("fieldset")?.hasAttribute("data-pending") ?? false,
-          });
-        });
-        return null;
-      }
-      function Parent() {
-        const [value, setValue] = useState(["a"]);
-        return (
-          <CheckboxGroup.Root
-            aria-label="T"
-            value={value}
-            valueChangeAction={async (_next, details) => {
-              await d.promise;
-              startTransition(() => setValue((prev) => applyDetails(prev, details)));
-            }}
-          >
-            {() => (
-              <>
-                <CheckboxGroup.Item value="a" aria-label="a" />
-                <CheckboxGroup.Item value="b" aria-label="b" />
-                <Recorder />
-              </>
-            )}
-          </CheckboxGroup.Root>
-        );
-      }
-      render(<Parent />);
-      // The mount commits (the Items' registration re-renders the group once at layout time).
-      const mountSnapshots = snapshots.length;
-      const user = setupUser();
-      await user.click(box("b"));
-      const inFlight = snapshots.at(-1);
-      await act(async () => {
-        d.resolve();
-      });
-      expect(inFlight).toEqual({ checked: ["a", "b"], pending: true });
-      expect(snapshots.at(-1)).toEqual({ checked: ["a", "b"], pending: false });
-      expect(snapshots.slice(mountSnapshots).every((s) => s.checked.join() === "a,b")).toBe(true);
-    });
-  });
-
-  describe("transition prop", () => {
-    it("Item and Parent render the same markup with and without `transition`", () => {
-      const ui = (transition?: string) =>
-        render(
-          <CheckboxGroup.Root aria-label="x" defaultValue={["a"]}>
-            <CheckboxGroup.Label>x</CheckboxGroup.Label>
-            <CheckboxGroup.Parent
-              values={["a", "b"]}
-              aria-label="all"
-              {...(transition && { transition })}
-            />
-            <CheckboxGroup.Item value="a" aria-label="a" {...(transition && { transition })} />
-          </CheckboxGroup.Root>,
-        ).container.innerHTML.replace(/_r_[0-9a-z]+_/g, "ID");
-      const plain = ui();
-      expect(ui("fsui-fade")).toBe(plain);
-    });
-  });
-
   describe("dev warnings", () => {
-    it("warns once when value and defaultValue are both set", () => {
-      const consoleError = silenceErrors();
-      const ui = (
-        <CheckboxGroup.Root aria-label="x" value={["a"]} defaultValue={["a"]}>
-          <CheckboxGroup.Item value="a" aria-label="a" />
-        </CheckboxGroup.Root>
-      );
-      const { rerender } = render(ui);
-      rerender(ui);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(
-        /^CheckboxGroup\.Root: both `value` and `defaultValue`/,
-      );
-    });
-
-    it("warns once when switching from uncontrolled to controlled", () => {
-      const consoleError = silenceErrors();
-      const ui = (value?: string[]) => (
-        <CheckboxGroup.Root aria-label="x" {...(value !== undefined && { value })}>
-          <CheckboxGroup.Item value="a" aria-label="a" />
-        </CheckboxGroup.Root>
-      );
-      const { rerender } = render(ui());
-      rerender(ui(["a"]));
-      rerender(ui(["b"]));
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(/uncontrolled to controlled/);
-    });
-
     it("warns once about duplicate Item values", () => {
       const consoleError = silenceErrors();
       const ui = (
