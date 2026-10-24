@@ -1,13 +1,5 @@
 "use client";
-import {
-  useCallback,
-  useEffectEvent,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -19,10 +11,9 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useElementCheck } from "../internal/use-element-check.js";
-import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
+import { useFieldValueChange } from "../internal/use-field-control.js";
+import { useFieldsetGroup } from "../internal/use-fieldset-group.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
 import {
@@ -193,21 +184,13 @@ export function CheckboxGroupRoot({
   render,
   ...rest
 }: CheckboxGroupRootProps) {
-  // Inside a Field.Root (design/components/field-form.md 7.2) the fieldset is the Field's group
-  // control: `aria-labelledby` → `Field.Label`, the ARIA wiring, and `name` / `required` ("at
-  // least one") / `disabled` defaulting from the Field.
-  const field = useFieldControl({
-    labelable: false,
+  // `required` is "at least one" (design section 7).
+  const { field, name, required, disabled, fieldsetRef, rootRef } = useFieldsetGroup({
+    component: "CheckboxGroup.Root",
     name: nameProp,
     disabled: disabledProp,
     required: requiredProp,
-    component: "CheckboxGroup.Root",
   });
-  const required = field.required;
-  const disabled = field.disabled;
-  const fallbackName = useId();
-  const name = field.name ?? fallbackName;
-  const fieldsetRef = useRef<HTMLFieldSetElement | null>(null);
   const warnedDuplicate = useRef(false);
   /** Parent reports waiting for the next mount read (design 8.1). */
   const parentReports = useRef<{ values: readonly string[]; checked: boolean }[]>([]);
@@ -266,11 +249,7 @@ export function CheckboxGroupRoot({
   // Deliberately no warning when neither `value` nor `defaultValue` is given: an empty group is
   // the HTML default (design 3.1).
 
-  /** What the user intends: the latest in-flight dispatch, else optimistic (conventions 3.8 rule 1). */
-  const base = (): ValueSet => {
-    const inFlight = latestInFlight();
-    return inFlight === null ? optimistic : inFlight.next;
-  };
+  const base = (): ValueSet => intendedValue(latestInFlight, optimistic);
 
   /** Dispatches `patch` on top of `from`, with the details of design 3.1. */
   const dispatchPatch = (
@@ -400,27 +379,6 @@ export function CheckboxGroupRoot({
   useLayoutEffect(() => {
     syncItemOrder();
   });
-
-  const checkElement = useElementCheck<HTMLFieldSetElement>(
-    isDev &&
-      ((el) =>
-        el.tagName !== "FIELDSET"
-          ? `CheckboxGroup.Root: expected to render a <fieldset> element but got ` +
-            `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
-            `inheritance, form reset) need a real <fieldset>.`
-          : null),
-  );
-  const libraryRef = useCallback(
-    (el: HTMLFieldSetElement) => {
-      fieldsetRef.current = el;
-      checkElement?.(el);
-      return () => {
-        fieldsetRef.current = null;
-      };
-    },
-    [checkElement],
-  );
-  const rootRef = useMergedRefs<HTMLFieldSetElement>(libraryRef, field.ref);
 
   const itemsRequired =
     required &&

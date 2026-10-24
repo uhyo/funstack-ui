@@ -1,13 +1,13 @@
 "use client";
 import { useLayoutEffect } from "react";
-import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import { groupMemberProps } from "../internal/group-member.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
-import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
+import { useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 import { useCheckboxGroupContext } from "./checkbox-group-context.js";
-import { syncPresence } from "../internal/sync-presence.js";
+import { syncPresences } from "../internal/sync-presence.js";
 
 export interface CheckboxGroupItemState {
   readonly value: string;
@@ -102,10 +102,12 @@ export function CheckboxGroupItem({
       // An Item hydrating after its Root can render a different state than the server did (a
       // click on an already hydrated box), and stale attributes would stay until the next change.
       if (el !== null) {
-        syncPresence(el, "data-checked", checked);
-        syncPresence(el, "data-pending", pending);
-        syncPresence(el, "data-disabled", disabled);
-        syncPresence(el, "required", required);
+        syncPresences(el, {
+          "data-checked": checked,
+          "data-pending": pending,
+          "data-disabled": disabled,
+          required,
+        });
       }
       ctx.onItemMounted(el);
     },
@@ -124,35 +126,21 @@ export function CheckboxGroupItem({
     ref: inputRef,
     // Pass-through layer: a `render` element's own props win over these.
     props: rest,
-    libraryProps: {
+    libraryProps: groupMemberProps({
       type: "checkbox",
+      component: "CheckboxGroup.Item",
       name: ctx.name,
-      value,
-      checked,
-      defaultChecked: undefined,
-      "aria-checked": undefined,
-      // Owned (Switch precedent) so that native disabledness, `data-disabled` and the click guard
-      // agree. Only the Item's own prop: `Root disabled` reaches the box through the fieldset.
-      disabled: disabledProp,
       form: ctx.form,
+      value,
       required,
-      "data-checked": dataAttr(checked),
-      "data-pending": dataAttr(pending),
-      "data-disabled": dataAttr(disabled),
+      checked,
+      pending,
+      disabled,
+      ownDisabled: disabledProp,
       // Inside a Field (owned there): the group's invalid state, since the fieldset cannot carry it.
-      ...(ctx.fieldInvalid === undefined ? {} : { "aria-invalid": ctx.fieldInvalid }),
-      onChange: (event: ChangeEvent<HTMLInputElement>) => {
-        // A natively disabled box fires no click; this covers `render` elements that do not
-        // honour `disabled`.
-        if (disabled) return;
-        const nativeEvent = event.nativeEvent;
-        guardCheckableChange(
-          nativeEvent,
-          () => ctx.toggle(value, !checked, nativeEvent),
-          "CheckboxGroup.Item",
-        );
-      },
-    },
+      invalid: ctx.fieldInvalid,
+      activate: (event) => ctx.toggle(value, !checked, event),
+    }),
   });
 
   return useTransitionBoundary("CheckboxGroup.Item", transition, element);

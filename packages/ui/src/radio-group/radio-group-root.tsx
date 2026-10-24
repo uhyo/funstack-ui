@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useId, useLayoutEffect, useMemo, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -11,10 +11,9 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useElementCheck } from "../internal/use-element-check.js";
-import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
+import { useFieldValueChange } from "../internal/use-field-control.js";
+import { useFieldsetGroup } from "../internal/use-fieldset-group.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
 import { RadioGroupContext } from "./radio-group-context.js";
@@ -151,21 +150,12 @@ export function RadioGroupRoot({
   render,
   ...rest
 }: RadioGroupRootProps) {
-  // Inside a Field.Root (design/components/field-form.md 7.2) the fieldset is the Field's group
-  // control: `aria-labelledby` → `Field.Label`, the ARIA wiring, and `name` / `required` /
-  // `disabled` defaulting from the Field.
-  const field = useFieldControl({
-    labelable: false,
+  const { field, name, required, disabled, fieldsetRef, rootRef } = useFieldsetGroup({
+    component: "RadioGroup.Root",
     name: nameProp,
     disabled: disabledProp,
     required: requiredProp,
-    component: "RadioGroup.Root",
   });
-  const required = field.required;
-  const disabled = field.disabled;
-  const fallbackName = useId();
-  const name = field.name ?? fallbackName;
-  const fieldsetRef = useRef<HTMLFieldSetElement | null>(null);
 
   const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     string | null,
@@ -184,12 +174,7 @@ export function RadioGroupRoot({
   // Deliberately no warning when neither `value` nor `defaultValue` is given: an unchecked group
   // is the HTML default (design decision 2).
 
-  /** What the user intends: the latest in-flight dispatch, else optimistic (conventions 3.8 rule 1). */
-  const base = (): string | null => {
-    const inFlight = latestInFlight();
-    // Not `?.next ?? optimistic`: an in-flight reset to `null` is a real intent.
-    return inFlight === null ? optimistic : inFlight.next;
-  };
+  const base = (): string | null => intendedValue(latestInFlight, optimistic);
 
   // The residual browser paths (design section 5): one dispatch per group, from here. Items that
   // mount after the Root report through `onItemMounted` so the group is reconciled again.
@@ -216,7 +201,7 @@ export function RadioGroupRoot({
     return () => {
       serverRadios.current = null;
     };
-  }, []);
+  }, [fieldsetRef]);
   const onItemMountedWithCheck = useCallback(
     (element?: Element | null) => {
       if (
@@ -238,27 +223,6 @@ export function RadioGroupRoot({
     },
     [onItemMounted],
   );
-
-  const checkElement = useElementCheck<HTMLFieldSetElement>(
-    isDev &&
-      ((el) =>
-        el.tagName !== "FIELDSET"
-          ? `RadioGroup.Root: expected to render a <fieldset> element but got ` +
-            `<${el.tagName.toLowerCase()}>. The platform semantics (legend naming, disabled ` +
-            `inheritance, form reset) need a real <fieldset>.`
-          : null),
-  );
-  const libraryRef = useCallback(
-    (el: HTMLFieldSetElement) => {
-      fieldsetRef.current = el;
-      checkElement?.(el);
-      return () => {
-        fieldsetRef.current = null;
-      };
-    },
-    [checkElement],
-  );
-  const rootRef = useMergedRefs<HTMLFieldSetElement>(libraryRef, field.ref);
 
   // Memoised: `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with
   // the state and the props below.

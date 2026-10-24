@@ -19,9 +19,8 @@ export interface UseNativeGroupReconciliationOptions<T> {
   readonly readDefault: () => T;
   /**
    * What the user intends (rule 1): the latest in-flight dispatch's `next`, else the optimistic
-   * value. Use an explicit null check, `const f = latestInFlight(); return f === null ?
-   * optimistic : f.next;`, not `?.next ?? optimistic`, which drops an in-flight dispatch of a
-   * nullish value (a pending reset to "nothing checked").
+   * value. `intendedValue` (use-controllable-action.ts) keeps an in-flight dispatch of a nullish
+   * value (a pending reset to "nothing checked"), which `?.next ?? optimistic` would drop.
    */
   readonly base: () => T;
   /**

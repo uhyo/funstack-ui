@@ -1,10 +1,10 @@
 "use client";
-import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import { groupMemberProps } from "../internal/group-member.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
-import { dataAttr } from "../internal/data-attr.js";
-import { syncPresence } from "../internal/sync-presence.js";
+import { syncPresences } from "../internal/sync-presence.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
+import { useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 import { useRadioGroupContext } from "./radio-group-context.js";
 
@@ -96,9 +96,11 @@ export function RadioGroupItem({
       // `checked` than the server did, e.g. after a click on an already hydrated radio, and a
       // stale `data-checked` would then stay until the prop changes again.
       if (el !== null) {
-        syncPresence(el, "data-checked", checked);
-        syncPresence(el, "data-pending", pending);
-        syncPresence(el, "data-disabled", disabled);
+        syncPresences(el, {
+          "data-checked": checked,
+          "data-pending": pending,
+          "data-disabled": disabled,
+        });
       }
       ctx.onItemMounted(el);
     },
@@ -117,28 +119,19 @@ export function RadioGroupItem({
     ref: inputRef,
     // Pass-through layer: a `render` element's own props win over these.
     props: rest,
-    libraryProps: {
+    libraryProps: groupMemberProps({
       type: "radio",
+      component: "RadioGroup.Item",
       name: ctx.name,
-      value,
-      checked,
-      defaultChecked: undefined,
-      // Owned (Switch precedent) so that native disabledness, `data-disabled` and the click guard
-      // agree. Only the Item's own prop: `Root disabled` reaches the radio through the fieldset.
-      disabled: disabledProp,
       form: ctx.form,
+      value,
       required: ctx.required,
-      "data-checked": dataAttr(checked),
-      "data-pending": dataAttr(pending),
-      "data-disabled": dataAttr(disabled),
-      onChange: (event: ChangeEvent<HTMLInputElement>) => {
-        // A natively disabled radio fires no click; this covers `render` elements that do not
-        // honour `disabled`.
-        if (disabled) return;
-        const nativeEvent = event.nativeEvent;
-        guardCheckableChange(nativeEvent, () => ctx.select(value, nativeEvent), "RadioGroup.Item");
-      },
-    },
+      checked,
+      pending,
+      disabled,
+      ownDisabled: disabledProp,
+      activate: (event) => ctx.select(value, event),
+    }),
   });
 
   return useTransitionBoundary("RadioGroup.Item", transition, element);

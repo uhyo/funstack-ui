@@ -12,3 +12,8 @@ export function syncPresence(el: Element, name: string, present: boolean): void 
     else el.removeAttribute(name);
   }
 }
+
+/** `syncPresence` for each entry of `attributes`, in order. */
+export function syncPresences(el: Element, attributes: Readonly<Record<string, boolean>>): void {
+  for (const [name, present] of Object.entries(attributes)) syncPresence(el, name, present);
+}

@@ -10,7 +10,7 @@ import { useFormReset } from "../internal/use-form-reset.js";
 import { useRender } from "../internal/use-render.js";
 import { enabledValues, useCheckboxGroupContext } from "./checkbox-group-context.js";
 import type { CheckboxGroupPatch } from "./checkbox-group-context.js";
-import { syncPresence } from "../internal/sync-presence.js";
+import { syncPresences } from "../internal/sync-presence.js";
 
 export interface CheckboxGroupParentState {
   readonly values: readonly string[];
@@ -144,10 +144,12 @@ export function CheckboxGroupParent({
         // semantic before the Root reads the group (which leaves disabled Items alone). Firefox's
         // form-state restoration cannot cause this: the Parent renders `autocomplete="off"`.
         if (el.checked !== checked) ctx.reportParent(values, el.checked);
-        syncPresence(el, "data-checked", checked);
-        syncPresence(el, "data-indeterminate", indeterminate);
-        syncPresence(el, "data-pending", pending);
-        syncPresence(el, "data-disabled", disabled);
+        syncPresences(el, {
+          "data-checked": checked,
+          "data-indeterminate": indeterminate,
+          "data-pending": pending,
+          "data-disabled": disabled,
+        });
       }
       ctx.onItemMounted(el);
     },

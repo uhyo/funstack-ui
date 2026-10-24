@@ -64,6 +64,19 @@ export interface ControllableAction<T, Details extends ActionDetails> {
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * What the user intends (conventions 3.8 rule 1): the latest in-flight dispatch's `next`, else
+ * `optimistic`. An explicit null check, not `?.next ?? optimistic`, which would drop an in-flight
+ * dispatch of a nullish value (a pending reset to "nothing checked"). Handlers and effects only.
+ */
+export function intendedValue<T>(
+  latestInFlight: () => { readonly next: T } | null,
+  optimistic: T,
+): T {
+  const inFlight = latestInFlight();
+  return inFlight === null ? optimistic : inFlight.next;
+}
+
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
