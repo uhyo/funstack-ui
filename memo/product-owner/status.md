@@ -296,3 +296,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Lesson: scratchpad dir is shared between agents → brief agents to use a private subdirectory.
 - #102 review (wave16-source-review.md): M1 dev strings shipped in prod (+3.8KB) → fixing + prod-bundle guard + pre-existing useDevWarning; L1 transition JSDoc restore; L2 menu doc. ARCHITECT TODO (batch at P2 fold): design docs rename useMergedRef→useMergedRefs (field-form.md, slider.md, toggle-group.md, conventions ~1158), context-menu.md ~1120 MENU_POINT_* location.
 - #102 MERGED (prod bundle −9.7KB min vs before; guard test). Closed. Waiting on #101 → then P2 (#104/#105).
+- #101 done on wave16/test-infra (CI 40063483588 green; no rows removed; 3 order-deps fixed; settle() retry conversions ×84 under review). Reviewer running.
+- P2 STARTED early (source-only; rebase after #101): p2-overlays (#104, wave16/overlays; owns use-popover-*, overlay dirs, O6+C12 disabled helper) and p2-controls (#105, wave16/controls; owns use-controllable-action/use-action-trigger, control dirs; C1 last).
+- Deferred into P3 (#106): T16 dialog section regroup + long titles, hydrateFromServer, sequencedDeferreds, jsdom top-layer cleanup loops.
+- #101 review: no weakening (mutation-verified); 4 minor fixes sent back. NOTE for #107: Select once-per-file warning warm-up breaks under no-isolate.
+- #101 MERGED. PHASE 1 COMPLETE. P2 devs told to rebase.
