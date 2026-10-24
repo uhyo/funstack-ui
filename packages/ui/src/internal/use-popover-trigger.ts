@@ -23,7 +23,7 @@ export interface PopoverTriggerHookState {
 /** Event handlers a component layers onto the Trigger's own (Menu's keys and hover intent). */
 export type PopoverTriggerHandlers = Pick<
   DOMAttributes<HTMLButtonElement>,
-  "onClick" | "onKeyDown" | "onPointerMove" | "onPointerEnter" | "onPointerLeave"
+  "onClick" | "onKeyDown" | "onMouseDown" | "onPointerMove" | "onPointerEnter" | "onPointerLeave"
 >;
 
 export interface UsePopoverTriggerOptions<State> {

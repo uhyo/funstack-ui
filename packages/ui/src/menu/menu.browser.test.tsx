@@ -24,6 +24,7 @@ import { act, render, screen } from "@testing-library/react";
 import { userEvent } from "vitest/browser";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import {
   anchorPositionHonoursParentDirection,
@@ -40,6 +41,7 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
+import { deferred } from "../__tests__/helpers.js";
 import { Menu } from "./index.js";
 import type { MenuOpenChangeDetails, MenuPopupProps, MenuRootProps } from "./index.js";
 import {
@@ -921,5 +923,89 @@ describe("light dismiss and layering (browser)", () => {
     await user.keyboard("{Escape}");
     await settle(() => expect(dialog.open).toBe(false));
     expect(isOpen()).toBe(true);
+  });
+});
+
+// #110: a press on the Trigger of an open menu moves no focus (its mousedown is prevented), so the
+// Popup's focusout never hides the menu first; the click is the single source of the close
+// (design/components/menu.md 2.2, "A press on the Trigger is not a focus-out"). One outcome on
+// every engine: WebKit, which never focuses a clicked button, already took this path.
+describe("Trigger click while open (browser, #110)", () => {
+  afterEach(async () => {
+    // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
+    await mouse.releaseHeld();
+  });
+
+  function setup() {
+    const work = deferred();
+    const action = vi.fn<OpenAction>((next) => (next ? undefined : work.promise));
+    render(<Basic root={{ openChangeAction: action }} />);
+    return { work, action };
+  }
+
+  /** Pending close through the click: menu shown, item focused, optimistic feedback on the Trigger. */
+  function expectPendingClose(action: ReturnType<typeof setup>["action"], calls: number) {
+    expect(document.activeElement).toBe(item("rename"));
+    expect(isOpen()).toBe(true);
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    expect(trigger()).not.toHaveAttribute("data-open");
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    expect(action).toHaveBeenCalledTimes(calls);
+    const [next, details] = action.mock.calls.at(-1)!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event).toBeInstanceOf(MouseEvent);
+    expect(details.event!.type).toBe("click");
+  }
+
+  it("closes through the action ('activate'): shown and focused until it settles", async () => {
+    const { work, action } = setup();
+    await openWithKeyboard();
+    expect(item("rename")).toHaveFocus();
+    const calls = action.mock.calls.length;
+    await user.click(trigger());
+    await flushFor();
+    expectPendingClose(action, calls + 1);
+    await act(async () => work.resolve());
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(trigger()).toHaveFocus();
+    expect(action).toHaveBeenCalledTimes(calls + 1);
+  });
+
+  it("a split press: the mousedown keeps focus in the menu, the release closes", async () => {
+    const { work, action } = setup();
+    await openWithKeyboard();
+    const calls = action.mock.calls.length;
+    const box = trigger().getBoundingClientRect();
+    const x = Math.round(box.left + box.width / 2);
+    const y = Math.round(box.top + box.height / 2);
+    await act(async () => {
+      await mouse.down(x, y);
+    });
+    await flushFor();
+    expect(document.activeElement).toBe(item("rename"));
+    expect(isOpen()).toBe(true);
+    expect(action).toHaveBeenCalledTimes(calls);
+    await act(async () => {
+      await mouse.up(x, y);
+    });
+    await flushFor();
+    expectPendingClose(action, calls + 1);
+    await act(async () => work.resolve());
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(trigger()).toHaveFocus();
+    expect(action).toHaveBeenCalledTimes(calls + 1);
+  });
+
+  it("while closed the press is not prevented: Chromium and Firefox focus the Trigger first", async () => {
+    render(<Basic />);
+    const focusedWhileClosed: boolean[] = [];
+    trigger().addEventListener("focus", () => focusedWhileClosed.push(!isOpen()));
+    await user.click(trigger());
+    await expect.poll(() => isOpen()).toBe(true);
+    await flushFor();
+    // WebKit never focuses a clicked button; the other engines do on mousedown, before the open.
+    expect(focusedWhileClosed).toEqual(browserName === "webkit" ? [] : [true]);
+    expect(item("rename")).toHaveFocus();
   });
 });

@@ -1,5 +1,11 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
+import type {
+  ComponentPropsWithRef,
+  CSSProperties,
+  KeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  ReactNode,
+} from "react";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -17,7 +23,14 @@ export type MenuTriggerState = PopoverTriggerHookState;
 
 export interface MenuTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "onKeyDown" | "aria-expanded" | "aria-haspopup" | "className" | "style" | "children"
+  | "onClick"
+  | "onKeyDown"
+  | "onMouseDown"
+  | "aria-expanded"
+  | "aria-haspopup"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * The menu cannot be opened from this button. Native `disabled` on a `<button>`; with a link or
@@ -67,7 +80,7 @@ function isPointerClick(event: Event): boolean {
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
  * (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`,
- * `onClick`, `onKeyDown`, `data-open`, `data-pending`, `data-disabled`.
+ * `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`.
  */
 export function MenuTrigger({
   disabled = false,
@@ -109,7 +122,14 @@ export function MenuTrigger({
     part: "Menu.Trigger",
     disabled,
     render,
-    handlers: { onKeyDown },
+    handlers: {
+      onKeyDown,
+      onMouseDown: (event: ReactMouseEvent<HTMLButtonElement>) => {
+        // A press on the Trigger of an open menu must not move focus out of the popup: the Popup's
+        // focusout would hide the menu before the click's library-owned close (design 2.2, #110).
+        if (event.button === 0 && menu.popover.intended()) event.preventDefault();
+      },
+    },
     activate: (event) => {
       const native = event.nativeEvent;
       if (menu.popover.intended()) {

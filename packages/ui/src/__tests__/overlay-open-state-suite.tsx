@@ -194,9 +194,9 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
   readonly detailsKeys: readonly string[];
   /**
    * A Trigger click while open closes (Popover, Menu: library-owned, `"activate"`); `false`: the
-   * Trigger only opens (Dialog), so a second click while optimistically open does nothing. For
-   * Menu the Trigger's mousedown moves focus out of the popup and its `focusout` close hides the
-   * menu before the click, which then dispatches the same library-owned close.
+   * Trigger only opens (Dialog), so a second click while optimistically open does nothing. Menu's
+   * Trigger prevents its mousedown while open, so the press moves no focus out of the popup and
+   * the click is the only close (design/components/menu.md 2.2, #110).
    */
   readonly triggerToggles: boolean;
   /** The Trigger carries `aria-expanded` (Popover, Menu; not Dialog). */
