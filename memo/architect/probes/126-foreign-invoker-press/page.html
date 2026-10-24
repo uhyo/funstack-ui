@@ -1,0 +1,64 @@
+<!doctype html>
+<style>
+  body { margin: 0; padding: 20px; font: 16px sans-serif; }
+  button, input { display: block; margin: 8px 0; padding: 8px 16px; }
+  [popover] { position: fixed; inset: auto; top: 300px; left: 20px; margin: 0; padding: 8px; }
+  #far { margin-top: 200px; }
+</style>
+<button id="trigger" type="button">Trigger</button>
+<button id="pt-btn" type="button" popovertarget="pop">pt</button>
+<button id="cf-btn" type="button" commandfor="pop" command="toggle-popover">cf toggle</button>
+<button id="cfh-btn" type="button" commandfor="pop" command="hide-popover">cf hide</button>
+<button id="plain-btn" type="button">plain</button>
+<input id="input" placeholder="input">
+<div id="pop" popover="auto" tabindex="-1">
+  <button id="item1" type="button" tabindex="-1">item 1</button>
+  <button id="item2" type="button" tabindex="-1">item 2</button>
+</div>
+<div id="far" style="height:400px">far</div>
+<script>
+  window.log = [];
+  const pop = document.getElementById("pop");
+  const input = document.getElementById("input");
+  const idOf = (n) => (n instanceof Element ? "#" + n.id : n === null ? null : String(n));
+  const isInvoker = (el) => {
+    const b = el instanceof Element ? el.closest("button") : null;
+    if (b === null || pop.contains(b)) return false;
+    if (b.popoverTargetElement === pop) return true;
+    if ("commandForElement" in b && b.commandForElement === pop && /-popover$/.test(b.command)) return true;
+    return false;
+  };
+  window.mode = "baseline"; // baseline | ignore | guard
+  window.holder = "item";   // item | input
+  const onFocusOut = (event) => {
+    const next = event.relatedTarget;
+    const rec = { t: "focusout", on: idOf(event.currentTarget), related: idOf(next), active: next instanceof Element && next.matches(":active"), open: pop.matches(":popover-open"), invoker: isInvoker(next) };
+    window.log.push(rec);
+    if (!(next instanceof Node)) return;
+    if (window.holder === "item" ? pop.contains(next) : (next === input || pop.contains(next))) return;
+    if (window.mode === "ignore" && isInvoker(next)) { window.log.push({ t: "focusout-ignored" }); return; }
+    if (pop.matches(":popover-open")) { window.log.push({ t: "hidePopover()" }); pop.hidePopover(); }
+  };
+  pop.addEventListener("focusout", onFocusOut);
+  input.addEventListener("focusout", onFocusOut);
+  document.addEventListener("mousedown", (e) => {
+    window.log.push({ t: "mousedown", target: idOf(e.target), open: pop.matches(":popover-open"), active: idOf(document.activeElement) });
+    if (window.mode === "guard" && e.button === 0 && pop.matches(":popover-open") && isInvoker(e.target)) { e.preventDefault(); window.log.push({ t: "mousedown-prevented" }); }
+  }, true);
+  for (const t of ["beforetoggle", "toggle"]) pop.addEventListener(t, (e) => window.log.push({ t, newState: e.newState, source: idOf(e.source ?? null), active: idOf(document.activeElement) }));
+  pop.addEventListener("command", (e) => window.log.push({ t: "command", command: e.command, source: idOf(e.source) }));
+  document.addEventListener("click", (e) => window.log.push({ t: "click", target: idOf(e.target), open: pop.matches(":popover-open"), active: idOf(document.activeElement) }), true);
+  document.addEventListener("pointerup", (e) => window.log.push({ t: "pointerup", target: idOf(e.target), open: pop.matches(":popover-open") }), true);
+  document.addEventListener("focusin", (e) => window.log.push({ t: "focusin", target: idOf(e.target) }), true);
+  window.setup = (mode, holder) => {
+    window.mode = mode; window.holder = holder;
+    if (pop.matches(":popover-open")) pop.hidePopover();
+    document.getElementById("trigger").focus();
+    if (holder === "item") { pop.showPopover({ source: document.getElementById("trigger") }); document.getElementById("item1").focus(); }
+    else { input.focus(); pop.showPopover({ source: input }); }
+    window.log = [];
+  };
+  window.state = () => ({ open: pop.matches(":popover-open"), active: idOf(document.activeElement), log: window.log.splice(0) });
+  window.rect = (id) => document.getElementById(id).getBoundingClientRect().toJSON();
+  window.features = () => ({ commandForElement: "commandForElement" in HTMLButtonElement.prototype, toggleSource: "source" in ToggleEvent.prototype });
+</script>

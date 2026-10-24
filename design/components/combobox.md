@@ -53,7 +53,7 @@ and a hidden input that follows the optimistic value.
 | 3 | Two library-owned states, two lanes | `value` (`string \| null`): `value` / `defaultValue` / `valueChangeAction`, a transition with `useOptimistic`, as every other value. `inputValue` (`string`): `inputValue` / `defaultInputValue` / `onInputValueChange`, the **urgent** state the vision reserved for this component (section 4). Same `x` / `defaultX` pair, different lane, and a **handler** instead of an action: `onInputValueChange` is the library's one `on*` prop, named as a handler because it is called synchronously in the event and never wrapped in a transition (conventions 2.1, 2.6; #96, replacing v1's `inputValueChangeAction: UrgentChangeAction`). `fooAction` keeps meaning "a transition" everywhere. |
 | 4 | Results | The library filters nothing. `query` is `useDeferredValue(inputValue)`; `Combobox.List`'s function `children` (and Root's) receive `{ query }` and render the `Option`s for it, under a consumer-owned `<Suspense>` for async search. While `inputValue !== query` the Popup and List carry `data-stale`; the List is `aria-busy="true"` while stale **or loading** (a `Status` mounted inside it, 6.3); the previous results stay visible. No out-of-order results: React renders only the latest deferred value (section 6). |
 | 5 | Active option | `aria-activedescendant` on the input, never DOM focus on options (research). The active option is **urgent library state** (it is focus; focus is never a transition anywhere in the library), exposed as `data-active` on the Option, revalidated whenever the mounted options change; ids are derived from the value so an option keeps its id across result sets. Typing, Home, End, Left and Right clear it (APG: visual focus returns to the textbox), so Enter never accepts an option the user has typed past; `autoHighlight` (default `false`) activates the first option only once results settle (not stale, not loading; 6.5). |
-| 6 | Open | Always library mode (`useOverlayRoot({ mode: "library" })`, Menu's configuration): no JS-free mode. Open by typing, ArrowDown / ArrowUp, Alt+ArrowDown, the Trigger, optionally a click on the input (`openOnClick`); opened with `showPopover({ source: input })` in the apply effect. Closes: an accepted option and a Trigger click while open (library-owned, after the action settles; the Trigger is an invoker of the popup after hydration, so its press is not a light dismiss, #112), Escape, light dismiss and a Clear click while open (browser-owned, notified `"dismiss"`), focus leaving the input and popup (immediate `hidePopover()`, Menu's Tab rule, `"dismiss"`). Keys are judged against `:popover-open`, what the user sees (section 8). A press on the input while open is **not** a close: `source` is no light-dismiss exemption, so the Input captures the pointer to the Popup at `pointerdown` while the listbox is shown (#123). |
+| 6 | Open | Always library mode (`useOverlayRoot({ mode: "library" })`, Menu's configuration): no JS-free mode. Open by typing, ArrowDown / ArrowUp, Alt+ArrowDown, the Trigger, optionally a click on the input (`openOnClick`); opened with `showPopover({ source: input })` in the apply effect. Closes: an accepted option and a Trigger click while open (library-owned, after the action settles; the Trigger is an invoker of the popup after hydration, so its press is not a light dismiss, #112), Escape, light dismiss and a Clear click while open (browser-owned, notified `"dismiss"`), focus leaving the input and popup (immediate `hidePopover()`, Menu's Tab rule, `"dismiss"`). Keys are judged against `:popover-open`, what the user sees (section 8). A press on the input while open is **not** a close: `source` is no light-dismiss exemption, so the Input captures the pointer to the Popup at `pointerdown` while the listbox is shown (#123). A press on a **foreign invoker** of the popup (a consumer `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names it) is not focus leaving either: the Popup prevents its primary `mousedown` while shown, the input keeps focus and the click's native toggle closes the listbox as `"activate"` (#125, #126). |
 | 7 | Accepting an option | Enter or click on an option: the input text becomes the option's label **at once** (urgent), the option shows `data-pending`, `valueChangeAction` is awaited inside the Root's transition, and the listbox closes in the commit that ends it (Menu decision 3). A rejection rolls the text and `data-selected` back and leaves the listbox open; a controlled parent that does not adopt the value gets the same rollback but the listbox closes (5.5); typing while the action is pending drops its close (5.2). Tab does **not** accept (manual selection; question 5). |
 | 8 | Free text | `allowCustomValue`: Enter with no active option, or focus leaving, commits the text as the value (`details.custom: true`). Without it the text reverts on focus loss to the committed value's label (React Aria's rule). |
 | 9 | Form | `name` / `form` on Root render `<input type="hidden" name value={optimistic ?? ""}>`; `required` goes on `Combobox.Input` and is native (empty text is `valueMissing`). No `setCustomValidity` (conventions 3.6). Form reset dispatches `"platform"` for both states, with reset targets computed in JS (a hidden input has no reset behaviour, 11.1); a pre-hydration typed text is reconciled at mount for `inputValue`. |
@@ -733,11 +733,17 @@ value); focus leaving reverts the text (2.2).
 | Light dismiss, another `auto` popover or modal dialog opening outside | browser | notification; focus wherever the platform left it; text reverted on the `focusout` that preceded it, if any | `"dismiss"` |
 | Focus leaving the input to anything outside the popup (Tab, Shift+Tab, a click elsewhere, script) | library-performed, browser-shaped | the Input's `focusout` with `relatedTarget` outside the input and the popup → `popup.hidePopover()` at once (Menu 2.2: a listbox must not linger over a page whose focus moved on), then the text revert or the custom-value commit of 5.3; `toggle` → notification. `relatedTarget === null` closes nothing synchronously. If a pointer is down (the blur came from a `mousedown`), the check runs one task after that press is released (`pointerup` or `pointercancel`); a `<label for>` (Combobox.Label, Field.Label) refocuses the input in the release's click, so a label press of any length keeps the text (#111). Without a press (script blur) it runs a task later. In both cases, if `document.hasFocus()` and the active element is outside the input and the popup, the revert or custom commit runs; the light dismiss has already closed the listbox (a label press closes it too, the label being outside the popup); a window blur stays a no-op. Nothing runs while `disabled` | `"dismiss"` |
 | Clear click while open | browser (light dismiss: the button is outside the popup) | notification; the listbox is not re-opened; the text is emptied and `null` dispatched as 3.3 | `"dismiss"` |
+| Foreign invoker click while open (a consumer `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names the popup) | browser | the Popup prevents the button's primary `mousedown` while shown, so the input keeps focus and the focus-leaving row above cannot pre-empt the click (#126); the press is light-dismiss exempt (conventions 3.5); the click's native toggle (or `hide-popover`) hides the listbox; the text is untouched; notified from `toggle` with the `ToggleEvent` (the `CommandEvent` for `commandfor`) whose `source` is the button (#125) | `"activate"` |
 | Alt+ArrowUp while open | library | the active option, if any, is accepted (APG optional behaviour); else `requestClose` | `"activate"` |
 
 A click on an option or anywhere in the popup is not focus loss: `pointerdown` and `mousedown`
 are prevented on the Popup (3.4), so the input never blurs and `focusout` never fires. A
-`focusout` whose `relatedTarget` is the Trigger or Clear cannot happen for the same reason.
+`focusout` whose `relatedTarget` is the Trigger or Clear cannot happen for the same reason, nor
+one whose `relatedTarget` is a foreign invoker of the popup pressed with a pointer (#126: the
+Popup's document capture `mousedown` listener, alive while shown, prevents the default for the
+primary button when the target's closest `<button>` is outside the popup and
+`popoverTargetElement === popup`, or `commandForElement === popup` with a `*-popover` command).
+A Tab onto such a button is still focus leaving, and a plain foreign button's press too.
 
 A press on the **input** is not a close either, although the input is outside the popup and can
 name no popover (#123). Light dismiss compares the popover under the press with the popover under
@@ -1267,7 +1273,7 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Rejection (both) | The catcher above Root receives it; `O` reverts; the input text reverts to the previous label with `onInputValueChange(prev, { reason: "dismiss", event: undefined })`; the listbox still open; hidden input back; a **synchronously throwing** action: the rollback write runs outside any transition (a `useTransition` probe or React's transition slot, review M2). Caught-inside variants commit. Controlled refusal: same revert without the error, and the listbox closes. |
 | Overlap, superseded rejection (both) | Two accepts out of order: text and `data-pending` follow the latest, `hidePopover` once after the latest; the older's rejection reaches the catcher after and while the newer is pending. |
 | Custom value | `allowCustomValue`: Enter with no active option dispatches `{ custom: true }`; `focusout` with changed text dispatches with the `focusout` event; empty text with a value dispatches `null`; without the flag `focusout` reverts the text (`"dismiss"`) and dispatches nothing. |
-| Focus loss | `focusout` with `relatedTarget` outside → `hidePopover` at once, notification `"dismiss"`; `relatedTarget: null` → nothing synchronously (with a pointer down, nothing until one task after its `pointerup`/`pointercancel`; a label press keeps the text), then (fake timers) with `document.hasFocus()` and focus outside → the revert / custom commit, with focus still in the input (window blur) → nothing, while `disabled` → nothing; `pointerdown` and `mousedown` on an Option / the Popup are `defaultPrevented` and the input keeps focus. |
+| Focus loss | `focusout` with `relatedTarget` outside → `hidePopover` at once, notification `"dismiss"`; `relatedTarget: null` → nothing synchronously (with a pointer down, nothing until one task after its `pointerup`/`pointercancel`; a label press keeps the text), then (fake timers) with `document.hasFocus()` and focus outside → the revert / custom commit, with focus still in the input (window blur) → nothing, while `disabled` → nothing; `pointerdown` and `mousedown` on an Option / the Popup are `defaultPrevented` and the input keeps focus. A `mousedown` on a foreign `<button popovertarget={popupId}>` while open is `defaultPrevented` and the input keeps focus (no revert); on a plain button or while closed it is not (#126). |
 | Active-option revalidation | The active option unmounts (results change) → `aria-activedescendant` removed; with `autoHighlight` → the first enabled option once not stale and not loading, and not before (the stale list's first option is never active); never a dangling id. |
 | Empty and Status | `Empty` renders only with zero mounted options, not stale and not loading: hidden during the Suspense fallback (a `Status` inside the List) and while stale old results show; `data-empty` on the List likewise; the List is `aria-busy="true"` while loading and while stale; a Status in the Popup is `role=status` and does not count as loading. |
 | Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with the default message (`"No results"` / `"1 result"` / `"3 results"`) or the consumer's `announce(count)`; not while stale; **with a `Status` fallback inside the List: zero calls until the results resolve, then one** (review H1); not for an unchanged count; never when `announce` returns `null`. |
@@ -1397,7 +1403,12 @@ packages/ui/src/internal/
   #111), then `leave()` only if `document.hasFocus()` and `document.activeElement` is outside the
   input and the popup. `onClick` → `openOnClick`. `onPointerDown` → while
   `popup.matches(":popover-open")` and `button === 0`, `capturePointer(popup, pointerId)` (#123;
-  the helper moves from `menu/menu-dom.ts` to `internal/pointer-capture.ts`). Composition: ignore
+  the helper moves from `menu/menu-dom.ts` to `internal/pointer-capture.ts`). **Foreign invokers**
+  (#126): `Combobox.Popup` passes an `onToggle` to `usePopoverPopup` that starts
+  `listenInvokerPresses(popup)` (`internal/invoker-press.ts`, shared with Menu: a document capture
+  `mousedown` listener preventing the primary button's default on a `<button>` outside the popup
+  whose `popoverTargetElement` / `commandForElement` with a `*-popover` command is the popup) when
+  shown and stops it when closed. Composition: ignore
   Enter / arrows while `event.nativeEvent.isComposing`.
 - **Popup.** `usePopoverPopup(ctx, { part, initialFocus: undefined, keepMounted, transition })`;
   `libraryProps`: `id`, `popover: "auto"`, `onPointerDown` and `onMouseDown` →
@@ -2165,3 +2176,54 @@ assertions are unchanged (22 attribute sites, about half of them the Input's and
 `combobox.browser.test.tsx`'s Trigger-close and pre-hydration rows swap the attribute name and
 add the Chromium AX sample. `ComboboxPage.tsx`: the overview sentence, the owned keys and the
 `data-open` row's `aria-expanded` aside.
+
+## Amendment: a press on a foreign invoker is not focus leaving (#126, 2026-10-25)
+
+Status: architect decision; no API change, no new prop, no new `reason`. Edited in place:
+decision 6, 5.4 (a new "Foreign invoker click while open" row and the paragraph after the table),
+12.2's Focus loss row, the 14 Input-handlers bullet. The cross-component rule is in conventions
+3.5; Menu's amendment of the same date carries the engine table and the grounds
+(`memo/architect/issue-126-foreign-invoker-press.md`, probe in
+`memo/architect/probes/126-foreign-invoker-press/`, which includes the Combobox shape: an input
+outside the popup as the focus holder, shown with `source: input`).
+
+The case: a consumer's own `<button popoverTarget={popupId}>` (or `commandfor` + `toggle-popover`
+/ `hide-popover`) pressed with a real mouse while the listbox is shown. Chromium and Firefox focus
+it on `mousedown`; the Input's `focusout` (`relatedTarget` = the button) ran `leave()`: the
+listbox hidden as `"dismiss"`, the text reverted (or the custom value committed), and the click's
+native toggle then re-showed the hidden listbox with the input blurred. WebKit, which does not
+focus a button on click, took the intended path: input focused, the click's toggle hides the
+listbox, `"activate"` from `ToggleEvent.source` (#125), text untouched.
+
+Rule: `Combobox.Popup` keeps a document capture `mousedown` listener alive while shown that calls
+`preventDefault()` for `button === 0` when the target's closest `<button>` is outside the popup
+and names it (`popoverTargetElement === popup`, or `commandForElement === popup` with a
+`*-popover` `command`). Every engine then ends as WebKit did: the input keeps focus, no `focusout`,
+no revert, the click's native toggle closes the listbox as `"activate"`; a dragged-off press
+leaves the listbox shown with the input focused. It is the rule the Combobox's own Trigger and
+Clear already follow ("the input must keep focus", 3.3, conventions 3.5), applied to a button the
+library does not render but which names its popup. A plain foreign button is unchanged: focus
+leaves, the listbox closes as `"dismiss"`, the text reverts or commits (5.4). A Tab onto a foreign
+invoker is unchanged too: focus leaving, `"dismiss"`; the guard is a `mousedown` rule.
+
+Rejected (as for Menu): the `focusout` path ignoring an invoker `relatedTarget`. For Combobox it
+is worse than for Menu: the input would be blurred with the listbox shown, and `leave()`'s second
+duty (the text revert / custom commit) would have to run or not run on a guess.
+
+Implementation (developer): `combobox-popup.tsx` passes an `onToggle` to `usePopoverPopup` that
+starts `listenInvokerPresses(popup)` (`internal/invoker-press.ts`, shared with Menu) when
+`newState === "open"` and the popup is `:popover-open`, and stops it on `"closed"` and unmount;
+`combobox-root.tsx` and `combobox-input.tsx` are unchanged. The docs page's `openChangeAction`
+row gains one sentence as Menu's.
+
+Tests. jsdom (`combobox.test.tsx`): with the listbox open, `fireEvent.mouseDown` on a foreign
+`<button popovertarget={popupId}>` is `defaultPrevented` and the input stays focused; not on a
+plain button, not while closed; the #125 foreign row keeps `foreign.click()`. Browser
+(`combobox.browser.test.tsx`, Chromium, Firefox and WebKit, real pointer): type unmatched text
+("Jamaicax", `allowCustomValue` off), then `user.click(foreign)`: the listbox is not
+`:popover-open`, `openChangeAction` since the open is exactly `[(false, "activate")]` with the
+`beforetoggle` `ToggleEvent` whose `source` is the button, **the input text is still "Jamaicax"**
+(no `leave()`), `document.activeElement === input`, and no `(true, …)` follows within 100 ms; a
+dragged-off press leaves the listbox shown, input focused, nothing dispatched. Mutation check: with
+the listener removed, the Chromium and Firefox rows fail (`"dismiss"`, text reverted, re-open on
+Firefox), the WebKit row passes.

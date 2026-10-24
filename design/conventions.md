@@ -1124,7 +1124,21 @@ Rules:
   `preventDefault()` the `mousedown` while the popup is open (Combobox: always, the input must
   keep focus; Menu's Trigger: while `intended()` is `true`, because an opening click must focus
   the Trigger for the platform's focus return). Focus then stays inside through the pending close
-  in every engine and the popup hides in the close commit. jsdom cannot catch this class of bug
+  in every engine and the popup hides in the close commit. **The same press on a foreign invoker**
+  (#126: a consumer's own `<button>` whose `popovertarget`, or `commandfor` with a popover
+  `command`, names the shown popup) is not a focus-out either: the component keeps a document
+  capture `mousedown` listener while the popup is shown and prevents the primary button's default
+  when the target's closest `<button>` is outside the popup and names it
+  (`popoverTargetElement === popup`, or `commandForElement === popup` with a `*-popover` command:
+  the relationship light dismiss exempts, below). The click's native toggle then closes the popup
+  and `ToggleEvent.source` names the close `"activate"` (#125); focus never left, so the
+  platform's hide returns it (Menu: to the Trigger) or it stays in the input (Combobox). Without
+  the guard, Chromium and Firefox hid the popup as `"dismiss"` at the press and the click's
+  toggle re-showed the hidden popup. Ignoring an invoker `relatedTarget` in the `focusout` path
+  instead was rejected: a Tab onto such a button (the popover follows its source in focus order,
+  so Tab from the last item lands right after the Trigger) would leave the popup open with focus
+  outside, and a dragged-off press would strand focus on the button with no `focusout` left
+  (`memo/architect/issue-126-foreign-invoker-press.md`). jsdom cannot catch this class of bug
   (user-event fires mousedown, mouseup and click in one task, so a `toggle` queued by the press
   lands after the click); a browser row that asserts the reason and `document.activeElement`
   across the click is required. The second known trap is **light dismiss** (Combobox's Trigger,

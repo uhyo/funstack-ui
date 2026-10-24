@@ -49,7 +49,7 @@ with a view transition in every engine.
 | 7 | Submenus | A nested `Menu.Root` whose `Menu.SubmenuTrigger` is an item of the parent menu. Opened with `showPopover({ source: submenuTrigger })` (nested auto popover: the parent stays open, siblings close each other), placed `side="inline-end" align="start"` (`self-x-end span-bottom`: the right of the item in LTR, its left in RTL, the side the mirrored arrow keys point to; wave 11, #53; `side="right"` before) with `position-try-fallbacks: flip-inline`. Opened by ArrowRight / Enter / Space / click (first item focused) or by hover intent (`delay` 100 ms, no focus move); closed by ArrowLeft, Escape (innermost only), hover leaving to a sibling item (`closeDelay` 150 ms), or the stack closing. Focus returns to the SubmenuTrigger through Popover 6.2's rule (the platform restores nothing for nested popovers). |
 | 8 | Hover intent (research Q5) | Timers only: `delay` / `closeDelay` on the submenu's `Menu.Root`, defaults 100 / 150 ms, implemented with the same small internal timer helper Tooltip's interaction uses for its delays, **not** Tooltip's interaction hook (focus, blur, document listeners and `interestfor` do not apply). No "safe triangle" in v0; `closeDelay` covers a diagonal move into the submenu. `interestfor` is not used (research: opens on focus and collapses the stack on Escape). |
 | 9 | `experimental_focusgroup` | On `Menu.Popup`: renders `focusgroup="menu wrap|nowrap"` (`wrap` from `loop`), detected with `"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore` (#43); on the native path items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out of the group) and the JS Up / Down / Home / End branch steps aside. Typeahead, Enter / Space, submenu keys and Tab-closes-stack stay JS everywhere. |
-| 10 | Closing the stack on Tab | A `focusout` listener on the **root** menu's Popup: when `relatedTarget` is outside the menu tree (the root Popup's subtree, which contains every submenu as a DOM descendant, since nothing portals), the root Popup hides itself (`hidePopover()`, the platform hides nested popovers) and every Root is notified with `reason: "dismiss"`. A null `relatedTarget` (window blur) closes nothing. A press on the Trigger of an open menu is not a focus-out: `Menu.Trigger` prevents the `mousedown` default while `intended()` is `true`, so focus stays on the current item in every engine and the click's library-owned close is the one source of the close (#110). |
+| 10 | Closing the stack on Tab | A `focusout` listener on the **root** menu's Popup: when `relatedTarget` is outside the menu tree (the root Popup's subtree, which contains every submenu as a DOM descendant, since nothing portals), the root Popup hides itself (`hidePopover()`, the platform hides nested popovers) and every Root is notified with `reason: "dismiss"`. A null `relatedTarget` (window blur) closes nothing. A press on the Trigger of an open menu is not a focus-out: `Menu.Trigger` prevents the `mousedown` default while `intended()` is `true`, so focus stays on the current item in every engine and the click's library-owned close is the one source of the close (#110). Nor is a press on a **foreign invoker** of the root popup (a consumer `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names it): the root Popup prevents its primary `mousedown` while shown, so the click's native toggle closes the menu and #125 names it `"activate"` (#126). |
 | 11 | ARIA | Trigger: `aria-haspopup="menu"`, `aria-expanded` (shown: the Root's mirror of the Popup's `toggle`, #118), `id`. Popup: `role="menu"`, `aria-labelledby` → the Trigger (or SubmenuTrigger) id. Items: explicit `role`s, `aria-disabled`, `aria-checked` from optimistic state. `Menu.Group` / `Menu.RadioGroup`: `role="group"` + `aria-labelledby` → `GroupLabel`. `Separator`: `<hr>` (implicit `separator`). |
 | 12 | Pending UI | Trigger: `data-open`, `data-pending` (Root pending: open or close in flight). Item: `data-pending` while its action runs. CheckboxItem / RadioItem: `data-checked` (optimistic), `data-pending`; `RadioGroup`: `data-pending` (owner). Popup: nothing (`:popover-open`). |
 | 13 | Content mounting | Conventions 3.7 unchanged: Popup children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">`. Items are read from the DOM at keydown time (no registration), so mounting strategy does not affect keyboard code. |
@@ -220,6 +220,7 @@ menu whose pre-hydration experience matters is rare; it is recorded as question 
 | Trigger click while open | library | Popover 2.3: click cancelled; `requestClose(event, "activate")`; `openChangeAction(false)` awaited **with the menu still shown** and the Trigger without `data-open`, with `data-pending`, still exposed as expanded by the browser (the menu is shown, #121); committed `false`; apply effect `hidePopover()` (view transition if set). The Trigger's `mousedown` is `preventDefault()`ed while `intended()` is `true`, so the press moves no focus and the `focusout` close below cannot pre-empt the click (#110) | `"activate"` |
 | ArrowLeft in a submenu, hover leaving a SubmenuTrigger to a sibling item | library, that submenu's Root | `requestClose` on the submenu's Root; `hidePopover()` in its apply effect; focus return to the SubmenuTrigger by Popover 6.2's rule (ArrowLeft) or no focus change (hover: focus was never inside) | `"activate"` (ArrowLeft) / `"dismiss"` (hover) |
 | Tab / Shift+Tab, focus leaving the tree | library-initiated, browser-shaped | the root Popup's `focusout` listener calls `rootPopup.hidePopover()` at once (no await: the focus has already moved and the menu must not linger over the page); every Root is notified from `toggle` | `"dismiss"` |
+| Foreign invoker click while open (a consumer `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names the root popup) | browser | the root Popup prevents the button's primary `mousedown` while shown, so the press moves no focus and the `focusout` close above cannot pre-empt the click (#126); the press is light-dismiss exempt (conventions 3.5); the click's native toggle (or `hide-popover`) hides the menu and the platform's hide returns focus to the Trigger; notified from `toggle` with the `ToggleEvent` (the `CommandEvent` for `commandfor`) whose `source` is the button (#125) | `"activate"` |
 | Escape | browser | innermost menu only (the platform's close-watcher stack); focus returns to its trigger (platform for the root menu, library for a submenu); notification | `"dismiss"` |
 | Light dismiss, another `auto` popover or modal dialog opening outside | browser | the whole stack; notifications | `"dismiss"` |
 | Controlled parent sets `open={false}` | library | apply effect; echo | (none) |
@@ -270,6 +271,20 @@ once on every engine (it would make the Trigger's close browser-shaped and contr
 above), and a "pressing" flag the `focusout` handler consults (Chromium would then hold focus on
 the Trigger outside the open menu during the pending close and after a dragged-off press, with
 no `focusout` left to catch a Tab).
+
+**Nor is a press on a foreign invoker (#126).** A consumer's own `<button popoverTarget={popupId}>`
+(or `commandfor` + `toggle-popover` / `hide-popover`) outside the menu is exempt from light
+dismiss and its close is `"activate"` (#125), but Chromium and Firefox focus it on `mousedown`
+too: the root Popup's `focusout` hid the menu as `"dismiss"`, and the click's native toggle then
+re-showed the hidden popover. The root Popup therefore keeps a document capture `mousedown`
+listener while shown that prevents the primary button's default when the target's closest
+`<button>` is outside the popup and names it (`popoverTargetElement === popup`, or
+`commandForElement === popup` with a `*-popover` command). The press then moves no focus in any
+engine, the click's native toggle hides the menu, the platform's hide returns focus to the
+Trigger, and a dragged-off press leaves the menu open with its item. The `focusout` listener is
+unchanged: a Tab onto the same button still closes (the popover follows its source in focus order,
+so Tab from the last item lands right after the Trigger), which is why ignoring an invoker
+`relatedTarget` there was rejected (amendment below).
 
 ### 2.3 Item activation and `closeOnActivate` (research question 1)
 
@@ -1067,7 +1082,7 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | Directive | Every file under `src/menu/` except `index.ts` is `"use client"`. |
 | Platform path | Mount with the popup already open (shim) → one `"platform"` dispatch; a foreign `show-popover` command is cancelled and routed; a controlled `open` flip calls `showPopover` / `hidePopover` with no echo dispatch. |
 | Submenus | A nested Root detects `submenu`; its Popup defaults `side="inline-end"` (`position-area: self-x-end span-bottom`, `data-side="inline-end"` while closed), `align="start"`, fallbacks `flip-inline`; `showPopover` called with `{ source: submenuTrigger }`; ArrowRight / Enter / Space / click open with the first item `autofocus`ed; hover: `pointerenter` + 100 ms → open with no `autofocus`; `pointerleave` + 150 ms → `requestClose` ("dismiss"); entering the submenu popup cancels; keyboard focus inside blocks the hover close; ArrowLeft → `requestClose` ("activate") and, after `hidePopover` + `toggle` with focus moved to body by the test, the SubmenuTrigger is focused; `Menu.Trigger` in a submenu warns; `delay` on a top-level Root warns. |
-| Stack close | Item activation in a submenu calls the root Root's close; root `openChangeAction(false, "activate")`, submenu `openChangeAction(false, "dismiss")` after the shim's nested hide (the shim must hide nested popovers when an ancestor hides: addition). `focusout` to an outside element → root `hidePopover` at once, `"dismiss"` everywhere; `relatedTarget: null` → nothing; `focusout` into a submenu item → nothing. A `mousedown` on the Trigger while open is `defaultPrevented` and focus stays on the item; while closed it is not (#110). |
+| Stack close | Item activation in a submenu calls the root Root's close; root `openChangeAction(false, "activate")`, submenu `openChangeAction(false, "dismiss")` after the shim's nested hide (the shim must hide nested popovers when an ancestor hides: addition). `focusout` to an outside element → root `hidePopover` at once, `"dismiss"` everywhere; `relatedTarget: null` → nothing; `focusout` into a submenu item → nothing. A `mousedown` on the Trigger while open is `defaultPrevented` and focus stays on the item; while closed it is not (#110). A `mousedown` on a foreign `<button popovertarget={popupId}>` (or `commandfor` + `toggle-popover` / `hide-popover`) while open is `defaultPrevented` and focus stays on the item; on a plain button, a `commandfor` button with a non-popover `command`, a button naming another popover, or while closed it is not (#126). |
 | Trigger close (#110) | With a deferred `openChangeAction`: a click on the Trigger while open leaves the menu `:popover-open` with focus on the item, the Trigger without `data-open`, with `data-pending` and no `aria-expanded` (#121; on Chromium the AX `expanded` is `true`), `hidePopover` not called; resolve → called once, `(false, "activate")` with the `click` event the only close dispatch; reject → menu still open, focus on the item. `fireEvent.blur(item, { relatedTarget: trigger })` without a press (Shift+Tab) still hides at once. The shared suite row "a click while open dispatches (false, 'activate')" now passes through the click for Menu as for Popover: drop the "(Menu: the focusout hides first)" caveats from `triggerToggles` and the Menu config comment. |
 | Pointer focus | `pointermove` on an item focuses it (no `focusVisible`); on the already-focused item nothing. `mousedown` on a Separator or the popup's padding is `defaultPrevented` and focus stays on the item; with focus on the popup itself, ArrowDown / Home focus the first item and ArrowUp / End the last (M1). |
 | `transition` smoke | As Popover 13.2; plus item activation with `transition` unmounts in the close commit. |
@@ -1182,7 +1197,11 @@ packages/ui/src/internal/
 - **`focusout` tree test.** `rootPopup.contains(relatedTarget)`; submenus are descendants. The
   Trigger is outside on purpose (Shift+Tab closes). A `mousedown` on the Trigger while open is
   prevented (`Menu.Trigger`'s owned `onMouseDown`: primary button, `intended()` true), so only a
-  keyboard or programmatic move reaches the Trigger through `focusout` (#110).
+  keyboard or programmatic move reaches the Trigger through `focusout` (#110). A `mousedown` on a
+  foreign invoker of the root popup (`popoverTargetElement === popup`, or
+  `commandForElement === popup` with a `*-popover` command) is prevented the same way by a
+  document capture listener the root Popup starts in `onToggle` next to `listenOutside` and stops
+  on close (`internal/invoker-press.ts`, shared with Combobox, #126).
 - **Hover intent.** In `SubmenuTrigger`: `pointerenter` (not `touch`) → `timers.open(delay, () =>
   requestOpen(event, "activate"))`; `pointerleave` → `timers.close(closeDelay, maybeClose)`;
   the submenu Popup's `pointerenter` → `timers.cancelClose()`, `pointerleave` → `timers.close`;
@@ -1466,3 +1485,71 @@ value assertions to a `render={<a href="#" />}` Trigger row. `menu.browser.test.
 `expanded=true` through `getAXNodes()` during the pending close and `false` after; the
 positioning and submenu rows run unchanged with the new attribute. `MenuPage.tsx`: the Trigger
 attribute row, the "optimistic" list in the pending section and the entanglement sentence.
+
+## Amendment: a press on a foreign invoker is not a focus-out (#126, 2026-10-25)
+
+Status: architect decision; no API change, no new prop, no new `reason`. Edited in place:
+decision 10, 2.2 (a new "Foreign invoker click while open" row and the paragraph after the #110
+one), 13.1, 14. The cross-component rule is in conventions 3.5 (the paragraph after the #110
+`mousedown` trap); Combobox has the same amendment. Grounds and the probe:
+`memo/architect/issue-126-foreign-invoker-press.md`, `memo/architect/probes/126-foreign-invoker-press/`.
+
+The case: a consumer's own `<button popoverTarget={popupId}>` (or `commandfor` + `toggle-popover`
+/ `hide-popover`) outside the menu, pressed with a real mouse while the menu is open. It is an
+invoker of the popup: light dismiss exempts it (conventions 3.5) and #125 names its close
+`"activate"` from `ToggleEvent.source`. But the press focuses it first in Chromium and Firefox.
+
+| | Chromium / Firefox before | WebKit before | Every engine after |
+| --- | --- | --- | --- |
+| `mousedown` on the foreign invoker | focuses the button; the root Popup's `focusout` hides the menu at once (`"dismiss"`, `ToggleEvent` with `source: null`) | no focus move | the root Popup's document capture listener prevents the default; focus stays on the item |
+| `pointerup` | nothing (the popup is already hidden) | light-dismiss exempt | light-dismiss exempt |
+| `click` | the native toggle finds a hidden popover and **re-shows it** (plain DOM, both engines; with the library the foreign open is cancelled at `beforetoggle` and routed through `requestOpen`, which was a no-op in Chromium, where `intended()` was still `true`, and re-opened in Firefox: timing) | the native toggle hides the menu, `source` = the button | the native toggle (or `hide-popover`) hides the menu, `source` = the button |
+| Dispatch | `(false, "dismiss")`, then on Firefox `(true, "activate")` | `(false, "activate")` with the `ToggleEvent` (`CommandEvent` for `commandfor`) | as WebKit |
+| Focus after | on the foreign button | on the Trigger (the platform's hide returns it: focus was inside) | on the Trigger |
+| Dragged-off press | menu closed (`"dismiss"`), focus on the button | menu open, item focused | menu open, item focused |
+| Tab from the last item onto the foreign button | closes (`"dismiss"`) | closes | closes, unchanged |
+
+Rule: the root Popup keeps a document capture `mousedown` listener alive while shown (started in
+`onToggle` next to `listenOutside`, stopped on close) that calls `preventDefault()` for
+`button === 0` when the target's closest `<button>` is outside the popup and
+`popoverTargetElement === popup`, or `commandForElement === popup` with a `*-popover` `command`.
+Nothing else changes: the `focusout` listener still closes on every `relatedTarget` outside the
+tree (a Tab onto the foreign button, a plain foreign button's press), `Menu.Trigger` keeps its own
+`onMouseDown` (judged on `intended()`: it also covers the pending-open window and a non-button
+`render`, which has no `popovertarget`), submenus are not involved (the listener and the
+`focusout` are the root Popup's; an invoker naming a submenu popup is not a supported pattern).
+
+Rejected: the `focusout` path ignoring an invoker `relatedTarget`. It fixes the press (closed by
+the click, `"activate"`, focus on the button) but a Tab onto the foreign button leaves the menu
+open with focus outside it (APG: Tab closes), and a dragged-off press strands focus on the button
+with no `focusout` left to catch the next Tab; `relatedTarget.matches(":active")` can tell a press
+from a Tab at `focusout` time (true on both engines) but does not fix the drag-off. Rejected too:
+documenting it. The pattern is one the library classifies on purpose (#125, whose Menu browser row
+had to prevent the button's `mousedown` by hand), and a flicker plus a re-open is a bug.
+
+Implementation (developer): `src/internal/invoker-press.ts` (directive-free):
+`isPopoverInvoker(target: EventTarget | null, popup: HTMLElement): boolean` (closest `<button>`,
+outside the popup, `popoverTargetElement === popup` or `commandForElement === popup` with
+`/-popover$/.test(command)`; absent IDL means the engine has no such invoker, so `false`) and
+`listenInvokerPresses(popup): () => void` (the capture `mousedown` listener on
+`popup.ownerDocument`, cleanup returned). `menu-popup.tsx`: in the existing `onToggle`, start it
+with `listenOutside` and stop it with `stopOutside()` (root only). `Menu.Popup`'s doc comment and
+the docs page's `openChangeAction` row gain one sentence: a consumer's own `popovertarget` /
+`commandfor` button for the popup closes it as `"activate"` and never moves focus out of the menu.
+
+Tests. jsdom (`menu.test.tsx`): with the menu open, `fireEvent.mouseDown` on a foreign
+`<button popovertarget={popupId}>` is `defaultPrevented` and `document.activeElement` is still the
+item; not on a plain button, not on a `commandfor` button with `command="my-cmd"`, not on a button
+naming another popover, not while the menu is closed; a `commandfor` + `hide-popover` button is
+prevented. (The invoker shim of #125 provides the IDL where jsdom lacks it.) Browser
+(`menu.browser.test.tsx`, Chromium, Firefox and WebKit, real pointer): the #125 foreign row drops
+its `onMouseDown={(e) => e.preventDefault()}`; after `user.click(foreign)` the dispatches since the
+open are exactly `[(false, "activate")]` with `details.event.type === "beforetoggle"` and
+`source === foreign`, the popup is not `:popover-open`, no `(true, …)` follows within 100 ms, and
+`document.activeElement` is the Trigger on every engine; a `commandfor` + `toggle-popover`
+variant asserts `"activate"` with the `CommandEvent`; a dragged-off press (`user.pointer` down on
+the foreign button, move to the page, release) leaves the menu `:popover-open` with the item
+focused and dispatches nothing; `user.tab()` from the last item onto a foreign button placed
+right after the Trigger still closes with `"dismiss"`. Mutation check: with the listener removed,
+the Chromium and Firefox press rows fail (`"dismiss"`, re-open), the WebKit row passes (no focus
+move there), which is why the row runs on all three.
