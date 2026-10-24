@@ -22,9 +22,9 @@ export function registerTrigger(
     if (!warned.has(triggerRef)) {
       warned.add(triggerRef);
       console.error(
-        `${part}: a second ${part} mounted in the same Root. A Root supports one ${part}: the ` +
-          "last one mounted becomes the popup's anchor and focus-return target, and the others " +
-          "act as outside the popup. Render one per Root, or a Root per trigger.",
+        `${part}: a second ${part} mounted in the same Root. A Root supports one ${part}: ` +
+          "the popup only follows the last one mounted (its anchor, focus return and " +
+          `aria-expanded). Render one ${part} per Root.`,
       );
     }
   }

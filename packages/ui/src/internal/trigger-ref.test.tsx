@@ -1,7 +1,7 @@
 // The one-Trigger-per-Root dev warning (#113 API3), for every Root with a single `triggerRef`:
 // Popover, Dialog, Menu (and its submenus) and Combobox (whose Input is the popover's trigger).
 import { render } from "@testing-library/react";
-import { StrictMode } from "react";
+import { Activity, StrictMode } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Combobox } from "../combobox/index.js";
@@ -129,6 +129,38 @@ describe.each(cases)("$name: one Trigger per Root (#113 API3)", ({ part, root })
     expect(secondTriggerWarnings(error, part)).toHaveLength(0);
     // The same Root, its Trigger remounted under a new key: the old one detaches first.
     rerender(<StrictMode>{root(1, 1)}</StrictMode>);
+    expect(secondTriggerWarnings(error, part)).toHaveLength(0);
+  });
+
+  it("does not warn when an <Activity> hides and shows the Root again", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const tree = (mode: "visible" | "hidden") => <Activity mode={mode}>{root(1)}</Activity>;
+    const { rerender } = render(tree("visible"));
+    rerender(tree("hidden"));
+    rerender(tree("visible"));
+    expect(secondTriggerWarnings(error, part)).toHaveLength(0);
+  });
+
+  it("does not warn when the Trigger moves to another Root", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { rerender } = render(
+      <>
+        {root(1)}
+        {root(0)}
+      </>,
+    );
+    rerender(
+      <>
+        {root(0)}
+        {root(1)}
+      </>,
+    );
+    rerender(
+      <>
+        {root(1)}
+        {root(0)}
+      </>,
+    );
     expect(secondTriggerWarnings(error, part)).toHaveLength(0);
   });
 });

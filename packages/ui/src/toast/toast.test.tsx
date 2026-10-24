@@ -1393,7 +1393,7 @@ describe("Toast", () => {
       expect(root(ids[0]!)).toHaveFocus();
     });
 
-    it("leaves ArrowDown / ArrowUp to a text field, textarea, select or contenteditable inside a toast (#113 A3)", async () => {
+    it("leaves ArrowDown / ArrowUp to an element inside a toast that uses them itself (#113 A3)", async () => {
       const user = setupUser();
       const list = ({ toasts }: ToastViewportState) =>
         toasts.map((t) =>
@@ -1407,13 +1407,22 @@ describe("Toast", () => {
                 <option>b</option>
               </select>
               <div data-testid={`editable-${t.id}`} contentEditable tabIndex={0} />
+              <input type="radio" data-testid={`radio-${t.id}`} aria-label="Option" />
+              <input type="range" data-testid={`range-${t.id}`} aria-label="Level" />
+              <div
+                data-testid={`slider-${t.id}`}
+                role="slider"
+                aria-label="Volume"
+                aria-valuenow={0}
+                tabIndex={0}
+              />
               <input type="checkbox" data-testid={`checkbox-${t.id}`} aria-label="Check" />
             </>,
           ),
         );
       render(<Harness manager={manager} list={list} />);
       const ids = await call(() => ["A", "B"].map((t) => manager({ title: t, duration: null })));
-      for (const part of ["input", "textarea", "select", "editable"]) {
+      for (const part of ["input", "textarea", "select", "editable", "radio", "range", "slider"]) {
         const field = screen.getByTestId(`${part}-${ids[1]!}`);
         act(() => field.focus());
         const event = new KeyboardEvent("keydown", {

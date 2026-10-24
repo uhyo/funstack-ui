@@ -1003,10 +1003,12 @@ request, a module-level visually hidden `div[role=status]` appended to `document
 engines without `ariaNotify` (cleared, written 100 ms later, cleared after a second; review N4).
 It never ran in a supported browser (docs/vision.md: latest stable of each engine, no
 fallbacks), and in `document.body` it was inert under a modal dialog, so it was dropped.
+Known gap (BCD): ChromeOS exposes `ariaNotify` but never speaks it; the feature-detected
+fallback would not have run there either.
 
 `null` from `announce` announces nothing. Combobox keeps its own `ariaNotify` call and
-`focus-first-invalid.ts` its own `announce` in v1; moving them onto `announce.ts` (which would
-give them the fallback region) is the optional follow-up in issue #77, not a design change.
+`focus-first-invalid.ts` its own `announce` in v1; moving them onto `announce.ts` would only
+remove the duplicated `ariaNotify` call (the optional follow-up in issue #77), not a design change.
 
 ### 8.4 The two built-in strings
 
@@ -1336,7 +1338,7 @@ deviation the reviewer accepted; none is corrected here.
 | N1 | **Stepping did not round to the format**: `step 0.001` in a `EUR` field showed `€1.00` and posted `1.001`. `step()` rounds through `formatter.round`, so 5.4 holds for stepped values too. | Decisions 6, 2.4, 5.4, 5.5, 14.1 |
 | N2 | **The hidden input lacked `autocomplete="off"`**: form-state restoration could restore it but not the visible text, posting an unseen value before hydration. Added; the restoration row is moot. | Decisions 11, 14; 6.1, 14.2 |
 | N3 | **Affixes were replaced anywhere in the text**, so `1€234` under `fr-FR` became `1234` (the replacement space is a group separator there). Affixes and literals are stripped at the edges only (and inside the sign and parentheses); in the middle the text is unparsable. | Decisions 7, 5.3, 14.1 |
-| N4 | **The fallback region was written in the task it was inserted** and a repeated text was not a change. It is cleared, written 100 ms later and cleared after a second. | 8.3, 14.1, 15 |
+| N4 | **The fallback region was written in the task it was inserted** and a repeated text was not a change. It is cleared, written 100 ms later and cleared after a second. Superseded by #113 A1: the fallback region was dropped. | 8.3, 14.1, 15 |
 | N5 | `onCompositionStart` / `onCompositionEnd` pass through `NumberField.Input` (the library installs neither); the details JSDoc and the docs say `event` is `undefined` on hold repeats and at a bound-ended hold. | 1, 2.4, 3.2, 14.1 |
 | Deviations 1 to 11 | Accepted by the reviewer and folded: (1) End → the largest grid point `≤ max`; (2) an empty value skips the against-direction rule; (3) the hydration re-sync writes `visible.value` directly; (4) no hidden-input registry, refs through context with `onItemMounted`; (5) the parser's affix-level leniencies and bidi stripping; (6) `event` undefined on hold ticks; (7) Ctrl / Meta combinations not handled; (8) `deltaY === 0` ignored; (9) a consumer `aria-labelledby` omits the default `aria-label`; (10) a commit while `disabled` / `readOnly` clears the draft; (11) the percent test row needs `maximumFractionDigits: 1` for `0.5 → 0.005`. | 4.1, 4.2, 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 6.1, 8.4, 14.1 |
 | Reports | **Firefox's bubble and `:user-invalid` persist while the user types a fix** (validity follows the committed value): recorded as a known difference in 6.2 with an open question below, no change now. **Implicit submission needs a submit button** (the hidden number input is a second field): correct platform behaviour, documented in 4.1 and on the docs page. **The Field layout shift under a click** is a property of every Field control; the Field docs page notes it, the rows tab out first. **Combobox and `focus-first-invalid.ts` keep their own announcements**; migrating them onto `announce.ts` is the optional part of #77. | 4.1, 6.2, 8.3, 14.2 |
@@ -1408,7 +1410,8 @@ in `design/components/field-form.md`); the list is kept as the record of what ch
 9. **8 (`ariaNotify`).** Record the second user and the fallback: "`internal/announce.ts`
    speaks through `ariaNotify()` where it exists and otherwise through one module-level
    `role="status"` live region in `document.body` (NumberField's step announcements); a
-   component announcing through it renders no live region of its own."
+   component announcing through it renders no live region of its own." (Superseded by #113 A1:
+   no fallback region; conventions 8 now says `ariaNotify()` only.)
 10. **10.1 test rows.** The "Inside a Field" row lists NumberField; the "Continuous control" row
     applies to the hold; the "Platform path" row gains "for a control with a hidden native
     input, every path leaves the hidden value equal to the shown value".
@@ -1476,7 +1479,8 @@ which needs the conventions owner.
 12. **The announcement fallback is a module-level live region** (8.3, `internal/announce.ts`)
     for engines without `ariaNotify`. Alternative: no fallback (Combobox's current rule).
     **Recommendation: the region**, since the product owner asked for a fallback; Combobox may
-    migrate to the helper as an implementation choice.
+    migrate to the helper as an implementation choice. (Superseded by #113 A1: the region was
+    dropped under the no-fallbacks policy, 8.3.)
 13. **In v1**: `largeStep` with PageUp / PageDown and Shift+Arrow, `format` of style `decimal`,
     `percent` (default `step` `0.01`), `currency`, `unit`; **not in v1**: `smallStep`,
     `step="any"`, a scrub area, Escape reverting, iPhone `inputmode="text"`, `compact` parsing

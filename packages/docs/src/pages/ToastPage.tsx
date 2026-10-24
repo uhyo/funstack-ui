@@ -465,7 +465,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
           [
             "ArrowDown / ArrowUp",
             "a toast",
-            "Next / previous toast, no wrap; a text field, `select` or slider inside keeps its arrows",
+            "Next / previous toast, no wrap. Elements inside that use the arrow keys themselves keep them: text, number, date, range and radio inputs, `textarea`, `select`, contenteditable, and the `textbox`, `combobox`, `spinbutton` and `slider` roles",
           ],
           ["Escape", "a toast", "Dismiss it"],
           ["Enter / Space", "Action, Close", "Native button activation"],

@@ -20,9 +20,3 @@ export function announce(element: Element, message: string): void {
   const notifying = element as NotifyingElement;
   if (typeof notifying.ariaNotify === "function") notifying.ariaNotify(message);
 }
-
-/**
- * Tests only, called by the test setup's per-test reset: the module holds no state since the
- * fallback region was dropped (#113 A1), so there is nothing to reset today.
- */
-export function resetAnnouncer(): void {}

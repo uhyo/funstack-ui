@@ -16,3 +16,7 @@
   Not warned: Menu.ContextTrigger (does not register triggerRef), Tooltip.
 - API2: `value` added first in both state objects.
 - A2: architect decided no aria-controls (issue comment); no code.
+- Review follow-ups (memo/reviewer/issue-113-review.md): resetAnnouncer removed entirely (M1);
+  number-field.md history marked superseded + ChromeOS gap (M2, i5); Toast arrow rule lists what
+  ownsArrows covers (m3); warning text "Render one <part> per Root" (m4); radio/range/slider A3
+  rows, Activity hide/show and moving-Trigger rows (i6).
