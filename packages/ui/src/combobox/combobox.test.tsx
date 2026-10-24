@@ -2276,6 +2276,30 @@ describe("Combobox", () => {
     });
   });
 
+  describe("foreign popovertarget invoker (#125)", () => {
+    it("a close that moves no focus is 'activate' with the ToggleEvent", async () => {
+      const openAction = vi.fn<OpenAction>();
+      const user = setupUser();
+      render(<Harness root={{ openChangeAction: openAction }} />);
+      await typeText(user, "j");
+      expect(isOpen()).toBe(true);
+      openAction.mockClear();
+      const foreign = screen.getByTestId("elsewhere");
+      foreign.setAttribute("popovertarget", popup().id);
+      // A press that moves focus out of the input closes the listbox at the focusout first
+      // (design 5.4); a click that moves none reaches the invoker's close.
+      act(() => foreign.click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(openAction).toHaveBeenCalledTimes(1);
+      const [next, details] = openAction.mock.calls[0]!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("activate");
+      expect(details.event!.type).toBe("beforetoggle");
+      expect((details.event as ToggleEvent & { source?: unknown }).source).toBe(foreign);
+    });
+  });
+
   describe("Input press (#123)", () => {
     // `source` is no light-dismiss exemption: a primary press on the field while the listbox is
     // shown captures the pointer to the Popup, so the release is not a light dismiss (design 5.4).

@@ -37,6 +37,38 @@ describe("invoker shim: popovertarget (#121)", () => {
     expect(commands).toEqual([]);
   });
 
+  it("passes the button as the toggle events' source, open and close; hidePopover() passes null (#125)", async () => {
+    const { popover, button } = setup({ popovertarget: "target" });
+    const events: [string, string, unknown][] = [];
+    for (const type of ["beforetoggle", "toggle"]) {
+      popover.addEventListener(type, (event) => {
+        const toggle = event as ToggleEvent & { source?: unknown };
+        events.push([type, toggle.newState, toggle.source]);
+      });
+    }
+    button.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    button.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    popover.showPopover();
+    popover.hidePopover();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    popover.togglePopover({ source: button });
+    popover.togglePopover({ source: button });
+    expect(events).toEqual([
+      ["beforetoggle", "open", button],
+      ["toggle", "open", button],
+      ["beforetoggle", "closed", button],
+      ["toggle", "closed", button],
+      ["beforetoggle", "open", null],
+      ["beforetoggle", "closed", null],
+      ["toggle", "closed", null],
+      ["beforetoggle", "open", button],
+      // `togglePopover()` hiding passes no source (HTML).
+      ["beforetoggle", "closed", null],
+    ]);
+  });
+
   it("an unknown popovertargetaction is toggle", () => {
     const { popover, button } = setup({ popovertarget: "target", popovertargetaction: "bogus" });
     button.click();

@@ -1756,6 +1756,35 @@ describe("Menu.Root", () => {
     expect(isOpen()).toBe(true);
   });
 
+  it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent (#125)", async () => {
+    const action = vi.fn<OpenAction>();
+    render(<Harness root={{ openChangeAction: action }} />);
+    fireEvent.click(trigger());
+    await flushTasks(2);
+    expect(isOpen()).toBe(true);
+    const foreign = screen.getByTestId("elsewhere");
+    foreign.setAttribute("popovertarget", popup().id);
+    // A click that moves no focus (a press that moves it out of the tree closes the menu at the
+    // focusout first, design 2.2).
+    act(() => foreign.click());
+    await flushTasks(2);
+    expect(isOpen()).toBe(false);
+    expect(action).toHaveBeenCalledTimes(2);
+    const [next, details] = action.mock.calls[1]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event!.type).toBe("beforetoggle");
+    expect((details.event as ToggleEvent & { source?: unknown }).source).toBe(foreign);
+    // Escape and light dismiss in jsdom: `hidePopover()`, no source.
+    fireEvent.click(trigger());
+    await flushTasks(2);
+    act(() => popup().hidePopover());
+    await flushTasks(2);
+    expect(action).toHaveBeenCalledTimes(4);
+    expect(action.mock.calls[3]![1].reason).toBe("dismiss");
+    expect(action.mock.calls[3]![1].event!.type).toBe("toggle");
+  });
+
   it("mount with the popup already open (pre-hydration click): one 'platform' dispatch", async () => {
     const action = vi.fn<OpenAction>();
     const ui = (

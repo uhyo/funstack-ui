@@ -14,7 +14,8 @@
 // activation behaviour (#121): the target must be a `[popover]`, `popovertargetaction` picks
 // `toggle` (default, also for an invalid value), `show` or `hide` (`show` on a shown and `hide` on
 // a hidden popover do nothing), there is **no `command` event**, and the same disabled and
-// submit-button exclusions apply. It runs through the popover shim's registered command.
+// submit-button exclusions apply. It runs through the popover shim's registered command, with the
+// button as the `source` of both the show and the hide (`ToggleEvent.source`, #125).
 
 /** One kind of command target (dialogs, popovers). */
 export interface CommandHandler {

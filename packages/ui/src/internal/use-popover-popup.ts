@@ -117,6 +117,11 @@ export function resetFocusVisibleOption(): void {
   focusVisibleOption = undefined;
 }
 
+/** `ToggleEvent.source` (Chromium 140, Firefox 145, Safari 26.5); not in TypeScript's DOM lib. */
+function toggleSource(event: ToggleEvent): Element | null | undefined {
+  return (event as ToggleEvent & { readonly source?: Element | null }).source;
+}
+
 /** Whether `element` sits inside a popover that is not shown (an outer popup that closed). */
 function insideHiddenPopover(element: Element): boolean {
   for (let node = element.parentElement; node !== null; node = node.parentElement) {
@@ -296,6 +301,13 @@ export function usePopoverPopup(
       }
       contentProbe.forget();
     } else {
+      // A foreign `popovertarget` invoker closing the popup (design 2.3, #125): `source` is the
+      // button, and `null` for Escape, light dismiss and script. The library's own parts never
+      // get here with a source (their clicks are cancelled; their closes are `hidePopover()`). A
+      // `commandfor` invoker sets `source` too, and its `command` intent comes first and stays.
+      if (isLibrary && toggleSource(toggle) != null) {
+        ctx.recordCloseIntent({ reason: "activate", event }, { unlessRecorded: true });
+      }
       awaitingClose.current = true;
       exit.recordBaseline(element);
       const active = element.ownerDocument.activeElement;
@@ -337,7 +349,8 @@ export function usePopoverPopup(
     const element = popupRef.current;
     if (element === null || event.target !== element || event.defaultPrevented) return;
     const command = commandOf(event);
-    // A foreign invoker closing the popup (design 2.3). Opens are caught at `beforetoggle`.
+    // A foreign `commandfor` invoker closing the popup (design 2.3). Opens are caught at
+    // `beforetoggle`.
     if (command === "hide-popover" || (command === "toggle-popover" && isPopoverOpen(element))) {
       ctx.recordCloseIntent({ reason: "activate", event });
     }

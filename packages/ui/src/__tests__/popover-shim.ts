@@ -17,6 +17,10 @@
 //   a close's `beforetoggle` is not cancelable (design/components/popover.md 13.1).
 // - `showPopover({ source })` / `togglePopover({ source })` record the source, readable through
 //   `popoverSource(el)` (no anchoring in jsdom).
+// - `beforetoggle` and `toggle` carry `source` (HTML: the invoker of a `popovertarget` or
+//   `commandfor` show or hide, the `source` of `showPopover` / `togglePopover` for a show, `null`
+//   for `hidePopover()`, `togglePopover()` hiding and the nested hides; #125). A coalesced
+//   `toggle` carries the latest change's.
 // - Invoker Commands (invoker-shim.ts): a click on `button[commandfor]` with `show-popover`,
 //   `hide-popover` or `toggle-popover` dispatches a cancelable `command` event at the popover and
 //   runs the command, with the button as `source`, unless it was cancelled. `show-popover` on an
@@ -110,19 +114,24 @@ function popoverFocusingSteps(popover: HTMLElement): void {
   control?.focus();
 }
 
-function toggleEvent(type: string, oldState: string, newState: string): Event {
+function toggleEvent(
+  type: string,
+  oldState: string,
+  newState: string,
+  source: HTMLElement | null,
+): Event {
   // Only an opening `beforetoggle` is cancelable (HTML, popover show / hide steps).
   const event = new Event(type, { cancelable: type === "beforetoggle" && newState === "open" });
-  return Object.assign(event, { oldState, newState });
+  return Object.assign(event, { oldState, newState, source });
 }
 
-function queueToggle(element: HTMLElement, open: boolean): void {
+function queueToggle(element: HTMLElement, open: boolean, source: HTMLElement | null): void {
   const pending = pendingToggles.get(element);
   const oldState = pending?.oldState ?? (open ? "closed" : "open");
   if (pending !== undefined) clearTimeout(pending.timer);
   const timer = setTimeout(() => {
     pendingToggles.delete(element);
-    element.dispatchEvent(toggleEvent("toggle", oldState, open ? "open" : "closed"));
+    element.dispatchEvent(toggleEvent("toggle", oldState, open ? "open" : "closed", source));
   }, 0);
   pendingToggles.set(element, { oldState, timer });
 }
@@ -160,7 +169,12 @@ function setOpen(element: HTMLElement, open: boolean, source: HTMLElement | null
     hideNested(element);
     if (!isOpen(element)) return;
   }
-  const before = toggleEvent("beforetoggle", open ? "closed" : "open", open ? "open" : "closed");
+  const before = toggleEvent(
+    "beforetoggle",
+    open ? "closed" : "open",
+    open ? "open" : "closed",
+    source,
+  );
   element.dispatchEvent(before);
   // A cancelled open stays hidden; a listener that already changed the state wins.
   if (before.defaultPrevented || isOpen(element) === open) return;
@@ -173,7 +187,7 @@ function setOpen(element: HTMLElement, open: boolean, source: HTMLElement | null
     openPopovers.delete(element);
     element.removeAttribute(SHOWN_ATTRIBUTE);
   }
-  queueToggle(element, open);
+  queueToggle(element, open, source);
 }
 
 if (typeof HTMLElement !== "undefined" && !("showPopover" in HTMLElement.prototype)) {
@@ -188,7 +202,8 @@ if (typeof HTMLElement !== "undefined" && !("showPopover" in HTMLElement.prototy
       const forced = typeof force === "object" ? force.force : force;
       const source = typeof force === "object" ? (force.source ?? null) : null;
       const next = forced ?? !isOpen(this);
-      setOpen(this, next, source);
+      // Hiding passes no source (HTML `togglePopover()` step 5).
+      setOpen(this, next, next ? source : null);
       return isOpen(this);
     },
   });
@@ -210,7 +225,7 @@ if (typeof HTMLElement !== "undefined" && !("showPopover" in HTMLElement.prototy
     run: (target, command, button) => {
       const popover = target as HTMLElement;
       if (command === "show-popover") setOpen(popover, true, button);
-      else if (command === "hide-popover") setOpen(popover, false);
+      else if (command === "hide-popover") setOpen(popover, false, button);
       else setOpen(popover, !isOpen(popover), button);
     },
   });

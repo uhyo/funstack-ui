@@ -371,6 +371,71 @@ describe("library mode (browser)", () => {
     await settle(() => expect(isOpen()).toBe(true));
   });
 
+  it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent; Escape and light dismiss stay 'dismiss' (#125)", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library
+        action={action}
+        before={
+          <button type="button" data-testid="foreign">
+            Foreign
+          </button>
+        }
+      />,
+    );
+    const foreign = screen.getByTestId("foreign");
+    foreign.setAttribute("popovertarget", popup().id);
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await user.click(foreign);
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action).toHaveBeenCalledTimes(2);
+    const [next, details] = action.mock.calls[1]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event).toBeInstanceOf(ToggleEvent);
+    expect(details.event!.type).toBe("beforetoggle");
+    expect((details.event as ToggleEvent & { source?: Element | null }).source).toBe(foreign);
+    // The platform's dismissals carry no source.
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await user.keyboard("{Escape}");
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action.mock.calls[3]![1].reason).toBe("dismiss");
+    expect(action.mock.calls[3]![1].event!.type).toBe("toggle");
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await user.click(screen.getByTestId("outside"));
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action).toHaveBeenCalledTimes(6);
+    expect(action.mock.calls[5]![1].reason).toBe("dismiss");
+    expect(action.mock.calls[5]![1].event!.type).toBe("toggle");
+  });
+
+  it("a foreign commandfor hide-popover close keeps the CommandEvent though its beforetoggle names the button (#125)", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library
+        action={action}
+        before={
+          <button type="button" data-testid="foreign">
+            Foreign
+          </button>
+        }
+      />,
+    );
+    const foreign = screen.getByTestId("foreign");
+    foreign.setAttribute("commandfor", popup().id);
+    foreign.setAttribute("command", "hide-popover");
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await user.click(foreign);
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(action.mock.calls[1]![1].reason).toBe("activate");
+    expect(action.mock.calls[1]![1].event!.type).toBe("command");
+  });
+
   it("a click outside light-dismisses ('dismiss'); focus stays on the clicked element", async () => {
     const action = vi.fn<ActionFn>();
     render(<Library action={action} />);

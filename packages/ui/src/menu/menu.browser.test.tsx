@@ -1019,6 +1019,44 @@ describe("light dismiss and layering (browser)", () => {
 // Popup's focusout never hides the menu first; the click is the single source of the close
 // (design/components/menu.md 2.2, "A press on the Trigger is not a focus-out"). One outcome on
 // every engine.
+describe("foreign popovertarget invoker (browser, #125)", () => {
+  it("a press that keeps focus in the menu closes it with 'activate' and the ToggleEvent", async () => {
+    const action = vi.fn<OpenAction>();
+    render(
+      <Basic
+        root={{ openChangeAction: action }}
+        after={
+          // A toolbar-style button that takes no focus on press: a press that moves focus out of
+          // the tree closes the menu at the focusout first (design 2.2).
+          <button type="button" data-testid="foreign" onMouseDown={(e) => e.preventDefault()}>
+            Foreign
+          </button>
+        }
+      />,
+    );
+    const foreign = screen.getByTestId("foreign");
+    foreign.setAttribute("popovertarget", popup().id);
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await user.click(foreign);
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action).toHaveBeenCalledTimes(2);
+    const [next, details] = action.mock.calls[1]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event).toBeInstanceOf(ToggleEvent);
+    expect(details.event!.type).toBe("beforetoggle");
+    expect((details.event as ToggleEvent & { source?: Element | null }).source).toBe(foreign);
+    // Escape stays a dismissal.
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await user.keyboard("{Escape}");
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action).toHaveBeenCalledTimes(4);
+    expect(action.mock.calls[3]![1].reason).toBe("dismiss");
+  });
+});
+
 describe("Trigger click while open (browser, #110)", () => {
   afterEach(async () => {
     // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.

@@ -20,7 +20,8 @@ export type OverlayMode = "static" | "library";
 
 /**
  * What caused the next close, recorded just before it happens (design 2.3). The `toggle` event
- * carries no source; without an intent a close is a `"dismiss"`.
+ * names no cause beyond a `popovertarget` invoker (`ToggleEvent.source`, #125); without an intent
+ * a close is a `"dismiss"`.
  */
 export interface OverlayCloseIntent {
   readonly reason: ChangeReason;
@@ -102,8 +103,15 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   readonly triggerRef: RefObject<HTMLElement | null>;
   /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()` / `close()`. */
   readonly popupRef: RefObject<Popup | null>;
-  /** Record what causes the next close. Cleared after a task if the popover did not close. */
-  readonly recordCloseIntent: (intent: OverlayCloseIntent | undefined) => void;
+  /**
+   * Record what causes the next close. Cleared after a task if the popover did not close.
+   * `unlessRecorded`: keep an intent already recorded for this close (the `command` listener runs
+   * before the `beforetoggle` of the same click, #125).
+   */
+  readonly recordCloseIntent: (
+    intent: OverlayCloseIntent | undefined,
+    options?: { readonly unlessRecorded?: boolean },
+  ) => void;
   /** Read and clear the recorded intent (the Popup's `toggle` listener). */
   readonly takeCloseIntent: () => OverlayCloseIntent | undefined;
 }
@@ -225,7 +233,8 @@ export function useOverlayRoot<
   }, []);
 
   const recordCloseIntent = useCallback(
-    (intent: OverlayCloseIntent | undefined) => {
+    (intent: OverlayCloseIntent | undefined, options?: { readonly unlessRecorded?: boolean }) => {
+      if (options?.unlessRecorded === true && closeIntent.current !== undefined) return;
       closeIntent.current = intent;
       if (intent !== undefined) {
         clearLater(closeIntent, intent, popupRef, callbacks.current.isShown ?? isPopoverOpen);

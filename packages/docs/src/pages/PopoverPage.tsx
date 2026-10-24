@@ -56,8 +56,8 @@ export function PopoverPage() {
           after its trigger. A <code>&lt;button commandfor command&gt;</code> or{" "}
           <code>&lt;button popovertarget&gt;</code> of your own that targets the popover is a{" "}
           <em>foreign invoker</em>; in library mode an open through it is routed through the
-          library, while a foreign <code>hide-popover</code> closes natively and is reported as{" "}
-          <code>"activate"</code>.
+          library, while a foreign close (<code>hide-popover</code>, or a <code>popovertarget</code>{" "}
+          click while open) happens natively and is reported as <code>"activate"</code>.
         </li>
         <li>
           <strong>
@@ -660,8 +660,12 @@ html:active-view-transition .popover { transition: none; }
             did not start (a <code>&lt;button commandfor command="show-popover"&gt;</code>, a{" "}
             <code>&lt;button popovertarget&gt;</code>, a script <code>showPopover()</code>) is
             cancelled at <code>beforetoggle</code> and dispatched with that <code>ToggleEvent</code>
-            . A foreign <code>hide-popover</code> closes it natively and is reported as{" "}
-            <code>"activate"</code>.
+            . A foreign close happens natively and is reported as <code>"activate"</code>: a{" "}
+            <code>hide-popover</code> or <code>toggle-popover</code> command with its{" "}
+            <code>CommandEvent</code>, a <code>&lt;button popovertarget&gt;</code> with the{" "}
+            <code>beforetoggle</code> <code>ToggleEvent</code>, whose <code>source</code> is the
+            button. Escape, a click outside and a script <code>hidePopover()</code> stay{" "}
+            <code>"dismiss"</code>.
           </li>
         </ul>
       </BehaviourSection>
