@@ -13,7 +13,7 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {
-  /** Optimistic open state (library mode); `false` in JS-free mode. */
+  /** Optimistic open state. A Popover in JS-free mode (the browser owns it) reports `false`. */
   readonly open: boolean;
   /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
   readonly pending: boolean;

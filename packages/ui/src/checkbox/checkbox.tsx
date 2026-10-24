@@ -90,8 +90,9 @@ export interface CheckboxProps extends Omit<
    * Forwarded as `default` to the Checkbox's `<ViewTransition>`. Default: no boundary. Animates the
    * commit that ends an action, not the optimistic flip; animate the flip with CSS on `:checked`.
    *
-   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
-   * included, makes a mount inside a transition start a document view transition.
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxState>;

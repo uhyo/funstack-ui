@@ -94,9 +94,10 @@ export interface PopoverPopupProps extends Omit<
    * click outside) are the browser's and animate with CSS only. Ignored (dev warning) in JS-free
    * mode.
    *
-   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
-   * included, makes a mount inside a transition start a document view transition.
-   * A plain open does not pay it: the children mount under the already-mounted popover element.
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
+   * A plain open starts none: the children mount under the already-mounted popover element.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, PopoverPopupState>;

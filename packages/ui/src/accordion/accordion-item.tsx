@@ -49,8 +49,9 @@ export interface AccordionItemProps extends Omit<
    * animates the commit that ends an action (the `open` attribute flip), not the optimistic
    * `data-open` flip. Ignored (dev warning) in JS-free mode.
    *
-   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
-   * included, makes a mount inside a transition start a document view transition.
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionItemState>;

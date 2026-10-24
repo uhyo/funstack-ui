@@ -25,8 +25,9 @@ export interface AccordionPanelProps extends Omit<
    * Library mode only. Forwarded as `default` to the `<ViewTransition>` around the panel's
    * `div`; animates content that mounts or changes in the commit that ends an action.
    *
-   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
-   * included, makes a mount inside a transition start a document view transition.
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionPanelState>;

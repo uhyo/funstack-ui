@@ -63,8 +63,9 @@ export interface CheckboxGroupParentProps extends Omit<
    * commit that settles the action (or rolls it back), never on the optimistic flip; animate the
    * flip itself with CSS on `:checked` / `:indeterminate`.
    *
-   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
-   * included, makes a mount inside a transition start a document view transition.
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
+   * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxGroupParentState>;
