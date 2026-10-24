@@ -795,6 +795,16 @@ is the APG's own grouping advice.
   for checkbox groups, and adding it would be the component's first keyboard JS. Can be added
   later without a breaking change.
 - No `orientation` prop (nothing keyboard-related would honour it); layout is CSS.
+- **No `aria-controls` on the Parent** (#113 A2, 2026-10-24). The APG mixed-state example sets
+  `aria-controls` from its tri-state `div[role="checkbox"]` to the boxes it controls. Here the
+  Parent and its Items are native checkboxes inside one `<fieldset>` named by the `<legend>`, so
+  the relationship is already exposed as the group; assistive-technology support for
+  `aria-controls` is thin (JAWS offers a jump to the controlled element, NVDA and VoiceOver
+  announce nothing); and emitting it would need every Item to carry a library id and the Parent
+  to learn the ids for its `values` through the registry after mount, written to the DOM because
+  they are unknown at server render (conventions 7.4), a mechanism for an attribute nobody
+  hears. The prop passes through: a consumer who wants it gives the Items `id`s and sets
+  `aria-controls` on the Parent. Revisit if AT support improves.
 - ARIA: native roles and states everywhere; `aria-checked` owned and removed on Item and Parent;
   the Root carries no `role`, no `aria-required`; `Label` names the fieldset natively. Optimistic
   state is heard by AT immediately (the DOM `checked` is optimistic); a rollback is silent
@@ -1175,3 +1185,11 @@ feedback above was applied to `design/conventions.md` the same day.
    uncontrolled reset reading from `defaultValue` (8.2), `required` over enabled Items (7), the
    engine-dependent AT exposure (7), `RootState.value` as of the Root's last render (3.1, 5.1),
    and the duplicate-value warning from the Root's layout effect (14.6).
+
+## Amendment: `aria-controls` on the Parent (#113 A2, 2026-10-24)
+
+Status: architect decision, recorded in section 9; no implementation. The library does not emit
+`aria-controls` from `CheckboxGroup.Parent` to its Items. Reasons in section 9: the `<fieldset>` /
+`<legend>` grouping already exposes the relationship, AT support for `aria-controls` is thin, and
+the attribute would cost per-Item ids plus a post-mount DOM write on the Parent. The prop is not
+owned, so a consumer can add it by hand. Nothing to add to the #113 implementation list.

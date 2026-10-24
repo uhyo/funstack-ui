@@ -74,3 +74,13 @@ with the questions turned into recorded decisions; the seven conventions items a
 `design/conventions.md` (1.1 `Parent`, 2.2 diff shape, 3.6 computed validity attributes, 3.8
 `equals` and the radio-only scope of rule 3, 4.1 derived `indeterminate`, 5.3 types, resolved
 question 20); checkbox.md §10 now points at the group design and withdraws its item 2.
+
+## #113 A2: `aria-controls` on the Parent (2026-10-24)
+
+Decided no. The APG mixed-state example's `aria-controls` is on a custom `div[role=checkbox]`
+with no other grouping; ours is a native checkbox in a `<fieldset>` with a `<legend>`. Support:
+JAWS announces "controls" and offers a jump; NVDA and VoiceOver do nothing with it. Cost would
+be per-Item ids (SSR-safe with `useId`, fine) plus the Parent learning them through the registry
+after mount and writing the token list to the DOM (a 7.4 write), for a subset (`values`) that
+can change. The prop passes through (`CheckboxGroupParentProps` does not omit it), so the
+consumer path exists. Recorded in checkbox-group.md 9 and an amendment at the end.
