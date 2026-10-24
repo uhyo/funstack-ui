@@ -1,16 +1,10 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
-import { dataAttr } from "../internal/data-attr.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
-import { useElementCheck } from "../internal/use-element-check.js";
-import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
-import type { DataAttributes } from "../internal/use-render.js";
+import { useOverlayClose } from "../internal/use-overlay-close.js";
 import { usePopoverContext } from "./popover-context.js";
-
-const isDev = process.env.NODE_ENV !== "production";
 
 export interface PopoverCloseState {
   /** The `action` is in flight. */
@@ -65,84 +59,35 @@ export function PopoverClose({
   ...rest
 }: PopoverCloseProps) {
   const ctx = usePopoverContext("Popover.Close");
-  const { ids, popupRef, recordCloseIntent, openGeneration } = ctx;
-  const { pending, run } = useActionTrigger({ openGeneration });
+  const { popupRef, recordCloseIntent } = ctx;
   const isLibrary = ctx.mode === "library";
-  const hasAction = action !== undefined;
-  const installClick = isLibrary || hasAction;
-  // JS-free mode without `action` is the browser's `hide-popover` command, which only native
-  // `disabled` stops.
-  const disabledProps = disabledButton(render, disabled, { handlesClick: installClick });
-
-  const state: PopoverCloseState = { pending, disabled };
-
-  const devRef = useElementCheck(
-    isDev &&
-      ((element) =>
-        !installClick && element.tagName !== "BUTTON"
-          ? `Popover.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
-            '`action`. Only a <button> runs `command="hide-popover"`; this element will not ' +
-            "close the popover."
-          : null),
-    [installClick],
-  );
-
-  const close = (event: Event): void => {
-    if (isLibrary) {
-      // A library-owned close (design 2.3): awaited, then hidden in the commit.
-      ctx.requestClose(event, "activate");
-      return;
-    }
-    // JS-free mode with `action`: a browser-owned close; there is no Root state to notify.
-    const popup = popupRef.current;
-    if (popup === null || !popup.isConnected || !isPopoverOpen(popup)) return;
-    recordCloseIntent({ reason: "activate", event });
-    popup.hidePopover();
-  };
-
-  const onClick = (event: MouseEvent<HTMLElement>) => {
-    // Cancelling the click cancels the command.
-    event.preventDefault();
-    if (disabled) return;
-    const native = event.nativeEvent;
-    if (action === undefined) {
-      close(native);
-      return;
-    }
-    const details = createActionDetails(native, {});
-    // A second activation while this Close's own run is in flight starts nothing (the hook's
-    // guard; the click is already cancelled above). A close whose open was superseded by a
-    // newer one (dismissed and re-opened meanwhile) is dropped by the hook.
-    run(
-      () => action(details),
-      () => close(native),
-    );
-  };
-
-  const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
-    ...(rendersButton(render) && { type: "button" as const }),
-    // Owned: a render element must not re-enable a disabled Close.
-    disabled: disabledProps.props.disabled,
-    commandfor: disabledProps.invoker ? ids.popup : undefined,
-    command: disabledProps.invoker ? "hide-popover" : undefined,
-    ...(installClick && { onClick }),
-    // Exactly while `data-pending`: a Close that will not act is unavailable to AT. Owned,
-    // so an idle Close removes a render element's own `aria-disabled`.
-    "aria-disabled": pending || !disabledProps.invoker ? true : undefined,
-    "data-pending": dataAttr(pending),
-    "data-disabled": dataAttr(disabled),
-  };
-
-  return useRender<ComponentPropsWithRef<"button">, PopoverCloseState>({
-    defaultElement: "button",
-    render,
-    state,
+  return useOverlayClose({
+    part: "Popover.Close",
+    noun: "popover",
+    isLibrary,
+    popupId: ctx.ids.popup,
+    command: "hide-popover",
+    openGeneration: ctx.openGeneration,
+    action,
+    details: (event) => createActionDetails(event, {}),
+    close: (event) => {
+      if (isLibrary) {
+        // A library-owned close (design 2.3): awaited, then hidden in the commit.
+        ctx.requestClose(event, "activate");
+        return;
+      }
+      // JS-free mode with `action`: a browser-owned close; there is no Root state to notify.
+      const popup = popupRef.current;
+      if (popup === null || !popup.isConnected || !isPopoverOpen(popup)) return;
+      recordCloseIntent({ reason: "activate", event });
+      popup.hidePopover();
+    },
+    disabled,
     className,
     style,
     children,
-    props: rest,
-    libraryProps,
-    ref: devRef,
+    render,
+    rest,
   });
 }
 

@@ -1,15 +1,9 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
-import { dataAttr } from "../internal/data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
-import { useElementCheck } from "../internal/use-element-check.js";
-import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
-import type { DataAttributes } from "../internal/use-render.js";
+import { useOverlayClose } from "../internal/use-overlay-close.js";
 import { useDialogContext } from "./dialog-context.js";
-
-const isDev = process.env.NODE_ENV !== "production";
 
 export interface DialogCloseState {
   /** The `action` is in flight. */
@@ -75,88 +69,38 @@ export function DialogClose({
   ...rest
 }: DialogCloseProps) {
   const ctx = useDialogContext("Dialog.Close");
-  // The open-generation guard: a close from a previous opening must not close a new one.
-  const { pending, run } = useActionTrigger({ openGeneration: ctx.openGeneration });
-  const { ids, dialogRef, recordCloseIntent } = ctx;
+  const { dialogRef, recordCloseIntent } = ctx;
   const isLibrary = ctx.mode === "library";
-  const hasAction = action !== undefined;
-  const installClick = isLibrary || hasAction;
-  // JS-free mode without `action` is the browser's `request-close` command, which only native
-  // `disabled` stops.
-  const disabledProps = disabledButton(render, disabled, { handlesClick: installClick });
-
-  const state: DialogCloseState = { pending, disabled };
-
-  const devRef = useElementCheck(
-    isDev &&
-      ((element) =>
-        !installClick && element.tagName !== "BUTTON"
-          ? `Dialog.Close: rendered a <${element.tagName.toLowerCase()}> in JS-free mode without ` +
-            '`action`. Only a <button> runs `command="request-close"`; this element will not ' +
-            "close the dialog."
-          : null),
-    [installClick],
-  );
-
-  const close = (event: Event, returnValue: string): void => {
-    if (isLibrary) {
-      // A library-owned close (design 2.3): awaited, then `close(returnValue)` in the commit. A
-      // no-op when `false` is already intended (a repeated click, or a dismissal meanwhile).
-      ctx.requestClose(event, "activate", returnValue);
-      return;
-    }
-    // JS-free mode with `action`: a browser-owned close; there is no Root state to go through.
-    const dialog = dialogRef.current;
-    if (dialog === null || !dialog.open) return;
-    recordCloseIntent({ reason: "activate", event });
-    dialog.close(returnValue);
-  };
-
-  const onClick = (event: MouseEvent<HTMLElement>) => {
-    // Cancelling the click cancels the command.
-    event.preventDefault();
-    if (disabled) return;
-    const native = event.nativeEvent;
-    const returnValue = value ?? "";
-    if (action === undefined) {
-      close(native, returnValue);
-      return;
-    }
-    const details = createActionDetails(native, { returnValue });
-    // A second activation while this Close's own run is in flight starts nothing (the hook's
-    // guard; the click is already cancelled above). A close whose open was superseded by a
-    // newer one (dismissed and re-opened meanwhile) is dropped by the hook.
-    run(
-      () => action(details),
-      () => close(native, returnValue),
-    );
-  };
-
-  const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
-    ...(rendersButton(render) && { type: "button" as const }),
-    // Owned: a render element must not re-enable a disabled Close.
-    disabled: disabledProps.props.disabled,
-    commandfor: disabledProps.invoker ? ids.dialog : undefined,
-    command: disabledProps.invoker ? "request-close" : undefined,
-    value,
-    ...(installClick && { onClick }),
-    // Exactly while `data-pending`: a Close that will not act is unavailable to AT. Owned,
-    // so an idle Close removes a render element's own `aria-disabled`.
-    "aria-disabled": pending || !disabledProps.invoker ? true : undefined,
-    "data-pending": dataAttr(pending),
-    "data-disabled": dataAttr(disabled),
-  };
-
-  return useRender<ComponentPropsWithRef<"button">, DialogCloseState>({
-    defaultElement: "button",
-    render,
-    state,
+  return useOverlayClose({
+    part: "Dialog.Close",
+    noun: "dialog",
+    isLibrary,
+    popupId: ctx.ids.dialog,
+    command: "request-close",
+    openGeneration: ctx.openGeneration,
+    action,
+    details: (event) => createActionDetails(event, { returnValue: value ?? "" }),
+    close: (event) => {
+      const returnValue = value ?? "";
+      if (isLibrary) {
+        // A library-owned close (design 2.3): awaited, then `close(returnValue)` in the commit. A
+        // no-op when `false` is already intended (a repeated click, or a dismissal meanwhile).
+        ctx.requestClose(event, "activate", returnValue);
+        return;
+      }
+      // JS-free mode with `action`: a browser-owned close; there is no Root state to go through.
+      const dialog = dialogRef.current;
+      if (dialog === null || !dialog.open) return;
+      recordCloseIntent({ reason: "activate", event });
+      dialog.close(returnValue);
+    },
+    ownProps: { value },
+    disabled,
     className,
     style,
     children,
-    props: rest,
-    libraryProps,
-    ref: devRef,
+    render,
+    rest,
   });
 }
 
