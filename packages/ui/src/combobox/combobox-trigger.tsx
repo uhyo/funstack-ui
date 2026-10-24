@@ -35,6 +35,8 @@ export interface ComboboxTriggerProps extends Omit<
   | "aria-controls"
   | "commandfor"
   | "command"
+  | "popoverTarget"
+  | "popoverTargetAction"
   | "disabled"
   | "className"
   | "style"
@@ -55,17 +57,19 @@ export interface ComboboxTriggerProps extends Omit<
 
 /**
  * The optional button that toggles the listbox: `<button type="button" tabindex="-1"
- * aria-expanded aria-controls>` (the APG keeps it out of the Tab sequence; the input is the one
- * stop). A press does not take focus from the input, and a click focuses the input. After
- * hydration a `<button>` also names the Popup as its invoker (`commandfor`,
- * `command="toggle-popover"`, written through the ref, never server-rendered), so a press while
- * the listbox is open is not a light dismiss and the click's close is the only one (design 3.3,
- * #112). Every click is cancelled, so the command never runs: the listbox stays anchored to the
- * input (design 1).
+ * aria-controls>` (the APG keeps it out of the Tab sequence; the input is the one stop). A press
+ * does not take focus from the input, and a click focuses the input. After hydration a `<button>`
+ * also names the Popup as its invoker (`popovertarget`, written through the ref, never
+ * server-rendered), so a press while the listbox is open is not a light dismiss and the click's
+ * close is the only one (design 3.3, #112, #121), and the browser exposes the listbox's state on
+ * it: a `<button>` renders no `aria-expanded`, another element renders it from the shown listbox.
+ * Every click is cancelled, so the toggle never runs: the listbox stays anchored to the input
+ * (design 1).
  *
  * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or
- * component `render`), `aria-expanded`, `aria-controls` (token-merged), `commandfor`, `command`,
- * `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`.
+ * component `render`), `aria-expanded`, `aria-controls` (token-merged), `popovertarget`,
+ * `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`;
+ * `commandfor`, `command` and `popoverTargetAction` are reserved.
  */
 export function ComboboxTrigger({
   disabled: ownDisabled = false,
@@ -97,17 +101,15 @@ export function ComboboxTrigger({
   const popupId = popover.ids.popup;
   // After hydration a `<button>` becomes the popup's invoker (design 3.3, #112): the platform's
   // light dismiss exempts a press on an invoker of the open popover. Written here, not rendered,
-  // so the server HTML has no `commandfor` and a click before hydration opens nothing.
+  // so the server HTML has no `popovertarget` and a click before hydration opens nothing (#121).
   const ref = useCallback(
     (element: HTMLElement) => {
       checkName?.(element);
       checkElement?.(element);
       if (element.tagName !== "BUTTON") return () => {};
-      element.setAttribute("commandfor", popupId);
-      element.setAttribute("command", "toggle-popover");
+      element.setAttribute("popovertarget", popupId);
       return () => {
-        element.removeAttribute("commandfor");
-        element.removeAttribute("command");
+        element.removeAttribute("popovertarget");
       };
     },
     [checkName, checkElement, popupId],
@@ -123,9 +125,14 @@ export function ComboboxTrigger({
     ...(rendersButton(render) && { type: "button" as const }),
     tabIndex: -1,
     ...disabledButton(render, disabled).props,
-    // Shown (the listbox is in the top layer); `data-open` is the optimistic one (#118).
-    "aria-expanded": popover.shown,
+    // A `<button>` is the invoker after hydration and the browser exposes the listbox's state on
+    // it (#121). Another element: shown (the listbox is in the top layer); `data-open` is the
+    // optimistic one (#118).
+    "aria-expanded": rendersButton(render) ? undefined : popover.shown,
     "aria-controls": ctx.ids.list,
+    // Owned: the ref writes `popovertarget` after hydration; a render element sets neither.
+    popoverTarget: undefined,
+    popoverTargetAction: undefined,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
     },
@@ -133,7 +140,7 @@ export function ComboboxTrigger({
       event.preventDefault();
     },
     onClick: (event: MouseEvent<HTMLButtonElement>) => {
-      // Cancelled first, whatever follows: the command must never run (the library opens the
+      // Cancelled first, whatever follows: the popover toggle must never run (the library opens the
       // listbox anchored to the input), and a disabled link must not navigate either.
       event.preventDefault();
       if (disabled) return;

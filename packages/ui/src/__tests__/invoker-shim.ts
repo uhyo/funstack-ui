@@ -9,6 +9,12 @@
 // for the target fires no `command` event and does nothing; custom `--commands` always fire. A
 // valid one dispatches a cancelable `command` event (with `command` and `source`) at the target
 // and runs the command unless that event was cancelled.
+//
+// Without `commandfor`, a button with `popovertarget` runs the popover target attribute
+// activation behaviour (#121): the target must be a `[popover]`, `popovertargetaction` picks
+// `toggle` (default, also for an invalid value), `show` or `hide` (`show` on a shown and `hide` on
+// a hidden popover do nothing), there is **no `command` event**, and the same disabled and
+// submit-button exclusions apply. It runs through the popover shim's registered command.
 
 /** One kind of command target (dialogs, popovers). */
 export interface CommandHandler {
@@ -50,7 +56,10 @@ export function installInvokerShim(): void {
     if (button.type === "submit" && button.form !== null) return;
     const id = button.getAttribute("commandfor");
     const command = button.getAttribute("command")?.toLowerCase();
-    if (id === null || command === undefined) return;
+    if (id === null || command === undefined) {
+      runPopoverTarget(button);
+      return;
+    }
     const target = button.ownerDocument.getElementById(id);
     if (target === null) return;
     if (command.startsWith("--")) {
@@ -63,4 +72,16 @@ export function installInvokerShim(): void {
     if (commandEvent.defaultPrevented) return;
     handler.run(target, command, button);
   });
+}
+
+/** The `popovertarget` activation behaviour: no `command` event (HTML "popover target attribute"). */
+function runPopoverTarget(button: HTMLButtonElement): void {
+  const id = button.getAttribute("popovertarget");
+  if (id === null) return;
+  const target = button.ownerDocument.getElementById(id);
+  if (target === null || !target.hasAttribute("popover")) return;
+  const action = button.getAttribute("popovertargetaction")?.toLowerCase();
+  const command =
+    action === "show" ? "show-popover" : action === "hide" ? "hide-popover" : "toggle-popover";
+  handlers.find((h) => h.isValid(target, command))?.run(target, command, button);
 }

@@ -104,7 +104,7 @@ export interface PopoverPopupProps extends Omit<
 
 /**
  * The popover itself: a `<dialog popover="auto" aria-modal="false" role="dialog">` with the id
- * the Trigger's `commandfor` names, placed against the Trigger with CSS Anchor Positioning and
+ * the Trigger's `popovertarget` names, placed against the Trigger with CSS Anchor Positioning and
  * wired to Title and Description through `aria-labelledby` / `aria-describedby`. Style it with
  * `:popover-open`; it emits `data-side` / `data-align` but no `data-open`. While shown, those are
  * where the browser placed it (the applied `position-try-fallbacks` option; conventions 13.2),

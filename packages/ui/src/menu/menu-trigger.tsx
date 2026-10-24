@@ -28,6 +28,10 @@ export interface MenuTriggerProps extends Omit<
   | "onMouseDown"
   | "aria-expanded"
   | "aria-haspopup"
+  | "commandfor"
+  | "command"
+  | "popoverTarget"
+  | "popoverTargetAction"
   | "className"
   | "style"
   | "children"
@@ -42,7 +46,7 @@ export interface MenuTriggerProps extends Omit<
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, MenuTriggerState>;
   /**
-   * Should render a `<button>` (the command path before hydration). Another element works through
+   * Should render a `<button>` (the `popovertarget` path before hydration). Another element works through
    * the click handler, but a press on it while the menu is open is a light dismiss rather than the
    * awaited close.
    */
@@ -77,14 +81,16 @@ function isPointerClick(event: Event): boolean {
 }
 
 /**
- * The menu button: `<button type="button" commandfor command="toggle-popover"
- * aria-haspopup="menu" aria-expanded>`. A click (Enter, Space) toggles the menu through the
+ * The menu button: `<button type="button" popovertarget aria-haspopup="menu">`, with no
+ * `aria-expanded` (the browser exposes the menu's state on its invoker, #121; a link or component
+ * `render` renders it from the shown menu). A click (Enter, Space) toggles the menu through the
  * Root's transition; ArrowDown / ArrowUp open it with the first / last item focused (inside a
  * vertical `Toolbar.Root`: the inline-end arrow, with the first item focused).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
- * (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`,
- * `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`.
+ * (link or component `render`), `popoverTarget`, `aria-haspopup`, `aria-expanded`, `onClick`,
+ * `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`; `commandfor`,
+ * `command` and `popoverTargetAction` are reserved.
  */
 export function MenuTrigger({
   disabled = false,

@@ -1,4 +1,4 @@
-// Placement of a popover against its implicit anchor (the invoker set by `commandfor`,
+// Placement of a popover against its implicit anchor (the invoker set by `popovertarget`, `commandfor`,
 // `interestfor` or `showPopover({ source })`): inline `position-area` from a side and an
 // alignment, plus `position-try-fallbacks` that flip it when it does not fit; and the parser that
 // reads back which option the browser applied. Shared by Tooltip, Popover and Menu

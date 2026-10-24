@@ -10,7 +10,15 @@ export type PopoverTriggerState = PopoverTriggerHookState;
 
 export interface PopoverTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "aria-expanded" | "className" | "style" | "children"
+  | "onClick"
+  | "aria-expanded"
+  | "commandfor"
+  | "command"
+  | "popoverTarget"
+  | "popoverTargetAction"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * Never dispatches. Native `disabled` on a `<button>` (no longer an invoker); in library mode
@@ -30,17 +38,18 @@ export interface PopoverTriggerProps extends Omit<
 }
 
 /**
- * The toggle: `<button type="button" commandfor command="toggle-popover" aria-expanded>`. In
- * JS-free mode the browser runs the command and the Popup keeps `aria-expanded` current. In
- * library mode the click is cancelled (so the command does not run) and dispatched through the
- * Root's transition: an open, or a library-owned close while open. The button shows optimistic
- * `data-open` and `data-pending` until the change has landed; `aria-expanded` follows the shown
- * popup (in the top layer, #118).
+ * The toggle: `<button type="button" popovertarget>`, with no `aria-expanded`: the browser exposes
+ * the popover's state on its invoker (#121). In JS-free mode the browser toggles the popover and
+ * the Popup keeps `data-open` current. In library mode the click is cancelled (so the toggle does
+ * not run) and dispatched through the Root's transition: an open, or a library-owned close while
+ * open. The button shows optimistic `data-open` and `data-pending` until the change has landed; a
+ * non-button `render` renders `aria-expanded` from the shown popup (in the top layer, #118).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`
- * (library mode, link or component `render`), `commandfor`, `command`, `aria-expanded`,
- * `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `aria-haspopup` and
- * `aria-controls` pass through.
+ * (library mode, link or component `render`), `popoverTarget`, `aria-expanded`,
+ * `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`; `commandfor`,
+ * `command` and `popoverTargetAction` are reserved. `aria-haspopup` and `aria-controls` pass
+ * through.
  */
 export function PopoverTrigger({
   disabled = false,

@@ -35,7 +35,7 @@ const toDirection = (value: string): Direction => (value === "rtl" ? "rtl" : "lt
 /**
  * Where the browser actually placed an anchored popup (design/conventions.md 13.2): the
  * `position-try-fallbacks` option it applied, read from the computed `position-area` while the
- * popup is shown. Observation only; runs whatever opened the popup (`interestfor` and
+ * popup is shown. Observation only; runs whatever opened the popup (`interestfor`, `popovertarget` and
  * `commandfor` included). Read on a `ResizeObserver` (hidden to shown is a resize, delivered
  * before paint), `toggle`, and while shown document `scroll` and window `resize` plus the next
  * two frames. Written urgently (`flushSync`), and only when the rendered pair changes: an open

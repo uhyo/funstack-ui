@@ -40,7 +40,8 @@ declare module "react" {
     interestfor?: string | undefined;
     /**
      * `commandfor` (Invoker Commands): id of the element the button's `command` acts on.
-     * Not in `@types/react` 19.3.0 (DefinitelyTyped #74664).
+     * Not in `@types/react` 19.3.0 (DefinitelyTyped #74664). Rendered by `Popover.Close`, the
+     * Dialog parts and `Button`; the overlay Triggers use `popovertarget` (#121).
      */
     commandfor?: string | undefined;
     /**

@@ -20,7 +20,9 @@
 // - Invoker Commands (invoker-shim.ts): a click on `button[commandfor]` with `show-popover`,
 //   `hide-popover` or `toggle-popover` dispatches a cancelable `command` event at the popover and
 //   runs the command, with the button as `source`, unless it was cancelled. `show-popover` on an
-//   open popover and `hide-popover` on a closed one are invalid (no event).
+//   open popover and `hide-popover` on a closed one are invalid (no event). A click on
+//   `button[popovertarget]` (no `commandfor`) runs the same command for `popovertargetaction`
+//   (`toggle`, `show`, `hide`) with no `command` event (#121).
 // - `showPopover()` runs the popover focusing steps (HTML): a `<dialog>` runs the dialog focusing
 //   steps (an `autofocus` descendant, else the first sequentially focusable descendant, else the
 //   dialog itself), any other popover focuses only itself with `autofocus` or an `autofocus`

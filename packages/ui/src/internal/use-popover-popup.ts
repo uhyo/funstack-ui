@@ -128,7 +128,7 @@ function insideHiddenPopover(element: Element): boolean {
 /**
  * Everything in a popover-like Popup except rendering (design/components/popover.md 14.2): mount
  * reconciliation, the apply effect, the native `beforetoggle` / `toggle` / `command` listeners,
- * close intents, the focus-return fallback, the JS-free `aria-expanded` sync, the deferred
+ * close intents, the focus-return fallback, the JS-free `data-open` sync, the deferred
  * unmount while a hide animates, and `initialFocus`. Shared by Popover and Menu.
  */
 export function usePopoverPopup(
@@ -159,9 +159,10 @@ export function usePopoverPopup(
   const contentProbe = useContentFocusProbe(popupRef);
   const { wrapContent } = contentProbe;
 
-  const syncExpanded = (element: HTMLElement): void => {
-    // JS-free mode only (design 9): read the DOM, not `newState`, so a stale task cannot lie.
-    triggerRef.current?.setAttribute("aria-expanded", String(isPopoverOpen(element)));
+  const syncOpen = (element: HTMLElement): void => {
+    // JS-free mode only (design 9, #121): read the DOM, not `newState`, so a stale task cannot
+    // lie.
+    triggerRef.current?.toggleAttribute("data-open", isPopoverOpen(element));
   };
 
   // Design 6.2 rule 2, for a close that began with focus inside; not to a Trigger inside a
@@ -237,7 +238,7 @@ export function usePopoverPopup(
     const element = popupRef.current;
     if (element === null) return;
     if (!isLibrary) {
-      syncExpanded(element);
+      syncOpen(element);
       return;
     }
     if (isPopoverOpen(element)) ctx.requestOpen(undefined, "platform");
@@ -309,9 +310,10 @@ export function usePopoverPopup(
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
     awaitingClose.current = false;
-    // `aria-expanded`: JS-free mode writes the DOM, library mode mirrors into the Root (#118).
+    // JS-free mode writes the Trigger's `data-open` (#121); library mode mirrors into the Root,
+    // which non-button Triggers and the Combobox Input render as `aria-expanded` (#118).
     if (isLibrary) setShown(isPopoverOpen(element));
-    else syncExpanded(element);
+    else syncOpen(element);
 
     if (!isPopoverOpen(element)) {
       // Focus return for what the platform leaves out (design 6.2): a nested popover restores

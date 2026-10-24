@@ -143,7 +143,7 @@ export interface SubmenuHover {
   readonly enter: (event: Event) => void;
   readonly leave: (event: Event) => void;
   /**
-   * The submenu's popup, for the gesture's "still over the submenu" test (not `commandfor`: a
+   * The submenu's popup, for the gesture's "still over the submenu" test (not `popovertarget`: a
    * non-button SubmenuTrigger has none).
    */
   readonly popup: () => HTMLElement | null;

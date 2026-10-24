@@ -82,7 +82,7 @@ export interface DisabledButton {
     readonly "aria-disabled"?: true | undefined;
   };
   /**
-   * Whether an invoker part may render `commandfor` / `command`: not when disabled in the
+   * Whether an invoker part may render `popovertarget` or `commandfor` / `command`: not when disabled in the
    * focusable branch, where nothing native stops the command (a component render spreading onto
    * a real `<button>` would be a live invoker before hydration).
    */

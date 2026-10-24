@@ -57,7 +57,7 @@ export interface PopoverRootProps {
  * `className` or `style`; `pending` is exposed through `children(state)` and the Trigger.
  *
  * Without `open`, `defaultOpen` and `openChangeAction` the Popover runs in **JS-free mode**: the
- * Trigger is a native `command="toggle-popover"` invoker and the browser owns everything. With any
+ * Trigger is a native `popovertarget` invoker and the browser owns everything. With any
  * of them it runs in **library mode**: opening and the closes the user asks a part for are
  * transitions (the Trigger shows `data-pending`, content renders from committed state,
  * `showPopover()` / `hidePopover()` run when the change has committed); dismissals are the

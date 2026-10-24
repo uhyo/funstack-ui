@@ -48,7 +48,8 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   readonly optimistic: boolean;
   /**
    * The popup is in the top layer, mirrored from its `toggle` (urgent, conventions 3.5): what
-   * `aria-expanded` renders (#118). Written by a popover Popup in library mode; Dialog does not
+   * `aria-expanded` renders on a non-button Trigger and the Combobox Input (#118; a `<button>`
+   * Trigger renders none, #121). Written by a popover Popup in library mode; Dialog does not
    * maintain it.
    */
   readonly shown: boolean;
