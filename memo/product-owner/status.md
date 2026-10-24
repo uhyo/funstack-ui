@@ -276,3 +276,13 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - User refined concept rule: several components on a concept page are fine; naming components that don't help understand the concept is bad. Updated technical-writer.md rule 1, commented on #99.
 - Writer implementing #99 on wave15-docs (worktree ../funstack-ui-wave15-docs): M4 State/Owned lines + shared rows, multi-part tables, Action props example convention, concept-page sweep under refined rule. Then reviewer → merge → docs deploy (docs-only: workflow_dispatch deploy-docs, no release needed).
 - #99 merged (..bc02380), closed. Reviews memo/reviewer/wave15-docs-review.md (0592334). PO allowed writer a one-off comment-only edit in packages/ui. Docs deploy via workflow_dispatch after master CI. WAVE 15 DONE.
+
+## WAVE 16 (#100 refactoring) — STARTED 2026-10-24
+- User: "big refactoring session, focus on tidying up code and tests". Library ~30k src + ~57k tests (ui), docs 22k, example 7.5k.
+- PO ground rules: behaviour-preserving (no public API / DOM / data-attr / timing change), no weakened assertions, branch per refactor, branch CI before master for WebKit-sensitive.
+- Running 3 read-only audits (reviewer): overlays, controls, tests → memo/reviewer/refactor-audit-*.md. Then sub-issues → developers in worktrees → reviewer per refactor.
+- User: delete merged remote branches (done: 7 deleted; ci/playwright-install unmerged kept). Scope extended to docs site + example CODE (not prose). 4th audit running → memo/reviewer/refactor-audit-docs-example.md.
+- Overlay audit done (O1–O19), controls audit done (C1–C17). PO DECISION C14: keep public reason types narrow (no breaking change in a refactor wave); express as Extract<ChangeReason, ...>; architect amends conventions 2.2/9.4 to allow documented subsets. Waiting on tests + docs/example audits.
+- Docs/example audit done (D1–D11, E1–E6). PO: D3 sidebar group class is a real bug → fix by applying class. D2 unused template CSS → delete (user may override). Waiting on tests audit.
+- USER: breaking changes are fine (alpha). → C14 REVERSED: Tabs/Accordion reason → ChangeReason (conventions as written, no amendment). Ground rule relaxed: public API changes allowed when they make the API more consistent/simpler; every breaking change recorded on #100 for the release notes. Behaviour-preserving remains the default for internal refactors.
+- USER POLICY (standing): during alpha, breaking changes are allowed freely; PO decides when to allow them. PO practice: allow when the change makes the API more consistent/simpler/correct; always log under "Breaking" for release notes; avoid churn for its own sake.
