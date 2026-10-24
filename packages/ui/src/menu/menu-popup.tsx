@@ -4,7 +4,6 @@ import type {
   ComponentPropsWithRef,
   CSSProperties,
   FocusEvent,
-  KeyboardEvent,
   MouseEvent,
   PointerEvent,
   ReactNode,
@@ -26,19 +25,11 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { claimPress, MenuListContext, useMenuContext } from "./menu-context.js";
 import type { MenuListContextValue } from "./menu-context.js";
-import {
-  capturePointer,
-  edgeItem,
-  focusItem,
-  hasModifier,
-  isMenuItem,
-  isRtl,
-  menuItems,
-  typeaheadText,
-} from "./menu-dom.js";
+import { capturePointer, edgeItem } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
 import { listenOutside } from "./menu-outside.js";
 import { MENU_POINT_HREF, MENU_POINT_RULES, pointStyle } from "./menu-point.js";
+import { useMenuKeyboard } from "./use-menu-keyboard.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -129,9 +120,6 @@ export interface MenuPopupProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuPopupState>;
 }
 
-/** Typeahead buffer lifetime after the last keystroke (design 5.1). */
-const TYPEAHEAD_RESET_MS = 500;
-
 /** What a press may focus inside a popup: items, the popup itself, the consumer's controls. */
 const FOCUSABLE_SELECTOR =
   'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"])';
@@ -189,12 +177,7 @@ export function MenuPopup({
   const resolvedAlign = placement.align;
 
   const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
-
-  const typeahead = useRef({ text: "", at: 0 });
-  const typingAhead = useCallback(() => {
-    const { text, at } = typeahead.current;
-    return text !== "" && Date.now() - at <= TYPEAHEAD_RESET_MS;
-  }, []);
+  const { onKeyDown, typingAhead } = useMenuKeyboard(menu, nativeFocusgroup);
 
   // The outside right- / middle-click listeners of a top-level menu, while it is shown.
   const outside = useRef<(() => void) | null>(null);
@@ -290,78 +273,6 @@ export function MenuPopup({
     align: resolvedAlign,
     submenu,
     context: point !== null,
-  };
-
-  const runTypeahead = (popup: HTMLElement, current: HTMLElement | null, key: string): boolean => {
-    const now = Date.now();
-    const buffer = typeahead.current;
-    if (buffer.text === "" || now - buffer.at > TYPEAHEAD_RESET_MS) buffer.text = "";
-    if (key === " " && buffer.text === "") return false;
-    buffer.text += key.toLowerCase();
-    buffer.at = now;
-    const items = menuItems(popup);
-    if (items.length === 0) return true;
-    // A repeated single character cycles through the items starting with it; a longer buffer
-    // keeps the current item while it still matches (design 5.1).
-    const repeated = [...buffer.text].every((c) => c === buffer.text[0]);
-    const search = repeated ? buffer.text[0]! : buffer.text;
-    const index = current === null ? -1 : items.indexOf(current);
-    const start = repeated || index < 0 ? index + 1 : index;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[(start + i) % items.length]!;
-      if (typeaheadText(item).startsWith(search)) {
-        if (item !== current) focusItem(item);
-        break;
-      }
-    }
-    return true;
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.defaultPrevented || hasModifier(event)) return;
-    const popup = event.currentTarget;
-    const target = event.target as HTMLElement;
-    const onItem = isMenuItem(target, popup);
-    if (!onItem && target !== popup) return;
-    const key = event.key;
-
-    // ArrowLeft (ArrowRight in RTL) closes a submenu; focus returns to its SubmenuTrigger
-    // through the popover hook's nested focus rule (design 6.3).
-    if (submenu && key === (isRtl(popup) ? "ArrowRight" : "ArrowLeft")) {
-      event.preventDefault();
-      popover.requestClose(event.nativeEvent, "activate");
-      return;
-    }
-
-    if (key === "ArrowDown" || key === "ArrowUp" || key === "Home" || key === "End") {
-      if (!onItem) {
-        // The popup itself has focus (no items at open, or focus landed on it some other way):
-        // into the list from its edge.
-        event.preventDefault();
-        const items = menuItems(popup);
-        const item = key === "ArrowDown" || key === "Home" ? items[0] : items.at(-1);
-        if (item !== undefined) focusItem(item);
-        return;
-      }
-      // The browser moves focus itself where `focusgroup` is implemented.
-      if (nativeFocusgroup) return;
-      event.preventDefault();
-      const items = menuItems(popup);
-      const index = items.indexOf(target);
-      const last = items.length - 1;
-      let next: number;
-      if (key === "Home") next = 0;
-      else if (key === "End") next = last;
-      else if (key === "ArrowDown") next = index >= last ? (loop ? 0 : last) : index + 1;
-      else next = index <= 0 ? (loop ? last : 0) : index - 1;
-      const item = items[next];
-      if (item !== undefined && item !== target) focusItem(item);
-      return;
-    }
-
-    if (key.length === 1 && runTypeahead(popup, onItem ? target : null, key)) {
-      event.preventDefault();
-    }
   };
 
   // Tab / Shift+Tab or any focus move out of the tree closes the whole stack at once (design
