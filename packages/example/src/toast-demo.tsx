@@ -90,7 +90,7 @@ export function ToastDemo() {
         </button>
         <SlowAction />
         <Menu.Root>
-          <Menu.Trigger className="toast-demo-menu-btn">Archive ▾</Menu.Trigger>
+          <Menu.Trigger>Archive ▾</Menu.Trigger>
           <Menu.Popup className="toast-demo-menu">
             <Menu.Item
               action={() =>

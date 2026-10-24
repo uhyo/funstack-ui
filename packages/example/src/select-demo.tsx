@@ -8,7 +8,7 @@ import "./select-demo.css";
 /** A decorative swatch: an SVG with no text, so the option still reads as plain text. */
 function Swatch({ color }: { color: string }) {
   return (
-    <svg className="sl-swatch" viewBox="0 0 10 10" aria-hidden="true">
+    <svg className="sel-swatch" viewBox="0 0 10 10" aria-hidden="true">
       <circle cx="5" cy="5" r="5" fill={color} />
     </svg>
   );
@@ -26,7 +26,7 @@ function FruitPicker() {
         are not rendered; <code>select[data-pending]</code> still styles the select).
       </p>
       <Select.Root
-        className="sl-select"
+        className="sel-select"
         name="fruit"
         defaultValue=""
         required
@@ -35,11 +35,11 @@ function FruitPicker() {
           startTransition(() => setSaved(next));
         }}
       >
-        <Select.Trigger className="sl-trigger">
+        <Select.Trigger className="sel-trigger">
           {({ pending }) => (
             <>
               <Select.Value />
-              {pending && <span className="sl-spinner" aria-hidden />}
+              {pending && <span className="sel-spinner" aria-hidden />}
             </>
           )}
         </Select.Trigger>
@@ -80,13 +80,13 @@ function RejectingDemo() {
         Picking <em>Large</em> fails after 800 ms: the error reaches the boundary and the select
         rolls back.
       </p>
-      <DemoErrorBoundary className="sl-error-box">
+      <DemoErrorBoundary className="sel-error-box">
         <Select.Root
-          className="sl-select"
+          className="sel-select"
           defaultValue="m"
           valueChangeAction={(next) => fakeSave("size", next, { fail: next === "l" })}
         >
-          <Select.Trigger className="sl-trigger">
+          <Select.Trigger className="sel-trigger">
             <Select.Value />
           </Select.Trigger>
           <Select.Option value="s">Small</Select.Option>
@@ -123,13 +123,13 @@ function LateOptionsDemo() {
         which React alone would not do.
       </p>
       <Select.Root
-        className="sl-select"
+        className="sel-select"
         value={country}
         valueChangeAction={(next) => {
           setCountry(next);
         }}
       >
-        <Select.Trigger className="sl-trigger">
+        <Select.Trigger className="sel-trigger">
           <Select.Value />
         </Select.Trigger>
         <Suspense
@@ -159,11 +159,11 @@ function ShippingDemo() {
         whenever its content changes.
       </p>
       <Select.Root
-        className="sl-select"
+        className="sel-select"
         defaultValue="standard"
         valueChangeAction={(next) => fakeSave("shipping", next)}
       >
-        <Select.Trigger className="sl-trigger">
+        <Select.Trigger className="sel-trigger">
           <Select.Value />
         </Select.Trigger>
         {["standard", "express"].map((v) => (

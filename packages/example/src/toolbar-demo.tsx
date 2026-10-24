@@ -8,6 +8,9 @@ import { Tooltip } from "@funstack/ui/tooltip";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
 import { sleep } from "./shared/fake-backend";
 import { Demo } from "./shared/Demo";
+// The tooltip and menu inside the toolbar reuse those demos' .tip and .menu rules.
+import "./menu-demo.css";
+import "./tooltip-demo.css";
 import "./toolbar-demo.css";
 
 const supportsFocusgroup =

@@ -230,7 +230,7 @@ function SelectAllDemo() {
         />
         Make the next save fail
       </label>
-      <div className="stack select-all">
+      <div className="stack">
         <label className="row">
           <Checkbox
             className="sc-checkbox"

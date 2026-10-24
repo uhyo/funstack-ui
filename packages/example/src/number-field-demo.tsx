@@ -151,8 +151,8 @@ function FormDemo() {
         Packs of six between 6 and 120. Typed values are not clamped: the hidden number input's own
         constraints report them; more than 48 fails on the server.
       </p>
-      <Form.Root action={formAction} errors={state.errors} className="nf-form">
-        <Field.Root name="quantity" className="nf-field">
+      <Form.Root action={formAction} errors={state.errors}>
+        <Field.Root name="quantity">
           <Field.Label className="nf-label">Packs</Field.Label>
           <NumberField.Root
             className="nf-root"
