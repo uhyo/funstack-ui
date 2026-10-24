@@ -507,8 +507,9 @@ export function ToastViewport({
 
   // --- The portal host (design 4.3) ------------------------------------------------------------
 
-  // A moved region gets no `pointerleave`: drop the hover pause; a pointer still over it enters
-  // it again on its next move.
+  // Keep this call before the region layout effect below: the host's move hides the popover
+  // (removal steps), which that effect shows again in the same commit. A moved region gets no
+  // `pointerleave`: drop the hover pause; a pointer still over it enters it again on its next move.
   const { portalled, host, anchorRef } = useModalPortalHost(() => setPause("hover", false));
 
   // --- After every commit: region, timers, queued announcements, orphan exits ----------------
