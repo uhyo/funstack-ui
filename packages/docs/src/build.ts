@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BuildEntryFunction } from "@funstack/static/server";
 import { collectSitePaths } from "./entries.js";
-import { SITE_URL } from "./pageMeta.js";
+import { SITE_URL } from "./site.js";
 
 function generateSitemap(): string {
   const pagePaths = collectSitePaths().filter((p) => p !== "/*");

@@ -1,5 +1,4 @@
-// Placeholder until the deployment target is decided (see wrangler.toml).
-export const SITE_URL = "https://ui.funstack.work";
+import { SITE_URL } from "./site.js";
 
 // Renders URL-related metadata for a page, derived from its route path.
 // Title and description tags are colocated with each page component via PageHead instead.

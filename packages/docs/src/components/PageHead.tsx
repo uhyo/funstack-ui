@@ -1,4 +1,4 @@
-const SITE_NAME = "FUNSTACK UI";
+import { SITE_NAME } from "../site.js";
 
 export interface PageHeadProps {
   /** Page-specific title. Omit for the home page, which uses the site-wide title. */
