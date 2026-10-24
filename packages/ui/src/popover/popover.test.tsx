@@ -33,6 +33,7 @@ import {
   setupUser,
   PlainButton,
   flushTasks,
+  hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { PopoverContext } from "./popover-context.js";
@@ -687,15 +688,15 @@ describe("Popover", () => {
   });
 
   describe("platform path", () => {
-    async function hydrate(ui: ReactNode) {
-      const container = document.createElement("div");
-      container.innerHTML = renderToString(ui);
-      document.body.append(container);
-      // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
-      container.querySelector<HTMLElement>("[popover]")!.showPopover();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      return render(ui, { container, hydrate: true });
-    }
+    const hydrate = (ui: ReactNode) =>
+      hydrateFromServer(ui, {
+        mutate: async (container) => {
+          // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+          container.querySelector<HTMLElement>("[popover]")!.showPopover();
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        },
+        flush: null,
+      });
 
     it("JS-free mode syncs aria-expanded for a pre-hydration open", async () => {
       await act(async () => {

@@ -14,7 +14,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
-import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
 import type { OverlayCloseIntent } from "../internal/use-overlay-root.js";
@@ -25,6 +24,7 @@ import {
   expectNotPending,
   expectPending,
   flushTasks,
+  hydrateFromServer,
   renderBoth,
   setupUser,
   silenceErrors,
@@ -880,15 +880,15 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
        * it inside `act`. `beforeHydrate` runs between the two (the spies of a row).
        */
       async function hydrate(ui: ReactNode, beforeHydrate?: () => void) {
-        const container = document.createElement("div");
-        container.innerHTML = renderToString(ui);
-        document.body.append(container);
-        await config.openBeforeHydration(
-          container.querySelector<HTMLElement>("[data-testid=popup]")!,
-        );
-        beforeHydrate?.();
-        await act(async () => {
-          render(ui, { container, hydrate: true });
+        await hydrateFromServer(ui, {
+          mutate: async (container) => {
+            await config.openBeforeHydration(
+              container.querySelector<HTMLElement>("[data-testid=popup]")!,
+            );
+            beforeHydrate?.();
+          },
+          inAct: true,
+          flush: null,
         });
       }
 

@@ -546,3 +546,12 @@ the same count Button, Toolbar and ToggleGroup assert. Titles: ToggleGroup's
 Select: nothing to convert. It has no `transition` prop; its "a pick never starts a document view
 transition" row is a different check (audit T7's second family) and stays.
 Mutation: both Items always passing `"none"` to `useTransitionBoundary`: both rows fail (Chromium).
+
+### Last private hydrate copies (commit 3j)
+
+The overlay open-state suite's `hydrate(ui, beforeHydrate)` (the old dialog/popover copy, moved
+there by the overlay-suite branch) and popover.test.tsx's platform-path `hydrate` now call
+`hydrateFromServer` (`mutate` opens the popup the way a pre-hydration click did; the suite
+hydrates `inAct`, popover's caller wraps it in `act`; `flush: null` as before). No title change.
+`hydrate: true` now appears only in helpers.tsx. Mutation: `mutate` without the pre-hydration
+open: 22 platform-path rows fail (7 suite rows x 3 drivers + the popover row).
