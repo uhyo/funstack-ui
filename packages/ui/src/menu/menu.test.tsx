@@ -13,7 +13,7 @@
 // and keep both rows.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
-import { StrictMode, Suspense, startTransition, useState } from "react";
+import { StrictMode, Suspense, startTransition, use, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
@@ -45,7 +45,12 @@ import type {
   MenuRootState,
   MenuTriggerState,
 } from "./index.js";
-import { recordClicks, spyHide, watchShow } from "../__tests__/overlay-helpers.js";
+import { recordClicks, spyHide, spyShow, watchShow } from "../__tests__/overlay-helpers.js";
+import {
+  createOverlayHarness,
+  describeOverlayOpenState,
+} from "../__tests__/overlay-open-state-suite.js";
+import { MenuContext } from "./menu-context.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
 
@@ -135,6 +140,83 @@ afterEach(() => {
     if (element.matches(":popover-open")) (element as HTMLElement).hidePopover();
   }
   document.body.innerHTML = "";
+});
+
+interface OpenStateHarnessProps {
+  trigger?: { disabled?: boolean } | false;
+  popup?: Partial<MenuPopupProps>;
+  /** Popup content; default: two items, `content` and the action-less `close`. */
+  content?: ReactNode;
+}
+
+/** The parity harness of the shared open-state suite (`createOverlayHarness`). */
+const OpenStateHarness = createOverlayHarness<MenuOpenChangeDetails, OpenStateHarnessProps>(
+  (rootProps, { trigger, popup, content }) => (
+    <Menu.Root {...rootProps}>
+      {trigger !== false && (
+        <Menu.Trigger data-testid="trigger" {...trigger}>
+          Actions
+        </Menu.Trigger>
+      )}
+      <Menu.Popup data-testid="popup" {...popup}>
+        {content ?? (
+          <>
+            <Menu.Item data-testid="content">Rename</Menu.Item>
+            <Menu.Item data-testid="close">Close</Menu.Item>
+          </>
+        )}
+      </Menu.Popup>
+    </Menu.Root>
+  ),
+);
+
+// Menu's open state is the same useOverlayRoot contract as Popover's. The part-initiated close is an
+// item's activation: a Trigger click while open moves focus out of the popup first, and the
+// `focusout` close hides the menu at once (design/components/menu.md 2.2). A dismissal is a
+// `hidePopover()` (Escape, light dismiss). Item actions, submenus and hover intent have their own
+// rows below.
+describeOverlayOpenState<MenuOpenChangeDetails>({
+  name: "Menu",
+  Harness: OpenStateHarness,
+  isOpen: () => isOpen(),
+  spyOpen: spyShow,
+  spyClose: spyHide,
+  openArgs: () => [{ source: trigger() }],
+  dismiss: () => popup().hidePopover(),
+  dismissEvent: "toggle",
+  partClose: (user) => user.click(screen.getByTestId("close")),
+  partCloseCancelsClick: false,
+  partCloseArgs: [],
+  returnValue: false,
+  detailsKeys: ["reason"],
+  triggerToggles: true,
+  ariaExpanded: true,
+  // A script's showPopover(): cancelled at `beforetoggle`, which is the dispatched event.
+  foreignOpen: () => {
+    let before!: Event;
+    popup().addEventListener("beforetoggle", (event) => (before = event), { once: true });
+    popup().showPopover();
+    return before;
+  },
+  foreignOpenCallsOpen: true,
+  // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+  openBeforeHydration: async (element) => {
+    element.showPopover();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  },
+  controlledOpenArgs: [undefined],
+  controlledCloseArgs: [],
+  closeIntents: {
+    // Library mode (Menu has no JS-free mode): `defaultOpen`; the popup's content is mounted only
+    // while open, so the probe is a child of the Root.
+    render: (probe) => (
+      <Menu.Root defaultOpen>
+        {probe}
+        <Menu.Popup data-testid="popup" aria-label="Probe" />
+      </Menu.Root>
+    ),
+    useIntents: () => use(MenuContext)!.popover,
+  },
 });
 
 describe("Menu", () => {

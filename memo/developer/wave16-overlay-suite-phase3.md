@@ -118,3 +118,32 @@ Mutations:
 4. use-popover-trigger.ts: the Trigger's close hides at once, before openChangeAction(false)
    settles: 9 failures, including S: part-initiated close (both), 11.13 (both), part close rejects
    (both) and the 11.14 veto row.
+
+### Commit 3: Menu (menu.test.tsx 107 -> 168 tests, nothing removed)
+
+Menu had almost no `openChangeAction` rows of its own (no rejection, refusal, overlap or superseded
+rows for the Root). It fits the suite with one difference: the part-initiated close is an action-
+less item's activation, not a Trigger click. A Trigger click while the menu is open moves focus to
+the Trigger first, and the root Popup's `focusout` hides the menu at once (design/components/menu.md
+2.2: "the one place Menu closes the way Dialog does"), so the menu is not open while
+`openChangeAction(false)` runs. Not a bug; the suite's Trigger-toggle rows (11.7, the open-then-close
+superseded rows, "a click while open dispatches (false, 'activate')") still run for Menu and pass.
+The item's click is not cancelled (no native command to replace): new suite parameter
+`partCloseCancelsClick` (Dialog, Popover `true`). The stale-intent row renders `<Menu.Root
+defaultOpen>` with the probe as a Root child (library mode cancels a native open; the popup's
+content mounts only while open): `closeIntents.open` became optional.
+
+No Menu row removed: the existing Root rows ("a controlled open flip ...", "mount with the popup
+already open ...", "items that suspend hold the open ...") also pin the autofocus target, Menu's
+own concern; they stay.
+
+Mutations (run on menu.test.tsx):
+1. menu-item.tsx: the item's close hides the popup at once, before openChangeAction(false)
+   settles: 7 failures, all suite rows (part-initiated close (both), 11.13 (both), part close
+   rejects (both), the 11.14 veto). Before this commit no Menu row caught it.
+2. use-popover-popup.ts: a dismissal reported as `"activate"`: 7 failures, including S: dismissal
+   (both), S: close intents (both).
+3. use-controllable-action.ts: latest-dispatch guard dropped: S: overlap 11.8 and 11.7
+   (uncontrolled) and the RadioGroup overlap row fail.
+4. use-overlay-root.ts: a stale intent never cleared: S: close intents > an intent is dropped ...
+   fails. Before this commit no Menu row caught it.

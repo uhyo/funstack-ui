@@ -169,9 +169,14 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
   readonly dismissEvent: string;
   /**
    * A library-owned close through a part, by a click (Dialog: the default content's Close part;
-   * Popover and Menu: the Trigger).
+   * Popover: the Trigger; Menu: an action-less item).
    */
   readonly partClose: (user: User) => Promise<void>;
+  /**
+   * `partClose`'s click is cancelled: the part is an invoker whose native close command the
+   * library replaces (Dialog's Close, Popover's Trigger); `false` for Menu's item, which has none.
+   */
+  readonly partCloseCancelsClick: boolean;
   /** The arguments of the library's close call after `partClose` (Dialog: the Close's `"x"`). */
   readonly partCloseArgs: readonly unknown[];
   /**
@@ -203,14 +208,15 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
   /** The close call's arguments for a controlled `open={false}` (Dialog: `""`, no part's value). */
   readonly controlledCloseArgs: readonly unknown[];
   /**
-   * The stale-intent rows: renders a JS-free Root whose Popup (`data-testid="popup"`) contains
-   * `probe`, reads the Root's context (`useIntents`) and opens the popup natively (`open`).
-   * Omit for a component without a JS-free mode.
+   * The stale-intent row: renders a Root (no open-state props: JS-free mode where there is one)
+   * with a Popup (`data-testid="popup"`) and `probe` where it renders at once, reads the Root's
+   * context (`useIntents`) and opens the popup (`open`: natively; omit when `render` already opens
+   * it, as Menu's `defaultOpen`, whose library mode would cancel a native open).
    */
   readonly closeIntents?: {
     readonly render: (probe: ReactNode) => ReactNode;
     readonly useIntents: () => CloseIntents;
-    readonly open: (popup: HTMLElement) => void;
+    readonly open?: (popup: HTMLElement) => void;
   };
 }
 
@@ -359,14 +365,14 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         action.mockImplementation(() => d.promise);
         const close = spyClose();
         await partClose(user);
-        // The click was cancelled (no native close command); the Root dispatched.
+        // The Root dispatched (a part with a native close command: its click was cancelled).
         expect(action).toHaveBeenCalledTimes(2);
         const [next, details] = action.mock.calls[1]!;
         expect(next).toBe(false);
         expect(details.reason).toBe("activate");
         if (config.returnValue) expect(returnValueOf(details)).toBe("x");
         expect(details.event!.type).toBe("click");
-        expect(details.event!.defaultPrevented).toBe(true);
+        expect(details.event!.defaultPrevented).toBe(config.partCloseCancelsClick);
         // Still open while the action runs; the Trigger shows the Root's pending.
         expect(isOpen()).toBe(true);
         expect(close).not.toHaveBeenCalled();
@@ -978,7 +984,8 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           }
           render(intents.render(<Probe />));
           const ctx = root! as CloseIntents;
-          act(() => intents.open(popup()));
+          if (intents.open) act(() => intents.open!(popup()));
+          expect(isOpen()).toBe(true);
           // A close that did not happen (a cancelled command): the popup is still open.
           ctx.recordCloseIntent({ reason: "activate", event: undefined });
           await flushTasks(1);

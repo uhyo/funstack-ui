@@ -55,7 +55,11 @@ import {
 import type { OverlayHarnessMode } from "../__tests__/overlay-open-state-suite.js";
 
 type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
-const controlModesWithStatic: readonly OverlayHarnessMode[] = ["uncontrolled", "controlled", "static"];
+const controlModesWithStatic: readonly OverlayHarnessMode[] = [
+  "uncontrolled",
+  "controlled",
+  "static",
+];
 
 interface PopoverHarnessProps {
   trigger?: Partial<PopoverTriggerProps> | false;
@@ -123,6 +127,7 @@ describeOverlayOpenState<PopoverOpenChangeDetails>({
   dismiss: () => popup().hidePopover(),
   dismissEvent: "toggle",
   partClose: (user) => user.click(trigger()),
+  partCloseCancelsClick: true,
   partCloseArgs: [],
   returnValue: false,
   detailsKeys: ["reason"],

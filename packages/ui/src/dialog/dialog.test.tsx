@@ -76,6 +76,7 @@ describeOverlayOpenState<DialogOpenChangeDetails>({
   dismiss: (value) => popup().requestClose(value),
   dismissEvent: "close",
   partClose: (user) => user.click(screen.getByTestId("close")),
+  partCloseCancelsClick: true,
   partCloseArgs: ["x"],
   returnValue: true,
   detailsKeys: ["reason", "returnValue"],
