@@ -488,7 +488,8 @@ State exposure (conventions 4.1), all booleans by presence:
 ### 5.1 Set, order, equality
 
 The Root normalises `value` / `defaultValue` to a `ReadonlySet<string>` at the prop boundary
-(`useMemo` on the array identity, as Accordion does) and calls `useControllableAction` with the
+(`useMemo` keyed on `JSON.stringify(value)`, as Accordion and ToggleGroup do, so an inline array
+with the same contents is unchanged; #108) and calls `useControllableAction` with the
 set. `next` handed to `valueChangeAction` is `fromSet(set)`: a fresh array sorted by the document
 order of the Items currently in the fieldset (read once per dispatch with
 `fieldset.querySelectorAll('input[type="checkbox"]')` filtered by `name === groupName`, which
