@@ -1101,6 +1101,20 @@ Rules:
   and a controlled `open={false}` are awaited and closed in the apply effect; Escape, Android
   back, AT dismiss and light dismiss are notified. The component doc lists which close is
   which.
+- **A part's library-owned close is the single source of that close** (Menu #110). Whatever the
+  press does on the way to the `click` must not trip one of the component's immediate,
+  browser-shaped closes first; otherwise the popup is gone before the action runs, the reason is
+  wrong (the notification's `"dismiss"` lands first and the click's dispatch is a no-op) and the
+  outcome depends on the engine. The known trap is the focus move of a `mousedown`: Chromium and
+  Firefox focus a button on press, WebKit does not. A component that closes on focus leaving
+  (Menu's Tab-out, Combobox's focus loss) therefore has the parts outside its popup
+  `preventDefault()` the `mousedown` while the popup is open (Combobox: always, the input must
+  keep focus; Menu's Trigger: while `intended()` is `true`, because an opening click must focus
+  the Trigger for the platform's focus return). Focus then stays inside through the pending close
+  in every engine and the popup hides in the close commit. jsdom cannot catch this class of bug
+  (user-event fires mousedown, mouseup and click in one task, so a `toggle` queued by the press
+  lands after the click); a browser row that asserts the reason and `document.activeElement`
+  across the click is required.
 
 ### 3.6 `disabled`
 
