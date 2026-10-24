@@ -10,7 +10,6 @@ import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 const transitionRow = (part: string) => ({
   name: "transition",
   type: "ViewTransitionClass",
-  default: "–",
   description: `Forwarded to the ${part}'s \`<ViewTransition default>\`; without it no boundary is rendered. Fires only on the commit that settles an action or rolls it back, never on the click itself. Keep it static.`,
 });
 

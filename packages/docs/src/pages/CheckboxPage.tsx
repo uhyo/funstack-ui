@@ -137,7 +137,6 @@ export function CheckboxPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: "–",
             description:
               "Forwarded to the Checkbox's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the check itself.",
           },

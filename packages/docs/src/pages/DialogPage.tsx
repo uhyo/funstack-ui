@@ -271,7 +271,6 @@ export function DialogPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: "–",
             description:
               "Library mode only. Forwarded to the `<ViewTransition>` around the dialog; without it no boundary is rendered. Animates the opening commit, content swaps while open, and every library-driven close (a Close part, a Form submit or settled action, a foreign close command, a controlled `open={false}`) in all engines. Dismissals (Escape, a click outside) are the browser's and animate with CSS only. Keep it static; any value makes a Root inserted by a transition run the page cross-fade.",
           },

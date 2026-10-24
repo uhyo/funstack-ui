@@ -89,7 +89,6 @@ export function SwitchPage() {
           {
             name: "transition",
             type: "ViewTransitionClass",
-            default: "–",
             description:
               "Forwarded to the Switch's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the flip; animate the flip with CSS on `:checked`.",
           },
