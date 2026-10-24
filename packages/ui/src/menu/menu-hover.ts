@@ -1,4 +1,4 @@
-"use client";
+// Hover intent of submenus. No "use client" directive: no hooks (conventions 7.1).
 import type { MenuContextValue } from "./menu-context.js";
 
 function hovered(element: Element | null): boolean {

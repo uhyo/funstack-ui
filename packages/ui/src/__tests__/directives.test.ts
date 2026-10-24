@@ -84,8 +84,6 @@ const clientFiles = [
   // Every Menu part, its context and helpers, and the hooks it shares with Popover, Dialog and
   // Tooltip (design/components/menu.md 13.1, "Directive").
   "menu/menu-context.mjs",
-  "menu/menu-dom.mjs",
-  "menu/menu-hover.mjs",
   "menu/menu-root.mjs",
   "menu/menu-trigger.mjs",
   "menu/menu-popup.mjs",
@@ -197,6 +195,15 @@ const clientFiles = [
 
 const directiveFreeFiles = [
   "index.mjs",
+  // Pure DOM helpers and constants of the overlays (conventions 7.1).
+  "menu/menu-dom.mjs",
+  "menu/menu-hover.mjs",
+  "menu/menu-outside.mjs",
+  "menu/menu-gestures.mjs",
+  "menu/menu-point.mjs",
+  "toast/toast-queue.mjs",
+  "toast/toast-hotkey.mjs",
+  "toast/toast-timers.mjs",
   "toggle/index.mjs",
   "accordion/index.mjs",
   "internal/action-details.mjs",

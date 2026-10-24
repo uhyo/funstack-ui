@@ -1,6 +1,6 @@
-"use client";
 // DOM helpers shared by the Menu parts. Items are read from the DOM when they are needed (a key
-// press, an open), never registered (design/components/menu.md 13 and 14).
+// press, an open), never registered (design/components/menu.md 13 and 14). No "use client"
+// directive: pure DOM reads (conventions 7.1).
 
 export const ITEM_SELECTOR = '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]';
 
