@@ -510,8 +510,8 @@ export interface PopoverTriggerProps
 ```
 
 Owned keys: `type` (`"button"`, on a `<button>` only), `popoverTarget` (on a `<button>` or a
-component render only: another element is no invoker, #115; `popoverTargetAction` is omitted too,
-the default `toggle` is never written), `disabled`, `aria-expanded`, `data-open`, `data-pending`,
+component render only: another element is no invoker, #115; `popoverTargetAction` is owned too
+and never written: the default `toggle`, which a `render` element cannot change; #121 review F7), `disabled`, `aria-expanded`, `data-open`, `data-pending`,
 `data-disabled`, and `onClick` only when installed (library mode; in JS-free mode the Trigger
 installs no handler and a `render` element's own `onClick` passes through). `commandfor` and
 `command` are omitted from the type as reserved keys (a second activation behaviour on the
