@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useTransition } from "react";
+import { useSupersededRejection } from "./use-superseded-rejection.js";
 
 export interface ActionTriggerOptions {
   /**
@@ -33,12 +34,6 @@ export interface ActionTrigger {
   readonly run: (work: () => unknown, then?: () => void) => boolean;
 }
 
-/** Reports an error that cannot reach a boundary (conventions 2.4: never swallow). */
-function report(error: unknown): void {
-  if (typeof reportError === "function") reportError(error);
-  else console.error(error);
-}
-
 /**
  * The transition of a pure-trigger part: an `action` with no state of its own (`Button`,
  * `Dialog.Close`, `Popover.Close`, `Menu.Item`, `Toast.Action`; conventions 3.4). A second `run`
@@ -53,25 +48,14 @@ function report(error: unknown): void {
 export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrigger {
   const { openGeneration, ignoreWhilePending = true } = options;
 
-  // Thrown before `useTransition` on purpose (see use-controllable-action.ts): in the retry of
-  // an errored render `useTransition` would suspend on the newer run's pending thenable.
-  const [supersededError, setSupersededError] = useState<{ readonly error: unknown } | null>(null);
-  const hasSupersededError = useRef(false);
-  if (supersededError !== null) throw supersededError.error;
+  // Before `useTransition` on purpose (see the hook).
+  const captureSuperseded = useSupersededRejection();
 
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
-  const mounted = useRef(false);
   // Runs whose work has not settled yet. Updated synchronously, so a second activation in the
   // same task (React's `pending` is still the stale render value) is seen (conventions 2.5).
   const inFlight = useRef(0);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   const run = (work: () => unknown, then?: () => void): boolean => {
     // The own counter only, not the rendered `pending` (design/components/button.md 5.2): after
@@ -89,14 +73,7 @@ export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrig
         inFlight.current--;
         // The latest run's rejection takes React's own route to the boundary.
         if (id === latest.current) throw error;
-        if (!mounted.current) return;
-        if (hasSupersededError.current) {
-          report(error);
-          return;
-        }
-        hasSupersededError.current = true;
-        // After an await, outside the transition: urgent, so the part re-renders and throws.
-        setSupersededError({ error });
+        captureSuperseded(error);
         return;
       }
       inFlight.current--;

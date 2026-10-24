@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { ActionDetails, ChangeAction } from "./types.js";
 import { useLatest } from "./use-latest.js";
+import { useSupersededRejection } from "./use-superseded-rejection.js";
 
 export interface UseControllableActionOptions<T, Details extends ActionDetails> {
   /** The controlled prop (`x`). `undefined` means uncontrolled. */
@@ -81,12 +82,6 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Reports an error that cannot reach a boundary (conventions 2.4: never swallow). */
-function report(error: unknown): void {
-  if (typeof reportError === "function") reportError(error);
-  else console.error(error);
-}
-
 /**
  * The one place the state model of conventions section 3 is implemented: committed state,
  * optimistic state (`useOptimistic`, reducer form), the component's own transition, the
@@ -99,17 +94,8 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const { controlled, defaultValue, initialValue, action, transitionTypes, reducer, warn } =
     options;
 
-  // React keeps only the newest thenable per `useTransition`, so a rejection from a dispatch that
-  // was superseded by a later one would be dropped entirely (no boundary, no `reportError`). The
-  // hook catches those itself, keeps the first, and throws it from render so it reaches the same
-  // nearest Error Boundary as the latest dispatch's rejection does through React.
-  //
-  // The throw sits before `useTransition` on purpose: React retries an errored render with every
-  // pending lane, and in that retry `useTransition` unwraps the still-pending action thenable and
-  // suspends, which would hold the boundary commit until the newer action settles.
-  const [supersededError, setSupersededError] = useState<{ readonly error: unknown } | null>(null);
-  const hasSupersededError = useRef(false);
-  if (supersededError !== null) throw supersededError.error;
+  // Before `useTransition` on purpose (see the hook).
+  const captureSuperseded = useSupersededRejection();
 
   const [internal, setInternal] = useState<T>(
     defaultValue === undefined ? initialValue : defaultValue,
@@ -124,16 +110,8 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
   const inFlight = useRef<{ count: number; next: T | undefined }>({ count: 0, next: undefined });
-  const mounted = useRef(false);
 
   useDevWarnings(isControlled, defaultValue !== undefined, warn);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   // The functions below keep one identity for the hook's lifetime, so the returned object changes
   // only with `committed`, `optimistic` and `pending`, and the components' memoised context values
@@ -163,17 +141,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
           settle();
           // The latest dispatch's rejection takes React's own route to the boundary.
           if (id === latest.current) throw error;
-          // Nothing to throw to once unmounted (React drops its own thenables the same way).
-          if (!mounted.current) return;
-          if (hasSupersededError.current) {
-            // One boundary reset per burst is enough; later errors are still reported.
-            report(error);
-            return;
-          }
-          hasSupersededError.current = true;
-          // Outside the transition by now (after an await), so this is an urgent update: the
-          // owner re-renders promptly and throws.
-          setSupersededError({ error });
+          captureSuperseded(error);
           return;
         }
         settle();
@@ -182,7 +150,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
         }
       });
     },
-    [props, settle, setOptimistic],
+    [props, settle, setOptimistic, captureSuperseded],
   );
 
   const latestInFlight = useCallback((): { readonly next: T } | null => {
