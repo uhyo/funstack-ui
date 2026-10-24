@@ -21,6 +21,9 @@ import {
   expectNotPending,
   expectPending,
   setupUser,
+  PlainButton,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
@@ -59,8 +62,6 @@ afterEach(() => {
 });
 
 // --- Helpers -------------------------------------------------------------------------------------
-
-const flush = () => act(async () => {});
 
 const root = () => screen.getByTestId("root");
 const input = () => screen.getByTestId("input") as HTMLInputElement;
@@ -309,7 +310,7 @@ describe("NumberField", () => {
     });
 
     it("warns for render type number, NaN, min > max, lang disagreement and an empty aria-label", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       document.documentElement.lang = "de";
       render(
         <>
@@ -328,7 +329,7 @@ describe("NumberField", () => {
     });
 
     it("does not warn about lang with a locale prop", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       document.documentElement.lang = "de";
       render(
         <NumberField.Root locale="en-US">
@@ -339,7 +340,7 @@ describe("NumberField", () => {
     });
 
     it("warns for compact notation", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <NumberField.Root locale="en-US" format={{ notation: "compact" }}>
           <NumberField.Input />
@@ -349,7 +350,7 @@ describe("NumberField", () => {
     });
 
     it("throws for a part outside a Root", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<NumberField.Input />)).toThrow(/inside a NumberField.Root/);
     });
   });
@@ -371,7 +372,7 @@ describe("NumberField", () => {
       expect(onCommit).not.toHaveBeenCalled();
       expectNotPending(root());
       await user.tab();
-      await flush();
+      await flushMicrotasks();
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onCommit).toHaveBeenCalledTimes(1);
       const [next, details] = onCommit.mock.calls[0]!;
@@ -391,7 +392,7 @@ describe("NumberField", () => {
       render(<Fixture mode={mode} onCommit={onCommit} />);
       typeText("7");
       const notPrevented = key("Enter");
-      await flush();
+      await flushMicrotasks();
       expect(notPrevented).toBe(true);
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toBe(7);
@@ -403,7 +404,7 @@ describe("NumberField", () => {
       render(<Fixture mode={mode} onCommit={onCommit} />);
       typeText("１２");
       key("Enter", { keyCode: 229 });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       expect(input().value).toBe("１２");
     });
@@ -431,7 +432,7 @@ describe("NumberField", () => {
       render(<Fixture mode={mode} onCommit={onCommit} />);
       typeText("7");
       key("Enter", { isComposing: true });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       expect(input().value).toBe("7");
     });
@@ -442,17 +443,17 @@ describe("NumberField", () => {
       render(<Fixture mode={mode} onChange={onChange} onCommit={onCommit} />);
       typeText("abc");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("1");
       expect(onCommit).not.toHaveBeenCalled();
       typeText("1,5");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("1");
       expect(onCommit).not.toHaveBeenCalled();
       typeText("");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toBeNull();
       expect(input().value).toBe("");
@@ -464,7 +465,7 @@ describe("NumberField", () => {
       render(<Fixture mode={mode} onCommit={onCommit} />);
       typeText("1.0");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       expect(input().value).toBe("1");
     });
@@ -474,12 +475,12 @@ describe("NumberField", () => {
       render(<Fixture mode={mode} onCommit={onCommit} rootProps={{ min: 0, max: 10, step: 2 }} />);
       typeText("11");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(onCommit.mock.calls[0]![0]).toBe(11);
       expect(hidden().validity.rangeOverflow).toBe(true);
       typeText("3");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(onCommit.mock.calls[1]![0]).toBe(3);
       expect(hidden().validity.stepMismatch).toBe(true);
       expect(input().validationMessage).toBe(hidden().validationMessage);
@@ -494,14 +495,14 @@ describe("NumberField", () => {
       expect(input()).toBeDisabled();
       expect(hidden()).toBeDisabled();
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       rerender(<Fixture mode={mode} onCommit={onCommit} rootProps={{ readOnly: true }} />);
       expect(input()).toHaveAttribute("readonly");
       expect(hidden()).toHaveAttribute("readonly");
       expect(inc()).toBeDisabled();
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
     });
   });
@@ -533,7 +534,7 @@ describe("NumberField", () => {
       ];
       for (const [k, init, expected] of rows) {
         const notPrevented = key(k, init);
-        await flush();
+        await flushMicrotasks();
         expect(notPrevented, k).toBe(false);
         expect(input().value, k).toBe(String(expected));
         expect(hidden().value, k).toBe(String(expected));
@@ -554,7 +555,7 @@ describe("NumberField", () => {
       );
       expect(key("Home", { shiftKey: true })).toBe(true);
       expect(key("End", { shiftKey: true })).toBe(true);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       expect(input().value).toBe("5");
     });
@@ -565,7 +566,7 @@ describe("NumberField", () => {
       expect(key("Home")).toBe(true);
       expect(key("End")).toBe(true);
       expect(key("ArrowUp", { altKey: true })).toBe(true);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
     });
 
@@ -574,12 +575,12 @@ describe("NumberField", () => {
       render(<Fixture mode={mode} onCommit={onCommit} />);
       typeText("5");
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("6");
       expect(onCommit.mock.calls[0]![0]).toBe(6);
       typeText("");
       key("ArrowDown");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("-1");
     });
 
@@ -589,11 +590,11 @@ describe("NumberField", () => {
       key("ArrowUp");
       key("ArrowUp", { repeat: true });
       key("ArrowUp", { repeat: true });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(3);
       expect(input().value).toBe("4");
       expect(key("ArrowUp", {}, inc())).toBe(true);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(3);
     });
   });
@@ -681,10 +682,10 @@ describe("NumberField", () => {
       pointer("pointerUp", inc(), { pointerId: 2 });
       expect(input().value).toBe("2");
       pointer("pointerUp", inc());
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       press(dec());
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(2);
       expect(onCommit.mock.calls[1]![0]).toBe(1);
     });
@@ -703,7 +704,7 @@ describe("NumberField", () => {
       act(() => {
         fireEvent.click(inc(), { detail: 0 });
       });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![1].source).toBe("increment");
       expect(onCommit.mock.calls[0]![1].event?.type).toBe("click");
@@ -713,13 +714,13 @@ describe("NumberField", () => {
       act(() => {
         fireEvent.click(inc(), { detail: 0 });
       });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(2);
       expect(input().value).toBe("3");
       act(() => {
         fireEvent.click(inc(), { detail: 1 });
       });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(2);
     });
 
@@ -732,7 +733,7 @@ describe("NumberField", () => {
       typeText("50");
       expect(inc()).toBeEnabled();
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("51");
       expect(onCommit.mock.calls[0]![0]).toBe(51);
       // An unparsable draft: the shown value decides.
@@ -756,14 +757,11 @@ describe("NumberField", () => {
       rerender(<Fixture mode="uncontrolled" onCommit={onCommit} rootProps={{ min: 1 }} />);
       expect(dec()).toBeDisabled();
       press(dec());
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
     });
 
     describe("disabled on component renders (#83, design/components/button.md 17.3)", () => {
-      function MyButton(props: ComponentPropsWithRef<"button">) {
-        return <button {...props} />;
-      }
       const cases = [
         ["the prop", { disabled: true }, {}],
         ["readOnly", {}, { readOnly: true }],
@@ -803,7 +801,7 @@ describe("NumberField", () => {
           vi.useFakeTimers();
           const onChange = vi.fn<Fn>();
           render(
-            <Box own={own} rootProps={rootProps} element={<MyButton />} onChange={onChange} />,
+            <Box own={own} rootProps={rootProps} element={<PlainButton />} onChange={onChange} />,
           );
           expect(inc()).toHaveAttribute("aria-disabled", "true");
           expect(inc()).not.toHaveAttribute("disabled");
@@ -823,7 +821,7 @@ describe("NumberField", () => {
             notCancelled = fireEvent.click(inc(), { detail: 1 });
           });
           expect(notCancelled).toBe(false);
-          await flush();
+          await flushMicrotasks();
           expect(onChange).not.toHaveBeenCalled();
           expect(input().value).toBe("1");
         },
@@ -833,7 +831,12 @@ describe("NumberField", () => {
         "disabled by %s with a component render: a press keeps focus in the input (review L3)",
         async (_, own, rootProps) => {
           render(
-            <Box own={own} rootProps={rootProps} element={<MyButton />} onChange={vi.fn<Fn>()} />,
+            <Box
+              own={own}
+              rootProps={rootProps}
+              element={<PlainButton />}
+              onChange={vi.fn<Fn>()}
+            />,
           );
           act(() => input().focus());
           expect(pointer("pointerDown", inc())).toBe(false); // the press is cancelled
@@ -858,7 +861,7 @@ describe("NumberField", () => {
       const d = deferred();
       render(<Fixture mode="uncontrolled" onCommit={() => d.promise} />);
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expectPending(inc());
       expectNotPending(dec());
       expectPending(root());
@@ -892,13 +895,13 @@ describe("NumberField", () => {
       const onCommit = vi.fn<Fn>();
       render(<Fixture mode="uncontrolled" onCommit={onCommit} rootProps={{ stepOnWheel: true }} />);
       expect(wheel(-1)).toBe(true);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       input().focus();
       expect(wheel(-1)).toBe(false);
       expect(wheel(-3)).toBe(false);
       expect(wheel(1)).toBe(false);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit.mock.calls.map((c) => c[0])).toEqual([2, 3, 2]);
       expect(onCommit.mock.calls[0]![1].source).toBe("wheel");
     });
@@ -908,7 +911,7 @@ describe("NumberField", () => {
       render(<Fixture mode="uncontrolled" onCommit={onCommit} />);
       input().focus();
       expect(wheel(-1)).toBe(true);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
     });
 
@@ -932,7 +935,7 @@ describe("NumberField", () => {
       });
       key("ArrowUp");
       expect(hidden().value).toBe("2");
-      await flush();
+      await flushMicrotasks();
       expect(inEvent).toBe("2");
     });
 
@@ -992,11 +995,11 @@ describe("NumberField", () => {
       );
       // 1 + 0.001 = 1.001, which the euro format shows as €1.00: rounded to 1, no change.
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       expect(hidden().value).toBe("1");
       key("PageUp");
-      await flush();
+      await flushMicrotasks();
       // + 0.01 (10 steps): €1.01, and the form posts 1.01.
       expect(input().value).toBe("€1.01");
       expect(onCommit.mock.calls[0]![0]).toBe(1.01);
@@ -1045,7 +1048,7 @@ describe("NumberField", () => {
       }
       render(<Probe />);
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       expect(input().value).toBe("2");
       await act(async () => d.resolve());
@@ -1071,10 +1074,10 @@ describe("NumberField", () => {
         </NumberField.Root>,
       );
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       // A step is not a re-entry: both steps ran.
       expect(onChange.mock.calls.map(([next]) => next)).toEqual([2, 3]);
       await act(async () => first.resolve());
@@ -1108,7 +1111,7 @@ describe("NumberField", () => {
       const d = deferred();
       render(<Fixture mode={mode} onCommit={() => d.promise} />);
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       expectPending(input());
       expectPending(inc());
@@ -1124,7 +1127,7 @@ describe("NumberField", () => {
 
   eachMode("rejection", (mode) => {
     it('reaches the boundary; uncontrolled reports the revert as a "dismiss" step', async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const caught = vi.fn();
       const onChange = vi.fn<Fn>();
@@ -1133,7 +1136,7 @@ describe("NumberField", () => {
       );
       typeText("5");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("5");
       onChange.mockClear();
       await act(async () => d.reject(new Error("save failed")));
@@ -1153,14 +1156,14 @@ describe("NumberField", () => {
     });
 
     it("after a retry the remounted field shows the value its parent holds", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       render(<Fixture mode={mode} onCommit={() => d.promise} retry />);
       press(inc());
-      await flush();
+      await flushMicrotasks();
       await act(async () => d.reject(new Error("x")));
       fireEvent.click(screen.getByRole("button", { name: "retry" }));
-      await flush();
+      await flushMicrotasks();
       const expected = mode === "adopt" ? "2" : "1";
       expect(input().value).toBe(expected);
       expect(hidden().value).toBe(expected);
@@ -1180,7 +1183,7 @@ describe("NumberField", () => {
         />,
       );
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("2");
       expectNotPending(root());
     });
@@ -1218,7 +1221,7 @@ describe("NumberField", () => {
       render(<Parent d={d.promise} onChange={onChange} />);
       typeText("5");
       blur();
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       expect(input().value).toBe("5");
       await act(async () => d.reject(new Error("save failed")));
@@ -1233,7 +1236,7 @@ describe("NumberField", () => {
       render(<Parent d={d.promise} />);
       typeText("5");
       blur();
-      await flush();
+      await flushMicrotasks();
       typeText("7");
       await act(async () => d.reject(new Error("x")));
       expect(input().value).toBe("7");
@@ -1307,11 +1310,11 @@ describe("NumberField", () => {
         .mockImplementationOnce(() => second.promise);
       render(<Fixture mode={mode} onCommit={onCommit} />);
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       typeText("9");
       expect(input().value).toBe("9");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(2);
       await act(async () => first.resolve());
       expectPending(root());
@@ -1323,7 +1326,7 @@ describe("NumberField", () => {
     });
 
     it("surfaces the superseded commit's rejection", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const first = deferred();
       const second = deferred();
       const caught = vi.fn();
@@ -1333,9 +1336,9 @@ describe("NumberField", () => {
         .mockImplementationOnce(() => second.promise);
       render(<Fixture mode={mode} onCommit={onCommit} boundary={caught} />);
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       await act(async () => first.reject(new Error("older")));
       if (mode === "adopt") {
         expect(caught).not.toHaveBeenCalled();
@@ -1349,7 +1352,7 @@ describe("NumberField", () => {
     });
 
     it("the older rejects after the newer resolved", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const first = deferred();
       const second = deferred();
       const caught = vi.fn();
@@ -1359,9 +1362,9 @@ describe("NumberField", () => {
         .mockImplementationOnce(() => second.promise);
       render(<Fixture mode={mode} onCommit={onCommit} boundary={caught} />);
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       await act(async () => second.resolve());
       await act(async () => first.reject(new Error("older")));
       expect(caught).toHaveBeenCalledTimes(1);
@@ -1403,7 +1406,7 @@ describe("NumberField", () => {
     container.innerHTML = renderToString(ui);
     mutate(container);
     render(ui, { container, hydrate: true });
-    await flush();
+    await flushMicrotasks();
     return container;
   }
 
@@ -1452,7 +1455,7 @@ describe("NumberField", () => {
       expect(hidden().value).toBe("1");
       // The blur resolves it by the ordinary rule: `12,` is not a number under en-US, so it reverts.
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       expect(input().value).toBe("1");
     });
@@ -1466,7 +1469,7 @@ describe("NumberField", () => {
       expect(onCommit).not.toHaveBeenCalled();
       expect(input().value).toBe("6");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toBe(6);
     });
@@ -1498,7 +1501,7 @@ describe("NumberField", () => {
       const onCommit = vi.fn<Fn>();
       render(<InForm initial={1000} onChange={onChange} onCommit={onCommit} />);
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("1,001");
       onChange.mockClear();
       onCommit.mockClear();
@@ -1510,7 +1513,7 @@ describe("NumberField", () => {
         });
       });
       await act(async () => form.reset());
-      await flush();
+      await flushMicrotasks();
       expect(visibleDefault).toBe("1,000");
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onCommit).toHaveBeenCalledTimes(1);
@@ -1526,18 +1529,18 @@ describe("NumberField", () => {
       const onCommit = vi.fn<Fn>();
       render(<InForm onCommit={onCommit} />);
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       onCommit.mockClear();
       const form = screen.getByTestId("form") as HTMLFormElement;
       const cancel = (e: Event) => e.preventDefault();
       form.addEventListener("reset", cancel);
       await act(async () => fireEvent.click(screen.getByTestId("reset")));
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       form.removeEventListener("reset", cancel);
       typeText("8");
       await act(async () => fireEvent.click(screen.getByTestId("reset")));
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(input().value).toBe("1");
     });
@@ -1559,11 +1562,11 @@ describe("NumberField", () => {
         </form>,
       );
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       onCommit.mockClear();
       await act(async () => fireEvent.click(screen.getByTestId("submit")));
-      await flush();
-      await flush();
+      await flushMicrotasks();
+      await flushMicrotasks();
       expect(submitted).toHaveBeenCalledWith("2");
       expect(onCommit).toHaveBeenCalledWith(1, expect.objectContaining({ reason: "platform" }));
       expect(input().value).toBe("1");
@@ -1591,10 +1594,10 @@ describe("NumberField", () => {
       }
       render(<Refusing />);
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("2");
       await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
-      await flush();
+      await flushMicrotasks();
       expect(input().value).toBe("2");
       expect(hidden().value).toBe("2");
     });
@@ -1670,7 +1673,7 @@ describe("NumberField", () => {
           <Field.Description data-testid="desc">Packs of six.</Field.Description>
         </Field.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       const fieldLabel = screen.getByTestId("field-label");
       expect(fieldLabel).toHaveAttribute("for", input().id);
       expect(screen.getByTestId("label")).toHaveAttribute("for", input().id);
@@ -1707,12 +1710,12 @@ describe("NumberField", () => {
       );
       typeText("7");
       blur();
-      await flush();
+      await flushMicrotasks();
       // jsdom has no `:user-invalid`: a submission attempt (an `invalid` event) shows it.
       act(() => {
         input().dispatchEvent(new Event("invalid", { cancelable: true }));
       });
-      await flush();
+      await flushMicrotasks();
       expect(seen?.stepMismatch).toBe(true);
       expect(seen?.message).toBe(hidden().validationMessage);
       expect(input().validationMessage).toBe(hidden().validationMessage);
@@ -1731,13 +1734,13 @@ describe("NumberField", () => {
           </Field.Root>
         </form>,
       );
-      await flush();
+      await flushMicrotasks();
       validate.mockClear();
       typeText("7");
-      await flush();
+      await flushMicrotasks();
       expect(validate).toHaveBeenLastCalledWith("6", expect.any(FormData));
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(validate).toHaveBeenLastCalledWith("7", expect.any(FormData));
       expect(hidden().validity.customError).toBe(true);
       expect(hidden().validationMessage).toBe("Sold in packs of six.");
@@ -1764,7 +1767,7 @@ describe("NumberField", () => {
       await act(async () => {
         (screen.getByTestId("form") as HTMLFormElement).requestSubmit();
       });
-      await flush();
+      await flushMicrotasks();
       const visibleEvent = events.find((e) => e.target === input());
       const hiddenEvent = events.find((e) => e.target === hidden());
       expect(hiddenEvent?.defaultPrevented).toBe(true);
@@ -1801,7 +1804,7 @@ describe("NumberField", () => {
           </Field.Root>
         </Form.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("error")).toHaveTextContent("Only 24 left.");
       expect(input()).toHaveAttribute("aria-invalid", "true");
       expect(root()).toHaveAttribute("data-invalid", "");
@@ -1809,7 +1812,7 @@ describe("NumberField", () => {
       expect(hidden().validationMessage).toBe("Only 24 left.");
       expect(input().validationMessage).toBe("Only 24 left.");
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expect(screen.queryByTestId("error")).toBeNull();
       expect(input().validationMessage).toBe("");
     });
@@ -1838,10 +1841,10 @@ describe("NumberField", () => {
         );
       }
       render(<Latest />);
-      await flush();
+      await flushMicrotasks();
       fireEvent.click(screen.getByText("change default"));
       await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledWith(5, expect.objectContaining({ reason: "platform" }));
       expect(input().value).toBe("5");
       expect(screen.getByTestId("error")).toHaveTextContent("Only 24 left.");
@@ -1862,7 +1865,7 @@ describe("NumberField", () => {
         </Field.Root>,
       );
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       expectPending(input());
       expectPending(inc());
@@ -1878,11 +1881,11 @@ describe("NumberField", () => {
           </NumberField.Root>
         </Field.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("field")).toHaveAttribute("data-required", "");
       typeText("");
       blur();
-      await flush();
+      await flushMicrotasks();
       expect(hidden().validity.valueMissing).toBe(true);
       expect(input().validationMessage).toBe(hidden().validationMessage);
       expect(input().validationMessage).not.toBe("");
@@ -2029,7 +2032,7 @@ describe("NumberField", () => {
       expect(input().style.width).toBe("1ch");
       expect(inc()).toHaveClass("on");
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expect(root()).toHaveClass("pending");
       expect(inc()).toHaveTextContent("…");
       expect(inc()).toHaveClass("off");
@@ -2057,7 +2060,7 @@ describe("NumberField", () => {
       expect(inc()).not.toHaveAttribute("type");
       expect(inc().tagName).toBe("A");
       key("ArrowUp");
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledWith(2, expect.anything());
     });
   });
@@ -2067,7 +2070,7 @@ describe("NumberField", () => {
       const d = deferred();
       render(<Fixture mode="commit" onCommit={() => d.promise} />);
       press(inc());
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("parent")).toHaveTextContent("1");
       expect(input().value).toBe("2");
       await act(async () => d.resolve());

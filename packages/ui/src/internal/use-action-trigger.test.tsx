@@ -3,7 +3,7 @@
 // cover it through their own suites; these rows pin the default and the opt-out.
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { deferred, ErrorCatcher } from "../__tests__/helpers.js";
+import { deferred, ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import type { ActionTrigger, ActionTriggerOptions } from "./use-action-trigger.js";
 
@@ -63,7 +63,7 @@ describe("useActionTrigger: re-entry (default)", () => {
   });
 
   it("the run's rejection reaches the boundary above the part", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     const caught = vi.fn();
     const { hook, caught: catcher } = setup(undefined, caught);
     const first = deferred();
@@ -95,7 +95,7 @@ describe("useActionTrigger: ignoreWhilePending: false (the continuous controls)"
   });
 
   it("a superseded rejection still reaches the boundary (moved from the Close / Item rows, #81)", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     const caught = vi.fn();
     const { hook } = setup({ ignoreWhilePending: false }, caught);
     const runs = [deferred(), deferred()];
@@ -110,7 +110,7 @@ describe("useActionTrigger: ignoreWhilePending: false (the continuous controls)"
   });
 
   it("a superseded rejection after the newer run resolved still reaches the boundary", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     const caught = vi.fn();
     const { hook } = setup({ ignoreWhilePending: false }, caught);
     const runs = [deferred(), deferred()];

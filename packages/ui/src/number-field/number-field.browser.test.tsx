@@ -13,7 +13,7 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { cdp, userEvent } from "vitest/browser";
-import { ErrorCatcher } from "../__tests__/helpers.js";
+import { ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
 import { Field } from "../field/index.js";
@@ -659,7 +659,7 @@ describe("NumberField (browser)", () => {
         return original(arg);
       }) as typeof document.startViewTransition);
     }
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     const caught = vi.fn();
     let reject!: (error: Error) => void;
     const onChange = vi.fn<Fn>();

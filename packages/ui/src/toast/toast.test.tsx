@@ -25,6 +25,8 @@ import {
   expectNotPending,
   expectPending,
   setupUser,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { createToastManager, Toast, toast } from "./index.js";
@@ -85,13 +87,6 @@ const root = (id: string) => screen.getByTestId(`toast-${id}`);
 const queryRoot = (id: string) => screen.queryByTestId(`toast-${id}`);
 const roots = () => [...region().querySelectorAll('[role="dialog"], [role="alertdialog"]')];
 
-/** Lets the manager's microtask and React's work after it run. */
-const flush = () =>
-  act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-
 /** Calls into the manager and lets the microtask dispatch commit. */
 async function call<T>(fn: () => T): Promise<T> {
   let result!: T;
@@ -128,10 +123,6 @@ afterEach(() => {
   }
   document.body.innerHTML = "";
 });
-
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
 
 // --- Tests ---------------------------------------------------------------------------------------
 
@@ -279,7 +270,7 @@ describe("Toast", () => {
       expect([...seen]).toEqual([a]);
       // Queued beyond `limit`: dismissed without rendering, `closeAction` still runs.
       await call(() => manager.dismiss(b));
-      await flush();
+      await flushMicrotasks(2);
       expect([...seen]).toEqual([a]);
       expect(closeAction).toHaveBeenCalledWith(
         expect.objectContaining({ id: b, reason: "dismiss" }),
@@ -303,7 +294,7 @@ describe("Toast", () => {
         manager.dismiss();
         return manager({ title: "Saved", closeAction: second });
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(a)).toBeNull();
       expect(root(b)).toHaveTextContent("Saved");
       expect(root(b)).not.toHaveAttribute("data-ending");
@@ -325,7 +316,7 @@ describe("Toast", () => {
         manager.dismiss("sync");
         manager({ id: "sync", title: "Synced", closeAction: second });
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(root("sync")).toHaveTextContent("Synced");
       expect(root("sync")).not.toHaveAttribute("data-ending");
       expect(first).toHaveBeenCalledTimes(1);
@@ -339,7 +330,7 @@ describe("Toast", () => {
       await act(async () => {
         vi.advanceTimersByTime(1);
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot("sync")).toBeNull();
       expect(second.mock.calls[0]![0]).toMatchObject({ reason: "timeout" });
     });
@@ -352,7 +343,7 @@ describe("Toast", () => {
         manager.dismiss();
         return added;
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
       expect(closeAction.mock.calls[0]![0]).toMatchObject({ id, reason: "dismiss" });
     });
@@ -418,7 +409,7 @@ describe("Toast", () => {
         manager({ title: "Plain" });
         await Promise.resolve();
       });
-      await flush();
+      await flushMicrotasks(2);
       expectPending(screen.getByTestId("slow"));
       expect(roots().map((r) => r.querySelector("div")?.textContent)).toEqual([
         "From the sync prefix",
@@ -481,7 +472,7 @@ describe("Toast", () => {
         ok.resolve("A");
         bad.reject(new Error("B"));
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(roots().map((r) => r.querySelector("div")?.textContent)).toEqual(["ok A", "bad B"]);
       expect(roots()[1]).toHaveAttribute("role", "alertdialog");
     });
@@ -523,7 +514,7 @@ describe("Toast", () => {
       });
       await expect(r1Settled).resolves.toBe(failure);
       await expect(r2).resolves.toBe(1);
-      await flush();
+      await flushMicrotasks(2);
       expect(roots()).toHaveLength(0);
     });
 
@@ -548,7 +539,7 @@ describe("Toast", () => {
         (e: unknown) => e,
       );
       await act(async () => d.resolve(undefined));
-      await flush();
+      await flushMicrotasks(2);
       expect(await settled).toBe(bug);
       expect(queryRoot("p")).toBeNull();
     });
@@ -572,7 +563,7 @@ describe("Toast", () => {
         (e: unknown) => e,
       );
       await act(async () => d.reject(new Error("network")));
-      await flush();
+      await flushMicrotasks(2);
       expect(await settled).toBe(bug);
       expect(queryRoot("p")).toBeNull();
     });
@@ -586,10 +577,10 @@ describe("Toast", () => {
           error: { title: "Could not archive", priority: "high" },
         });
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenLastCalledWith("Archiving…", { priority: "normal" });
       await act(async () => d.reject(new Error("x")));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenLastCalledWith("Could not archive", { priority: "high" });
       expect(ariaNotify).toHaveBeenCalledTimes(2);
     });
@@ -605,7 +596,7 @@ describe("Toast", () => {
         manager({ title: "Archived", action: { label: "Undo", action }, closeAction }),
       );
       await user.click(screen.getByTestId(`action-${id}`));
-      await flush();
+      await flushMicrotasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       const details = action.mock.calls[0]![0] as ToastActionDetails;
       expect(details.id).toBe(id);
@@ -644,7 +635,7 @@ describe("Toast", () => {
       expect(button).toHaveAttribute("type", "button");
       button.focus();
       await user.keyboard("{Enter}");
-      await flush();
+      await flushMicrotasks(2);
       expect(action).toHaveBeenCalledTimes(1);
     });
 
@@ -679,7 +670,7 @@ describe("Toast", () => {
       expect(button).toHaveAttribute("type", "button");
       expect(button).not.toHaveAttribute("command");
       await user.click(button);
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
       expect(closeAction).toHaveBeenCalledTimes(1);
       expect(closeAction.mock.calls[0]![0]).toMatchObject({ id, reason: "dismiss" });
@@ -711,7 +702,7 @@ describe("Toast", () => {
       });
       expect(queryRoot(id)).not.toBeNull();
       await act(async () => d.resolve());
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
       expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
@@ -736,7 +727,7 @@ describe("Toast", () => {
       });
       expectPending(screen.getByTestId("root"));
       await act(async () => d.resolve());
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("root")).toBeInTheDocument();
       expectNotPending(screen.getByTestId("root"));
     });
@@ -756,7 +747,7 @@ describe("Toast", () => {
       });
       const failure = new Error("undo failed");
       await act(async () => d.reject(failure));
-      await flush();
+      await flushMicrotasks(2);
       expect(errors).toEqual([failure]);
       expect(screen.getByTestId("error-catcher")).toHaveTextContent("undo failed");
     });
@@ -781,7 +772,7 @@ describe("Toast", () => {
         fireEvent.click(screen.getByTestId(`action-${id}`));
       });
       await act(async () => d.reject(new Error("x")));
-      await flush();
+      await flushMicrotasks(2);
       expect(last?.toasts.map((t) => [t.id, t.ending, t.pending])).toEqual([[id, false, false]]);
     });
 
@@ -805,7 +796,7 @@ describe("Toast", () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId(`action-${id}`));
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
     });
 
@@ -845,7 +836,7 @@ describe("Toast", () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId(`action-${id}`));
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(errors).toHaveLength(1);
       expect(last?.toasts.map((t) => t.title)).toEqual(["Could not undo"]);
     });
@@ -891,7 +882,7 @@ describe("Toast", () => {
       });
       expect(queryRoot(id)).not.toBeNull();
       await act(async () => d.resolve());
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
       expect(closeAction).toHaveBeenCalledTimes(1);
       expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
@@ -924,7 +915,7 @@ describe("Toast", () => {
       expect(undo).toHaveBeenCalledTimes(1);
       const failure = new Error("undo failed");
       await act(async () => d.reject(failure));
-      await flush();
+      await flushMicrotasks(2);
       expect(errors).toEqual([failure]);
       // The boundary above the list replaced it; the toast itself was not closed.
       expect(screen.getByTestId("error-catcher")).toHaveTextContent("undo failed");
@@ -960,7 +951,7 @@ describe("Toast", () => {
       expect(undo).toHaveBeenCalledTimes(1);
       const failure = new Error("older");
       await act(async () => d.reject(failure));
-      await flush();
+      await flushMicrotasks(2);
       expect(errors).toEqual([failure]);
     });
 
@@ -997,24 +988,24 @@ describe("Toast", () => {
       await act(async () => {
         vi.advanceTimersByTime(5000);
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(reasons).toEqual(["a:timeout"]);
       expect(queryRoot(a)).toBeNull();
       await act(async () => {
         fireEvent.click(screen.getByTestId(`close-${b}`));
       });
-      await flush();
+      await flushMicrotasks(2);
       act(() => root(c).focus());
       await act(async () => {
         fireEvent.keyDown(root(c), { key: "Escape" });
       });
-      await flush();
+      await flushMicrotasks(2);
       await call(() => manager.dismiss(e));
-      await flush();
+      await flushMicrotasks(2);
       expect(reasons).toEqual(["a:timeout", "b:dismiss", "c:dismiss", "e:dismiss"]);
       // Idempotent: a second dismissal of a gone toast does nothing.
       await call(() => manager.dismiss(e));
-      await flush();
+      await flushMicrotasks(2);
       expect(reasons).toHaveLength(4);
     });
 
@@ -1054,7 +1045,7 @@ describe("Toast", () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId(`close-${id}`));
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(errors).toEqual([failure]);
     });
 
@@ -1063,10 +1054,10 @@ describe("Toast", () => {
       const { unmount } = render(<Harness manager={manager} />);
       const id = await call(() => manager({ title: "Keep me", closeAction }));
       unmount();
-      await flush();
+      await flushMicrotasks(2);
       expect(closeAction).not.toHaveBeenCalled();
       render(<Harness manager={manager} />);
-      await flush();
+      await flushMicrotasks(2);
       expect(root(id)).toHaveTextContent("Keep me");
     });
   });
@@ -1075,16 +1066,16 @@ describe("Toast", () => {
     it("does not announce a restored toast again", async () => {
       const { unmount } = render(<Harness manager={manager} />);
       const id = await call(() => manager({ title: "Archived", duration: null }));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledTimes(1);
       unmount();
       render(<Harness manager={manager} />);
-      await flush();
+      await flushMicrotasks(2);
       expect(root(id)).toHaveTextContent("Archived");
       expect(ariaNotify).toHaveBeenCalledTimes(1);
       // A changed text is still announced.
       await call(() => manager.update(id, { title: "Archived 2" }));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenLastCalledWith("Archived 2", { priority: "normal" });
     });
   });
@@ -1175,7 +1166,7 @@ describe("Toast", () => {
       await advance(10_000);
       expect(roots()).toHaveLength(1);
       await act(async () => d.resolve());
-      await flush();
+      await flushMicrotasks(2);
       await advance(1000);
       expect(roots()).toHaveLength(0);
     });
@@ -1316,10 +1307,10 @@ describe("Toast", () => {
       // Escape returns focus to where it was before F8.
       await user.keyboard("{ArrowUp}");
       await user.keyboard("{Escape}");
-      await flush();
+      await flushMicrotasks(2);
       expect(root(b)).toHaveFocus();
       await user.keyboard("{Escape}");
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("outside")).toHaveFocus();
     });
 
@@ -1410,11 +1401,11 @@ describe("Toast", () => {
       );
       act(() => screen.getByTestId(`close-${ids[1]!}`).focus());
       await user.keyboard("{Escape}");
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(ids[1]!)).toBeNull();
       expect(root(ids[2]!)).toHaveFocus();
       await user.keyboard("{Escape}");
-      await flush();
+      await flushMicrotasks(2);
       expect(root(ids[0]!)).toHaveFocus();
     });
 
@@ -1427,7 +1418,7 @@ describe("Toast", () => {
       await user.tab();
       expect(root(id)).toHaveFocus();
       await user.click(screen.getByTestId(`close-${id}`));
-      await flush();
+      await flushMicrotasks(2);
       expect(outside).toHaveFocus();
 
       const other = await call(() => manager({ title: "B", duration: null }));
@@ -1456,7 +1447,7 @@ describe("Toast", () => {
       const r = root(slow);
       expectNotPending(r);
       expect(r).not.toHaveTextContent("avatar");
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledTimes(1);
       expect(ariaNotify).toHaveBeenLastCalledWith("Plain", { priority: "normal" });
       await act(async () => {
@@ -1467,7 +1458,7 @@ describe("Toast", () => {
         resolve("avatar", "Ada");
         await vi.advanceTimersByTimeAsync(400);
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(root(slow)).toHaveTextContent("Ada");
       expect(ariaNotify).toHaveBeenLastCalledWith("Ada", { priority: "normal" });
       await act(async () => {
@@ -1522,7 +1513,7 @@ describe("Toast", () => {
       const id = await call(() =>
         manager({ title: <Suspender value="avatar" />, description: "joined", duration: 1000 }),
       );
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.queryByTestId("app-fallback")).toBeNull();
       const r = root(id);
       // In the same commit as the add: the boundary is new, so its fallback shows at once.
@@ -1538,7 +1529,7 @@ describe("Toast", () => {
         resolve("avatar", "Ada");
         await vi.advanceTimersByTimeAsync(400);
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.queryByTestId("skeleton")).toBeNull();
       expect(root(id)).toHaveTextContent("Adajoined");
       expect(ariaNotify).toHaveBeenCalledTimes(1);
@@ -1570,14 +1561,14 @@ describe("Toast", () => {
         />,
       );
       const id = await call(() => manager({ title: "Uploading", duration: 1000 }));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenLastCalledWith("Uploading", { priority: "normal" });
       expect(screen.queryByTestId("skeleton")).toBeNull();
       await act(async () => {
         vi.advanceTimersByTime(500);
       });
       await call(() => manager.update(id, { title: <Suspender value="done" /> }));
-      await flush();
+      await flushMicrotasks(2);
       expect(root(id)).toContainElement(screen.getByTestId("skeleton"));
       expectNotPending(root(id));
       await act(async () => {
@@ -1592,7 +1583,7 @@ describe("Toast", () => {
         resolve("done", "Uploaded");
         await vi.advanceTimersByTimeAsync(400);
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.queryByTestId("skeleton")).toBeNull();
       expect(root(id)).toHaveTextContent("Uploaded");
       expect(ariaNotify).toHaveBeenCalledTimes(2);
@@ -1611,7 +1602,7 @@ describe("Toast", () => {
         <Harness manager={manager} list={fallbackList(<Toast.Title>Loading…</Toast.Title>)} />,
       );
       const id = await call(() => manager({ title: <Suspender value="avatar" />, duration: 1000 }));
-      await flush();
+      await flushMicrotasks(2);
       const r = root(id);
       expect(r).toHaveAccessibleName("Loading…");
       expect(ariaNotify).not.toHaveBeenCalled();
@@ -1624,7 +1615,7 @@ describe("Toast", () => {
         resolve("avatar", "Ada");
         await vi.advanceTimersByTimeAsync(400);
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(root(id)).toHaveAccessibleName("Ada");
       expect(ariaNotify).toHaveBeenCalledTimes(1);
       expect(ariaNotify).toHaveBeenCalledWith("Ada", { priority: "normal" });
@@ -1657,14 +1648,14 @@ describe("Toast", () => {
       await call(() =>
         manager({ title: <Suspender value="x" />, description: "joined", duration: null }),
       );
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("root")).toHaveTextContent("Loading…");
       expect(ariaNotify).not.toHaveBeenCalled();
       await act(async () => {
         resolve("x", "Ada");
         await vi.advanceTimersByTimeAsync(400);
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("root")).toHaveTextContent("Ada");
       // One announcement for the Title and Description revealed together.
       expect(ariaNotify).toHaveBeenCalledTimes(1);
@@ -1679,7 +1670,7 @@ describe("Toast", () => {
         manager({ title: "Saved", description: "All good" });
       });
       expect(ariaNotify).not.toHaveBeenCalled();
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledTimes(1);
       expect(ariaNotify).toHaveBeenCalledWith("Saved All good", { priority: "normal" });
     });
@@ -1689,13 +1680,13 @@ describe("Toast", () => {
         <Harness manager={manager} limit={10} announce={(t) => `Viewport: ${String(t.title)}`} />,
       );
       await call(() => manager({ title: "A" }));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenLastCalledWith("Viewport: A", { priority: "normal" });
       await call(() => manager({ title: "B", announce: (t) => `Own: ${String(t.title)}` }));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenLastCalledWith("Own: B", { priority: "normal" });
       await call(() => manager({ title: "C", announce: () => null }));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledTimes(2);
     });
 
@@ -1705,7 +1696,7 @@ describe("Toast", () => {
         manager({ title: "One" });
         manager({ title: "Two", priority: "high" });
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledTimes(1);
       expect(ariaNotify).toHaveBeenCalledWith("One Two", { priority: "high" });
     });
@@ -1713,11 +1704,11 @@ describe("Toast", () => {
     it("does not announce an update with unchanged text, nor a dismissal", async () => {
       render(<Harness manager={manager} />);
       const id = await call(() => manager({ title: "A" }));
-      await flush();
+      await flushMicrotasks(2);
       await call(() => manager.update(id, { type: "info" }));
-      await flush();
+      await flushMicrotasks(2);
       await call(() => manager.dismiss(id));
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledTimes(1);
     });
 
@@ -1727,7 +1718,7 @@ describe("Toast", () => {
         manager({ title: "Shown" });
         manager({ title: "Waiting", description: "in line" });
       });
-      await flush();
+      await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledWith("Shown Waiting in line", { priority: "normal" });
     });
 
@@ -1735,7 +1726,7 @@ describe("Toast", () => {
       delete (document as unknown as { ariaNotify?: unknown }).ariaNotify;
       render(<Harness manager={manager} />);
       await call(() => manager({ title: "A" }));
-      await flush();
+      await flushMicrotasks(2);
       expect(roots()).toHaveLength(1);
     });
   });
@@ -1805,7 +1796,7 @@ describe("Toast", () => {
       await call(() => manager.dismiss(a));
       expect(root(a)).toHaveAttribute("data-ending", "");
       await act(async () => finishExit());
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(a)).toBeNull();
 
       // No exit animation of its own: dropped at once, the progress bar notwithstanding.
@@ -1850,7 +1841,7 @@ describe("Toast", () => {
       ]);
       expect(root(ids[1]!)).toHaveAttribute("data-ending", "");
       await act(async () => animations.get(ids[1]!)!());
-      await flush();
+      await flushMicrotasks(2);
       expect(last?.toasts.map((t) => t.id)).toEqual([ids[0], ids[2]]);
     });
   });
@@ -1958,7 +1949,7 @@ describe("Toast", () => {
       expect(element).toBe(r);
       act(() => r.focus());
       await user.keyboard("{Escape}");
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.queryByTestId("root")).toBeNull();
       void id;
     });
@@ -2002,7 +1993,7 @@ describe("Toast", () => {
           <Toast.Viewport manager={manager} data-testid="two" />
         </>,
       );
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("one")).toBeInTheDocument();
       expect(screen.queryByTestId("two")).toBeNull();
       expect(error).toHaveBeenCalledWith(expect.stringContaining("another Toast.Viewport"));
@@ -2022,7 +2013,7 @@ describe("Toast", () => {
           </Toast.Viewport>
         </>,
       );
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("one").textContent).toBe("Early");
       expect(screen.queryByTestId("two")).toBeNull();
       expect(show.mock.contexts).toEqual([screen.getByTestId("one")]);
@@ -2037,7 +2028,7 @@ describe("Toast", () => {
       const { rerender } = render(<Harness manager={manager} />);
       const a = await call(() => manager({ title: "A", duration: null }));
       rerender(<Harness manager={other} />);
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(a)).toBeNull();
       expect(root(b)).toHaveTextContent("B");
       // The old manager's commands no longer reach this Viewport, and the new one's do not
@@ -2047,7 +2038,7 @@ describe("Toast", () => {
       await call(() => other.dismiss());
       expect(roots()).toHaveLength(0);
       rerender(<Harness manager={manager} />);
-      await flush();
+      await flushMicrotasks(2);
       expect(roots().map((r) => r.querySelector("div")?.textContent)).toEqual(["A", "A2"]);
     });
 
@@ -2055,7 +2046,7 @@ describe("Toast", () => {
       const error = silenceErrors();
       const seen: HTMLElement[] = [];
       const { rerender } = render(<Toast.Viewport manager={manager} data-testid="one" />);
-      await flush();
+      await flushMicrotasks(2);
       rerender(
         <>
           <Toast.Viewport manager={manager} data-testid="one" />
@@ -2068,7 +2059,7 @@ describe("Toast", () => {
           />
         </>,
       );
-      await flush();
+      await flushMicrotasks(2);
       expect(seen).toHaveLength(0);
       expect(screen.queryByTestId("two")).toBeNull();
       expect(error).toHaveBeenCalledWith(expect.stringContaining("another Toast.Viewport"));
@@ -2085,7 +2076,7 @@ describe("Toast", () => {
           <Harness manager={manager} />
         </StrictMode>,
       );
-      await flush();
+      await flushMicrotasks(2);
       expect(roots().map((r) => r.querySelector("div")?.textContent)).toEqual([
         "Early 1",
         "Early 2",
@@ -2135,7 +2126,7 @@ describe("Toast", () => {
       expect(error).toHaveBeenCalledTimes(1);
       expect(error).toHaveBeenCalledWith(expect.stringContaining("called on the server"));
       render(<Harness manager={server} />);
-      await flush();
+      await flushMicrotasks(2);
       expect(roots()).toHaveLength(0);
     });
 
@@ -2205,7 +2196,7 @@ describe("Toast", () => {
       expect(region().closest("dialog")).toBeNull();
       await user.click(screen.getByTestId("open-dialog"));
       await tasks();
-      await flush();
+      await flushMicrotasks(2);
       const dialog = screen.getByTestId("dialog");
       expect(dialog.matches(":modal")).toBe(true);
       expect(dialog.contains(region())).toBe(true);
@@ -2213,7 +2204,7 @@ describe("Toast", () => {
       expect(root(id)).toHaveTextContent("A");
       await user.click(screen.getByTestId("close-dialog"));
       await tasks();
-      await flush();
+      await flushMicrotasks(2);
       expect(region().closest("dialog")).toBeNull();
       expect(region().matches(":popover-open")).toBe(true);
     });
@@ -2228,7 +2219,7 @@ describe("Toast", () => {
       expect(region()).toHaveAttribute("data-paused", "");
       await user.click(screen.getByTestId("open-dialog"));
       await tasks();
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("dialog").contains(region())).toBe(true);
       expect(region()).not.toHaveAttribute("data-paused");
     });
@@ -2255,7 +2246,7 @@ describe("Toast", () => {
       const show = vi.spyOn(HTMLElement.prototype, "showPopover");
       await user.click(screen.getByTestId("open-dialog"));
       await tasks();
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("dialog").contains(region())).toBe(true);
       expect(show).toHaveBeenCalled();
       expect(region().matches(":popover-open")).toBe(true);
@@ -2300,7 +2291,7 @@ describe("Toast", () => {
         fireEvent.click(screen.getByTestId("urgent-open"));
       });
       await tasks();
-      await flush();
+      await flushMicrotasks(2);
       expect(screen.getByTestId("dialog").contains(region())).toBe(true);
       // The same elements, still pending, so the timer stays paused.
       expect(root(id)).toBe(element);
@@ -2313,7 +2304,7 @@ describe("Toast", () => {
       expect(queryRoot(id)).not.toBeNull();
       expect(closeAction).not.toHaveBeenCalled();
       await act(async () => d.resolve());
-      await flush();
+      await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
       expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
@@ -2328,7 +2319,7 @@ describe("Toast", () => {
       );
       await user.click(screen.getByTestId("open-dialog"));
       await tasks();
-      await flush();
+      await flushMicrotasks(2);
       expect(error).toHaveBeenCalledWith(expect.stringContaining("rendered inside a Dialog"));
     });
   });

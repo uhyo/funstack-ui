@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetWarnOnce } from "../internal/dev-warn.js";
 import { Meter } from "./index.js";
 import type { MeterRootProps, MeterState } from "./index.js";
+import { silenceErrors } from "../__tests__/helpers.js";
 
 function Storage(props: Partial<MeterRootProps>) {
   return (
@@ -37,7 +38,7 @@ const meter = () => screen.getByRole("meter");
 let errorSpy: { mock: { calls: unknown[][] }; mockRestore: () => void };
 beforeEach(() => {
   resetWarnOnce();
-  errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  errorSpy = silenceErrors();
 });
 afterEach(() => {
   errorSpy.mockRestore();

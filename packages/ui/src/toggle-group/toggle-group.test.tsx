@@ -11,6 +11,8 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  silenceErrors,
+  PlainButton,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { ToggleGroup } from "./index.js";
@@ -150,7 +152,7 @@ describe("ToggleGroup", () => {
     });
 
     it("Item outside a Root throws", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<ToggleGroup.Item value="a">A</ToggleGroup.Item>)).toThrow(
         /inside a ToggleGroup\.Root/,
       );
@@ -321,7 +323,7 @@ describe("ToggleGroup", () => {
 
   renderBoth("rejection (row 4)", (mode) => {
     it("reaches the boundary above the Root; committed unchanged", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -488,7 +490,7 @@ describe("ToggleGroup", () => {
 
   renderBoth("superseded rejection (row 6)", (mode) => {
     it("older rejects after the newer resolved: the catcher records it", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const deferreds = [deferred(), deferred()];
       let calls = 0;
       const onError = vi.fn();
@@ -510,7 +512,7 @@ describe("ToggleGroup", () => {
     });
 
     it("older rejects while the newer pends: the catcher records it once", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const deferreds = [deferred(), deferred()];
       let calls = 0;
       const onError = vi.fn();
@@ -797,13 +799,9 @@ describe("ToggleGroup", () => {
   });
 
   describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
-    function MyButton(props: ComponentPropsWithRef<"button">) {
-      return <button {...props} />;
-    }
-
     it.each([
       ["a link", <a key="link" href="#b" />],
-      ["a component", <MyButton key="component" />],
+      ["a component", <PlainButton key="component" />],
     ] as const)(
       "a disabled Item with %s render: aria-disabled, reached by the arrows, never dispatches",
       async (_, element) => {
@@ -880,7 +878,7 @@ describe("ToggleGroup", () => {
     });
 
     it("follows the optimistic pressed Item and reverts on rollback once focus leaves", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       render(
         <>
@@ -1035,7 +1033,7 @@ describe("ToggleGroup", () => {
 
   describe("dev warnings (row 17)", () => {
     it("value and defaultValue together warn once", async () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       const { rerender } = render(
         <ToggleGroup.Root aria-label="x" value={[]} defaultValue={["a"]} />,
       );
@@ -1045,14 +1043,14 @@ describe("ToggleGroup", () => {
     });
 
     it("switching exclusive after mount warns", () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       const { rerender } = render(<ToggleGroup.Root aria-label="x" />);
       rerender(<ToggleGroup.Root exclusive aria-label="x" />);
       expect(error.mock.calls.some(([m]) => String(m).includes("`exclusive` changed"))).toBe(true);
     });
 
     it("duplicate Item values warn", () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       render(
         <ToggleGroup.Root aria-label="x">
           <ToggleGroup.Item value="a">A1</ToggleGroup.Item>

@@ -17,6 +17,8 @@ import {
   ErrorCatcher,
   expectNotPending,
   expectPending,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
@@ -106,8 +108,6 @@ function pointer(
   });
   return result;
 }
-
-const flush = () => act(async () => {});
 
 /** A pointer event for `dispatchEvent` inside an awaited `act` (Testing Library's is sync). */
 function rawPointer(type: string, x: number, y = 50): PointerEvent {
@@ -394,7 +394,7 @@ describe("Slider", () => {
     });
 
     it("warns for unnamed thumbs and an unnamed group", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Slider.Root defaultValue={[20, 80]}>
           <Slider.Thumb index={0} />
@@ -407,7 +407,7 @@ describe("Slider", () => {
     });
 
     it("does not warn about a group named by its Label", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Slider.Root defaultValue={[20, 80]}>
           <Parts count={2} />
@@ -417,7 +417,7 @@ describe("Slider", () => {
     });
 
     it("warns for a duplicate and an out-of-range index", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Slider.Root defaultValue={40}>
           <Slider.Label>Volume</Slider.Label>
@@ -433,7 +433,7 @@ describe("Slider", () => {
     });
 
     it("warns for an off-grid value, an unreachable max and a descending array", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <>
           <Slider.Root defaultValue={33} step={10} aria-label="a">
@@ -455,7 +455,7 @@ describe("Slider", () => {
     });
 
     it("throws for a Thumb outside a Root", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<Slider.Thumb />)).toThrow(/inside a Slider.Root/);
     });
 
@@ -594,7 +594,7 @@ describe("Slider", () => {
     });
 
     it("Value shows one thumb by index and warns without children for several", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Slider.Root defaultValue={[20, 80]} aria-label="r">
           <Slider.Value data-testid="v1" index={1} />
@@ -642,7 +642,7 @@ describe("Slider", () => {
       expect(details.thumb).toBe(0);
       expect(details.event?.type).toBe("input");
       expect(seen?.value).toBe("41");
-      await flush();
+      await flushMicrotasks();
       expect(input.value).toBe("41");
       expect(thumb().style.getPropertyValue("--slider-value")).toBe("41%");
       expect(input).toHaveAttribute("aria-valuetext", "41 percent");
@@ -654,7 +654,7 @@ describe("Slider", () => {
       const onCommit = vi.fn<CommitFn>();
       render(<Fixture mode={mode} onChange={onChange} onCommit={onCommit} />);
       press(thumbInput(), 40);
-      await flush();
+      await flushMicrotasks();
       expect(onChange).not.toHaveBeenCalled();
       expect(onCommit).not.toHaveBeenCalled();
     });
@@ -663,7 +663,7 @@ describe("Slider", () => {
       const onCommit = vi.fn<CommitFn>();
       render(<Fixture mode={mode} onCommit={onCommit} />);
       press(thumbInput(), 41);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toBe(41);
       expect(onCommit.mock.calls[0]![1].reason).toBe("activate");
@@ -677,11 +677,11 @@ describe("Slider", () => {
       const onCommit = vi.fn<CommitFn>();
       render(<Fixture mode={mode} onCommit={onCommit} />);
       press(thumbInput(), 41);
-      await flush();
+      await flushMicrotasks();
       act(() => {
         thumbInput().dispatchEvent(new Event("change", { bubbles: true }));
       });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
     });
 
@@ -691,7 +691,7 @@ describe("Slider", () => {
       const onCommit = vi.fn<CommitFn>();
       render(<Fixture mode={mode} onCommit={onCommit} />);
       press(thumbInput(), 42);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
     });
   });
@@ -702,7 +702,7 @@ describe("Slider", () => {
       const onCommit = vi.fn<CommitFn>(() => d.promise);
       render(<Fixture mode={mode} onCommit={onCommit} />);
       press(thumbInput(), 45);
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       expectPending(thumb());
       expect(thumbInput().value).toBe("45");
@@ -719,7 +719,7 @@ describe("Slider", () => {
 
   eachMode("rejection", (mode) => {
     it('reaches the boundary, which replaces the slider; uncontrolled reports the revert as a "dismiss" step', async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const d = deferred();
       const caught = vi.fn();
       const onChange = vi.fn<ChangeFn>();
@@ -730,7 +730,7 @@ describe("Slider", () => {
       }
       render(<Probe />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("70");
       onChange.mockClear();
       await act(async () => d.reject(new Error("save failed")));
@@ -752,15 +752,15 @@ describe("Slider", () => {
     });
 
     it("after a retry the remounted slider shows the value its parent holds", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       render(<Fixture mode={mode} onCommit={() => d.promise} retry />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       await act(async () => d.reject(new Error("x")));
       expect(screen.queryByTestId("root")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "retry" }));
-      await flush();
+      await flushMicrotasks();
       // Uncontrolled: `defaultValue`; update on success: the parent never took 70; an adopting
       // parent took 70 in the step and owns its own rollback.
       const expected = mode === "adopt" ? "70" : "40";
@@ -778,7 +778,7 @@ describe("Slider", () => {
       });
       render(<Fixture mode={mode} onCommit={onCommit} />);
       press(thumbInput(), 60);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("60");
       expectNotPending(root());
     });
@@ -813,7 +813,7 @@ describe("Slider", () => {
       }
       render(<Parent />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("70");
       expectPending(root());
       await act(async () => d.reject(new Error("save failed")));
@@ -836,15 +836,15 @@ describe("Slider", () => {
       render(<Fixture mode="uncontrolled" onChange={onChange} onCommit={onCommit} />);
       const track = mockTrack();
       pointer("pointerDown", track, 55);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("55");
       pointer("pointerMove", track, 60);
-      await flush();
+      await flushMicrotasks();
       // The step's transition has settled; the shown value is still the gesture's.
       expect(thumbInput().value).toBe("60");
       expect(thumb().style.getPropertyValue("--slider-value")).toBe("60%");
       pointer("pointerUp", track, 60);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("60");
       expect(onCommit).toHaveBeenCalledTimes(1);
     });
@@ -898,10 +898,10 @@ describe("Slider", () => {
       const track = mockTrack();
       pointer("pointerDown", track, 55);
       pointer("pointerMove", track, 70);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("70");
       pointer("pointerUp", track, 70);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("40");
     });
 
@@ -927,14 +927,14 @@ describe("Slider", () => {
       const track = mockTrack();
       pointer("pointerDown", track, 70);
       pointer("pointerUp", track, 70);
-      await flush();
+      await flushMicrotasks();
       fireEvent.click(screen.getByText("set 30"));
       expect(thumbInput().value).toBe("30");
       pointer("pointerDown", track, 30);
       expect(thumbInput().value).toBe("30");
       expect(root()).toHaveAttribute("data-dragging", "");
       pointer("pointerUp", track, 30);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("30");
     });
 
@@ -948,7 +948,7 @@ describe("Slider", () => {
       pointer("pointerMove", track, 50);
       pointer("pointerMove", track, 40);
       pointer("pointerUp", track, 40);
-      await flush();
+      await flushMicrotasks();
       expect(onChange.mock.calls.map((c) => c[0])).toEqual([60, 50, 40]);
       expect(onCommit).not.toHaveBeenCalled();
       expect(thumbInput().value).toBe("40");
@@ -967,9 +967,9 @@ describe("Slider", () => {
         .mockImplementationOnce(() => second.promise);
       render(<Fixture mode={mode} onCommit={onCommit} />);
       press(thumbInput(), 41);
-      await flush();
+      await flushMicrotasks();
       press(thumbInput(), 42);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(2);
       await act(async () => first.resolve());
       expectPending(root());
@@ -981,7 +981,7 @@ describe("Slider", () => {
     });
 
     it("surfaces the superseded commit's rejection", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const first = deferred();
       const second = deferred();
       const caught = vi.fn();
@@ -991,9 +991,9 @@ describe("Slider", () => {
         .mockImplementationOnce(() => second.promise);
       render(<Fixture mode={mode} onCommit={onCommit} boundary={caught} />);
       press(thumbInput(), 41);
-      await flush();
+      await flushMicrotasks();
       press(thumbInput(), 42);
-      await flush();
+      await flushMicrotasks();
       await act(async () => first.reject(new Error("older")));
       if (mode === "adopt") {
         // The adopting parent's step updates are entangled with the pending save (React holds a
@@ -1018,14 +1018,14 @@ describe("Slider", () => {
         .mockImplementationOnce(() => second.promise);
       render(<Fixture mode={mode} onCommit={onCommit} />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       const track = mockTrack();
       pointer("pointerDown", track, 75);
       pointer("pointerMove", track, 80);
       // The thumb follows at once although the step transitions are entangled with the save.
       expect(thumbInput().value).toBe("80");
       pointer("pointerUp", track, 80);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(2);
       expect(onCommit.mock.calls[1]![0]).toBe(80);
       // The earlier save's resolution does not land: the thumb keeps the newer gesture's value.
@@ -1056,7 +1056,7 @@ describe("Slider", () => {
         />,
       );
       press(thumbInput(), 41);
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("suspender")).toHaveTextContent("40");
       expect(screen.queryByTestId("fallback")).toBeNull();
       expectPending(root());
@@ -1101,7 +1101,7 @@ describe("Slider", () => {
       pointer("pointerMove", track, 80);
       expect(thumbInput(0).value).toBe("300");
       pointer("pointerUp", track, 80);
-      await flush();
+      await flushMicrotasks();
       expect(root()).not.toHaveAttribute("data-dragging");
       expect(thumb(0)).not.toHaveAttribute("data-dragging");
     });
@@ -1123,7 +1123,7 @@ describe("Slider", () => {
       pointer("pointerUp", track, 60, { pointerId: 2 });
       expect(root()).toHaveAttribute("data-dragging", "");
       pointer("pointerUp", track, 60, { pointerId: 1 });
-      await flush();
+      await flushMicrotasks();
       expect(onChange.mock.calls.map((c) => c[0])).toEqual([50, 60]);
     });
 
@@ -1148,7 +1148,7 @@ describe("Slider", () => {
         } else {
           pointer(end, track, 65);
         }
-        await flush();
+        await flushMicrotasks();
         expect(onCommit).toHaveBeenCalledTimes(1);
         expect(onCommit.mock.calls[0]![0]).toBe(65);
         expect(onCommit.mock.calls[0]![1].event?.type).toBe(end.toLowerCase());
@@ -1170,7 +1170,7 @@ describe("Slider", () => {
       pointer("pointerDown", track, 20);
       expect(onChange.mock.calls[0]![0]).toBe(80);
       pointer("pointerUp", track, 20);
-      await flush();
+      await flushMicrotasks();
     });
 
     it("uses the block axis from the bottom when vertical", async () => {
@@ -1189,7 +1189,7 @@ describe("Slider", () => {
       pointer("pointerDown", track, 0, { y: 25 });
       expect(onChange.mock.calls[0]![0]).toBe(75);
       pointer("pointerUp", track, 0, { y: 25 });
-      await flush();
+      await flushMicrotasks();
     });
 
     it("works for a Thumb outside the Track and captures on the Thumb", async () => {
@@ -1206,7 +1206,7 @@ describe("Slider", () => {
       expect(thumb()).toHaveAttribute("data-dragging", "");
       pointer("pointerMove", thumb(), 47);
       pointer("pointerUp", thumb(), 47);
-      await flush();
+      await flushMicrotasks();
       expect(onChange.mock.calls.map((c) => c[0])).toEqual([45, 47]);
     });
 
@@ -1229,7 +1229,7 @@ describe("Slider", () => {
       expect(track.hasPointerCapture(1)).toBe(false);
       expect(onChange.mock.calls[0]![0]).toEqual([20, 30]);
       pointer("pointerUp", thumb(1), 30);
-      await flush();
+      await flushMicrotasks();
     });
 
     it("stacked thumbs at max: a press on the top thumb moves the one that can go toward the pointer", async () => {
@@ -1258,7 +1258,7 @@ describe("Slider", () => {
       expect(thumb(1)).not.toHaveAttribute("data-dragging");
       expect(document.activeElement).toBe(thumbInput(0));
       pointer("pointerUp", thumb(1), 60);
-      await flush();
+      await flushMicrotasks();
       expect(onChange.mock.calls.map((c) => [c[0], c[1].thumb])).toEqual([[[60, 100], 0]]);
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toEqual([60, 100]);
@@ -1284,12 +1284,12 @@ describe("Slider", () => {
       expect(thumbInput(0).value).toBe("28");
       pointer("pointerMove", thumb(1), 20);
       pointer("pointerUp", thumb(1), 20);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit.mock.calls.at(-1)![0]).toEqual([20, 30]);
       // Back to a stack, then a press on the bottom thumb exactly on the value, moved right.
       pointer("pointerDown", thumb(0), 30);
       pointer("pointerUp", thumb(0), 30);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit.mock.calls.at(-1)![0]).toEqual([30, 30]);
       pointer("pointerDown", thumb(0), 30);
       pointer("pointerMove", thumb(0), 30);
@@ -1299,7 +1299,7 @@ describe("Slider", () => {
       expect(thumbInput(0).value).toBe("30");
       expect(thumb(1)).toHaveAttribute("data-dragging", "");
       pointer("pointerUp", thumb(0), 50);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit.mock.calls.at(-1)![0]).toEqual([30, 50]);
       expect(onCommit.mock.calls.at(-1)![1].thumb).toBe(1);
     });
@@ -1321,7 +1321,7 @@ describe("Slider", () => {
       pointer("pointerDown", track, 20);
       pointer("pointerMove", track, 40);
       pointer("pointerUp", track, 55);
-      await flush();
+      await flushMicrotasks();
       expect(onChange.mock.calls.map((c) => [c[0], c[1].event?.type])).toEqual([
         [40, "pointermove"],
         [55, "pointerup"],
@@ -1332,7 +1332,7 @@ describe("Slider", () => {
       pointer("pointerDown", track, 55);
       pointer("pointerMove", track, 60);
       pointer("pointerCancel", track, 90);
-      await flush();
+      await flushMicrotasks();
       expect(onCommit.mock.calls.at(-1)![0]).toBe(60);
     });
 
@@ -1361,12 +1361,12 @@ describe("Slider", () => {
       pointer("pointerMove", track, 40);
       pointer("pointerMove", track, 50);
       pointer("pointerMove", track, 60);
-      await flush();
+      await flushMicrotasks();
       seen.push(...observer.takeRecords().map((r) => String(r.attributeName)));
       expect(thumbInput().value).toBe("60");
       expect(seen).toEqual([]);
       pointer("pointerUp", track, 60);
-      await flush();
+      await flushMicrotasks();
       observer.disconnect();
       expect(thumbInput().value).toBe("60");
       expect(root()).not.toHaveAttribute("data-pending");
@@ -1385,13 +1385,13 @@ describe("Slider", () => {
         valueSetter.call(thumbInput(), "50");
         thumbInput().dispatchEvent(new Event("input", { bubbles: true }));
       });
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("50");
       expect(screen.getByTestId("value")).toHaveTextContent("50");
       act(() => {
         thumbInput().dispatchEvent(new Event("change", { bubbles: true }));
       });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toBe(50);
       expect(thumbInput().value).toBe("50");
@@ -1407,7 +1407,7 @@ describe("Slider", () => {
       const track = mockTrack();
       pointer("pointerDown", track, 20);
       pointer("pointerMove", track, 80);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("80");
       const seen: string[] = [];
       const observer = new MutationObserver(() =>
@@ -1415,7 +1415,7 @@ describe("Slider", () => {
       );
       observer.observe(thumb(), { attributes: true, attributeFilter: ["style"] });
       pointer("pointerUp", track, 80);
-      await flush();
+      await flushMicrotasks();
       seen.push(
         ...observer.takeRecords().map(() => thumb().style.getPropertyValue("--slider-value")),
       );
@@ -1435,7 +1435,7 @@ describe("Slider", () => {
       );
       const track = mockTrack();
       pointer("pointerDown", track, 30);
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       pointer("pointerUp", track, 30);
       await act(async () => step.resolve());
@@ -1455,10 +1455,10 @@ describe("Slider", () => {
         </Slider.Root>,
       );
       press(thumbInput(), 21);
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       press(thumbInput(), 22);
-      await flush();
+      await flushMicrotasks();
       // A step is not a re-entry: both steps ran.
       expect(onChange.mock.calls.map((c) => c[0])).toEqual([21, 22]);
       await act(async () => first.resolve());
@@ -1486,7 +1486,7 @@ describe("Slider", () => {
     });
 
     it("warns once and stays keyboard-only without a Track", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Slider.Root defaultValue={40}>
           <Slider.Thumb data-testid="thumb-0" aria-label="v" />
@@ -1519,7 +1519,7 @@ describe("Slider", () => {
       act(() => {
         notPrevented = fireEvent.keyDown(thumbInput(), { key: "ArrowRight" });
       });
-      await flush();
+      await flushMicrotasks();
       expect(notPrevented).toBe(false);
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onChange.mock.calls[0]![0]).toBe(41);
@@ -1530,7 +1530,7 @@ describe("Slider", () => {
       act(() => {
         fireEvent.keyDown(thumbInput(), { key: "ArrowLeft" });
       });
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("40");
     });
 
@@ -1553,7 +1553,7 @@ describe("Slider", () => {
       act(() => {
         notPrevented = fireEvent.keyDown(thumbInput(), { key: "ArrowLeft" });
       });
-      await flush();
+      await flushMicrotasks();
       expect(notPrevented).toBe(false);
       expect(thumbInput().value).toBe("41");
       expect(onChange).toHaveBeenCalledTimes(1);
@@ -1567,7 +1567,7 @@ describe("Slider", () => {
       act(() => {
         fireEvent.keyDown(thumbInput(), { key: "ArrowRight" });
       });
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("39");
       expect(onCommit).toHaveBeenCalledTimes(3);
       // Other keys stay native.
@@ -1642,7 +1642,7 @@ describe("Slider", () => {
     container.innerHTML = renderToString(ui);
     mutate(container);
     render(ui, { container, hydrate: true });
-    await flush();
+    await flushMicrotasks();
     return container;
   }
 
@@ -1711,11 +1711,11 @@ describe("Slider", () => {
       container.innerHTML = renderToString(ui);
       hydrating = true;
       render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       (container.querySelectorAll("input")[1] as HTMLInputElement).value = "90";
       await act(async () => gate.resolve());
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(onCommit.mock.calls[0]![0]).toEqual([20, 90]);
       expect(onCommit.mock.calls[0]![1].reason).toBe("platform");
@@ -1739,7 +1739,7 @@ describe("Slider", () => {
       const onCommit = vi.fn<CommitFn>();
       render(<InForm onChange={onChange} onCommit={onCommit} />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       onChange.mockClear();
       onCommit.mockClear();
       const form = screen.getByTestId("form") as HTMLFormElement;
@@ -1750,7 +1750,7 @@ describe("Slider", () => {
         });
       });
       await act(async () => form.reset());
-      await flush();
+      await flushMicrotasks();
       expect(defaultAtEvent).toBe("40");
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onChange.mock.calls[0]![0]).toBe(40);
@@ -1768,17 +1768,17 @@ describe("Slider", () => {
       const onCommit = vi.fn<CommitFn>();
       render(<InForm onCommit={onCommit} />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       onCommit.mockClear();
       const form = screen.getByTestId("form") as HTMLFormElement;
       const cancel = (e: Event) => e.preventDefault();
       form.addEventListener("reset", cancel);
       await act(async () => fireEvent.click(screen.getByTestId("reset")));
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).not.toHaveBeenCalled();
       form.removeEventListener("reset", cancel);
       await act(async () => fireEvent.click(screen.getByTestId("reset")));
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledTimes(1);
       expect(thumbInput().value).toBe("40");
     });
@@ -1798,10 +1798,10 @@ describe("Slider", () => {
       }
       render(<Toggle />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       fireEvent.click(screen.getByText("disable"));
       await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("40");
     });
   });
@@ -1828,10 +1828,10 @@ describe("Slider", () => {
       }
       render(<Refusing />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("70");
       await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
-      await flush();
+      await flushMicrotasks();
       expect(onCommit).toHaveBeenLastCalledWith(
         40,
         expect.objectContaining({ reason: "platform" }),
@@ -1853,13 +1853,13 @@ describe("Slider", () => {
           </form>
         );
       }
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       render(<Latest />);
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       fireEvent.click(screen.getByText("change default"));
       await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("10");
     });
 
@@ -1887,11 +1887,11 @@ describe("Slider", () => {
         </form>,
       );
       press(thumbInput(), 70);
-      await flush();
+      await flushMicrotasks();
       onCommit.mockClear();
       await act(async () => fireEvent.click(screen.getByTestId("submit")));
-      await flush();
-      await flush();
+      await flushMicrotasks();
+      await flushMicrotasks();
       expect(submitted).toHaveBeenCalledWith("70");
       expect(onCommit).toHaveBeenCalledWith(40, expect.objectContaining({ reason: "platform" }));
       expect(thumbInput().value).toBe("40");
@@ -1905,7 +1905,7 @@ describe("Slider", () => {
       const d = deferred();
       render(<Fixture mode="commit" onCommit={() => d.promise} />);
       press(thumbInput(), 55);
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("parent")).toHaveTextContent("40");
       expect(thumbInput().value).toBe("55");
       await act(async () => d.resolve());
@@ -1956,7 +1956,7 @@ describe("Slider", () => {
           <Field.Error />
         </Field.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       const input = thumbInput();
       expect(input.id).not.toBe("");
       expect(screen.getByTestId("field-label")).toHaveAttribute("for", input.id);
@@ -1990,7 +1990,7 @@ describe("Slider", () => {
           <Field.Description data-testid="desc">Pick a range.</Field.Description>
         </Field.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       const fieldLabel = screen.getByTestId("field-label");
       expect(fieldLabel).not.toHaveAttribute("for");
       expect(root()).toHaveAttribute("role", "group");
@@ -2018,7 +2018,7 @@ describe("Slider", () => {
           </Slider.Root>
         </Field.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(root()).toHaveAttribute("aria-labelledby", fieldLabel.id);
       expect(root()).toHaveAccessibleName("Price");
       expect(
@@ -2027,7 +2027,7 @@ describe("Slider", () => {
     });
 
     it("Field.Root required warns once (a range is never empty); no input is required", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Field.Root name="volume" required data-testid="field">
           <Field.Label data-testid="field-label">Volume</Field.Label>
@@ -2036,7 +2036,7 @@ describe("Slider", () => {
           </Slider.Root>
         </Field.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       const warnings = consoleError.mock.calls.filter((c) =>
         String(c[0]).includes("a range is never empty"),
       );
@@ -2047,7 +2047,7 @@ describe("Slider", () => {
     });
 
     it("warns when a Thumb's name differs from the Field's", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Field.Root name="price">
           <Field.Label>Price</Field.Label>
@@ -2059,7 +2059,7 @@ describe("Slider", () => {
           </Slider.Root>
         </Field.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(
         consoleError.mock.calls.filter((c) => String(c[0]).includes('("price-min") differs')),
       ).toHaveLength(1);
@@ -2077,7 +2077,7 @@ describe("Slider", () => {
           </Field.Root>
         </Form.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("error")).toHaveTextContent("Too loud");
       expect(thumbInput(0).validationMessage).toBe("Too loud");
       expect(thumbInput(0).validity.customError).toBe(true);
@@ -2090,7 +2090,7 @@ describe("Slider", () => {
 
       // A pointer gesture fires no `input` / `change`: the commit tells the Field.
       drag(55, 30);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput(0).value).toBe("30");
       expect(screen.queryByTestId("error")).toBeNull();
       expect(thumbInput(0).validationMessage).toBe("");
@@ -2119,21 +2119,21 @@ describe("Slider", () => {
           </Field.Root>
         </Form.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       // At mount: the slot is set on the first thumb's input, nothing is shown yet.
       expect(thumbInput(0).validationMessage).toBe("Narrow the range to 50 or less.");
       expect(screen.queryByTestId("error")).toBeNull();
 
       const form = screen.getByTestId("form") as HTMLFormElement;
       await act(async () => form.requestSubmit());
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(screen.getByTestId("error")).toHaveTextContent("Narrow the range to 50 or less.");
       expect(document.activeElement).toBe(thumbInput(0));
 
       // A pointer commit that satisfies the rule clears it (90 -> 50).
       drag(85, 50);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput(1).value).toBe("50");
       expect(thumbInput(0).validationMessage).toBe("");
       expect(screen.queryByTestId("error")).toBeNull();
@@ -2144,20 +2144,20 @@ describe("Slider", () => {
         act(() => {
           fireEvent.keyDown(thumbInput(1), { key: "ArrowLeft" });
         });
-        await flush();
+        await flushMicrotasks();
       }
       expect(thumbInput(1).value).toBe("61");
       expect(thumbInput(0).validationMessage).toBe("Narrow the range to 50 or less.");
       act(() => {
         fireEvent.keyDown(thumbInput(1), { key: "ArrowRight" });
       });
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput(1).value).toBe("60");
       expect(thumbInput(0).validationMessage).toBe("");
 
       // A form reset: the "platform" commit back to [10, 90] re-runs the rule.
       await act(async () => form.reset());
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput(1).value).toBe("90");
       expect(validate.mock.lastCall![1].getAll("price")).toEqual(["10", "90"]);
       expect(thumbInput(0).validationMessage).toBe("Narrow the range to 50 or less.");
@@ -2175,12 +2175,12 @@ describe("Slider", () => {
           </Field.Root>
         </form>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().validationMessage).toBe("");
       act(() => {
         fireEvent.keyDown(thumbInput(), { key: "ArrowRight" });
       });
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("41");
       expect(validate.mock.lastCall![0]).toBe("41");
       expect(thumbInput().validationMessage).toBe("Too loud");
@@ -2225,9 +2225,9 @@ describe("Slider", () => {
         );
       }
       render(<App />);
-      await flush();
+      await flushMicrotasks();
       drag(40, 70);
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("70");
       expectPending(root());
 
@@ -2236,10 +2236,10 @@ describe("Slider", () => {
       const form = screen.getByTestId("form") as HTMLFormElement;
       await act(async () => form.requestSubmit());
       await act(async () => submission.resolve());
-      await flush();
+      await flushMicrotasks();
       validate.mockClear();
       await act(async () => save.reject(new Error("save failed")));
-      await flush();
+      await flushMicrotasks();
       expect(thumbInput().value).toBe("40");
       // The Field was told (validate re-ran on the reverted value), but not as an edit.
       expect(validate).toHaveBeenCalled();
@@ -2274,11 +2274,11 @@ describe("Slider", () => {
           );
         }
         render(<App />);
-        await flush();
+        await flushMicrotasks();
         const form = screen.getByTestId("form") as HTMLFormElement;
         await act(async () => form.requestSubmit());
         await act(async () => submission.resolve());
-        await flush();
+        await flushMicrotasks();
         expect(screen.getByTestId("error")).toHaveTextContent("Too loud");
         expect(document.activeElement).toBe(thumbInput(0));
       },
@@ -2301,9 +2301,9 @@ describe("Slider", () => {
           </Field.Root>
         </Form.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       press(thumbInput(1), 70);
-      await flush();
+      await flushMicrotasks();
       expectPending(root());
       expectPending(thumb(1));
       expectNotPending(thumb(0));
@@ -2340,13 +2340,13 @@ describe("Slider", () => {
         );
       }
       render(<App />);
-      await flush();
+      await flushMicrotasks();
       expect(screen.queryByTestId("thumb-1")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "show" }));
-      await flush();
+      await flushMicrotasks();
       validate.mockClear();
       press(thumbInput(1), 90);
-      await flush();
+      await flushMicrotasks();
       expect(validate).toHaveBeenCalled();
       expect(thumbInput(0).validationMessage).toBe("Too high");
       expect(thumbInput(1).validationMessage).toBe("");

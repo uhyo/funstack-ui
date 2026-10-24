@@ -1,6 +1,7 @@
 import { Component, use } from "react";
-import type { ReactNode } from "react";
-import { expect, describe } from "vitest";
+import type { ComponentPropsWithRef, ReactNode } from "react";
+import { expect, describe, vi } from "vitest";
+import type { MockInstance } from "vitest";
 import { userEvent } from "@testing-library/user-event";
 import { act, configure, getConfig } from "@testing-library/react";
 
@@ -199,4 +200,41 @@ export function setupUser(options?: Parameters<typeof userEvent.setup>[0]): User
         inAct(() => Promise.resolve((value as (...a: unknown[]) => unknown).apply(target, args)));
     },
   });
+}
+
+/**
+ * One async `act()` with nothing in it, then `ticks` more microtask turns inside it: React
+ * renders and commits what the test's last step (a resolved promise, an event) scheduled. No
+ * macrotask runs, so a `setTimeout` or a shim's queued event stays pending.
+ */
+export function flushMicrotasks(ticks = 0): Promise<void> {
+  return act(async () => {
+    for (let i = 0; i < ticks; i++) await Promise.resolve();
+  });
+}
+
+/**
+ * Runs `rounds` macrotasks (`setTimeout(0)` each) inside one async `act()`: events queued as a
+ * task (the Popover shim's coalesced `toggle`) and React's work after them. The overlay files use
+ * two rounds. jsdom's `<details>` `toggle` is queued with `setImmediate`, which a `setTimeout(0)`
+ * can race (accordion.test.tsx waits for an immediate instead).
+ */
+export function flushTasks(rounds = 1): Promise<void> {
+  return act(async () => {
+    for (let i = 0; i < rounds; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/**
+ * Silences `console.error` for the rest of the test (React's report of an error a boundary
+ * caught, expected dev warnings) and returns the spy, so the test can still assert the calls.
+ * Restored after each test by vitest.setup.ts.
+ */
+export function silenceErrors(): MockInstance<typeof console.error> {
+  return vi.spyOn(console, "error").mockImplementation(() => {});
+}
+
+/** A plain component for `render={<PlainButton />}`: forwards every prop to a `<button>`. */
+export function PlainButton(props: ComponentPropsWithRef<"button">): ReactNode {
+  return <button {...props} />;
 }

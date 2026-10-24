@@ -21,6 +21,8 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  flushTasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import type { UrgentChangeHandler } from "../index.js";
@@ -42,6 +44,7 @@ import type {
   ComboboxTriggerState,
   ComboboxValueChangeDetails,
 } from "./index.js";
+import { spyHide } from "../__tests__/overlay-helpers.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -187,17 +190,6 @@ const isOpen = () => popup().matches(":popover-open");
 const optionTexts = () => screen.queryAllByRole("option").map((o) => o.textContent);
 const hidden = () => document.querySelector<HTMLInputElement>('input[type="hidden"]');
 
-/** Runs the tasks the shim queued (`toggle`) and React's work after them. */
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
-
 function watchShow() {
   const calls: { popup: HTMLElement; source: unknown; children: number }[] = [];
   const original = HTMLElement.prototype.showPopover;
@@ -211,15 +203,11 @@ function watchShow() {
   return calls;
 }
 
-function spyHide() {
-  return vi.spyOn(HTMLElement.prototype, "hidePopover");
-}
-
 /** Types into the (focused) input and runs the open. */
 async function typeText(user: ReturnType<typeof setupUser>, text: string) {
   if (document.activeElement !== input()) await user.click(input());
   await user.keyboard(text);
-  await flush();
+  await flushTasks(2);
 }
 
 afterEach(() => {
@@ -381,7 +369,7 @@ describe("Combobox", () => {
         />,
       );
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(option("jm")).toHaveAttribute("aria-selected", "true");
       expect(option("jm")).toHaveAttribute("data-selected", "");
       expect(option("jp")).toHaveAttribute("aria-selected", "false");
@@ -554,7 +542,7 @@ describe("Combobox", () => {
       if (mode === "controlled")
         expect(screen.getByTestId("parent-text")).toHaveTextContent("Japanxy");
       await act(async () => save.resolve());
-      await flush();
+      await flushTasks(2);
     });
 
     it("warns once when onInputValueChange returns a promise", async () => {
@@ -605,7 +593,7 @@ describe("Combobox", () => {
       expect(optionTexts()).toEqual(["Japan", "Jamaica", "Jersey"]);
       expect(list()).not.toHaveAttribute("data-stale");
       await user.keyboard("a");
-      await flush();
+      await flushTasks(2);
       expect(input().value).toBe("ja");
       expect(optionTexts()).toEqual(["Japan", "Jamaica", "Jersey"]);
       expect(list()).toHaveAttribute("data-stale", "");
@@ -613,7 +601,7 @@ describe("Combobox", () => {
       expect(popup()).toHaveAttribute("data-stale", "");
       expect(input()).toHaveAttribute("data-stale", "");
       await act(async () => search.resolve("ja"));
-      await flush();
+      await flushTasks(2);
       expect(optionTexts()).toEqual(["Japan", "Jamaica"]);
       expect(list()).not.toHaveAttribute("data-stale");
       expect(list()).not.toHaveAttribute("aria-busy");
@@ -626,14 +614,14 @@ describe("Combobox", () => {
       render(<Harness results={(query) => <search.Results query={query} />} />);
       await typeText(user, "j");
       await user.keyboard("a");
-      await flush();
+      await flushTasks(2);
       await user.keyboard("m");
-      await flush();
+      await flushTasks(2);
       await act(async () => search.resolve("jam"));
-      await flush();
+      await flushTasks(2);
       expect(optionTexts()).toEqual(["Jamaica"]);
       await act(async () => search.resolve("ja"));
-      await flush();
+      await flushTasks(2);
       expect(optionTexts()).toEqual(["Jamaica"]);
       expect(list()).not.toHaveAttribute("data-stale");
     });
@@ -647,13 +635,13 @@ describe("Combobox", () => {
       expect(option("jp")).toHaveAttribute("data-pending", "");
       await user.clear(input());
       await user.keyboard("fr");
-      await flush();
+      await flushTasks(2);
       // The deferred render ran although the save still holds every transition.
       expect(optionTexts()).toEqual(["France"]);
       expect(list()).not.toHaveAttribute("data-stale");
       expect(isOpen()).toBe(true);
       await act(async () => save.resolve());
-      await flush();
+      await flushTasks(2);
       // The user typed a new search meanwhile: the accepted option's close is dropped.
       expect(isOpen()).toBe(true);
     });
@@ -678,7 +666,7 @@ describe("Combobox", () => {
       expect(popoverSource(popup())).toBe(input());
       expect(document.activeElement).toBe(input());
       await user.keyboard("a");
-      await flush();
+      await flushTasks(2);
       expect(openAction).toHaveBeenCalledTimes(1);
     });
 
@@ -687,7 +675,7 @@ describe("Combobox", () => {
       render(<Harness root={{ defaultInputValue: "j" }} />);
       await user.click(input());
       await user.keyboard("{Backspace}");
-      await flush();
+      await flushTasks(2);
       expect(input().value).toBe("");
       expect(isOpen()).toBe(true);
     });
@@ -697,7 +685,7 @@ describe("Combobox", () => {
       render(<Harness />);
       await user.click(input());
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id);
     });
@@ -707,7 +695,7 @@ describe("Combobox", () => {
       render(<Harness />);
       await user.click(input());
       await user.keyboard("{ArrowUp}");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(input()).toHaveAttribute("aria-activedescendant", option("fr").id);
     });
@@ -717,7 +705,7 @@ describe("Combobox", () => {
       render(<Harness />);
       await user.click(input());
       await user.keyboard("{Alt>}{ArrowDown}{/Alt}");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(input()).not.toHaveAttribute("aria-activedescendant");
     });
@@ -728,7 +716,7 @@ describe("Combobox", () => {
       await user.click(input());
       await user.tab();
       await user.tab({ shift: true });
-      await flush();
+      await flushTasks(2);
       expect(document.activeElement).toBe(input());
       expect(isOpen()).toBe(false);
     });
@@ -737,7 +725,7 @@ describe("Combobox", () => {
       const user = setupUser();
       render(<Harness root={{ openOnClick: true }} />);
       await user.click(input());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
     });
 
@@ -746,13 +734,13 @@ describe("Combobox", () => {
       const user = setupUser();
       render(<Harness root={{ openChangeAction: openAction }} />);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(document.activeElement).toBe(input());
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
       expect(trigger()).toHaveAttribute("data-open", "");
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
         [true, "activate"],
@@ -764,12 +752,12 @@ describe("Combobox", () => {
       const user = setupUser();
       render(<Harness />);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       // A real press outside the popup hides it before the click (light dismiss).
       fireEvent.pointerDown(trigger());
       act(() => popup().hidePopover());
       fireEvent.click(trigger(), { detail: 1 });
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
 
@@ -777,23 +765,23 @@ describe("Combobox", () => {
       const user = setupUser();
       render(<Harness />);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       // A press while open, cancelled; the listbox closes some other way. The next click opens.
       fireEvent.pointerDown(trigger());
       fireEvent.pointerCancel(trigger());
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       fireEvent.click(trigger(), { detail: 1 });
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       // A press while open that was dragged off (no click, no cancel); the listbox closes. A
       // click without a press (assistive technology, element.click()) reads the current state.
       fireEvent.pointerDown(trigger());
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       act(() => trigger().click());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
     });
 
@@ -807,7 +795,7 @@ describe("Combobox", () => {
       expect(clearButton()).toBeDisabled();
       await user.click(trigger());
       fireEvent.keyDown(input(), { key: "ArrowDown" });
-      await flush();
+      await flushTasks(2);
       expect(openAction).not.toHaveBeenCalled();
       expect(isOpen()).toBe(false);
     });
@@ -879,7 +867,7 @@ describe("Combobox", () => {
       await typeText(user, "j");
       expect(fireEvent.keyDown(input(), { key: "Enter" })).toBe(false);
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(fireEvent.keyDown(input(), { key: "Enter" })).toBe(true);
       expect(action).not.toHaveBeenCalled();
     });
@@ -890,13 +878,13 @@ describe("Combobox", () => {
       render(<Harness root={{ valueChangeAction: action }} />);
       await typeText(user, "j");
       await user.keyboard("{Alt>}{ArrowUp}{/Alt}");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(action).not.toHaveBeenCalled();
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushTasks(2);
       await user.keyboard("{Alt>}{ArrowUp}{/Alt}");
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledWith("jp", expect.anything());
       expect(input().value).toBe("Japan");
       expect(isOpen()).toBe(false);
@@ -907,7 +895,7 @@ describe("Combobox", () => {
       render(<Harness />);
       await user.click(input());
       expect(fireEvent.keyDown(input(), { key: "ArrowDown", ctrlKey: true })).toBe(true);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
 
@@ -976,7 +964,7 @@ describe("Combobox", () => {
       if (mode === "controlled")
         expect(screen.getByTestId("parent-value")).toHaveTextContent("null");
       await act(async () => save.resolve());
-      await flush();
+      await flushTasks(2);
       expect(hide).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
       expectNotPending(input());
@@ -1007,14 +995,14 @@ describe("Combobox", () => {
       );
       await typeText(user, "x");
       await user.click(option("a"));
-      await flush();
+      await flushTasks(2);
       expect(input().value).toBe("Apple (fruit)");
       expect(action.mock.calls[0]![1].event?.type).toBe("click");
       expect(isOpen()).toBe(false);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       await user.click(option("b"));
-      await flush();
+      await flushTasks(2);
       expect(input().value).toBe("Banana");
       expect(action.mock.calls.map(([n]) => n)).toEqual(["a", "b"]);
     });
@@ -1030,9 +1018,9 @@ describe("Combobox", () => {
         />,
       );
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       await user.click(option("fr"));
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(isOpen()).toBe(false);
       expect(input().value).toBe("France");
@@ -1044,7 +1032,7 @@ describe("Combobox", () => {
       render(<ValueHarness mode={mode} action={action} />);
       await typeText(user, "je");
       await user.click(option("je"));
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(input().value).toBe("je");
       expect(isOpen()).toBe(true);
@@ -1057,11 +1045,11 @@ describe("Combobox", () => {
       await typeText(user, "j");
       await user.keyboard("{ArrowDown}{Enter}");
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushTasks(2);
       await act(async () => save.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(input()).toHaveAttribute("data-selected", "");
     });
@@ -1085,11 +1073,11 @@ describe("Combobox", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("ja");
-      await flush();
+      await flushTasks(2);
       await user.keyboard("{ArrowDown}{Enter}");
       expect(input().value).toBe("Japan");
       await act(async () => save.reject(new Error("nope")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledTimes(1);
       expect(texts).toHaveBeenLastCalledWith("France", expect.anything());
       expect(texts.mock.lastCall![1].reason).toBe("dismiss");
@@ -1123,9 +1111,9 @@ describe("Combobox", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("ja");
-      await flush();
+      await flushTasks(2);
       await user.keyboard("{ArrowDown}{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledTimes(1);
       expect(writes.at(-1)).toEqual({ next: "France", inTransition: false });
       expect(writes.every((w) => !w.inTransition)).toBe(true);
@@ -1153,9 +1141,9 @@ describe("Combobox", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("ja");
-      await flush();
+      await flushTasks(2);
       await user.keyboard("{ArrowDown}{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(caught).not.toHaveBeenCalled();
       // Controlled parents in this suite always adopt after the action, so both commit.
       expect(input().value).toBe("Japan");
@@ -1181,9 +1169,9 @@ describe("Combobox", () => {
     await user.click(input());
     await user.clear(input());
     await user.keyboard("ja");
-    await flush();
+    await flushTasks(2);
     await user.keyboard("{ArrowDown}{Enter}");
-    await flush();
+    await flushTasks(2);
     expect(input().value).toBe("France");
     expect(texts.mock.lastCall).toEqual(["France", expect.anything()]);
     expect(texts.mock.lastCall![1].reason).toBe("dismiss");
@@ -1215,9 +1203,9 @@ describe("Combobox", () => {
       expectPending(option("jm"));
       expectNotPending(option("jp"));
       await act(async () => second.resolve());
-      await flush();
+      await flushTasks(2);
       await act(async () => first.resolve());
-      await flush();
+      await flushTasks(2);
       expect(hide).toHaveBeenCalledTimes(1);
       expect(input()).toHaveAttribute("data-selected", "");
       if (mode === "controlled") {
@@ -1249,9 +1237,9 @@ describe("Combobox", () => {
       await user.click(option("jp"));
       await user.click(option("jm"));
       await act(async () => second.resolve());
-      await flush();
+      await flushTasks(2);
       await act(async () => first.reject(new Error("older")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledTimes(1);
       expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
     });
@@ -1275,11 +1263,11 @@ describe("Combobox", () => {
       await user.click(option("jp"));
       await user.click(option("jm"));
       await act(async () => first.reject(new Error("older")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledTimes(1);
       expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
       await act(async () => second.resolve());
-      await flush();
+      await flushTasks(2);
     });
   });
 
@@ -1290,7 +1278,7 @@ describe("Combobox", () => {
       render(<Harness root={{ allowCustomValue: true, valueChangeAction: action, name: "tag" }} />);
       await typeText(user, "Narnia");
       await user.keyboard("{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       const [next, details] = action.mock.calls[0]!;
       expect(next).toBe("Narnia");
@@ -1310,7 +1298,7 @@ describe("Combobox", () => {
       render(<Harness root={{ allowCustomValue: true, valueChangeAction: action, name: "tag" }} />);
       await typeText(user, "Oz");
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(fireEvent.keyDown(input(), { key: "Enter" })).toBe(true);
       expect(action).toHaveBeenCalledWith("Oz", expect.anything());
       expect(hidden()!.value).toBe("Oz");
@@ -1321,7 +1309,7 @@ describe("Combobox", () => {
       render(<Harness root={{ allowCustomValue: true, name: "tag" }} />);
       await typeText(user, "Oz");
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       let seen: string | undefined;
       const listener = () => {
         seen = hidden()!.value;
@@ -1335,7 +1323,7 @@ describe("Combobox", () => {
         document.removeEventListener("keydown", listener);
       }
       expect(seen).toBe("Oz");
-      await flush();
+      await flushTasks(2);
     });
 
     it("Enter right after a dismissal, before its toggle task, is the closed Enter", async () => {
@@ -1352,7 +1340,7 @@ describe("Combobox", () => {
       expect(notPrevented).toBe(true);
       expect(action).toHaveBeenCalledWith("Oz", expect.anything());
       expect(hidden()!.value).toBe("Oz");
-      await flush();
+      await flushTasks(2);
     });
 
     it("focus leaving with changed text dispatches with the focusout event", async () => {
@@ -1361,7 +1349,7 @@ describe("Combobox", () => {
       render(<Harness root={{ allowCustomValue: true, valueChangeAction: action }} />);
       await typeText(user, "Oz");
       await user.click(screen.getByTestId("next"));
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]![0]).toBe("Oz");
       expect(action.mock.calls[0]![1].custom).toBe(true);
@@ -1385,7 +1373,7 @@ describe("Combobox", () => {
       await user.click(input());
       await user.clear(input());
       await user.click(screen.getByTestId("next"));
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]![0]).toBeNull();
       expect(action.mock.calls[0]![1].custom).toBe(false);
@@ -1418,9 +1406,9 @@ describe("Combobox", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("Jam");
-      await flush();
+      await flushTasks(2);
       await user.click(screen.getByTestId("next"));
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(input().value).toBe("France");
       expect(texts.mock.lastCall![0]).toBe("France");
@@ -1433,15 +1421,15 @@ describe("Combobox", () => {
       render(<Harness />);
       await typeText(user, "ja");
       await user.click(screen.getByTestId("next"));
-      await flush();
+      await flushTasks(2);
       expect(input().value).toBe("");
       await typeText(user, "ja");
       await user.click(option("jm"));
-      await flush();
+      await flushTasks(2);
       await user.clear(input());
       await user.keyboard("zzz");
       await user.click(screen.getByTestId("next"));
-      await flush();
+      await flushTasks(2);
       expect(input().value).toBe("Jamaica");
     });
   });
@@ -1458,7 +1446,7 @@ describe("Combobox", () => {
         texts.mockClear();
         rerender(<Harness root={{ ...root, disabled: true }} />);
         fireEvent.focusOut(input(), { relatedTarget: screen.getByTestId("next") });
-        await flush();
+        await flushTasks(2);
         expect(action).not.toHaveBeenCalled();
         expect(texts).not.toHaveBeenCalled();
         expect(input().value).toBe("jam");
@@ -1474,7 +1462,7 @@ describe("Combobox", () => {
       await typeText(user, "j");
       await user.click(screen.getByTestId("elsewhere"));
       expect(hide).toHaveBeenCalledTimes(1);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(openAction.mock.calls.at(-1)![0]).toBe(false);
       expect(openAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
@@ -1486,7 +1474,7 @@ describe("Combobox", () => {
       render(<Harness />);
       await typeText(user, "j");
       fireEvent.blur(input(), { relatedTarget: null });
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(input().value).toBe("j");
     });
@@ -1513,7 +1501,7 @@ describe("Combobox", () => {
       await user.keyboard("{ArrowDown}");
       expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id);
       await user.keyboard("am");
-      await flush();
+      await flushTasks(2);
       expect(optionTexts()).toEqual(["Jamaica"]);
       expect(input()).not.toHaveAttribute("aria-activedescendant");
     });
@@ -1526,7 +1514,7 @@ describe("Combobox", () => {
       expect(input()).toHaveAttribute("aria-activedescendant", option("jm").id);
       await user.keyboard("a");
       expect(input()).not.toHaveAttribute("aria-activedescendant");
-      await flush();
+      await flushTasks(2);
       expect(optionTexts()).toEqual(["Japan", "Jamaica"]);
       expect(input()).not.toHaveAttribute("aria-activedescendant");
       expect(option("jm")).not.toHaveAttribute("data-active");
@@ -1543,7 +1531,7 @@ describe("Combobox", () => {
         await user.keyboard("{ArrowDown}");
         expect(input()).toHaveAttribute("aria-activedescendant");
         expect(fireEvent.keyDown(input(), { key })).toBe(true);
-        await flush();
+        await flushTasks(2);
         // autoHighlight does not take it back: the results did not change.
         expect(input()).not.toHaveAttribute("aria-activedescendant");
         expect(isOpen()).toBe(true);
@@ -1557,7 +1545,7 @@ describe("Combobox", () => {
       await typeText(user, "ja");
       await user.keyboard("{ArrowDown}");
       await user.keyboard("p{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.lastCall![0]).toBe("jap");
       expect(action.mock.lastCall![1].custom).toBe(true);
@@ -1578,12 +1566,12 @@ describe("Combobox", () => {
       await user.keyboard("{ArrowDown}");
       expect(input()).toHaveAttribute("aria-activedescendant", option("jm").id);
       await user.keyboard("{Backspace}f");
-      await flush();
+      await flushTasks(2);
       // Stale: the old results stay, nothing is active (typing cleared it; not re-highlighted).
       expect(list()).toHaveAttribute("data-stale", "");
       expect(input()).not.toHaveAttribute("aria-activedescendant");
       await act(async () => search.resolve("f"));
-      await flush();
+      await flushTasks(2);
       expect(input()).toHaveAttribute("aria-activedescendant", option("fr").id);
       await user.keyboard("{Enter}");
       expect(input().value).toBe("France");
@@ -1604,11 +1592,11 @@ describe("Combobox", () => {
         await typeText(user, "ja");
         expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id);
         await user.keyboard("m");
-        await flush();
+        await flushTasks(2);
         expect(list()).toHaveAttribute("data-stale", "");
         expect(input()).not.toHaveAttribute("aria-activedescendant");
         await user.keyboard("{Enter}");
-        await flush();
+        await flushTasks(2);
         if (allowCustomValue) {
           expect(action).toHaveBeenCalledTimes(1);
           expect(action.mock.lastCall![0]).toBe("jam");
@@ -1627,7 +1615,7 @@ describe("Combobox", () => {
       await typeText(user, "j");
       await user.keyboard("{ArrowDown}");
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(input()).not.toHaveAttribute("aria-activedescendant");
     });
   });
@@ -1657,17 +1645,17 @@ describe("Combobox", () => {
       expect(screen.queryByTestId("empty")).toBeNull();
       expect(list()).not.toHaveAttribute("data-empty");
       await act(async () => search.resolve("j"));
-      await flush();
+      await flushTasks(2);
       expect(screen.queryByTestId("loading")).toBeNull();
       expect(list()).not.toHaveAttribute("aria-busy");
       expect(screen.queryByTestId("empty")).toBeNull();
       await user.keyboard("zz");
-      await flush();
+      await flushTasks(2);
       // Stale old results: no Empty.
       expect(list()).toHaveAttribute("data-stale", "");
       expect(screen.queryByTestId("empty")).toBeNull();
       await act(async () => search.resolve("jzz"));
-      await flush();
+      await flushTasks(2);
       expect(optionTexts()).toEqual([]);
       expect(screen.getByTestId("empty")).toHaveTextContent("No country");
       expect(list()).toHaveAttribute("data-empty", "");
@@ -1715,13 +1703,13 @@ describe("Combobox", () => {
       expect(notify).toHaveBeenCalledTimes(1);
       expect(notify).toHaveBeenLastCalledWith(list(), "3 results");
       await user.keyboard("a");
-      await flush();
+      await flushTasks(2);
       expect(notify).toHaveBeenLastCalledWith(list(), "2 results");
       await user.keyboard("m");
-      await flush();
+      await flushTasks(2);
       expect(notify).toHaveBeenLastCalledWith(list(), "1 result");
       await user.keyboard("z");
-      await flush();
+      await flushTasks(2);
       expect(notify).toHaveBeenLastCalledWith(list(), "No results");
       expect(notify).toHaveBeenCalledTimes(4);
       // A re-render with the same results announces nothing.
@@ -1738,11 +1726,11 @@ describe("Combobox", () => {
       await typeText(user, "j");
       expect(notify).toHaveBeenCalledTimes(1);
       await user.keyboard("a");
-      await flush();
+      await flushTasks(2);
       expect(list()).toHaveAttribute("data-stale", "");
       expect(notify).toHaveBeenCalledTimes(1);
       await act(async () => search.resolve("ja"));
-      await flush();
+      await flushTasks(2);
       expect(notify).toHaveBeenCalledTimes(2);
       expect(notify).toHaveBeenLastCalledWith(list(), "2 results");
     });
@@ -1765,10 +1753,10 @@ describe("Combobox", () => {
       await typeText(user, "j");
       expect(screen.getByTestId("loading")).toBeInTheDocument();
       expect(isOpen()).toBe(true);
-      await flush();
+      await flushTasks(2);
       expect(notify).not.toHaveBeenCalled();
       await act(async () => search.resolve("j"));
-      await flush();
+      await flushTasks(2);
       expect(notify).toHaveBeenCalledTimes(1);
       expect(notify).toHaveBeenLastCalledWith(list(), "3 results");
     });
@@ -1784,7 +1772,7 @@ describe("Combobox", () => {
       expect(notify).toHaveBeenLastCalledWith(list(), "3 countries");
       await user.clear(input());
       await user.keyboard("x");
-      await flush();
+      await flushTasks(2);
       expect(announce).toHaveBeenLastCalledWith(0, expect.objectContaining({ query: "x" }));
       // "3 countries" for "j", "4 countries" for the emptied text, nothing for "x".
       expect(notify).toHaveBeenCalledTimes(2);
@@ -1818,7 +1806,7 @@ describe("Combobox", () => {
       );
       await user.click(input());
       await user.click(clearButton());
-      await flush();
+      await flushTasks(2);
       expect(input().value).toBe("");
       expect(texts).toHaveBeenCalledWith("", expect.anything());
       expect(texts.mock.lastCall![1].reason).toBe("activate");
@@ -1893,7 +1881,7 @@ describe("Combobox", () => {
       }
       await setupUser().click(trigger());
       await setupUser().click(clearButton());
-      await flush();
+      await flushTasks(2);
       expect(openAction).not.toHaveBeenCalled();
       expect(valueAction).not.toHaveBeenCalled();
       expect(isOpen()).toBe(false);
@@ -1916,7 +1904,7 @@ describe("Combobox", () => {
       container.innerHTML = renderToString(ui);
       container.querySelector<HTMLInputElement>('[role="combobox"]')!.value = typed;
       const result = render(ui, { container, hydrate: true });
-      await flush();
+      await flushTasks(2);
       return result;
     }
 
@@ -1949,7 +1937,7 @@ describe("Combobox", () => {
         const user = setupUser();
         await user.click(input());
         await user.keyboard("{ArrowDown}");
-        await flush();
+        await flushTasks(2);
         expect(optionTexts()).toEqual(["Japan"]);
       });
     });
@@ -1991,9 +1979,9 @@ describe("Combobox", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("ja");
-      await flush();
+      await flushTasks(2);
       await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(hidden()!.value).toBe("jm");
       expect(input().value).toBe("Jamaica");
       action.mockClear();
@@ -2001,7 +1989,7 @@ describe("Combobox", () => {
       await act(async () => {
         (screen.getByTestId("form") as HTMLFormElement).reset();
       });
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]![0]).toBe("fr");
       expect(action.mock.calls[0]![1].reason).toBe("platform");
@@ -2021,19 +2009,19 @@ describe("Combobox", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("ja");
-      await flush();
+      await flushTasks(2);
       await user.click(option("jp"));
-      await flush();
+      await flushTasks(2);
       action.mockClear();
       const form = screen.getByTestId("form");
       const cancel = (event: Event) => event.preventDefault();
       form.addEventListener("reset", cancel);
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       form.removeEventListener("reset", cancel);
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       expect(input().value).toBe("France");
       expect(hidden()!.value).toBe("fr");
@@ -2054,7 +2042,7 @@ describe("Combobox", () => {
     const { rerender, unmount } = render(ui({ defaultValue: "fr", defaultInputValue: "France" }));
     rerender(ui({ defaultValue: "jp", defaultInputValue: "Japan" }));
     await act(async () => form().reset());
-    await flush();
+    await flushTasks(2);
     expect(action.mock.calls.map(([n]) => n)).toEqual(["jp"]);
     expect(texts.mock.calls.map(([t]) => t)).toEqual(["Japan"]);
     unmount();
@@ -2063,7 +2051,7 @@ describe("Combobox", () => {
     const controlled = render(ui({ value: "fr", inputValue: "France" }));
     controlled.rerender(ui({ value: "jm", inputValue: "Jamaica" }));
     await act(async () => form().reset());
-    await flush();
+    await flushTasks(2);
     expect(action.mock.calls.map(([n]) => n)).toEqual(["fr"]);
     expect(texts.mock.calls.map(([t]) => t)).toEqual(["France"]);
   });
@@ -2084,11 +2072,11 @@ describe("Combobox", () => {
     );
     await typeText(user, "fr");
     await user.keyboard("{ArrowDown}{Enter}");
-    await flush();
+    await flushTasks(2);
     expect(hidden()!.value).toBe("fr");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await act(async () => submit.resolve());
-    await flush();
+    await flushTasks(2);
     expect(action).toHaveBeenCalledTimes(2);
     expect(action.mock.calls[1]![0]).toBeNull();
     expect(action.mock.calls[1]![1].reason).toBe("platform");
@@ -2107,7 +2095,7 @@ describe("Combobox", () => {
     await act(async () => {
       (screen.getByTestId("form") as HTMLFormElement).reset();
     });
-    await flush();
+    await flushTasks(2);
     expect(input().value).toBe("Kept");
   });
 
@@ -2142,12 +2130,12 @@ describe("Combobox", () => {
       render(<App />);
       await typeText(user, "fr");
       await user.keyboard("{ArrowDown}{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(screen.queryByTestId("fallback")).toBeNull();
       expect(screen.getByTestId("suspender")).toHaveTextContent("none");
       expectPending(input());
       await act(async () => content.resolve("fr", "France detail"));
-      await flush();
+      await flushTasks(2);
       expect(screen.getByTestId("suspender")).toHaveTextContent("France detail");
       expectNotPending(input());
     });
@@ -2175,13 +2163,13 @@ describe("Combobox", () => {
         </Combobox.Root>,
       );
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expectPending(input());
       expectPending(trigger());
       expect(input()).toHaveAttribute("aria-expanded", "true");
       expect(shows).toHaveLength(0);
       await act(async () => results.resolve("all"));
-      await flush();
+      await flushTasks(2);
       expect(shows).toHaveLength(1);
       expect(isOpen()).toBe(true);
       expectNotPending(input());
@@ -2278,7 +2266,7 @@ describe("Combobox", () => {
       expect(input()).toHaveClass("in");
       expect(popup()).toHaveClass("pop");
       await act(async () => save.resolve());
-      await flush();
+      await flushTasks(2);
     });
 
     it("render={<input type=search />} keeps the role and the handlers", async () => {
@@ -2375,7 +2363,7 @@ describe("Combobox", () => {
         const { unmount } = render(<Harness popup={transition ? { transition } : {}} />);
         await typeText(user, "j");
         await user.click(option("jp"));
-        await flush();
+        await flushTasks(2);
         if (transition) expect(childrenAtHide).toBe(0);
         else expect(childrenAtHide).toBeGreaterThan(0);
         spy.mockRestore();

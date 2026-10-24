@@ -14,7 +14,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, useState } from "react";
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
@@ -27,6 +27,9 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  PlainButton,
+  flushTasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import { Menu } from "./index.js";
 import type {
@@ -42,6 +45,7 @@ import type {
   MenuRootState,
   MenuTriggerState,
 } from "./index.js";
+import { recordClicks, spyHide, watchShow } from "../__tests__/overlay-helpers.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
 
@@ -111,51 +115,14 @@ function SubmenuContent({
   );
 }
 
-function MyButton(props: ComponentPropsWithRef<"button">) {
-  return <button {...props} />;
-}
-
 const trigger = () => screen.getByTestId("trigger");
 const popup = () => screen.getByTestId("popup");
 const item = (id: string) => screen.getByTestId(id);
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
 
-/** Runs the tasks the shim queued (`toggle`) and React's work after them. */
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
-
-/**
- * Records, for every `showPopover()` call, the popup and the element carrying `autofocus` at
- * that moment (the library writes it right before the call, design 6.1).
- */
-function watchShow() {
-  const calls: { popup: HTMLElement; autofocus: Element | null; source: unknown }[] = [];
-  const original = HTMLElement.prototype.showPopover;
-  const spy = vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
-    this: HTMLElement,
-    options?: ShowPopoverOptions,
-  ) {
-    const autofocus = this.hasAttribute("autofocus") ? this : this.querySelector("[autofocus]");
-    calls.push({ popup: this, autofocus, source: options?.source });
-    return original.call(this, options);
-  });
-  return { calls, spy };
-}
-
-function spyHide() {
-  return vi.spyOn(HTMLElement.prototype, "hidePopover");
-}
-
 async function openMenu(user: ReturnType<typeof setupUser>) {
   await user.click(trigger());
-  await flush();
+  await flushTasks(2);
   expect(isOpen()).toBe(true);
 }
 
@@ -310,7 +277,7 @@ describe("Menu", () => {
       expect(item("move")).toHaveAttribute("data-disabled", "");
       expect(item("move")).not.toHaveAttribute("disabled");
       await user.click(item("move"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen(screen.getByTestId("subpopup"))).toBe(false);
     });
   });
@@ -334,7 +301,7 @@ describe("Menu", () => {
       );
       trigger().focus();
       await user.keyboard("{ArrowDown}");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(calls).toHaveLength(1);
       expect(calls[0]!.autofocus).toBe(item("b"));
@@ -349,7 +316,7 @@ describe("Menu", () => {
       render(<Harness />);
       trigger().focus();
       await user.keyboard("{ArrowUp}");
-      await flush();
+      await flushTasks(2);
       expect(calls[0]!.autofocus).toBe(item("delete"));
     });
 
@@ -359,7 +326,7 @@ describe("Menu", () => {
       render(<Harness />);
       trigger().focus();
       await user.keyboard(key);
-      await flush();
+      await flushTasks(2);
       expect(calls[0]!.autofocus).toBe(item("rename"));
     });
 
@@ -371,7 +338,7 @@ describe("Menu", () => {
       await openMenu(user);
       expect(calls[0]!.autofocus).toBe(item("rename"));
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
         [true, "activate"],
@@ -401,13 +368,13 @@ describe("Menu", () => {
       expect(trigger()).toBeDisabled();
       fireEvent.keyDown(trigger(), { key: "ArrowDown" });
       fireEvent.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
 
     it.each([
       ["a link", <a key="link" href="#x" />],
-      ["a component", <MyButton key="component" />],
+      ["a component", <PlainButton key="component" />],
     ] as const)(
       "a disabled Trigger with %s render is aria-disabled; click, Enter and ArrowDown do not open (#83)",
       async (_, element) => {
@@ -430,7 +397,7 @@ describe("Menu", () => {
         trigger().focus();
         await user.keyboard("{Enter}");
         await user.keyboard("{ArrowDown}");
-        await flush();
+        await flushTasks(2);
         expect(isOpen()).toBe(false);
         expect(openChange).not.toHaveBeenCalled();
       },
@@ -439,7 +406,7 @@ describe("Menu", () => {
     it("a disabled Trigger with a component render is no invoker: no commandfor / command (review M1)", () => {
       render(
         <Menu.Root>
-          <Menu.Trigger data-testid="trigger" disabled render={<MyButton />}>
+          <Menu.Trigger data-testid="trigger" disabled render={<PlainButton />}>
             Actions
           </Menu.Trigger>
           <Menu.Popup data-testid="popup">
@@ -455,7 +422,7 @@ describe("Menu", () => {
       const container = document.createElement("div");
       container.innerHTML = renderToString(
         <Menu.Root>
-          <Menu.Trigger disabled render={<MyButton />}>
+          <Menu.Trigger disabled render={<PlainButton />}>
             Actions
           </Menu.Trigger>
           <Menu.Popup>
@@ -470,7 +437,7 @@ describe("Menu", () => {
       // Enabled again: the command is back.
       container.innerHTML = renderToString(
         <Menu.Root>
-          <Menu.Trigger render={<MyButton />}>Actions</Menu.Trigger>
+          <Menu.Trigger render={<PlainButton />}>Actions</Menu.Trigger>
           <Menu.Popup>
             <Menu.Item>A</Menu.Item>
           </Menu.Popup>
@@ -780,7 +747,7 @@ describe("Menu.Item actions", () => {
     );
     await openMenu(user);
     await user.click(item("rename"));
-    await flush();
+    await flushTasks(2);
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]).toHaveLength(1);
     const details = action.mock.calls[0]![0];
@@ -822,7 +789,7 @@ describe("Menu.Item actions", () => {
     render(<Harness />);
     await openMenu(user);
     await user.click(item("rename"));
-    await flush();
+    await flushTasks(2);
     expect(isOpen()).toBe(false);
   });
 
@@ -842,7 +809,7 @@ describe("Menu.Item actions", () => {
     await user.click(item("rename"));
     item("rename").focus();
     await user.keyboard("{Enter} ");
-    await flush();
+    await flushTasks(2);
     expect(action).not.toHaveBeenCalled();
     expect(isOpen()).toBe(true);
   });
@@ -862,7 +829,7 @@ describe("Menu.Item actions", () => {
     );
     await openMenu(user);
     await user.click(item("refresh"));
-    await flush();
+    await flushTasks(2);
     expect(action).toHaveBeenCalledTimes(1);
     expect(hide).not.toHaveBeenCalled();
     expect(isOpen()).toBe(true);
@@ -908,7 +875,7 @@ describe("Menu.Item actions", () => {
       expectNotPending(trigger());
       expect(isOpen()).toBe(true);
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(hide).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
     });
@@ -936,7 +903,7 @@ describe("Menu.Item actions", () => {
       );
       await openMenu(user);
       await user.click(item("archive"));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "archive failed" }));
       expect(hide).not.toHaveBeenCalled();
       expect(isOpen()).toBe(true);
@@ -944,14 +911,6 @@ describe("Menu.Item actions", () => {
   });
 
   describe("re-entry (#81, design/components/button.md 16.4)", () => {
-    /** `defaultPrevented` of every click once it bubbled past React's root listener. */
-    function recordClicks(): { seen: boolean[]; stop: () => void } {
-      const seen: boolean[] = [];
-      const listener = (event: Event) => seen.push(event.defaultPrevented);
-      document.addEventListener("click", listener);
-      return { seen, stop: () => document.removeEventListener("click", listener) };
-    }
-
     it("M1: a second Enter, Space and click while pending are ignored and cancelled; one close", async () => {
       const user = setupUser();
       const work = deferred();
@@ -990,7 +949,7 @@ describe("Menu.Item actions", () => {
       expect(archive).toHaveFocus();
       expect(isOpen()).toBe(true);
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(openChange.mock.calls.filter(([next]) => !next)).toHaveLength(1);
       expect(hide).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
@@ -1019,7 +978,7 @@ describe("Menu.Item actions", () => {
       expect(action).toHaveBeenCalledTimes(1);
       expect(second).toBe(false); // cancelled
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
 
@@ -1046,7 +1005,7 @@ describe("Menu.Item actions", () => {
       expect(refresh).toHaveAttribute("aria-disabled", "true");
       expectPending(refresh);
       await act(async () => runs[0]!.resolve());
-      await flush();
+      await flushTasks(2);
       expect(refresh).not.toHaveAttribute("aria-disabled");
       expectNotPending(refresh);
       expect(isOpen()).toBe(true);
@@ -1123,7 +1082,7 @@ describe("Menu.Item actions", () => {
       await openMenu(user);
       await user.click(item("archive"));
       await act(async () => runs[0]!.reject(new Error("first failed")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
       expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
       expect(isOpen()).toBe(true);
@@ -1153,7 +1112,7 @@ describe("Menu.Item actions", () => {
     expect(link).toHaveAttribute("role", "menuitem");
     link.focus();
     await user.keyboard("{Enter}");
-    await flush();
+    await flushTasks(2);
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![0].event!.type).toBe("click");
     expect(isOpen()).toBe(false);
@@ -1181,12 +1140,12 @@ describe("Menu.Item actions", () => {
     await user.click(item("archive"));
     // Escape (the platform's hide), then a new open while the action still runs.
     await act(async () => popup().hidePopover());
-    await flush();
+    await flushTasks(2);
     // React holds the re-open's commit until the item's async action settles (entangled
     // transitions); the item's close, which belongs to the first opening, is then dropped.
     await user.click(trigger());
     await act(async () => work.resolve());
-    await flush();
+    await flushTasks(2);
     expect(isOpen()).toBe(true);
   });
 
@@ -1252,7 +1211,7 @@ describe("Menu.CheckboxItem", () => {
       expect(item("box")).toHaveTextContent("Compact on…");
       expect(action.mock.calls[0]![0]).toBe(true);
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expectNotPending(item("box"));
       expect(item("box")).toHaveAttribute("aria-checked", "true");
       expect(hide).not.toHaveBeenCalled();
@@ -1260,7 +1219,7 @@ describe("Menu.CheckboxItem", () => {
       // Space toggles back.
       item("box").focus();
       await user.keyboard(" ");
-      await flush();
+      await flushTasks(2);
       expect(item("box")).toHaveAttribute("aria-checked", "false");
     });
 
@@ -1272,7 +1231,7 @@ describe("Menu.CheckboxItem", () => {
       await user.click(item("box"));
       expect(isOpen()).toBe(true);
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
 
@@ -1288,11 +1247,11 @@ describe("Menu.CheckboxItem", () => {
       // the re-open's commit until the change settles (entangled transitions); the stack close,
       // which belongs to the first opening, is then dropped.
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       await user.click(trigger());
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
     });
 
@@ -1311,7 +1270,7 @@ describe("Menu.CheckboxItem", () => {
       );
       await openMenu(user);
       await user.click(item("box"));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
     });
   });
@@ -1334,7 +1293,7 @@ describe("Menu.CheckboxItem", () => {
     await user.click(item("box"));
     expect(item("box")).toHaveAttribute("aria-checked", "true");
     await act(async () => failing.reject(new Error("save failed")));
-    await flush();
+    await flushTasks(2);
     expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
   });
 
@@ -1366,7 +1325,7 @@ describe("Menu.CheckboxItem", () => {
     render(<Caught />);
     await openMenu(user);
     await user.click(item("box"));
-    await flush();
+    await flushTasks(2);
     expect(item("box")).toHaveAttribute("aria-checked", "false");
     expect(isOpen()).toBe(true);
   });
@@ -1393,7 +1352,7 @@ describe("Menu.CheckboxItem", () => {
     await user.click(item("box"));
     expect(item("box")).toHaveAttribute("aria-checked", "false");
     await act(async () => runs[0]!.reject(new Error("older failed")));
-    await flush();
+    await flushTasks(2);
     expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older failed" }));
   });
 });
@@ -1460,7 +1419,7 @@ describe("Menu.RadioGroup", () => {
       expectNotPending(item("name"));
       expect(item("state")).toHaveTextContent("date…");
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expectNotPending(item("group"));
       expect(item("date")).toHaveAttribute("aria-checked", "true");
       expect(isOpen()).toBe(true);
@@ -1473,7 +1432,7 @@ describe("Menu.RadioGroup", () => {
       await openMenu(user);
       await user.click(item("name"));
       await user.click(item("size"));
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(isOpen()).toBe(true);
     });
@@ -1491,7 +1450,7 @@ describe("Menu.RadioGroup", () => {
       expectNotPending(item("date"));
       await act(async () => runs[1]!.resolve());
       await act(async () => runs[0]!.resolve());
-      await flush();
+      await flushTasks(2);
       expectNotPending(item("group"));
       if (mode === "uncontrolled") {
         expect(item("name")).toHaveAttribute("aria-checked", "true");
@@ -1513,7 +1472,7 @@ describe("Menu.RadioGroup", () => {
       );
       await openMenu(user);
       await user.click(item("date"));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "sort failed" }));
     });
 
@@ -1526,11 +1485,11 @@ describe("Menu.RadioGroup", () => {
       await user.click(item("date"));
       expect(action).toHaveBeenCalledTimes(1);
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       await user.click(trigger());
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(item("date")).toHaveAttribute("aria-checked", "true");
     });
@@ -1541,11 +1500,11 @@ describe("Menu.RadioGroup", () => {
       render(<Radios action={action} closeOnActivate />);
       await openMenu(user);
       await user.click(item("date"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       await openMenu(user);
       await user.click(item("date"));
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
     });
@@ -1578,7 +1537,7 @@ describe("Menu.RadioGroup", () => {
     );
     await openMenu(user);
     await user.click(item("b"));
-    await flush();
+    await flushTasks(2);
     expect(caught).toHaveBeenCalled();
     expect(isOpen()).toBe(true);
   });
@@ -1610,7 +1569,7 @@ describe("Menu.RadioGroup", () => {
     await user.click(item("a"));
     await act(async () => runs[1]!.resolve());
     await act(async () => runs[0]!.reject(new Error("older failed")));
-    await flush();
+    await flushTasks(2);
     expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older failed" }));
   });
 
@@ -1676,7 +1635,7 @@ describe("Menu.Root", () => {
     expect(trigger()).toHaveClass("open");
     expect(isOpen()).toBe(false);
     await act(async () => work.resolve());
-    await flush();
+    await flushTasks(2);
     expect(isOpen()).toBe(true);
     expect(seen.popup!.open).toBe(true);
     expectNotPending(trigger());
@@ -1699,13 +1658,13 @@ describe("Menu.Root", () => {
       </Suspense>,
     );
     await user.click(trigger());
-    await flush();
+    await flushTasks(2);
     expectPending(trigger());
     expect(trigger()).toHaveAttribute("aria-expanded", "true");
     expect(calls).toHaveLength(0);
     expect(screen.queryByTestId("fallback")).toBeNull();
     await act(async () => resolve("recent"));
-    await flush();
+    await flushTasks(2);
     expect(calls).toHaveLength(1);
     expect(calls[0]!.autofocus).toBe(item("first"));
     expectNotPending(trigger());
@@ -1730,7 +1689,7 @@ describe("Menu.Root", () => {
     render(<Controlled />);
     await openMenu(user);
     await user.click(item("rename"));
-    await flush();
+    await flushTasks(2);
     expect(isOpen()).toBe(false);
   });
 
@@ -1748,11 +1707,11 @@ describe("Menu.Root", () => {
     const { calls } = watchShow();
     render(<Outside />);
     fireEvent.click(screen.getByTestId("flip"));
-    await flush();
+    await flushTasks(2);
     expect(isOpen()).toBe(true);
     expect(calls[0]!.autofocus).toBe(item("rename"));
     fireEvent.click(screen.getByTestId("flip"));
-    await flush();
+    await flushTasks(2);
     expect(isOpen()).toBe(false);
     expect(action).not.toHaveBeenCalled();
   });
@@ -1763,7 +1722,7 @@ describe("Menu.Root", () => {
     const event = dispatchCommand(popup(), "show-popover");
     expect(event.defaultPrevented).toBe(false);
     act(() => popup().showPopover());
-    await flush();
+    await flushTasks(2);
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![1].reason).toBe("activate");
     expect(isOpen()).toBe(true);
@@ -1785,7 +1744,7 @@ describe("Menu.Root", () => {
     await act(async () => {
       render(ui, { container, hydrate: true });
     });
-    await flush();
+    await flushTasks(2);
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![0]).toBe(true);
     expect(action.mock.calls[0]![1].reason).toBe("platform");
@@ -1855,7 +1814,7 @@ describe("submenus", () => {
     await openMenu(user);
     item("move").focus();
     await user.keyboard("{ArrowRight}");
-    await flush();
+    await flushTasks(2);
     expect(isOpen(screen.getByTestId("subpopup"))).toBe(true);
   }
   const sub = () => screen.getByTestId("subpopup");
@@ -1887,7 +1846,7 @@ describe("submenus", () => {
       expect(popup()).toHaveAttribute("data-align", "start");
       expect(states.at(-1)).toMatchObject({ side: "top", align: "start" });
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(popup()).toHaveAttribute("data-side", "bottom");
       expect(states.at(-1)).toMatchObject({ side: "bottom", align: "start" });
     });
@@ -1904,7 +1863,7 @@ describe("submenus", () => {
       expect(sub()).toHaveAttribute("data-align", "start");
       expect(sub().style.getPropertyValue("position-area")).toBe("self-x-end span-bottom");
       await act(async () => sub().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(sub()).toHaveAttribute("data-side", "inline-end");
     });
   });
@@ -1950,7 +1909,7 @@ describe("submenus", () => {
     await openMenu(user);
     item("move").focus();
     await user.keyboard(key);
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(true);
     expect(calls.at(-1)!.autofocus).toBe(item("inbox"));
   });
@@ -1961,11 +1920,11 @@ describe("submenus", () => {
     render(<Harness content={<SubmenuContent sub={{ openChangeAction: subAction }} />} />);
     await openMenu(user);
     await user.click(item("move"));
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(true);
     item("move").focus();
     await user.click(item("move"));
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(true);
     expect(item("inbox")).toHaveFocus();
     expect(subAction).toHaveBeenCalledTimes(1);
@@ -1995,7 +1954,7 @@ describe("submenus", () => {
     await openSub(user);
     item("inbox").focus();
     await user.keyboard("{ArrowLeft}");
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(false);
     expect(isOpen()).toBe(true);
     expect(subAction.mock.calls.at(-1)![0]).toBe(false);
@@ -2017,17 +1976,17 @@ describe("submenus", () => {
     await openMenu(user);
     item("move").focus();
     await user.keyboard("{ArrowRight}");
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(false);
     await user.keyboard("{ArrowLeft}");
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(true);
     item("inbox").focus();
     await user.keyboard("{ArrowLeft}");
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(true);
     await user.keyboard("{ArrowRight}");
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(false);
   });
 
@@ -2062,11 +2021,11 @@ describe("submenus", () => {
     );
     await openMenu(user);
     await user.click(item("move"));
-    await flush();
+    await flushTasks(2);
     expectPending(item("move"));
     expect(isOpen(sub())).toBe(false);
     await act(async () => resolve("files"));
-    await flush();
+    await flushTasks(2);
     expect(isOpen(sub())).toBe(true);
     expectNotPending(item("move"));
   });
@@ -2174,7 +2133,7 @@ describe("submenus", () => {
     await openSub(user);
     item("inbox").focus();
     await user.keyboard("{Enter}");
-    await flush();
+    await flushTasks(2);
     expect(onItem).toHaveBeenCalledTimes(1);
     expect(isOpen()).toBe(false);
     expect(rootAction.mock.calls.at(-1)![0]).toBe(false);
@@ -2208,7 +2167,7 @@ describe("submenus", () => {
     // Immediate, not awaited: the root popup is hidden before any action settles.
     expect(hide).toHaveBeenCalled();
     expect(isOpen()).toBe(false);
-    await flush();
+    await flushTasks(2);
     expect(rootAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
     expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
@@ -2222,7 +2181,7 @@ describe("submenus", () => {
       fireEvent.blur(item("move"), { relatedTarget: item("inbox") });
       fireEvent.blur(item("inbox"), { relatedTarget: item("rename") });
     });
-    await flush();
+    await flushTasks(2);
     expect(isOpen()).toBe(true);
     expect(isOpen(sub())).toBe(true);
   });
@@ -2268,7 +2227,7 @@ describe("right- and middle-click (context-menu.md 5, every menu)", () => {
     });
     expect(hide).toHaveBeenCalledTimes(1);
     expect(isOpen()).toBe(false);
-    await flush();
+    await flushTasks(2);
     expect(action.mock.calls.at(-1)).toEqual([
       false,
       expect.objectContaining({ reason: "dismiss" }),
@@ -2298,7 +2257,7 @@ describe("transition (smoke)", () => {
       seenItems = this.querySelectorAll('[role="menuitem"]').length;
     });
     await user.click(item("duplicate"));
-    await flush();
+    await flushTasks(2);
     expect(seenItems).toBe(0);
   });
 
@@ -2313,7 +2272,7 @@ describe("transition (smoke)", () => {
       original.call(this);
     });
     await user.click(item("duplicate"));
-    await flush();
+    await flushTasks(2);
     expect(seenItems).toBe(4);
     expect(popup().children).toHaveLength(0);
   });

@@ -16,7 +16,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { setupUser } from "../__tests__/helpers.js";
+import { setupUser, flushMicrotasks, silenceErrors } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
 import { RadioGroup } from "../radio-group/index.js";
 import { Toggle } from "../toggle/index.js";
@@ -24,12 +24,6 @@ import { Field } from "./index.js";
 import type { FieldState } from "./index.js";
 
 const JSDOM_MESSAGE = "Constraints not satisfied";
-
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
-
-const flush = () => act(async () => {});
 
 function EmailField({
   required = true,
@@ -78,7 +72,7 @@ describe("Field: roles and ARIA", () => {
         <EmailField />
       </TestForm>,
     );
-    await flush();
+    await flushMicrotasks();
     const control = screen.getByTestId("email-control");
     const label = screen.getByTestId("email-label");
     const description = screen.getByTestId("email-description");
@@ -110,7 +104,7 @@ describe("Field: roles and ARIA", () => {
         <Field.Description>D</Field.Description>
       </Field.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     const c = screen.getByTestId("c");
     expect(c.getAttribute("aria-describedby")?.split(" ")).toEqual([
       "hint",
@@ -139,7 +133,7 @@ describe("Field: roles and ARIA", () => {
         </Field.Root>
       </>,
     );
-    await flush();
+    await flushMicrotasks();
     const ta = screen.getByTestId("ta");
     expect(ta.tagName).toBe("TEXTAREA");
     expect(ta).toHaveAccessibleName("Body");
@@ -159,7 +153,7 @@ describe("Field: roles and ARIA", () => {
         <Field.Control data-testid="c" />
       </Field.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("c")).toBeDisabled();
     for (const id of ["root", "label", "c"]) {
       expect(screen.getByTestId(id)).toHaveAttribute("data-disabled", "");
@@ -173,7 +167,7 @@ describe("Field: roles and ARIA", () => {
         <Field.Control required data-testid="c" />
       </Field.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("c")).toBeRequired();
     expect(screen.getByTestId("root")).toHaveAttribute("data-required", "");
   });
@@ -186,7 +180,7 @@ describe("Field: roles and ARIA", () => {
         <Field.Control name="b" data-testid="c" />
       </Field.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("c")).toHaveAttribute("name", "b");
     expect(error).toHaveBeenCalledWith(expect.stringContaining("differs from the Field.Root's"));
   });
@@ -220,7 +214,7 @@ describe("Field: native validation (display)", () => {
     control.addEventListener("invalid", (event) => invalidEvents.push(event));
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushMicrotasks();
 
     expect(action).not.toHaveBeenCalled();
     expect(invalidEvents).toHaveLength(1);
@@ -249,7 +243,7 @@ describe("Field: native validation (display)", () => {
     );
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushMicrotasks();
     expect(document.activeElement).toBe(screen.getByTestId("first-control"));
     expect(screen.getByTestId("first-error")).toBeInTheDocument();
     expect(screen.getByTestId("second-error")).toBeInTheDocument();
@@ -266,7 +260,7 @@ describe("Field: native validation (display)", () => {
     control.addEventListener("invalid", (event) => invalidEvents.push(event));
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushMicrotasks();
     expect(invalidEvents).toHaveLength(1);
     expect(invalidEvents[0]!.defaultPrevented).toBe(false);
     // The mirror still follows: the Field shows data-invalid and aria-invalid.
@@ -301,7 +295,7 @@ describe("Field: native validation (display)", () => {
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(screen.getByTestId("email-error")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reset" }));
-    await flush();
+    await flushMicrotasks();
     expect(screen.queryByTestId("email-error")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
@@ -309,7 +303,7 @@ describe("Field: native validation (display)", () => {
     await act(async () => {
       (screen.getByTestId("form") as HTMLFormElement).reset();
     });
-    await flush();
+    await flushMicrotasks();
     expect(screen.queryByTestId("email-error")).toBeNull();
   });
 
@@ -353,7 +347,7 @@ describe("Field: validate", () => {
         </Field.Root>
       </TestForm>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(validate).toHaveBeenCalledWith("a b", expect.any(FormData));
     const c = screen.getByTestId("c") as HTMLInputElement;
     expect(c.validity.customError).toBe(true);
@@ -393,7 +387,7 @@ describe("Field: validate", () => {
         </Field.Root>
       </TestForm>,
     );
-    await flush();
+    await flushMicrotasks();
     const pw = screen.getByTestId("pw") as HTMLInputElement;
     const confirm = screen.getByTestId("confirm") as HTMLInputElement;
     expect(confirm.validity.valid).toBe(true); // "" === ""
@@ -422,7 +416,7 @@ describe("Field: validate", () => {
       );
     }
     render(<Harness />);
-    await flush();
+    await flushMicrotasks();
     const c = screen.getByTestId("c") as HTMLInputElement;
     expect(c.validationMessage).toBe("Banned.");
     const user = setupUser();
@@ -435,7 +429,7 @@ describe("Field: validate", () => {
     await act(async () => {
       (screen.getByTestId("form") as HTMLFormElement).reset();
     });
-    await flush();
+    await flushMicrotasks();
     // Back to "x", which is allowed now.
     expect(c.value).toBe("x");
     expect(c.validity.customError).toBe(false);
@@ -474,7 +468,7 @@ describe("Field: validate", () => {
       );
     }
     render(<Harness />);
-    await flush();
+    await flushMicrotasks();
     const c = screen.getByTestId("c") as HTMLInputElement;
     expect(c.validationMessage).toBe("Accept the terms.");
     const user = setupUser();
@@ -503,7 +497,7 @@ describe("Field: group controls", () => {
         </Field.Root>
       </TestForm>,
     );
-    await flush();
+    await flushMicrotasks();
     const label = screen.getByTestId("label");
     const group = screen.getByTestId("group");
     expect(label).not.toHaveAttribute("for");
@@ -519,7 +513,7 @@ describe("Field: group controls", () => {
 
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: "Submit" }));
-    await flush();
+    await flushMicrotasks();
     expect(group).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByTestId("error")).toHaveTextContent(JSDOM_MESSAGE);
     expect(document.activeElement).toBe(radios[0]);
@@ -554,7 +548,7 @@ describe("Field: function props and render", () => {
         </Field.Root>
       </TestForm>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("label")).toHaveTextContent("N *");
     expect(screen.getByTestId("root")).toHaveClass("root");
     expect(screen.getByTestId("root").style.outlineWidth).toBe("0px");
@@ -591,7 +585,7 @@ describe("Field: function props and render", () => {
         />
       </Field.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("root").tagName).toBe("SECTION");
     const c = screen.getByTestId("c");
     expect(c).toHaveClass("part", "el");
@@ -617,7 +611,7 @@ describe("Field: development warnings", () => {
         </Field.Root>
       </Field.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     const messages = error.mock.calls.map((call) => String(call[0]));
     expect(messages.some((m) => m.includes("two Field.Error parts"))).toBe(true);
     expect(messages.some((m) => m.includes("nested inside another Field.Root"))).toBe(true);
@@ -648,7 +642,7 @@ describe("Field: development warnings", () => {
         </Field.Root>
       </>,
     );
-    await flush();
+    await flushMicrotasks();
     const messages = error.mock.calls.map((call) => String(call[0]));
     expect(messages.some((m) => m.includes("two form controls registered"))).toBe(true);
     expect(messages.some((m) => m.includes("`validate` without `name`"))).toBe(true);
@@ -677,7 +671,7 @@ describe("Field: development warnings", () => {
         </Field.Root>
       </StrictMode>,
     );
-    await flush();
+    await flushMicrotasks();
     const twoErrors = error.mock.calls.filter((call) =>
       String(call[0]).includes("two Field.Error parts"),
     );

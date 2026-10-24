@@ -23,6 +23,8 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
@@ -166,8 +168,6 @@ const dataPending = () =>
   items()
     .filter((b) => b.hasAttribute("data-pending"))
     .map((b) => b.value);
-/** Lets queued microtasks (the reset handler) and the resulting renders run. */
-const flush = () => act(async () => {});
 const form = () => screen.getByTestId("form") as HTMLFormElement;
 /** `[next, reason, added, removed]` of every call, for compact assertions. */
 const calls = (action: { mock: { calls: [string[], Details][] } }) =>
@@ -377,7 +377,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("Item, Parent and Label throw outside a Root", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<CheckboxGroup.Item value="a" />)).toThrow(
         "CheckboxGroup.Item must be rendered inside a CheckboxGroup.Root.",
       );
@@ -498,7 +498,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("a click already cancelled by a pass-through onClick never dispatches", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       function Cancelling() {
         const [value, setValue] = useState<string[]>(["a"]);
@@ -525,7 +525,7 @@ describe("CheckboxGroup", () => {
       const user = setupUser();
       await user.click(box("b"));
       await user.click(parentBox());
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(dataChecked()).toEqual(["a"]);
       expectNotPending(group());
@@ -559,7 +559,7 @@ describe("CheckboxGroup", () => {
 
   renderBoth("rejection", (mode) => {
     it("reaches the Error Boundary and leaves committed state", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -708,7 +708,7 @@ describe("CheckboxGroup", () => {
     }
 
     it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds, action } = renderTwo(onError);
       const user = setupUser();
@@ -735,7 +735,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds } = renderTwo(onError);
       const user = setupUser();
@@ -1120,7 +1120,7 @@ describe("CheckboxGroup", () => {
 
   describe("Parent, server rendering", () => {
     it("emits data-indeterminate and no aria-checked; the property is set after hydration", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <CheckboxGroup.Root aria-label="T" defaultValue={["a"]}>
           <CheckboxGroup.Parent values={["a", "b"]} aria-label="all" />
@@ -1141,7 +1141,7 @@ describe("CheckboxGroup", () => {
       expect(serverParent.indeterminate).toBe(false);
 
       render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       expect(parentBox()).toBe(serverParent);
       expect(serverParent.indeterminate).toBe(true);
       expect(parentShows()).toBe("mixed");
@@ -1161,7 +1161,7 @@ describe("CheckboxGroup", () => {
       };
       mutate(container);
       render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       return server;
     }
 
@@ -1288,7 +1288,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("the server counts disabled Items; hydration settles without a dispatch or a warning", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       const server = await hydrate(
         <Harness
@@ -1464,7 +1464,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("the server HTML counts any checked value (it cannot know the Items); hydration corrects it", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <form data-testid="form">
           <CheckboxGroup.Root aria-label="T" name="t" required defaultValue={["c"]}>
@@ -1478,7 +1478,7 @@ describe("CheckboxGroup", () => {
       container.innerHTML = renderToString(ui);
       expect(container.querySelector('input[value="a"]')).not.toHaveAttribute("required");
       render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       expect(box("a")).toBeRequired();
       expect(consoleError).not.toHaveBeenCalled();
     });
@@ -1536,7 +1536,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(calls(action)).toEqual([
         [["a"], "activate", ["a"], []],
         [[], "platform", [], ["a"]],
@@ -1552,7 +1552,7 @@ describe("CheckboxGroup", () => {
       container.innerHTML = renderToString(ui);
       mutate(container);
       const result = render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       return result;
     }
     const setChecked =
@@ -1563,7 +1563,7 @@ describe("CheckboxGroup", () => {
 
     renderBoth("hydration", (mode) => {
       it("dispatches the hydrated DOM value once with reason platform and no event", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         await hydrate(<Harness mode={mode} initial={["a"]} action={action} />, setChecked("c"));
         expect(action).toHaveBeenCalledTimes(1);
@@ -1634,7 +1634,7 @@ describe("CheckboxGroup", () => {
           <Harness mode="uncontrolled" initial={["b"]} action={action} parent={["a", "b"]} />
         </StrictMode>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["b"]);
     });
@@ -1647,7 +1647,7 @@ describe("CheckboxGroup", () => {
       container.innerHTML = renderToString(ui);
       mutate(container);
       render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
     }
     const clickParent = (checked: boolean) => (c: HTMLElement) => {
       c.querySelector<HTMLInputElement>("input:not([name])")!.checked = checked;
@@ -1655,7 +1655,7 @@ describe("CheckboxGroup", () => {
 
     renderBoth("hydration", (mode) => {
       it("a mixed Parent checked before hydration dispatches its missing values once", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         await hydrate(
           <StrictMode>
@@ -1790,7 +1790,7 @@ describe("CheckboxGroup", () => {
 
     renderBoth("late hydration", (mode) => {
       it("pre-hydration clicks on two late Items dispatch exactly once when they hydrate", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         const { container, g } = await hydrateLate({ mode, action });
         expect(action).not.toHaveBeenCalled();
@@ -1802,7 +1802,7 @@ describe("CheckboxGroup", () => {
         await act(async () => {
           g.open();
         });
-        await flush();
+        await flushMicrotasks();
 
         expect(calls(action)).toEqual([[["a", "b", "c"], "platform", ["b", "c"], []]]);
         expect(action.mock.calls[0]?.[1].event).toBeUndefined();
@@ -1820,14 +1820,14 @@ describe("CheckboxGroup", () => {
         await act(async () => {
           g.open();
         });
-        await flush();
+        await flushMicrotasks();
         expect(calls(action)).toEqual([[["a", "b", "c"], "platform", ["b", "c"], []]]);
         expect(checkedValues()).toEqual(["a", "b", "c"]);
         expect(parentShows()).toBe("checked");
       });
 
       it("partial hydration works: a click on a hydrated Item while others are dehydrated", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         const { container, g } = await hydrateLate({ mode, action, initial: ["b"] });
         const uncaught: unknown[] = [];
@@ -1849,7 +1849,7 @@ describe("CheckboxGroup", () => {
         await act(async () => {
           g.open();
         });
-        await flush();
+        await flushMicrotasks();
         expect(action).toHaveBeenCalledTimes(1);
         expect(checkedValues()).toEqual(["a", "b"]);
         expect(dataChecked()).toEqual(["a", "b"]);
@@ -1862,7 +1862,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("a late Parent hydrating after a disabled Item registered compares with the server's derivation", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       function Group({ gate }: { gate: Promise<void> }) {
         return (
@@ -1888,7 +1888,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         g.open();
       });
-      await flush();
+      await flushMicrotasks();
       // Server: mixed (2 of 3). Over the enabled values the Parent is checked, but its DOM was
       // never clicked: nothing to report.
       expect(action).not.toHaveBeenCalled();
@@ -1910,7 +1910,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         g.open();
       });
-      await flush();
+      await flushMicrotasks();
       expect(items()).toHaveLength(3);
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["a"]);
@@ -1928,7 +1928,7 @@ describe("CheckboxGroup", () => {
       await user.click(box("c"));
       expect(committedText()).toBe("a,b,c");
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(3);
       const [next, details] = action.mock.calls[2]!;
       expect(next).toEqual(["a"]);
@@ -1963,7 +1963,7 @@ describe("CheckboxGroup", () => {
       await user.click(box("b"));
       form().addEventListener("reset", (e) => e.preventDefault());
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(checkedValues()).toEqual(["a", "b"]);
     });
@@ -1973,7 +1973,7 @@ describe("CheckboxGroup", () => {
       render(<Harness mode={mode} action={action} inForm initial={["b", "c"]} />);
       const user = setupUser();
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["b", "c"]);
     });
@@ -1999,7 +1999,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(calls(action)).toEqual([
         [["a", "b"], "activate", ["b"], []],
         [["a"], "platform", [], ["b"]],
@@ -2040,7 +2040,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(actions).toHaveLength(2);
       expect(checkedValues()).toEqual([]);
       expect(committedText()).toBe("");
@@ -2054,7 +2054,7 @@ describe("CheckboxGroup", () => {
       const user = setupUser();
       await user.click(box("b"));
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(calls(action)).toEqual([
         [["a", "b"], "activate", ["b"], []],
         [["a"], "platform", [], ["b"]],
@@ -2096,7 +2096,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(calls(action)).toEqual([
         [["a", "b"], "activate", ["b"], []],
         [["b", "c"], "platform", ["c"], ["a"]],
@@ -2119,7 +2119,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(calls(action)).toEqual([
         [["a", "kept", "ghost"], "activate", ["a", "ghost"], []],
         [["kept"], "platform", [], ["a", "ghost"]],
@@ -2154,7 +2154,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       // The Items reset to the value the group already has: no dispatch, no re-render.
       expect(action).not.toHaveBeenCalled();
       expect(parentShows()).toBe("unchecked");
@@ -2187,7 +2187,7 @@ describe("CheckboxGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
         [["a", "b"], "activate", "click"],
         [["b"], "activate", "click"],
@@ -2226,7 +2226,7 @@ describe("CheckboxGroup", () => {
         await act(async () => {
           d.resolve();
         });
-        await flush();
+        await flushMicrotasks();
         if (withAction) {
           expect(calls(action)).toEqual([
             [["a", "b"], "activate", ["b"], []],
@@ -2245,7 +2245,7 @@ describe("CheckboxGroup", () => {
 
   describe("preventDefault in the action", () => {
     it("warns once per element (Item and Parent) and the action still runs", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>((_next, details) => {
         details.event?.preventDefault();
       });
@@ -2261,16 +2261,16 @@ describe("CheckboxGroup", () => {
           .map(([m]) => String(m))
           .filter((m) => m.includes("preventDefault()"));
       await user.click(box("a"));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(warnings()).toHaveLength(1);
       expect(warnings()[0]).toMatch(/^CheckboxGroup\.Item: /);
       await user.click(box("a"));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       expect(warnings()).toHaveLength(1);
       await user.click(parentBox());
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(3);
       expect(warnings()).toHaveLength(2);
       expect(warnings()[1]).toMatch(/^CheckboxGroup\.Parent: /);
@@ -2449,7 +2449,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("Parent render element strips name, required, indeterminate and aria-checked", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       const extra = { indeterminate: true } as object;
       render(
@@ -2532,7 +2532,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("warns in development when the mounted element is not a fieldset / checkbox input", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <CheckboxGroup.Root aria-label="T" render={<div />}>
           <CheckboxGroup.Parent
@@ -2637,7 +2637,7 @@ describe("CheckboxGroup", () => {
 
   describe("dev warnings", () => {
     it("warns once when value and defaultValue are both set", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <CheckboxGroup.Root aria-label="x" value={["a"]} defaultValue={["a"]}>
           <CheckboxGroup.Item value="a" aria-label="a" />
@@ -2652,7 +2652,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("warns once when switching from uncontrolled to controlled", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (value?: string[]) => (
         <CheckboxGroup.Root aria-label="x" {...(value !== undefined && { value })}>
           <CheckboxGroup.Item value="a" aria-label="a" />
@@ -2666,7 +2666,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("warns once about duplicate Item values", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <CheckboxGroup.Root aria-label="x">
           <CheckboxGroup.Item value="a" aria-label="a1" />
@@ -2680,7 +2680,7 @@ describe("CheckboxGroup", () => {
     });
 
     it("does not warn in normal use, without value or defaultValue, or for values with no Item", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <CheckboxGroup.Root aria-label="x">
           <CheckboxGroup.Parent values={["a", "b", "ghost"]} aria-label="all" />

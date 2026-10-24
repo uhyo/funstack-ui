@@ -5,6 +5,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { guardCheckableChange, useNativeChecked } from "./use-native-checked.js";
 import type { UseNativeCheckedOptions } from "./use-native-checked.js";
+import { flushMicrotasks, silenceErrors } from "../__tests__/helpers.js";
 
 type ProbeProps = Partial<UseNativeCheckedOptions> & {
   as?: "input" | "button";
@@ -36,7 +37,6 @@ function Probe({ as = "input", inputType = "checkbox", tick = 0, ...options }: P
 }
 
 const probe = () => screen.getByLabelText("probe") as HTMLInputElement;
-const flush = () => act(async () => {});
 
 async function hydrate(ui: ReactNode, mutate: (el: HTMLInputElement) => void) {
   const container = document.createElement("div");
@@ -44,13 +44,13 @@ async function hydrate(ui: ReactNode, mutate: (el: HTMLInputElement) => void) {
   container.innerHTML = renderToString(ui);
   mutate(container.querySelector("input")!);
   render(ui, { container, hydrate: true });
-  await flush();
+  await flushMicrotasks();
 }
 
 describe("useNativeChecked", () => {
   describe("element check (dev)", () => {
     it("warns once when the node is not an input of the expected type", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const { rerender } = render(<Probe as="button" />);
       rerender(<Probe as="button" tick={1} />);
       expect(consoleError).toHaveBeenCalledTimes(1);
@@ -60,14 +60,14 @@ describe("useNativeChecked", () => {
     });
 
     it("warns for an input of the wrong type", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(<Probe inputType="radio" />);
       expect(consoleError).toHaveBeenCalledTimes(1);
       expect(consoleError.mock.calls[0]?.[0]).toMatch(/but got `<input type="radio">`/);
     });
 
     it("does not warn for the right element", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(<Probe />);
       render(<Probe type="radio" inputType="radio" />);
       expect(consoleError).not.toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe("useNativeChecked", () => {
       await act(async () => {
         screen.getByRole("button", { name: "Save" }).click();
       });
-      await flush();
+      await flushMicrotasks();
       expect(probe().defaultChecked).toBe(true);
       expect(probe().checked).toBe(false);
     });
@@ -197,7 +197,7 @@ describe("useNativeChecked", () => {
 
   describe("mount reconciliation (single control)", () => {
     it("reports the hydrated DOM value once with no event", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const onPlatformChange = vi.fn();
       await hydrate(<Probe checked={false} onPlatformChange={onPlatformChange} />, (el) => {
         el.checked = true;
@@ -273,7 +273,7 @@ describe("useNativeChecked", () => {
       expect(probe().checked).toBe(true);
       const form = screen.getByTestId("form") as HTMLFormElement;
       form.reset();
-      await flush();
+      await flushMicrotasks();
       expect(onPlatformChange).toHaveBeenCalledTimes(1);
       const [next, event] = onPlatformChange.mock.calls[0]!;
       expect(next).toBe(false);
@@ -284,7 +284,7 @@ describe("useNativeChecked", () => {
       const onPlatformChange = vi.fn();
       render(<Controlled onPlatformChange={onPlatformChange} />);
       (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flush();
+      await flushMicrotasks();
       expect(onPlatformChange).not.toHaveBeenCalled();
     });
 
@@ -295,7 +295,7 @@ describe("useNativeChecked", () => {
         screen.getByRole("button", { name: "flip" }).click();
       });
       (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flush();
+      await flushMicrotasks();
       expect(onPlatformChange).not.toHaveBeenCalled();
     });
   });
@@ -311,7 +311,7 @@ describe("guardCheckableChange", () => {
   });
 
   it("dispatches, and warns once per element when the dispatch cancelled the event", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = silenceErrors();
     const target = document.createElement("input");
     const fire = (cancel: boolean) => {
       const dispatch = vi.fn(() => {

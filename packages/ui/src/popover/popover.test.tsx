@@ -18,7 +18,7 @@
 // (#79, #81); the Close rows P1-P4 (design/components/button.md 16.4) replace them.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useRef, useState } from "react";
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
@@ -32,6 +32,9 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  PlainButton,
+  flushTasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Popover } from "./index.js";
@@ -45,6 +48,7 @@ import type {
   PopoverTriggerProps,
   PopoverTriggerState,
 } from "./index.js";
+import { recordClicks, spyHide, spyShow } from "../__tests__/overlay-helpers.js";
 
 type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
 type Mode = ControlMode | "static";
@@ -160,35 +164,10 @@ const content = () => screen.queryByTestId("content");
 const committedText = () => screen.getByTestId("committed").textContent;
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
 
-/** Runs the tasks the shim queued (`toggle`) and React's work after them. */
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-function spyShow() {
-  return vi.spyOn(HTMLElement.prototype, "showPopover");
-}
-function spyHide() {
-  return vi.spyOn(HTMLElement.prototype, "hidePopover");
-}
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
-
-/** `defaultPrevented` of every click once it bubbled past React's root listener. */
-function recordClicks(): { seen: boolean[]; stop: () => void } {
-  const seen: boolean[] = [];
-  const listener = (event: Event) => seen.push(event.defaultPrevented);
-  document.addEventListener("click", listener);
-  return { seen, stop: () => document.removeEventListener("click", listener) };
-}
-
 /** Opens a library-mode popover through the Trigger and waits for it to be shown. */
 async function openThroughTrigger(user: ReturnType<typeof setupUser>) {
   await user.click(trigger());
-  await flush();
+  await flushTasks(2);
   expect(isOpen()).toBe(true);
 }
 
@@ -401,17 +380,17 @@ describe("Popover", () => {
           }}
         </Popover.Root>,
       );
-      await flush();
+      await flushTasks(2);
       const before = renders;
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(trigger()).toHaveAttribute("aria-expanded", "false");
       // A foreign open (script) is followed too.
       await act(async () => popup().showPopover());
-      await flush();
+      await flushTasks(2);
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
       expect(renders).toBe(before);
     });
@@ -424,13 +403,13 @@ describe("Popover", () => {
       render(<Harness mode="uncontrolled" action={action} />);
       trigger().focus();
       await user.keyboard("{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenLastCalledWith(true, expect.anything());
       expect(isOpen()).toBe(true);
       // Focus moved into the popup on open; back to the Trigger for the next key.
       trigger().focus();
       await user.keyboard(" ");
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenLastCalledWith(false, expect.anything());
       expect(isOpen()).toBe(false);
     });
@@ -460,7 +439,7 @@ describe("Popover", () => {
       expect(details.event!.defaultPrevented).toBe(true);
       // `details` is serialisable; `event` is virtual (conventions 2.2).
       expect(Object.keys(details)).toEqual(["reason"]);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(committedText()).toBe("true");
     });
@@ -477,7 +456,7 @@ describe("Popover", () => {
       expect(details.reason).toBe("activate");
       expect(details.event!.type).toBe("click");
       expect(details.event!.defaultPrevented).toBe(true);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(committedText()).toBe("false");
       // The library's own hide echoes back through `toggle` without a second dispatch.
@@ -490,7 +469,7 @@ describe("Popover", () => {
       render(<Harness mode={mode} action={action} trigger={{ disabled: true }} />);
       await user.click(trigger());
       fireEvent.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(isOpen()).toBe(false);
       expect(trigger()).toHaveAttribute("data-disabled", "");
@@ -509,7 +488,7 @@ describe("Popover", () => {
       expect(next).toBe(true);
       expect(details.reason).toBe("activate");
       expect(details.event).toBe(before);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       // The test's call and the library's own (with the Trigger as source).
       expect(showPopover).toHaveBeenCalledTimes(2);
@@ -526,7 +505,7 @@ describe("Popover", () => {
       await user.click(foreign);
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]![1].event!.type).toBe("beforetoggle");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(popoverSource(popup())).toBe(trigger());
     });
@@ -540,7 +519,7 @@ describe("Popover", () => {
       foreign.setAttribute("commandfor", popup().id);
       foreign.setAttribute("command", "hide-popover");
       await user.click(foreign);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
@@ -582,7 +561,7 @@ describe("Popover", () => {
       const d = deferred();
       action.mockImplementation(() => d.promise);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(content()).toBeInTheDocument();
       expectPending(trigger());
@@ -593,7 +572,7 @@ describe("Popover", () => {
       expect(hidePopover).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
       expectNotPending(trigger());
-      await flush();
+      await flushTasks(2);
       expect(content()).toBeNull();
       expect(action).toHaveBeenCalledTimes(2);
     });
@@ -608,7 +587,7 @@ describe("Popover", () => {
       // What Escape or a click outside does: the browser hides the popover.
       await act(async () => popup().hidePopover());
       expect(isOpen()).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe(false);
@@ -618,7 +597,7 @@ describe("Popover", () => {
       expect(trigger()).not.toHaveAttribute("data-open");
       expect(content()).toBeInTheDocument(); // committed is still true
       await act(async () => d.resolve());
-      await flush();
+      await flushTasks(2);
       expectNotPending(trigger());
       expect(content()).toBeNull();
       expect(committedText()).toBe("false");
@@ -638,7 +617,7 @@ describe("Popover", () => {
       });
       expect(popup()).toHaveClass("re-rendered");
       expect(isOpen()).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(showPopover).not.toHaveBeenCalled();
       expect(isOpen()).toBe(false);
       expect(action).toHaveBeenLastCalledWith(false, expect.anything());
@@ -673,7 +652,7 @@ describe("Popover", () => {
         />,
       );
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       // A swallowed error is success: uncontrolled commits; the controlled harness returns early
       // (does not adopt) so it stays closed.
       expect(isOpen()).toBe(mode === "uncontrolled");
@@ -694,7 +673,7 @@ describe("Popover", () => {
       await user.click(trigger());
       expect(isOpen()).toBe(true);
       await act(async () => d.reject(new Error("save failed")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
       expect(hidePopover).not.toHaveBeenCalled();
       // The boundary replaced the component; removing the popover hid it.
@@ -710,7 +689,7 @@ describe("Popover", () => {
         throw new Error("handled");
       });
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(mode === "controlled");
     });
 
@@ -725,7 +704,7 @@ describe("Popover", () => {
         throw new Error("save failed");
       });
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
     });
   });
@@ -741,7 +720,7 @@ describe("Popover", () => {
       action.mockImplementation(() => d.promise);
       await act(async () => popup().hidePopover());
       expect(isOpen()).toBe(false);
-      await flush();
+      await flushTasks(2);
       expectPending(trigger());
       expect(showPopover).not.toHaveBeenCalled();
       await act(async () => d.resolve());
@@ -762,7 +741,7 @@ describe("Popover", () => {
       await user.click(trigger());
       expect(trigger()).not.toHaveAttribute("data-open");
       await act(async () => d.resolve());
-      await flush();
+      await flushTasks(2);
       expect(hidePopover).not.toHaveBeenCalled();
       expect(isOpen()).toBe(true);
       expect(trigger()).toHaveAttribute("data-open", "");
@@ -803,7 +782,7 @@ describe("Popover", () => {
         // Out of order: the close first, then the superseded open.
         await act(async () => closing.resolve());
         await act(async () => opening.resolve());
-        await flush();
+        await flushTasks(2);
         expectNotPending(trigger());
         if (mode === "uncontrolled") {
           expect(trigger()).toHaveAttribute("aria-expanded", "false");
@@ -829,11 +808,11 @@ describe("Popover", () => {
         await user.click(trigger());
         expect(action).toHaveBeenCalledTimes(2);
         await act(async () => popup().hidePopover());
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(2);
         const hidePopover = spyHide();
         await act(async () => d.resolve());
-        await flush();
+        await flushTasks(2);
         expect(hidePopover).not.toHaveBeenCalled(); // already hidden
         expect(isOpen()).toBe(false);
         expect(content()).toBeNull();
@@ -861,14 +840,14 @@ describe("Popover", () => {
       const { caught, opening, closing } = await setup();
       await act(async () => closing.resolve());
       await act(async () => opening.reject(new Error("older")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
     });
 
     it("the older dispatch rejects while the newer is pending: the boundary gets it", async () => {
       const { caught, opening, closing } = await setup();
       await act(async () => opening.reject(new Error("older")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
       await act(async () => closing.resolve());
     });
@@ -881,7 +860,7 @@ describe("Popover", () => {
       const suspender = createSuspender();
       render(<Harness mode={mode} suspense content={<suspender.Suspender value="filters" />} />);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(showPopover).not.toHaveBeenCalled();
       expect(isOpen()).toBe(false);
       expectPending(trigger());
@@ -904,7 +883,7 @@ describe("Popover", () => {
           content={<suspender.Suspender value="filters" />}
         />,
       );
-      await flush();
+      await flushTasks(2);
       const hidden = screen.getByTestId("suspender");
       expect(hidden).not.toBeVisible();
       await openThroughTrigger(user);
@@ -1043,7 +1022,7 @@ describe("Popover", () => {
       expect(close).toHaveClass("closing");
       expect(close).toHaveAttribute("data-state", "pending");
       await act(async () => d.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
   });
@@ -1063,7 +1042,7 @@ describe("Popover", () => {
       expect(popup()).toHaveClass("card", "popover");
       await openThroughTrigger(user);
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(action.mock.calls[1]![1].reason).toBe("dismiss");
     });
 
@@ -1074,7 +1053,7 @@ describe("Popover", () => {
       expect(trigger().tagName).toBe("A");
       expect(trigger()).not.toHaveAttribute("type");
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(true);
       // A non-button is still passed as the source (anchoring and focus order).
@@ -1155,7 +1134,7 @@ describe("Popover", () => {
       await openThroughTrigger(user);
       expect(content()).toBeInTheDocument();
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(saved.mock.calls).toEqual([[true], [false]]);
       expect(isOpen()).toBe(false);
       expect(content()).toBeNull();
@@ -1182,7 +1161,7 @@ describe("Popover", () => {
         });
         // The spy saw the native open of the setup; nothing after it.
         showPopover.mockClear();
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(1);
         const [next, details] = action.mock.calls[0]!;
         expect(next).toBe(true);
@@ -1203,7 +1182,7 @@ describe("Popover", () => {
             </StrictMode>,
           );
         });
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(1);
       });
     });
@@ -1214,7 +1193,7 @@ describe("Popover", () => {
       await act(async () => {
         await hydrate(<Harness mode="controlled" action={action} refuseOpen />);
       });
-      await flush();
+      await flushTasks(2);
       expect(hidePopover).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
       expect(action).toHaveBeenCalledTimes(1);
@@ -1251,7 +1230,7 @@ describe("Popover", () => {
       await act(async () => setOpen(false));
       expect(hidePopover).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(content()).toBeNull();
     });
@@ -1291,7 +1270,7 @@ describe("Popover", () => {
       expect(details.reason).toBe("activate");
       expect(details.event!.type).toBe("click");
       expect(details.event!.defaultPrevented).toBe(true);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
 
@@ -1311,7 +1290,7 @@ describe("Popover", () => {
         expect(isOpen()).toBe(true);
         expect(action).toHaveBeenCalledTimes(1);
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expectNotPending(close);
         expect(action).toHaveBeenCalledTimes(2);
         expect(action.mock.calls[1]![0]).toBe(false);
@@ -1329,13 +1308,13 @@ describe("Popover", () => {
         expectPending(screen.getByTestId("close"));
         // A dismissal, then the user opens the popover again.
         await act(async () => popup().hidePopover());
-        await flush();
+        await flushTasks(2);
         expect(isOpen()).toBe(false);
         // The re-open is entangled with the Close's pending async transition (React batches
         // them), so it commits together with the action's end.
         await user.click(trigger());
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(isOpen()).toBe(true);
         expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
       });
@@ -1365,7 +1344,7 @@ describe("Popover", () => {
         );
         await openThroughTrigger(user);
         await user.click(screen.getByTestId("close"));
-        await flush();
+        await flushTasks(2);
         expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "archive failed" }));
         expect(action).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
@@ -1395,7 +1374,7 @@ describe("Popover", () => {
         await openThroughTrigger(user);
         await user.click(screen.getByTestId("close"));
         await act(async () => runs[0]!.reject(new Error("first failed")));
-        await flush();
+        await flushTasks(2);
         expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
         expect(isOpen()).toBe(true);
         expect(action).toHaveBeenCalledTimes(1);
@@ -1403,7 +1382,7 @@ describe("Popover", () => {
         await user.click(screen.getByTestId("close"));
         expect(call).toBe(2);
         await act(async () => runs[1]!.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
         expect(isOpen()).toBe(false);
       });
@@ -1435,7 +1414,7 @@ describe("Popover", () => {
         expect(close).not.toBeDisabled();
         expect(document.activeElement).toBe(close);
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
           [true, "activate"],
           [false, "activate"],
@@ -1458,7 +1437,7 @@ describe("Popover", () => {
         });
         expect(closeAction).toHaveBeenCalledTimes(1);
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(2);
         expect(isOpen()).toBe(false);
       });
@@ -1528,7 +1507,7 @@ describe("Popover", () => {
       );
       await openThroughTrigger(user);
       fireEvent.click(screen.getByTestId("close"));
-      await flush();
+      await flushTasks(2);
       expect(closeAction).not.toHaveBeenCalled();
       expect(action).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(true);
@@ -1549,12 +1528,9 @@ describe("Popover", () => {
   });
 
   describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
-    function MyButton(props: ComponentPropsWithRef<"button">) {
-      return <button {...props} />;
-    }
     const renders = [
       ["a link", <a key="link" href="#x" />],
-      ["a component", <MyButton key="component" />],
+      ["a component", <PlainButton key="component" />],
     ] as const;
     const cancelled = (el: Element) => !fireEvent.click(el);
 
@@ -1577,7 +1553,7 @@ describe("Popover", () => {
         expect(close).not.toHaveAttribute("disabled");
         expect(close).toHaveAttribute("data-disabled", "");
         expect(cancelled(close)).toBe(true);
-        await flush();
+        await flushTasks(2);
         expect(closeAction).not.toHaveBeenCalled();
         expect(action).toHaveBeenCalledTimes(1); // the open only
         expect(hide).not.toHaveBeenCalled();
@@ -1614,7 +1590,7 @@ describe("Popover", () => {
         expect(trigger()).not.toHaveAttribute("disabled");
         expect(trigger()).toHaveAttribute("data-disabled", "");
         expect(cancelled(trigger())).toBe(true);
-        await flush();
+        await flushTasks(2);
         expect(action).not.toHaveBeenCalled();
         expect(isOpen()).toBe(false);
       });
@@ -1625,11 +1601,11 @@ describe("Popover", () => {
         <Harness
           mode="uncontrolled"
           initialOpen
-          trigger={{ disabled: true, render: <MyButton /> }}
-          close={{ disabled: true, render: <MyButton /> }}
+          trigger={{ disabled: true, render: <PlainButton /> }}
+          close={{ disabled: true, render: <PlainButton /> }}
         />,
       );
-      await flush();
+      await flushTasks(2);
       for (const el of [trigger(), screen.getByTestId("close")]) {
         expect(el).not.toHaveAttribute("commandfor");
         expect(el).not.toHaveAttribute("command");
@@ -1641,7 +1617,7 @@ describe("Popover", () => {
       render(
         <Harness
           mode="static"
-          close={{ disabled: true, action: () => {}, render: <MyButton /> }}
+          close={{ disabled: true, action: () => {}, render: <PlainButton /> }}
         />,
       );
       await user.click(trigger());
@@ -1654,7 +1630,7 @@ describe("Popover", () => {
       render(
         <Harness
           mode="static"
-          close={{ disabled: true, action: () => {}, render: <MyButton /> }}
+          close={{ disabled: true, action: () => {}, render: <PlainButton /> }}
         />,
       );
       await user.click(trigger());
@@ -1666,8 +1642,8 @@ describe("Popover", () => {
       render(
         <Harness
           mode="static"
-          trigger={{ disabled: true, render: <MyButton /> }}
-          close={{ disabled: true, render: <MyButton /> }}
+          trigger={{ disabled: true, render: <PlainButton /> }}
+          close={{ disabled: true, render: <PlainButton /> }}
         />,
       );
       for (const el of [trigger(), screen.getByTestId("close")]) {
@@ -1685,7 +1661,7 @@ describe("Popover", () => {
           close={{ disabled: true }}
         />,
       );
-      await flush();
+      await flushTasks(2);
       for (const el of [trigger(), screen.getByTestId("close")]) {
         expect(el).toBeDisabled();
         expect(el).not.toHaveAttribute("aria-disabled");
@@ -1761,7 +1737,7 @@ describe("Popover", () => {
           content={<input name="query" />}
         />,
       );
-      await flush();
+      await flushTasks(2);
       expect(screen.getByRole("textbox", { hidden: true })).toHaveAttribute("autofocus");
     });
 
@@ -1841,7 +1817,7 @@ describe("Popover", () => {
         screen.getByTestId("close").focus();
         // The shim leaves focus where it is, like the platform for a nested popover.
         await act(async () => popup().hidePopover());
-        await flush();
+        await flushTasks(2);
         expect(trigger()).toHaveFocus();
       });
 
@@ -1851,7 +1827,7 @@ describe("Popover", () => {
         await openThroughTrigger(user);
         screen.getByTestId("elsewhere").focus();
         await act(async () => popup().hidePopover());
-        await flush();
+        await flushTasks(2);
         expect(screen.getByTestId("elsewhere")).toHaveFocus();
       });
     });
@@ -1868,7 +1844,7 @@ describe("Popover", () => {
             await openThroughTrigger(user);
             screen.getByTestId("close").focus();
             await user.keyboard("{Enter}");
-            await flush();
+            await flushTasks(2);
             expect(isOpen()).toBe(false);
             expect(content()).toBeNull();
             expect(trigger()).toHaveFocus();
@@ -1893,7 +1869,7 @@ describe("Popover", () => {
         await openThroughTrigger(user);
         screen.getByTestId("field").focus();
         await act(async () => setOpen(false));
-        await flush();
+        await flushTasks(2);
         expect(isOpen()).toBe(false);
         expect(trigger()).toHaveFocus();
       });
@@ -1914,7 +1890,7 @@ describe("Popover", () => {
         await openThroughTrigger(user);
         screen.getByTestId("elsewhere").focus();
         await act(async () => setOpen(false));
-        await flush();
+        await flushTasks(2);
         expect(isOpen()).toBe(false);
         expect(screen.getByTestId("elsewhere")).toHaveFocus();
       });
@@ -1925,7 +1901,7 @@ describe("Popover", () => {
         await openThroughTrigger(user);
         screen.getByTestId("close").focus();
         await user.keyboard("{Enter}");
-        await flush();
+        await flushTasks(2);
         expect(isOpen()).toBe(false);
         expect(trigger()).toHaveFocus();
       });
@@ -1937,7 +1913,7 @@ describe("Popover", () => {
       await user.click(trigger());
       screen.getByTestId("close").focus();
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(trigger()).toHaveFocus();
     });
 
@@ -1957,7 +1933,7 @@ describe("Popover", () => {
       screen.getByTestId("close").focus();
       expect(screen.getByTestId("close")).toHaveFocus();
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(document.activeElement).toBe(document.body);
     });
 
@@ -1979,7 +1955,7 @@ describe("Popover", () => {
         outer.hidePopover();
         popup().hidePopover();
       });
-      await flush();
+      await flushTasks(2);
       expect(trigger()).not.toHaveFocus();
       // The library blurs the focused element instead (jsdom ignores `blur()` on an element
       // under `display: none`, so the result is not observable here; browsers move it to body).
@@ -2059,7 +2035,7 @@ describe("Popover", () => {
         expect(popup()).toHaveAttribute("data-side", "bottom");
         if (mode === "static") {
           await user.click(trigger());
-          await flush();
+          await flushTasks(2);
         } else {
           await openThroughTrigger(user);
         }
@@ -2072,7 +2048,7 @@ describe("Popover", () => {
         expect(popup().style.getPropertyValue("position-area")).toBe("bottom span-self-x-end");
 
         await act(async () => popup().hidePopover());
-        await flush();
+        await flushTasks(2);
         expect(popup()).toHaveAttribute("data-side", "bottom");
         expect(states.at(-1)).toMatchObject({ side: "bottom", align: "start" });
       },
@@ -2095,7 +2071,7 @@ describe("Popover", () => {
       );
       const before = renders;
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(renders).toBe(before);
     });
@@ -2198,7 +2174,7 @@ describe("Popover", () => {
       await openThroughTrigger(user);
       const seen = atHide(() => [committedText(), content() !== null] as const);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       // The close commit (committed `false`) still had the children when the popup was hidden.
       expect(seen.value()).toEqual(["false", true]);
       expect(isOpen()).toBe(false);
@@ -2212,7 +2188,7 @@ describe("Popover", () => {
       await openThroughTrigger(user);
       const seen = atHide(() => content()!.style.display);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(seen.value()).not.toBe("none");
       expect(content()!.style.display).toBe("none");
     });
@@ -2224,7 +2200,7 @@ describe("Popover", () => {
       expect(content()).toBeInTheDocument();
       const seen = atHide(() => [committedText(), content() !== null] as const);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(seen.value()).toEqual(["false", false]);
       expect(isOpen()).toBe(false);
     });
@@ -2234,8 +2210,8 @@ describe("Popover", () => {
       render(<Harness mode="uncontrolled" />);
       await openThroughTrigger(user);
       await act(async () => popup().hidePopover());
-      await flush();
-      await flush();
+      await flushTasks(2);
+      await flushTasks(2);
       expect(content()).toBeNull();
       // And it opens again with fresh content.
       await openThroughTrigger(user);
@@ -2253,7 +2229,7 @@ describe("Popover", () => {
       await openThroughTrigger(user);
       expect(content()).toBeInTheDocument();
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
   });
@@ -2269,7 +2245,7 @@ describe("Popover", () => {
         expect(event.defaultPrevented).toBe(false);
         popup().hidePopover();
       });
-      await flush();
+      await flushTasks(2);
       expect(action.mock.calls[1]![1].reason).toBe("activate");
     });
   });

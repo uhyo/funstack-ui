@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import { cdp } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
-import { deferred } from "../__tests__/helpers.js";
+import { deferred, silenceErrors } from "../__tests__/helpers.js";
 import { CheckboxGroup } from "./index.js";
 import type { CheckboxGroupValueChangeDetails } from "./index.js";
 
@@ -218,7 +218,7 @@ describe("CheckboxGroup (browser)", () => {
     });
 
     it("a real click before hydration on the Parent is reconciled as check all", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       const ui: ReactNode = (
         <CheckboxGroup.Root aria-label="T" defaultValue={["a"]} valueChangeAction={action}>

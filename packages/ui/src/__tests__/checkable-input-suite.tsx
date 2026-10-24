@@ -20,6 +20,8 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  flushMicrotasks,
+  silenceErrors,
 } from "./helpers.js";
 import type { ControlMode } from "./helpers.js";
 
@@ -140,8 +142,6 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
 
   const input = () => screen.getByRole(role) as HTMLInputElement;
   const committed = () => screen.getByTestId("committed");
-  /** Lets queued microtasks (the reset handler) and the resulting renders run. */
-  const flush = () => act(async () => {});
 
   describe(name, () => {
     describe("roles and ARIA", () => {
@@ -334,13 +334,13 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         // The DOM half of this row (`el.checked` back to the old value) is in
         // switch.browser.test.tsx: jsdom's canceled-activation step toggles `checked` instead of
         // restoring the pre-click value, so after React's restore it ends up wrong in jsdom only.
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         render(<Harness mode={mode} action={action} onClick={(e) => e.preventDefault()} />);
         const user = setupUser();
 
         await user.click(input());
-        await flush();
+        await flushMicrotasks();
         expect(action).not.toHaveBeenCalled();
         expect(input()).not.toHaveAttribute("data-checked");
         expectNotPending(input());
@@ -387,7 +387,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
 
     renderBoth("rejection", (mode) => {
       it("reaches the Error Boundary and leaves committed state (row 9)", async () => {
-        vi.spyOn(console, "error").mockImplementation(() => {});
+        silenceErrors();
         const d = deferred();
         const onError = vi.fn();
         render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -500,7 +500,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       }
 
       it("reaches the boundary when the older action rejects after the newer resolved (row 12a)", async () => {
-        vi.spyOn(console, "error").mockImplementation(() => {});
+        silenceErrors();
         const onError = vi.fn();
         const { deferreds, action } = renderTwoClicks(onError);
         const user = setupUser();
@@ -525,7 +525,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       it("reaches the boundary when the older action rejects while the newer is pending (row 12b)", async () => {
-        vi.spyOn(console, "error").mockImplementation(() => {});
+        silenceErrors();
         const onError = vi.fn();
         const { deferreds } = renderTwoClicks(onError);
         const user = setupUser();
@@ -658,7 +658,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       it("element form cannot set checked, defaultChecked or aria-checked (row 15)", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         render(
           <Control
@@ -746,7 +746,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       it("warns in development when the rendered element is not a checkbox input (row 16)", () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const { rerender } = render(
           <Control aria-label="Wi-Fi" render={(props) => <button {...(props as object)} />} />,
         );
@@ -843,7 +843,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
 
     describe("dev warnings (row 19)", () => {
       it("warns once when checked and defaultChecked are both set", () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const { rerender } = render(<Control aria-label="x" checked defaultChecked />);
         rerender(<Control aria-label="x" checked defaultChecked />);
         expect(consoleError).toHaveBeenCalledTimes(1);
@@ -851,7 +851,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       it("warns once when switching from uncontrolled to controlled", () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const { rerender } = render(<Control aria-label="x" />);
         rerender(<Control aria-label="x" checked />);
         rerender(<Control aria-label="x" checked={false} />);
@@ -860,7 +860,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       it("preventDefault() in the action warns once and desyncs only while pending", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const deferreds = [deferred(), deferred()];
         let calls = 0;
         render(
@@ -897,7 +897,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       it("does not warn in normal use", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const { rerender } = render(<Control aria-label="x" defaultChecked />);
         const user = setupUser();
         await user.click(input());
@@ -915,7 +915,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await user.click(input());
         expect(committed()).toHaveTextContent("true");
         await user.click(screen.getByRole("button", { name: "Reset" }));
-        await flush();
+        await flushMicrotasks();
         expect(action).toHaveBeenCalledTimes(2);
         const [next, details] = action.mock.calls[1]!;
         expect(next).toBe(false);
@@ -965,7 +965,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await user.click(input());
         screen.getByTestId("form").addEventListener("reset", (e) => e.preventDefault());
         await user.click(screen.getByRole("button", { name: "Reset" }));
-        await flush();
+        await flushMicrotasks();
         expect(action).toHaveBeenCalledTimes(1);
         expect(input().checked).toBe(true);
       });
@@ -975,7 +975,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         render(<Harness mode={mode} action={action} inForm initial />);
         const user = setupUser();
         await user.click(screen.getByRole("button", { name: "Reset" }));
-        await flush();
+        await flushMicrotasks();
         expect(action).not.toHaveBeenCalled();
         expect(input().checked).toBe(true);
       });
@@ -988,7 +988,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         const user = setupUser();
         await user.click(input());
         await user.click(screen.getByRole("button", { name: "Reset" }));
-        await flush();
+        await flushMicrotasks();
         expect(action).toHaveBeenCalledTimes(2);
         expect(action.mock.calls[1]?.[1].reason).toBe("platform");
         expect(input().checked).toBe(true);
@@ -1003,7 +1003,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await user.click(input());
         expect(input().checked).toBe(false);
         await user.click(screen.getByRole("button", { name: "Reset" }));
-        await flush();
+        await flushMicrotasks();
         expect(action.mock.calls.at(-1)?.[0]).toBe(true);
         expect(input().checked).toBe(true);
       });
@@ -1048,7 +1048,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await act(async () => {
           d.resolve();
         });
-        await flush();
+        await flushMicrotasks();
         expect(input().checked).toBe(false);
         expect(input()).not.toHaveAttribute("data-checked");
         expectNotPending(input());
@@ -1068,7 +1068,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await act(async () => {
           d.resolve();
         });
-        await flush();
+        await flushMicrotasks();
         expect(action).toHaveBeenCalledTimes(2);
         expect(action.mock.calls[1]?.[0]).toBe(false);
         expect(action.mock.calls[1]?.[1].reason).toBe("platform");
@@ -1086,7 +1086,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await act(async () => {
           d.resolve();
         });
-        await flush();
+        await flushMicrotasks();
         expect(input().checked).toBe(true);
         expect(input()).toHaveAttribute("data-checked", "");
         expect(input().defaultChecked).toBe(true);
@@ -1124,7 +1124,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await act(async () => {
           d.resolve();
         });
-        await flush();
+        await flushMicrotasks();
         expect(action).toHaveBeenCalledTimes(2);
         expect(action.mock.calls[1]?.[0]).toBe(false);
         expect(action.mock.calls[1]?.[1].event?.type).toBe("reset");
@@ -1139,13 +1139,13 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         container.innerHTML = renderToString(ui);
         mutate(container.querySelector("input")!);
         const result = render(ui, { container, hydrate: true });
-        await flush();
+        await flushMicrotasks();
         return result;
       }
 
       renderBoth("mount reconciliation", (mode) => {
         it("dispatches the hydrated DOM value once with reason platform", async () => {
-          const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+          const consoleError = silenceErrors();
           const action = vi.fn<ActionFn>();
           await hydrate(<Harness mode={mode} action={action} />, (el) => {
             el.checked = true;
@@ -1218,7 +1218,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
           it(`a click before the boundary hydrates dispatches once${strict ? " (StrictMode)" : ""}`, async () => {
             // A single control reconciles at its own mount, which is the boundary's hydration;
             // nothing depends on when its parents mounted (contrast the group adapter).
-            const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+            const consoleError = silenceErrors();
             const action = vi.fn<ActionFn>();
             const wrap = (ui: ReactNode) => (strict ? <StrictMode>{ui}</StrictMode> : ui);
             const container = document.createElement("div");
@@ -1233,7 +1233,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
               container,
               hydrate: true,
             });
-            await flush();
+            await flushMicrotasks();
             const server = container.querySelector("input")!;
             await act(async () => {
               server.click();
@@ -1244,7 +1244,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
             await act(async () => {
               gate.resolve();
             });
-            await flush();
+            await flushMicrotasks();
             expect(action).toHaveBeenCalledTimes(1);
             expect(action.mock.calls[0]?.[0]).toBe(true);
             expect(action.mock.calls[0]?.[1].reason).toBe("platform");
@@ -1264,7 +1264,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
             <Control aria-label="x" defaultChecked checkedChangeAction={action} />
           </StrictMode>,
         );
-        await flush();
+        await flushMicrotasks();
         expect(action).not.toHaveBeenCalled();
         expect(input().checked).toBe(true);
       });
@@ -1397,7 +1397,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
     });
 
     it("Field disabled disables it; its own id is ignored with a warning", async () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       render(
         <Field.Root name="n" disabled>
           <Field.Label>N</Field.Label>

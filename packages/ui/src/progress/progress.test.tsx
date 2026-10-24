@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deferred } from "../__tests__/helpers.js";
+import { deferred, silenceErrors } from "../__tests__/helpers.js";
 import type { Deferred } from "../__tests__/helpers.js";
 import { resetWarnOnce } from "../internal/dev-warn.js";
 import { Progress } from "./index.js";
@@ -37,7 +37,7 @@ const bar = () => screen.getByRole("progressbar");
 let errorSpy: { mock: { calls: unknown[][] }; mockRestore: () => void };
 beforeEach(() => {
   resetWarnOnce();
-  errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  errorSpy = silenceErrors();
 });
 afterEach(() => {
   errorSpy.mockRestore();

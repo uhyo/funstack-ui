@@ -17,6 +17,7 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Tabs } from "./index.js";
@@ -258,7 +259,7 @@ describe("Tabs", () => {
     });
 
     it("a value matching no tab: the List is the tab stop and a dev warning fires once", async () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       const action = vi.fn<ActionFn>();
       const { rerender } = render(<Harness mode="controlled" initial="zzz" action={action} />);
       for (const t of allTabs()) {
@@ -287,14 +288,14 @@ describe("Tabs", () => {
     });
 
     it("a matching value gives the List no tabindex and no warning", () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       render(<Harness mode="controlled" initial="b" />);
       expect(list()).not.toHaveAttribute("tabindex");
       expect(error).not.toHaveBeenCalled();
     });
 
     it("warns once in development when neither value nor defaultValue is passed", () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       const tree = (props: Partial<TabsRootProps>) => (
         <Tabs.Root {...props}>
           <Tabs.List aria-label="x">
@@ -318,7 +319,7 @@ describe("Tabs", () => {
     });
 
     it("throws a helpful error outside Tabs.Root", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<Tabs.Tab value="x">X</Tabs.Tab>)).toThrow(
         "Tabs.Tab must be rendered inside a Tabs.Root.",
       );
@@ -730,7 +731,7 @@ describe("Tabs", () => {
 
   renderBoth("rejection", (mode) => {
     it("reaches the Error Boundary; committed value unchanged", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -859,7 +860,7 @@ describe("Tabs", () => {
 
   renderBoth("superseded rejection", (mode) => {
     it("older rejects after the newer resolved: reaches the boundary", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const ds = [deferred(), deferred()];
       let calls = 0;
       const onError = vi.fn();
@@ -883,7 +884,7 @@ describe("Tabs", () => {
     });
 
     it("older rejects while the newer is pending: reaches the boundary", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const ds = [deferred(), deferred()];
       let calls = 0;
       const onError = vi.fn();
@@ -1080,7 +1081,7 @@ describe("Tabs", () => {
     });
 
     it('"until-found": a rejected find stays revealed while pending and reaches the boundary', async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       const props = {

@@ -28,7 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand, isModal } from "../__tests__/dialog-shim.js";
@@ -40,6 +40,9 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  PlainButton,
+  flushTasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Dialog } from "./index.js";
@@ -53,6 +56,7 @@ import type {
   DialogTriggerProps,
   DialogTriggerState,
 } from "./index.js";
+import { recordClicks } from "../__tests__/overlay-helpers.js";
 
 type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
 type Mode = ControlMode | "static";
@@ -167,27 +171,17 @@ const popup = () => screen.getByTestId("popup") as HTMLDialogElement;
 const content = () => screen.queryByTestId("content");
 const committedText = () => screen.getByTestId("committed").textContent;
 
-/** Runs the tasks the shim queued (`toggle`, `close`) and React's work after them. */
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
 function spyShowModal() {
   return vi.spyOn(HTMLDialogElement.prototype, "showModal");
 }
 function spyClose() {
   return vi.spyOn(HTMLDialogElement.prototype, "close");
 }
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
 
 /** Opens a library-mode dialog through the Trigger and waits for it to be shown. */
 async function openThroughTrigger(user: ReturnType<typeof setupUser>) {
   await user.click(trigger());
-  await flush();
+  await flushTasks(2);
 }
 
 afterEach(() => {
@@ -320,7 +314,7 @@ describe("Dialog", () => {
       await user.click(screen.getByTestId("close"));
       expect(popup().open).toBe(false);
       expect(popup().returnValue).toBe("x");
-      await flush();
+      await flushTasks(2);
       expect(trigger()).toHaveFocus();
     });
 
@@ -351,14 +345,14 @@ describe("Dialog", () => {
         render(<Harness mode={mode} action={action} />);
         trigger().focus();
         await user.keyboard("{Enter}");
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(1);
         expect(popup().open).toBe(true);
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         trigger().focus();
         await user.keyboard(" ");
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(3);
         expect(action.mock.calls[2]![0]).toBe(true);
       });
@@ -373,7 +367,7 @@ describe("Dialog", () => {
       screen.getByTestId("close").focus();
       await user.keyboard("{Escape}");
       expect(popup().open).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenLastCalledWith(false, expect.anything());
       expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
     });
@@ -405,7 +399,7 @@ describe("Dialog", () => {
       expect(details.event!.defaultPrevented).toBe(true);
       // `details` is serialisable; `event` is virtual (conventions 2.2).
       expect(Object.keys(details).sort()).toEqual(["reason", "returnValue"]);
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(true);
       expect(committedText()).toBe("true");
     });
@@ -416,7 +410,7 @@ describe("Dialog", () => {
       render(<Harness mode={mode} action={action} trigger={{ disabled: true }} />);
       await user.click(trigger());
       fireEvent.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(popup().open).toBe(false);
       expect(trigger()).toHaveAttribute("data-disabled", "");
@@ -431,7 +425,7 @@ describe("Dialog", () => {
       await user.click(trigger());
       expect(action).toHaveBeenCalledTimes(1);
       await act(async () => d.resolve());
-      await flush();
+      await flushTasks(2);
     });
 
     it("a foreign show-modal command is cancelled and dispatched with the CommandEvent", async () => {
@@ -446,7 +440,7 @@ describe("Dialog", () => {
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]![1].event).toBe(event);
       expect(action.mock.calls[0]![1].reason).toBe("activate");
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(true);
     });
   });
@@ -481,7 +475,7 @@ describe("Dialog", () => {
       await act(async () => popup().requestClose("x"));
       // Closed natively and at once; the notification follows the `close` event.
       expect(popup().open).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe(false);
@@ -528,7 +522,7 @@ describe("Dialog", () => {
       expect(popup().returnValue).toBe("x");
       expect(committedText()).toBe("false");
       expectNotPending(trigger());
-      await flush();
+      await flushTasks(2);
       // The `close` event is an echo: no second notification.
       expect(action).toHaveBeenCalledTimes(2);
       expect(trigger()).toHaveFocus();
@@ -553,7 +547,7 @@ describe("Dialog", () => {
       await openThroughTrigger(user);
       await user.click(screen.getByRole("button", { name: "OK" }));
       expect(popup().open).toBe(false);
-      await flush();
+      await flushTasks(2);
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("activate");
@@ -574,7 +568,7 @@ describe("Dialog", () => {
       });
       expect(popup()).toHaveClass("re-rendered");
       expect(popup().open).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(showModal).not.toHaveBeenCalled();
       expect(popup().open).toBe(false);
       expect(action).toHaveBeenLastCalledWith(false, expect.anything());
@@ -587,14 +581,14 @@ describe("Dialog", () => {
       render(<Harness mode={mode} action={action} popup={{ onCancel }} />);
       await openThroughTrigger(user);
       await user.click(screen.getByTestId("close"));
-      await flush();
+      await flushTasks(2);
       // The veto point of a part's close is openChangeAction, not `cancel` (design 7).
       expect(onCancel).not.toHaveBeenCalled();
       expect(popup().open).toBe(false);
       // A later dismissal is labelled as one (no stale intent from the part's close).
       await openThroughTrigger(user);
       await act(async () => popup().close());
-      await flush();
+      await flushTasks(2);
       expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
         [true, "activate"],
         [false, "activate"],
@@ -651,7 +645,7 @@ describe("Dialog", () => {
         throw new Error("save failed");
       });
       await act(async () => popup().requestClose());
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
     });
 
@@ -665,7 +659,7 @@ describe("Dialog", () => {
       });
       const showModal = spyShowModal();
       await act(async () => popup().requestClose());
-      await flush();
+      await flushTasks(2);
       if (mode === "uncontrolled") {
         expect(popup().open).toBe(false);
         expect(showModal).not.toHaveBeenCalled();
@@ -688,7 +682,7 @@ describe("Dialog", () => {
       action.mockImplementation(() => d.promise);
       await act(async () => popup().requestClose());
       expect(popup().open).toBe(false);
-      await flush();
+      await flushTasks(2);
       expectPending(trigger());
       expect(showModal).not.toHaveBeenCalled();
       await act(async () => d.resolve());
@@ -724,7 +718,7 @@ describe("Dialog", () => {
         action.mockImplementationOnce(() => opening.promise);
         const showModal = spyShowModal();
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(trigger()).not.toHaveAttribute("data-open");
         await user.click(trigger());
         expect(action).toHaveBeenCalledTimes(3);
@@ -737,7 +731,7 @@ describe("Dialog", () => {
         // Resolve out of order: the open first, then the superseded close.
         await act(async () => opening.resolve());
         await act(async () => closing.resolve());
-        await flush();
+        await flushTasks(2);
         expectNotPending(trigger());
         if (mode === "uncontrolled") {
           // The latest-dispatch guard ignores the superseded close.
@@ -770,7 +764,7 @@ describe("Dialog", () => {
       action.mockImplementationOnce(() => closing.promise);
       action.mockImplementationOnce(() => opening.promise);
       await act(async () => popup().requestClose());
-      await flush();
+      await flushTasks(2);
       await user.click(trigger());
       return { caught, closing, opening };
     }
@@ -779,14 +773,14 @@ describe("Dialog", () => {
       const { caught, closing, opening } = await setup();
       await act(async () => opening.resolve());
       await act(async () => closing.reject(new Error("older")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
     });
 
     it("the older dispatch rejects while the newer is pending: the boundary gets it", async () => {
       const { caught, closing, opening } = await setup();
       await act(async () => closing.reject(new Error("older")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
       await act(async () => opening.resolve());
     });
@@ -799,7 +793,7 @@ describe("Dialog", () => {
       const suspender = createSuspender();
       render(<Harness mode={mode} suspense content={<suspender.Suspender value="details" />} />);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(showModal).not.toHaveBeenCalled();
       expect(popup().open).toBe(false);
       expectPending(trigger());
@@ -822,7 +816,7 @@ describe("Dialog", () => {
           content={<suspender.Suspender value="details" />}
         />,
       );
-      await flush();
+      await flushTasks(2);
       const hidden = screen.getByTestId("suspender");
       expect(hidden).not.toBeVisible();
       await openThroughTrigger(user);
@@ -933,11 +927,11 @@ describe("Dialog", () => {
           </Dialog.Popup>
         </Dialog.Root>,
       );
-      await flush();
+      await flushTasks(2);
       expect(closeStates.at(-1)).toEqual({ pending: false, disabled: false });
       expect(formStates.at(-1)).toEqual({ pending: false });
       await user.click(screen.getByRole("button", { name: "Save" }));
-      await flush();
+      await flushTasks(2);
       expect(formStates.at(-1)).toEqual({ pending: true });
       expect(screen.getByTestId("form")).toHaveClass("saving");
       expect(screen.getByTestId("form")).not.toHaveAttribute("data-pending");
@@ -947,7 +941,7 @@ describe("Dialog", () => {
         saving.resolve();
         closing.resolve();
       });
-      await flush();
+      await flushTasks(2);
     });
   });
 
@@ -967,7 +961,7 @@ describe("Dialog", () => {
       await openThroughTrigger(user);
       expect(popup().getAttribute("aria-labelledby")).toBe(screen.getByTestId("title").id);
       await act(async () => popup().requestClose());
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenLastCalledWith(false, expect.anything());
     });
 
@@ -981,7 +975,7 @@ describe("Dialog", () => {
       expect(trigger()).not.toHaveAttribute("type");
       await user.click(trigger());
       expect(action).toHaveBeenCalledTimes(1);
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(true);
     });
 
@@ -1048,7 +1042,7 @@ describe("Dialog", () => {
       expect(popup().open).toBe(true);
       expect(content()).toBeInTheDocument();
       await act(async () => popup().requestClose());
-      await flush();
+      await flushTasks(2);
       expect(content()).toBeNull();
       expect(trigger()).not.toHaveAttribute("data-open");
     });
@@ -1072,7 +1066,7 @@ describe("Dialog", () => {
         await act(async () => {
           await hydrate(<Harness mode={mode} action={action} />);
         });
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(1);
         const [next, details] = action.mock.calls[0]!;
         expect(next).toBe(true);
@@ -1094,7 +1088,7 @@ describe("Dialog", () => {
             </StrictMode>,
           );
         });
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(1);
       });
 
@@ -1107,7 +1101,7 @@ describe("Dialog", () => {
         await act(async () => {
           await hydrate(<Harness mode={mode} action={action} catchErrors />);
         });
-        await flush();
+        await flushTasks(2);
         if (mode === "controlled") {
           expect(close).toHaveBeenCalledTimes(1);
           expect(popup().open).toBe(false);
@@ -1126,7 +1120,7 @@ describe("Dialog", () => {
       await act(async () => {
         await hydrate(<Harness mode="controlled" action={action} refuseOpen />);
       });
-      await flush();
+      await flushTasks(2);
       expect(close).toHaveBeenCalledTimes(1);
       expect(popup().open).toBe(false);
       expect(action).toHaveBeenCalledTimes(1);
@@ -1155,7 +1149,7 @@ describe("Dialog", () => {
       expect(close).toHaveBeenCalledTimes(1);
       expect(close).toHaveBeenCalledWith(""); // no part's value: a controlled close
       expect(popup().open).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(action).not.toHaveBeenCalled();
       expect(content()).toBeNull();
     });
@@ -1202,7 +1196,7 @@ describe("Dialog", () => {
       expect(close).not.toHaveBeenCalled();
       await act(async () => d.resolve());
       expect(close).toHaveBeenCalledWith("deleted");
-      await flush();
+      await flushTasks(2);
       const [next, notify] = action.mock.calls[1]!;
       expect(next).toBe(false);
       expect(notify.reason).toBe("activate");
@@ -1234,7 +1228,7 @@ describe("Dialog", () => {
       );
       await openThroughTrigger(user);
       await user.click(screen.getByTestId("delete"));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "delete failed" }));
       expect(close).not.toHaveBeenCalled();
       expect(popup().open).toBe(true);
@@ -1264,7 +1258,7 @@ describe("Dialog", () => {
       await openThroughTrigger(user);
       await user.click(screen.getByTestId("delete"));
       await act(async () => runs[0]!.reject(new Error("first failed")));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
       expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
       expect(popup().open).toBe(true);
@@ -1274,20 +1268,12 @@ describe("Dialog", () => {
       await user.click(screen.getByTestId("delete"));
       expect(call).toBe(2);
       await act(async () => runs[1]!.resolve());
-      await flush();
+      await flushTasks(2);
       expect(close).toHaveBeenCalledTimes(1);
       expect(popup().open).toBe(false);
     });
 
     describe("re-entry (#81, design/components/button.md 16.4)", () => {
-      /** `defaultPrevented` of every click once it bubbled past React's root listener. */
-      function recordClicks(): { seen: boolean[]; stop: () => void } {
-        const seen: boolean[] = [];
-        const listener = (event: Event) => seen.push(event.defaultPrevented);
-        document.addEventListener("click", listener);
-        return { seen, stop: () => document.removeEventListener("click", listener) };
-      }
-
       it("D1: library mode, a second click, Enter and Space while pending are ignored and cancelled", async () => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
@@ -1328,7 +1314,7 @@ describe("Dialog", () => {
         expect(document.activeElement).toBe(button);
         expect(action).toHaveBeenCalledTimes(1); // the open only
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
           [true, "activate"],
           [false, "activate"],
@@ -1373,7 +1359,7 @@ describe("Dialog", () => {
         expectPending(button);
         expect(popup().open).toBe(true);
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(close).toHaveBeenCalledTimes(1);
         expect(close).toHaveBeenCalledWith("deleted");
         expect(button).not.toHaveAttribute("aria-disabled");
@@ -1400,7 +1386,7 @@ describe("Dialog", () => {
         });
         expect(closeAction).toHaveBeenCalledTimes(1);
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
       });
 
@@ -1420,7 +1406,7 @@ describe("Dialog", () => {
         expect(screen.getByTestId("close")).not.toHaveAttribute("aria-disabled");
         expectNotPending(screen.getByTestId("close"));
         await act(async () => closing.resolve());
-        await flush();
+        await flushTasks(2);
         expect(close).toHaveBeenCalledTimes(1);
       });
 
@@ -1466,14 +1452,14 @@ describe("Dialog", () => {
         await user.click(screen.getByTestId("delete"));
         // Escape while the action runs: the dialog closes natively.
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         // The re-open is entangled with the Close's pending async transition (React batches
         // them), so it commits together with the action's end.
         await user.click(trigger());
         close.mockClear();
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(true);
         expect(close).not.toHaveBeenCalled();
         expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
@@ -1497,7 +1483,7 @@ describe("Dialog", () => {
       await act(async () => popup().showModal());
       await user.click(screen.getByTestId("delete"));
       await act(async () => popup().requestClose());
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(false);
       close.mockClear();
       // The action may settle after the native re-open but before its queued `toggle` task (the
@@ -1508,7 +1494,7 @@ describe("Dialog", () => {
       try {
         await act(async () => popup().showModal());
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
       } finally {
         window.removeEventListener("toggle", holdToggle, true);
       }
@@ -1567,13 +1553,13 @@ describe("Dialog", () => {
         await openThroughTrigger(user);
         expect(screen.getByTestId("form")).not.toHaveAttribute("method");
         await user.click(screen.getByRole("button", { name: "Save" }));
-        await flush();
+        await flushTasks(2);
         expect(save).toHaveBeenCalledTimes(1);
         expect(save.mock.calls[0]![0].get("name")).toBe("Ada");
         expect(popup().open).toBe(true); // the dialog waits for the action
         expect(close).not.toHaveBeenCalled();
         await act(async () => saving.resolve());
-        await flush();
+        await flushTasks(2);
         expect(close).toHaveBeenCalledWith("save");
         expect(popup().open).toBe(false);
         const [next, details] = action.mock.calls[1]!;
@@ -1582,7 +1568,7 @@ describe("Dialog", () => {
         expect(details.returnValue).toBe("save");
         expect(details.event!.type).toBe("submit");
         // The dialog does not re-open from commits that land after the close.
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
       });
     });
@@ -1610,7 +1596,7 @@ describe("Dialog", () => {
       );
       await openThroughTrigger(user);
       await user.click(screen.getByRole("button", { name: "Save" }));
-      await flush();
+      await flushTasks(2);
       expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "invalid" }));
       expect(close).not.toHaveBeenCalled();
       expect(popup().open).toBe(true);
@@ -1632,7 +1618,7 @@ describe("Dialog", () => {
       await user.click(trigger());
       expect(popup().open).toBe(true);
       await user.click(screen.getByRole("button", { name: "Save" }));
-      await flush();
+      await flushTasks(2);
       expect(save).toHaveBeenCalledTimes(1);
       expect(popup().open).toBe(false);
     });
@@ -1715,11 +1701,11 @@ describe("Dialog", () => {
         expect(popup().open).toBe(true);
         // Escape while openChangeAction(false) runs: the platform closes at once.
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         close.mockClear();
         await act(async () => closing.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
           [true, "activate"],
           [false, "activate"],
@@ -1744,7 +1730,7 @@ describe("Dialog", () => {
       await user.click(screen.getByTestId("close"));
       expect(trigger()).not.toHaveAttribute("data-open");
       await act(async () => d.resolve());
-      await flush();
+      await flushTasks(2);
       expect(close).not.toHaveBeenCalled();
       expect(showModal).not.toHaveBeenCalled(); // never blinked
       expect(popup().open).toBe(true);
@@ -1768,7 +1754,7 @@ describe("Dialog", () => {
       );
       await openThroughTrigger(user);
       await user.click(screen.getByTestId("close")); // value "x", vetoed
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(true);
       const close = spyClose();
       await act(async () => setOpen(false));
@@ -1830,13 +1816,13 @@ describe("Dialog", () => {
         expect(popup().open).toBe(true);
         // Escape while openChangeAction(false) runs: the platform closes at once.
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         // Nothing more yet: the user's intent is already "close" (11.13).
         expect(action).toHaveBeenCalledTimes(2);
         action.mockImplementation(() => undefined);
         await act(async () => closing.resolve());
-        await flush();
+        await flushTasks(2);
         // The parent vetoed the Close; the dismissal stands and is notified now.
         expect(action.mock.calls.map(([next, d]) => [next, d.reason, d.returnValue])).toEqual([
           [true, "activate", undefined],
@@ -1861,11 +1847,11 @@ describe("Dialog", () => {
         action.mockImplementation((next) => (next ? undefined : closing.promise));
         await user.click(screen.getByTestId("close"));
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         await user.click(trigger());
         await act(async () => closing.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
           [true, "activate"],
           [false, "activate"],
@@ -1897,7 +1883,7 @@ describe("Dialog", () => {
         await user.click(screen.getByTestId("delete"));
         expectPending(screen.getByTestId("delete"));
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(closeAction).toHaveBeenCalledTimes(1);
         expect(action.mock.calls.map(([next, d]) => [next, d.reason, d.returnValue])).toEqual([
           [true, "activate", undefined],
@@ -1913,7 +1899,7 @@ describe("Dialog", () => {
         // A later close is not affected by the vetoed one's value.
         action.mockImplementation(() => undefined);
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         expect(popup().returnValue).toBe("");
       });
@@ -1933,7 +1919,7 @@ describe("Dialog", () => {
           expect(trigger()).not.toHaveAttribute("data-open");
           await user.click(trigger());
           await act(async () => closing.resolve());
-          await flush();
+          await flushTasks(2);
           expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
           expect(close).not.toHaveBeenCalled();
           expect(popup().open).toBe(true);
@@ -1971,7 +1957,7 @@ describe("Dialog", () => {
         await user.click(screen.getByTestId("delete"));
         await act(async () => setOpen(false));
         await act(async () => work.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action.mock.calls.filter(([next]) => !next)).toHaveLength(1);
         expect(action.mock.calls[1]![1]).toMatchObject({ reason: "activate", returnValue: "v" });
         expect(close).toHaveBeenCalledTimes(1);
@@ -2006,7 +1992,7 @@ describe("Dialog", () => {
           await user.click(screen.getByRole("button", { name: "OK" }));
           // Not cancelled by the library: closed natively, at once.
           expect(popup().open).toBe(false);
-          await flush();
+          await flushTasks(2);
           expect(action.mock.calls[1]![1]).toMatchObject({ reason: "dismiss", returnValue: "ok" });
         } finally {
           document.removeEventListener("submit", stop);
@@ -2037,7 +2023,7 @@ describe("Dialog", () => {
         );
         const dialog = shadow.querySelector<HTMLDialogElement>("[data-testid=popup]")!;
         await act(async () => shadow.querySelector<HTMLElement>("[data-testid=trigger]")!.click());
-        await flush();
+        await flushTasks(2);
         expect(dialog.open).toBe(true);
         action.mockImplementation(() => closing.promise);
         await act(async () => shadow.querySelector<HTMLButtonElement>("[data-testid=ok]")!.click());
@@ -2045,7 +2031,7 @@ describe("Dialog", () => {
         expect(dialog.open).toBe(true);
         expect(action.mock.calls[1]![1]).toMatchObject({ reason: "activate", returnValue: "ok" });
         await act(async () => closing.resolve());
-        await flush();
+        await flushTasks(2);
         expect(dialog.open).toBe(false);
         expect(dialog.returnValue).toBe("ok");
       });
@@ -2065,7 +2051,7 @@ describe("Dialog", () => {
           />,
         );
         await act(async () => trigger().click());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(true);
         const close = spyClose();
         act(() => setOpen(false));
@@ -2073,8 +2059,8 @@ describe("Dialog", () => {
         expect(popup().open).toBe(false);
         // The Trigger, in the task gap before the `close` event.
         act(() => trigger().click());
-        await flush();
-        await flush();
+        await flushTasks(2);
+        await flushTasks(2);
         expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
           [true, "activate"],
           [true, "activate"],
@@ -2136,13 +2122,13 @@ describe("Dialog", () => {
           const outer = () => screen.getByTestId("outer") as HTMLDialogElement;
           const inner = () => screen.getByTestId("inner") as HTMLDialogElement;
           await user.click(screen.getByTestId("outer-trigger"));
-          await flush();
+          await flushTasks(2);
           expect(outer().open).toBe(true);
           await user.click(screen.getByTestId("inner-trigger"));
-          await flush();
+          await flushTasks(2);
           expect(inner().open).toBe(true);
           await user.click(screen.getByRole("button", { name: "Inner OK" }));
-          await flush();
+          await flushTasks(2);
           expect(inner().open).toBe(false);
           expect(inner().returnValue).toBe("inner-ok");
           expect(outer().open).toBe(true);
@@ -2156,7 +2142,7 @@ describe("Dialog", () => {
           }
           // The outer form still closes the outer dialog through its own Root.
           await user.click(screen.getByRole("button", { name: "Outer OK" }));
-          await flush();
+          await flushTasks(2);
           expect(outer().open).toBe(false);
           expect(outer().returnValue).toBe("outer-ok");
           expect(outerAction.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
@@ -2183,7 +2169,7 @@ describe("Dialog", () => {
       );
       await openThroughTrigger(user);
       await user.click(screen.getByTestId("link-close"));
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(false);
       expect(popup().returnValue).toBe("link");
       expect(action.mock.calls[1]![1].returnValue).toBe("link");
@@ -2265,7 +2251,7 @@ describe("Dialog", () => {
         );
         await openThroughTrigger(user);
         await user.click(screen.getByRole("button", { name: "OK" }));
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(true);
         expect(action).toHaveBeenCalledTimes(1);
       });
@@ -2301,15 +2287,15 @@ describe("Dialog", () => {
       );
       await openThroughTrigger(user);
       await user.click(screen.getByRole("button", { name: "Not a dialog submit" }));
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(true);
       await user.click(screen.getByRole("button", { name: "Plain" }));
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(false);
       expect(popup().returnValue).toBe("plain");
       await openThroughTrigger(user);
       await user.click(screen.getByRole("button", { name: "Submitter" }));
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(false);
       expect(popup().returnValue).toBe("submitter");
       expect(
@@ -2341,7 +2327,7 @@ describe("Dialog", () => {
       await user.click(screen.getByRole("button", { name: "OK" }));
       // Closed natively, at once.
       expect(popup().open).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(action.mock.calls[1]![1]).toMatchObject({ reason: "dismiss", returnValue: "ok" });
     });
 
@@ -2369,7 +2355,7 @@ describe("Dialog", () => {
         const close = spyClose();
         await user.click(screen.getByRole("button", { name: "Save" }));
         await act(async () => saving.resolve());
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(2);
         expect(action.mock.calls[1]![1]).toMatchObject({
           reason: "activate",
@@ -2422,7 +2408,7 @@ describe("Dialog", () => {
       await act(async () => {
         dispatchCommand(popup(), "request-close", null);
       });
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(false);
       expect(action.mock.calls[1]![1].returnValue).toBe("");
     });
@@ -2479,12 +2465,12 @@ describe("Dialog", () => {
             }}
           />,
         );
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(true);
         const seen = atClose(() => [committedText(), content() !== null] as const);
         await act(async () => setOpen(false));
         expect(seen.value()).toEqual(["false", true]);
-        await flush();
+        await flushTasks(2);
         // Released after the `close` event found no exit animation; never re-mounted.
         expect(content()).toBeNull();
         expect(mounts).toHaveBeenCalledTimes(1);
@@ -2496,7 +2482,7 @@ describe("Dialog", () => {
         await openThroughTrigger(user);
         const seen = atClose(() => [committedText(), content() !== null] as const);
         await user.click(screen.getByTestId("close"));
-        await flush();
+        await flushTasks(2);
         expect(seen.value()).toEqual(["false", true]);
         expect(content()).toBeNull();
       });
@@ -2507,7 +2493,7 @@ describe("Dialog", () => {
         await openThroughTrigger(user);
         const seen = atClose(() => [committedText(), content() !== null] as const);
         await user.click(screen.getByTestId("close"));
-        await flush();
+        await flushTasks(2);
         expect(seen.value()).toEqual(["false", false]);
         expect(popup().open).toBe(false);
       });
@@ -2518,7 +2504,7 @@ describe("Dialog", () => {
         await openThroughTrigger(user);
         const seen = atClose(() => content()!.style.display);
         await user.click(screen.getByTestId("close"));
-        await flush();
+        await flushTasks(2);
         expect(seen.value()).not.toBe("none");
         expect(content()!.style.display).toBe("none");
       });
@@ -2547,12 +2533,12 @@ describe("Dialog", () => {
           );
           calls.mockClear();
           await act(async () => popup().requestClose());
-          await flush();
+          await flushTasks(2);
           // The notification commit (one document view transition); the content is held.
           expect(calls).toHaveBeenCalledTimes(1);
           expect(content()).toBeInTheDocument();
           await act(async () => fade.resolve());
-          await flush();
+          await flushTasks(2);
           expect(content()).toBeNull();
           expect(calls).toHaveBeenCalledTimes(1);
         } finally {
@@ -2571,7 +2557,7 @@ describe("Dialog", () => {
         // The same object before and after the close: a progress bar, not the exit.
         vi.spyOn(popup(), "getAnimations").mockReturnValue([running]);
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         expect(content()).toBeNull();
       });
@@ -2591,7 +2577,7 @@ describe("Dialog", () => {
           await openThroughTrigger(user);
           screen.getByTestId("close").focus();
           await user.keyboard("{Enter}");
-          await flush();
+          await flushTasks(2);
           expect(popup().open).toBe(false);
           expect(trigger()).toHaveFocus();
         });
@@ -2632,7 +2618,7 @@ describe("Dialog", () => {
       expect(requestClose).not.toHaveBeenCalled();
       pressAndClick(popup(), { clientX: 10, clientY: 10 }); // the ::backdrop
       expect(requestClose).toHaveBeenCalledTimes(1);
-      await flush();
+      await flushTasks(2);
       expect(action.mock.calls[1]![1].reason).toBe("dismiss");
     });
 
@@ -2649,7 +2635,7 @@ describe("Dialog", () => {
       const user = setupUser();
       render(<Harness mode="uncontrolled" modal={false} popup={{ lightDismiss: true }} />);
       await openThroughTrigger(user);
-      await flush(); // the `toggle` task attaches the document listener
+      await flushTasks(2); // the `toggle` task attaches the document listener
       await user.click(screen.getByTestId("content"));
       expect(popup().open).toBe(true);
       await user.click(screen.getByTestId("elsewhere"));
@@ -2694,7 +2680,7 @@ describe("Dialog", () => {
       const user = setupUser();
       render(<Harness mode="uncontrolled" modal={false} popup={{ lightDismiss: true }} />);
       await openThroughTrigger(user);
-      await flush(); // the `toggle` task attaches the document listeners
+      await flushTasks(2); // the `toggle` task attaches the document listeners
       fireEvent.pointerDown(screen.getByTestId("content"));
       fireEvent.click(document.body);
       expect(popup().open).toBe(true);
@@ -2725,7 +2711,7 @@ describe("Dialog", () => {
       }
       render(<App />);
       await user.click(trigger());
-      await flush();
+      await flushTasks(2);
       expect(showModal).toHaveBeenCalledTimes(1);
       expect(seen).toEqual(["name"]);
       expect(popup().querySelector("[autofocus]")).toBeNull();
@@ -2803,23 +2789,20 @@ describe("Dialog", () => {
       // Open from the "opener" so the platform would return focus to it.
       screen.getByTestId("opener").focus();
       await act(async () => dispatchCommand(popup(), "show-modal", screen.getByTestId("opener")));
-      await flush();
+      await flushTasks(2);
       expect(popup().open).toBe(true);
       await user.click(screen.getByTestId("remove"));
       screen.getByTestId("remove").focus();
       await act(async () => popup().close());
-      await flush();
+      await flushTasks(2);
       expect(trigger()).toHaveFocus();
     });
   });
 
   describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
-    function MyButton(props: ComponentPropsWithRef<"button">) {
-      return <button {...props} />;
-    }
     const renders = [
       ["a link", <a key="link" href="#x" />],
-      ["a component", <MyButton key="component" />],
+      ["a component", <PlainButton key="component" />],
     ] as const;
 
     /** Dispatches a cancelable click and reports whether it was cancelled. */
@@ -2847,11 +2830,11 @@ describe("Dialog", () => {
             }
           />,
         );
-        await flush();
+        await flushTasks(2);
         const close = spyClose();
         expectAriaDisabled(screen.getByTestId("close"));
         expect(cancelled(screen.getByTestId("close"))).toBe(true);
-        await flush();
+        await flushTasks(2);
         expect(closeAction).not.toHaveBeenCalled();
         expect(action).not.toHaveBeenCalled();
         expect(close).not.toHaveBeenCalled();
@@ -2874,7 +2857,7 @@ describe("Dialog", () => {
         expect(screen.getByTestId("close")).toHaveAttribute("aria-disabled", "true");
         expect(screen.getByTestId("close")).not.toHaveAttribute("disabled");
         expect(cancelled(screen.getByTestId("close"))).toBe(true);
-        await flush();
+        await flushTasks(2);
         expect(closeAction).not.toHaveBeenCalled();
         expect(close).not.toHaveBeenCalled();
         expect(popup().open).toBe(true);
@@ -2894,7 +2877,7 @@ describe("Dialog", () => {
           }
         />,
       );
-      await flush();
+      await flushTasks(2);
       for (const id of ["a", "b"]) {
         expect(screen.getByTestId(id)).toBeDisabled();
         expect(screen.getByTestId(id)).not.toHaveAttribute("aria-disabled");
@@ -2905,7 +2888,7 @@ describe("Dialog", () => {
       render(
         <Harness
           mode="static"
-          content={<Dialog.Close data-testid="close" disabled render={<MyButton />} />}
+          content={<Dialog.Close data-testid="close" disabled render={<PlainButton />} />}
         />,
       );
       expect(screen.getByTestId("close")).toBeDisabled();
@@ -2928,7 +2911,7 @@ describe("Dialog", () => {
           );
           expectAriaDisabled(trigger());
           expect(cancelled(trigger())).toBe(true);
-          await flush();
+          await flushTasks(2);
           expect(action).not.toHaveBeenCalled();
           expect(showModal).not.toHaveBeenCalled();
           expect(popup().open).toBe(false);
@@ -2942,7 +2925,7 @@ describe("Dialog", () => {
         expect(trigger()).toHaveAttribute("aria-disabled", "true");
         expect(trigger()).not.toHaveAttribute("disabled");
         expect(cancelled(trigger())).toBe(true);
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
       });
     });
@@ -2952,11 +2935,11 @@ describe("Dialog", () => {
         <Harness
           mode="uncontrolled"
           initialOpen
-          trigger={{ disabled: true, render: <MyButton /> }}
-          content={<Dialog.Close data-testid="close" disabled render={<MyButton />} />}
+          trigger={{ disabled: true, render: <PlainButton /> }}
+          content={<Dialog.Close data-testid="close" disabled render={<PlainButton />} />}
         />,
       );
-      await flush();
+      await flushTasks(2);
       for (const el of [trigger(), screen.getByTestId("close")]) {
         expect(el).not.toHaveAttribute("commandfor");
         expect(el).not.toHaveAttribute("command");
@@ -2968,7 +2951,7 @@ describe("Dialog", () => {
         <Harness
           mode="static"
           content={
-            <Dialog.Close data-testid="close" disabled action={() => {}} render={<MyButton />} />
+            <Dialog.Close data-testid="close" disabled action={() => {}} render={<PlainButton />} />
           }
         />,
       );
@@ -2982,11 +2965,11 @@ describe("Dialog", () => {
         <Harness
           mode="uncontrolled"
           initialOpen
-          trigger={{ render: <MyButton /> }}
-          content={<Dialog.Close data-testid="close" render={<MyButton />} />}
+          trigger={{ render: <PlainButton /> }}
+          content={<Dialog.Close data-testid="close" render={<PlainButton />} />}
         />,
       );
-      await flush();
+      await flushTasks(2);
       expect(trigger()).toHaveAttribute("command", "show-modal");
       expect(screen.getByTestId("close")).toHaveAttribute("command", "request-close");
     });
@@ -2994,7 +2977,7 @@ describe("Dialog", () => {
     it.each([
       ["modal, host button", true, undefined],
       ["non-modal, host button", false, undefined],
-      ["non-modal, component render", false, <MyButton key="component" />],
+      ["non-modal, component render", false, <PlainButton key="component" />],
     ] as const)(
       "Trigger, JS-free %s: a disabled Trigger carries data-disabled (fold W8)",
       (_, modal, element) => {
@@ -3006,7 +2989,7 @@ describe("Dialog", () => {
     );
 
     it("Trigger, JS-free modal with a component render: native disabled (the command)", () => {
-      render(<Harness mode="static" trigger={{ disabled: true, render: <MyButton /> }} />);
+      render(<Harness mode="static" trigger={{ disabled: true, render: <PlainButton /> }} />);
       expect(trigger()).toBeDisabled();
       expect(trigger()).not.toHaveAttribute("aria-disabled");
     });
@@ -3074,11 +3057,11 @@ describe("Dialog", () => {
         );
         await openThroughTrigger(user);
         await user.click(screen.getByRole("button", { name: "Save" }));
-        await flush();
+        await flushTasks(2);
         // Escape while the save runs: closed natively; the notification is entangled with the
         // form's async action (React holds it until the save settles).
         await act(async () => popup().requestClose());
-        await flush();
+        await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(2);
         expect(action.mock.calls[1]![0]).toBe(false);
         expect(action.mock.calls[1]![1].reason).toBe("dismiss");
@@ -3092,7 +3075,7 @@ describe("Dialog", () => {
         expect(popup().open).toBe(false);
         close.mockClear();
         await act(async () => saving.resolve());
-        await flush();
+        await flushTasks(2);
         // The save settled: the dialog opens (the user's latest intent) and the Form does not
         // close it again, because it was closed after the submit.
         expect(popup().open).toBe(true);
@@ -3121,12 +3104,12 @@ describe("Dialog", () => {
       await openThroughTrigger(user);
       action.mockImplementationOnce(() => closing.promise);
       await act(async () => popup().requestClose());
-      await flush();
+      await flushTasks(2);
       await user.click(trigger());
       expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=true");
       expectPending(trigger());
       await act(async () => closing.resolve());
-      await flush();
+      await flushTasks(2);
       expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=false");
       expect(popup().open).toBe(true);
     });
@@ -3154,7 +3137,7 @@ describe("Dialog", () => {
         render(<Harness mode="uncontrolled" content={<ValidatingForm />} />);
         await openThroughTrigger(user);
         await user.click(screen.getByRole("button", { name: "Save" }));
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
       });
 
@@ -3178,12 +3161,12 @@ describe("Dialog", () => {
         );
         await openThroughTrigger(user);
         await user.click(screen.getByRole("button", { name: "Save" }));
-        await flush();
+        await flushTasks(2);
         expect(screen.getByRole("alert")).toHaveTextContent("Name is required");
         expect(popup().open).toBe(true);
         expect(close).not.toHaveBeenCalled();
         await user.click(screen.getByTestId("close"));
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         expect(action.mock.calls[1]![1]).toMatchObject({
           reason: "activate",
@@ -3309,13 +3292,13 @@ describe("Dialog", () => {
         const discarding = deferred();
         render(<Editor discard={() => discarding.promise} />);
         await user.click(trigger());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(true);
         await user.click(screen.getByTestId("discard"));
         expect(confirm().open).toBe(true);
         // While the user decides, nothing is pending: an unrelated transition commits.
         await user.click(screen.getByTestId("unrelated"));
-        await flush();
+        await flushTasks(2);
         expect(screen.getByTestId("unrelated")).toHaveTextContent("1");
         // "Keep editing" closes the confirm only.
         await user.click(screen.getByTestId("keep"));
@@ -3327,10 +3310,10 @@ describe("Dialog", () => {
         expectPending(screen.getByTestId("confirm-discard"));
         expect(popup().open).toBe(true);
         await act(async () => discarding.resolve());
-        await flush();
+        await flushTasks(2);
         expect(popup().open).toBe(false);
         await user.click(screen.getByTestId("unrelated"));
-        await flush();
+        await flushTasks(2);
         expect(screen.getByTestId("unrelated")).toHaveTextContent("2");
       });
 
@@ -3362,15 +3345,15 @@ describe("Dialog", () => {
           );
         }
         render(<Anti />);
-        await flush();
+        await flushTasks(2);
         await user.click(screen.getByTestId("discard"));
-        await flush();
+        await flushTasks(2);
         expect(screen.getByTestId("confirming")).toHaveTextContent("false");
         await user.click(screen.getByTestId("unrelated"));
-        await flush();
+        await flushTasks(2);
         expect(screen.getByTestId("unrelated")).toHaveTextContent("0");
         await act(async () => answer.resolve());
-        await flush();
+        await flushTasks(2);
         expect(screen.getByTestId("confirming")).toHaveTextContent("true");
         expect(screen.getByTestId("unrelated")).toHaveTextContent("1");
       });

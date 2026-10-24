@@ -21,7 +21,7 @@ import { act, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -30,6 +30,8 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
@@ -158,9 +160,25 @@ const defaultSelected = () =>
   allOptions()
     .filter((o) => o.defaultSelected)
     .map((o) => o.value);
-/** Lets queued microtasks (the reset handler, late reconciliation) and the renders run. */
-const flush = () => act(async () => {});
 const form = () => screen.getByTestId("form") as HTMLFormElement;
+
+// React warns once per file that `<selectedcontent>` is an unknown tag (jsdom has no customizable
+// select). Take that warning before any row, so the rows asserting no `console.error` do not
+// depend on running after another row that rendered a Select (#101: failed under
+// --sequence.shuffle). The expectation below fails the day React stops warning: drop the warm-up.
+beforeAll(() => {
+  const error = silenceErrors();
+  render(
+    <Select.Root aria-label="warm-up">
+      <Select.Trigger>
+        <Select.Value />
+      </Select.Trigger>
+      <Select.Option value="a">A</Select.Option>
+    </Select.Root>,
+  ).unmount();
+  expect(error).toHaveBeenCalledWith(expect.stringContaining("is unrecognized"), "selectedcontent");
+  error.mockRestore();
+});
 
 describe("Select", () => {
   describe("roles and ARIA", () => {
@@ -283,7 +301,7 @@ describe("Select", () => {
     });
 
     it("every part throws outside a Root", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<Select.Option value="a" />)).toThrow(
         "Select.Option must be rendered inside a Select.Root.",
       );
@@ -380,7 +398,7 @@ describe("Select", () => {
 
   renderBoth("rejection", (mode) => {
     it("reaches the Error Boundary and leaves committed state", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -490,7 +508,7 @@ describe("Select", () => {
 
   renderBoth("superseded rejection", (mode) => {
     it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const older = deferred();
       const newer = deferred();
       const queue = [older, newer];
@@ -510,7 +528,7 @@ describe("Select", () => {
     });
 
     it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const older = deferred();
       const newer = deferred();
       const queue = [older, newer];
@@ -638,13 +656,13 @@ describe("Select", () => {
           render(<LateSelect mode={mode} fallback="disabled" action={action} gate={gate} />);
         });
         expect(sel().selectedIndex).toBe(-1);
-        await flush();
+        await flushMicrotasks();
         expect(action).not.toHaveBeenCalled();
 
         await act(async () => {
           gate.open();
         });
-        await flush();
+        await flushMicrotasks();
         expect(sel().value).toBe("c");
         expect(dataSelected()).toEqual(["c"]);
         expect(action).not.toHaveBeenCalled();
@@ -660,7 +678,7 @@ describe("Select", () => {
         await act(async () => {
           gate.open();
         });
-        await flush();
+        await flushMicrotasks();
         expect(sel().value).toBe("c");
         expect(action).not.toHaveBeenCalled();
       });
@@ -677,7 +695,7 @@ describe("Select", () => {
       await act(async () => {
         gate.open();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("a");
       expect(screen.getByTestId("state")).toHaveTextContent("a");
       expect(dataSelected()).toEqual(["a"]);
@@ -696,11 +714,11 @@ describe("Select", () => {
       await act(async () => {
         gate.open();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("a");
       const user = setupUser();
       await user.selectOptions(sel(), "b");
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("state")).toHaveTextContent("b");
 
       // Reload: the options suspend again behind the disabled "" fallback, then come back.
@@ -716,13 +734,13 @@ describe("Select", () => {
           />,
         );
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().options).toHaveLength(1);
       expect(screen.getByTestId("state")).toHaveTextContent("b");
       await act(async () => {
         reload.open();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("b");
       expect(screen.getByTestId("state")).toHaveTextContent("b");
       expect(dataSelected()).toEqual(["b"]);
@@ -737,7 +755,7 @@ describe("Select", () => {
       container.innerHTML = renderToString(ui);
       mutate(container);
       const result = render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       return result;
     }
     const pickC = (c: HTMLElement) => {
@@ -746,7 +764,7 @@ describe("Select", () => {
 
     renderBoth("hydration", (mode) => {
       it("dispatches the hydrated DOM value once with reason platform and no event", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         await hydrate(<Harness mode={mode} action={action} trigger={false} />, pickC);
         expect(action).toHaveBeenCalledTimes(1);
@@ -821,7 +839,7 @@ describe("Select", () => {
           <Harness mode="uncontrolled" initial="b" action={action} />
         </StrictMode>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(sel().value).toBe("b");
     });
@@ -862,7 +880,7 @@ describe("Select", () => {
             <Plain action={action} />
           </StrictMode>,
         );
-        await flush();
+        await flushMicrotasks();
         expect(sel().value).toBe("b");
         expect(screen.getByTestId("state")).toHaveTextContent("b");
         expect(dataSelected()).toEqual(["b"]);
@@ -885,7 +903,7 @@ describe("Select", () => {
             )}
           </Select.Root>,
         );
-        await flush();
+        await flushMicrotasks();
         expect(sel().value).toBe("");
         expect(screen.getByTestId("state")).toHaveTextContent("[]");
         expect(action).not.toHaveBeenCalled();
@@ -913,14 +931,14 @@ describe("Select", () => {
             <Plain action={action} />
           </form>,
         );
-        await flush();
+        await flushMicrotasks();
         const user = setupUser();
         await user.selectOptions(sel(), "c");
         expect(defaultSelected()).toEqual(["b"]);
         await act(async () => {
           form().reset();
         });
-        await flush();
+        await flushMicrotasks();
         expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
           ["c", "activate"],
           ["b", "platform"],
@@ -987,7 +1005,7 @@ describe("Select", () => {
 
     renderBoth("late hydration", (mode) => {
       it("a pre-hydration pick of a late option dispatches exactly once when it hydrates", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         const container = document.createElement("div");
         document.body.append(container);
@@ -1009,7 +1027,7 @@ describe("Select", () => {
         await act(async () => {
           g.open();
         });
-        await flush();
+        await flushMicrotasks();
 
         expect(action).toHaveBeenCalledTimes(1);
         const [next, details] = action.mock.calls[0]!;
@@ -1039,7 +1057,7 @@ describe("Select", () => {
         await act(async () => {
           g.open();
         });
-        await flush();
+        await flushMicrotasks();
         expect(action).not.toHaveBeenCalled();
         expect(sel().value).toBe("a");
       });
@@ -1055,7 +1073,7 @@ describe("Select", () => {
       await act(async () => {
         g.open();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().options).toHaveLength(3);
       expect(action).not.toHaveBeenCalled();
       expect(sel().value).toBe("a");
@@ -1069,7 +1087,7 @@ describe("Select", () => {
       const user = setupUser();
       await user.selectOptions(sel(), "c");
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe("a");
@@ -1088,7 +1106,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
         ["b", "activate"],
         ["", "platform"],
@@ -1106,7 +1124,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(sel().value).toBe("b");
     });
@@ -1117,7 +1135,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(sel().value).toBe("a");
     });
@@ -1142,7 +1160,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n]) => n)).toEqual(["b", "a"]);
       expect(sel().value).toBe("a");
     });
@@ -1161,7 +1179,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n]) => n)).toEqual(["b", "a"]);
       await act(async () => {
         d.resolve();
@@ -1179,7 +1197,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
         ["b", "activate"],
         ["a", "platform"],
@@ -1217,7 +1235,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("c");
       expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["c", "platform"]]);
     });
@@ -1233,7 +1251,7 @@ describe("Select", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
         ["c", "activate"],
         ["b", "platform"],
@@ -1306,7 +1324,7 @@ describe("Select", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe("");
@@ -1329,7 +1347,7 @@ describe("Select", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("");
       expect(dataSelected()).toEqual([""]);
     });
@@ -1366,7 +1384,7 @@ describe("Select", () => {
       let d = deferred();
       const action = vi.fn<ActionFn>();
       render(<PlainOrderForm submit={() => d.promise} action={action} />);
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("");
       expect(defaultSelected()).toEqual([""]);
       const user = setupUser();
@@ -1376,7 +1394,7 @@ describe("Select", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("");
       expect(sel()).toHaveClass("state-[]");
       expect(action).not.toHaveBeenCalled();
@@ -1388,7 +1406,7 @@ describe("Select", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(sel().value).toBe("");
       expect(sel()).toHaveClass("state-[]");
       expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
@@ -1635,7 +1653,7 @@ describe("Select", () => {
     });
 
     it("warns once per part when a render element changes the tag", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <Select.Root aria-label="Fruit" render={(props) => <div {...(props as object)} />}>
           <Select.Trigger render={(props) => <span {...(props as object)} />}>
@@ -1663,7 +1681,7 @@ describe("Select", () => {
     });
 
     it("warns when the Trigger is not the first child and the GroupLabel not the first child of its Group", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Select.Root aria-label="Fruit" defaultValue="a">
           <Select.Option value="a">A</Select.Option>
@@ -1811,10 +1829,10 @@ describe("Select", () => {
         const user = setupUser();
         await user.click(screen.getByRole("button", { name: "other" }));
         await user.click(screen.getByRole("button", { name: "mark" }));
-        await flush();
+        await flushMicrotasks();
         expect(writes).toEqual([]);
         await user.click(screen.getByRole("button", { name: "label" }));
-        await flush();
+        await flushMicrotasks();
         expect(writes).toEqual(["b"]);
         expect(sel().value).toBe("b");
       } finally {
@@ -1834,13 +1852,13 @@ describe("Select", () => {
         await act(async () => {
           form().reset();
         });
-        await flush();
+        await flushMicrotasks();
         expect(writes).toEqual([]);
         form().removeEventListener("reset", cancel);
         await act(async () => {
           form().reset();
         });
-        await flush();
+        await flushMicrotasks();
         expect(writes[0]).toBe("a");
         expect(sel().value).toBe("a");
       } finally {
@@ -1867,7 +1885,7 @@ describe("Select", () => {
         await act(async () => {
           f1.reset();
         });
-        await flush();
+        await flushMicrotasks();
         expect(writes[0]).toBe("a");
         expect(sel().value).toBe("a");
 
@@ -1883,13 +1901,13 @@ describe("Select", () => {
         await act(async () => {
           f1.reset();
         });
-        await flush();
+        await flushMicrotasks();
         expect(writes).toEqual([]);
         expect(sel().value).toBe("b");
         await act(async () => {
           f2.reset();
         });
-        await flush();
+        await flushMicrotasks();
         expect(writes[0]).toBe("a");
         expect(sel().value).toBe("a");
       } finally {
@@ -1923,7 +1941,7 @@ describe("Select", () => {
         const writes = spyValueWrites();
         const user = setupUser();
         await user.click(screen.getByRole("button", { name: "label" }));
-        await flush();
+        await flushMicrotasks();
         expect(writes).toEqual([]);
         expect(sel().selectedIndex).toBe(-1);
       } finally {
@@ -1941,14 +1959,14 @@ describe("Select", () => {
           <Select.Option value="a">A</Select.Option>
         </Select.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(observe).not.toHaveBeenCalled();
     });
   });
 
   describe("dev warnings", () => {
     it("warns once when value and defaultValue are both set", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <Select.Root aria-label="x" value="a" defaultValue="a">
           <Select.Option value="a">A</Select.Option>

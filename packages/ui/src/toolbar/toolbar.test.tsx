@@ -7,7 +7,7 @@ import { renderToString } from "react-dom/server";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { setupUser } from "../__tests__/helpers.js";
+import { setupUser, flushTasks, silenceErrors } from "../__tests__/helpers.js";
 import { Button } from "../button/index.js";
 import { Dialog } from "../dialog/index.js";
 import { Menu } from "../menu/index.js";
@@ -22,12 +22,6 @@ const button = (name: string) => screen.getByRole("button", { name });
 const toolbar = () => screen.getByRole("toolbar");
 const tabStops = () =>
   [...toolbar().querySelectorAll("[tabindex]")].filter((el) => el.getAttribute("tabindex") === "0");
-/** Runs the tasks the popover shim queued and React's work after them. */
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
 
 function press(target: Element, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
   const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
@@ -337,7 +331,7 @@ describe("Toolbar", () => {
 
   describe("ToggleGroup inside a Toolbar (row 14)", () => {
     it("joins the Toolbar's single sequence; clicks still dispatch", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const action = vi.fn<(next: string[]) => void>();
       render(
         <Toolbar.Root aria-label="T" orientation="vertical">
@@ -375,7 +369,7 @@ describe("Toolbar", () => {
     });
 
     it("the group renders no focusgroup and warns for each ignored prop once", () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       const { rerender } = render(
         <Toolbar.Root aria-label="T">
           <ToggleGroup.Root
@@ -456,7 +450,7 @@ describe("Toolbar", () => {
       const down = press(button("Insert"), "ArrowDown");
       expect(down.defaultPrevented).toBe(true);
       expect(button("After")).not.toHaveFocus();
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
     });
 
@@ -465,15 +459,15 @@ describe("Toolbar", () => {
       act(() => button("Insert").focus());
       press(button("Insert"), "ArrowDown");
       expect(button("After")).toHaveFocus();
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
 
       act(() => button("Insert").focus());
       press(button("Insert"), "ArrowLeft");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       press(button("Insert"), "ArrowRight");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       // Opened with the first item focused (Enter would focus it too; the point is the arrow).
       expect(screen.getByRole("menuitem", { name: "Image" })).toHaveFocus();
@@ -483,10 +477,10 @@ describe("Toolbar", () => {
       render(<WithMenu orientation="vertical" rtl />);
       act(() => button("Insert").focus());
       press(button("Insert"), "ArrowRight");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       press(button("Insert"), "ArrowLeft");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(screen.getByRole("menuitem", { name: "Image" })).toHaveFocus();
     });
@@ -495,7 +489,7 @@ describe("Toolbar", () => {
       render(<WithMenu orientation="vertical" />);
       act(() => button("Insert").focus());
       await setupUser().keyboard("{Enter}");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
     });
 
@@ -503,7 +497,7 @@ describe("Toolbar", () => {
       render(<WithMenu />);
       act(() => button("Insert").focus());
       press(button("Insert"), "ArrowDown");
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       const image = screen.getByRole("menuitem", { name: "Image" });
       // The menu's items keep the Menu's own tabindex; the toolbar wrote only its three items.
@@ -514,7 +508,7 @@ describe("Toolbar", () => {
       press(image, "End");
       expect(screen.getByRole("menuitem", { name: "Table" })).toHaveFocus();
       act(() => screen.getByTestId("popup").hidePopover());
-      await flush();
+      await flushTasks(2);
       act(() => button("Insert").focus());
       press(button("Insert"), "ArrowRight");
       expect(button("After")).toHaveFocus();
@@ -555,10 +549,10 @@ describe("Toolbar", () => {
       );
       act(() => button("Insert").focus());
       press(button("Insert"), "ArrowRight");
-      await flush();
+      await flushTasks(2);
       expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
       press(button("Insert"), "ArrowDown");
-      await flush();
+      await flushTasks(2);
       expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
     });
   });
@@ -586,7 +580,7 @@ describe("Toolbar", () => {
           </Popover.Root>
         </Toolbar.Root>,
       );
-      await flush();
+      await flushTasks(2);
       const group = screen.getByRole("group", { name: "Inner" });
       // Its own orientation and engine: one Tab stop on the pressed Item.
       expect(group).toHaveAttribute("data-orientation", "horizontal");
@@ -598,10 +592,10 @@ describe("Toolbar", () => {
       const trigger = button("Inner menu");
       act(() => trigger.focus());
       press(trigger, "ArrowRight");
-      await flush();
+      await flushTasks(2);
       expect(screen.getByTestId("inner-menu").matches(":popover-open")).toBe(false);
       press(trigger, "ArrowDown");
-      await flush();
+      await flushTasks(2);
       expect(screen.getByTestId("inner-menu").matches(":popover-open")).toBe(true);
       expect(screen.getByRole("menuitem", { name: "First" })).toHaveFocus();
     });
@@ -627,7 +621,7 @@ describe("Toolbar", () => {
           </Menu.Root>
         </Toolbar.Root>,
       );
-      await flush();
+      await flushTasks(2);
       expect(screen.getByTestId("dialog-sep")).toHaveAttribute("aria-orientation", "vertical");
       expect(screen.getByTestId("menu-sep")).toHaveAttribute("aria-orientation", "vertical");
       expect(screen.getByRole("group", { name: "In dialog" })).toHaveAttribute(

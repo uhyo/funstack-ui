@@ -14,7 +14,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { SwitchCheckedChangeDetails, SwitchProps } from "../switch/switch.js";
 import { user } from "./browser-user.js";
-import { deferred } from "./helpers.js";
+import { deferred, silenceErrors } from "./helpers.js";
 
 type Details = SwitchCheckedChangeDetails;
 type ActionFn = (next: boolean, details: Details) => unknown;
@@ -86,7 +86,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
     });
 
     it("a click cancelled by a pass-through onClick does not dispatch and the DOM reverts (row 26)", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       render(
         <Control
@@ -106,7 +106,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
     });
 
     it("preventDefault() in the action desyncs only while pending and warns (row 19)", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const d = deferred();
       render(
         <Control
@@ -199,7 +199,7 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
     });
 
     it("a real click before hydration is reconciled with one platform dispatch", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       const ui: ReactNode = <Control aria-label="Wi-Fi" checkedChangeAction={action} />;
       const container = document.createElement("div");

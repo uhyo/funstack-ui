@@ -27,7 +27,7 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { MockInstance } from "vitest";
-import { createSuspender } from "../__tests__/helpers.js";
+import { createSuspender, silenceErrors } from "../__tests__/helpers.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { isPopoverOpen } from "../__tests__/popover-shim.js";
 import { CSPProvider } from "../csp/index.js";
@@ -356,7 +356,7 @@ describe("Roles and ARIA", () => {
   });
 
   it("throws a clear error when a part is rendered outside Tooltip.Root", () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     expect(() => render(<Tooltip.Trigger>Save</Tooltip.Trigger>)).toThrow(
       "Tooltip.Trigger must be rendered inside a Tooltip.Root.",
     );
@@ -1284,7 +1284,7 @@ describe("Native step-aside (experimental_interestFor)", () => {
   });
 
   it("detection is per element: a rendered <span> keeps the JS path", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     const user = setupTimers();
     render(
       <Harness
@@ -1622,7 +1622,7 @@ describe("Arrow", () => {
   });
 
   it("throws outside a Tooltip.Popup", () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     expect(() => render(<Tooltip.Arrow />)).toThrow(/Tooltip\.Popup/);
   });
 });
@@ -1835,7 +1835,7 @@ describe("render element", () => {
 describe("Dev warnings", () => {
   let errorSpy: MockInstance<typeof console.error>;
   beforeEach(() => {
-    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    errorSpy = silenceErrors();
   });
 
   it('warns for provides="name" with aria-label on the trigger', () => {

@@ -25,6 +25,7 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Accordion } from "./index.js";
@@ -229,7 +230,7 @@ describe("Accordion", () => {
       expect(item("a").open).toBe(false);
 
       // No toggle handler: a platform flip is left alone (nothing re-applied, nothing emitted).
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       act(() => {
         item("a").setAttribute("open", "");
       });
@@ -282,7 +283,7 @@ describe("Accordion", () => {
     });
 
     it("`defaultOpen` is ignored and warned about in library mode", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Accordion.Root defaultValue={[]}>
           <Accordion.Item value="a" defaultOpen data-testid="item-a">
@@ -674,7 +675,7 @@ describe("Accordion", () => {
     });
 
     it("keeps working after unmounting while pending", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const d = deferred();
       const { unmount } = render(<Harness mode={mode} action={() => d.promise} />);
       const user = setupUser();
@@ -690,7 +691,7 @@ describe("Accordion", () => {
 
   renderBoth("rejection", (mode) => {
     it("reaches the Error Boundary around the Root; nothing was committed", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -829,7 +830,7 @@ describe("Accordion", () => {
     }
 
     it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds, action } = renderTwoClicks(onError);
       const user = setupUser();
@@ -856,7 +857,7 @@ describe("Accordion", () => {
     });
 
     it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds } = renderTwoClicks(onError);
       const user = setupUser();
@@ -1144,7 +1145,7 @@ describe("Accordion", () => {
     });
 
     it("warns in development when the mounted element is not <details> / <summary>", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Accordion.Root>
           <Accordion.Item value="a" render={<div />}>
@@ -1466,7 +1467,7 @@ describe("Accordion", () => {
     });
 
     it("JS-free mode: a platform open is simply the browser's business", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Accordion.Root>
           <Accordion.Item value="a" data-testid="item-a">
@@ -1505,7 +1506,7 @@ describe("Accordion", () => {
 
     renderBoth("library mode", (mode) => {
       it("reconciles every pre-opened item in ONE dispatch with reason 'platform' and no event", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         await act(async () => {
           await hydrate(<Harness mode={mode} action={action} />, ["a", "b"]);
@@ -1528,7 +1529,7 @@ describe("Accordion", () => {
     });
 
     it("exclusive: the first pre-opened item in document order wins", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const action = vi.fn<ActionFn>();
       await act(async () => {
         await hydrate(<Harness mode="uncontrolled" exclusive action={action} />, ["b", "c"]);
@@ -1540,7 +1541,7 @@ describe("Accordion", () => {
     });
 
     it("a pre-opened disabled item is put back without dispatching", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const action = vi.fn<ActionFn>();
       await act(async () => {
         await hydrate(
@@ -1553,7 +1554,7 @@ describe("Accordion", () => {
     });
 
     it("JS-free mode: the browser's state stays and nothing warns", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <Accordion.Root exclusive>
           <Accordion.Item value="a" data-testid="item-a">
@@ -1575,7 +1576,7 @@ describe("Accordion", () => {
     });
 
     it("StrictMode: a pre-opened item stays open through the double effect run and a slow accept", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const action = vi.fn<ActionFn>(() => d.promise);
       function Parent() {
@@ -1635,7 +1636,7 @@ describe("Accordion", () => {
 
   describe("dev warnings", () => {
     it("warns once when the mode changes after mount", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const { rerender } = render(
         <Accordion.Root>
           <Accordion.Item value="a">
@@ -1663,14 +1664,14 @@ describe("Accordion", () => {
     });
 
     it("warns once when `value` and `defaultValue` are both set", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(<Accordion.Root value={[]} defaultValue={[]} />);
       expect(consoleError).toHaveBeenCalledTimes(1);
       expect(consoleError.mock.calls[0]?.[0]).toMatch(/both `value` and `defaultValue`/);
     });
 
     it("does not warn in normal use of either mode", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const { unmount } = render(<Harness mode="uncontrolled" />);
       const user = setupUser();
       await user.click(trigger("a"));
@@ -1690,7 +1691,7 @@ describe("Accordion", () => {
     });
 
     it("Trigger and Panel outside an Item throw", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<Accordion.Trigger>A</Accordion.Trigger>)).toThrow(
         /must be rendered inside an Accordion\.Item/,
       );
@@ -1711,7 +1712,7 @@ describe("Accordion", () => {
     );
 
     it("renders the same markup with and without `transition` in library mode", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const plain = render(tree(undefined)).container.innerHTML;
       const withTransition = render(tree("fsui-grow")).container.innerHTML;
       expect(withTransition).toBe(plain);
@@ -1737,7 +1738,7 @@ describe("Accordion", () => {
     });
 
     it("warns on each part in JS-free mode", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <Accordion.Root>
           <Accordion.Item value="a" transition="fsui-grow">
@@ -1808,7 +1809,7 @@ describe("Accordion", () => {
 
   describe("standalone Item (no Root)", () => {
     it("is a JS-free disclosure and unmounts cleanly", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const { unmount } = render(
         <Accordion.Item value="solo" data-testid="item-solo">
           <Accordion.Trigger data-testid="trigger-solo">Solo</Accordion.Trigger>

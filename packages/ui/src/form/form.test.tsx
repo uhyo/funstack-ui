@@ -12,7 +12,7 @@
 // content apply to the submission and are covered below.
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, Suspense, useActionState, useState } from "react";
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -22,6 +22,9 @@ import {
   expectNotPending,
   expectPending,
   setupUser,
+  PlainButton,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
 import { Dialog } from "../dialog/index.js";
@@ -30,12 +33,6 @@ import type { DialogOpenChangeDetails } from "../dialog/index.js";
 import { Field } from "../field/index.js";
 import { Form } from "./index.js";
 import type { FormErrors, FormRootState, FormSubmitState } from "./index.js";
-
-const flush = () => act(async () => {});
-
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
 
 function EmailField({ name = "email" }: { name?: string }) {
   return (
@@ -183,7 +180,7 @@ describe("Form: submission (intercept)", () => {
     const user = setupUser();
     await user.type(control(), "typed");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
     expect(formAction).toHaveBeenCalledTimes(1);
     expect(formAction.mock.calls[0]![0].get("email")).toBe("typed");
@@ -200,7 +197,7 @@ describe("Form: server errors", () => {
         <Form.Submit>Save</Form.Submit>
       </Form.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
     expect(control()).toHaveAttribute("aria-invalid", "true");
     expect(control().validationMessage).toBe("Taken");
@@ -217,7 +214,7 @@ describe("Form: server errors", () => {
     await user.type(control("name"), "Ann");
     result = { errors: { name: "Bad name", email: ["Taken", "Try another"] } };
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("email-error")).toHaveTextContent("Taken Try another");
     expect(screen.getByTestId("name-error")).toHaveTextContent("Bad name");
@@ -234,7 +231,7 @@ describe("Form: server errors", () => {
     const user = setupUser();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
 
     // The slot blocks a resubmission of the unchanged value: the Field shows the error again
@@ -245,7 +242,7 @@ describe("Form: server errors", () => {
     expect(control().validationMessage).toBe("");
 
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
     expect(document.activeElement).toBe(control());
   });
@@ -256,10 +253,10 @@ describe("Form: server errors", () => {
     const user = setupUser();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(1);
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(control());
   });
@@ -280,7 +277,7 @@ describe("Form: server errors", () => {
       fireEvent.input(control(), { target: { value: "a@b.cx" } });
     });
     await act(async () => d.resolve({ errors: { email: "Taken", name: "Bad name" } }));
-    await flush();
+    await flushMicrotasks();
     expect(screen.queryByTestId("email-error")).toBeNull();
     expect(control().validationMessage).toBe("");
     // The unchanged field's error is shown and focused.
@@ -303,21 +300,21 @@ describe("Form: server errors", () => {
       fireEvent.input(control(), { target: { value: "x@y.z" } });
     });
     await act(async () => first.resolve({ errors: { email: "a@b.c is taken" } }));
-    await flush();
+    await flushMicrotasks();
     expect(screen.queryByTestId("email-error")).toBeNull();
 
     // Submit "x@y.z": the `errors` prop still holds the first result during this flight.
     await act(async () => {
       submit().click();
     });
-    await flush();
+    await flushMicrotasks();
     expectPending(screen.getByTestId("form"));
     expect(screen.queryByTestId("email-error")).toBeNull();
     expect(control()).toHaveAttribute("aria-invalid", "false");
     expect(control().validationMessage).toBe("");
 
     await act(async () => second.resolve({}));
-    await flush();
+    await flushMicrotasks();
     expect(call).toBe(2);
     expect(screen.queryByTestId("email-error")).toBeNull();
   });
@@ -335,12 +332,12 @@ describe("Form: server errors", () => {
       fireEvent.input(control(), { target: { value: "x@y.z" } });
     });
     await act(async () => first.resolve({ errors: { email: "a@b.c is taken" } }));
-    await flush();
+    await flushMicrotasks();
     await act(async () => {
       submit().click();
     });
     await act(async () => second.resolve({ errors: { email: "x@y.z is taken" } }));
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("email-error")).toHaveTextContent("x@y.z is taken");
     expect(document.activeElement).toBe(control());
   });
@@ -365,7 +362,7 @@ describe("Form: server errors", () => {
       render(<ActionStateForm run={async () => ({ errors: { email: "Taken" } })} />);
       const user = setupUser();
       await user.type(control(), "a@b.c{Enter}");
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
       expect(document.activeElement).toBe(control());
       expect(notify).toHaveBeenCalledTimes(1);
@@ -378,7 +375,7 @@ describe("Form: server errors", () => {
       const user = setupUser();
       await user.type(control(), "a@b.c");
       await user.click(submit());
-      await flush();
+      await flushMicrotasks();
       expect(document.activeElement).toBe(control());
       expect(notify).not.toHaveBeenCalled();
     });
@@ -401,10 +398,10 @@ describe("Form: server errors", () => {
           <Form.Submit>Save</Form.Submit>
         </Form.Root>,
       );
-      await flush();
+      await flushMicrotasks();
       const user = setupUser();
       await user.type(control("code"), "a{Enter}");
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(screen.getByTestId("code-error")).toHaveTextContent("Too short.");
       expect(document.activeElement).toBe(control("code"));
@@ -414,7 +411,7 @@ describe("Form: server errors", () => {
       // Focus elsewhere: it moves to the first invalid field, no announcement.
       notify.mockClear();
       await user.click(submit());
-      await flush();
+      await flushMicrotasks();
       expect(document.activeElement).toBe(control("code"));
       expect(notify).not.toHaveBeenCalled();
     });
@@ -423,7 +420,7 @@ describe("Form: server errors", () => {
       render(<ActionStateForm run={async () => ({ errors: { email: "Taken" } })} />);
       const user = setupUser();
       await user.type(control(), "a@b.c{Enter}");
-      await flush();
+      await flushMicrotasks();
       expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
       expect(document.activeElement).toBe(control());
     });
@@ -434,7 +431,7 @@ describe("Form: server errors", () => {
     const user = setupUser();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(document.activeElement).toBe(submit());
     expect(control().value).toBe("a@b.c");
     expect(screen.queryByTestId("email-error")).toBeNull();
@@ -450,7 +447,7 @@ describe("Form: server errors", () => {
     await user.type(control(), "a@b.c");
     await user.type(control("name"), "Ann");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("name-error")).toHaveTextContent("Bad name");
     expect(document.activeElement).toBe(control("name"));
     await user.type(control("name"), "e");
@@ -463,7 +460,7 @@ describe("Form: server errors", () => {
         <EmailField />
       </form>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(control().validity.valid).toBe(true);
     expect(screen.queryByTestId("email-error")).toBeNull();
   });
@@ -486,7 +483,7 @@ describe("Form: reset policy", () => {
     await user.click(screen.getByTestId("news"));
     checkboxAction.mockClear();
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(control().value).toBe("");
     expect(screen.getByTestId("news")).not.toBeChecked();
     expect(checkboxAction).toHaveBeenCalledTimes(1);
@@ -500,7 +497,7 @@ describe("Form: reset policy", () => {
     const user = setupUser();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(control().value).toBe("a@b.c");
   });
 
@@ -517,7 +514,7 @@ describe("Form: reset policy", () => {
     await user.click(submit());
     expect(control().value).toBe("a@b.c");
     await act(async () => d.resolve());
-    await flush();
+    await flushMicrotasks();
     expect(control().value).toBe("");
   });
 });
@@ -540,7 +537,7 @@ describe("Form: rejection", () => {
     await user.type(control(), "a@b.c");
     await user.click(submit());
     await act(async () => d.reject(new Error("network")));
-    await flush();
+    await flushMicrotasks();
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "network" }));
     expect(screen.getByTestId("error-catcher")).toHaveTextContent("network");
     expect(reset).not.toHaveBeenCalled();
@@ -571,7 +568,7 @@ describe("Form: overlap", () => {
     expectPending(screen.getByTestId("form"));
     expect(screen.queryByTestId("email-error")).toBeNull();
     await act(async () => calls[1]!.d.resolve({ errors: { email: "Second" } }));
-    await flush();
+    await flushMicrotasks();
     expectNotPending(screen.getByTestId("form"));
     expect(screen.getByTestId("email-error")).toHaveTextContent("Second");
     expect(control().value).toBe("first!");
@@ -602,13 +599,13 @@ describe("Form: suspending content", () => {
     const user = setupUser();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(screen.queryByTestId("fallback")).toBeNull();
     expectPending(screen.getByTestId("form"));
     expect(screen.getByTestId("suspender")).toHaveTextContent("before");
     expect(screen.queryByTestId("email-error")).toBeNull();
     await act(async () => suspender.resolve("after"));
-    await flush();
+    await flushMicrotasks();
     expectNotPending(screen.getByTestId("form"));
     expect(screen.getByTestId("suspender")).toHaveTextContent("after");
     expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
@@ -673,7 +670,7 @@ describe("Form: function props and render", () => {
     const user = setupUser();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
     expectNotPending(submit());
     expect(control().value).toBe("a@b.c");
@@ -700,14 +697,11 @@ describe("Form: function props and render", () => {
   });
 
   it("Form.Submit disabled with a component render stays natively disabled, no aria-disabled (#83)", async () => {
-    function MyButton(props: ComponentPropsWithRef<"button">) {
-      return <button {...props} />;
-    }
     const action = vi.fn();
     render(
       <Form.Root action={action}>
         <EmailField />
-        <Form.Submit disabled render={<MyButton />}>
+        <Form.Submit disabled render={<PlainButton />}>
           Save
         </Form.Submit>
       </Form.Root>,
@@ -718,7 +712,7 @@ describe("Form: function props and render", () => {
     expect(submit()).not.toHaveAttribute("aria-disabled");
     expect(submit()).toHaveAttribute("data-disabled", "");
     await setupUser().click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
   });
 
@@ -743,7 +737,7 @@ describe("Form: function props and render", () => {
         <Form.Submit render={<span />}>Save</Form.Submit>
       </Form.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     const messages = error.mock.calls.map((call) => String(call[0]));
     expect(messages.some((m) => m.includes("Form.Root: expected to render a <form>"))).toBe(true);
     expect(messages.some((m) => m.includes("Form.Submit: expected to render a <button>"))).toBe(
@@ -773,7 +767,7 @@ describe("Form: platform path", () => {
     expect(screen.getByTestId("email-error")).toBeInTheDocument();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(control().value).toBe("");
     // The reset cleared the user-validity (fallback: "attempted") flag.
     expect(screen.queryByTestId("email-error")).toBeNull();
@@ -806,7 +800,7 @@ describe("Form: platform path", () => {
     expect(screen.getByTestId("out")).toHaveTextContent("ab");
     expect(screen.queryByTestId("email-error")).toBeNull();
     fireEvent.input(control(), { target: { value: "" } });
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("email-error")).toBeInTheDocument();
   });
 });
@@ -855,7 +849,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     const user = setupUser();
     await user.type(control(), "bad");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("email-error")).toHaveTextContent("Taken");
     // React's own path would have reset the form after this successful action.
@@ -867,7 +861,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     await user.type(control(), "good");
     expect(screen.queryByTestId("email-error")).toBeNull();
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(2);
     // autoReset: no error in the result.
     expect(control().value).toBe("");
@@ -882,7 +876,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     const user = setupUser();
     await user.type(control(), "x");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(1);
     expect(popup().open).toBe(true);
     expect(openChangeAction).not.toHaveBeenCalled();
@@ -904,7 +898,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     await user.click(submit());
     expectPending(screen.getByTestId("form"));
     await act(async () => d.resolve({}));
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(1);
     expect(control().value).toBe("");
     expect(openChangeAction).toHaveBeenCalledTimes(1);
@@ -915,7 +909,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     // openChangeAction is awaited before the close commit.
     expect(popup().open).toBe(true);
     await act(async () => close.resolve());
-    await flush();
+    await flushMicrotasks();
     expect(popup().open).toBe(false);
     expect(popup().returnValue).toBe("save");
   });
@@ -927,7 +921,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     const user = setupUser();
     await user.type(control(), "a@b.c");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(1);
     expect(control().value).toBe("");
     expect(openChangeAction).not.toHaveBeenCalled();
@@ -946,7 +940,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
       fireEvent.input(control(), { target: { value: "x@y.z" } });
     });
     await act(async () => d.resolve({ errors: { email: "a@b.c is taken" } }));
-    await flush();
+    await flushMicrotasks();
     expect(screen.queryByTestId("email-error")).toBeNull();
     expect(control().value).toBe("x@y.z");
     expect(document.activeElement).toBe(submit());
@@ -979,13 +973,13 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     const user = setupUser();
     await user.type(control(), "bad");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(popup().open).toBe(true);
     expect(document.activeElement).toBe(control());
     await user.clear(control());
     await user.type(control(), "good");
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(run).toHaveBeenCalledTimes(2);
     expect(popup().open).toBe(false);
     expect(popup().returnValue).toBe("save");
@@ -1003,7 +997,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
         </Dialog.Popup>
       </Dialog.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     const warnings = error.mock.calls.filter((args) =>
       String(args[0]).includes("`Dialog.Form` rendered as a `Form.Root` needs a function `action`"),
     );
@@ -1028,7 +1022,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
         </Dialog.Popup>
       </Dialog.Root>,
     );
-    await flush();
+    await flushMicrotasks();
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -1056,7 +1050,7 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     render(<Plain />);
     const user = setupUser();
     await user.click(submit());
-    await flush();
+    await flushMicrotasks();
     expect(screen.getByTestId("state")).toHaveTextContent("Taken");
     expect(popup().open).toBe(false);
     expect(popup().returnValue).toBe("save");

@@ -19,6 +19,8 @@ import {
   expectNotPending,
   expectPending,
   setupUser,
+  silenceErrors,
+  PlainButton,
 } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Form } from "../form/index.js";
@@ -114,12 +116,9 @@ describe("Button", () => {
     });
 
     it("disabled on a component render element: aria-disabled, no disabled (review fold F1)", async () => {
-      function MyButton(props: ComponentPropsWithRef<"button">) {
-        return <button {...props} />;
-      }
       const action = vi.fn();
       render(
-        <Button disabled action={action} render={<MyButton />}>
+        <Button disabled action={action} render={<PlainButton />}>
           Mine
         </Button>,
       );
@@ -277,7 +276,7 @@ describe("Button", () => {
 
   describe("rejection (row 4)", () => {
     it("reaches the boundary above the Button", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(
@@ -882,7 +881,7 @@ describe("Button", () => {
   describe("development warnings (row 14)", () => {
     let error: ReturnType<typeof vi.spyOn>;
     beforeEach(() => {
-      error = vi.spyOn(console, "error").mockImplementation(() => {});
+      error = silenceErrors();
     });
     const ours = () =>
       error.mock.calls.filter((c: unknown[]) => String(c[0]).startsWith("Button:")).length;
@@ -1118,7 +1117,7 @@ describe("Button", () => {
 
   describe("SSR markup (row 19)", () => {
     it("server HTML has type=button and no pending state; hydration matches", async () => {
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = silenceErrors();
       const fn = () => {};
       const ui: ReactNode = (
         <form>

@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { StrictMode, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { deferred, setupUser } from "../__tests__/helpers.js";
+import { deferred, setupUser, flushMicrotasks } from "../__tests__/helpers.js";
 import { useFormReset } from "./use-form-reset.js";
 
 interface Seen {
@@ -26,7 +26,6 @@ function Probe({
 }
 
 const probe = () => screen.getByLabelText("probe") as HTMLInputElement;
-const flush = () => act(async () => {});
 
 describe("useFormReset", () => {
   it("calls onReset in a microtask after the reset, with the reset event", async () => {
@@ -49,7 +48,7 @@ describe("useFormReset", () => {
     form.reset();
     // Not synchronously: the reset event precedes the reset algorithm.
     expect(seen).toEqual([]);
-    await flush();
+    await flushMicrotasks();
     expect(seen).toEqual([{ type: "reset", checked: false, sameEvent: true }]);
   });
 
@@ -64,7 +63,7 @@ describe("useFormReset", () => {
     form.addEventListener("reset", (e) => e.preventDefault());
     probe().checked = true;
     form.reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).not.toHaveBeenCalled();
     expect(probe().checked).toBe(true);
   });
@@ -116,7 +115,7 @@ describe("useFormReset", () => {
     await act(async () => {
       d.resolve();
     });
-    await flush();
+    await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(1);
     expect(probe().checked).toBe(false);
     expect(probe().dataset["tick"]).toBe("1");
@@ -134,7 +133,7 @@ describe("useFormReset", () => {
     const a = screen.getByTestId("a") as HTMLFormElement;
     const b = screen.getByTestId("b") as HTMLFormElement;
     a.reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -145,10 +144,10 @@ describe("useFormReset", () => {
       </>,
     );
     a.reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(1);
     b.reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(2);
   });
 
@@ -162,7 +161,7 @@ describe("useFormReset", () => {
       </>,
     );
     (screen.getByTestId("later") as HTMLFormElement).reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
@@ -175,7 +174,7 @@ describe("useFormReset", () => {
     const form = screen.getByTestId("form") as HTMLFormElement;
     rerender(<App show={false} />);
     form.reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).not.toHaveBeenCalled();
   });
 
@@ -189,7 +188,7 @@ describe("useFormReset", () => {
       </StrictMode>,
     );
     (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
@@ -207,7 +206,7 @@ describe("useFormReset", () => {
       </form>,
     );
     (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flush();
+    await flushMicrotasks();
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
   });
@@ -225,7 +224,7 @@ describe("useFormReset", () => {
       </form>,
     );
     (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flush();
+    await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 });

@@ -19,6 +19,8 @@ import {
   expectNotPending,
   expectPending,
   setupUser,
+  flushTasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { CSPProvider } from "../csp/index.js";
@@ -33,6 +35,7 @@ import type {
   MenuRootState,
 } from "./index.js";
 import { MENU_POINT_FALLBACKS, MENU_POINT_RULES } from "./menu-point.js";
+import { watchShow } from "../__tests__/overlay-helpers.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
 
@@ -109,17 +112,6 @@ const popup = () => screen.getByTestId("popup");
 const item = (id: string) => screen.getByTestId(id);
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
 
-/** Runs the tasks the shim queued (`toggle`) and React's work after them. */
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-function silenceErrors() {
-  return vi.spyOn(console, "error").mockImplementation(() => {});
-}
-
 /** A `PointerEvent` of `type`, bubbling and cancelable, a right-button press by default. */
 function pointerEvent(type: string, init: PointerEventInit = {}): PointerEvent {
   return new PointerEvent(type, {
@@ -152,26 +144,8 @@ async function rightClick(target: Element, x = 312, y = 148, init: PointerEventI
     target,
     pointerEvent("contextmenu", { clientX: x, clientY: y, ...init }),
   );
-  await flush();
+  await flushTasks(2);
   return event;
-}
-
-/**
- * Records, for every `showPopover()` call, the popup, the element carrying `autofocus` at that
- * moment (the keyboard path) and the `source`.
- */
-function watchShow() {
-  const calls: { popup: HTMLElement; autofocus: Element | null; source: unknown }[] = [];
-  const original = HTMLElement.prototype.showPopover;
-  vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
-    this: HTMLElement,
-    options?: ShowPopoverOptions,
-  ) {
-    const autofocus = this.hasAttribute("autofocus") ? this : this.querySelector("[autofocus]");
-    calls.push({ popup: this, autofocus, source: options?.source });
-    return original.call(this, options);
-  });
-  return calls;
 }
 
 /**
@@ -331,10 +305,10 @@ describe("Menu.ContextTrigger", () => {
       expect(seen.popup).toMatchObject({ open: true, side: null, context: true });
       // Close, then open from the Trigger: anchored.
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(seen.root!.context).toBe(false);
       await user.click(screen.getByTestId("trigger"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(popup()).not.toHaveAttribute("data-context");
       expect(popup()).toHaveAttribute("data-side", "bottom");
@@ -346,7 +320,7 @@ describe("Menu.ContextTrigger", () => {
   describe("opening", () => {
     it("a contextmenu opens at the point: openChangeAction once, prevented, source, inline placement", async () => {
       const action = vi.fn<OpenAction>();
-      const calls = watchShow();
+      const { calls } = watchShow();
       render(<Harness root={{ openChangeAction: action }} />);
       expect(popup().children).toHaveLength(0);
       const event = await rightClick(screen.getByTestId("label"), 312, 148);
@@ -383,7 +357,7 @@ describe("Menu.ContextTrigger", () => {
       expectPending(region());
       expect(isOpen()).toBe(false);
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expectNotPending(region());
     });
@@ -391,18 +365,18 @@ describe("Menu.ContextTrigger", () => {
 
   describe("modality", () => {
     it("button -1 (Chromium keyboard): the first item gets autofocus (ring)", async () => {
-      const calls = watchShow();
+      const { calls } = watchShow();
       const quiet = watchQuietFocus();
       render(<Harness />);
       await dispatch(region(), pointerEvent("contextmenu", { button: -1, buttons: 0 }));
-      await flush();
+      await flushTasks(2);
       expect(calls[0]!.autofocus).toBe(item("rename"));
       expect(quiet).toEqual([]);
       expect(document.activeElement).toBe(item("rename"));
     });
 
     it("pointerdown then contextmenu: quiet focus on the first item", async () => {
-      const calls = watchShow();
+      const { calls } = watchShow();
       const quiet = watchQuietFocus();
       render(<Harness />);
       await rightClick(region());
@@ -412,7 +386,7 @@ describe("Menu.ContextTrigger", () => {
     });
 
     it("keydown on a focused child, then contextmenu with button 0 (Gecko keyboard): ring", async () => {
-      const calls = watchShow();
+      const { calls } = watchShow();
       render(<Harness />);
       // A pointer press earlier must not count once a key came after it.
       await dispatch(region(), pointerEvent("pointerdown", { button: 0, buttons: 1 }));
@@ -420,7 +394,7 @@ describe("Menu.ContextTrigger", () => {
       act(() => inner.focus());
       fireEvent.keyDown(inner, { key: "F10", shiftKey: true });
       await dispatch(inner, pointerEvent("contextmenu", { button: 0, buttons: 0 }));
-      await flush();
+      await flushTasks(2);
       expect(calls[0]!.autofocus).toBe(item("rename"));
     });
 
@@ -441,7 +415,7 @@ describe("Menu.ContextTrigger", () => {
       const quiet = watchQuietFocus();
       render(<Harness />);
       await dispatch(region(), pointerEvent("contextmenu", { button: 0, buttons: 0 }));
-      await flush();
+      await flushTasks(2);
       expect(quiet).toEqual([item("rename")]);
     });
   });
@@ -482,7 +456,7 @@ describe("Menu.ContextTrigger", () => {
       const capture = vi.spyOn(Element.prototype, "setPointerCapture");
       render(<Harness />);
       await dispatch(region(), pointerEvent("contextmenu", { buttons: 0 }));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(capture).not.toHaveBeenCalled();
     });
@@ -534,7 +508,7 @@ describe("Menu.ContextTrigger", () => {
     it("nested regions: the inner one opens, the outer one does not", async () => {
       const error = vi.spyOn(console, "error");
       render(<Nested />);
-      await flush();
+      await flushTasks(2);
       // A Root inside a region is the nested region's own menu, not a misplaced submenu.
       expect(error).not.toHaveBeenCalledWith(expect.stringContaining("outside its Menu.Popup"));
       await rightClick(screen.getByTestId("target"));
@@ -936,7 +910,7 @@ describe("Menu.ContextTrigger", () => {
         />,
       );
       await user.click(screen.getByTestId("inner-trigger"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen(screen.getByTestId("inner-popup"))).toBe(true);
       vi.useFakeTimers();
       press(item("inner-item"));
@@ -955,7 +929,7 @@ describe("Menu.ContextTrigger", () => {
       expect(isOpen()).toBe(true);
       const firstFallbacks = pointStyle(popup()).fallbacks;
       act(() => item("delete").focus());
-      const calls = watchShow();
+      const { calls } = watchShow();
       const hide = vi.spyOn(HTMLElement.prototype, "hidePopover");
       const quiet = watchQuietFocus();
       const event = await rightClick(screen.getByTestId("label"), 300, 250);
@@ -972,7 +946,7 @@ describe("Menu.ContextTrigger", () => {
       expect(quiet).toEqual([item("rename")]);
       expect(document.activeElement).toBe(item("rename"));
       // The coalesced toggle notified nothing.
-      await flush();
+      await flushTasks(2);
       expect(action).toHaveBeenCalledTimes(1);
     });
 
@@ -992,20 +966,20 @@ describe("Menu.ContextTrigger", () => {
       );
       await rightClick(region(), 100, 100);
       fireEvent.click(item("slow"));
-      await flush();
+      await flushTasks(2);
       expectPending(item("slow"));
       await rightClick(region(), 300, 250);
       expect(isOpen()).toBe(true);
       expect(pointStyle(popup()).x).toBe("300px");
       expectPending(item("slow"));
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
 
     it("a move during a pending open: one showPopover, at the latest point", async () => {
       const work = deferred();
-      const calls = watchShow();
+      const { calls } = watchShow();
       const action = vi.fn<OpenAction>(() => work.promise);
       render(<Harness root={{ openChangeAction: action }} />);
       await rightClick(region(), 100, 100);
@@ -1013,7 +987,7 @@ describe("Menu.ContextTrigger", () => {
       expect(action).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(calls).toHaveLength(1);
       expect(pointStyle(popup()).x).toBe("300px");
@@ -1033,7 +1007,7 @@ describe("Menu.ContextTrigger", () => {
         async () => {
           const user = setupUser();
           await user.click(screen.getByTestId("trigger"));
-          await flush();
+          await flushTasks(2);
         },
       ],
     ];
@@ -1051,7 +1025,7 @@ describe("Menu.ContextTrigger", () => {
         });
         expect(hide).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(false);
-        await flush();
+        await flushTasks(2);
         expect(action.mock.calls.at(-1)![0]).toBe(false);
         expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
       },
@@ -1067,7 +1041,7 @@ describe("Menu.ContextTrigger", () => {
           .dispatchEvent(pointerEvent("pointerdown", { button: 1, buttons: 4 }));
       });
       expect(isOpen()).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
     });
 
@@ -1089,7 +1063,7 @@ describe("Menu.ContextTrigger", () => {
         item("archive"),
         pointerEvent("contextmenu", { clientX: 400, clientY: 400 }),
       );
-      await flush();
+      await flushTasks(2);
       expect(event.defaultPrevented).toBe(true);
       expect(hide).not.toHaveBeenCalled();
       expect(isOpen()).toBe(true);
@@ -1117,7 +1091,7 @@ describe("Menu.ContextTrigger", () => {
       render(<Harness />);
       await rightClick(region());
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       const hide = vi.spyOn(HTMLElement.prototype, "hidePopover");
       act(() => {
         document.body.dispatchEvent(pointerEvent("contextmenu"));
@@ -1146,7 +1120,7 @@ describe("Menu.ContextTrigger", () => {
       await rightClick(region());
       act(() => item("move").focus());
       await user.keyboard("{ArrowRight}");
-      await flush();
+      await flushTasks(2);
       expect(isOpen(screen.getByTestId("subpopup"))).toBe(true);
       const hidden: Element[] = [];
       const original = HTMLElement.prototype.hidePopover;
@@ -1167,16 +1141,16 @@ describe("Menu.ContextTrigger", () => {
   describe("dual-trigger Root", () => {
     it("Trigger: anchored; region: point; aria-expanded on the Trigger during a context open", async () => {
       const user = setupUser();
-      const calls = watchShow();
+      const { calls } = watchShow();
       render(<Harness withTrigger />);
       const t = screen.getByTestId("trigger");
       await user.click(t);
-      await flush();
+      await flushTasks(2);
       expect(calls.at(-1)!.source).toBe(t);
       expect(popup()).toHaveAttribute("data-side", "bottom");
       expect(popup().style.getPropertyValue("position-area")).toBe("bottom span-self-x-end");
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       await rightClick(screen.getByTestId("label"));
       expect(calls.at(-1)!.source).toBe(region());
       expect(popup()).toHaveAttribute("data-context", "");
@@ -1190,7 +1164,7 @@ describe("Menu.ContextTrigger", () => {
       render(<Harness withTrigger root={{ openChangeAction: action }} />);
       await rightClick(region());
       await user.click(screen.getByTestId("trigger"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(action.mock.calls.at(-1)![0]).toBe(false);
       expect(action.mock.calls.at(-1)![1].reason).toBe("activate");
@@ -1200,8 +1174,8 @@ describe("Menu.ContextTrigger", () => {
       const user = setupUser();
       render(<Harness withTrigger />);
       await user.click(screen.getByTestId("trigger"));
-      await flush();
-      const calls = watchShow();
+      await flushTasks(2);
+      const { calls } = watchShow();
       await rightClick(screen.getByTestId("label"), 50, 60);
       expect(isOpen()).toBe(true);
       expect(popup()).toHaveAttribute("data-context", "");
@@ -1249,10 +1223,10 @@ describe("Menu.ContextTrigger", () => {
       expect(isOpen()).toBe(true);
       expect(popup()).toHaveAttribute("data-context", "");
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       fireEvent.click(screen.getByTestId("flip"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(popup()).not.toHaveAttribute("data-context");
       expect(popup()).toHaveAttribute("data-side", "bottom");
@@ -1395,7 +1369,7 @@ describe("Menu.ContextTrigger", () => {
       );
       const user = setupUser({ document: doc });
       await user.click(inside.getByTestId("trigger"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen(inside.getByTestId("popup"))).toBe(true);
       expect(rulesInHead(doc)).toHaveLength(0);
     });
@@ -1494,7 +1468,7 @@ describe("Menu.ContextTrigger", () => {
     it("the keyboard is placed as a mouse", async () => {
       render(<Harness />);
       await dispatch(region(), pointerEvent("contextmenu", { button: -1, buttons: 0 }));
-      await flush();
+      await flushTasks(2);
       expect(gap()).toBe("0px");
       expect(pointStyle(popup()).top).toBe(BELOW);
     });
@@ -1600,7 +1574,7 @@ describe("Menu.ContextTrigger", () => {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 150));
       });
-      await flush();
+      await flushTasks(2);
       expect(isOpen(screen.getByTestId("submenu"))).toBe(true);
       // Into the submenu: the submenu stays open, its item takes focus.
       hit = item("inbox");
@@ -1609,7 +1583,7 @@ describe("Menu.ContextTrigger", () => {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
       });
-      await flush();
+      await flushTasks(2);
       expect(isOpen(screen.getByTestId("submenu"))).toBe(true);
     });
 
@@ -1630,7 +1604,7 @@ describe("Menu.ContextTrigger", () => {
       });
       expect(actions.archive).toHaveBeenCalledTimes(1);
       expect(click!.defaultPrevented).toBe(true);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(open.mock.calls.at(-1)).toEqual([
         false,
@@ -1653,7 +1627,7 @@ describe("Menu.ContextTrigger", () => {
         await rightClick(region(), 312, 148);
         hit = item(target);
         captured("pointerup", 312 + dx, 148, { buttons: 0 });
-        await flush();
+        await flushTasks(2);
         expect(isOpen()).toBe(true);
       }
       expect(actions.archive).not.toHaveBeenCalled();
@@ -1668,13 +1642,13 @@ describe("Menu.ContextTrigger", () => {
       hit = document.body;
       now += 100;
       captured("pointerup", 322, 148, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       // 600 ms after a fresh open (a move restarts the clock), 0 px away: still open.
       await rightClick(region(), 312, 148);
       now += 600;
       captured("pointerup", 312, 148, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       // 600 ms, 10 px away: dismissed.
       await rightClick(region(), 312, 148);
@@ -1683,7 +1657,7 @@ describe("Menu.ContextTrigger", () => {
       captured("pointerup", 322, 148, { buttons: 0 });
       expect(hide).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(open.mock.calls.at(-1)![1].reason).toBe("dismiss");
     });
 
@@ -1702,13 +1676,13 @@ describe("Menu.ContextTrigger", () => {
       expect(isOpen()).toBe(false);
       now += 500;
       await act(async () => settle());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       // 600 ms after the press but 100 ms after the show, 10 px away, outside: still open.
       hit = document.body;
       now += 100;
       captured("pointerup", 322, 148, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
     });
 
@@ -1720,7 +1694,7 @@ describe("Menu.ContextTrigger", () => {
       expect(actions.archive).not.toHaveBeenCalled();
       captured("lostpointercapture", 330, 148);
       captured("pointerup", 330, 148, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(actions.archive).not.toHaveBeenCalled();
       expect(isOpen()).toBe(true);
     });
@@ -1731,7 +1705,7 @@ describe("Menu.ContextTrigger", () => {
       hit = item("archive");
       captured("pointerup", 313, 148, { buttons: 0 });
       captured("pointerup", 330, 148, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(actions.archive).not.toHaveBeenCalled();
       expect(isOpen()).toBe(true);
     });
@@ -1739,13 +1713,13 @@ describe("Menu.ContextTrigger", () => {
     it("no gesture without a button down (Windows, the keyboard)", async () => {
       render(<Harness content={<DragItems />} />);
       await dispatch(region(), pointerEvent("contextmenu", { buttons: 0 }));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       hit = item("archive");
       captured("pointermove", 330, 160, { buttons: 0 });
       expect(document.activeElement).toBe(item("rename"));
       captured("pointerup", 330, 160, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(actions.archive).not.toHaveBeenCalled();
     });
 
@@ -1756,11 +1730,11 @@ describe("Menu.ContextTrigger", () => {
       hit = item("archive");
       // 2 px from the new point (far from the first one): within the slop.
       captured("pointerup", 102, 100, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(actions.archive).not.toHaveBeenCalled();
       await rightClick(region(), 100, 100);
       captured("pointerup", 110, 100, { buttons: 0 });
-      await flush();
+      await flushTasks(2);
       expect(actions.archive).toHaveBeenCalledTimes(1);
     });
 
@@ -1942,13 +1916,13 @@ describe("Menu.ContextTrigger", () => {
       scroll(document);
       expect(hide).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
-      await flush();
+      await flushTasks(2);
       expect(open.mock.calls.at(-1)![1].reason).toBe("dismiss");
       // Removed with the close.
       await rightClick(region());
       hide.mockClear();
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       hide.mockClear();
       scroll(document);
       expect(hide).not.toHaveBeenCalled();
@@ -1972,7 +1946,7 @@ describe("Menu.ContextTrigger", () => {
       const user = setupUser();
       render(<Harness withTrigger />);
       await user.click(screen.getByTestId("trigger"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       await nextFrame();
       scroll(document);
@@ -2006,7 +1980,7 @@ describe("Menu.ContextTrigger", () => {
       await rightClick(region());
       const cancel = vi.spyOn(window, "cancelAnimationFrame");
       act(() => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(cancel).toHaveBeenCalledTimes(1);
     });
 
@@ -2026,13 +2000,13 @@ describe("Menu.ContextTrigger", () => {
         if (from === "region") await rightClick(region());
         else {
           await user.click(screen.getByTestId("trigger"));
-          await flush();
+          await flushTasks(2);
         }
         expect(wheel(item("archive"), 10).defaultPrevented).toBe(true);
         expect(wheel(popup(), -10).defaultPrevented).toBe(true);
         // Removed with the close.
         act(() => popup().hidePopover());
-        await flush();
+        await flushTasks(2);
         expect(wheel(popup(), 10).defaultPrevented).toBe(false);
       },
     );
@@ -2087,7 +2061,7 @@ describe("Menu.ContextTrigger", () => {
       render(<Harness root={{ openChangeAction: action }} />);
       await rightClick(region());
       fireEvent.click(item("archive"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(action.mock.calls.at(-1)).toEqual([
         false,
@@ -2100,7 +2074,7 @@ describe("Menu.ContextTrigger", () => {
       render(<Harness root={{ openChangeAction: action }} />);
       await rightClick(region());
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
       expect(region()).not.toHaveAttribute("data-open");
     });
@@ -2137,7 +2111,7 @@ describe("Menu.ContextTrigger", () => {
       await rightClick(region());
       expect(isOpen()).toBe(true);
       fireEvent.click(screen.getByTestId("close"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(action).toHaveBeenCalledTimes(1);
     });
@@ -2150,7 +2124,7 @@ describe("Menu.ContextTrigger", () => {
       await rightClick(screen.getByTestId("label"));
       expect(document.activeElement).toBe(item("rename"));
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(document.activeElement).toBe(screen.getByTestId("trigger"));
     });
 
@@ -2159,7 +2133,7 @@ describe("Menu.ContextTrigger", () => {
       await rightClick(screen.getByTestId("label"));
       expect(document.activeElement).toBe(item("rename"));
       await act(async () => popup().hidePopover());
-      await flush();
+      await flushTasks(2);
       expect(document.activeElement).toBe(document.body);
     });
   });
@@ -2167,7 +2141,7 @@ describe("Menu.ContextTrigger", () => {
   describe("Suspense and rejection", () => {
     it("items that suspend hold the open: data-pending on the region and the Trigger; then at the point", async () => {
       const { Suspender, resolve } = createSuspender();
-      const calls = watchShow();
+      const { calls } = watchShow();
       render(
         <Suspense fallback={<span data-testid="fallback" />}>
           <Harness
@@ -2187,7 +2161,7 @@ describe("Menu.ContextTrigger", () => {
       expectPending(screen.getByTestId("trigger"));
       expect(screen.queryByTestId("fallback")).toBeNull();
       await act(async () => resolve("items"));
-      await flush();
+      await flushTasks(2);
       expect(calls).toHaveLength(1);
       expect(isOpen()).toBe(true);
       expect(pointStyle(popup()).x).toBe("40px");
@@ -2208,7 +2182,7 @@ describe("Menu.ContextTrigger", () => {
         />,
       );
       await rightClick(region());
-      await flush();
+      await flushTasks(2);
       expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "no menu" }));
       expect(screen.getByTestId("error-catcher")).toHaveTextContent("no menu");
     });
@@ -2220,7 +2194,7 @@ describe("Menu.ContextTrigger", () => {
       }
       render(<Refusing />);
       await rightClick(region());
-      await flush();
+      await flushTasks(2);
       expect(region()).not.toHaveAttribute("data-open");
       expect(isOpen()).toBe(false);
     });
@@ -2247,13 +2221,13 @@ describe("Menu.ContextTrigger", () => {
       }
       render(<Refusing />);
       await rightClick(region(), 70, 80);
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(popup()).not.toHaveAttribute("data-context");
       expect(popup().style.getPropertyValue("--menu-point-x")).toBe("");
       expect(seen.at(-1)!.context).toBe(false);
       fireEvent.click(screen.getByTestId("flip"));
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(popup()).not.toHaveAttribute("data-context");
       expect(popup()).toHaveAttribute("data-side", "bottom");
@@ -2294,7 +2268,7 @@ describe("Menu.ContextTrigger", () => {
       expect(region().style.opacity).toBe("0.5");
       expect(seen.at(-1)).toEqual({ open: true, pending: true, disabled: false });
       await act(async () => work.resolve());
-      await flush();
+      await flushTasks(2);
       expect(region().style.opacity).toBe("1");
     });
 
@@ -2353,11 +2327,11 @@ describe("Menu.ContextTrigger", () => {
       }
       render(<Controlled />);
       await rightClick(region());
-      await flush();
+      await flushTasks(2);
       expect(isOpen()).toBe(true);
       fireEvent.click(item("rename"));
-      await flush();
-      await flush();
+      await flushTasks(2);
+      await flushTasks(2);
       expect(isOpen()).toBe(false);
     });
   });
@@ -2376,7 +2350,7 @@ describe("Menu.ContextTrigger", () => {
           </Menu.Popup>
         </Menu.Root>,
       );
-      await flush();
+      await flushTasks(2);
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining("Menu.ContextTrigger: rendered in a submenu"),
       );

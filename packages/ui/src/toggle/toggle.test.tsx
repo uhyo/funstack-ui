@@ -10,6 +10,7 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Toggle } from "./toggle.js";
@@ -283,7 +284,7 @@ describe("Toggle", () => {
     });
 
     it("settles quietly when unmounted while pending (smoke test)", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const d = deferred();
       const { unmount } = render(<Harness mode={mode} action={() => d.promise} />);
       const user = setupUser();
@@ -300,7 +301,7 @@ describe("Toggle", () => {
 
   renderBoth("rejection", (mode) => {
     it("reaches the Error Boundary, reverts optimistic state, leaves committed state (row 9)", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -322,7 +323,7 @@ describe("Toggle", () => {
     });
 
     it("treats a synchronous throw like a rejection (edge case)", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const err = new Error("sync boom");
       render(
@@ -420,7 +421,7 @@ describe("Toggle", () => {
     }
 
     it("reaches the boundary when the older action rejects after the newer resolved (row 12a)", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds, action } = renderTwoClicks(onError);
       const user = setupUser();
@@ -447,7 +448,7 @@ describe("Toggle", () => {
     });
 
     it("reaches the boundary when the older action rejects while the newer is pending (row 12b)", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds } = renderTwoClicks(onError);
       const user = setupUser();
@@ -475,7 +476,7 @@ describe("Toggle", () => {
     });
 
     it("keeps the first superseded error and reports later ones through reportError", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const reportError = vi.fn();
       vi.stubGlobal("reportError", reportError);
       const onError = vi.fn();
@@ -506,7 +507,7 @@ describe("Toggle", () => {
     });
 
     it("ignores a superseded rejection after unmount (smoke test)", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const reportError = vi.fn();
       vi.stubGlobal("reportError", reportError);
       const onError = vi.fn();
@@ -1057,7 +1058,7 @@ describe("Toggle", () => {
 
   describe("dev warnings (row 19)", () => {
     it("warns once when pressed and defaultPressed are both set", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const { rerender } = render(
         <Toggle pressed defaultPressed>
           Favorite
@@ -1073,7 +1074,7 @@ describe("Toggle", () => {
     });
 
     it("warns once when switching from uncontrolled to controlled", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const { rerender } = render(<Toggle>Favorite</Toggle>);
       expect(consoleError).not.toHaveBeenCalled();
       rerender(<Toggle pressed>Favorite</Toggle>);
@@ -1083,7 +1084,7 @@ describe("Toggle", () => {
     });
 
     it("does not warn in normal use", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const { rerender } = render(<Toggle defaultPressed>Favorite</Toggle>);
       const user = setupUser();
       await user.click(button());

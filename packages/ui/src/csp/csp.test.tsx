@@ -5,13 +5,14 @@
 import { createHash } from "node:crypto";
 import type { ReactNode } from "react";
 import { renderToReadableStream } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { TOOLTIP_WARM_HREF, TOOLTIP_WARM_RULES } from "../internal/tooltip-warm.js";
 import { Menu } from "../menu/index.js";
 import { MENU_POINT_HREF, MENU_POINT_RULES } from "../menu/menu-point.js";
 import { Tooltip } from "../tooltip/index.js";
 import * as root from "../index.js";
 import { CSPProvider, STYLE_SHA256 } from "./index.js";
+import { silenceErrors } from "../__tests__/helpers.js";
 
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("base64");
 
@@ -70,7 +71,7 @@ describe("CSPProvider on the server", () => {
   });
 
   it("a mismatched render nonce drops the rule (React 19.3), which is why the docs ask for the same value", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = silenceErrors();
     const head = await serverHtml({ style: "other" });
     expect(head).not.toContain("@property --fsui-tooltip-warm");
     expect(error).toHaveBeenCalled();
@@ -78,7 +79,7 @@ describe("CSPProvider on the server", () => {
   });
 
   it("nonce.style without a <CSPProvider> drops the rule too (the element carries no nonce)", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = silenceErrors();
     const head = await serverHtml({ script: "abc", style: "abc" }, false);
     expect(head).not.toContain("@property --fsui-tooltip-warm");
     error.mockRestore();

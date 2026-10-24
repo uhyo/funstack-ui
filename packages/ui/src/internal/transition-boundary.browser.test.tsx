@@ -25,6 +25,7 @@ import { server } from "vitest/browser";
 import { Accordion } from "../accordion/index.js";
 import { Dialog } from "../dialog/index.js";
 import { Tabs } from "../tabs/index.js";
+import { silenceErrors } from "../__tests__/helpers.js";
 
 type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
@@ -293,7 +294,7 @@ describe("Dialog open", () => {
     ['library, transition="none"', "none", true, 1],
     ['JS-free, transition="none" (ignored)', "none", false, 0],
   ])("a Dialog.Root inserted by a transition (%s)", async (_label, transition, library, n) => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     render(
       <Inserted>
         <Dialog.Root {...(library && { defaultOpen: false })}>

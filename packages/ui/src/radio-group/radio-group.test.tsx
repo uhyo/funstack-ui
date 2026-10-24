@@ -22,6 +22,8 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
@@ -146,8 +148,6 @@ const dataPending = () =>
     .getAllByRole("radio")
     .filter((r) => r.hasAttribute("data-pending"))
     .map((r) => (r as HTMLInputElement).value);
-/** Lets queued microtasks (the reset handler) and the resulting renders run. */
-const flush = () => act(async () => {});
 const form = () => screen.getByTestId("form") as HTMLFormElement;
 
 describe("RadioGroup", () => {
@@ -311,7 +311,7 @@ describe("RadioGroup", () => {
     });
 
     it("an empty group (default null) checks nothing and does not warn", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <RadioGroup.Root aria-label="Plan">
           <RadioGroup.Item value="a" aria-label="a" />
@@ -354,7 +354,7 @@ describe("RadioGroup", () => {
     });
 
     it("Item and Label throw outside a Root", () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       expect(() => render(<RadioGroup.Item value="a" />)).toThrow(
         "RadioGroup.Item must be rendered inside a RadioGroup.Root.",
       );
@@ -489,7 +489,7 @@ describe("RadioGroup", () => {
     });
 
     it("a click already cancelled by a pass-through onClick never dispatches", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       function Cancelling() {
         const [value, setValue] = useState<string | null>("a");
@@ -511,7 +511,7 @@ describe("RadioGroup", () => {
       render(<Cancelling />);
       const user = setupUser();
       await user.click(radio("b"));
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["a"]);
       expect(dataChecked()).toEqual(["a"]);
@@ -546,7 +546,7 @@ describe("RadioGroup", () => {
 
   renderBoth("rejection", (mode) => {
     it("reaches the Error Boundary and leaves committed state", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const d = deferred();
       const onError = vi.fn();
       render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
@@ -692,7 +692,7 @@ describe("RadioGroup", () => {
     }
 
     it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds, action } = renderTwo(onError);
       const user = setupUser();
@@ -716,7 +716,7 @@ describe("RadioGroup", () => {
     });
 
     it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      vi.spyOn(console, "error").mockImplementation(() => {});
+      silenceErrors();
       const onError = vi.fn();
       const { deferreds } = renderTwo(onError);
       const user = setupUser();
@@ -771,7 +771,7 @@ describe("RadioGroup", () => {
       container.innerHTML = renderToString(ui);
       mutate(container);
       const result = render(ui, { container, hydrate: true });
-      await flush();
+      await flushMicrotasks();
       return result;
     }
     const checkC = (c: HTMLElement) => {
@@ -780,7 +780,7 @@ describe("RadioGroup", () => {
 
     renderBoth("hydration", (mode) => {
       it("dispatches the hydrated DOM value once with reason platform and no event", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         await hydrate(<Harness mode={mode} initial="a" action={action} />, checkC);
         expect(action).toHaveBeenCalledTimes(1);
@@ -843,7 +843,7 @@ describe("RadioGroup", () => {
           <Harness mode="uncontrolled" initial="b" action={action} />
         </StrictMode>,
       );
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["b"]);
     });
@@ -909,7 +909,7 @@ describe("RadioGroup", () => {
 
     renderBoth("late hydration", (mode) => {
       it("a pre-hydration click on a late item dispatches exactly once when it hydrates", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         const container = document.createElement("div");
         document.body.append(container);
@@ -934,7 +934,7 @@ describe("RadioGroup", () => {
         await act(async () => {
           g.open();
         });
-        await flush();
+        await flushMicrotasks();
 
         expect(action).toHaveBeenCalledTimes(1);
         const [next, details] = action.mock.calls[0]!;
@@ -954,7 +954,7 @@ describe("RadioGroup", () => {
       // Pins a React limitation (react-dom 19.3.1, design 5.1 "Unsupported: partial hydration").
       // If React stops throwing here, revisit the design note, the dev warning and this test.
       it("a click on a hydrated radio while siblings are dehydrated: react-dom throws; the state is consistent after hydration", async () => {
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleError = silenceErrors();
         const action = vi.fn<ActionFn>();
         const container = document.createElement("div");
         document.body.append(container);
@@ -994,7 +994,7 @@ describe("RadioGroup", () => {
         await act(async () => {
           g.open();
         });
-        await flush();
+        await flushMicrotasks();
 
         // After the boundary hydrates: no platform dispatch, and `data-checked` agrees with
         // `:checked` (hydration alone would keep the server's `data-checked` on "b").
@@ -1013,7 +1013,7 @@ describe("RadioGroup", () => {
     it("a group hydrated in one boundary does not warn about partial hydration (StrictMode)", async () => {
       // Any Suspense boundary between Root and Items hydrates in a later commit, even one that
       // never suspends (react-dom 19.3.1), so only a group without one is quiet.
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       const ui = (
         <StrictMode>
@@ -1031,7 +1031,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         render(ui, { container, hydrate: true });
       });
-      await flush();
+      await flushMicrotasks();
       expect(screen.getAllByRole("radio")).toHaveLength(2);
       expect(action).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
@@ -1048,7 +1048,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         g.open();
       });
-      await flush();
+      await flushMicrotasks();
       expect(screen.getAllByRole("radio")).toHaveLength(3);
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["a"]);
@@ -1065,7 +1065,7 @@ describe("RadioGroup", () => {
       await user.click(radio("b"));
       expect(committed()).toHaveTextContent("b");
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe("a");
@@ -1118,7 +1118,7 @@ describe("RadioGroup", () => {
       await user.click(radio("b"));
       form().addEventListener("reset", (e) => e.preventDefault());
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(checkedValues()).toEqual(["b"]);
     });
@@ -1128,7 +1128,7 @@ describe("RadioGroup", () => {
       render(<Harness mode={mode} action={action} inForm initial="b" />);
       const user = setupUser();
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
       expect(checkedValues()).toEqual(["b"]);
     });
@@ -1154,7 +1154,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
         ["b", "activate"],
         ["a", "platform"],
@@ -1196,7 +1196,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(actions).toHaveLength(2);
       expect(checkedValues()).toEqual([]);
       expect(committed()).toHaveTextContent("null");
@@ -1210,7 +1210,7 @@ describe("RadioGroup", () => {
       const user = setupUser();
       await user.click(radio("b"));
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       expect(action.mock.calls[1]?.[0]).toBe("a");
       expect(action.mock.calls[1]?.[1].reason).toBe("platform");
@@ -1249,7 +1249,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
         ["b", "activate"],
         ["c", "platform"],
@@ -1279,7 +1279,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n]) => n)).toEqual([null]);
       expect(checkedValues()).toEqual([]);
     });
@@ -1312,7 +1312,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         form().reset();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
         ["b", "activate", "click"],
         ["c", "activate", "click"],
@@ -1365,7 +1365,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe(initial);
@@ -1389,7 +1389,7 @@ describe("RadioGroup", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(checkedValues()).toEqual([]);
       expect(dataChecked()).toEqual([]);
       await user.click(radio("free"));
@@ -1400,7 +1400,7 @@ describe("RadioGroup", () => {
 
   describe("preventDefault in the action", () => {
     it("warns once and the action still runs", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const d = deferred();
       let calls = 0;
       const action = vi.fn<ActionFn>((_next, details) => {
@@ -1429,13 +1429,13 @@ describe("RadioGroup", () => {
       expect(String(warnings()[0]?.[0])).toMatch(/^RadioGroup\.Item: /);
 
       await user.click(radio("a"));
-      await flush();
+      await flushMicrotasks();
       expect(checkedValues()).toEqual(["a"]);
       expect(action).toHaveBeenCalledTimes(2);
       // Once per input element: the second radio's first cancelled click warns too.
       expect(warnings()).toHaveLength(2);
       await user.click(radio("b"));
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(3);
       expect(warnings()).toHaveLength(2);
     });
@@ -1688,7 +1688,7 @@ describe("RadioGroup", () => {
     });
 
     it("warns in development when the mounted element is not a fieldset / radio input", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <RadioGroup.Root aria-label="Fruit" render={<div />}>
           <RadioGroup.Item
@@ -1793,7 +1793,7 @@ describe("RadioGroup", () => {
     });
 
     it("a controlled value that matches no Item checks nothing and does not warn", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <RadioGroup.Root aria-label="Fruit" value="zzz">
           <RadioGroup.Item value="a" aria-label="a" />
@@ -1838,7 +1838,7 @@ describe("RadioGroup", () => {
 
   describe("dev warnings", () => {
     it("warns once when value and defaultValue are both set", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (
         <RadioGroup.Root aria-label="x" value="a" defaultValue="a">
           <RadioGroup.Item value="a" aria-label="a" />
@@ -1853,7 +1853,7 @@ describe("RadioGroup", () => {
     });
 
     it("warns once when switching from uncontrolled to controlled", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const ui = (value?: string) => (
         <RadioGroup.Root aria-label="x" {...(value !== undefined && { value })}>
           <RadioGroup.Item value="a" aria-label="a" />
@@ -1867,7 +1867,7 @@ describe("RadioGroup", () => {
     });
 
     it("does not warn in normal use, nor without value or defaultValue", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       render(
         <RadioGroup.Root aria-label="x">
           <RadioGroup.Item value="a" aria-label="a" />

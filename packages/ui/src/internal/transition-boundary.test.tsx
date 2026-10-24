@@ -19,7 +19,7 @@ import {
 import type { ReactElement, ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { setupUser } from "../__tests__/helpers.js";
+import { setupUser, silenceErrors } from "../__tests__/helpers.js";
 import { Accordion } from "../accordion/index.js";
 import { Checkbox } from "../checkbox/index.js";
 import { Dialog } from "../dialog/index.js";
@@ -290,7 +290,7 @@ describe("Accordion", () => {
   });
 
   it("JS-free mode renders no boundary even with transition set", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    silenceErrors();
     const { mount } = mountInTransition(
       <Accordion.Root>
         <Accordion.Item value="a" transition="none">
@@ -373,7 +373,7 @@ describe("transition is static", () => {
   );
 
   it("undefined to a value remounts the part's element and warns once in development", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = silenceErrors();
     const { rerender } = render(panels(undefined));
     const before = screen.getByRole("tabpanel");
     await act(async () => rerender(panels("fade")));
@@ -385,7 +385,7 @@ describe("transition is static", () => {
   });
 
   it('"none" to a class keeps the boundary: no remount, no warning', async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = silenceErrors();
     const { rerender } = render(panels("none"));
     const before = screen.getByRole("tabpanel");
     await act(async () => rerender(panels("fade")));
@@ -394,7 +394,7 @@ describe("transition is static", () => {
   });
 
   it("the warning names the part", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = silenceErrors();
     const { rerender } = render(<Toggle>B</Toggle>);
     await act(async () => rerender(<Toggle transition="fade">B</Toggle>));
     expect(error).toHaveBeenCalledWith(

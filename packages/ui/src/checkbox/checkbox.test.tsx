@@ -13,6 +13,8 @@ import {
   expectPending,
   renderBoth,
   setupUser,
+  flushMicrotasks,
+  silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Checkbox } from "./index.js";
@@ -29,7 +31,6 @@ describeCheckableInput({
 type ActionFn = (next: boolean, details: CheckboxCheckedChangeDetails) => unknown;
 
 const box = () => screen.getByRole("checkbox") as HTMLInputElement;
-const flush = () => act(async () => {});
 
 /**
  * A "select all"-style parent: `checked` (controlled mode) or `defaultChecked` (uncontrolled) plus
@@ -113,7 +114,7 @@ describe("Checkbox indeterminate", () => {
   });
 
   it("server-renders data-indeterminate and sets the property on hydration (C3)", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = silenceErrors();
     const ui = <Checkbox aria-label="All" indeterminate />;
     const html = renderToString(ui);
     expect(html).toContain('data-indeterminate=""');
@@ -125,14 +126,14 @@ describe("Checkbox indeterminate", () => {
     container.innerHTML = html;
     expect((container.querySelector("input") as HTMLInputElement).indeterminate).toBe(false);
     render(ui, { container, hydrate: true });
-    await flush();
+    await flushMicrotasks();
     expect(box().indeterminate).toBe(true);
     expect(box()).toHaveAttribute("data-indeterminate", "");
     expect(consoleError).not.toHaveBeenCalled();
   });
 
   it("a render element's own indeterminate prop is stripped (design 6.3)", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = silenceErrors();
     const forced = { indeterminate: true } as object;
     render(<Checkbox aria-label="All" render={<input {...forced} />} />);
     expect(box().indeterminate).toBe(false);
@@ -193,7 +194,7 @@ describe("Checkbox indeterminate", () => {
     render(<Checkbox aria-label="All" indeterminate checkedChangeAction={() => {}} />);
     const user = setupUser();
     await user.click(box());
-    await flush();
+    await flushMicrotasks();
     expect(box().checked).toBe(true);
     expect(box().indeterminate).toBe(true);
     expect(box()).toHaveAttribute("data-indeterminate", "");
@@ -235,7 +236,7 @@ describe("Checkbox indeterminate", () => {
       expect(box().indeterminate).toBe(true);
 
       await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flush();
+      await flushMicrotasks();
       expect(actions).toEqual([
         [true, "activate"],
         [false, "platform"],

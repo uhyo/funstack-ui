@@ -2,10 +2,10 @@
 // uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, a
 // `<div popover>` popup (no dialog focusing steps), and `wrapContent` with a Menu-style
 // `requestClose`. Popover's own behaviour is covered by src/popover/popover.test.tsx.
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import type { Ref, ViewTransitionClass } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { setupUser } from "../__tests__/helpers.js";
+import { setupUser, flushTasks } from "../__tests__/helpers.js";
 import type { ChangeReason } from "./types.js";
 import { usePopoverPopup } from "./use-popover-popup.js";
 import { usePopoverRoot } from "./use-popover-root.js";
@@ -78,11 +78,6 @@ function Mini({
   );
 }
 
-const flush = () =>
-  act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
 describe("shared popover hooks: Menu's extension points", () => {
   it('mode: "library" without any prop: the Trigger click is intercepted and opens', async () => {
     const user = setupUser();
@@ -90,7 +85,7 @@ describe("shared popover hooks: Menu's extension points", () => {
     render(<Mini onDispatch={onDispatch} />);
     expect(screen.queryByTestId("one")).toBeNull();
     await user.click(screen.getByTestId("trigger"));
-    await flush();
+    await flushTasks();
     expect(onDispatch).toHaveBeenCalledTimes(1);
     const [next, details] = onDispatch.mock.calls[0]!;
     expect(next).toBe(true);
@@ -99,7 +94,7 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
     expect(screen.getByTestId("trigger")).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByTestId("trigger"));
-    await flush();
+    await flushTasks();
     expect(onDispatch.mock.calls.map(([n]) => n)).toEqual([true, false]);
     expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
   });
@@ -117,7 +112,7 @@ describe("shared popover hooks: Menu's extension points", () => {
     });
     render(<Mini resolve={(popup) => popup.querySelector("[data-testid=two]")} />);
     await user.click(screen.getByTestId("trigger"));
-    await flush();
+    await flushTasks();
     expect(autofocused).toBe("two");
     expect(screen.getByTestId("two")).not.toHaveAttribute("autofocus");
   });
@@ -126,7 +121,7 @@ describe("shared popover hooks: Menu's extension points", () => {
     const user = setupUser();
     render(<Mini />);
     await user.click(screen.getByTestId("trigger"));
-    await flush();
+    await flushTasks();
     expect(screen.getByTestId("trigger")).toHaveFocus();
   });
 
@@ -161,7 +156,7 @@ describe("shared popover hooks: Menu's extension points", () => {
 
     // The stable `requestOpen` reaches the `onDispatch` of the last committed render.
     await user.click(screen.getByRole("button"));
-    await flush();
+    await flushTasks();
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
     const last = values.at(-1)!;
@@ -178,10 +173,10 @@ describe("shared popover hooks: Menu's extension points", () => {
       const user = setupUser();
       render(<Mini transition={transition} resolve={(popup) => popup.querySelector("button")} />);
       await user.click(screen.getByTestId("trigger"));
-      await flush();
+      await flushTasks();
       expect(screen.getByTestId("one")).toHaveFocus();
       await user.keyboard("{Enter}");
-      await flush();
+      await flushTasks();
       expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
       expect(screen.queryByTestId("one")).toBeNull();
       expect(screen.getByTestId("trigger")).toHaveFocus();

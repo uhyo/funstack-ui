@@ -8,7 +8,13 @@ import { StrictMode, Suspense, createContext, startTransition, use, useRef, useS
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { deferred, renderBoth, setupUser } from "../__tests__/helpers.js";
+import {
+  deferred,
+  renderBoth,
+  setupUser,
+  flushMicrotasks,
+  silenceErrors,
+} from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { createActionDetails } from "./action-details.js";
 import type { ChangeReason } from "./types.js";
@@ -170,7 +176,6 @@ function Harness({
 
 const radio = (v: string, name = "size") =>
   screen.getByLabelText(`${name} ${v}`) as HTMLInputElement;
-const flush = () => act(async () => {});
 
 async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) {
   const container = document.createElement("div");
@@ -178,14 +183,14 @@ async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) 
   container.innerHTML = renderToString(ui);
   mutate(container);
   render(ui, { container, hydrate: true });
-  await flush();
+  await flushMicrotasks();
   return container;
 }
 
 describe("useNativeGroupReconciliation", () => {
   renderBoth("mount reconciliation", (mode) => {
     it("dispatches once for the group with the hydrated value and no event", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       await hydrate(<Harness mode={mode} initial="s" action={action} />, (c) => {
         (c.querySelector('input[value="l"]') as HTMLInputElement).checked = true;
@@ -219,7 +224,7 @@ describe("useNativeGroupReconciliation", () => {
       const action = vi.fn<ActionFn>();
       await hydrate(<Harness mode={mode} initial="s" action={action} />, () => {});
       render(<Harness mode={mode} initial="m" action={action} />);
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
     });
   });
@@ -232,7 +237,7 @@ describe("useNativeGroupReconciliation", () => {
       await user.click(radio("l"));
       expect(action).toHaveBeenCalledTimes(1);
       (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       expect(action.mock.calls[1]?.[0]).toBe("s");
       expect(action.mock.calls[1]?.[1].reason).toBe("platform");
@@ -247,7 +252,7 @@ describe("useNativeGroupReconciliation", () => {
       const user = setupUser();
       await user.click(radio("m"));
       (screen.getByTestId("form") as HTMLFormElement).reset();
-      await flush();
+      await flushMicrotasks();
       expect(action.mock.calls.map(([v]) => v)).toEqual(["m", null]);
       expect(radio("m").checked).toBe(false);
     });
@@ -257,14 +262,14 @@ describe("useNativeGroupReconciliation", () => {
       render(<Harness mode={mode} initial="s" action={action} />);
       const form = screen.getByTestId("form") as HTMLFormElement;
       form.reset();
-      await flush();
+      await flushMicrotasks();
       expect(action).not.toHaveBeenCalled();
 
       const user = setupUser();
       await user.click(radio("m"));
       form.addEventListener("reset", (e) => e.preventDefault());
       form.reset();
-      await flush();
+      await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(1);
       expect(radio("m").checked).toBe(true);
     });
@@ -304,7 +309,7 @@ describe("useNativeGroupReconciliation", () => {
       await act(async () => {
         d.resolve();
       });
-      await flush();
+      await flushMicrotasks();
       expect(
         action.mock.calls.map(([v, details]) => [v, details.reason, details.event?.type]),
       ).toEqual([
@@ -327,7 +332,7 @@ describe("useNativeGroupReconciliation", () => {
     await user.click(radio("l"));
     expect(screen.getByTestId("value")).toHaveTextContent("l");
     (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flush();
+    await flushMicrotasks();
     expect(action).toHaveBeenCalledTimes(2);
     expect(action.mock.calls[1]?.[0]).toBe("s");
     expect(action.mock.calls[1]?.[1].reason).toBe("platform");
@@ -357,7 +362,7 @@ describe("useNativeGroupReconciliation", () => {
     expect(radio("s").defaultChecked).toBe(false);
     expect(radio("l").checked).toBe(true);
     (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flush();
+    await flushMicrotasks();
     expect(action.mock.calls.map(([v]) => v)).toEqual(["l", "m"]);
     expect(radio("m").checked).toBe(true);
     expect(radio("l").checked).toBe(false);
@@ -384,7 +389,7 @@ describe("useNativeGroupReconciliation", () => {
     expect(radio("m").checked).toBe(true);
     expect(radio("blue", "color").checked).toBe(true);
     (screen.getByTestId("form") as HTMLFormElement).reset();
-    await flush();
+    await flushMicrotasks();
     expect(size.mock.calls.map(([v, d]) => [v, d.reason])).toEqual([
       ["m", "activate"],
       ["s", "platform"],
@@ -418,7 +423,7 @@ describe("useNativeGroupReconciliation", () => {
         container,
         hydrate: true,
       });
-      await flush();
+      await flushMicrotasks();
       // The Root and "s" are hydrated; "m" and "l" are still server HTML.
       expect(action).not.toHaveBeenCalled();
       await act(async () => {
@@ -428,14 +433,14 @@ describe("useNativeGroupReconciliation", () => {
         await act(async () => {
           gate.resolve();
         });
-        await flush();
+        await flushMicrotasks();
       };
     }
     const serverRadio = (c: HTMLElement, v: string) =>
       c.querySelector(`input[value="${v}"]`) as HTMLInputElement;
 
     it("a click on a member before it hydrates is reconciled with one platform dispatch", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();
       const release = await hydrateLate(action, (c) => {
         serverRadio(c, "m").click();
@@ -498,7 +503,7 @@ describe("useNativeGroupReconciliation", () => {
     }
     const { rerender } = render(<Growing more={false} />);
     rerender(<Growing more />);
-    await flush();
+    await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
     expect(radio("s").checked).toBe(true);
     expect(radio("m").checked).toBe(false);
@@ -539,7 +544,7 @@ describe("equals option", () => {
     await act(async () => {
       (screen.getByTestId("set-form") as HTMLFormElement).reset();
     });
-    await flush();
+    await flushMicrotasks();
     expect(onPlatformChange).not.toHaveBeenCalled();
   });
 
@@ -552,7 +557,7 @@ describe("equals option", () => {
     await act(async () => {
       (screen.getByTestId("set-form") as HTMLFormElement).reset();
     });
-    await flush();
+    await flushMicrotasks();
     expect(onPlatformChange).toHaveBeenCalledTimes(2);
     expect(onPlatformChange.mock.calls[1]![1]).toBeInstanceOf(Event);
   });

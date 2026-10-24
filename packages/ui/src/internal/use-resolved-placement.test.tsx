@@ -11,6 +11,7 @@ import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import type { PlacementStub } from "../__tests__/placement-stub.js";
 import type { AnchorSide } from "./anchor-position.js";
 import { useResolvedPlacement } from "./use-resolved-placement.js";
+import { flushTasks } from "../__tests__/helpers.js";
 
 let renders = 0;
 
@@ -22,8 +23,6 @@ function Probe({ side }: { side: AnchorSide | null }) {
 
 const popup = () => screen.getByTestId("popup");
 const side = () => popup().getAttribute("data-side");
-/** Lets the shim's queued `toggle` task run. */
-const flush = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
 
 let frames: Map<number, FrameRequestCallback>;
 let nextFrame: number;
@@ -51,7 +50,7 @@ const scroll = () => act(() => void document.dispatchEvent(new Event("scroll")))
 
 const show = async () => {
   act(() => popup().showPopover());
-  await flush();
+  await flushTasks();
 };
 
 beforeEach(() => {
@@ -87,7 +86,7 @@ describe("useResolvedPlacement: scroll and resize (conventions 13.2)", () => {
     const [, onResize] = calls(winAdd, "resize")[0]!;
 
     act(() => popup().hidePopover());
-    await flush();
+    await flushTasks();
     expect(calls(docRemove, "scroll")).toEqual([["scroll", onScroll, { capture: true }]]);
     expect(calls(winRemove, "resize")).toEqual([["resize", onResize]]);
   });
@@ -164,7 +163,7 @@ describe("useResolvedPlacement: scroll and resize (conventions 13.2)", () => {
     scroll();
     const pending = [...frames.keys()][0];
     act(() => popup().hidePopover());
-    await flush();
+    await flushTasks();
     expect(cafSpy).toHaveBeenCalledWith(pending);
     expect(frames.size).toBe(0);
     expect(calls(docRemove, "scroll")).toHaveLength(1);
@@ -217,7 +216,7 @@ describe("useResolvedPlacement: scroll and resize (conventions 13.2)", () => {
     expect(frames.size).toBe(0);
     expect(rafSpy).toHaveBeenCalledTimes(1);
     expect(calls(docRemove, "scroll")).toHaveLength(1);
-    await flush();
+    await flushTasks();
   });
 });
 
@@ -234,7 +233,7 @@ describe("useResolvedPlacement: costs", () => {
     const before = renders;
     await show();
     act(() => popup().hidePopover());
-    await flush();
+    await flushTasks();
     expect(renders).toBe(before);
   });
 
@@ -247,7 +246,7 @@ describe("useResolvedPlacement: costs", () => {
     expect(side()).toBe("right");
     expect(renders).toBe(before + 1);
     act(() => popup().hidePopover());
-    await flush();
+    await flushTasks();
     expect(side()).toBe("inline-end");
     expect(renders).toBe(before + 2);
   });

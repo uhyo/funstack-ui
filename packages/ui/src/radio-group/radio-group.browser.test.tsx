@@ -13,7 +13,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
-import { deferred } from "../__tests__/helpers.js";
+import { deferred, silenceErrors } from "../__tests__/helpers.js";
 import { RadioGroup } from "./index.js";
 import type { RadioGroupValueChangeDetails } from "./index.js";
 
@@ -208,7 +208,7 @@ describe("RadioGroup (browser)", () => {
   });
 
   it("a click cancelled by a pass-through onClick does not dispatch and the DOM reverts", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = silenceErrors();
     const action = vi.fn<ActionFn>();
     render(
       <RadioGroup.Root aria-label="Fruit" defaultValue="a" valueChangeAction={action}>
@@ -249,7 +249,7 @@ describe("RadioGroup (browser)", () => {
   });
 
   it("a real click before hydration is reconciled with one platform dispatch", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = silenceErrors();
     const action = vi.fn<ActionFn>();
     const ui: ReactNode = (
       <RadioGroup.Root aria-label="Fruit" defaultValue="a" valueChangeAction={action}>
