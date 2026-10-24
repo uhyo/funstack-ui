@@ -736,6 +736,36 @@ describe("Toggle", () => {
       }
     });
 
+    it("a host <button> render keeps its own aria-disabled: the key is not owned there (#83)", () => {
+      render(
+        <>
+          <Toggle render={<button aria-disabled="true" />}>A</Toggle>
+          <Toggle disabled render={<button aria-disabled="true" />}>
+            B
+          </Toggle>
+        </>,
+      );
+      expect(screen.getByRole("button", { name: "A" })).toHaveAttribute("aria-disabled", "true");
+      expect(screen.getByRole("button", { name: "B" })).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("a component render gets `disabled` owned as absent: an own undefined key (#83)", () => {
+      const received: ComponentPropsWithRef<"button">[] = [];
+      function Spy(props: ComponentPropsWithRef<"button">) {
+        received.push(props);
+        return <button {...props} />;
+      }
+      render(
+        <Toggle disabled render={<Spy disabled />}>
+          Favorite
+        </Toggle>,
+      );
+      const props = received.at(-1)!;
+      expect(Object.hasOwn(props, "disabled")).toBe(true);
+      expect(props.disabled).toBeUndefined();
+      expect(props["aria-disabled"]).toBe(true);
+    });
+
     it("element form cannot re-introduce an owned attribute the library left off", async () => {
       const d = deferred();
       render(

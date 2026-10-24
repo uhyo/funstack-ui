@@ -18,7 +18,7 @@
 // (#79, #81); the Close rows P1-P4 (design/components/button.md 16.4) replace them.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
@@ -1549,6 +1549,26 @@ describe("Popover", () => {
   });
 
   describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
+    it("Trigger: a host <button> render keeps its own aria-disabled (not owned there)", () => {
+      render(<Harness mode="uncontrolled" trigger={{ render: <button aria-disabled="true" /> }} />);
+      expect(trigger()).toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("Trigger, library mode: a component render gets `disabled` as an own undefined key", () => {
+      const received: ComponentPropsWithRef<"button">[] = [];
+      function Spy(props: ComponentPropsWithRef<"button">) {
+        received.push(props);
+        return <button {...props} />;
+      }
+      render(
+        <Harness mode="uncontrolled" trigger={{ disabled: true, render: <Spy disabled /> }} />,
+      );
+      const props = received.at(-1)!;
+      expect(Object.hasOwn(props, "disabled")).toBe(true);
+      expect(props.disabled).toBeUndefined();
+      expect(props["aria-disabled"]).toBe(true);
+    });
+
     const renders = [
       ["a link", <a key="link" href="#x" />],
       ["a component", <PlainButton key="component" />],
