@@ -33,6 +33,7 @@ import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import type { ComboboxContextValue, ComboboxOptionEntry } from "./combobox-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
+import { useLatest } from "../internal/use-latest.js";
 
 /** Details passed as the second argument of `Combobox.Root`'s `valueChangeAction`. */
 export interface ComboboxValueChangeDetails extends ActionDetails {
@@ -261,12 +262,8 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   // --- Refs the handlers read after an `await` or from a timer ------------------------------
 
-  const propsRef = useRef(props);
-  const popoverRef = useRef(popover);
-  useInsertionEffect(() => {
-    propsRef.current = props;
-    popoverRef.current = popover;
-  });
+  const propsRef = useLatest(props);
+  const popoverRef = useLatest(popover);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLElement | null>(null);
@@ -302,7 +299,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
         );
       }
     },
-    [],
+    [propsRef],
   );
 
   // --- Labels (design 2.3) -------------------------------------------------------------------
@@ -323,7 +320,6 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   const dispatchSeq = useRef(0);
   const [dispatchMeta] = useState(() => new WeakMap<object, DispatchMeta>());
   const textRecord = useRef<TextRecord | null>(null);
-  const committedRef = useRef<string | null>(null);
 
   const runValueAction = async (
     next: string | null,
@@ -370,9 +366,8 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     transitionTypes: () => VALUE_TRANSITION_TYPES,
     warn: { component: "Combobox.Root", prop: "value" },
   });
-  useInsertionEffect(() => {
-    committedRef.current = selection.committed;
-  });
+  // Read by `runValueAction` above, which only runs after a commit.
+  const committedRef = useLatest(selection.committed);
 
   /** The next change of the optimistic selection comes from the user (a dispatch). */
   const userEdit = useRef(false);
@@ -817,10 +812,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     const label = labelFor(selection.optimistic);
     if (textRef.current !== label) writeText(label, "dismiss", event);
   };
-  const leaveRef = useRef(leave);
-  useInsertionEffect(() => {
-    leaveRef.current = leave;
-  });
+  const leaveRef = useLatest(leave);
 
   const focusOut = (event: FocusEvent): void => {
     const input = inputRef.current;

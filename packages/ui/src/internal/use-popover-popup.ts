@@ -1,18 +1,11 @@
 "use client";
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useInsertionEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
 import { useExitAnimation } from "./use-exit-animation.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
 import { isPopoverOpen } from "./popover-open.js";
+import { useLatest } from "./use-latest.js";
 
 export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */
@@ -394,10 +387,7 @@ export function usePopoverPopup(
   // The listeners the callback ref attaches call the latest render's handlers. An insertion
   // effect publishes them before refs attach and before any layout effect (whose
   // `hidePopover()` dispatches `beforetoggle` synchronously).
-  const handlers = useRef({ onBeforeToggle, onToggle, onCommand });
-  useInsertionEffect(() => {
-    handlers.current = { onBeforeToggle, onToggle, onCommand };
-  });
+  const handlers = useLatest({ onBeforeToggle, onToggle, onCommand });
 
   // --- Element ------------------------------------------------------------------------------
 
@@ -436,7 +426,7 @@ export function usePopoverPopup(
         if (popupRef.current === element) popupRef.current = null;
       };
     },
-    [part, popupRef, isLibrary, initialFocus],
+    [part, popupRef, handlers, isLibrary, initialFocus],
   );
 
   // Development check (design 9): `role="dialog"` needs a name once the popup is (or can be)
