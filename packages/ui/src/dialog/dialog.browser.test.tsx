@@ -17,7 +17,8 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
-import { browserName, supportsDialogClosedBy } from "../__tests__/engine.js";
+import { mouse } from "../__tests__/browser-commands.js";
+import { browserName, pressFocusesButtons, supportsDialogClosedBy } from "../__tests__/engine.js";
 import {
   addExitStyle,
   describeOverlayInBrowser,
@@ -36,8 +37,11 @@ import {
   addStyle,
   closeOpenTopLayer,
   flushFor,
+  leaveActEnvironment,
+  quietPeriod,
   runCleanups,
   settle,
+  sleep,
 } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
@@ -154,6 +158,33 @@ function SuiteHarness({
   );
 }
 
+/** The suite harness with `lightDismiss` on the Popup. */
+function LightDismissHarness({
+  action,
+  className,
+}: OverlayBrowserHarnessProps<DialogOpenChangeDetails>) {
+  return (
+    <Library action={action} popup={{ className, lightDismiss: true }}>
+      <span data-testid="content">content</span>
+      <Dialog.Close data-testid="close">Cancel</Dialog.Close>
+    </Library>
+  );
+}
+
+/** The suite harness with a `Dialog.Form` whose submitter closes the dialog (value "ok"). */
+function FormHarness({ action, className }: OverlayBrowserHarnessProps<DialogOpenChangeDetails>) {
+  return (
+    <Library action={action} popup={{ className }}>
+      <span data-testid="content">content</span>
+      <Dialog.Form>
+        <button type="submit" data-testid="ok" value="ok">
+          OK
+        </button>
+      </Dialog.Form>
+    </Library>
+  );
+}
+
 describeOverlayInBrowser<DialogOpenChangeDetails>({
   name: "Dialog",
   Harness: SuiteHarness,
@@ -164,6 +195,48 @@ describeOverlayInBrowser<DialogOpenChangeDetails>({
   dismissEvent: "close",
   ariaExpanded: false,
   dismissDetails: (details) => expect(details.returnValue).toBe(""),
+  // Design 2.3 and 7, a modal dialog (the Trigger is under the `::backdrop`). The non-modal
+  // Trigger press (#116) is its own describe below.
+  pressesWhileOpen: [
+    {
+      name: "a Close part: awaited close ('activate'), focus returns to the Trigger",
+      target: () => screen.getByTestId("close"),
+      outcome: "awaited",
+      focusAtPress: "target",
+      focusAfter: () => trigger(),
+    },
+    {
+      name: 'a method="dialog" submitter: awaited close with the SubmitEvent',
+      Harness: FormHarness,
+      target: () => screen.getByTestId("ok"),
+      outcome: "awaited",
+      eventType: "submit",
+      focusAtPress: "target",
+      focusAfter: () => trigger(),
+    },
+    {
+      name: "the ::backdrop with lightDismiss: dismissed ('dismiss')",
+      Harness: LightDismissHarness,
+      target: popup,
+      at: { x: -20, y: -20 },
+      outcome: "dismissed",
+      focusAtPress: popup,
+      focusAfter: () => trigger(),
+    },
+    {
+      name: "the ::backdrop without lightDismiss: nothing closes; the engine focuses the <dialog>",
+      target: popup,
+      at: { x: -20, y: -20 },
+      outcome: "kept",
+      focusAtPress: popup,
+    },
+    {
+      name: "the dialog's own content: nothing closes; the engine focuses the <dialog>",
+      target: () => screen.getByTestId("content"),
+      outcome: "kept",
+      focusAtPress: popup,
+    },
+  ],
   viewTransition: {
     Plain,
     partCloses: [
@@ -800,6 +873,42 @@ describe("non-modal lightDismiss: a Trigger click while open (browser, #116)", (
     expect(action).toHaveBeenCalledTimes(2);
     expect(popup().open).toBe(false);
     expect(trigger()).not.toHaveAttribute("data-open");
+  });
+
+  // #117: without `lightDismiss` nothing dismisses on a click outside (design 7), and the
+  // Trigger only opens: a real press on it while open is no close at all.
+  it("without lightDismiss: a real Trigger press while open neither closes nor dispatches", async () => {
+    const focusesButtons = await pressFocusesButtons();
+    const action = vi.fn<ActionFn>();
+    render(
+      <div style={{ padding: 40 }}>
+        <Dialog.Root defaultOpen={false} modal={false} openChangeAction={action}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Help">
+            <button type="button">Inside</button>
+          </Dialog.Popup>
+        </Dialog.Root>
+      </div>,
+    );
+    await openWithTrigger();
+    await flushFor();
+    const restore = leaveActEnvironment();
+    try {
+      const box = trigger().getBoundingClientRect();
+      const x = Math.round(box.left + box.width / 2);
+      const y = Math.round(box.top + box.height / 2);
+      await mouse.down(x, y);
+      await sleep(20);
+      await mouse.up(x, y);
+      await quietPeriod(80, "the dialog must stay open and nothing may be dispatched");
+    } finally {
+      await mouse.releaseHeld();
+      restore();
+    }
+    expect(popup().open).toBe(true);
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(trigger()).toHaveAttribute("data-open", "");
+    if (focusesButtons) expect(trigger()).toHaveFocus();
   });
 
   // JS-free mode (review F1): the light dismiss closes the dialog before the click, and the

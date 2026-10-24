@@ -210,6 +210,31 @@ describeOverlayInBrowser<MenuOpenChangeDetails>({
   partClose: () => user.keyboard("{Enter}"),
   dismissEvent: "toggle",
   ariaExpanded: true,
+  // Design 2.2. The Trigger is #110's rows below; a submenu's presses are in "submenus".
+  pressesWhileOpen: [
+    {
+      name: "an item: awaited close ('activate'), the item keeps focus until it settles",
+      target: () => item("content"),
+      outcome: "awaited",
+      focusAtPress: "target",
+      focusAfter: () => trigger(),
+    },
+    {
+      name: "a button outside: the press's focus move hides it ('dismiss', 2.2)",
+      target: () => item("outside"),
+      outcome: "dismissed",
+      hiddenAtPress: true,
+      focusAtPress: "target",
+      focusAfter: ({ pressFocused }) => (pressFocused ? item("outside") : trigger()),
+    },
+    {
+      name: "the popup's padding: nothing closes, the item keeps focus",
+      target: popup,
+      at: { x: 2, y: 2 },
+      outcome: "kept",
+      focusAtPress: "kept",
+    },
+  ],
   viewTransition: {
     Plain,
     partCloses: [
@@ -483,6 +508,85 @@ describe("submenus (browser)", () => {
     await user.click(item("outside"));
     expect(isOpen(subElement)).toBe(false);
     expect(isOpen()).toBe(false);
+  });
+
+  // #117: real presses with real timing while a submenu is open (design 2.2, the SubmenuTrigger
+  // row of 1). The pointer is parked on the target first, so the hover rules (focus follows the
+  // pointer, 6.2) have run before the press.
+  describe("a real press while a submenu is open (#117)", () => {
+    let restoreAct: (() => void) | undefined;
+
+    afterEach(async () => {
+      await mouse.releaseHeld();
+      restoreAct?.();
+      restoreAct = undefined;
+    });
+
+    async function pressOn(target: Element) {
+      const box = target.getBoundingClientRect();
+      const x = Math.round(box.left + box.width / 2);
+      const y = Math.round(box.top + box.height / 2);
+      await mouse.move(x, y);
+      await sleep(20);
+      await mouse.down(x, y);
+      await sleep(20);
+      await mouse.up(x, y);
+      await sleep(20);
+    }
+
+    it("the SubmenuTrigger: the submenu stays open and its first item takes focus; nothing closes", async () => {
+      const action = vi.fn<OpenAction>();
+      const subAction = vi.fn<OpenAction>();
+      render(
+        <Basic root={{ openChangeAction: action }}>
+          <Submenu sub={{ openChangeAction: subAction }} />
+        </Basic>,
+      );
+      await openSub();
+      const calls = [action.mock.calls.length, subAction.mock.calls.length];
+      restoreAct = leaveActEnvironment();
+      // The submenu's invoker: no light dismiss; its click opens, or focuses into an open submenu.
+      await pressOn(item("move"));
+      await expect.poll(() => document.activeElement).toBe(item("inbox"));
+      await quietPeriod(80, "neither menu may close");
+      expect(isOpen(sub())).toBe(true);
+      expect(isOpen()).toBe(true);
+      expect(item("move")).toHaveAttribute("aria-expanded", "true");
+      expect([action.mock.calls.length, subAction.mock.calls.length]).toEqual(calls);
+    });
+
+    it("a sibling item: the submenu is dismissed at the release, the item's click closes the root through the action", async () => {
+      const work = deferred();
+      const action = vi.fn<OpenAction>((next) => (next ? undefined : work.promise));
+      const subAction = vi.fn<OpenAction>();
+      render(
+        <Basic root={{ openChangeAction: action }}>
+          <Submenu sub={{ openChangeAction: subAction }} />
+        </Basic>,
+      );
+      await openSub();
+      const subElement = sub();
+      const calls = action.mock.calls.length;
+      restoreAct = leaveActEnvironment();
+      await pressOn(item("delete"));
+      // Light dismiss of the nested popover (a press in the parent menu), or the hover close:
+      // either way a dismissal. The root stays shown through its pending close.
+      await expect.poll(() => isOpen(subElement)).toBe(false);
+      await expect.poll(() => subAction.mock.calls.at(-1)?.[0]).toBe(false);
+      expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+      expect(isOpen()).toBe(true);
+      expect(document.activeElement).toBe(item("delete"));
+      expect(action).toHaveBeenCalledTimes(calls + 1);
+      const [next, details] = action.mock.calls.at(-1)!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("activate");
+      expect(details.event?.type).toBe("click");
+      work.resolve();
+      await expect.poll(() => isOpen()).toBe(false);
+      await expect.poll(() => document.activeElement).toBe(trigger());
+      await quietPeriod(50, "no re-open and no second dispatch");
+      expect(action).toHaveBeenCalledTimes(calls + 1);
+    });
   });
 
   it("hover intent: opens after ~100 ms without moving focus, closes ~150 ms after leaving", async () => {

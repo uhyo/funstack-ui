@@ -6,10 +6,12 @@
 // input comes from Playwright through `userEvent` from `vitest/browser`.
 import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
+import { mouse } from "../__tests__/browser-commands.js";
 import {
   anchorPositionHonoursParentDirection,
+  pressFocusesButtons,
   supportsInterestFor,
   supportsPopoverHint,
   topLayerAnchorReChoosesOnScroll,
@@ -23,7 +25,7 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Tooltip } from "./index.js";
 import type { TooltipPopupProps, TooltipPopupState, TooltipTriggerProps } from "./index.js";
-import { quietPeriod } from "../__tests__/browser-helpers.js";
+import { leaveActEnvironment, quietPeriod, sleep } from "../__tests__/browser-helpers.js";
 
 function Harness({
   trigger,
@@ -379,6 +381,78 @@ describe.skipIf(!supportsInterestFor)(
     });
   },
 );
+
+// #117: real presses with real timing while the tooltip is open (design 2.2's document
+// `pointerdown` row: "covers outside click, click on the trigger, and click on the popup"; 5.2
+// "Any pointerdown closes"). Split presses: the close must land at the press, and nothing may
+// re-open it while the pointer stays put (design 2.2, "nothing reopens the tooltip until the
+// pointer leaves and re-enters"). The outside press is "a pointerdown outside" above. The native
+// path's "a click on the trigger does not close" (2.1) is Chromium-only (`supportsInterestFor`).
+describe("a real press while open (#117)", () => {
+  let restoreAct: (() => void) | undefined;
+
+  beforeEach(() => {
+    restoreAct = leaveActEnvironment();
+  });
+
+  afterEach(async () => {
+    await mouse.releaseHeld();
+    restoreAct?.();
+    restoreAct = undefined;
+  });
+
+  function centre(element: Element) {
+    const r = element.getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  }
+
+  it.each([
+    ["the trigger", () => trigger()],
+    ["the popup", () => popup()],
+  ])(
+    "JS path, %s: hidden at the press; the release and the click do not re-open it",
+    async (_, target) => {
+      const focusesButtons = await pressFocusesButtons();
+      render(<Harness delay={0} closeDelay={10_000} />);
+      await userEvent.hover(trigger());
+      await expect.poll(isOpen).toBe(true);
+      const { x, y } = centre(target());
+      await mouse.move(x, y);
+      await sleep(20);
+      expect(isOpen()).toBe(true);
+      await mouse.down(x, y);
+      await sleep(20);
+      expect(isOpen()).toBe(false);
+      await mouse.up(x, y);
+      await quietPeriod(150, "the tooltip must not re-open while the pointer stays put");
+      expect(isOpen()).toBe(false);
+      if (target() === trigger() && focusesButtons) expect(trigger()).toHaveFocus();
+    },
+  );
+
+  it.runIf(supportsInterestFor)(
+    "native interestfor path: a press on the trigger leaves the tooltip open (2.1)",
+    async () => {
+      render(
+        <Harness
+          delay={0}
+          closeDelay={10_000}
+          trigger={{ experimental_interestFor: true }}
+          popup={{ experimental_hint: true }}
+        />,
+      );
+      await userEvent.hover(trigger());
+      await expect.poll(isOpen, { timeout: 3000 }).toBe(true);
+      const { x, y } = centre(trigger());
+      await mouse.down(x, y);
+      await sleep(20);
+      expect(isOpen()).toBe(true);
+      await mouse.up(x, y);
+      await quietPeriod(150, "an invoker press is no light dismiss; the library attaches nothing");
+      expect(isOpen()).toBe(true);
+    },
+  );
+});
 
 // --- Wave 11: resolved side, inline sides and direction (design 7.4, 7.5, 13; conventions 13) --
 

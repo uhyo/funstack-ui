@@ -2,6 +2,7 @@
 // memo/developer/cross-engine.md). Prefer the feature checks: Playwright's WebKit build tracks
 // WebKit trunk and can be ahead of the shipping Safari, so "webkit" does not mean "Safari 27.0".
 import { server } from "vitest/browser";
+import { mouse } from "./browser-commands.js";
 
 /** The Playwright engine running this file: "chromium", "firefox" or "webkit". */
 export const browserName = server.browser;
@@ -154,4 +155,30 @@ export function topLayerAnchorReChoosesOnScroll(): Promise<boolean> {
     }
   })();
   return topLayerReChoice;
+}
+
+let buttonFocusOnPress: Promise<boolean> | undefined;
+
+/**
+ * Whether a real mouse press focuses a `<button>`. Chromium, Firefox and Playwright's Linux
+ * WebKit do; Safari on macOS does not. A row that asserts where a press leaves focus branches on
+ * this rather than on the engine name (#117). Measured once, on first use, with a real press on a
+ * button outside any popup, and shared.
+ */
+export function pressFocusesButtons(): Promise<boolean> {
+  buttonFocusOnPress ??= (async () => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "probe";
+    button.style.cssText = "position: fixed; top: 0; left: 0; width: 40px; height: 20px";
+    document.body.append(button);
+    try {
+      await mouse.down(20, 10);
+      await mouse.up(20, 10);
+      return document.activeElement === button;
+    } finally {
+      button.remove();
+    }
+  })();
+  return buttonFocusOnPress;
 }

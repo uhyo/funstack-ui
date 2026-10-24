@@ -27,6 +27,7 @@ import { user } from "../__tests__/browser-user.js";
 import {
   anchorPositionHonoursParentDirection,
   browserName,
+  pressFocusesButtons,
   supportsPopoverHint,
 } from "../__tests__/engine.js";
 import {
@@ -52,9 +53,11 @@ import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
 import {
   closeOpenTopLayer,
   flushFor,
+  leaveActEnvironment,
   runCleanups,
   quietPeriod,
   settle,
+  sleep,
 } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
@@ -171,6 +174,36 @@ describeOverlayInBrowser<PopoverOpenChangeDetails>({
   partClose: () => user.click(trigger()),
   dismissEvent: "toggle",
   ariaExpanded: true,
+  // Design 2.3 and 7. The non-button Trigger (#115) is its own row below.
+  pressesWhileOpen: [
+    {
+      name: "the Trigger: awaited close ('activate'), an invoker is no light dismiss",
+      target: trigger,
+      outcome: "awaited",
+      focusAtPress: "target",
+      focusAfter: () => trigger(),
+    },
+    {
+      name: "a Close part: awaited close ('activate'), focus returns to the Trigger",
+      target: () => screen.getByTestId("close"),
+      outcome: "awaited",
+      focusAtPress: "target",
+      focusAfter: () => trigger(),
+    },
+    {
+      name: "a button outside: light dismiss ('dismiss') at the release",
+      target: () => screen.getByTestId("outside"),
+      outcome: "dismissed",
+      focusAtPress: "target",
+      focusAfter: ({ pressFocused }) => (pressFocused ? screen.getByTestId("outside") : trigger()),
+    },
+    {
+      name: "the popup's own content: nothing closes; the engine focuses the <dialog>",
+      target: () => screen.getByTestId("content"),
+      outcome: "kept",
+      focusAtPress: popup,
+    },
+  ],
   viewTransition: {
     Plain,
     partCloses: [{ name: "a Trigger click", close: () => trigger().click() }],
@@ -509,6 +542,75 @@ describe("nested popovers (browser)", () => {
     await user.click(screen.getByRole("heading", { name: "Filters" }));
     expect(isOpen(inner())).toBe(false);
     expect(isOpen()).toBe(true);
+  });
+
+  // #117: real presses with real timing while both are open (design 7: a press inside the outer
+  // popup is outside the inner one; the inner Trigger is the inner popup's invoker).
+  describe("a real press while both are open (#117)", () => {
+    let restoreAct: (() => void) | undefined;
+
+    afterEach(async () => {
+      await mouse.releaseHeld();
+      restoreAct?.();
+      restoreAct = undefined;
+    });
+
+    async function pressOn(target: Element) {
+      const box = target.getBoundingClientRect();
+      const x = Math.round(box.left + box.width / 2);
+      const y = Math.round(box.top + box.height / 2);
+      await mouse.down(x, y);
+      await sleep(20);
+      await mouse.up(x, y);
+      await sleep(20);
+    }
+
+    it("the inner Trigger: the inner popup's close is awaited ('activate'); the outer stays", async () => {
+      const work = deferred();
+      const action = vi.fn<ActionFn>();
+      const innerAction = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
+      render(<Nested action={action} innerAction={innerAction} />);
+      await openBoth();
+      const outerCalls = action.mock.calls.length;
+      const innerCalls = innerAction.mock.calls.length;
+      restoreAct = leaveActEnvironment();
+      await pressOn(screen.getByTestId("inner-trigger"));
+      expect(isOpen(inner())).toBe(true);
+      expect(innerAction).toHaveBeenCalledTimes(innerCalls + 1);
+      const [next, details] = innerAction.mock.calls.at(-1)!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("activate");
+      expect(details.event?.type).toBe("click");
+      await quietPeriod(50, "the inner popup must stay shown until the action settles");
+      expect(isOpen(inner())).toBe(true);
+      work.resolve();
+      await expect.poll(() => isOpen(inner())).toBe(false);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(outerCalls);
+      expect(popup().contains(document.activeElement)).toBe(true);
+    });
+
+    it("the outer popup's heading: the inner popup is light-dismissed ('dismiss'); the outer stays", async () => {
+      const action = vi.fn<ActionFn>();
+      const innerAction = vi.fn<ActionFn>();
+      render(<Nested action={action} innerAction={innerAction} />);
+      await openBoth();
+      const outerCalls = action.mock.calls.length;
+      const innerCalls = innerAction.mock.calls.length;
+      restoreAct = leaveActEnvironment();
+      await pressOn(screen.getByRole("heading", { name: "Filters" }));
+      await expect.poll(() => isOpen(inner())).toBe(false);
+      await expect.poll(() => innerAction.mock.calls.length).toBe(innerCalls + 1);
+      const [next, details] = innerAction.mock.calls.at(-1)!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("dismiss");
+      expect(details.event?.type).toBe("toggle");
+      await quietPeriod(50, "the outer popup must stay open");
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(outerCalls);
+      // The press focused the outer popup (a <dialog>; nothing focusable under the heading).
+      expect(document.activeElement).toBe(popup());
+    });
   });
 
   it("the inner popup flips to the other side near the viewport edge", async () => {
@@ -994,4 +1096,65 @@ describe("non-button Trigger click while open (browser, #115)", () => {
     expect(isOpen()).toBe(false);
     expect(action).toHaveBeenCalledTimes(2);
   });
+});
+
+// #117: a foreign invoker naming the open popup (design 2.3: a foreign `hide-popover` /
+// `toggle-popover` invoker is a browser-owned close the Popup records as `"activate"` and
+// notifies with the `CommandEvent`). The invoker is exempt from light dismiss, so the command is
+// the single source of the close. Real press, real timing.
+describe("a real press on a foreign invoker while open (browser, #117)", () => {
+  let restoreAct: (() => void) | undefined;
+
+  afterEach(async () => {
+    await mouse.releaseHeld();
+    restoreAct?.();
+    restoreAct = undefined;
+  });
+
+  it.each(["hide-popover", "toggle-popover"])(
+    "command=%s hides it at the click with one (false, 'activate') carrying the CommandEvent",
+    async (command) => {
+      const focusesButtons = await pressFocusesButtons();
+      const work = deferred();
+      const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
+      render(
+        <Library
+          action={action}
+          before={
+            <button type="button" data-testid="foreign">
+              Foreign
+            </button>
+          }
+        />,
+      );
+      const foreign = screen.getByTestId("foreign");
+      foreign.setAttribute("commandfor", popup().id);
+      foreign.setAttribute("command", command);
+      await user.click(trigger());
+      await settle(() => expect(isOpen()).toBe(true));
+      const calls = action.mock.calls.length;
+      restoreAct = leaveActEnvironment();
+      const box = foreign.getBoundingClientRect();
+      const x = Math.round(box.left + box.width / 2);
+      const y = Math.round(box.top + box.height / 2);
+      await mouse.down(x, y);
+      await sleep(20);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(calls);
+      await mouse.up(x, y);
+      await expect.poll(() => isOpen()).toBe(false);
+      await expect.poll(() => action.mock.calls.length).toBe(calls + 1);
+      const [next, details] = action.mock.calls.at(-1)!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("activate");
+      expect(details.event?.type).toBe("command");
+      work.resolve();
+      await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
+      // Focus moved to the invoker at the press (outside the popup): the hide returns nothing.
+      expect(document.activeElement).toBe(focusesButtons ? foreign : trigger());
+      await quietPeriod(50, "no re-open and no second dispatch");
+      expect(isOpen()).toBe(false);
+      expect(action).toHaveBeenCalledTimes(calls + 1);
+    },
+  );
 });

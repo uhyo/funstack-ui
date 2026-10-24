@@ -28,8 +28,10 @@ import {
   sleep,
   spyViewTransitions,
 } from "./browser-helpers.js";
+import { mouse } from "./browser-commands.js";
 import { user } from "./browser-user.js";
-import { browserName } from "./engine.js";
+import { browserName, pressFocusesButtons } from "./engine.js";
+import { deferred } from "./helpers.js";
 
 /** What every overlay's `openChangeAction` details have. */
 interface OverlayDetailsLike {
@@ -75,6 +77,48 @@ export interface OverlayViewTransitionClose {
   readonly afterClose?: () => void | Promise<void>;
 }
 
+/**
+ * A real mouse press on something while the popup is open (#117): one entry per "click X while
+ * open" row of the component's closing table. jsdom fires mousedown, mouseup and click in one
+ * task; a real engine runs focus, light dismiss and `toggle` tasks between them, which is where
+ * #110, #112, #115 and #116 hid.
+ */
+export interface OverlayPressWhileOpen<D> {
+  /** Completes the title: `a real press on ${name} …`. */
+  readonly name: string;
+  /** The pressed element. */
+  readonly target: () => Element;
+  /**
+   * The pressed point, relative to the target's top-left corner; the centre without it. A
+   * negative offset presses outside the target (a modal dialog's `::backdrop`).
+   */
+  readonly at?: { readonly x: number; readonly y: number };
+  /**
+   * `"awaited"`: a library-owned close; the popup stays shown through the pending
+   * `openChangeAction(false)` and hides when it settles (conventions 3.5, the single source of
+   * the close). `"dismissed"`: a browser-owned close, hidden at once and notified with
+   * `"dismiss"`. `"kept"`: nothing closes and nothing is dispatched.
+   */
+  readonly outcome: "awaited" | "dismissed" | "kept";
+  /** `details.event.type` of an awaited close (default `"click"`; a dialog form: `"submit"`). */
+  readonly eventType?: string;
+  /**
+   * Where focus is right after the press: `"target"` (a button the engine focuses on press,
+   * where `pressFocusesButtons()`; else what had focus before), `"kept"` (what had focus before:
+   * the press is prevented), or the element the engine focuses instead.
+   */
+  readonly focusAtPress: "target" | "kept" | (() => Element);
+  /**
+   * A dismissal that happens at the press, not at the release, where the press focused the
+   * target: the focus move closes a popup that closes on focus leaving (Menu 2.2).
+   */
+  readonly hiddenAtPress?: boolean;
+  /** Focus once the popup closed (`"awaited"` and `"dismissed"` only). */
+  readonly focusAfter?: (ctx: { readonly pressFocused: boolean }) => Element;
+  /** Renders this harness instead of the config's (Dialog with `lightDismiss`, a form). */
+  readonly Harness?: ComponentType<OverlayBrowserHarnessProps<D>>;
+}
+
 export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
   /** The describe block's name (`"Dialog"`). */
   readonly name: string;
@@ -99,6 +143,8 @@ export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
   readonly ariaExpanded: boolean;
   /** Extra checks on an Escape's `details` (Dialog: `returnValue` is `""`). */
   readonly dismissDetails?: (details: D) => void;
+  /** The "click X while open" rows of the closing table (#117). */
+  readonly pressesWhileOpen: readonly OverlayPressWhileOpen<D>[];
   readonly viewTransition: {
     readonly Plain: ComponentType<OverlayViewTransitionProps>;
     /** The library-owned closes; the first one is used by the rows that need just one. */
@@ -352,6 +398,103 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           );
           expect(bar?.playState).toBe("running");
           bar?.cancel();
+        },
+      );
+    });
+
+    // #117: real presses with real timing. React's act environment is left for the press, so the
+    // engine's focus, light dismiss and `toggle` tasks interleave with React's work as they do on
+    // a page; the close action is held open so the pending window can be inspected.
+    describe("a real press while open (#117)", () => {
+      let restoreAct: (() => void) | undefined;
+
+      afterEach(async () => {
+        // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
+        await mouse.releaseHeld();
+        restoreAct?.();
+        restoreAct = undefined;
+      });
+
+      it.each(config.pressesWhileOpen.map((press) => [press.name, press] as const))(
+        "a real press on %s",
+        async (_, press) => {
+          const focusesButtons = await pressFocusesButtons();
+          const work = deferred();
+          const action = vi.fn<Action>((next) => (next ? undefined : work.promise));
+          const Rendered = press.Harness ?? Harness;
+          render(<Rendered action={action} />);
+          await config.open();
+          await flushFor();
+          restoreAct = leaveActEnvironment();
+
+          const target = press.target();
+          const before = document.activeElement;
+          const pressFocused = press.focusAtPress === "target" && focusesButtons;
+          const focusAtPress =
+            typeof press.focusAtPress === "function"
+              ? press.focusAtPress()
+              : pressFocused
+                ? target
+                : before;
+          const calls = action.mock.calls.length;
+          const box = target.getBoundingClientRect();
+          const x = Math.round(box.left + (press.at?.x ?? box.width / 2));
+          const y = Math.round(box.top + (press.at?.y ?? box.height / 2));
+
+          await mouse.down(x, y);
+          await sleep(20);
+          expect(document.activeElement).toBe(focusAtPress);
+          if (press.hiddenAtPress && pressFocused) {
+            expect(isOpen()).toBe(false);
+          } else {
+            // Nothing closes at the press: light dismiss waits for the release, a part for its
+            // click.
+            expect(isOpen()).toBe(true);
+            expect(action).toHaveBeenCalledTimes(calls);
+          }
+
+          await mouse.up(x, y);
+          await sleep(20);
+          const last = () => action.mock.calls.at(-1)!;
+
+          if (press.outcome === "kept") {
+            await quietPeriod(80, "a press inside must neither close nor dispatch");
+            expect(isOpen()).toBe(true);
+            expect(action).toHaveBeenCalledTimes(calls);
+            expect(document.activeElement).toBe(focusAtPress);
+            return;
+          }
+
+          if (press.outcome === "awaited") {
+            // The pending window: shown, focus where the press left it, one dispatch.
+            expect(isOpen()).toBe(true);
+            expect(document.activeElement).toBe(focusAtPress);
+            if (config.ariaExpanded) expect(trigger()).toHaveAttribute("aria-expanded", "true");
+            expect(action).toHaveBeenCalledTimes(calls + 1);
+            expect(last()[0]).toBe(false);
+            expect(last()[1].reason).toBe("activate");
+            expect(last()[1].event?.type).toBe(press.eventType ?? "click");
+            await quietPeriod(50, "the popup must stay shown until the action settles");
+            expect(isOpen()).toBe(true);
+            work.resolve();
+            await expect.poll(() => isOpen()).toBe(false);
+          } else {
+            // Hidden by the platform (or the library's light dismiss) at once; notified.
+            await expect.poll(() => isOpen(), { timeout: 1000 }).toBe(false);
+            await expect.poll(() => action.mock.calls.length).toBe(calls + 1);
+            expect(last()[0]).toBe(false);
+            expect(last()[1].reason).toBe("dismiss");
+            expect(last()[1].event?.type).toBe(config.dismissEvent);
+            work.resolve();
+          }
+
+          await expect.poll(() => document.activeElement).toBe(press.focusAfter!({ pressFocused }));
+          if (config.ariaExpanded) {
+            await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
+          }
+          await quietPeriod(50, "no re-open and no second dispatch");
+          expect(isOpen()).toBe(false);
+          expect(action).toHaveBeenCalledTimes(calls + 1);
         },
       );
     });
