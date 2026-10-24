@@ -1,6 +1,8 @@
 // Placement of a menu at a point (design/components/context-menu.md 4.2, conventions 12,
-// 13.4): the custom properties of the inline base position and the shipped `@position-try`
-// rules that mirror it. No "use client" directive: constants only (conventions 7.1).
+// 13.4): the custom properties of the inline base position, that position, and the shipped
+// `@position-try` rules that mirror it. No "use client" directive: pure (conventions 7.1).
+import type { CSSProperties } from "react";
+import type { MenuPlacement } from "./menu-context.js";
 
 /** Custom property carrying the x coordinate of a point-placed popup (viewport px). */
 export const MENU_POINT_X = "--menu-point-x";
@@ -77,3 +79,36 @@ export const MENU_POINT_FALLBACKS = {
     ],
   },
 } as const;
+
+type PointPlacement = Extract<MenuPlacement, { kind: "point" }>;
+
+/**
+ * The inline placement of a point open (context-menu.md 3.3): the point and the gap as custom
+ * properties (`--menu-point-gap`: `0px`, `16px` for a touch or pen open, 4.7), and unless the
+ * stylesheet owns placement, the menu below the point (`top`) or, for a touch or pen open, above
+ * it (`bottom`), and by the popup's direction read at the open (4.6), `left` (LTR) or
+ * `right` (RTL: the menu's right edge at the point), with the other two insets `auto`
+ * (longhands, so React never sees a shorthand next to its longhands), `position-area: none` (a
+ * consumer's anchored `position-area` would otherwise place the popup inside a grid area) and
+ * the library's fallbacks for that direction and pointer kind, spelled by generation parity
+ * (4.3).
+ */
+export function pointStyle(point: PointPlacement, stylesheetOwned: boolean): CSSProperties {
+  const vars = {
+    [MENU_POINT_X]: `${point.x}px`,
+    [MENU_POINT_Y]: `${point.y}px`,
+    [MENU_POINT_GAP]: point.offset ? MENU_POINT_TOUCH_GAP : "0px",
+  };
+  if (stylesheetOwned) return vars as CSSProperties;
+  const rtl = point.direction === "rtl";
+  const kind = point.offset ? "touch" : "mouse";
+  return {
+    ...vars,
+    top: point.offset ? "auto" : `calc(var(${MENU_POINT_Y}) + var(${MENU_POINT_GAP}))`,
+    right: rtl ? `calc(100% - var(${MENU_POINT_X}))` : "auto",
+    bottom: point.offset ? `calc(100% - var(${MENU_POINT_Y}) + var(${MENU_POINT_GAP}))` : "auto",
+    left: rtl ? "auto" : `var(${MENU_POINT_X})`,
+    positionArea: "none",
+    positionTryFallbacks: MENU_POINT_FALLBACKS[point.direction][kind][point.generation % 2],
+  } as CSSProperties;
+}

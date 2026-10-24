@@ -24,8 +24,8 @@ import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { claimPress, isHandledBy, MenuListContext, useMenuContext } from "./menu-context.js";
-import type { MenuContextValue, MenuListContextValue, MenuPlacement } from "./menu-context.js";
+import { claimPress, MenuListContext, useMenuContext } from "./menu-context.js";
+import type { MenuListContextValue } from "./menu-context.js";
 import {
   capturePointer,
   edgeItem,
@@ -37,15 +37,8 @@ import {
   typeaheadText,
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
-import {
-  MENU_POINT_FALLBACKS,
-  MENU_POINT_GAP,
-  MENU_POINT_HREF,
-  MENU_POINT_RULES,
-  MENU_POINT_TOUCH_GAP,
-  MENU_POINT_X,
-  MENU_POINT_Y,
-} from "./menu-point.js";
+import { listenOutside } from "./menu-outside.js";
+import { MENU_POINT_HREF, MENU_POINT_RULES, pointStyle } from "./menu-point.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -142,148 +135,6 @@ const TYPEAHEAD_RESET_MS = 500;
 /** What a press may focus inside a popup: items, the popup itself, the consumer's controls. */
 const FOCUSABLE_SELECTOR =
   'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"])';
-
-type PointPlacement = Extract<MenuPlacement, { kind: "point" }>;
-
-/**
- * The inline placement of a point open (context-menu.md 3.3): the point and the gap as custom
- * properties (`--menu-point-gap`: `0px`, `16px` for a touch or pen open, 4.7), and unless the
- * stylesheet owns placement, the menu below the point (`top`) or, for a touch or pen open, above
- * it (`bottom`), and by the popup's direction read at the open (4.6), `left` (LTR) or
- * `right` (RTL: the menu's right edge at the point), with the other two insets `auto`
- * (longhands, so React never sees a shorthand next to its longhands), `position-area: none` (a
- * consumer's anchored `position-area` would otherwise place the popup inside a grid area) and
- * the library's fallbacks for that direction and pointer kind, spelled by generation parity
- * (4.3).
- */
-function pointStyle(point: PointPlacement, stylesheetOwned: boolean): CSSProperties {
-  const vars = {
-    [MENU_POINT_X]: `${point.x}px`,
-    [MENU_POINT_Y]: `${point.y}px`,
-    [MENU_POINT_GAP]: point.offset ? MENU_POINT_TOUCH_GAP : "0px",
-  };
-  if (stylesheetOwned) return vars as CSSProperties;
-  const rtl = point.direction === "rtl";
-  const kind = point.offset ? "touch" : "mouse";
-  return {
-    ...vars,
-    top: point.offset ? "auto" : `calc(var(${MENU_POINT_Y}) + var(${MENU_POINT_GAP}))`,
-    right: rtl ? `calc(100% - var(${MENU_POINT_X}))` : "auto",
-    bottom: point.offset ? `calc(100% - var(${MENU_POINT_Y}) + var(${MENU_POINT_GAP}))` : "auto",
-    left: rtl ? "auto" : `var(${MENU_POINT_X})`,
-    positionArea: "none",
-    positionTryFallbacks: MENU_POINT_FALLBACKS[point.direction][kind][point.generation % 2],
-  } as CSSProperties;
-}
-
-/**
- * The element under a wheel event that can scroll the way the wheel turns, up to `popup`: then
- * the wheel is the menu's own and the page under it is not involved.
- */
-function scrollsWithin(popup: HTMLElement, target: EventTarget | null, event: WheelEvent) {
-  const vertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
-  const delta = vertical ? event.deltaY : event.deltaX;
-  if (delta === 0) return true;
-  let element = target instanceof Element ? target : null;
-  while (element !== null && popup.contains(element)) {
-    const computed = element.ownerDocument.defaultView?.getComputedStyle(element);
-    const overflow = computed?.[vertical ? "overflowY" : "overflowX"] ?? "";
-    if (overflow === "auto" || overflow === "scroll" || overflow === "overlay") {
-      // Scroll offsets run 0..room (down, or right in LTR) or -room..0 (right to left).
-      const room = vertical
-        ? element.scrollHeight - element.clientHeight
-        : element.scrollWidth - element.clientWidth;
-      const offset = vertical ? element.scrollTop : element.scrollLeft;
-      const min = !vertical && computed?.direction === "rtl" ? -room : 0;
-      if (room > 0 && (delta > 0 ? offset < min + room - 0.5 : offset > min + 0.5)) return true;
-    }
-    element = element.parentElement;
-  }
-  return false;
-}
-
-/**
- * The outside right- and middle-click close of a top-level menu (context-menu.md 5): a
- * `contextmenu` outside the menu tree that this menu's ContextTrigger did not handle, or a
- * middle-button `pointerdown` outside it, hides the root popup at once (`"dismiss"` through the
- * `toggle` notification). Chromium's click-based light dismiss ignores those buttons.
- *
- * While the menu is placed at a point (4.8; read at each event: a right-click may
- * re-place a Trigger-opened menu), a `scroll` of the document or of an element that contains the
- * region closes it the same way; scrolls elsewhere and inside the menu are ignored. Scrolling
- * already in flight at the open (a smooth scroll, trackpad momentum) does not count: scroll
- * events are ignored until the first animation frame without one. And a `wheel`
- * over any menu never scrolls the page: it is prevented unless something in the menu under the
- * pointer can scroll that way, or it is a zoom (`ctrlKey`: Ctrl+wheel, trackpad pinch). Returns
- * the cleanup.
- */
-function listenOutside(
-  popup: HTMLElement,
-  menu: MenuContextValue,
-  placement: () => MenuPlacement,
-): () => void {
-  const doc = popup.ownerDocument;
-  const inside = (target: EventTarget | null) => target instanceof Node && popup.contains(target);
-  const close = () => {
-    if (isPopoverOpen(popup)) popup.hidePopover();
-  };
-  // Bubble phase: the region's handler ran first and marked a move.
-  const onContextMenu = (event: Event) => {
-    if (inside(event.target) || isHandledBy(event, menu)) return;
-    close();
-  };
-  const onPointerDown = (event: Event) => {
-    if ((event as globalThis.PointerEvent).button !== 1 || inside(event.target)) return;
-    close();
-  };
-  // Scroll events run in a frame's rendering steps, before its animation frame callbacks: the
-  // first callback that saw none since the last one ends the in-flight scroll window.
-  const view = doc.defaultView;
-  let settling = typeof view?.requestAnimationFrame === "function";
-  let scrolledThisFrame = false;
-  let frame = 0;
-  const tick = () => {
-    if (scrolledThisFrame) {
-      scrolledThisFrame = false;
-      frame = view!.requestAnimationFrame(tick);
-    } else settling = false;
-  };
-  if (settling) frame = view!.requestAnimationFrame(tick);
-  const onScroll = (event: Event) => {
-    if (settling) {
-      scrolledThisFrame = true;
-      return;
-    }
-    const current = placement();
-    if (current.kind !== "point") return;
-    const target = event.target;
-    // The point is meaningless once the content under it moved: the document, or a scroller
-    // around the region (React Aria's rule). A scroller elsewhere or inside the menu is not.
-    if (target instanceof Node && target.nodeType !== Node.DOCUMENT_NODE) {
-      if (inside(target) || !target.contains(current.source)) return;
-    }
-    close();
-  };
-  // Native menus never scroll the page from inside the menu; a non-overflowing popup would chain
-  // the wheel to the page (Firefox ignores `overscroll-behavior` there).
-  const onWheel = (event: WheelEvent) => {
-    // A zoom, not a scroll: Ctrl+wheel and a trackpad pinch (`wheel` with `ctrlKey`) stay the
-    // user's.
-    if (event.ctrlKey) return;
-    if (!scrollsWithin(popup, event.target, event)) event.preventDefault();
-  };
-  doc.addEventListener("contextmenu", onContextMenu);
-  doc.addEventListener("pointerdown", onPointerDown, true);
-  doc.addEventListener("scroll", onScroll, { capture: true, passive: true });
-  popup.addEventListener("wheel", onWheel, { passive: false });
-  return () => {
-    if (settling) view!.cancelAnimationFrame(frame);
-    doc.removeEventListener("contextmenu", onContextMenu);
-    doc.removeEventListener("pointerdown", onPointerDown, true);
-    doc.removeEventListener("scroll", onScroll, { capture: true });
-    popup.removeEventListener("wheel", onWheel);
-  };
-}
 
 /**
  * The menu itself: `<div popover="auto" role="menu" aria-labelledby={trigger} tabindex="-1">`,
