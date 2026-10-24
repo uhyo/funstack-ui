@@ -258,6 +258,11 @@ export function MenuPage() {
       <h4>
         <code>Menu.Trigger</code>
       </h4>
+      <p>
+        One per Root: only one Trigger is the menu's anchor and focus-return target, and a press on
+        another while open counts as outside it. A second <code>Menu.Trigger</code> in the same Root
+        is not supported (development warns); use a Root per trigger.
+      </p>
       <PropsTable
         rows={[
           {

@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import type { ComponentPropsWithRef, DOMAttributes, MouseEvent } from "react";
 import { dataAttr } from "./data-attr.js";
 import { isPopoverOpen } from "./popover-open.js";
+import { registerTrigger } from "./trigger-ref.js";
 import type { RenderProp } from "./types.js";
 import { useElementCheck } from "./use-element-check.js";
 import { disabledButton, rendersButton } from "./use-render.js";
@@ -96,17 +97,15 @@ export function usePopoverTrigger<State>(
   const ref = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);
-      triggerRef.current = element;
+      const unregister = registerTrigger(triggerRef, element, part);
       // JS-free mode: the DOM owns `aria-expanded` (design 9). A Trigger that mounts after the
       // Popup (or is re-created) picks up the current state here.
       if (!isLibrary && popupRef.current !== null) {
         element.setAttribute("aria-expanded", String(isPopoverOpen(popupRef.current)));
       }
-      return () => {
-        if (triggerRef.current === element) triggerRef.current = null;
-      };
+      return unregister;
     },
-    [isLibrary, checkElement, triggerRef, popupRef],
+    [isLibrary, checkElement, triggerRef, popupRef, part],
   );
 
   const onClick = (event: MouseEvent<HTMLElement>) => {

@@ -193,6 +193,11 @@ export function DialogPage() {
       <h4>
         <code>Dialog.Trigger</code>
       </h4>
+      <p>
+        One per Root: focus returns to the Trigger that mounted last, and a non-modal dialog treats
+        a press on any other one as outside. A second <code>Dialog.Trigger</code> in the same Root
+        is not supported (development warns); use a Root per trigger.
+      </p>
       <PropsTable
         rows={[
           {

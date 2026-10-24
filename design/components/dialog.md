@@ -2145,7 +2145,8 @@ packages/ui/src/internal/use-overlay-root.ts, overlay-popup.tsx, use-overlay-clo
   conventions 7.2): mode change; `transition` / `keepMounted={false}` in static
   mode; wrong `tagName` behind `render`; no name on the dialog; `initialFocus` unresolved or
   outside the dialog; Trigger without a Popup (checked in the Trigger's effect through
-  `document.getElementById(dialogId)`). A part rendered outside a `Dialog.Root` **throws** (no
+  `document.getElementById(dialogId)`); a second Trigger in one Root (once per Root,
+  `registerTrigger`, popover.md 14.2 item 7, #113 API3). A part rendered outside a `Dialog.Root` **throws** (no
   context), consistent with Tabs and Tooltip, rather than warning.
 - **Implementation checks** (example app, all three engines; resolved: `getAnimations({ subtree:
   true })` lists `::backdrop` in Chromium, 4.4): the top-layer `<ViewTransition>` capture of the

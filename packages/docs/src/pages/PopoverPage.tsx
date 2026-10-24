@@ -193,6 +193,11 @@ export function PopoverPage() {
       <h4>
         <code>Popover.Trigger</code>
       </h4>
+      <p>
+        One per Root: only one Trigger is the popover's anchor and focus-return target, and a press
+        on another while open counts as outside it. A second <code>Popover.Trigger</code> in the
+        same Root is not supported (development warns); use a Root per trigger.
+      </p>
       <PropsTable
         rows={[
           {

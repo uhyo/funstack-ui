@@ -1513,6 +1513,10 @@ is passed as `ref`; consumers destructure). Effects and listeners:
    Trigger that mounts after the Popup.
 7. **Dev warnings** (section 9): `useJsFreePropWarnings` (`transition` / `keepMounted` in JS-free
    mode), `useElementCheck` and `useShownNameWarning`, once per instance (conventions 7.2).
+   One Trigger per Root (#113 API3): the Root's `triggerRef` holds one element (last mounted
+   wins), so `internal/trigger-ref.ts` `registerTrigger` warns once per Root when a second
+   Trigger mounts while one is registered. Shared by `usePopoverTrigger` (Popover, Menu,
+   submenus), `Dialog.Trigger` and `Combobox.Input`.
 
 ### 14.3 `usePopoverTrigger(ctx, { part, disabled, render, handlers?, activate?, disabledAs? })` (shared)
 

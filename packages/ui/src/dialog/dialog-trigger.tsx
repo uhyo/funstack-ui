@@ -3,6 +3,7 @@ import { useCallback, useEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { registerTrigger } from "../internal/trigger-ref.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -85,10 +86,7 @@ export function DialogTrigger({
   const libraryRef = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);
-      triggerRef.current = element;
-      return () => {
-        if (triggerRef.current === element) triggerRef.current = null;
-      };
+      return registerTrigger(triggerRef, element, "Dialog.Trigger");
     },
     [checkElement, triggerRef],
   );

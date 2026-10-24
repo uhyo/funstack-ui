@@ -313,6 +313,10 @@ export function ComboboxPage() {
       <h4>
         <code>Combobox.Input</code>
       </h4>
+      <p>
+        One per Root: the Input is the listbox's anchor, so a second <code>Combobox.Input</code> in
+        the same Root is not supported (development warns). Use a Root per input.
+      </p>
       <PropsTable
         rows={[
           {
