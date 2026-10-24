@@ -10,7 +10,6 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
-import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
@@ -22,7 +21,7 @@ import { useLatest } from "../internal/use-latest.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
-import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
+import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { claimPress, isHandledBy, MenuListContext, useMenuContext } from "./menu-context.js";
@@ -330,7 +329,11 @@ export function MenuPopup({
   const point = menu.placement.kind === "point" ? menu.placement : null;
   const requestedSide = point !== null ? null : sideOption;
   // Resolved while shown (conventions 13.2); idle for a point open, which has no side.
-  const placement = useResolvedPlacement({ side: requestedSide, align });
+  const placement = useAnchoredPlacement({
+    side: requestedSide,
+    align,
+    fallbacks: submenu ? "flip-inline" : undefined,
+  });
   const { side } = placement;
   const resolvedAlign = placement.align;
 
@@ -556,7 +559,7 @@ export function MenuPopup({
         if (event.pointerType !== "touch") scheduleHoverClose(menu, event.nativeEvent);
       },
     }),
-    ...(side !== null && { "data-side": side, "data-align": resolvedAlign }),
+    ...placement.dataAttributes,
     "data-context": point !== null ? "" : undefined,
   };
 
@@ -582,18 +585,11 @@ export function MenuPopup({
     render,
     state,
     className,
-    // The inline placement (the requested one: the browser keeps choosing from it) sits under
-    // the consumer's style: the consumer wins.
+    // The inline placement sits under the consumer's style: the consumer wins.
     style:
       point !== null
         ? (s) => ({ ...pointStyle(point, sideOption === null), ...resolveStateValue(style, s) })
-        : requestedSide === null
-          ? style
-          : (s) => ({
-              positionArea: positionArea(requestedSide, align),
-              positionTryFallbacks: submenu ? "flip-inline" : POSITION_TRY_FALLBACKS,
-              ...resolveStateValue(style, s),
-            }),
+        : placement.style(style),
     children: content,
     props: rest,
     libraryProps,

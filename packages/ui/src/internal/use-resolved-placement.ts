@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import type { RefCallback } from "react";
+import type { CSSProperties, RefCallback } from "react";
 import { flushSync } from "react-dom";
-import { parsePositionArea } from "./anchor-position.js";
+import { parsePositionArea, POSITION_TRY_FALLBACKS, positionArea } from "./anchor-position.js";
 import type {
   AnchorAlign,
   AnchorSide,
@@ -11,6 +11,9 @@ import type {
   ResolvedPlacement,
 } from "./anchor-position.js";
 import { isPopoverOpen } from "./popover-open.js";
+import { resolveStateValue } from "./render-element.js";
+import type { DataAttributes } from "./render-element.js";
+import type { StateValue } from "./types.js";
 
 export interface PlacementRequest<Side extends AnchorSide> {
   /** The requested side; `null` when the stylesheet owns placement (the hook is idle). */
@@ -205,4 +208,50 @@ export function useResolvedPlacement<Side extends AnchorSide>(
 
   if (side === null) return { side: null, align, ref };
   return resolved === null ? { side, align, ref } : { ...resolved, ref };
+}
+
+export interface AnchoredPlacementRequest<Side extends AnchorSide> extends PlacementRequest<Side> {
+  /** `position-try-fallbacks`. Default: flip on both axes. */
+  readonly fallbacks?: string;
+}
+
+export interface AnchoredPlacement<Side extends AnchorSide> extends PlacementResult<Side> {
+  /** `data-side` / `data-align` (resolved); no keys when the side is `null` (not owned then). */
+  readonly dataAttributes: DataAttributes;
+  /**
+   * The popup's `style`: the requested inline placement (the browser keeps choosing from it)
+   * under the consumer's style, so the consumer wins. The consumer's style alone for `side: null`.
+   */
+  readonly style: <State>(
+    consumer: StateValue<CSSProperties | undefined, State>,
+  ) => StateValue<CSSProperties | undefined, State>;
+}
+
+/**
+ * An anchored popup's placement (Popover, Tooltip and Menu Popup): `useResolvedPlacement` plus
+ * the data attributes and the inline `position-area` / `position-try-fallbacks` it renders.
+ */
+export function useAnchoredPlacement<Side extends AnchorSide>(
+  request: AnchoredPlacementRequest<Side>,
+): AnchoredPlacement<Side> {
+  const {
+    side: requestedSide,
+    align: requestedAlign,
+    fallbacks = POSITION_TRY_FALLBACKS,
+  } = request;
+  const placement = useResolvedPlacement({ side: requestedSide, align: requestedAlign });
+  const { side, align } = placement;
+  const dataAttributes: DataAttributes =
+    side !== null ? { "data-side": side, "data-align": align } : {};
+  const style = <State>(
+    consumer: StateValue<CSSProperties | undefined, State>,
+  ): StateValue<CSSProperties | undefined, State> =>
+    requestedSide === null
+      ? consumer
+      : (s: State) => ({
+          positionArea: positionArea(requestedSide, requestedAlign),
+          positionTryFallbacks: fallbacks,
+          ...resolveStateValue(consumer, s),
+        });
+  return { ...placement, dataAttributes, style };
 }

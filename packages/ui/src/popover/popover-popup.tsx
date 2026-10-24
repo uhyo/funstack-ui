@@ -6,14 +6,13 @@ import type {
   RefObject,
   ViewTransitionClass,
 } from "react";
-import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
-import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
+import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
@@ -161,7 +160,7 @@ export function PopoverPopup({
 
   // Resolved while shown, in library and JS-free mode alike (it hangs off the element's ref and
   // the platform's `toggle`, not off library state).
-  const placement = useResolvedPlacement({ side: sideProp, align: alignProp });
+  const placement = useAnchoredPlacement({ side: sideProp, align: alignProp });
   const { side, align } = placement;
   const ref = useMergedRefs(setElement, placement.ref);
 
@@ -184,7 +183,7 @@ export function PopoverPopup({
     "aria-labelledby": ids.title,
     "aria-describedby": ids.description,
     // Not owned with `side={null}`: the stylesheet (or a render element) may set them.
-    ...(side !== null && { "data-side": side, "data-align": align }),
+    ...placement.dataAttributes,
   };
 
   const element = useRender<ComponentPropsWithRef<"dialog">, PopoverPopupState>({
@@ -192,16 +191,8 @@ export function PopoverPopup({
     render,
     state,
     className,
-    // The inline placement is the requested one (the browser keeps choosing from it) and sits
-    // under the consumer's style: the consumer wins (design 8).
-    style:
-      sideProp === null
-        ? style
-        : (s) => ({
-            positionArea: positionArea(sideProp, alignProp),
-            positionTryFallbacks: POSITION_TRY_FALLBACKS,
-            ...resolveStateValue(style, s),
-          }),
+    // The consumer's style wins over the inline placement (design 8).
+    style: placement.style(style),
     children: content,
     // `role` is a default the consumer's `rest` overrides (design 3.3): WebKit implements no
     // minimum role for `[popover]`, and a `<div>` popup needs it.

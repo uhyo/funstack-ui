@@ -1,12 +1,11 @@
 "use client";
 import { useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
-import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
+import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { TooltipPopupContext, useTooltipContext } from "./tooltip-context.js";
 import type { TooltipAlign, TooltipPopupContextValue, TooltipSide } from "./tooltip-context.js";
@@ -88,7 +87,7 @@ export function TooltipPopup({
   ...rest
 }: TooltipPopupProps) {
   const ctx = useTooltipContext("Tooltip.Popup");
-  const placement = useResolvedPlacement({ side: sideProp, align: alignProp });
+  const placement = useAnchoredPlacement({ side: sideProp, align: alignProp });
   const { side, align } = placement;
   const state: TooltipPopupState = { disabled: ctx.disabled, side, align };
   const arrow = useMemo<TooltipPopupContextValue>(() => ({ side, align }), [side, align]);
@@ -100,7 +99,7 @@ export function TooltipPopup({
     role: "tooltip",
     "data-disabled": dataAttr(ctx.disabled),
     // Not owned with `side={null}`: the stylesheet (or a render element) may set them.
-    ...(side !== null && { "data-side": side, "data-align": align }),
+    ...placement.dataAttributes,
   };
 
   const element = useRender<ComponentPropsWithRef<"div">, TooltipPopupState>({
@@ -108,16 +107,8 @@ export function TooltipPopup({
     render,
     state,
     className,
-    // The inline placement is the requested one (the browser keeps choosing from it) and sits
-    // under the consumer's style: the consumer wins (design 3).
-    style:
-      sideProp === null
-        ? style
-        : (s) => ({
-            positionArea: positionArea(sideProp, alignProp),
-            positionTryFallbacks: POSITION_TRY_FALLBACKS,
-            ...resolveStateValue(style, s),
-          }),
+    // The consumer's style wins over the inline placement (design 3).
+    style: placement.style(style),
     children,
     props: rest,
     libraryProps,
