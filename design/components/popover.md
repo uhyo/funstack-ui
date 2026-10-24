@@ -280,8 +280,8 @@ What the user sees while the open is pending:
 | `Popover.Close` (with or without `action`) | library | click cancelled; `action` awaited in the Close's own transition (`data-pending` on the button); then the same dispatch as above | `"activate"` | the `click` `MouseEvent` |
 | Controlled parent sets `open={false}` | library | apply effect `hidePopover()`; the resulting `toggle` is an echo, no dispatch | (no dispatch) | |
 | Escape, Android back, AT dismiss, light dismiss | browser | popover hidden at once; `toggle` → dispatch `false` as a notification: optimistic `false`, action awaited inside the Root's transition, uncontrolled state committed after it | `"dismiss"` | the `toggle` `ToggleEvent` |
-| A foreign `hide-popover` / `toggle-popover` invoker | browser | the Popup's `command` listener records an `"activate"` intent; `toggle` consumes it | `"activate"` | the `CommandEvent` |
-| A foreign `popovertarget` invoker (#125) | browser | no `command` event; the Popup's `beforetoggle` listener records an `"activate"` intent when the close's `ToggleEvent.source` is non-null (the button; `null` for Escape, light dismiss and script), unless one is already recorded for this close (a `commandfor` invoker sets `source` too, and its `command` intent comes first and wins); `toggle` consumes it | `"activate"` | the `beforetoggle` `ToggleEvent` (its `source` is the button) |
+| A foreign `hide-popover` / `toggle-popover` invoker | browser | the Popup's `command` listener records an `"activate"` intent while the popup is shown (the `command` event fires whatever the popover's state, HTML; one at a hidden popup closes nothing and records nothing); `toggle` consumes it | `"activate"` | the `CommandEvent` |
+| A foreign `popovertarget` invoker (#125) | browser | no `command` event; the Popup's `beforetoggle` listener records an `"activate"` intent when the close's `ToggleEvent.source` is a button or input whose `popoverTargetElement` is the popup. Other sources stay dismissals: `null` (Escape, light dismiss, script, another popover opening), an `interestfor` button (Chromium names it on a lost-interest hide), a `commandfor` invoker (its `command` row above). An intent already recorded for this close wins (a button with both `commandfor` and `popovertarget` runs its command, whose `command` listener comes first); `toggle` consumes it | `"activate"` | the `beforetoggle` `ToggleEvent` (its `source` is the button) |
 | Script `hidePopover()`, another `auto` popover or modal dialog opening elsewhere | browser | as a dismissal | `"dismiss"` | the `toggle` `ToggleEvent` |
 
 Why the line is drawn here and not at "close is browser-owned" as in Dialog: a dialog's close
@@ -294,11 +294,12 @@ commit" (#39). Dismissals remain the browser's: `beforetoggle` for a close is no
 a user who pressed Escape expects the popup to go away now. The `openChangeAction` doc comment
 says which closes are awaited and which are notified.
 
-Close intents work as in Dialog 2.3: the `toggle` event names no cause beyond a `popovertarget`
-or `commandfor` invoker (`ToggleEvent.source`: Chrome 140, Firefox 145, Safari 26.5), so the
-Popup records what caused the close just before it happens and the `toggle` listener consumes
-it; a recorded intent that did not result in a close is cleared by one `setTimeout(0)` that
-clears it only if the popover is still open. In library mode the only recorded intents are
+Close intents work as in Dialog 2.3: the `toggle` event names no cause beyond its invoker
+(`ToggleEvent.source`: Chrome 140, Firefox 145, Safari 26.5), so the Popup records what caused
+the close just before it happens and the `toggle` listener consumes it; a recorded intent that
+did not result in a close is cleared by one `setTimeout(0)` that clears it only if the popover is
+still open. That clear cannot tell a hidden popup's stale intent from one waiting for its
+`toggle`, so nothing is recorded for a popup that is already hidden. In library mode the only recorded intents are
 foreign invokers. The library's own Trigger and Close never produce a close with a `source`:
 their clicks are cancelled and the close is the library's `hidePopover()`, whose `source` is
 `null`. The library's own `hidePopover()` calls are recognised through `intended()` (the latest
