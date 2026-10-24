@@ -161,18 +161,29 @@ let buttonFocusOnPress: Promise<boolean> | undefined;
 
 /**
  * Whether a real mouse press focuses a `<button>`. Chromium, Firefox and Playwright's Linux
- * WebKit do; Safari on macOS does not. A row that asserts where a press leaves focus branches on
- * this rather than on the engine name (#117). Measured once, on first use, with a real press on a
- * button outside any popup, and shared.
+ * WebKit do; Safari on macOS does not (no CI engine runs that branch, so rows' `false` branches
+ * are unverified). A row that asserts where a press leaves focus branches on this rather than on
+ * the engine name (#117). Measured once, on first use, with a real press on a temporary button at
+ * the viewport's top-left, and shared by the file; call it before rendering. Residue: the press
+ * leaves the pointer at (20, 10) and grants transient user activation (which, for instance,
+ * Dialog's `cancel` anti-abuse rule reads). Throws if something else is under that point, rather
+ * than caching a wrong `false`.
  */
 export function pressFocusesButtons(): Promise<boolean> {
   buttonFocusOnPress ??= (async () => {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = "probe";
-    button.style.cssText = "position: fixed; top: 0; left: 0; width: 40px; height: 20px";
+    button.style.cssText =
+      "position: fixed; top: 0; left: 0; width: 40px; height: 20px; z-index: 2147483647";
     document.body.append(button);
     try {
+      const hit = document.elementFromPoint(20, 10);
+      if (hit !== button) {
+        throw new Error(
+          `pressFocusesButtons: (20, 10) hits ${hit?.tagName ?? "nothing"}, not the probe button`,
+        );
+      }
       await mouse.down(20, 10);
       await mouse.up(20, 10);
       return document.activeElement === button;

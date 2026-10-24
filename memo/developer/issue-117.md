@@ -2,6 +2,38 @@
 
 Branch `test/117-click-while-open` (worktree `.claude/worktrees/dev-117`), 2026-10-24.
 
+## Review fixes (memo/reviewer/issue-117-review.md)
+
+- M1: the `it.fails` input row is now a plain `it` named for #123 that pins today's outcome
+  (open and focused at the press; hidden at the release; one `(false, "dismiss", "toggle")`;
+  focus, text and value untouched; no re-open). It fails, and must be rewritten, when #123 is
+  fixed.
+- M2: Dialog foreign `request-close` and `close` invokers inside the modal popup, real press,
+  deferred action: cancelled (`defaultPrevented`), pending window (shown, Trigger
+  `data-pending`, no `data-open`), `(false, "activate", "command")` with the invoker's
+  `returnValue`, closed after the resolve, focus back on the Trigger.
+- L1: added the submenu item press (root awaited, both shown until it settles, submenu
+  `"dismiss"` after), CheckboxItem / RadioItem / `closeOnActivate={false}` presses (stay open),
+  Popover.Close with `action`, Dialog non-modal outside press without lightDismiss (nothing) and
+  the non-modal Close part (awaited), and the Tooltip native path's popup press (stays) and
+  outside press (hint light dismiss), both `runIf(supportsInterestFor)`. Nothing from L1 skipped.
+- L2: the suite's awaited rows assert Trigger `data-pending` and no `data-open` (Dialog's
+  Trigger has both too) next to `aria-expanded`. The bespoke rows (nested inner Trigger, Menu
+  sibling item, submenu item, Dialog foreign / non-modal) do the same. The Combobox option row
+  asserts `aria-expanded="true"` and the Input's `data-open`. The pending action there is the
+  value action, so the Input and Trigger carry no `data-pending`; checked, and design 5.2 puts
+  it on the option.
+- L3: the Menu suite item row presses `delete` (not the keyboard-focused item); the pointer
+  moves focus to it.
+- L4: `pressFocusesButtons()` puts the probe at the top z-index and throws unless
+  `elementFromPoint(20, 10)` is the probe. The doc states its residue (the pointer position and
+  transient activation) and that the `false` branch is unverified.
+- L5: `OverlayPressWhileOpen` is a discriminated union on `outcome` (`"awaited"` /
+  `"dismissed"` / `"stays-open"`). `focusAfter` is required where it applies, `eventType` is
+  awaited-only, `focusAtPress: "kept"` is now `"unchanged"`, and `hiddenAtPress` is now
+  `hiddenAtPressIfFocused` (dismissed-only). The dismissed doc notes that browser-owned
+  `"activate"` closes stay bespoke.
+
 ## Approach
 
 - Shared suite (`__tests__/overlay-browser-suite.tsx`): new config field `pressesWhileOpen`
@@ -78,8 +110,8 @@ Legend: NEW = added in this branch; EXISTS = an earlier real-input row covers it
 - Another field (focus leaving): NEW (hidden at the press, `(false, "dismiss", "focusout")`,
   text reverted). Uses the `before` input, because the listbox covers `after`.
 - Page without a focus target: EXISTS (#111 rows).
-- The input itself: NEW, **`it.fails`, bug #123**. A real press light-dismisses the listbox.
-  `source` gives no exemption; the design and research claim it does.
+- The input itself: NEW, pins today's behaviour of **bug #123**. A real press light-dismisses
+  the listbox. `source` gives no exemption; the design and research claim it does.
 - Popup padding, disabled option: NEW (kept).
 
 ### Select (8)

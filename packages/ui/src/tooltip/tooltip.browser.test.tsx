@@ -452,6 +452,40 @@ describe("a real press while open (#117)", () => {
       expect(isOpen()).toBe(true);
     },
   );
+
+  // The native path's other presses (design 2.1): the `hint` popover's own light dismiss, at the
+  // release. A press on the popup is inside it, so it stays.
+  it.runIf(supportsInterestFor).each([
+    ["the popup", () => popup(), true],
+    ["a button outside", () => screen.getByRole("button", { name: "Elsewhere" }), false],
+  ] as const)(
+    "native interestfor path, a press on %s: open after it = %s",
+    async (_, target, staysOpen) => {
+      render(
+        <Harness
+          delay={0}
+          closeDelay={10_000}
+          trigger={{ experimental_interestFor: true }}
+          popup={{ experimental_hint: true }}
+        />,
+      );
+      await userEvent.hover(trigger());
+      await expect.poll(isOpen, { timeout: 3000 }).toBe(true);
+      const { x, y } = centre(target());
+      await mouse.move(x, y);
+      await sleep(20);
+      await mouse.down(x, y);
+      await sleep(20);
+      expect(isOpen()).toBe(true);
+      await mouse.up(x, y);
+      if (staysOpen) {
+        await quietPeriod(150, "a press inside the hint must not dismiss it");
+        expect(isOpen()).toBe(true);
+      } else {
+        await expect.poll(isOpen, { timeout: 1000 }).toBe(false);
+      }
+    },
+  );
 });
 
 // --- Wave 11: resolved side, inline sides and direction (design 7.4, 7.5, 13; conventions 13) --

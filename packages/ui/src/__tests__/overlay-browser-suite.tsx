@@ -77,13 +77,8 @@ export interface OverlayViewTransitionClose {
   readonly afterClose?: () => void | Promise<void>;
 }
 
-/**
- * A real mouse press on something while the popup is open (#117): one entry per "click X while
- * open" row of the component's closing table. jsdom fires mousedown, mouseup and click in one
- * task; a real engine runs focus, light dismiss and `toggle` tasks between them, which is where
- * #110, #112, #115 and #116 hid.
- */
-export interface OverlayPressWhileOpen<D> {
+/** What every `OverlayPressWhileOpen` has. */
+interface PressBase<D> {
   /** Completes the title: `a real press on ${name} …`. */
   readonly name: string;
   /** The pressed element. */
@@ -94,30 +89,60 @@ export interface OverlayPressWhileOpen<D> {
    */
   readonly at?: { readonly x: number; readonly y: number };
   /**
-   * `"awaited"`: a library-owned close; the popup stays shown through the pending
-   * `openChangeAction(false)` and hides when it settles (conventions 3.5, the single source of
-   * the close). `"dismissed"`: a browser-owned close, hidden at once and notified with
-   * `"dismiss"`. `"kept"`: nothing closes and nothing is dispatched.
-   */
-  readonly outcome: "awaited" | "dismissed" | "kept";
-  /** `details.event.type` of an awaited close (default `"click"`; a dialog form: `"submit"`). */
-  readonly eventType?: string;
-  /**
    * Where focus is right after the press: `"target"` (a button the engine focuses on press,
-   * where `pressFocusesButtons()`; else what had focus before), `"kept"` (what had focus before:
-   * the press is prevented), or the element the engine focuses instead.
+   * where `pressFocusesButtons()`), `"unchanged"` (what had focus before: the press is
+   * prevented), or the element the engine focuses instead. Where `pressFocusesButtons()` is
+   * `false` (Safari on macOS; no engine in CI), `"target"` expects what had focus before: that
+   * branch is unverified, and macOS WebKit may instead clear focus or focus the nearest
+   * mouse-focusable ancestor (the `<dialog>`).
    */
-  readonly focusAtPress: "target" | "kept" | (() => Element);
-  /**
-   * A dismissal that happens at the press, not at the release, where the press focused the
-   * target: the focus move closes a popup that closes on focus leaving (Menu 2.2).
-   */
-  readonly hiddenAtPress?: boolean;
-  /** Focus once the popup closed (`"awaited"` and `"dismissed"` only). */
-  readonly focusAfter?: (ctx: { readonly pressFocused: boolean }) => Element;
+  readonly focusAtPress: "target" | "unchanged" | (() => Element);
   /** Renders this harness instead of the config's (Dialog with `lightDismiss`, a form). */
   readonly Harness?: ComponentType<OverlayBrowserHarnessProps<D>>;
 }
+
+/** Focus once the popup closed; `pressFocused`: the press focused the target. */
+type FocusAfter = (ctx: { readonly pressFocused: boolean }) => Element;
+
+/**
+ * A library-owned close: the popup stays shown through the pending `openChangeAction(false)` and
+ * hides when it settles (conventions 3.5, the single source of the close).
+ */
+interface AwaitedPress<D> extends PressBase<D> {
+  readonly outcome: "awaited";
+  /** `details.event.type` of the close (default `"click"`; a dialog form: `"submit"`). */
+  readonly eventType?: string;
+  readonly focusAfter: FocusAfter;
+}
+
+/**
+ * A browser-owned close (light dismiss, or a library hide shaped like one), hidden at once and
+ * notified with `"dismiss"`. A browser-owned close with another reason (Popover's foreign
+ * invoker, `"activate"`) is a bespoke row.
+ */
+interface DismissedPress<D> extends PressBase<D> {
+  readonly outcome: "dismissed";
+  /**
+   * The popup closes on focus leaving (Menu 2.2), so it is hidden at the press rather than the
+   * release, but only where the press focused the target (`focusAtPress: "target"` and
+   * `pressFocusesButtons()`); elsewhere it is the release's light dismiss.
+   */
+  readonly hiddenAtPressIfFocused?: boolean;
+  readonly focusAfter: FocusAfter;
+}
+
+/** Nothing closes and nothing is dispatched. */
+interface StaysOpenPress<D> extends PressBase<D> {
+  readonly outcome: "stays-open";
+}
+
+/**
+ * A real mouse press on something while the popup is open (#117): one entry per "click X while
+ * open" row of the component's closing table. jsdom fires mousedown, mouseup and click in one
+ * task; a real engine runs focus, light dismiss and `toggle` tasks between them, which is where
+ * #110, #112, #115 and #116 hid.
+ */
+export type OverlayPressWhileOpen<D> = AwaitedPress<D> | DismissedPress<D> | StaysOpenPress<D>;
 
 export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
   /** The describe block's name (`"Dialog"`). */
@@ -444,7 +469,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           await mouse.down(x, y);
           await sleep(20);
           expect(document.activeElement).toBe(focusAtPress);
-          if (press.hiddenAtPress && pressFocused) {
+          if (press.outcome === "dismissed" && press.hiddenAtPressIfFocused && pressFocused) {
             expect(isOpen()).toBe(false);
           } else {
             // Nothing closes at the press: light dismiss waits for the release, a part for its
@@ -457,7 +482,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           await sleep(20);
           const last = () => action.mock.calls.at(-1)!;
 
-          if (press.outcome === "kept") {
+          if (press.outcome === "stays-open") {
             await quietPeriod(80, "a press inside must neither close nor dispatch");
             expect(isOpen()).toBe(true);
             expect(action).toHaveBeenCalledTimes(calls);
@@ -469,6 +494,10 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
             // The pending window: shown, focus where the press left it, one dispatch.
             expect(isOpen()).toBe(true);
             expect(document.activeElement).toBe(focusAtPress);
+            // The Trigger's optimistic feedback: pending, no longer `data-open`; `aria-expanded`
+            // stays on the shown popup (#118).
+            expect(trigger()).toHaveAttribute("data-pending", "");
+            expect(trigger()).not.toHaveAttribute("data-open");
             if (config.ariaExpanded) expect(trigger()).toHaveAttribute("aria-expanded", "true");
             expect(action).toHaveBeenCalledTimes(calls + 1);
             expect(last()[0]).toBe(false);
@@ -478,6 +507,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
             expect(isOpen()).toBe(true);
             work.resolve();
             await expect.poll(() => isOpen()).toBe(false);
+            await expect.poll(() => trigger().hasAttribute("data-pending")).toBe(false);
           } else {
             // Hidden by the platform (or the library's light dismiss) at once; notified.
             await expect.poll(() => isOpen(), { timeout: 1000 }).toBe(false);
@@ -488,7 +518,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
             work.resolve();
           }
 
-          await expect.poll(() => document.activeElement).toBe(press.focusAfter!({ pressFocused }));
+          await expect.poll(() => document.activeElement).toBe(press.focusAfter({ pressFocused }));
           if (config.ariaExpanded) {
             await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
           }

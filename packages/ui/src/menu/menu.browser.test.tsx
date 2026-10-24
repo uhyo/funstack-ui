@@ -213,8 +213,10 @@ describeOverlayInBrowser<MenuOpenChangeDetails>({
   // Design 2.2. The Trigger is #110's rows below; a submenu's presses are in "submenus".
   pressesWhileOpen: [
     {
-      name: "an item: awaited close ('activate'), the item keeps focus until it settles",
-      target: () => item("content"),
+      // Not the item the keyboard open focused: the pointer moves focus to the pressed item
+      // (6.2), which keeps it through the pending close.
+      name: "another item: awaited close ('activate'), the pressed item has focus until it settles",
+      target: () => item("delete"),
       outcome: "awaited",
       focusAtPress: "target",
       focusAfter: () => trigger(),
@@ -223,7 +225,7 @@ describeOverlayInBrowser<MenuOpenChangeDetails>({
       name: "a button outside: the press's focus move hides it ('dismiss', 2.2)",
       target: () => item("outside"),
       outcome: "dismissed",
-      hiddenAtPress: true,
+      hiddenAtPressIfFocused: true,
       focusAtPress: "target",
       focusAfter: ({ pressFocused }) => (pressFocused ? item("outside") : trigger()),
     },
@@ -231,8 +233,8 @@ describeOverlayInBrowser<MenuOpenChangeDetails>({
       name: "the popup's padding: nothing closes, the item keeps focus",
       target: popup,
       at: { x: 2, y: 2 },
-      outcome: "kept",
-      focusAtPress: "kept",
+      outcome: "stays-open",
+      focusAtPress: "unchanged",
     },
   ],
   viewTransition: {
@@ -576,6 +578,9 @@ describe("submenus (browser)", () => {
       expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
       expect(isOpen()).toBe(true);
       expect(document.activeElement).toBe(item("delete"));
+      expect(trigger()).toHaveAttribute("data-pending", "");
+      expect(trigger()).not.toHaveAttribute("data-open");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
       expect(action).toHaveBeenCalledTimes(calls + 1);
       const [next, details] = action.mock.calls.at(-1)!;
       expect(next).toBe(false);
@@ -585,6 +590,46 @@ describe("submenus (browser)", () => {
       await expect.poll(() => isOpen()).toBe(false);
       await expect.poll(() => document.activeElement).toBe(trigger());
       await quietPeriod(50, "no re-open and no second dispatch");
+      expect(action).toHaveBeenCalledTimes(calls + 1);
+    });
+
+    it("an item in the submenu: the root's close is awaited ('activate'); both stay shown until it settles, the submenu then notified ('dismiss')", async () => {
+      const work = deferred();
+      const onInbox = vi.fn();
+      const action = vi.fn<OpenAction>((next) => (next ? undefined : work.promise));
+      const subAction = vi.fn<OpenAction>();
+      render(
+        <Basic root={{ openChangeAction: action }}>
+          <Submenu sub={{ openChangeAction: subAction }} onInbox={onInbox} />
+        </Basic>,
+      );
+      await openSub();
+      const subElement = sub();
+      const calls = action.mock.calls.length;
+      const subCalls = subAction.mock.calls.length;
+      restoreAct = leaveActEnvironment();
+      // Not the item the keyboard open focused: the pointer moves focus to it (6.2).
+      await pressOn(item("later"));
+      expect(document.activeElement).toBe(item("later"));
+      expect(isOpen(subElement)).toBe(true);
+      expect(isOpen()).toBe(true);
+      expect(trigger()).toHaveAttribute("data-pending", "");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(action).toHaveBeenCalledTimes(calls + 1);
+      const [next, details] = action.mock.calls.at(-1)!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("activate");
+      expect(details.event?.type).toBe("click");
+      await quietPeriod(50, "both menus must stay shown until the root's action settles");
+      expect(isOpen(subElement)).toBe(true);
+      expect(subAction).toHaveBeenCalledTimes(subCalls);
+      work.resolve();
+      await expect.poll(() => isOpen()).toBe(false);
+      expect(isOpen(subElement)).toBe(false);
+      await expect.poll(() => subAction.mock.calls.length).toBe(subCalls + 1);
+      expect(subAction.mock.calls.at(-1)![0]).toBe(false);
+      expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+      await expect.poll(() => document.activeElement).toBe(trigger());
       expect(action).toHaveBeenCalledTimes(calls + 1);
     });
   });
@@ -840,6 +885,55 @@ describe("checkbox and radio items (browser)", () => {
     expect(item("date")).toHaveAttribute("aria-checked", "true");
     expect(item("name")).toHaveAttribute("aria-checked", "false");
     expect(isOpen()).toBe(true);
+  });
+
+  // #117: the same by real presses, with real timing: a checkable item, and a plain item with
+  // closeOnActivate={false}, keep the menu open (2.3); nothing closes or dispatches a close.
+  it("a real press on a checkbox, a radio or a closeOnActivate={false} item keeps the menu open (#117)", async () => {
+    const action = vi.fn<OpenAction>();
+    const onKeep = vi.fn();
+    render(
+      <Basic root={{ openChangeAction: action }}>
+        <Menu.CheckboxItem data-testid="dense">Dense</Menu.CheckboxItem>
+        <Menu.RadioGroup defaultValue="name">
+          <Menu.RadioItem data-testid="name" value="name">
+            Name
+          </Menu.RadioItem>
+          <Menu.RadioItem data-testid="date" value="date">
+            Date
+          </Menu.RadioItem>
+        </Menu.RadioGroup>
+        <Menu.Item data-testid="keep" closeOnActivate={false} action={onKeep}>
+          Keep open
+        </Menu.Item>
+      </Basic>,
+    );
+    await openWithKeyboard();
+    const calls = action.mock.calls.length;
+    const restore = leaveActEnvironment();
+    try {
+      for (const id of ["dense", "date", "keep"]) {
+        const r = item(id).getBoundingClientRect();
+        const x = Math.round(r.left + r.width / 2);
+        const y = Math.round(r.top + r.height / 2);
+        await mouse.down(x, y);
+        await sleep(20);
+        expect(document.activeElement).toBe(item(id));
+        await mouse.up(x, y);
+        await quietPeriod(60, "the menu must stay open");
+        expect(isOpen()).toBe(true);
+        expect(document.activeElement).toBe(item(id));
+      }
+    } finally {
+      await mouse.releaseHeld();
+      restore();
+    }
+    expect(item("dense")).toHaveAttribute("aria-checked", "true");
+    expect(item("date")).toHaveAttribute("aria-checked", "true");
+    expect(item("name")).toHaveAttribute("aria-checked", "false");
+    expect(onKeep).toHaveBeenCalledTimes(1);
+    expect(action).toHaveBeenCalledTimes(calls);
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
   });
 
   it("closeOnActivate closes after the change action", async () => {

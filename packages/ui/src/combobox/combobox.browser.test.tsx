@@ -1234,6 +1234,9 @@ describe("a real press while open (#117, browser)", () => {
     expect(document.activeElement).toBe(input());
     expect(input().value).toBe("Jamaica");
     expect(option("jm")).toHaveAttribute("data-pending", "");
+    // The value action is pending (on the option, design 5.2); no close is requested yet.
+    expect(input()).toHaveAttribute("aria-expanded", "true");
+    expect(input()).toHaveAttribute("data-open", "");
     expect(valueAction.mock.calls.map(([v, d]) => [v, d.reason, d.event?.type])).toEqual([
       ["jm", "activate", "click"],
     ]);
@@ -1313,48 +1316,65 @@ describe("a real press while open (#117, browser)", () => {
     ]);
   });
 
-  // BUG (#123): design 5.1 and the research's probe table say a press on the input does not
-  // light-dismiss, because the popup was shown with `{ source: input }`. Real presses say
-  // otherwise in Chromium 156 and Firefox 157: HTML's "topmost clicked popover" exempts only an
-  // invoker button's `commandfor` / `popovertarget`, not the `source`, so the press closes the
-  // listbox at `pointerup` with `(false, "dismiss")` from the `toggle`. The research probed with
-  // a synthesised click (no `pointerdown` / `pointerup`, so no light dismiss). `it.fails` until
-  // the issue is decided; then flip it to `it`.
-  for (const [where, target, at, known] of [
-    ["the input (the popup's source)", () => input(), undefined, "fails"],
-    ["the popup's padding", () => popup(), { x: 3, y: 3 }, undefined],
-    ["a disabled option", () => screen.getByTestId("opt-off"), undefined, undefined],
+  // #123 (current behaviour, pinned): design 5.1 and the research's probe table say a press on
+  // the input does not light-dismiss, because the popup was shown with `{ source: input }`. Real
+  // presses say otherwise in Chromium and Firefox: HTML's "topmost clicked popover" exempts only
+  // an invoker button's `commandfor` / `popovertarget`, not the `source`, so the press closes the
+  // listbox at `pointerup` with `(false, "dismiss")` from the `toggle`. The research probed with a
+  // synthesised click (no `pointerdown` / `pointerup`, so no light dismiss). This row asserts
+  // today's outcome so every other part of it stays guarded; it fails, and must be rewritten to
+  // the decided behaviour, when #123 is fixed.
+  it("the input (the popup's source), #123 today: light-dismissed at the release; focus, text and value untouched", async () => {
+    const valueAction = vi.fn<ValueAction>();
+    const openAction = vi.fn<OpenAction>();
+    render(<Harness root={{ valueChangeAction: valueAction, openChangeAction: openAction }} />);
+    await openByTyping("j");
+    const calls = openAction.mock.calls.length;
+    const atPress = await press(input());
+    expect(atPress).toEqual({ open: true, focus: input() });
+    await expect.poll(() => isOpen()).toBe(false);
+    expect(document.activeElement).toBe(input());
+    expect(input().value).toBe("j");
+    await quietPeriod(80, "the listbox must not re-open");
+    expect(isOpen()).toBe(false);
+    expect(input()).toHaveAttribute("aria-expanded", "false");
+    expect(valueAction).not.toHaveBeenCalled();
+    expect(
+      openAction.mock.calls.slice(calls).map(([n, d]) => [n, d.reason, d.event?.type]),
+    ).toEqual([[false, "dismiss", "toggle"]]);
+  });
+
+  for (const [where, target, at] of [
+    ["the popup's padding", () => popup(), { x: 3, y: 3 }],
+    ["a disabled option", () => screen.getByTestId("opt-off"), undefined],
   ] as const) {
-    (known === "fails" ? it.fails : it)(
-      `${where}: nothing closes or dispatches; the input keeps focus and its text`,
-      async () => {
-        const valueAction = vi.fn<ValueAction>();
-        const openAction = vi.fn<OpenAction>();
-        render(
-          <Harness
-            root={{ valueChangeAction: valueAction, openChangeAction: openAction }}
-            popup={{ style: { padding: 6 } }}
-            results={(query) => (
-              <>
-                <Options query={query} />
-                <Combobox.Option value="off" disabled data-testid="opt-off" style={optionStyle}>
-                  Jupiter (closed)
-                </Combobox.Option>
-              </>
-            )}
-          />,
-        );
-        await openByTyping("j");
-        const calls = openAction.mock.calls.length;
-        const atPress = await press(target(), at);
-        expect(atPress).toEqual({ open: true, focus: input() });
-        await quietPeriod(80, "a press inside must neither close nor dispatch");
-        expect(isOpen()).toBe(true);
-        expect(document.activeElement).toBe(input());
-        expect(input().value).toBe("j");
-        expect(valueAction).not.toHaveBeenCalled();
-        expect(openAction).toHaveBeenCalledTimes(calls);
-      },
-    );
+    it(`${where}: nothing closes or dispatches; the input keeps focus and its text`, async () => {
+      const valueAction = vi.fn<ValueAction>();
+      const openAction = vi.fn<OpenAction>();
+      render(
+        <Harness
+          root={{ valueChangeAction: valueAction, openChangeAction: openAction }}
+          popup={{ style: { padding: 6 } }}
+          results={(query) => (
+            <>
+              <Options query={query} />
+              <Combobox.Option value="off" disabled data-testid="opt-off" style={optionStyle}>
+                Jupiter (closed)
+              </Combobox.Option>
+            </>
+          )}
+        />,
+      );
+      await openByTyping("j");
+      const calls = openAction.mock.calls.length;
+      const atPress = await press(target(), at);
+      expect(atPress).toEqual({ open: true, focus: input() });
+      await quietPeriod(80, "a press inside must neither close nor dispatch");
+      expect(isOpen()).toBe(true);
+      expect(document.activeElement).toBe(input());
+      expect(input().value).toBe("j");
+      expect(valueAction).not.toHaveBeenCalled();
+      expect(openAction).toHaveBeenCalledTimes(calls);
+    });
   }
 });

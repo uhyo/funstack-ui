@@ -200,7 +200,7 @@ describeOverlayInBrowser<PopoverOpenChangeDetails>({
     {
       name: "the popup's own content: nothing closes; the engine focuses the <dialog>",
       target: () => screen.getByTestId("content"),
-      outcome: "kept",
+      outcome: "stays-open",
       focusAtPress: popup,
     },
   ],
@@ -576,6 +576,10 @@ describe("nested popovers (browser)", () => {
       restoreAct = leaveActEnvironment();
       await pressOn(screen.getByTestId("inner-trigger"));
       expect(isOpen(inner())).toBe(true);
+      const innerTrigger = screen.getByTestId("inner-trigger");
+      expect(innerTrigger).toHaveAttribute("data-pending", "");
+      expect(innerTrigger).not.toHaveAttribute("data-open");
+      expect(innerTrigger).toHaveAttribute("aria-expanded", "true");
       expect(innerAction).toHaveBeenCalledTimes(innerCalls + 1);
       const [next, details] = innerAction.mock.calls.at(-1)!;
       expect(next).toBe(false);
@@ -585,6 +589,7 @@ describe("nested popovers (browser)", () => {
       expect(isOpen(inner())).toBe(true);
       work.resolve();
       await expect.poll(() => isOpen(inner())).toBe(false);
+      await expect.poll(() => innerTrigger.getAttribute("aria-expanded")).toBe("false");
       expect(isOpen()).toBe(true);
       expect(action).toHaveBeenCalledTimes(outerCalls);
       expect(popup().contains(document.activeElement)).toBe(true);
@@ -1157,4 +1162,60 @@ describe("a real press on a foreign invoker while open (browser, #117)", () => {
       expect(action).toHaveBeenCalledTimes(calls + 1);
     },
   );
+});
+
+// #117: Popover.Close with `action` (design 2.3 row 2): the press runs the Close's own action in
+// its transition (`data-pending` on the Close) with the popup shown; the close dispatch follows it.
+describe("a real press on a Close with action (browser, #117)", () => {
+  let restoreAct: (() => void) | undefined;
+
+  afterEach(async () => {
+    await mouse.releaseHeld();
+    restoreAct?.();
+    restoreAct = undefined;
+  });
+
+  it("the action runs with the popup shown; then one (false, 'activate') and focus back on the Trigger", async () => {
+    const focusesButtons = await pressFocusesButtons();
+    const save = deferred();
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library action={action}>
+        <Popover.Close data-testid="save" action={() => save.promise}>
+          Save
+        </Popover.Close>
+      </Library>,
+    );
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    const close = screen.getByTestId("save");
+    const before = document.activeElement;
+    const calls = action.mock.calls.length;
+    restoreAct = leaveActEnvironment();
+    const r = close.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    await mouse.down(x, y);
+    await sleep(20);
+    expect(isOpen()).toBe(true);
+    expect(document.activeElement).toBe(focusesButtons ? close : before);
+    await mouse.up(x, y);
+    await sleep(20);
+    expect(close).toHaveAttribute("data-pending", "");
+    await quietPeriod(50, "the popup must stay shown while the Close's action runs");
+    expect(isOpen()).toBe(true);
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    expect(action).toHaveBeenCalledTimes(calls);
+    save.resolve();
+    await expect.poll(() => isOpen()).toBe(false);
+    expect(action).toHaveBeenCalledTimes(calls + 1);
+    const [next, details] = action.mock.calls.at(-1)!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event?.type).toBe("click");
+    await expect.poll(() => document.activeElement).toBe(trigger());
+    await quietPeriod(50, "no re-open and no second dispatch");
+    expect(isOpen()).toBe(false);
+    expect(action).toHaveBeenCalledTimes(calls + 1);
+  });
 });

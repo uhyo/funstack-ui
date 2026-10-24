@@ -227,13 +227,13 @@ describeOverlayInBrowser<DialogOpenChangeDetails>({
       name: "the ::backdrop without lightDismiss: nothing closes; the engine focuses the <dialog>",
       target: popup,
       at: { x: -20, y: -20 },
-      outcome: "kept",
+      outcome: "stays-open",
       focusAtPress: popup,
     },
     {
       name: "the dialog's own content: nothing closes; the engine focuses the <dialog>",
       target: () => screen.getByTestId("content"),
-      outcome: "kept",
+      outcome: "stays-open",
       focusAtPress: popup,
     },
   ],
@@ -971,5 +971,138 @@ describe("non-modal lightDismiss: a Trigger click while open (browser, #116)", (
     await flushFor(50);
     expect(popup().open).toBe(true);
     expect(toggles).toEqual([]);
+  });
+});
+
+// #117: real presses with real timing on the closes the shared suite's modal harness does not
+// reach. A foreign `request-close` / `close` invoker is library-owned (design 2.3: the command is
+// cancelled, the same awaited dispatch as the Close part); a non-modal dialog without
+// `lightDismiss` ignores an outside press (7); its Close part is awaited like the modal one.
+describe("a real press while open: foreign invokers and non-modal (browser, #117)", () => {
+  let restoreAct: (() => void) | undefined;
+
+  afterEach(async () => {
+    await mouse.releaseHeld();
+    restoreAct?.();
+    restoreAct = undefined;
+  });
+
+  async function pressOn(target: Element) {
+    const r = target.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    await mouse.down(x, y);
+    await sleep(20);
+    const atPress = { open: popup().open, focus: document.activeElement };
+    await mouse.up(x, y);
+    await sleep(20);
+    return atPress;
+  }
+
+  /** The pending window of an awaited close, then the close once `work` settles. */
+  async function expectAwaitedClose(
+    action: { mock: { calls: Parameters<ActionFn>[] } },
+    calls: number,
+    work: { resolve: () => void },
+    focus: Element,
+    eventType: string,
+  ) {
+    expect(popup().open).toBe(true);
+    expect(document.activeElement).toBe(focus);
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    expect(trigger()).not.toHaveAttribute("data-open");
+    expect(action.mock.calls).toHaveLength(calls + 1);
+    const [next, details] = action.mock.calls.at(-1)!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event?.type).toBe(eventType);
+    expect(details.event?.defaultPrevented).toBe(true);
+    await quietPeriod(50, "the dialog must stay open until the action settles");
+    expect(popup().open).toBe(true);
+    work.resolve();
+    await expect.poll(() => popup().open).toBe(false);
+    await expect.poll(() => document.activeElement).toBe(trigger());
+    await quietPeriod(50, "no re-open and no second dispatch");
+    expect(popup().open).toBe(false);
+    expect(action.mock.calls).toHaveLength(calls + 1);
+  }
+
+  it.each(["request-close", "close"])(
+    "a foreign command=%s invoker inside: cancelled, awaited ('activate', the CommandEvent), closed with its value",
+    async (command) => {
+      const focusesButtons = await pressFocusesButtons();
+      const work = deferred();
+      const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
+      render(
+        <Library action={action}>
+          <button type="button" data-testid="foreign" value="foreign">
+            Foreign close
+          </button>
+        </Library>,
+      );
+      await openWithTrigger();
+      await flushFor();
+      const foreign = screen.getByTestId("foreign");
+      foreign.setAttribute("commandfor", popup().id);
+      foreign.setAttribute("command", command);
+      const before = document.activeElement!;
+      const calls = action.mock.calls.length;
+      restoreAct = leaveActEnvironment();
+      const focus = focusesButtons ? foreign : before;
+      expect(await pressOn(foreign)).toEqual({ open: true, focus });
+      expect(action.mock.calls.at(-1)![1].returnValue).toBe("foreign");
+      await expectAwaitedClose(action, calls, work, focus, "command");
+      expect(popup().returnValue).toBe("foreign");
+    },
+  );
+
+  function NonModal({ action }: { action: ActionFn }) {
+    return (
+      <div style={{ padding: 40 }}>
+        <button type="button" data-testid="outside" style={{ display: "block" }}>
+          Outside
+        </button>
+        <Dialog.Root defaultOpen={false} modal={false} openChangeAction={action}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Help" style={{ margin: "40px 0 0 0" }}>
+            <Dialog.Close data-testid="close">Close</Dialog.Close>
+          </Dialog.Popup>
+        </Dialog.Root>
+      </div>
+    );
+  }
+
+  it("non-modal without lightDismiss: an outside press neither closes nor dispatches", async () => {
+    const focusesButtons = await pressFocusesButtons();
+    const action = vi.fn<ActionFn>();
+    render(<NonModal action={action} />);
+    await openWithTrigger();
+    await flushFor();
+    restoreAct = leaveActEnvironment();
+    const outside = screen.getByTestId("outside");
+    const before = document.activeElement;
+    expect(await pressOn(outside)).toEqual({
+      open: true,
+      focus: focusesButtons ? outside : before,
+    });
+    await quietPeriod(80, "the dialog must stay open and nothing may be dispatched");
+    expect(popup().open).toBe(true);
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it("non-modal: the Close part's close is awaited ('activate'); focus returns to the Trigger", async () => {
+    const focusesButtons = await pressFocusesButtons();
+    const work = deferred();
+    const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
+    render(<NonModal action={action} />);
+    await openWithTrigger();
+    await flushFor();
+    const close = screen.getByTestId("close");
+    const before = document.activeElement!;
+    const calls = action.mock.calls.length;
+    restoreAct = leaveActEnvironment();
+    const focus = focusesButtons ? close : before;
+    expect(await pressOn(close)).toEqual({ open: true, focus });
+    await expectAwaitedClose(action, calls, work, focus, "click");
   });
 });
