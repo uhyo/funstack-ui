@@ -21,9 +21,9 @@ function JsFreeShare() {
       <h3>JS-free share popover</h3>
       <p>
         No <code>open</code>, <code>defaultOpen</code> or <code>openChangeAction</code>: the Trigger
-        is a native <code>command="toggle-popover"</code> invoker. The browser opens it in the top
-        layer below the button, focuses the input (the first focusable element), and closes it on
-        Escape, a click outside or Done. The library only keeps <code>aria-expanded</code> current.
+        is a native <code>popovertarget</code> invoker. The browser opens it in the top layer below
+        the button, focuses the input (the first focusable element), and closes it on Escape, a
+        click outside or Done. The library only keeps the Trigger's <code>data-open</code> current.
       </p>
       <Popover.Root>
         <Popover.Trigger className="pop-btn">Share</Popover.Trigger>

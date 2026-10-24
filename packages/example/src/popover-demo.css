@@ -1,6 +1,7 @@
 /* Popover demo. The library ships no CSS; this is the starter stylesheet from the design
    (design/components/popover.md, section 10). Open state is `:popover-open` on the popup; the
-   Trigger carries `aria-expanded` in both modes and `data-open` / `data-pending` in library mode. */
+   Trigger carries `data-open` in both modes and `data-pending` in library mode (a <button>
+   Trigger has no `aria-expanded`: the browser exposes its state). */
 
 .pop {
   /* The popover UA stylesheet sets `inset: 0; margin: auto`; reset both for anchored placement. */
@@ -117,9 +118,8 @@ html:active-view-transition .pop-vt {
   font: inherit;
   cursor: pointer;
 }
-/* `data-open` flips at the click (library mode); `aria-expanded` is the shown popup (JS-free). */
-.pop-btn[data-open],
-.pop-btn[aria-expanded="true"]:not([data-pending]) {
+/* `data-open` flips at the click (library mode) and follows the shown popup (JS-free). */
+.pop-btn[data-open] {
   border-color: #2563eb;
   color: #2563eb;
 }
