@@ -118,10 +118,11 @@ export function AccordionPage() {
             description: (
               <>
                 Called with the next open items on every change, inside the Root's transition. Sync,
-                async or a Server Function. <code>details</code>: <code>reason</code> (
-                <code>"activate"</code> or <code>"platform"</code>), <code>item</code> (the item
-                that changed) and <code>open</code> (its new state). In multiple mode the array
-                lists items in the order they mounted. Selects library mode.
+                async or a Server Function. <code>details</code>: <code>reason</code> (a{" "}
+                <code>ChangeReason</code>; Accordion dispatches <code>"activate"</code> or{" "}
+                <code>"platform"</code>), <code>item</code> (the item that changed) and{" "}
+                <code>open</code> (its new state). In multiple mode the array lists items in the
+                order they mounted. Selects library mode.
               </>
             ),
           },

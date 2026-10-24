@@ -1,9 +1,6 @@
 "use client";
 import { createContext } from "react";
 
-/** Why a change was dispatched (design 2.2 / 2.3). */
-export type AccordionChangeReason = "activate" | "platform";
-
 /**
  * "static": JS-free mode, the browser owns `open`. "library": `open` is driven by React
  * committed state inside the Root's transition (design section 2).

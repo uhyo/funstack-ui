@@ -4,17 +4,18 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  RenderProp,
+  StateValue,
+} from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { TabsContext } from "./tabs-context.js";
-import type {
-  TabsActivationMode,
-  TabsChangeReason,
-  TabsContextValue,
-  TabsOrientation,
-} from "./tabs-context.js";
+import type { TabsActivationMode, TabsContextValue, TabsOrientation } from "./tabs-context.js";
 import { tabId } from "./tabs-ids.js";
 
 export type { TabsActivationMode, TabsOrientation } from "./tabs-context.js";
@@ -22,11 +23,12 @@ export type { TabsActivationMode, TabsOrientation } from "./tabs-context.js";
 /** Details passed as the second argument of `valueChangeAction`. */
 export interface TabsValueChangeDetails extends ActionDetails {
   /**
+   * The shared vocabulary (conventions 2.2); Tabs dispatches two of its values.
    * `"activate"`: the user selected the tab (click, Enter/Space, or focus in automatic mode).
    * `"platform"`: the browser revealed a `keepMounted="until-found"` panel through find-in-page or a
    * text fragment (`details.event` is the `beforematch` event).
    */
-  readonly reason: TabsChangeReason;
+  readonly reason: ChangeReason;
 }
 
 export interface TabsRootState {
