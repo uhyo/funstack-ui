@@ -68,6 +68,8 @@ export interface ComboboxContextValue {
   readonly focusOut: (event: FocusEvent) => void;
   /** A pointer click in the Input (`openOnClick`). */
   readonly inputClick: (event: MouseEvent) => void;
+  /** A press on the Input: captures the pointer to the shown Popup (design 5.4, #123). */
+  readonly inputPointerDown: (event: PointerEvent) => void;
 }
 
 export const ComboboxContext = createContext<ComboboxContextValue | null>(null);

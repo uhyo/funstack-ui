@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, expectTypeOf, it, onTestFinished, vi } from "vitest";
+import { capturedPointers } from "../__tests__/pointer-capture-shim.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
   createSuspender,
@@ -35,6 +36,7 @@ import type { FormErrors } from "../form/index.js";
 import { Combobox } from "./index.js";
 import type {
   ComboboxClearState,
+  ComboboxInputProps,
   ComboboxInputState,
   ComboboxInputValueChangeDetails,
   ComboboxListState,
@@ -2223,6 +2225,144 @@ describe("Combobox", () => {
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
       expect(hide).not.toHaveBeenCalled();
       expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "activate"]]);
+    });
+  });
+
+  describe("Input press (#123)", () => {
+    // `source` is no light-dismiss exemption: a primary press on the field while the listbox is
+    // shown captures the pointer to the Popup, so the release is not a light dismiss (design 5.4).
+    // The real-pointer outcome is in combobox.browser.test.tsx; these rows pin the call.
+    const press = (init: PointerEventInit = {}) =>
+      act(() => {
+        input().dispatchEvent(
+          new PointerEvent("pointerdown", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            button: 0,
+            buttons: 1,
+            pointerId: 7,
+            pointerType: "mouse",
+            isPrimary: true,
+            ...init,
+          }),
+        );
+      });
+    const spyCapture = () => vi.spyOn(Element.prototype, "setPointerCapture");
+
+    it("while shown: captures the pointer to the Popup once, with the press's pointer id", async () => {
+      const openAction = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: openAction }} />);
+      act(() => trigger().click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      openAction.mockClear();
+      const capture = spyCapture();
+      press();
+      expect(capture).toHaveBeenCalledTimes(1);
+      expect(capture).toHaveBeenCalledWith(7);
+      expect(capture.mock.contexts[0]).toBe(popup());
+      expect(capturedPointers.get(7)).toBe(popup());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(openAction).not.toHaveBeenCalled();
+    });
+
+    it("a touch press is captured too (capture at pointerdown, not the compat mousedown)", async () => {
+      render(<Harness />);
+      act(() => trigger().click());
+      await flushTasks(2);
+      const capture = spyCapture();
+      press({ pointerType: "touch", pointerId: 3 });
+      expect(capture).toHaveBeenCalledWith(3);
+      expect(capture.mock.contexts[0]).toBe(popup());
+    });
+
+    it("while closed: nothing is captured", async () => {
+      render(<Harness />);
+      const capture = spyCapture();
+      press();
+      expect(isOpen()).toBe(false);
+      expect(capture).not.toHaveBeenCalled();
+    });
+
+    it("a secondary-button press is not captured (the field's own context menu)", async () => {
+      render(<Harness />);
+      act(() => trigger().click());
+      await flushTasks(2);
+      const capture = spyCapture();
+      press({ button: 2, buttons: 2 });
+      press({ button: 1, buttons: 4 });
+      expect(capture).not.toHaveBeenCalled();
+    });
+
+    it("disabled while shown: nothing is captured", async () => {
+      function Toggle() {
+        const [disabled, setDisabled] = useState(false);
+        return (
+          <>
+            <button type="button" data-testid="disable" onClick={() => setDisabled(true)}>
+              Disable
+            </button>
+            <Harness root={{ disabled, open: true }} />
+          </>
+        );
+      }
+      render(<Toggle />);
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      act(() => screen.getByTestId("disable").click());
+      await flushTasks(2);
+      // A controlled open={true} parent keeps it shown; the disabled Root still captures nothing.
+      expect(isOpen()).toBe(true);
+      expect(input()).toBeDisabled();
+      const capture = spyCapture();
+      press();
+      expect(capture).not.toHaveBeenCalled();
+    });
+
+    it("judged on :popover-open: a press during a pending close is still captured", async () => {
+      const close = deferred();
+      const openAction = vi.fn<OpenAction>(() => close.promise);
+      render(<Harness root={{ open: true, openChangeAction: openAction }} />);
+      await flushTasks(2);
+      act(() => trigger().click());
+      await flushTasks(2);
+      // Optimistically closed, still shown.
+      expect(input()).not.toHaveAttribute("data-open");
+      expect(isOpen()).toBe(true);
+      const capture = spyCapture();
+      press();
+      expect(capture).toHaveBeenCalledTimes(1);
+      expect(capture.mock.contexts[0]).toBe(popup());
+      await act(async () => close.resolve());
+    });
+
+    it("a throwing setPointerCapture is swallowed", async () => {
+      render(<Harness />);
+      act(() => trigger().click());
+      await flushTasks(2);
+      vi.spyOn(Element.prototype, "setPointerCapture").mockImplementation(() => {
+        throw new DOMException("No active pointer", "NotFoundError");
+      });
+      expect(() => press()).not.toThrow();
+      expect(isOpen()).toBe(true);
+    });
+
+    it("openOnClick still opens from a press and click while closed", async () => {
+      const capture = spyCapture();
+      const user = setupUser();
+      render(<Harness root={{ openOnClick: true }} />);
+      await user.click(input());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(capture).not.toHaveBeenCalled();
+    });
+
+    it("onPointerDown is an owned key", () => {
+      // @ts-expect-error -- owned key, omitted from ComboboxInputProps
+      const props: ComboboxInputProps = { onPointerDown: () => {} };
+      expect(props).toBeDefined();
     });
   });
 

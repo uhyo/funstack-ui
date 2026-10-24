@@ -12,6 +12,7 @@ import type {
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
+import { capturePointer } from "../internal/pointer-capture.js";
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -25,7 +26,7 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { claimPress, MenuListContext, useMenuContext } from "./menu-context.js";
 import type { MenuListContextValue } from "./menu-context.js";
-import { capturePointer, edgeItem } from "./menu-dom.js";
+import { edgeItem } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
 import { listenOutside } from "./menu-outside.js";
 import { MENU_POINT_HREF, MENU_POINT_RULES, pointStyle } from "./menu-point.js";

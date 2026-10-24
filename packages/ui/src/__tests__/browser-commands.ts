@@ -5,7 +5,7 @@ declare module "vitest/browser" {
   interface BrowserCommands {
     emulateReducedMotion: (reduce: boolean) => Promise<void>;
     mouse: (
-      action: "move" | "down" | "up" | "click",
+      action: "move" | "down" | "up" | "click" | "dblclick",
       x: number,
       y: number,
       button?: "left" | "right" | "middle",
@@ -59,8 +59,8 @@ function inputHandled(type: string): Promise<void> {
 const held = new Set<Button>();
 
 /**
- * Real mouse input at client coordinates of this frame (see `toPagePoint`). `down`, `up` and
- * `click` resolve after the page handled the input (`inputHandled`).
+ * Real mouse input at client coordinates of this frame (see `toPagePoint`). `down`, `up`,
+ * `click` and `dblclick` resolve after the page handled the input (`inputHandled`).
  */
 export const mouse = {
   /**
@@ -97,6 +97,13 @@ export const mouse = {
     const p = toPagePoint(x, y);
     const handled = inputHandled("pointerup");
     await commands.mouse("click", p.x, p.y, button);
+    await handled;
+  },
+  /** Two presses and releases, the second with `detail === 2`; resolves after the `dblclick`. */
+  dblclick: async (x: number, y: number, button: Button = "left") => {
+    const p = toPagePoint(x, y);
+    const handled = inputHandled("dblclick");
+    await commands.mouse("dblclick", p.x, p.y, button);
     await handled;
   },
 };

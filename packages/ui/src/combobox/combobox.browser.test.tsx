@@ -1123,6 +1123,198 @@ describe("Trigger close (#112, browser)", () => {
   });
 });
 
+// #123 (design 5.4, amendment "a press on the Input while open stays open"): `source` is no
+// light-dismiss exemption, so a primary press on the Input while the listbox is shown captures the
+// pointer to the Popup; the release then lands on the Popup, whose topmost clicked popover is the
+// listbox itself. These rows check what the capture must not break: the caret, the double click,
+// nesting, touch and the drag-selection (whose Firefox cost the design documents). The plain
+// press is #117's row above. Outside React's act environment, as #117's rows.
+describe("Input press (#123, browser)", () => {
+  let restoreAct: (() => void) | undefined;
+
+  afterEach(async () => {
+    await mouse.releaseHeld();
+    restoreAct?.();
+    restoreAct = undefined;
+  });
+
+  // Ten characters with ordinary-width letters around the boundaries the rows press at (2, 3, 8).
+  const TEXT = "Wide Words";
+
+  /** Opens by typing TEXT with every option listed, then leaves the act environment. */
+  async function openWithText(root: Partial<ComboboxRootProps> = {}) {
+    render(<Harness root={root} results={() => <Options query="" />} />);
+    await typeInto(TEXT);
+    await settle(() => expect(isOpen()).toBe(true));
+    expect(input().value).toBe(TEXT);
+    restoreAct = leaveActEnvironment();
+  }
+
+  /** Client point of the caret boundary before `input().value[index]`, at mid-height. */
+  function caretPoint(index: number) {
+    const field = input();
+    const style = getComputedStyle(field);
+    const context = document.createElement("canvas").getContext("2d")!;
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const r = field.getBoundingClientRect();
+    const x =
+      r.left +
+      field.clientLeft +
+      parseFloat(style.paddingLeft) +
+      context.measureText(field.value.slice(0, index)).width -
+      field.scrollLeft;
+    return { x, y: r.top + r.height / 2 };
+  }
+
+  const selection = () => [input().selectionStart, input().selectionEnd];
+
+  it("a caret click after the third character: the caret lands there, the listbox stays, the click goes to the Popup", async () => {
+    const openAction = vi.fn<OpenAction>();
+    const valueAction = vi.fn<ValueAction>();
+    await openWithText({
+      openOnClick: true,
+      openChangeAction: openAction,
+      valueChangeAction: valueAction,
+    });
+    openAction.mockClear();
+    const clicks: EventTarget[] = [];
+    const record = (event: Event) => clicks.push(event.target!);
+    document.addEventListener("click", record, true);
+    onCleanup(() => document.removeEventListener("click", record, true));
+    const { x, y } = caretPoint(3);
+    await mouse.down(x, y);
+    await sleep(20);
+    expect(isOpen()).toBe(true);
+    await mouse.up(x, y);
+    await quietPeriod(80, "a caret click must neither close nor re-open the listbox");
+    expect(isOpen()).toBe(true);
+    expect(document.activeElement).toBe(input());
+    expect(input().value).toBe(TEXT);
+    expect(selection()).toEqual([3, 3]);
+    // Captured: the click is the Popup's, so openOnClick does not run for it.
+    expect(clicks).toEqual([popup()]);
+    expect(openAction).not.toHaveBeenCalled();
+    expect(valueAction).not.toHaveBeenCalled();
+  });
+
+  it("a double click on a word selects it; the listbox stays", async () => {
+    const openAction = vi.fn<OpenAction>();
+    await openWithText({ openChangeAction: openAction });
+    openAction.mockClear();
+    const from = caretPoint(5);
+    const to = caretPoint(10);
+    await mouse.dblclick((from.x + to.x) / 2, from.y);
+    await quietPeriod(80, "a double click must not close the listbox");
+    expect(isOpen()).toBe(true);
+    expect(document.activeElement).toBe(input());
+    expect(selection()).toEqual([5, 10]);
+    expect(openAction).not.toHaveBeenCalled();
+  });
+
+  // Firefox (design 5.4, the documented cost of the capture): Gecko routes the mouse drag to the
+  // capturing element, so a drag-to-select in the field does not extend while the listbox is open
+  // and the selection collapses at the press point. Chromium's selection drag ignores pointer
+  // capture; WebKit is expected to behave like Chromium. No feature check fits a drag, hence the
+  // engine name. If this branch starts failing, Gecko changed: re-check the amendment.
+  it("a drag from the second to the eighth character: selects [2, 8] (Firefox: [2, 2], #123's cost); the listbox stays", async () => {
+    const openAction = vi.fn<OpenAction>();
+    await openWithText({ openChangeAction: openAction });
+    openAction.mockClear();
+    const from = caretPoint(2);
+    const to = caretPoint(8);
+    await mouse.down(from.x, from.y);
+    await mouse.move((from.x + to.x) / 2, from.y);
+    await mouse.move(to.x, to.y);
+    await sleep(20);
+    await mouse.up(to.x, to.y);
+    await quietPeriod(80, "a drag in the field must not close the listbox");
+    expect(isOpen()).toBe(true);
+    expect(document.activeElement).toBe(input());
+    expect(input().value).toBe(TEXT);
+    expect(selection()).toEqual(browserName === "firefox" ? [2, 2] : [2, 8]);
+    expect(openAction).not.toHaveBeenCalled();
+  });
+
+  it("nested in an open Popover: a press on the input keeps both open", async () => {
+    render(<InPopover />);
+    await user.click(screen.getByTestId("popover-trigger"));
+    await flushFor();
+    await typeInto("j");
+    const outer = screen.getByTestId("popover");
+    await settle(() => expect(isOpen()).toBe(true));
+    expect(isOpen(outer)).toBe(true);
+    restoreAct = leaveActEnvironment();
+    const r = input().getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    await mouse.down(x, y);
+    await sleep(20);
+    await mouse.up(x, y);
+    await quietPeriod(80, "a press on the input must close neither popover");
+    expect(isOpen()).toBe(true);
+    expect(isOpen(outer)).toBe(true);
+    expect(document.activeElement).toBe(input());
+    expect(input().value).toBe("j");
+  });
+
+  // Touch needs a `hasTouch` context for Playwright's touchscreen, which this harness does not
+  // create (it would turn the whole page into a touch device); Chromium takes CDP touch input
+  // without it, as the Menu and NumberField touch rows. The touch compat `mousedown` / `click`
+  // come after `pointerup`, so only a capture at `pointerdown` keeps the listbox (design 5.4).
+  //
+  // Chromium inside a frame (#123 finding, memo/developer/issue-123.md): the capture keeps a
+  // touch tap from light-dismissing in a top-level document, but in a same-origin iframe
+  // Chromium still hides the listbox at the tap's `click` (mouse presses are fine there; Firefox
+  // keeps it open in both; probed in plain DOM with Playwright's touchscreen too). vitest's
+  // runner is such a frame, so the frame branch is what runs here; it asserts the documented
+  // close, and fails the day Chromium changes.
+  it.runIf(browserName === "chromium")(
+    "a touch tap on the input (CDP): the listbox stays (Chromium in a frame: dismissed, #123), focus and text kept",
+    async () => {
+      const openAction = vi.fn<OpenAction>();
+      const valueAction = vi.fn<ValueAction>();
+      render(<Harness root={{ openChangeAction: openAction, valueChangeAction: valueAction }} />);
+      await typeInto("j");
+      await settle(() => expect(isOpen()).toBe(true));
+      openAction.mockClear();
+      restoreAct = leaveActEnvironment();
+      const downs: string[] = [];
+      const captures: Element[] = [];
+      const recordDown = (event: PointerEvent) => downs.push(event.pointerType);
+      const recordCapture = (event: Event) => captures.push(event.target as Element);
+      const field = input();
+      const listbox = popup();
+      field.addEventListener("pointerdown", recordDown, true);
+      listbox.addEventListener("gotpointercapture", recordCapture);
+      onCleanup(() => {
+        field.removeEventListener("pointerdown", recordDown, true);
+        listbox.removeEventListener("gotpointercapture", recordCapture);
+      });
+      const r = field.getBoundingClientRect();
+      const point = toPagePoint(r.left + r.width / 2, r.top + r.height / 2);
+      const session = cdp();
+      await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
+      await sleep(20);
+      await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await quietPeriod(80, "a tap on the input must not close the listbox (top-level)");
+      expect(downs).toEqual(["touch"]);
+      expect(captures).toEqual([listbox]);
+      expect(document.activeElement).toBe(field);
+      expect(field.value).toBe("j");
+      expect(valueAction).not.toHaveBeenCalled();
+      if (window === window.top) {
+        expect(isOpen()).toBe(true);
+        expect(openAction).not.toHaveBeenCalled();
+      } else {
+        expect(isOpen()).toBe(false);
+        expect(openAction.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
+          [false, "dismiss", "toggle"],
+        ]);
+      }
+    },
+  );
+});
+
 // --- helpers ---------------------------------------------------------------------------------
 
 /**

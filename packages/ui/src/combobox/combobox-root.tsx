@@ -17,6 +17,7 @@ import { createActionDetails } from "../internal/action-details.js";
 import type { AriaNotifyTarget } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
+import { capturePointer } from "../internal/pointer-capture.js";
 import { useFieldValueChange } from "../internal/use-field-control.js";
 import type {
   ActionDetails,
@@ -819,6 +820,18 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     popover.requestOpen(event, "activate");
   };
 
+  // A press on the field while the listbox is shown: `source` is no light-dismiss exemption, so
+  // the release goes to the Popup, whose topmost clicked popover is the listbox itself (design
+  // 5.4, #123). Judged on `:popover-open`, not the intent: a press during a pending close must
+  // not dismiss either. Primary button only (a right click keeps the field's own context menu).
+  // The engine releases the capture after `pointerup`; the #111 press tracking above still sees
+  // the release on the document.
+  const inputPointerDown = (event: PointerEvent): void => {
+    if (disabled || event.button !== 0) return;
+    const popup = popover.popupRef.current;
+    if (popup !== null && isPopoverOpen(popup)) capturePointer(popup, event.pointerId);
+  };
+
   const context: ComboboxContextValue = {
     popover,
     ids,
@@ -847,6 +860,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     focusIn,
     focusOut,
     inputClick,
+    inputPointerDown,
   };
 
   return (

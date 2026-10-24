@@ -46,22 +46,6 @@ export function isRtl(element: Element): boolean {
   return getComputedStyle(element).direction === "rtl";
 }
 
-/**
- * `setPointerCapture`, which throws `NotFoundError` for a pointer the engine no longer tracks
- * (context-menu.md 2.1). A silent no-op when no button is down. `true` when the capture was
- * taken (the press-drag-release gesture runs only then, 2.6).
- */
-export function capturePointer(element: Element | null, pointerId: number | undefined): boolean {
-  if (element === null || pointerId === undefined) return false;
-  try {
-    element.setPointerCapture(pointerId);
-    return true;
-  } catch {
-    // Not an active pointer (a synthetic event, a released button): nothing to capture.
-    return false;
-  }
-}
-
 /** `<input>` types that take no text: their `contextmenu` is not an editing one. */
 const NON_TEXT_INPUTS = new Set([
   "button",

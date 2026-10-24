@@ -51,11 +51,20 @@ type MouseButton = "left" | "right" | "middle";
  * coordinates first (src/__tests__/browser-commands.ts).
  */
 const mouse: BrowserCommand<
-  [action: "move" | "down" | "up" | "click", x: number, y: number, button?: MouseButton]
+  [
+    action: "move" | "down" | "up" | "click" | "dblclick",
+    x: number,
+    y: number,
+    button?: MouseButton,
+  ]
 > = async (context, action, x, y, button = "left") => {
   const { mouse } = context.page;
   if (action === "click") {
     await mouse.click(x, y, { button });
+    return;
+  }
+  if (action === "dblclick") {
+    await mouse.dblclick(x, y, { button });
     return;
   }
   if (action === "move") {

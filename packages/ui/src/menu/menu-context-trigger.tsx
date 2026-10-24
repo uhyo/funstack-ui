@@ -8,6 +8,7 @@ import type {
   ReactNode,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
+import { capturePointer } from "../internal/pointer-capture.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -19,7 +20,7 @@ import {
   MenuRegionContext,
   useMenuContext,
 } from "./menu-context.js";
-import { capturePointer, isEditableTarget } from "./menu-dom.js";
+import { isEditableTarget } from "./menu-dom.js";
 import {
   armClickSwallow,
   DRAG_SLOP,
