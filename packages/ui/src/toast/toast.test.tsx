@@ -2272,6 +2272,13 @@ describe("Toast", () => {
           </>
         );
       }
+      // Fake timers from the start, so the 30 ms timer would fire in the wait below unless it is
+      // paused (#101: was an 80 ms real wait).
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const elapse = (ms: number) =>
+        act(async () => {
+          await vi.advanceTimersByTimeAsync(ms);
+        });
       render(<Harness manager={manager} before={<UrgentDialog />} />);
       const id = await call(() =>
         manager({
@@ -2290,7 +2297,7 @@ describe("Toast", () => {
       act(() => {
         fireEvent.click(screen.getByTestId("urgent-open"));
       });
-      await tasks();
+      await elapse(0);
       await flushMicrotasks(2);
       expect(screen.getByTestId("dialog").contains(region())).toBe(true);
       // The same elements, still pending, so the timer stays paused.
@@ -2298,9 +2305,7 @@ describe("Toast", () => {
       expect(screen.getByTestId(`action-${id}`)).toBe(action);
       expectPending(action);
       expectPending(element);
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 80));
-      });
+      await elapse(80);
       expect(queryRoot(id)).not.toBeNull();
       expect(closeAction).not.toHaveBeenCalled();
       await act(async () => d.resolve());

@@ -29,6 +29,8 @@ import {
   sleep,
   leaveActEnvironment,
   spyViewTransitions,
+  animationsFinished,
+  quietPeriod,
 } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
@@ -631,7 +633,8 @@ describe("exit animation and the deferred unmount (browser)", () => {
         </Library>,
       );
       await openWithTrigger();
-      await sleep(350);
+      // The enter fade has run its course (the bar keeps running for 10 s).
+      await animationsFinished(popup(), [bar]);
       expect(bar?.playState).toBe("running");
       if (kind === "Escape") await user.keyboard("{Escape}");
       else await user.click(screen.getByTestId("close"));
@@ -822,7 +825,7 @@ describe("ViewTransition (browser, #46)", () => {
     expect(screen.queryByTestId("content")).toBeNull();
     const expected = testId === "close" ? "cancel" : testId === "ok" ? "ok" : "";
     expect(popup().returnValue).toBe(expected);
-    await sleep(50);
+    await quietPeriod(50, "no third view transition");
     expect(calls).toHaveLength(2);
   });
 
@@ -848,7 +851,7 @@ describe("ViewTransition (browser, #46)", () => {
     expect(calls[1]!.openAtStart).toBe(false);
     await transitions[1]!.finished;
     await expect.poll(() => screen.queryByTestId("content")).toBeNull();
-    await sleep(50);
+    await quietPeriod(50, "the release of the held content must not start a view transition");
     expect(calls).toHaveLength(2);
   });
 
@@ -892,7 +895,7 @@ describe("ViewTransition (browser, #46)", () => {
     addStyle(cssExit(true));
     render(<Plain transition="pop" className="fade" />);
     await open();
-    await sleep(250); // the enter fade
+    await animationsFinished(popup()); // the enter fade
     await userEvent.keyboard("{Escape}");
     // The notification commit (design 4.4); the content may be held for the CSS fade.
     await expect.poll(() => calls.length).toBe(2);
@@ -901,7 +904,7 @@ describe("ViewTransition (browser, #46)", () => {
     await transitions[1]!.finished;
     await expect.poll(() => screen.queryByTestId("content")).toBeNull();
     // Releasing the hold is a normal update: no second document view transition.
-    await sleep(100);
+    await quietPeriod(100, "the release of the hold must not start a view transition");
     expect(calls).toHaveLength(2);
   });
 
@@ -914,7 +917,7 @@ describe("ViewTransition (browser, #46)", () => {
       addStyle(cssExit(true));
       render(<Plain transition="pop" className="fade" controlled={testId === "parent-close"} />);
       await open();
-      await sleep(250); // the enter fade
+      await animationsFinished(popup()); // the enter fade
       screen.getByTestId(testId).click();
       await expect.poll(() => calls.length).toBe(2);
       await transitions[1]!.ready;
@@ -934,7 +937,7 @@ describe("ViewTransition (browser, #46)", () => {
       }
       await transitions[1]!.finished;
       expect(isOpen()).toBe(false);
-      await sleep(100);
+      await quietPeriod(100, "the release of the hold must not start a view transition");
       expect(calls).toHaveLength(2);
     },
   );
@@ -943,7 +946,7 @@ describe("ViewTransition (browser, #46)", () => {
     addStyle(cssExit(false));
     render(<Plain transition="pop" className="fade" />);
     await open();
-    await sleep(250);
+    await animationsFinished(popup()); // the enter fade
     screen.getByTestId("close").click();
     await expect.poll(() => calls.length).toBe(2);
     await transitions[1]!.ready;
@@ -966,7 +969,7 @@ describe("ViewTransition (browser, #46)", () => {
     await open();
     await userEvent.keyboard("{Escape}");
     await expect.poll(() => isOpen()).toBe(false);
-    await sleep(50);
+    await quietPeriod(50, "no part may start a view transition");
     expect(calls).toHaveLength(0);
   });
 

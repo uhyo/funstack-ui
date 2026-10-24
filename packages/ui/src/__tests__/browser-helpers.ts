@@ -41,6 +41,32 @@ export async function settle(
   }
 }
 
+/**
+ * Resolves once the animations and transitions running now on `element`, its descendants and
+ * their pseudo-elements (`::backdrop` included) have finished or were cancelled, ignoring the
+ * ones in `except` (an infinite or long animation the row keeps running). Reading
+ * `getAnimations()` flushes style, so a transition the last change starts is included.
+ */
+export async function animationsFinished(
+  element: Element,
+  except: readonly (Animation | undefined)[] = [],
+): Promise<void> {
+  const running = element
+    .getAnimations({ subtree: true })
+    .filter((animation) => !except.includes(animation));
+  await Promise.allSettled(running.map((animation) => animation.finished));
+}
+
+/**
+ * A deliberate wait during which nothing may happen: the row asserts afterwards that a close, an
+ * open or a view transition did not come. A negative check has no event to wait for, so these
+ * waits stay, but under a name that is greppable and says what the engine gets a chance to do.
+ * Never use it where a condition can be awaited instead (`settle`, `expect.poll`).
+ */
+export function quietPeriod(ms: number, _whatMustNotHappen: string): Promise<void> {
+  return sleep(ms);
+}
+
 const cleanups: (() => void)[] = [];
 
 /** Registers `cleanup` to run at `runCleanups()` (the file's `afterEach`, or the setup file's). */

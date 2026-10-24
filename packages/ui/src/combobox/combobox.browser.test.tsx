@@ -49,9 +49,9 @@ import {
   onCleanup,
   runCleanups,
   settle,
-  sleep,
   leaveActEnvironment,
   spyViewTransitions,
+  quietPeriod,
 } from "../__tests__/browser-helpers.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
@@ -218,25 +218,21 @@ describe("Combobox (browser)", () => {
       expect(input().value).toBe("Jamaica");
       expect(isOpen()).toBe(true);
       await act(async () => save.resolve());
-      await flushFor();
-      expect(isOpen()).toBe(false);
+      await settle(() => expect(isOpen()).toBe(false));
       expect(document.activeElement).toBe(input());
     });
 
     it("the Trigger opens with the input focused; Clear leaves focus in the input", async () => {
       render(<Harness root={{ defaultValue: "fr", defaultInputValue: "France" }} />);
       await user.click(screen.getByTestId("trigger"));
-      await flushFor();
-      expect(isOpen()).toBe(true);
+      await settle(() => expect(isOpen()).toBe(true));
       expect(document.activeElement).toBe(input());
       // A second press closes it (decided against the state at pointerdown).
       await user.click(screen.getByTestId("trigger"));
-      await flushFor();
-      expect(isOpen()).toBe(false);
+      await settle(() => expect(isOpen()).toBe(false));
       expect(document.activeElement).toBe(input());
       await user.click(screen.getByTestId("clear"));
-      await flushFor();
-      expect(document.activeElement).toBe(input());
+      await settle(() => expect(document.activeElement).toBe(input()));
       expect(input().value).toBe("");
     });
 
@@ -252,11 +248,9 @@ describe("Combobox (browser)", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("Ja");
-      await flushFor();
-      expect(isOpen()).toBe(true);
+      await settle(() => expect(isOpen()).toBe(true));
       await user.click(screen.getByTestId("page"));
-      await flushFor();
-      expect(isOpen()).toBe(false);
+      await settle(() => expect(isOpen()).toBe(false));
       expect(input().value).toBe("France");
     });
   });
@@ -268,8 +262,7 @@ describe("Combobox (browser)", () => {
       await typeInto("ja");
       await user.keyboard("{ArrowDown}");
       await user.keyboard("{Escape}");
-      await flushFor();
-      expect(isOpen()).toBe(false);
+      await settle(() => expect(isOpen()).toBe(false));
       expect(openAction.mock.calls.at(-1)![0]).toBe(false);
       expect(openAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
       expect(document.activeElement).toBe(input());
@@ -294,12 +287,10 @@ describe("Combobox (browser)", () => {
       expect(isOpen()).toBe(true);
       expect(dialog.open).toBe(true);
       await user.keyboard("{Escape}");
-      await flushFor();
-      expect(isOpen()).toBe(false);
+      await settle(() => expect(isOpen()).toBe(false));
       expect(dialog.open).toBe(true);
       await user.keyboard("{Escape}");
-      await flushFor();
-      expect(dialog.open).toBe(false);
+      await settle(() => expect(dialog.open).toBe(false));
     });
 
     it("inside a Popover: the first Escape closes the listbox, the second the Popover", async () => {
@@ -312,12 +303,10 @@ describe("Combobox (browser)", () => {
       expect(isOpen()).toBe(true);
       expect(isOpen(outer)).toBe(true);
       await user.keyboard("{Escape}");
-      await flushFor();
-      expect(isOpen()).toBe(false);
+      await settle(() => expect(isOpen()).toBe(false));
       expect(isOpen(outer)).toBe(true);
       await user.keyboard("{Escape}");
-      await flushFor();
-      expect(isOpen(outer)).toBe(false);
+      await settle(() => expect(isOpen(outer)).toBe(false));
     });
   });
 
@@ -332,11 +321,9 @@ describe("Combobox (browser)", () => {
       await user.click(input());
       await user.clear(input());
       await user.keyboard("Jam");
-      await flushFor();
-      expect(isOpen()).toBe(true);
+      await settle(() => expect(isOpen()).toBe(true));
       await user.tab();
-      await flushFor();
-      expect(document.activeElement).toBe(screen.getByTestId("after"));
+      await settle(() => expect(document.activeElement).toBe(screen.getByTestId("after")));
       expect(isOpen()).toBe(false);
       expect(input().value).toBe("France");
       expect(texts.mock.lastCall![1].reason).toBe("dismiss");
@@ -347,8 +334,7 @@ describe("Combobox (browser)", () => {
       render(<Harness root={{ allowCustomValue: true, valueChangeAction: action }} />);
       await typeInto("Narnia");
       await user.tab({ shift: true });
-      await flushFor();
-      expect(document.activeElement).toBe(screen.getByTestId("before"));
+      await settle(() => expect(document.activeElement).toBe(screen.getByTestId("before")));
       expect(isOpen()).toBe(false);
       expect(action).toHaveBeenCalledWith("Narnia", expect.anything());
       expect(action.mock.calls[0]![1].custom).toBe(true);
@@ -371,8 +357,7 @@ describe("Combobox (browser)", () => {
     // Still pending: the save holds every transition, not the deferred render.
     expect(input()).toHaveAttribute("data-pending", "");
     await act(async () => save.resolve());
-    await flushFor();
-    expect(input()).not.toHaveAttribute("data-pending");
+    await settle(() => expect(input()).not.toHaveAttribute("data-pending"));
   });
 
   it("the same with an async search: the new results load and show while the save is pending", async () => {
@@ -393,8 +378,7 @@ describe("Combobox (browser)", () => {
     await user.keyboard("{ArrowDown}{Enter}");
     await user.clear(input());
     await user.keyboard("f");
-    await flushFor();
-    expect(screen.getByTestId("list")).toHaveAttribute("data-stale", "");
+    await settle(() => expect(screen.getByTestId("list")).toHaveAttribute("data-stale", ""));
     await act(async () => search.resolve("f"));
     await expect.poll(() => optionTexts(), { timeout: 2000 }).toEqual(["France"]);
     expect(input()).toHaveAttribute("data-pending", "");
@@ -416,8 +400,7 @@ describe("Combobox (browser)", () => {
     );
     await typeInto("Narnia");
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     await user.keyboard("{Enter}");
     await flushFor();
     // Document the engine's order if this ever differs (design 5.3).
@@ -441,8 +424,7 @@ describe("Combobox (browser)", () => {
       expect(isOpen()).toBe(true);
       expect(isOpen(outer)).toBe(true);
       await user.click(screen.getByTestId("outside"));
-      await flushFor();
-      expect(isOpen()).toBe(false);
+      await settle(() => expect(isOpen()).toBe(false));
       expect(isOpen(outer)).toBe(false);
     });
 
@@ -500,12 +482,10 @@ describe("Combobox (browser)", () => {
       }
       expect(calls).toEqual([{ element: screen.getByTestId("list"), message: "3 results" }]);
       await user.keyboard("a");
-      await flushFor();
-      expect(screen.getByTestId("list")).toHaveAttribute("data-stale", "");
+      await settle(() => expect(screen.getByTestId("list")).toHaveAttribute("data-stale", ""));
       expect(calls).toHaveLength(1);
       await act(async () => search.resolve("ja"));
-      await flushFor();
-      expect(calls.map((c) => c.message)).toEqual(["3 results", "2 results"]);
+      await settle(() => expect(calls.map((c) => c.message)).toEqual(["3 results", "2 results"]));
     });
   });
 
@@ -555,8 +535,7 @@ describe("Combobox (browser)", () => {
       await act(async () => {
         hydrateRoot(container, <App />, { onRecoverableError: (e) => recoverable.push(e) });
       });
-      await flushFor();
-      expect(recoverable).toEqual([]);
+      await settle(() => expect(recoverable).toEqual([]));
       expect(consoleError).not.toHaveBeenCalled();
       expect(container.querySelector("input")).toBe(field);
       expect(field.value).toBe("jap");
@@ -581,8 +560,7 @@ describe("Combobox (browser)", () => {
       render(<Harness root={{ valueChangeAction: action }} results={() => <Options query="" />} />);
       await user.click(input());
       await user.keyboard("{ArrowDown}");
-      await flushFor();
-      expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id);
+      await settle(() => expect(input()).toHaveAttribute("aria-activedescendant", option("jp").id));
       if (browserName === "chromium") {
         const session = cdp();
         await act(async () => {
@@ -592,8 +570,7 @@ describe("Combobox (browser)", () => {
             selectionEnd: 1,
           });
         });
-        await flushFor();
-        expect(input().value).toBe("に");
+        await settle(() => expect(input().value).toBe("に"));
         expect(isOpen()).toBe(true);
         // Enter while composing commits the composition, not the active option.
         await act(async () => {
@@ -605,8 +582,7 @@ describe("Combobox (browser)", () => {
           });
           await session.send("Input.insertText", { text: "に" });
         });
-        await flushFor();
-        expect(action).not.toHaveBeenCalled();
+        await settle(() => expect(action).not.toHaveBeenCalled());
         expect(input().value).toBe("に");
         // The composed text is an edit: visual focus went back to the input (APG).
         expect(input()).not.toHaveAttribute("aria-activedescendant");
@@ -677,11 +653,11 @@ describe("ViewTransition (browser)", () => {
     default: "none",
   };
 
-  /** Types one character with the real keyboard, outside `act` (in-page events). */
-  async function press(text: string) {
-    await userEvent.keyboard(text);
-    await sleep(30);
-  }
+  /**
+   * Types with the real keyboard, outside `act` (in-page events). Every press is followed by an
+   * `expect.poll` on what it should cause, which replaces a fixed wait (#101).
+   */
+  const press = (text: string) => userEvent.keyboard(text);
 
   it("type map with default none: open and accept-close run one each; a results change none", async () => {
     render(<Plain transition={TYPE_MAP} />);
@@ -693,7 +669,7 @@ describe("ViewTransition (browser)", () => {
     await transitions[0]!.finished;
     await press("a");
     await expect.poll(() => optionTexts()).toEqual(["Japan", "Jamaica"]);
-    await sleep(50);
+    await quietPeriod(50, "a results change must not start a view transition");
     expect(calls).toHaveLength(1);
     option("jm").click();
     await expect.poll(() => calls.length).toBe(2);
@@ -732,7 +708,7 @@ describe("ViewTransition (browser)", () => {
     await expect.poll(() => optionTexts()).toEqual(["Japan", "Jamaica"]);
     option("jm").click();
     await expect.poll(() => isOpen()).toBe(false);
-    await sleep(50);
+    await quietPeriod(50, "no part may start a view transition");
     expect(calls).toHaveLength(0);
   });
 });

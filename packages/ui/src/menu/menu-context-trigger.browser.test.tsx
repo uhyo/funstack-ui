@@ -44,6 +44,8 @@ import {
   sleep,
   leaveActEnvironment,
   spyViewTransitions,
+  quietPeriod,
+  settle,
 } from "../__tests__/browser-helpers.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
@@ -210,8 +212,7 @@ describe("opening at the pointer (browser)", () => {
       await mouse.up(x + 2, y - 2, "right");
     });
     await flushFor();
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
   });
 
   it("survives the pending pointerup when it flips away from the pointer (bottom-right corner)", async () => {
@@ -233,8 +234,7 @@ describe("opening at the pointer (browser)", () => {
       await mouse.up(x, y, "right");
     });
     await flushFor();
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
   });
 });
 
@@ -415,8 +415,7 @@ describe("move (browser)", () => {
     await user.keyboard("{ArrowDown}");
     expect(item("grid")).toHaveFocus();
     await user.keyboard(" ");
-    await flushFor();
-    expect(item("grid")).toHaveAttribute("aria-checked", "true");
+    await settle(() => expect(item("grid")).toHaveAttribute("aria-checked", "true"));
     expect(isOpen()).toBe(true);
     await openAt(240, 220);
     expectTopLeftAtPoint();
@@ -442,8 +441,7 @@ describe("move (browser)", () => {
       await mouse.up(238, 218, "right");
     });
     await flushFor();
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
     expectTopLeftAtPoint();
     expect(action).toHaveBeenCalledTimes(1);
   });
@@ -459,8 +457,7 @@ describe("closing (browser)", () => {
       await mouse.click(outside.left + 20, outside.top + 20, "right");
     });
     await expect.poll(() => isOpen()).toBe(false);
-    await flushFor();
-    expect(action.mock.calls.at(-1)![0]).toBe(false);
+    await settle(() => expect(action.mock.calls.at(-1)![0]).toBe(false));
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
 
     await openAt(100, 100);
@@ -468,8 +465,7 @@ describe("closing (browser)", () => {
       await mouse.click(outside.left + 20, outside.top + 20, "middle");
     });
     await expect.poll(() => isOpen()).toBe(false);
-    await flushFor();
-    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
   });
 
   it("a right-click inside the popup: still open, not moved, no item activated", async () => {
@@ -493,8 +489,7 @@ describe("closing (browser)", () => {
       await mouse.click(target.left + 10, target.top + 10, "right");
     });
     await flushFor();
-    await flushFor();
-    expect(lastMenu!.prevented).toBe(true);
+    await settle(() => expect(lastMenu!.prevented).toBe(true));
     expect(isOpen()).toBe(true);
     const after = rect();
     expect(after.left).toBe(before.left);
@@ -518,8 +513,7 @@ describe("closing (browser)", () => {
     await openAt(100, 100);
     await user.click(screen.getByTestId("outside"));
     await expect.poll(() => isOpen()).toBe(false);
-    await flushFor();
-    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
     await openAt(100, 100);
     await user.click(item("rename"));
     await expect.poll(() => isOpen()).toBe(false);
@@ -581,8 +575,7 @@ describe("focus return (browser)", () => {
     await openAt(200, 150);
     expect(item("rename")).toHaveFocus();
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     expect(document.activeElement).toBe(document.body);
   });
 
@@ -590,8 +583,7 @@ describe("focus return (browser)", () => {
     render(<Harness withTrigger />);
     await openAt(200, 150);
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     expect(item("trigger")).toHaveFocus();
   });
 
@@ -600,8 +592,7 @@ describe("focus return (browser)", () => {
     await openAt(200, 150);
     expect(item("rename")).toHaveFocus();
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(region()).toHaveFocus();
+    await settle(() => expect(region()).toHaveFocus());
   });
 });
 
@@ -631,8 +622,7 @@ describe("nesting (browser)", () => {
     await openAt(120, 100);
     expect(isOpen(item("panel"))).toBe(true);
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     expect(isOpen(item("panel"))).toBe(true);
   });
 
@@ -685,20 +675,19 @@ describe("long-press (browser)", () => {
     await act(async () => {
       region().dispatchEvent(new PointerEvent("pointerdown", init));
       // Inside `act`: the 500 ms timer (earlier deadline, same thread) has fired by then and its
-      // updates are in this scope.
+      // updates are in this scope. Polling for the open cannot replace the wait: React queues it
+      // in the `act` scope until the scope ends (#101).
       await sleep(600);
     });
     await expect.poll(() => isOpen()).toBe(true);
-    await flushFor();
-    expect(action).toHaveBeenCalledTimes(1);
+    await settle(() => expect(action).toHaveBeenCalledTimes(1));
     expect(action.mock.calls[0]![1].event!.type).toBe("pointerdown");
     // Above the touch point with the 16 px gap (wave 11, 4.7).
     expectBottomLeftAt(150, 120 - 16);
     await act(async () => {
       region().dispatchEvent(new PointerEvent("pointerup", { ...init, buttons: 0 }));
     });
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
   });
 
   it.runIf(browserName === "chromium")(
@@ -742,8 +731,7 @@ describe("editable targets (browser)", () => {
       await mouse.click(box.left + 10, box.top + 10, "right");
     });
     await flushFor();
-    await flushFor();
-    expect(lastMenu).not.toBeNull();
+    await settle(() => expect(lastMenu).not.toBeNull());
     expect(lastMenu!.prevented).toBe(false);
     expect(isOpen()).toBe(false);
     unmount();
@@ -798,7 +786,7 @@ describe("ViewTransition (browser)", () => {
     await mouse.click(240, 220, "right");
     await expect.poll(() => lastMenu?.x).toBeGreaterThan(200);
     await expect.poll(() => Math.abs(rect().left - lastMenu!.x)).toBeLessThanOrEqual(1);
-    await sleep(50);
+    await quietPeriod(50, "a move must not start a view transition");
     expect(calls).toHaveLength(1);
     item("rename").click();
     await expect.poll(() => calls.length).toBe(2);
@@ -836,7 +824,7 @@ describe("ViewTransition (browser)", () => {
     await expect.poll(() => isOpen()).toBe(true);
     item("rename").click();
     await expect.poll(() => isOpen()).toBe(false);
-    await sleep(50);
+    await quietPeriod(50, "no part may start a view transition");
     expect(calls).toHaveLength(0);
   });
 });
@@ -1000,8 +988,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     await act(async () => {
       await mouse.up(x, y, "right");
     });
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
     expect(item("rename")).toHaveFocus();
     expect(archive).not.toHaveBeenCalled();
     const target = centre(item("archive"));
@@ -1048,6 +1035,8 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     await expect.poll(() => isOpen()).toBe(true);
     await expect.poll(() => Math.abs(rect().top - 400)).toBeLessThanOrEqual(1);
     await act(async () => {
+      // A required duration, not a stand-in for an event: the release must come at least
+      // 500 ms (DRAG_DISMISS_DELAY, menu-context-trigger.tsx) after the open.
       await sleep(600);
       await mouse.move(60, 340);
       await mouse.up(60, 340, "right");
@@ -1074,6 +1063,7 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
     // Flipped up-left: the pointer is at the corner, over no item.
     expect(Math.abs(rect().right - lastMenu!.x)).toBeLessThanOrEqual(1);
     await act(async () => {
+      // Held still past DRAG_DISMISS_DELAY (500 ms): only the missing movement keeps it open.
       await sleep(600);
       await mouse.up(x, y, "right");
     });
@@ -1244,8 +1234,7 @@ describe("scrolling (browser, wave 11, #88)", () => {
       await wheel(400, 400, 0, 200);
     });
     await expect.poll(() => window.scrollY).toBeGreaterThan(0);
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
     const t = screen.getByTestId("trigger").getBoundingClientRect();
     expect(Math.abs(rect().top - t.bottom)).toBeLessThanOrEqual(1);
   });

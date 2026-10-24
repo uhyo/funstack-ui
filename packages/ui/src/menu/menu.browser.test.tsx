@@ -51,6 +51,8 @@ import {
   sleep,
   leaveActEnvironment,
   spyViewTransitions,
+  quietPeriod,
+  settle,
 } from "../__tests__/browser-helpers.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
@@ -190,8 +192,7 @@ describe("keyboard end to end (browser)", () => {
     await user.keyboard("{Home}d");
     expect(item("duplicate")).toHaveFocus();
     await user.keyboard("{Enter}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     expect(trigger()).toHaveFocus();
     expect(action.mock.calls.at(-1)![0]).toBe(false);
     expect(action.mock.calls.at(-1)![1].reason).toBe("activate");
@@ -204,8 +205,7 @@ describe("keyboard end to end (browser)", () => {
     await user.keyboard("{Escape}");
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveFocus();
-    await flushFor();
-    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
   });
 
   it("Shift+Tab from the first item lands on the Trigger and closes the menu", async () => {
@@ -215,8 +215,7 @@ describe("keyboard end to end (browser)", () => {
     await user.tab({ shift: true });
     expect(trigger()).toHaveFocus();
     expect(isOpen()).toBe(false);
-    await flushFor();
-    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
   });
 
   it("Tab from an item moves past the menu and closes it", async () => {
@@ -333,10 +332,11 @@ describe("experimental_focusgroup (browser)", () => {
       // Typeahead and activation stay JS on both paths.
       await user.keyboard("du");
       expect(item("duplicate")).toHaveFocus();
+      // The typeahead buffer resets after 500 ms without a key (TYPEAHEAD_RESET_MS in
+      // menu-popup.tsx); nothing observable marks the reset, so wait it out with a margin.
       await sleep(600);
       await user.keyboard("{Enter}");
-      await flushFor();
-      expect(action).toHaveBeenCalledTimes(1);
+      await settle(() => expect(action).toHaveBeenCalledTimes(1));
       expect(isOpen()).toBe(false);
     },
   );
@@ -377,8 +377,7 @@ describe("submenus (browser)", () => {
     expect(isOpen(sub())).toBe(false);
     expect(isOpen()).toBe(true);
     await expect.poll(() => document.activeElement).toBe(item("move"));
-    await flushFor();
-    expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await settle(() => expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss"));
   });
 
   it("ArrowLeft closes only the submenu ('activate') and focus returns to its trigger", async () => {
@@ -390,8 +389,7 @@ describe("submenus (browser)", () => {
     );
     await openSub();
     await user.keyboard("{ArrowLeft}");
-    await flushFor();
-    expect(isOpen(sub())).toBe(false);
+    await settle(() => expect(isOpen(sub())).toBe(false));
     expect(isOpen()).toBe(true);
     await expect.poll(() => document.activeElement).toBe(item("move"));
     expect(subAction.mock.calls.at(-1)![1].reason).toBe("activate");
@@ -409,8 +407,7 @@ describe("submenus (browser)", () => {
     await openSub();
     const subElement = sub();
     await user.keyboard("{Enter}");
-    await flushFor();
-    expect(onInbox).toHaveBeenCalledTimes(1);
+    await settle(() => expect(onInbox).toHaveBeenCalledTimes(1));
     expect(isOpen()).toBe(false);
     expect(isOpen(subElement)).toBe(false);
     expect(trigger()).toHaveFocus();
@@ -453,7 +450,10 @@ describe("submenus (browser)", () => {
     expect(item("move")).toHaveFocus();
     // Into the submenu: entering it cancels the close.
     await userEvent.hover(item("later"));
-    await sleep(300);
+    await quietPeriod(
+      300,
+      "the ~150 ms close timer of the trigger left must not close the submenu",
+    );
     expect(isOpen(sub())).toBe(true);
     expect(item("later")).toHaveFocus();
     // Back to a sibling item of the parent: focus leaves the submenu and it closes.
@@ -699,8 +699,7 @@ describe("checkbox and radio items (browser)", () => {
     expect(isOpen()).toBe(true);
     expect(item("dense")).toHaveAttribute("data-pending", "");
     await act(async () => resolve());
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     expect(trigger()).toHaveFocus();
   });
 });
@@ -764,8 +763,7 @@ describe("exit animation (browser)", () => {
     await openWithKeyboard();
     const exit = watchExit();
     await user.keyboard("{Enter}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     await expectHeldThenReleased(exit);
   });
 
@@ -775,8 +773,7 @@ describe("exit animation (browser)", () => {
     await openWithKeyboard();
     const exit = watchExit();
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     await expectHeldThenReleased(exit);
   });
 });
@@ -864,10 +861,10 @@ describe("ViewTransition (browser)", () => {
     render(<Plain />);
     trigger().click();
     await expect.poll(() => isOpen()).toBe(true);
-    await sleep(50);
+    await quietPeriod(50, "the open must not start a view transition");
     item("rename").click();
     await expect.poll(() => isOpen()).toBe(false);
-    await sleep(50);
+    await quietPeriod(50, "the activation must not start a view transition");
     expect(calls).toHaveLength(0);
   });
 });
@@ -879,8 +876,7 @@ describe("light dismiss and layering (browser)", () => {
     await openWithKeyboard();
     await user.click(item("outside"));
     expect(isOpen()).toBe(false);
-    await flushFor();
-    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
   });
 
   it("a Tooltip on an item does not close the menu", async () => {
@@ -923,8 +919,7 @@ describe("light dismiss and layering (browser)", () => {
     await expect.poll(() => dialog.open).toBe(true);
     expect(isOpen()).toBe(true);
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(dialog.open).toBe(false);
+    await settle(() => expect(dialog.open).toBe(false));
     expect(isOpen()).toBe(true);
   });
 });

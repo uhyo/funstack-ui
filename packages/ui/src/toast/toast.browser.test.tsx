@@ -29,6 +29,7 @@ import {
   flushFor,
   runCleanups,
   sleep,
+  settle,
 } from "../__tests__/browser-helpers.js";
 
 async function call<T>(fn: () => T): Promise<T> {
@@ -119,8 +120,7 @@ describe("top layer (browser)", () => {
     expect(isOpen(region())).toBe(true);
     expect(hitTestable(root(id))).toBe(true);
     await user.click(screen.getByTestId(`close-${id}`));
-    await flushFor();
-    expect(queryRoot(id)).toBeNull();
+    await settle(() => expect(queryRoot(id)).toBeNull());
     expect(isOpen(region())).toBe(false);
   });
 
@@ -139,16 +139,13 @@ describe("top layer (browser)", () => {
       />,
     );
     await user.click(screen.getByTestId("menu-trigger"));
-    await flushFor();
-    expect(isOpen(screen.getByTestId("menu"))).toBe(true);
+    await settle(() => expect(isOpen(screen.getByTestId("menu"))).toBe(true));
     const id = await call(() => manager({ title: "Hello", duration: null }));
-    await flushFor();
-    expect(isOpen(screen.getByTestId("menu"))).toBe(true);
+    await settle(() => expect(isOpen(screen.getByTestId("menu"))).toBe(true));
     expect(isOpen(region())).toBe(true);
     // Re-raised above it for a second toast as well.
     await call(() => manager({ title: "Again", duration: null }));
-    await flushFor();
-    expect(isOpen(screen.getByTestId("menu"))).toBe(true);
+    await settle(() => expect(isOpen(screen.getByTestId("menu"))).toBe(true));
     expect(root(id)).toBeVisible();
   });
 
@@ -168,8 +165,7 @@ describe("top layer (browser)", () => {
     pop.showPopover();
     expect(isOpen(pop)).toBe(true);
     await user.click(root(id));
-    await flushFor();
-    expect(isOpen(pop)).toBe(false);
+    await settle(() => expect(isOpen(pop)).toBe(false));
   });
 });
 
@@ -251,14 +247,12 @@ describe("modal dialog (browser)", () => {
     expect(hitTestable(action)).toBe(true);
 
     await user.click(screen.getByTestId("close-dialog"));
-    await flushFor();
-    expect(dialog.matches(":modal")).toBe(false);
+    await settle(() => expect(dialog.matches(":modal")).toBe(false));
     expect(region().closest("dialog")).toBeNull();
     expect(isOpen(region())).toBe(true);
     expect(region().checkVisibility()).toBe(true);
     await user.click(screen.getByTestId(`action-${id}`));
-    await flushFor();
-    expect(undo).toHaveBeenCalledTimes(1);
+    await settle(() => expect(undo).toHaveBeenCalledTimes(1));
     expect(queryRoot(id)).toBeNull();
   });
 });
@@ -321,8 +315,7 @@ describe("enter and exit (browser)", () => {
     expect(root(id).getAnimations({ subtree: true }).length).toBeGreaterThan(0);
     // The click rests the pointer over the region: the progress bar is paused too.
     await user.click(screen.getByTestId(`close-${id}`));
-    await flushFor();
-    expect(queryRoot(id)).toBeNull();
+    await settle(() => expect(queryRoot(id)).toBeNull());
     expect(isOpen(region())).toBe(false);
   });
 
@@ -342,20 +335,17 @@ describe("announcement (browser)", () => {
     if (!supportsAriaNotify) {
       render(<Viewport />);
       await call(() => manager({ title: "Saved" }));
-      await flushFor();
-      expect(screen.getByText("Saved")).toBeInTheDocument();
+      await settle(() => expect(screen.getByText("Saved")).toBeInTheDocument());
       return;
     }
     expect(typeof (document as { ariaNotify?: unknown }).ariaNotify).toBe("function");
     const spy = vi.spyOn(document as Document & { ariaNotify: () => void }, "ariaNotify");
     render(<Viewport />);
     await call(() => manager({ title: "Saved", description: "All changes stored" }));
-    await flushFor();
-    expect(spy).toHaveBeenCalledTimes(1);
+    await settle(() => expect(spy).toHaveBeenCalledTimes(1));
     expect(spy).toHaveBeenCalledWith("Saved All changes stored", { priority: "normal" });
     await call(() => manager({ title: "Failed", priority: "high" }));
-    await flushFor();
-    expect(spy).toHaveBeenCalledTimes(2);
+    await settle(() => expect(spy).toHaveBeenCalledTimes(2));
     expect(spy).toHaveBeenLastCalledWith("Failed", { priority: "high" });
   });
 });
@@ -377,10 +367,8 @@ describe("no view transition (browser)", () => {
       manager({ title: "C", action: { label: "Undo", action: () => sleep(10) } }),
     );
     await user.click(screen.getByTestId(`action-${c}`));
-    await act(async () => {
-      await sleep(40);
-    });
-    expect(queryRoot(c)).toBeNull();
+    // The Undo action (10 ms) settles and the toast closes.
+    await settle(() => expect(queryRoot(c)).toBeNull());
     expect(spy).not.toHaveBeenCalled();
   });
 });
@@ -402,7 +390,6 @@ describe("focus (browser)", () => {
     // Focus moved on to the remaining (newest) toast.
     expect(root(b)).toHaveFocus();
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(outside).toHaveFocus();
+    await settle(() => expect(outside).toHaveFocus());
   });
 });

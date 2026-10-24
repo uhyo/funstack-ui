@@ -23,7 +23,7 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Tooltip } from "./index.js";
 import type { TooltipPopupProps, TooltipPopupState, TooltipTriggerProps } from "./index.js";
-import { sleep } from "../__tests__/browser-helpers.js";
+import { quietPeriod } from "../__tests__/browser-helpers.js";
 
 function Harness({
   trigger,
@@ -143,12 +143,16 @@ describe("JS path (baseline) in a real browser", () => {
   });
 
   it("stays open while the pointer moves from the trigger into the popup", async () => {
-    render(<Harness delay={0} closeDelay={100} />);
+    const closeDelay = 100;
+    render(<Harness delay={0} closeDelay={closeDelay} />);
     await userEvent.hover(trigger());
     await expect.poll(isOpen).toBe(true);
     // The popup sits directly above the trigger (no gap): one move leaves one, enters the other.
     await userEvent.hover(popup());
-    await sleep(400);
+    await quietPeriod(
+      closeDelay * 4,
+      "the close delay must not run out while the popup is hovered",
+    );
     expect(isOpen()).toBe(true);
 
     await userEvent.hover(screen.getByRole("button", { name: "Elsewhere" }));
@@ -184,7 +188,7 @@ describe("JS path (baseline) in a real browser", () => {
     dismiss = () => document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     await userEvent.hover(trigger());
     await expect.poll(() => vi.mocked(HTMLElement.prototype.showPopover).mock.calls.length).toBe(1);
-    await sleep(50);
+    await quietPeriod(50, "the queued toggle task must not leave the tooltip open");
     expect(isOpen()).toBe(false);
 
     await userEvent.hover(screen.getByRole("button", { name: "Elsewhere" }));
@@ -198,7 +202,7 @@ describe("JS path (baseline) in a real browser", () => {
     };
     await userEvent.hover(trigger());
     await expect.poll(() => vi.mocked(HTMLElement.prototype.showPopover).mock.calls.length).toBe(2);
-    await sleep(50);
+    await quietPeriod(50, "the queued toggle task must not leave the tooltip open");
     expect(isOpen()).toBe(false);
     expect(escapeEvent?.defaultPrevented).toBe(true);
     unmount();
@@ -252,7 +256,7 @@ describe.each([
 
     await userEvent.keyboard("{Escape}");
     await expect.poll(isOpen).toBe(false);
-    await sleep(50);
+    await quietPeriod(50, "the first Escape must not also close the dialog");
     expect(dialog.open).toBe(true);
 
     await userEvent.keyboard("{Escape}");
@@ -275,7 +279,7 @@ describe.each([
 
     await userEvent.keyboard("{Escape}");
     await expect.poll(isOpen).toBe(false);
-    await sleep(50);
+    await quietPeriod(50, "the first Escape must not also close the menu");
     expect(menuOpen()).toBe(true);
 
     await userEvent.keyboard("{Escape}");

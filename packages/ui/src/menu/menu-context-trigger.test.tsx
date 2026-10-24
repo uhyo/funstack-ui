@@ -1568,22 +1568,24 @@ describe("Menu.ContextTrigger", () => {
     it("a move over a SubmenuTrigger focuses it and opens its submenu after the delay", async () => {
       render(<Harness content={<DragItems />} />);
       await rightClick(region(), 312, 148);
+      // The submenu's hover timers run on fake time (#101: were 150 / 200 ms real waits).
+      vi.useFakeTimers();
+      const elapse = (ms: number) =>
+        act(async () => {
+          await vi.advanceTimersByTimeAsync(ms);
+        });
       hit = item("move");
       captured("pointermove", 320, 230);
       expect(document.activeElement).toBe(item("move"));
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
-      await flushTasks(2);
+      // Past the 100 ms open delay, plus the shim's queued `toggle`.
+      await elapse(150);
       expect(isOpen(screen.getByTestId("submenu"))).toBe(true);
       // Into the submenu: the submenu stays open, its item takes focus.
       hit = item("inbox");
       captured("pointermove", 420, 230);
       expect(document.activeElement).toBe(item("inbox"));
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      });
-      await flushTasks(2);
+      // Past the 150 ms close delay: entering the submenu cancelled the close.
+      await elapse(200);
       expect(isOpen(screen.getByTestId("submenu"))).toBe(true);
     });
 

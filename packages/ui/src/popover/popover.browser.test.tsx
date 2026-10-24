@@ -46,6 +46,9 @@ import {
   sleep,
   leaveActEnvironment,
   spyViewTransitions,
+  animationsFinished,
+  quietPeriod,
+  settle,
 } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
@@ -185,21 +188,18 @@ describe("library mode (browser)", () => {
     expect(event).toBeInstanceOf(ToggleEvent);
     expect(event.type).toBe("beforetoggle");
     expect((event as ToggleEvent & { source?: Element | null }).source).toBe(foreign);
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
   });
 
   it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
     const action = vi.fn<ActionFn>();
     render(<Library action={action} />);
     await user.click(trigger());
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
     await user.keyboard("{Escape}");
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveFocus();
-    await flushFor();
-    expect(action).toHaveBeenCalledTimes(2);
+    await settle(() => expect(action).toHaveBeenCalledTimes(2));
     const [next, details] = action.mock.calls[1]!;
     expect(next).toBe(false);
     expect(details.reason).toBe("dismiss");
@@ -211,12 +211,10 @@ describe("library mode (browser)", () => {
     const action = vi.fn<ActionFn>();
     render(<Library action={action} />);
     await user.click(trigger());
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
     await user.click(screen.getByTestId("outside"));
     expect(isOpen()).toBe(false);
-    await flushFor();
-    expect(screen.getByTestId("outside")).toHaveFocus();
+    await settle(() => expect(screen.getByTestId("outside")).toHaveFocus());
     expect(action.mock.calls[1]![1].reason).toBe("dismiss");
   });
 
@@ -226,8 +224,7 @@ describe("library mode (browser)", () => {
     await user.click(trigger());
     await flushFor();
     await user.click(trigger());
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     expect(action).toHaveBeenCalledTimes(2);
     expect(action.mock.calls[1]![0]).toBe(false);
     expect(action.mock.calls[1]![1].reason).toBe("activate");
@@ -240,8 +237,7 @@ describe("library mode (browser)", () => {
     await user.click(trigger());
     await flushFor();
     await user.click(screen.getByTestId("close"));
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     expect(action.mock.calls[1]![1].reason).toBe("activate");
     expect(trigger()).toHaveFocus();
   });
@@ -286,8 +282,7 @@ describe("focus (browser)", () => {
   it("<dialog> default: focus moves to the first focusable descendant after a library open", async () => {
     render(<Library />);
     await user.click(trigger());
-    await flushFor();
-    expect(document.activeElement).toHaveAttribute("name", "query");
+    await settle(() => expect(document.activeElement).toHaveAttribute("name", "query"));
     await user.keyboard("{Escape}");
     expect(trigger()).toHaveFocus();
   });
@@ -302,8 +297,7 @@ describe("focus (browser)", () => {
       </Library>,
     );
     await user.click(trigger());
-    await flushFor();
-    expect(document.activeElement).toHaveAttribute("data-initial");
+    await settle(() => expect(document.activeElement).toHaveAttribute("data-initial"));
     expect(document.activeElement).not.toHaveAttribute("autofocus");
   });
 
@@ -314,8 +308,7 @@ describe("focus (browser)", () => {
       </Library>,
     );
     await user.click(trigger());
-    await flushFor();
-    expect(popup().contains(document.activeElement)).toBe(true);
+    await settle(() => expect(popup().contains(document.activeElement)).toBe(true));
   });
 
   it("render={<div />}: focus stays on the Trigger and Tab enters the adjacent popup", async () => {
@@ -327,8 +320,7 @@ describe("focus (browser)", () => {
       </Library>,
     );
     await user.click(trigger());
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
     expect(trigger()).toHaveFocus();
     // The Popup is rendered right after the Trigger: Tab enters it in every engine.
     await user.tab();
@@ -380,8 +372,7 @@ describe("nested popovers (browser)", () => {
     expect(isOpen()).toBe(true);
     // The platform restores nothing for a nested popover; the library does, from `toggle`.
     await expect.poll(() => document.activeElement).toBe(screen.getByTestId("inner-trigger"));
-    await flushFor();
-    expect(innerAction.mock.calls.at(-1)).toEqual([false, expect.anything()]);
+    await settle(() => expect(innerAction.mock.calls.at(-1)).toEqual([false, expect.anything()]));
     expect(innerAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
     await user.keyboard("{Escape}");
     expect(isOpen()).toBe(false);
@@ -397,8 +388,7 @@ describe("nested popovers (browser)", () => {
     await user.click(screen.getByTestId("outside"));
     expect(isOpen(innerElement)).toBe(false);
     expect(isOpen()).toBe(false);
-    await flushFor();
-    expect(screen.getByTestId("outside")).toHaveFocus();
+    await settle(() => expect(screen.getByTestId("outside")).toHaveFocus());
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
     expect(innerAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
   });
@@ -521,8 +511,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
     await flushFor();
     const exit = watchExit();
     await user.click(trigger());
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     await expectHeldThenReleased(exit);
   });
 
@@ -538,8 +527,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
     await flushFor();
     const exit = watchExit();
     await user.keyboard("{Escape}");
-    await flushFor();
-    expect(isOpen()).toBe(false);
+    await settle(() => expect(isOpen()).toBe(false));
     await expectHeldThenReleased(exit);
   });
 
@@ -565,19 +553,17 @@ describe("exit animation and the deferred unmount (browser)", () => {
       );
       await user.click(trigger());
       await flushFor();
-      await sleep(350);
+      // The enter fade has run its course (the bar keeps running for 10 s).
+      await animationsFinished(popup(), [bar]);
       expect(bar?.playState).toBe("running");
       if (kind === "dismissal") await user.keyboard("{Escape}");
       else await user.click(trigger());
-      await flushFor();
-      expect(isOpen()).toBe(false);
-      const start = performance.now();
-      while (screen.queryByTestId("content") !== null && performance.now() - start < 3000) {
-        await act(async () => {
-          await sleep(50);
-        });
-      }
-      expect(screen.queryByTestId("content")).toBeNull();
+      await settle(() => expect(isOpen()).toBe(false));
+      await settle(
+        () => expect(screen.queryByTestId("content")).toBeNull(),
+        3000,
+        () => flushFor(50),
+      );
       expect(bar?.playState).toBe("running");
       bar?.cancel();
     },
@@ -693,14 +679,14 @@ describe("ViewTransition (browser)", () => {
     await expect.poll(() => isOpen()).toBe(true);
     await expect.poll(() => calls.length).toBe(1);
     await transitions[0]!.finished;
-    await sleep(250); // the enter fade
+    await animationsFinished(popup()); // the enter fade
     popup().hidePopover();
     // The notification commit (design 4.4); the content may be held for the CSS fade.
     await expect.poll(() => calls.length).toBe(2);
     await transitions[1]!.finished;
     await expect.poll(() => screen.queryByTestId("content")).toBeNull();
     // Releasing the hold is a normal update: no second document view transition.
-    await sleep(100);
+    await quietPeriod(100, "the release of the hold must not start a view transition");
     expect(calls).toHaveLength(2);
   });
 
@@ -728,7 +714,7 @@ describe("ViewTransition (browser)", () => {
     trigger().click();
     await expect.poll(() => calls.length).toBe(1);
     await transitions[0]!.finished;
-    await sleep(250); // the enter fade
+    await animationsFinished(popup()); // the enter fade
     trigger().click();
     await expect.poll(() => calls.length).toBe(2);
     await transitions[1]!.ready;
@@ -783,7 +769,7 @@ describe("ViewTransition (browser)", () => {
     await expect.poll(() => isOpen()).toBe(true);
     trigger().click();
     await expect.poll(() => isOpen()).toBe(false);
-    await sleep(50);
+    await quietPeriod(50, "no part may start a view transition");
     expect(calls).toHaveLength(0);
   });
 
@@ -810,7 +796,7 @@ describe("ViewTransition (browser)", () => {
     await transitions[0]!.finished;
     trigger().click();
     await expect.poll(() => isOpen()).toBe(true);
-    await sleep(50);
+    await quietPeriod(50, "the shielded open must not start a view transition");
     expect(calls).toHaveLength(1);
   });
 });
@@ -865,8 +851,7 @@ describe("stack interactions (browser)", () => {
     await flushFor();
     await user.keyboard("{Escape}");
     expect(isOpen()).toBe(false);
-    await flushFor();
-    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
   });
 
   it("an unrelated auto popover opening closes the popup with 'dismiss'", async () => {
@@ -880,12 +865,10 @@ describe("stack interactions (browser)", () => {
       </>,
     );
     await user.click(trigger());
-    await flushFor();
-    expect(isOpen()).toBe(true);
+    await settle(() => expect(isOpen()).toBe(true));
     act(() => screen.getByTestId("other").showPopover());
     expect(isOpen()).toBe(false);
-    await flushFor();
-    expect(action).toHaveBeenCalledTimes(2);
+    await settle(() => expect(action).toHaveBeenCalledTimes(2));
     expect(action.mock.calls[1]![0]).toBe(false);
     expect(action.mock.calls[1]![1].reason).toBe("dismiss");
   });
