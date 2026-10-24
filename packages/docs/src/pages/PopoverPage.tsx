@@ -219,7 +219,7 @@ export function PopoverPage() {
           "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open, a part's close or a dismissal notification."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `commandfor`, `command`, `aria-expanded`, `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `commandfor`, `command` (not on a host element other than a `<button>`), `aria-expanded`, `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`."
         }
         note={
           'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode) is no invoker, so a press on it while open light-dismisses the popup before the click: the close is reported as `"activate"` but not awaited, a controlled parent cannot veto it and there is no exit transition ([#115](https://github.com/uhyo/funstack-ui/issues/115)); a development warning says so. `aria-haspopup` and `aria-controls` pass through.'
@@ -332,7 +332,7 @@ export function PopoverPage() {
       <PartFacts
         state={"`PopoverCloseState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a host element other than a `<button>`), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
           'In library mode the click is always intercepted, so every Close goes through the Root. A second click while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending` (the action and the hide); never natively disabled, so it keeps focus. To hide at once and finish the work in the background, do not return the promise: `action={() => { void apply(); }}`. If the user dismisses the popover and opens it again while the action runs, the action\'s close is dropped: it belonged to the earlier open. Popovers have no return value.'

@@ -142,6 +142,11 @@ export function isPressClaimed(event: Event): boolean {
 export interface SubmenuHover {
   readonly enter: (event: Event) => void;
   readonly leave: (event: Event) => void;
+  /**
+   * The submenu's popup, for the gesture's "still over the submenu" test (not `commandfor`: a
+   * non-button SubmenuTrigger has none).
+   */
+  readonly popup: () => HTMLElement | null;
 }
 
 const submenuHovers = new WeakMap<Element, SubmenuHover>();

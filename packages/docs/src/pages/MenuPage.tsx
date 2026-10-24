@@ -279,7 +279,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `commandfor`, `command` (not on a host element other than a `<button>`), `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`."
         }
         note={"Use it in a top-level Root only."}
       />
@@ -500,7 +500,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `data-open`, `data-pending`) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+          "the Trigger's (`type`, `id`, `commandfor`, `command` (not on a host element other than a `<button>`), `aria-haspopup`, `aria-expanded`, `data-open`, `data-pending`) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
         }
         note={
           "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. Use it in a submenu Root only."

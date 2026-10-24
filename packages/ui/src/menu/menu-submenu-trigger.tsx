@@ -111,14 +111,16 @@ export function MenuSubmenuTrigger({
     if (menu.popover.intended()) scheduleHoverClose(menu, native);
     else menu.timers.cancel();
   };
+  const submenuPopupRef = menu.popover.popupRef;
   const latestHover = useLatest({ enter: hoverEnter, leave: hoverLeave });
   const hoverRef = useCallback(
     (element: HTMLElement) =>
       registerSubmenuHover(element, {
         enter: (event) => latestHover.current.enter(event),
         leave: (event) => latestHover.current.leave(event),
+        popup: () => submenuPopupRef.current,
       }),
-    [latestHover],
+    [latestHover, submenuPopupRef],
   );
 
   const {
@@ -146,6 +148,7 @@ export function MenuSubmenuTrigger({
     },
     // A click opens (or moves focus into the open submenu); it never closes.
     activate: (event) => open(event.nativeEvent),
+    opensOnly: true,
   });
   const ref = useMergedRefs(triggerRef, hoverRef);
 

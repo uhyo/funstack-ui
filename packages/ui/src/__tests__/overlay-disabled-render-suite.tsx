@@ -155,7 +155,38 @@ export function describeOverlayDisabledRenders<D, P extends object>(
       if (close) expectNoInvoker(closePart());
     });
 
+    // #115 review F4: a host element other than a button is no invoker, enabled or not, so it
+    // gets no `commandfor` / `command` (a component render is assumed to render a button).
+    it.each(variants)("library mode%s, an enabled link render is no invoker", async (_, extra) => {
+      render(
+        <Harness
+          mode="uncontrolled"
+          initialOpen
+          trigger={{ render: <a href="#x" /> }}
+          {...closeProps({ render: <a href="#x" /> })}
+          {...extra}
+        />,
+      );
+      await flushTasks(2);
+      expectNoInvoker(trigger());
+      if (close) {
+        expectNoInvoker(closePart());
+        // Still available: no invoker attributes does not mean unavailable.
+        expect(closePart()).not.toHaveAttribute("aria-disabled");
+      }
+    });
+
     if (!close) return;
+
+    it("an enabled component-render Close keeps commandfor / command and is available", async () => {
+      render(
+        <Harness mode="uncontrolled" initialOpen {...close.props({ render: <PlainButton /> })} />,
+      );
+      await flushTasks(2);
+      expect(closePart()).toHaveAttribute("commandfor");
+      expect(closePart()).toHaveAttribute("command");
+      expect(closePart()).not.toHaveAttribute("aria-disabled");
+    });
 
     describe.each(renders)("Close, %s render", (_, element) => {
       it("library mode: aria-disabled, the click is cancelled, nothing closes", async () => {

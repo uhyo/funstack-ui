@@ -106,7 +106,8 @@ export function DialogTrigger({
   const installClick = isLibrary || !modal;
   // The modal JS-free command needs native `disabled` to stop it.
   const disabledProps = disabledButton(render, disabled, { handlesClick: installClick });
-  const invoker = modal && disabledProps.invoker;
+  // Only on a button (or a component, assumed to render one): another element is no invoker.
+  const invoker = modal && disabledProps.invoker && rendersButton(render);
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (isLibrary) {
       // Cancelling the click cancels the command (it runs as the button's activation

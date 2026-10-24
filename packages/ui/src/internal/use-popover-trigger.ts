@@ -44,6 +44,12 @@ export interface UsePopoverTriggerOptions<State> {
    */
   readonly activate?: (event: MouseEvent<HTMLElement>) => void;
   /**
+   * The click never closes (Menu's SubmenuTrigger): only picks the library-mode non-button
+   * warning's text, since there a press while open dismisses the popup instead of moving focus
+   * into it. (Not `activate !== undefined`: Menu.Trigger has an `activate` that closes.)
+   */
+  readonly opensOnly?: boolean;
+  /**
    * How `disabled` is rendered. `"native"` (default): the `disabled` attribute, so the button is
    * no invoker at all; in library mode a link or component `render` still gets the `"aria"`
    * branch, because native `disabled` means nothing on a link and the installed click handler is
@@ -74,7 +80,15 @@ export function usePopoverTrigger<State>(
   ctx: PopoverRootValue,
   options: UsePopoverTriggerOptions<State>,
 ): PopoverTriggerHook {
-  const { part, disabled, render, handlers, activate, disabledAs = "native" } = options;
+  const {
+    part,
+    disabled,
+    render,
+    handlers,
+    activate,
+    opensOnly = false,
+    disabledAs = "native",
+  } = options;
   const isLibrary = ctx.mode === "library";
   const { ids, triggerRef, popupRef } = ctx;
 
@@ -92,6 +106,13 @@ export function usePopoverTrigger<State>(
         const tag = element.tagName.toLowerCase();
         // Library mode: the click handler works, but only an invoker button is spared by the
         // popover's light dismiss, so a press while open hides the popup before the click (#115).
+        if (isLibrary && opensOnly) {
+          return (
+            `${part}: rendered a <${tag}>. Only a <button> is the popover's invoker: a press on ` +
+            "this element while its popup is open dismisses the popup through light dismiss " +
+            "instead of moving focus into it. Render a <button>."
+          );
+        }
         return isLibrary
           ? `${part}: rendered a <${tag}>. Only a <button> is the popover's invoker: a press on ` +
               "this element while the popup is open closes it through light dismiss before the " +
@@ -151,14 +172,18 @@ export function usePopoverTrigger<State>(
     alwaysFocusable: disabledAs === "aria",
   });
 
+  const invoker = disabledProps.invoker && rendersButton(render);
+
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     // `type` only applies to a <button>; on any other element the key is not owned.
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the browser
     // would run its command).
     ...disabledProps.props,
-    commandfor: disabledProps.invoker ? ids.popup : undefined,
-    command: disabledProps.invoker ? "toggle-popover" : undefined,
+    // Only on a button (or a component, assumed to render one): another element is no invoker,
+    // and the attributes would claim otherwise (#115).
+    commandfor: invoker ? ids.popup : undefined,
+    command: invoker ? "toggle-popover" : undefined,
     // Library mode: optimistic. JS-free mode: "false" in React; the Popup's `toggle` listener
     // writes the DOM value, and React never rewrites an unchanged prop.
     "aria-expanded": isLibrary ? state.open : false,

@@ -89,8 +89,10 @@ export function useOverlayClose<Details extends ActionDetails>(
     ...(rendersButton(render) && { type: "button" as const }),
     // Owned: a render element must not re-enable a disabled Close.
     disabled: disabledProps.props.disabled,
-    commandfor: disabledProps.invoker ? popupId : undefined,
-    command: disabledProps.invoker ? command : undefined,
+    // Only on a button (or a component, assumed to render one): another element is no invoker.
+    // `disabledProps.invoker` itself stays the availability below.
+    commandfor: disabledProps.invoker && rendersButton(render) ? popupId : undefined,
+    command: disabledProps.invoker && rendersButton(render) ? command : undefined,
     ...options.ownProps,
     ...(installClick && { onClick }),
     // Exactly while `data-pending`: a Close that will not act is unavailable to AT. Owned,

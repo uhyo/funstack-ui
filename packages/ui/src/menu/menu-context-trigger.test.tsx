@@ -9,7 +9,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { Suspense, startTransition, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
@@ -1511,7 +1511,7 @@ describe("Menu.ContextTrigger", () => {
       for (const fn of Object.values(actions)) fn.mockReset();
     });
 
-    function DragItems() {
+    function DragItems({ submenuTrigger }: { submenuTrigger?: ReactElement<object> } = {}) {
       return (
         <>
           <Menu.Item data-testid="rename" action={actions.rename}>
@@ -1525,7 +1525,9 @@ describe("Menu.ContextTrigger", () => {
           </Menu.Item>
           <Menu.Separator data-testid="separator" />
           <Menu.Root>
-            <Menu.SubmenuTrigger data-testid="move">Move to</Menu.SubmenuTrigger>
+            <Menu.SubmenuTrigger data-testid="move" render={submenuTrigger}>
+              Move to
+            </Menu.SubmenuTrigger>
             <Menu.Popup data-testid="submenu" aria-label="Folders">
               <Menu.Item data-testid="inbox">Inbox</Menu.Item>
             </Menu.Popup>
@@ -1584,6 +1586,36 @@ describe("Menu.ContextTrigger", () => {
       await elapse(200);
       expect(isOpen(screen.getByTestId("submenu"))).toBe(true);
     });
+
+    // The gesture finds the submenu through the SubmenuTrigger's registration, not its
+    // `commandfor`, which a non-button SubmenuTrigger does not get (#115 review F4).
+    it.each([
+      ["a <button>", undefined],
+      ["a <div>", <div key="div" />],
+    ])(
+      "a move from %s SubmenuTrigger onto the submenu's padding keeps the submenu open",
+      async (_, element) => {
+        silenceErrors();
+        render(<Harness content={<DragItems submenuTrigger={element} />} />);
+        await rightClick(region(), 312, 148);
+        vi.useFakeTimers();
+        const elapse = (ms: number) =>
+          act(async () => {
+            await vi.advanceTimersByTimeAsync(ms);
+          });
+        hit = item("move");
+        captured("pointermove", 320, 230);
+        await elapse(150);
+        const submenu = screen.getByTestId("submenu");
+        expect(isOpen(submenu)).toBe(true);
+        expect(item("move").hasAttribute("commandfor")).toBe(element === undefined);
+        // Over the submenu itself, not an item: focus stays on the SubmenuTrigger.
+        hit = submenu;
+        captured("pointermove", 420, 230);
+        await elapse(200);
+        expect(isOpen(submenu)).toBe(true);
+      },
+    );
 
     it("a release 10 px away over an enabled item activates it and closes with 'activate'", async () => {
       const open = vi.fn<OpenAction>();

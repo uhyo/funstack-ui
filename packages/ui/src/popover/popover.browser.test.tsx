@@ -898,7 +898,8 @@ describe("non-button Trigger click while open (browser, #115)", () => {
       </div>,
     );
     expect(trigger().tagName).toBe("A");
-    // It carries `commandfor`, but only a button is an invoker.
+    // No invoker attributes: only a button is an invoker.
+    expect(trigger()).not.toHaveAttribute("commandfor");
     await user.click(trigger());
     await settle(() => expect(isOpen()).toBe(true));
     expect(action).toHaveBeenCalledTimes(1);

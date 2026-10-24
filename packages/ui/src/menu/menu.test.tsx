@@ -1833,6 +1833,32 @@ describe("Menu.Root", () => {
       .find((m) => m.includes("Menu.Trigger: rendered a <span>"));
     expect(warning).toContain("closes it through light dismiss before the click");
   });
+
+  it("warns for a non-button SubmenuTrigger: a press while open dismisses the submenu (#115)", async () => {
+    const user = setupUser();
+    const error = silenceErrors();
+    render(
+      <Menu.Root>
+        <Menu.Trigger data-testid="trigger">Actions</Menu.Trigger>
+        <Menu.Popup>
+          <Menu.Root>
+            <Menu.SubmenuTrigger render={<div />}>Move to</Menu.SubmenuTrigger>
+            <Menu.Popup aria-label="Folders">
+              <Menu.Item>Inbox</Menu.Item>
+            </Menu.Popup>
+          </Menu.Root>
+        </Menu.Popup>
+      </Menu.Root>,
+    );
+    // The popup's content mounts on the first open.
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks(2);
+    const warning = error.mock.calls
+      .map((call) => String(call[0]))
+      .find((m) => m.includes("Menu.SubmenuTrigger: rendered a <div>"));
+    expect(warning).toContain("dismisses the popup through light dismiss instead of moving focus");
+    expect(warning).not.toContain("not awaited");
+  });
 });
 
 describe("submenus", () => {

@@ -56,10 +56,9 @@ export function startDrag(popup: HTMLElement, options: DragOptions): () => void 
     const item = target?.closest<HTMLElement>(ITEM_SELECTOR) ?? null;
     return item !== null && popup.contains(item) ? item : null;
   };
-  /** The pointer is over the submenu `trigger` opens (its popup is the `commandfor` target). */
+  /** The pointer is over the submenu `trigger` opens (its popup, registered with its hover). */
   const inSubmenuOf = (trigger: HTMLElement, target: Element | null) => {
-    const id = trigger.getAttribute("commandfor");
-    const submenu = id === null ? null : doc.getElementById(id);
+    const submenu = submenuHover(trigger)?.popup() ?? null;
     return submenu !== null && target !== null && submenu.contains(target);
   };
   const hoverSubmenu = (next: HTMLElement | null, event: Event) => {

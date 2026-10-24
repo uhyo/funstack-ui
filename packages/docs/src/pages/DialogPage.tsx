@@ -219,7 +219,7 @@ export function DialogPage() {
           "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, a part's close waiting for `openChangeAction(false)`, a close notification in flight, or a re-open requested while a close notification is still settling."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command`, `onClick` (when it installs one), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a host element other than a `<button>`), `onClick` (when it installs one), `data-open`, `data-pending`, `data-disabled`."
         }
       />
 
@@ -337,7 +337,7 @@ export function DialogPage() {
       <PartFacts
         state={"`DialogCloseState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a host element other than a `<button>`), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
           'A second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'
