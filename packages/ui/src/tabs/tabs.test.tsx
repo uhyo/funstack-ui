@@ -1,5 +1,10 @@
 // Tabs tests (design/components/tabs.md section 12; conventions 10.1).
 //
+// The action-prop rows shared by every value component (sync and async actions, rejection,
+// overlap, superseded rejection, the post-await rule, the controlled veto, `transition` on Tab and
+// Panel, details, dev warnings) come from __tests__/value-action-suite.tsx with the driver
+// __tests__/drivers/tabs.tsx; this file keeps the Tabs-specific rows.
+//
 // Transition types (fsui-tabs, -next, -prev) are asserted in tabs-transition-types.test.tsx,
 // which mocks React's addTransitionType. The Indicator's actual anchored position needs layout
 // and lives in tabs.browser.test.tsx; here only the anchor-name / position-anchor wiring is
@@ -21,6 +26,8 @@ import {
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { tabsDriver } from "../__tests__/drivers/tabs.js";
+import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Tabs } from "./index.js";
 import type {
   TabsIndicatorState,
@@ -151,6 +158,8 @@ function expectAnchoredTo(name: string): void {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+describeValueAction(tabsDriver);
 
 describe("Tabs", () => {
   describe("roles and ARIA", () => {
@@ -664,24 +673,6 @@ describe("Tabs", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("calls valueChangeAction(next, details) and swaps panels", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(tab("B"));
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toBe("b");
-      expect(details.reason).toBe("activate");
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(Object.keys(details)).toEqual(["reason"]);
-      expectSelected("B");
-      expectNotPending(root());
-      expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel b");
-      expect(committed()).toHaveTextContent("b");
-    });
-
     it("clicking the selected tab, a disabled tab, or any tab under Root disabled never dispatches", async () => {
       const action = vi.fn<ActionFn>();
       const first = render(<Harness mode={mode} action={action} disabledValues={["c"]} />);
@@ -698,78 +689,6 @@ describe("Tabs", () => {
       expect(action).not.toHaveBeenCalled();
       expectSelected("A");
       expect(committed()).toHaveTextContent("a");
-    });
-  });
-
-  renderBoth("async action", (mode) => {
-    it("pending on Root and the clicked Tab; old panel stays until resolve", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} />);
-      const user = setupUser();
-
-      await user.click(tab("B"));
-      expectSelected("B");
-      expectPending(root());
-      expectPending(tab("B"));
-      expectNotPending(tab("A"));
-      expectNotPending(tab("C"));
-      expectPending(indicator());
-      expect(panelOf("A")).toBeInTheDocument();
-      expect(panelOf("B")).not.toBeInTheDocument();
-      expect(screen.getByRole("tabpanel")).not.toHaveAttribute("data-pending");
-
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(root());
-      expectNotPending(tab("B"));
-      expectNotPending(indicator());
-      expect(panelOf("A")).not.toBeInTheDocument();
-      expect(panelOf("B")).toHaveTextContent("Panel b");
-      expect(committed()).toHaveTextContent("b");
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("reaches the Error Boundary; committed value unchanged", async () => {
-      silenceErrors();
-      const d = deferred();
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(tab("B"));
-      expectSelected("B");
-      expect(panelOf("A")).toBeInTheDocument();
-
-      const err = new Error("save failed");
-      await act(async () => {
-        d.reject(err);
-      });
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
-      expect(committed()).toHaveTextContent("a");
-    });
-
-    it("caught inside the action: resolves; uncontrolled commits, controlled reverts", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} catchErrors />);
-      const user = setupUser();
-
-      await user.click(tab("B"));
-      expectPending(root());
-      await act(async () => {
-        d.reject(new Error("vetoed"));
-      });
-      expectNotPending(root());
-      expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
-      if (mode === "controlled") {
-        expectSelected("A");
-        expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel a");
-      } else {
-        expectSelected("B");
-        expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel b");
-      }
     });
   });
 
@@ -791,32 +710,6 @@ describe("Tabs", () => {
   });
 
   describe("overlapping actions (uncontrolled)", () => {
-    it("dispatch b then c, resolve b last: optimistic c throughout, committed c", async () => {
-      const ds = sequencedDeferreds(2);
-      render(<Harness mode="uncontrolled" action={() => ds.next()} />);
-      const user = setupUser();
-
-      await user.click(tab("B"));
-      await user.click(tab("C"));
-      expectSelected("C");
-      expectPending(tab("C"));
-      expectNotPending(tab("B"));
-
-      await act(async () => {
-        ds[1]!.resolve();
-      });
-      expectSelected("C");
-      expectPending(root());
-      expect(panelOf("A")).toBeInTheDocument();
-
-      await act(async () => {
-        ds[0]!.resolve();
-      });
-      expectSelected("C");
-      expectNotPending(root());
-      expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel c");
-    });
-
     it("clicking back to the committed tab cancels the intent; its panel never leaves (9.4)", async () => {
       const ds = sequencedDeferreds(2);
       const action = vi.fn<ActionFn>(() => ds.next());
@@ -854,52 +747,6 @@ describe("Tabs", () => {
       expect(action.mock.calls.map(([next]) => next)).toEqual(["b", "c", "d"]);
       expectSelected("D");
       expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel d");
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    it("older rejects after the newer resolved: reaches the boundary", async () => {
-      silenceErrors();
-      const ds = sequencedDeferreds(2);
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => ds.next()} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(tab("B"));
-      await user.click(tab("C"));
-      await act(async () => {
-        ds[1]!.resolve();
-      });
-      expect(onError).not.toHaveBeenCalled();
-      expectSelected("C");
-
-      const err = new Error("older failed");
-      await act(async () => {
-        ds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-    });
-
-    it("older rejects while the newer is pending: reaches the boundary", async () => {
-      silenceErrors();
-      const ds = sequencedDeferreds(2);
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => ds.next()} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(tab("B"));
-      await user.click(tab("C"));
-      const err = new Error("older failed");
-      await act(async () => {
-        ds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      await act(async () => {
-        ds[1]!.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1463,65 +1310,7 @@ describe("Tabs", () => {
     });
   });
 
-  describe("post-await rule", () => {
-    it("a controlled parent updating in startTransition after its own await works end to end", async () => {
-      const d = deferred();
-      function Parent() {
-        const [tabValue, setTab] = useState("a");
-        return (
-          <Tabs.Root
-            value={tabValue}
-            valueChangeAction={async (next) => {
-              await d.promise;
-              startTransition(() => setTab(next));
-            }}
-          >
-            <Tabs.List aria-label="x">
-              <Tabs.Tab value="a">A</Tabs.Tab>
-              <Tabs.Tab value="b">B</Tabs.Tab>
-            </Tabs.List>
-            <Tabs.Panel value="a">Panel a</Tabs.Panel>
-            <Tabs.Panel value="b">Panel b</Tabs.Panel>
-          </Tabs.Root>
-        );
-      }
-      render(<Parent />);
-      const user = setupUser();
-      await user.click(tab("B"));
-      expectSelected("B");
-      expectPending(root());
-      expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel a");
-      await act(async () => {
-        d.resolve();
-      });
-      expectSelected("B");
-      expectNotPending(root());
-      expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel b");
-    });
-  });
-
   describe("transition prop", () => {
-    it("Tab and Panel render with and without transition", async () => {
-      render(
-        <Tabs.Root defaultValue="a">
-          <Tabs.List aria-label="x">
-            <Tabs.Tab value="a" transition="fade">
-              A
-            </Tabs.Tab>
-            <Tabs.Tab value="b">B</Tabs.Tab>
-          </Tabs.List>
-          <Tabs.Panel value="a" transition={{ "fsui-tabs-next": "slide", default: "fade" }}>
-            Panel a
-          </Tabs.Panel>
-          <Tabs.Panel value="b">Panel b</Tabs.Panel>
-        </Tabs.Root>,
-      );
-      const user = setupUser();
-      expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel a");
-      await user.click(tab("B"));
-      expect(screen.getByRole("tabpanel")).toHaveTextContent("Panel b");
-    });
-
     it("Indicator has no transition prop (type-level)", () => {
       render(
         <Tabs.Root defaultValue="a">

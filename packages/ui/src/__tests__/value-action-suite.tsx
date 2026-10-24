@@ -230,6 +230,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expect(details.event).toBeInstanceOf(window.Event);
         expect(details.event?.type).toBe(driver.eventType);
         expect(JSON.parse(JSON.stringify(details))).toEqual(driver.detailsFields(0));
+        expect(Object.keys(details).sort()).toEqual(Object.keys(driver.detailsFields(0)).sort());
         driver.expectShown(values[1]);
         expectNonePending(0);
         expectCommittedValue(values[1]);
@@ -310,6 +311,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         await driver.gesture(setupUser(), 0);
         driver.expectShown(values[1]);
         expectAllPending(0);
+        driver.expectCommitted?.(values[0]);
 
         const err = new Error("save failed");
         await act(async () => {
@@ -400,12 +402,15 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         });
         expectAllPending(1);
         driver.expectShown(values[2]);
+        // One async action scope: nothing commits before every action settled.
+        driver.expectCommitted?.(values[0]);
 
         await act(async () => {
           ds[0]!.resolve();
         });
         expectNonePending(1);
         driver.expectShown(values[2]);
+        driver.expectCommitted?.(values[2]);
       });
     });
 
@@ -588,6 +593,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
 
         await driver.gesture(setupUser(), 0);
         expect(snapshots.at(-1)).toEqual({ shown: driver.shown(values[1]), pending: true });
+        expectCommittedValue(values[0]);
         const afterClick = snapshots.length;
         await act(async () => {
           d.resolve();
@@ -642,7 +648,8 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
           const { container, unmount } = render(
             <>{driver.render(definedProps({ defaultValue: values[1], transition }))}</>,
           );
-          const html = container.innerHTML;
+          // `useId` values differ from root to root; everything else must be identical.
+          const html = container.innerHTML.replace(/_r_[0-9a-z]+_/g, "_r_id_");
           unmount();
           return html;
         };
@@ -661,6 +668,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         expect(action).toHaveBeenCalledTimes(1);
         expect(action.mock.calls[0]?.[0]).toEqual(values[1]);
         driver.expectShown(values[1]);
+        expectCommittedValue(values[1]);
       });
     });
 

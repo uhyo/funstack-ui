@@ -109,3 +109,50 @@ Mutations (toggle.tsx, reverted):
 2. press/release types swapped: the 3 transition-type rows fail.
 3. A "sticky" aria-pressed that never reverts after a click: suite rows "caught inside
    (controlled)" and "controlled veto" fail.
+
+### Tabs (commit 3b)
+
+Suite changes made while mapping Tabs (they apply to every component): the sync row also compares
+`Object.keys(details)`; the rejection row checks the committed DOM (`expectCommitted(values[0])`)
+before the reject; "stays pending until every in-flight action settles" checks that nothing
+committed while the older action is pending and the committed DOM after; the post-await row
+checks the committed DOM mid-flight; the transition dispatch rows check the committed value; the
+markup row normalises React's client `useId` values (`_r_<n>_`, which differ per root).
+
+Removed title (tabs.test.tsx, `Tabs …`) -> suite row (`Tabs.Root: value action conformance …`):
+- sync action (both) calls valueChangeAction(next, details) and swaps panels -> sync action (both)
+  dispatches (next, details) … (reason, event, keys `["reason"]`, selection with tabindex and
+  data-selected in `expectShown`, panel in `expectCommitted`, Root not pending, committed `b`)
+- async action (both) pending on Root and the clicked Tab; old panel stays until resolve -> async
+  action (both) shows the optimistic value and data-pending … (`pendingOn`: Root, tab B, Indicator;
+  `pendingOff`: tabs A and C, the tabpanel; `expectCommitted(a)`: panel A mounted, B not)
+- rejection (both) reaches the Error Boundary; committed value unchanged -> rejection (both)
+  reaches the Error Boundary and leaves the committed value (panel A mounted before the reject)
+- rejection (both) caught inside the action: resolves; uncontrolled commits, controlled reverts ->
+  rejection (both) caught inside … (selection and panel text by mode)
+- overlapping actions (uncontrolled) dispatch b then c, resolve b last -> overlapping actions
+  (uncontrolled) stays pending until every in-flight action settles (resolves the newer first:
+  C selected and pending, B not; Root pending; panel A still mounted; then panel c) and the latest
+  dispatch wins (both orders)
+- superseded rejection (both), the two rows -> superseded rejection (both) after / while the newer
+  … (C selected after the newer resolved, boundary called once)
+- post-await rule: a controlled parent updating in startTransition after its own await works end
+  to end -> post-await rule (controlled parent) the shown value and data-pending converge …
+  (B selected and pending with panel a mid-flight; B and panel b after)
+- transition prop: Tab and Panel render with and without transition -> transition prop: renders
+  the same markup … and still dispatches with a class / a type map (the driver puts `transition`
+  on every Tab and Panel; the dispatch rows check the committed panel)
+- tabs-transition-types: adds fsui-tabs and fsui-tabs-next for a later tab -> Tabs.Root:
+  transition types gesture 0 / 1 (a->b, b->c: next); adds fsui-tabs and fsui-tabs-prev for an
+  earlier tab -> gesture 2 (c->a: prev). The "no committed tab" row stays in that file.
+Kept in tabs.test.tsx: disabled/selected no-ops, controlled veto with focus on the clicked tab,
+cancelled intent (9.4), rapid arrows, the panel-suspending rows (keyed boundary), keepMounted,
+Indicator, function props, render prop, focusgroup.
+jsdom titles: 2927 -> 2953 (-17, +43: the suite adds dev-warning, details, overlap order, unmount,
+non-thenable, sync throw, reportError and suspender rows Tabs did not have).
+
+Mutations (reverted):
+1. tabs-panel.tsx shows the optimistic selection instead of the committed one: 13 rows fail (8
+   suite rows: async, rejection, overlap, suspending content, post-await).
+2. tabs-root.tsx swaps next/prev: the 3 suite transition-type rows fail.
+3. tabs-tab.tsx marks every tab pending while the Root is: 18 rows fail (suite `pendingOff`).
