@@ -858,7 +858,6 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     () => ({
       state: state as SliderRootState<SliderValue>,
       shown,
-      shownValue: shownValue as SliderValue,
       min,
       max,
       step,
@@ -886,7 +885,6 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     [
       state,
       shown,
-      shownValue,
       min,
       max,
       step,

@@ -57,7 +57,7 @@ export function openMenuWithFocus(
 }
 
 /** A click from a pointing device (`detail` counts clicks; keyboard and `click()` give 0). */
-export function isPointerClick(event: Event): boolean {
+function isPointerClick(event: Event): boolean {
   return event.type === "click" && (event as MouseEvent).detail > 0;
 }
 

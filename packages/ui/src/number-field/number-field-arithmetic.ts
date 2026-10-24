@@ -1,7 +1,7 @@
 // Stepping arithmetic of NumberField (design/components/number-field.md 5.5). No directive: no
 // React, no client-only API. The spec's `stepUp(n)` / `stepDown(n)` (snap off-grid values in the
 // stepping direction, clamp into `[min, max]` on the grid), not the native UI stepping.
-import { decimalsOf, roundTo } from "../internal/decimal.js";
+import { EPSILON, gridDecimals, roundTo } from "../internal/decimal.js";
 
 export interface StepBounds {
   readonly min: number | undefined;
@@ -10,11 +10,8 @@ export interface StepBounds {
   readonly step: number;
 }
 
-/** Tolerance for grid computations on binary floating point. */
-const EPSILON = 1e-9;
-
 function decimalsFor(bounds: StepBounds): number {
-  return Math.max(decimalsOf(bounds.step), decimalsOf(bounds.min ?? 0));
+  return gridDecimals(bounds.step, bounds.min ?? 0);
 }
 
 /** The largest grid point `≤ max` (an unreachable `max` stays unreachable: `0..5` by `2` is `4`). */

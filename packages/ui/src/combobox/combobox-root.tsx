@@ -160,7 +160,7 @@ export interface ComboboxRootProps {
 }
 
 /** The default announcement (design 6.4; conventions 11: English, always overridable). */
-export function defaultComboboxAnnouncement(count: number): string {
+function defaultComboboxAnnouncement(count: number): string {
   if (count === 0) return "No results";
   if (count === 1) return "1 result";
   return `${count} results`;

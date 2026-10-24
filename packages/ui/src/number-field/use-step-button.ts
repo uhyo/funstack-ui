@@ -4,8 +4,8 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import type { NumberFieldContextValue, StepDirection } from "./number-field-context.js";
 
 /** First repeat after the press, then the interval between repeats (Base UI, React Aria). */
-export const HOLD_DELAY = 400;
-export const HOLD_INTERVAL = 60;
+const HOLD_DELAY = 400;
+const HOLD_INTERVAL = 60;
 
 interface ActiveHold {
   readonly pointerId: number;

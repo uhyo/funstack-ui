@@ -74,13 +74,13 @@ export function MenuSubmenuTrigger({
   const open = (event: Event) => openMenuWithFocus(menu, event, "first");
 
   // The item half: role, roving tabindex, aria-disabled, Enter / Space, pointer focus. Its
-  // activation is the click, which the trigger half handles (`activate` below).
+  // activation is the click, which the trigger half handles (`activate` below), so the item's own
+  // `onClick` is not used.
   const item = useMenuItem({
     part: "Menu.SubmenuTrigger",
     role: "menuitem",
     disabled,
     label,
-    activate: open,
   });
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

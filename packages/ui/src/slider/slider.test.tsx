@@ -30,7 +30,6 @@ import type {
 } from "./index.js";
 import {
   clampToNeighbours,
-  decimalsOf,
   isMaxReachable,
   nearestThumb,
   percent,
@@ -265,9 +264,6 @@ describe("arithmetic", () => {
     expect(snap(0.3, 0, 1, 0.1)).toBe(0.3);
     expect(snap(0.1 + 0.2, 0, 1, 0.1)).toBe(0.3);
     expect(snap(0.27, 0, 1, 0.05)).toBe(0.25);
-    expect(decimalsOf(0.001)).toBe(3);
-    expect(decimalsOf(1e-7)).toBe(7);
-    expect(decimalsOf(5)).toBe(0);
   });
 
   it("uses the platform midpoint as the default", () => {

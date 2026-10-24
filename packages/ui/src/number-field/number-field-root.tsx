@@ -55,7 +55,7 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
    */
   readonly reason: ChangeReason;
   /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
-  readonly source: "input" | "increment" | "decrement" | "keyboard" | "wheel" | null;
+  readonly source: NumberFieldSource;
 }
 
 /** The state every NumberField part's function props receive (one object, Field's precedent). */

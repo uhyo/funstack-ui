@@ -22,8 +22,6 @@ export interface SliderContextValue {
   readonly state: SliderRootState<SliderValue>;
   /** The values the thumbs show (design 2.2): `live` while held, else optimistic. */
   readonly shown: readonly number[];
-  /** `shown` in the prop's shape (`number` or array). */
-  readonly shownValue: number | readonly number[];
   readonly min: number;
   readonly max: number;
   readonly step: number;

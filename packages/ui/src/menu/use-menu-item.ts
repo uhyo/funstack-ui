@@ -5,7 +5,6 @@ import { dataAttr } from "../internal/data-attr.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { MenuListContext } from "./menu-context.js";
-import type { MenuListContextValue } from "./menu-context.js";
 import { hasModifier } from "./menu-dom.js";
 
 export interface MenuItemBaseOptions {
@@ -14,12 +13,14 @@ export interface MenuItemBaseOptions {
   readonly role: "menuitem" | "menuitemcheckbox" | "menuitemradio";
   readonly disabled: boolean;
   readonly label: string | undefined;
-  /** Runs for a click, Enter or Space on an enabled item (never for a disabled one). */
-  readonly activate: (event: Event) => void;
+  /**
+   * Runs for a click on an enabled item (never for a disabled one). Omitted when another hook
+   * handles the click (SubmenuTrigger).
+   */
+  readonly activate?: (event: Event) => void;
 }
 
 export interface MenuItemBase {
-  readonly list: MenuListContextValue | null;
   /** Owned props shared by every item kind (design 3.4). */
   readonly libraryProps: {
     role: string;
@@ -48,7 +49,7 @@ export function useMenuItem(options: MenuItemBaseOptions): MenuItemBase {
       event.preventDefault();
       return;
     }
-    activate(event.nativeEvent);
+    activate?.(event.nativeEvent);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -70,7 +71,6 @@ export function useMenuItem(options: MenuItemBaseOptions): MenuItemBase {
   };
 
   return {
-    list,
     libraryProps: {
       role,
       tabIndex: list?.nativeFocusgroup === true ? undefined : -1,
