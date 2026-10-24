@@ -43,3 +43,26 @@ Option E (`popovertarget`, no `aria-expanded`) is in its own issue; trade-offs t
 
 When w3c/html-aria#514 merges: recheck Gecko's OR for `popovertarget` and axe-core #4837; the
 #118 decision stands either way, E becomes more urgent.
+
+## Revision after review M1 (2026-10-24)
+
+Reviewer caught what I missed: "Chromium/WebKit are right regardless" is only true for invoker
+buttons. Combobox.Input (role=combobox) and non-button Trigger renders (#115 strips commandfor)
+are read in every engine, so `committed` made the stale-dismissal window universal there, and
+entanglement (conventions 2.3 item 5) can stretch it to a whole save. Regression vs optimistic.
+
+Decision: `shown`, an urgent `useState` in `useOverlayRoot`, written by the Popup from `toggle`
+(`:popover-open`), set on ref attach (pre-hydration open), cleared on detach. Triggers and the
+Combobox parts render it. JS-free keeps the DOM write (no React state in that mode).
+
+Why not A' after all: a DOM-write registry (two Combobox targets) vs one state with one writer.
+The earlier "#514 makes engines ignore it" argument was about invokers only; wrong lens for the
+Input. Why urgent: mirrors browser-owned state (3.5), nothing to await; a transition recreates
+the window.
+
+Side effects to remember: `defaultOpen` SSR now says `aria-expanded="false"` (correct: not shown
+pre-hydration; L6 updated). Platform path reads `"true"` from the attach read. One sync render per
+show/hide. Dialog shares the hook but never sets `shown`.
+
+Open: whether to expose `shown` in `children(state)` later (consumers have `:popover-open`, so
+not now). Screen-reader pass still due.

@@ -50,7 +50,7 @@ with a view transition in every engine.
 | 8 | Hover intent (research Q5) | Timers only: `delay` / `closeDelay` on the submenu's `Menu.Root`, defaults 100 / 150 ms, implemented with the same small internal timer helper Tooltip's interaction uses for its delays, **not** Tooltip's interaction hook (focus, blur, document listeners and `interestfor` do not apply). No "safe triangle" in v0; `closeDelay` covers a diagonal move into the submenu. `interestfor` is not used (research: opens on focus and collapses the stack on Escape). |
 | 9 | `experimental_focusgroup` | On `Menu.Popup`: renders `focusgroup="menu wrap|nowrap"` (`wrap` from `loop`), detected with `"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore` (#43); on the native path items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out of the group) and the JS Up / Down / Home / End branch steps aside. Typeahead, Enter / Space, submenu keys and Tab-closes-stack stay JS everywhere. |
 | 10 | Closing the stack on Tab | A `focusout` listener on the **root** menu's Popup: when `relatedTarget` is outside the menu tree (the root Popup's subtree, which contains every submenu as a DOM descendant, since nothing portals), the root Popup hides itself (`hidePopover()`, the platform hides nested popovers) and every Root is notified with `reason: "dismiss"`. A null `relatedTarget` (window blur) closes nothing. A press on the Trigger of an open menu is not a focus-out: `Menu.Trigger` prevents the `mousedown` default while `intended()` is `true`, so focus stays on the current item in every engine and the click's library-owned close is the one source of the close (#110). |
-| 11 | ARIA | Trigger: `aria-haspopup="menu"`, `aria-expanded` (committed: the shown menu, #118), `id`. Popup: `role="menu"`, `aria-labelledby` → the Trigger (or SubmenuTrigger) id. Items: explicit `role`s, `aria-disabled`, `aria-checked` from optimistic state. `Menu.Group` / `Menu.RadioGroup`: `role="group"` + `aria-labelledby` → `GroupLabel`. `Separator`: `<hr>` (implicit `separator`). |
+| 11 | ARIA | Trigger: `aria-haspopup="menu"`, `aria-expanded` (shown: the Root's mirror of the Popup's `toggle`, #118), `id`. Popup: `role="menu"`, `aria-labelledby` → the Trigger (or SubmenuTrigger) id. Items: explicit `role`s, `aria-disabled`, `aria-checked` from optimistic state. `Menu.Group` / `Menu.RadioGroup`: `role="group"` + `aria-labelledby` → `GroupLabel`. `Separator`: `<hr>` (implicit `separator`). |
 | 12 | Pending UI | Trigger: `data-open`, `data-pending` (Root pending: open or close in flight). Item: `data-pending` while its action runs. CheckboxItem / RadioItem: `data-checked` (optimistic), `data-pending`; `RadioGroup`: `data-pending` (owner). Popup: nothing (`:popover-open`). |
 | 13 | Content mounting | Conventions 3.7 unchanged: Popup children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">`. Items are read from the DOM at keydown time (no registration), so mounting strategy does not affect keyboard code. |
 | 14 | Animation | As Popover: CSS for opens and dismissals; `transition` on Popup wraps the `<div popover>` and animates library-driven opens and closes (item activation, Close, ArrowLeft, hover close, controlled) in every engine. Types `fsui-menu`, `fsui-menu-open`, `fsui-menu-close`; item state types `fsui-menu-check` / `fsui-menu-uncheck` / `fsui-menu-select`. |
@@ -130,7 +130,7 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.open` (optimistic), `state.pending`, `state.submenu` in `children(state)` | `useOverlayRoot({ component: "menu", mode: "library", details: popoverDetails })`. A Root under a `MenuContext` is a submenu. |
-| `Trigger` | `button` | button | `aria-expanded` (committed, #118), `data-open` (optimistic), `data-pending`, `data-disabled` | `usePopoverTrigger` plus `id`, `aria-haspopup="menu"` and the open-with-focus keys. Only valid in a top-level Root (dev warning otherwise). |
+| `Trigger` | `button` | button | `aria-expanded` (shown, #118), `data-open` (optimistic), `data-pending`, `data-disabled` | `usePopoverTrigger` plus `id`, `aria-haspopup="menu"` and the open-with-focus keys. Only valid in a top-level Root (dev warning otherwise). |
 | `Popup` | `div` | `menu` | `data-side`, `data-align` (the resolved placement while shown, conventions 13.2) | `usePopoverPopup` with Menu's initial-focus resolver, keyboard handling, typeahead, `focusout`, `focusgroup`; `useResolvedPlacement` for the attributes. |
 | `Item` | `button` | `menuitem` | `data-pending`, `data-disabled` | `action`, `closeOnActivate` (default `true`). |
 | `CheckboxItem` | `button` | `menuitemcheckbox` | `aria-checked`, `data-checked` (optimistic), `data-pending`, `data-disabled` | `checked` triple; `closeOnActivate` default `false`. |
@@ -139,7 +139,7 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 | `Group` | `div` | `group` | none | `aria-labelledby` → `GroupLabel`. |
 | `GroupLabel` | `div` | | none | `id` wiring. |
 | `Separator` | `hr` | `separator` (implicit) | none | `render={<div role="separator" />}` if an `<hr>` cannot be styled as wanted. |
-| `SubmenuTrigger` | `button` | `menuitem` | `aria-expanded` (committed, #118), `data-open` (optimistic), `data-pending`, `data-disabled` | Both an item of the parent menu and the Trigger of the submenu: `commandfor` + `toggle-popover`, `aria-haspopup="menu"`, roving `tabindex`, typeahead participation, ArrowRight / Enter / Space / click / hover open. |
+| `SubmenuTrigger` | `button` | `menuitem` | `aria-expanded` (shown, #118), `data-open` (optimistic), `data-pending`, `data-disabled` | Both an item of the parent menu and the Trigger of the submenu: `commandfor` + `toggle-popover`, `aria-haspopup="menu"`, roving `tabindex`, typeahead participation, ArrowRight / Enter / Space / click / hover open. |
 | `ContextTrigger` | `div` | none | `data-open` (optimistic), `data-pending`, `data-disabled`; inline `-webkit-touch-callout: none` | #45: the region whose `contextmenu` (and touch / pen long-press) opens the Popup at the pointer. No ARIA. Top-level Roots only. `design/components/context-menu.md`. |
 
 Why these parts:
@@ -797,7 +797,7 @@ No `returnFocus` prop.
 
 | Part | Attributes |
 | --- | --- |
-| Trigger | `id`, `aria-haspopup="menu"`, `aria-expanded` (committed: the shown menu, #118), `commandfor`, `command="toggle-popover"`, `type="button"`; no `aria-controls` (passes through) |
+| Trigger | `id`, `aria-haspopup="menu"`, `aria-expanded` (shown, #118), `commandfor`, `command="toggle-popover"`, `type="button"`; no `aria-controls` (passes through) |
 | Popup | `role="menu"`, `aria-labelledby` → Trigger / SubmenuTrigger id (token-merged), `tabindex="-1"`, `popover="auto"`, `focusgroup` with the flag |
 | Item | `role="menuitem"`, `tabindex="-1"` (none on the native focusgroup path), `aria-disabled="true"` when disabled, `type="button"` |
 | CheckboxItem | `role="menuitemcheckbox"`, `aria-checked` (optimistic), rest as Item |
@@ -805,13 +805,14 @@ No `returnFocus` prop.
 | RadioItem | `role="menuitemradio"`, `aria-checked` (optimistic), rest as Item |
 | Group / GroupLabel | `role="group"` + `aria-labelledby`; the label has the `id` |
 | Separator | `<hr>` (implicit `separator`) |
-| SubmenuTrigger | `role="menuitem"`, `aria-haspopup="menu"`, `aria-expanded` (committed, #118), `id`, `commandfor`, `command`, `tabindex="-1"` |
+| SubmenuTrigger | `role="menuitem"`, `aria-haspopup="menu"`, `aria-expanded` (shown, #118), `id`, `commandfor`, `command`, `tabindex="-1"` |
 | ContextTrigger | none (#45): no role, no `aria-haspopup`, no `aria-expanded`; `aria-label` on the Popup names a context-only menu |
 
 Chromium and WebKit derive a `commandfor` invoker's expanded state from its popover and never
 read the explicit `aria-expanded`; Firefox maps nothing for `commandfor` and reads it (#118,
-`docs/research/invoker-aria-expanded.md`). The attribute therefore renders the committed open
-state, the value the other two engines compute, so all three agree. Placing the Popup right
+`docs/research/invoker-aria-expanded.md`). The attribute therefore renders the shown state (the
+Root's `shown` mirror of the Popup's `toggle`), the value the other two engines compute, so all
+three agree. Placing the Popup right
 after the Trigger (the natural DOM order here) suppresses the implicit `aria-details` relation
 in HTML-AAM. Screen-reader pass (NVDA, JAWS,
 VoiceOver) in the example app before leaving "proposed": menu button announcement, item
@@ -863,7 +864,7 @@ Notation: `C` / `O` / `P` as in Popover. Uncontrolled root menu, `keepMounted={f
 
 1. **Open by keyboard, items load.** Focus on the Trigger, ArrowDown → `preventDefault`; open
    cause "first"; dispatch `true` (`O=true`, Trigger `data-open`, `data-pending`; `aria-expanded`
-   flips at the commit, #118).
+   flips with the `toggle` of `showPopover()`, #118).
    Children render, `<RowActions>` suspends → held. Data arrives → commit, apply effect: resolver
    finds the first enabled item, writes `autofocus`, `showPopover({ source: trigger })`: menu in
    the top layer under the Trigger, focus on the first item. `P=false`.
@@ -1399,7 +1400,8 @@ The grounds and the engine table are in popover.md's amendment of the same name;
 conventions 3.2 and decision 40.
 
 For Menu: `Menu.Trigger` and `Menu.SubmenuTrigger` render `aria-expanded` from the Root's
-committed open state (the shown menu), through `usePopoverTrigger`; `data-open`, `state.open`
+`shown` mirror of the Popup's `toggle` (revised after review M1, below; `committed` for a day),
+through `usePopoverTrigger`; `data-open`, `state.open`
 and `children(state).open` stay optimistic. The Trigger close of #110 therefore reads
 `aria-expanded="true"` with `data-pending` and no `data-open` while `openChangeAction(false)`
 runs with the menu still shown, which is also what Chromium and WebKit exposed all along; and a
@@ -1414,3 +1416,15 @@ popover.md's amendment (`menu.test.tsx`: the Suspense open row and the #110 Trig
 `menu-submenu-trigger.tsx` that list `aria-expanded` among the optimistic attributes are
 corrected. `MenuPage.tsx`: the entanglement sentence, the pending section's "optimistic" list
 and the Trigger's data-attribute row.
+
+Revision (review M1, 2026-10-24): the attribute renders the Root's **`shown`** mirror of the
+Popup's `toggle` (an urgent `useState` in `useOverlayRoot`), not `committed`; see popover.md's
+revision of the same name for the finding, the phase table and the implementation. For Menu the
+observable differences are: after Escape or an outside press, `aria-expanded="false"` one task
+after the hide while the `"dismiss"` notification is still pending (no longer `"true"` until it
+settles, which mattered for a non-button Trigger render in every engine and for Firefox on every
+Trigger); a pre-hydration open found at mount reads `"true"` at once; a submenu's
+`SubmenuTrigger` follows its own Root's `shown`, which the platform's cascade hide flips through
+each nested Popup's `toggle`. No Menu code changes; `menu.test.tsx` adds an Escape row with a
+deferred `openChangeAction` asserting `"false"` while pending, next to the #110 Trigger-close
+row's `"true"`.

@@ -833,10 +833,11 @@ The state owner (`Root` or the single component) holds:
 | Value | Source | Lane | Shown by |
 | --- | --- | --- | --- |
 | `committed` | `x ?? internal` | transition | content regions (`Panel`, `Popup`), everything that may suspend |
-| `optimistic` | `useOptimistic(committed, reducer)` | sync | trigger parts (`Tab`, `Trigger`, `Toggle`): `aria-pressed`, `aria-selected`, `data-selected`, state passed to their function props. ARIA state only where the optimistic value is what is displayed: an overlay Trigger's `aria-expanded` follows `committed` (below, #118) |
+| `optimistic` | `useOptimistic(committed, reducer)` | sync | trigger parts (`Tab`, `Trigger`, `Toggle`): `aria-pressed`, `aria-selected`, `data-selected`, state passed to their function props. ARIA state only where the optimistic value is what is displayed: an overlay Trigger's `aria-expanded` follows the shown popup, the `shown` mirror below (#118) |
 | `pending` | `useTransition()` | sync | `data-pending` on the owner and on the trigger that initiated the change |
 | urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event; reported through an `on<State>Change` handler, not an action (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
 | urgent, internal (the value a slider gesture has reached, `live`; NumberField's draft text and the value under its held button, #67) | `useState`, written from the pointer or `input` event; no consumer-facing urgent action | sync, urgent | the thumbs, while a pointer is captured or a step or commit is in flight (`held`); otherwise they render `optimistic` (Slider 2.2) |
+| urgent, internal (`shown`: the popup is in the top layer, #118) | `useState` in `useOverlayRoot`, written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on the overlay Triggers and the Combobox Input (library mode); `false` on the server and at hydration |
 
 **Virtual focus is urgent library state.** Where a pattern keeps DOM focus on one element and
 moves focus virtually with `aria-activedescendant` (Combobox), the active item is a plain
@@ -888,8 +889,12 @@ where the attribute describes an element whose visibility follows committed stat
 on a Popover, Menu or Combobox Trigger and on the Combobox Input: the Popup is shown from
 `committed`, and Chromium and WebKit expose a `commandfor` invoker's shown state whatever the
 attribute says, #118, `docs/research/invoker-aria-expanded.md`), optimistic state is **visual
-only** (`data-open`, `state.open`) and assistive technology hears the committed state when it
-lands. The component doc says so explicitly.
+only** (`data-open`, `state.open`) and assistive technology hears what is shown: `<details open>`
+for the Accordion, and for the overlays the Root's `shown` mirror of the popup's `toggle` (the
+urgent row above; #118, revised after its review M1). The mirror, not `committed`, because a
+dismissal hides the popup before its notification settles and a transition entangled with an
+unrelated action can hold `committed` for that action's whole duration, while the attribute must
+equal `:popover-open` within a task in every phase. The component doc says so explicitly.
 
 ### 3.3 When uncontrolled state is committed
 
@@ -1028,7 +1033,7 @@ can delay or roll it back. The boundary:
 | --- | --- | --- |
 | Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in Accordion's static (JS-free) mode, `<dialog open>`; the Toast region (`popover="manual"`), which the library shows and hides in both directions, driven by the urgent queue, and never notifies: it has no `openChangeAction` because nothing a consumer could do with "the region opened" exists |
 | Who changes it | The library, inside its transition | The browser (top layer, light dismiss, `interestfor`, find-in-page) |
-| Optimistic source | `useOptimistic` | The DOM itself |
+| Optimistic source | `useOptimistic` | The DOM itself. An ARIA attribute on another element that must report it to assistive technology (`aria-expanded` on an overlay Trigger or the Combobox Input, #118) renders an urgent `useState` mirror written from the platform event (`toggle`, reading `:popover-open`), never transition state |
 | `xChangeAction` | Can be awaited; the UI waits for it | Notification: dispatched from the platform event (`toggle`) inside a transition, after the fact |
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
@@ -1337,7 +1342,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `active` | boolean | `Combobox.Option` | Virtual focus: `aria-activedescendant` points here. Urgent (section 3.2), never a transition. |
 | `stale` | boolean | `Combobox.Popup`, `Combobox.List` (with `aria-busy="true"` on the listbox while stale **or loading**: a `Status` mounted inside the List; loading itself is not a data attribute in v1) | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile. |
 | `empty` | boolean | `Combobox.List`; `Toast.Viewport` | List: no mounted options, not stale and not loading; the same condition under which `Empty` renders. Viewport: no toasts in the queue, the `ending` ones kept mounted included (the region is hidden under it; Toast decision 7), so a layout can collapse the region's reserved space. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits no `data-open` (only `data-modal`, below) because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` in library mode, while its `aria-expanded` is the **committed** open state, the shown popup, #118 and section 3.2; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open`, committed `aria-expanded`), Menu `ContextTrigger` (optimistic `data-open`, no ARIA, #45); Combobox `Input` and `Trigger` likewise, its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits no `data-open` (only `data-modal`, below) because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` in library mode, while its `aria-expanded` is the **shown** state, the Root's urgent mirror of the popup's `toggle`, #118 and section 3.2; in JS-free mode only `aria-expanded`, kept current by a DOM write from the popup's `toggle` listener, section 7.4) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open`, shown `aria-expanded`), Menu `ContextTrigger` (optimistic `data-open`, no ARIA, #45); Combobox `Input` and `Trigger` likewise, its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch); Progress, every part (`value` is `null`: derived, not a DOM property, never suspended, #68) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`, product-owner decision) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `modal` | boolean | `Dialog.Popup` | The Root's `modal` prop (default `true`): the dialog is opened with `showModal()` (library mode) or the invoker's `show-modal` command (JS-free). A prop echo, not a state: rendered in every mode, server HTML included, so a stylesheet can lay out a non-modal panel (`.dialog:not([data-modal])`) before hydration and while closed, where `:modal` is false either way. |
@@ -2862,6 +2867,17 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     no `aria-expanded` and `Select` has no popover, so neither changes. Option E of the research
     (a `popovertarget` Trigger with no `aria-expanded`, the spec-conformant end state, which
     would also unblock a directive-free Popover) is a separate evaluation in its own issue.
+    **Revised 2026-10-24 after the review (M1):** `committed` left `Combobox.Input` (no invoker,
+    so every engine reads it) and a non-button Trigger render saying "expanded" over a hidden
+    listbox after Escape or a light dismiss until the notification, and any action entangled with
+    it, settled: a regression in Chromium and WebKit on the focused element. The attribute now
+    renders **`shown`**, an urgent `useState` mirror in `useOverlayRoot` (3.2's table) that the
+    Popup writes from `toggle` (read from `:popover-open`), sets at mount for a pre-hydration open
+    and clears on unmount; no transition can delay it, so the attribute equals `:popover-open`
+    within a task in every phase and in every engine, and the three lag phases the review listed
+    (dismissal window, pre-hydration `defaultOpen`, platform path) are gone. Consequence:
+    `defaultOpen` server-renders `aria-expanded="false"` (the popup is not shown before
+    hydration). JS-free mode keeps its DOM write (7.4). Not exposed in render-prop state.
 
 ## Open questions
 
