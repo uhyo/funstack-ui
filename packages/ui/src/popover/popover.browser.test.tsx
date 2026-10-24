@@ -19,7 +19,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import {
@@ -36,7 +36,10 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
-import { describeOverlayInBrowser } from "../__tests__/overlay-browser-suite.js";
+import {
+  describeOverlayInBrowser,
+  setUpViewTransitionRows,
+} from "../__tests__/overlay-browser-suite.js";
 import type {
   OverlayBrowserHarnessProps,
   OverlayViewTransitionProps,
@@ -44,12 +47,9 @@ import type {
 import { Popover } from "./index.js";
 import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
 import {
-  addStyle,
   closeOpenTopLayer,
   flushFor,
   runCleanups,
-  leaveActEnvironment,
-  spyViewTransitions,
   quietPeriod,
   settle,
 } from "../__tests__/browser-helpers.js";
@@ -114,7 +114,13 @@ function Library({
 }
 
 /** No wrapper element: inserted by a transition, the Popup's boundary is the subtree's top. */
-function Plain({ transition, className, keepMounted }: OverlayViewTransitionProps) {
+function Plain({
+  transition,
+  className,
+  keepMounted,
+  controlled,
+}: OverlayViewTransitionProps & { keepMounted?: boolean }) {
+  if (controlled) throw new Error("Popover's Plain has no controlled variant");
   return (
     <Popover.Root defaultOpen={false}>
       <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
@@ -477,29 +483,7 @@ describe("nested popovers (browser)", () => {
 });
 
 describe("ViewTransition (browser)", () => {
-  let restoreAct: () => void;
-  let calls: { openAtStart: boolean }[] = [];
-  let transitions: ViewTransition[] = [];
-
-  beforeEach(() => {
-    calls = [];
-    ({ transitions } = spyViewTransitions(() => {
-      const element = document.querySelector("[data-testid=popup]");
-      calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
-    }));
-    restoreAct = leaveActEnvironment();
-    addStyle(`
-        ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
-        ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
-        @keyframes vt-pop-out { to { opacity: 0; } }
-        @keyframes vt-pop-in { from { opacity: 0; } }
-      `);
-  });
-
-  afterEach(async () => {
-    restoreAct();
-    await Promise.allSettled(transitions.map((transition) => transition.finished));
-  });
+  const vt = setUpViewTransitionRows((element) => element.matches(":popover-open"));
 
   // H1: with `transition` the close commit unmounts the focused Close before `hidePopover()`
   // runs, so the platform (which restores focus only from inside the popover) restores nothing.
@@ -510,15 +494,13 @@ describe("ViewTransition (browser)", () => {
   ] as const)("transition=%s keepMounted=%s", (transition, keepMounted) => {
     it("a Close activated from the keyboard returns focus to the Trigger", async () => {
       render(<Plain transition={transition} keepMounted={keepMounted} />);
-      trigger().click();
-      await expect.poll(() => isOpen()).toBe(true);
-      await Promise.allSettled(transitions.map((t) => t.finished));
+      await vt.open();
       const close = screen.getByTestId("close");
       close.focus();
       expect(close).toHaveFocus();
       await userEvent.keyboard("{Enter}");
       await expect.poll(() => isOpen()).toBe(false);
-      await Promise.allSettled(transitions.map((t) => t.finished));
+      await Promise.allSettled(vt.transitions.map((t) => t.finished));
       await expect.poll(() => document.activeElement).toBe(trigger());
     });
   });
@@ -542,12 +524,12 @@ describe("ViewTransition (browser)", () => {
     render(<Inserted />);
     screen.getByTestId("insert").click();
     await expect.poll(() => screen.queryByTestId("trigger")).not.toBeNull();
-    await expect.poll(() => calls.length).toBe(1);
-    await transitions[0]!.finished;
+    await expect.poll(() => vt.calls.length).toBe(1);
+    await vt.transitions[0]!.finished;
     trigger().click();
     await expect.poll(() => isOpen()).toBe(true);
     await quietPeriod(50, "the shielded open must not start a view transition");
-    expect(calls).toHaveLength(1);
+    expect(vt.calls).toHaveLength(1);
   });
 });
 

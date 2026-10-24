@@ -180,7 +180,8 @@ function SuiteHarness({
 }
 
 /** No wrapper element: the Popup's boundary is the top of what a transition inserts. */
-function Plain({ transition, className }: OverlayViewTransitionProps) {
+function Plain({ transition, className, controlled }: OverlayViewTransitionProps) {
+  if (controlled) throw new Error("Menu's Plain has no controlled variant");
   return (
     <Menu.Root>
       <Menu.Trigger data-testid="trigger">Actions</Menu.Trigger>

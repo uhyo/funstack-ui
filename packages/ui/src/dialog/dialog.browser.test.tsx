@@ -14,11 +14,17 @@
 import { act, render, screen } from "@testing-library/react";
 import { Suspense, startTransition, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsDialogClosedBy } from "../__tests__/engine.js";
-import { describeOverlayInBrowser } from "../__tests__/overlay-browser-suite.js";
+import {
+  addExitStyle,
+  describeOverlayInBrowser,
+  setUpViewTransitionRows,
+  watchExit,
+  finishExit,
+} from "../__tests__/overlay-browser-suite.js";
 import type {
   OverlayBrowserHarnessProps,
   OverlayViewTransitionProps,
@@ -32,9 +38,6 @@ import {
   flushFor,
   runCleanups,
   settle,
-  sleep,
-  leaveActEnvironment,
-  spyViewTransitions,
 } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
@@ -95,7 +98,7 @@ function Plain({
   keepMounted,
   modal,
   controlled = false,
-}: OverlayViewTransitionProps & { modal?: boolean }) {
+}: OverlayViewTransitionProps & { keepMounted?: boolean; modal?: boolean }) {
   const [open, setOpen] = useState(false);
   const rootProps = controlled
     ? { open, openChangeAction: (next: boolean) => setOpen(next) }
@@ -160,7 +163,7 @@ describeOverlayInBrowser<DialogOpenChangeDetails>({
   partClose: () => user.click(screen.getByTestId("close")),
   dismissEvent: "close",
   ariaExpanded: false,
-  dismissReturnValue: "",
+  dismissDetails: (details) => expect(details.returnValue).toBe(""),
   viewTransition: {
     Plain,
     partCloses: [
@@ -629,47 +632,10 @@ describe("nested confirm (browser)", () => {
   });
 });
 
+// A fade whose exit outlasts any test (#71): the row ends the exit itself with `finish()`.
 describe("exit animation and the deferred unmount (browser)", () => {
-  /**
-   * A fade whose exit outlasts any test (#71): the enter is instant and the exit takes 60 s, so
-   * the "content still there" check cannot race a 300 ms fade against Playwright round trips
-   * under load. The row ends the exit itself with `finish()` and then expects the release.
-   */
-  function heldExitStyle() {
-    addStyle(`
-        .held-exit, .held-exit::backdrop {
-          opacity: 0;
-          transition: opacity 60s, display 60s allow-discrete, overlay 60s allow-discrete;
-        }
-        .held-exit:open, .held-exit:open::backdrop { opacity: 1; transition-duration: 0s; }
-      `);
-  }
-
-  /** Resolves with the exit animations running when the dialog's `close` (a queued task) fires. */
-  function watchExit(): Promise<Animation[]> {
-    return new Promise((resolve) => {
-      const element = popup();
-      element.addEventListener(
-        "close",
-        () => {
-          void getComputedStyle(element).opacity;
-          resolve(element.getAnimations({ subtree: true }));
-        },
-        { once: true },
-      );
-    });
-  }
-
-  /** Ends the exit and lets the Popup's release (a normal update) run, inside `act`. */
-  const finishExit = (animations: Animation[]) =>
-    act(async () => {
-      for (const animation of animations) animation.finish();
-      await Promise.allSettled(animations.map((animation) => animation.finished));
-      await sleep(20);
-    });
-
   it("a controlled close without transition keeps the content through the fade, mounted once (#46)", async () => {
-    heldExitStyle();
+    addExitStyle("held-exit", "60s", { openPseudo: ":open", instantEnter: true });
     let mounts = 0;
     function Content() {
       useEffect(() => {
@@ -700,7 +666,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
     render(<Controlled />);
     await openWithTrigger();
     expect(mounts).toBe(1);
-    const exit = watchExit();
+    const exit = watchExit(popup(), "close");
     // A programmatic close (the dialog's page is inert, so not a click on the page).
     await act(async () => screen.getByTestId("close-from-outside").click());
     expect(popup().open).toBe(false);
@@ -723,29 +689,7 @@ describe("exit animation and the deferred unmount (browser)", () => {
 
 // The library-owned closes are captured since #46; the shared rows are in the suite above.
 describe("ViewTransition (browser)", () => {
-  let restoreAct: () => void;
-  let calls: { openAtStart: boolean }[] = [];
-  let transitions: ViewTransition[] = [];
-
-  beforeEach(() => {
-    calls = [];
-    ({ transitions } = spyViewTransitions(() => {
-      const element = document.querySelector<HTMLDialogElement>("[data-testid=popup]");
-      calls.push({ openAtStart: element?.open ?? false });
-    }));
-    restoreAct = leaveActEnvironment();
-    addStyle(`
-        ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
-        ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
-        @keyframes vt-pop-out { to { opacity: 0; } }
-        @keyframes vt-pop-in { from { opacity: 0; } }
-      `);
-  });
-
-  afterEach(async () => {
-    restoreAct();
-    await Promise.allSettled(transitions.map((transition) => transition.finished));
-  });
+  const vt = setUpViewTransitionRows((element) => (element as HTMLDialogElement).open);
 
   const isOpen = () => popup().open;
 
@@ -758,22 +702,15 @@ describe("ViewTransition (browser)", () => {
       );
   }
 
-  /** Opens through the Trigger and waits for the open's view transition (if any) to finish. */
-  async function open(): Promise<void> {
-    trigger().click();
-    await expect.poll(() => isOpen()).toBe(true);
-    await Promise.allSettled(transitions.map((t) => t.finished));
-  }
-
   it('transition="pop": the opening commit captures the dialog shown by showModal() (10.3)', async () => {
     render(<Plain transition="pop" />);
     trigger().click();
-    await expect.poll(() => calls.length).toBe(1);
-    await transitions[0]!.ready;
+    await expect.poll(() => vt.calls.length).toBe(1);
+    await vt.transitions[0]!.ready;
     // The top-layer dialog promoted inside the update callback has a new snapshot. If an engine
     // ever stops capturing it, this row tells (design 10.3 then documents the open as CSS only).
     expect(pseudoAnimations("::view-transition-new").length).toBeGreaterThan(0);
-    await transitions[0]!.finished;
+    await vt.transitions[0]!.finished;
     expect(isOpen()).toBe(true);
   });
 
@@ -787,13 +724,13 @@ describe("ViewTransition (browser)", () => {
   ] as const)("modal=%s keepMounted=%s", (modal, keepMounted) => {
     it('transition="pop": a Close activated with Enter returns focus to the Trigger', async () => {
       render(<Plain transition="pop" modal={modal} keepMounted={keepMounted} />);
-      await open();
+      await vt.open();
       const close = screen.getByTestId("close");
       close.focus();
       expect(close).toHaveFocus();
       await userEvent.keyboard("{Enter}");
       await expect.poll(() => isOpen()).toBe(false);
-      await Promise.allSettled(transitions.map((t) => t.finished));
+      await Promise.allSettled(vt.transitions.map((t) => t.finished));
       await expect.poll(() => document.activeElement).toBe(trigger());
     });
   });

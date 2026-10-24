@@ -99,15 +99,17 @@ environment.browser.test.tsx "fires ToggleEvent when a popover opens": same titl
 | M6 library close 150 ms after the commit (popover/menu `hidePopover`, dialog `close`) | 10 fail: pop open/close (all partCloses) + CSS exit recipe=true | 16 |
 | M7 library open 150 ms after the commit | 5 fail: pop open/close (all partCloses) | 5 |
 | M8 hold during render even with `transition` | 5 fail: pop open/close | 5 |
-| M9 `afterClose` holds for an echo with `transition` | 0 survive | - |
+| M9 `afterClose` holds for an echo with `transition` | 5 fail after review M1 (re-mount count in the CSS-exit part-close rows, recipe=false x all part closes) | 0 (no exit animations; expected) |
 
 - M6/M7 with a 0 ms delay survived the original row shape (it polled `isOpen` before checking at
   `updateCallbackDone`). The row now polls the call count first and checks the popup at
   `updateCallbackDone` for the open and the close; M6/M7 with 150 ms fail. The 0 ms variant is
   not distinguishable (React's update callback outlives a 0 ms timer).
-- M9 survivor: with `transition` the content would be re-mounted into the hidden popup for the
-  CSS exit; only Chromium without the recipe would show it, and a check races the fade. Pre-existing
-  gap, not covered by any old row either.
+- M9 (first a survivor): with `transition` the content would be re-mounted into the hidden popup
+  for the CSS exit. Review M1 showed a MutationObserver count does not race the fade: the
+  "a CSS exit (recipe=%s)" rows now count `content` nodes added to the popup from before the close
+  to after the quiet period and expect 0 (`countMounts`). Clean runs: 3 on chromium + firefox
+  green (32/32 each).
 
 ## 2. `__tests__/overlay-disabled-render-suite.tsx` (`describeOverlayDisabledRenders`)
 
@@ -174,3 +176,16 @@ Mutations (jsdom, suite rows only):
 - Browser: dialog/popover/menu .browser files +244 / -802, suite +456: net -102 lines, with more
   rows than before (Menu and Dialog gained variants).
 - jsdom: dialog-disabled / popover / menu tests +53 / -368, suite +248: net -67.
+
+## Review follow-up (memo/reviewer/issue-109-review.md)
+
+- M1: re-mount count added (above).
+- L2: the suite exports `addExitStyle`, `watchExit`, `finishExit` and `setUpViewTransitionRows`
+  (spy + act environment + `.pop` keyframes + `open()`, registered in the caller's describe).
+  Dialog's #46 row and the local ViewTransition blocks of dialog/popover.browser use them.
+- N1: `OverlayViewTransitionProps.keepMounted` dropped (Dialog and Popover add it locally for the
+  focus rows); Popover's and Menu's `Plain` throw on `controlled`.
+- N2: `dismissReturnValue` replaced by a `dismissDetails(details)` hook (no cast).
+- N3: CSS-exit part-close title now "… has the old image, a live new image only where the box still
+  fades (Chromium, recipe=false); the content is not re-mounted".
+- L1 (one real-mouse row per "click X while open" entry): issue #117, out of scope.

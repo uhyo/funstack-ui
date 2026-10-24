@@ -55,13 +55,12 @@ export interface OverlayBrowserHarnessProps<D> {
 /**
  * The ViewTransition rows' harness: no wrapper element above the Root, so a Root inserted by a
  * transition has the Popup's boundary at the top of the subtree. The popup holds
- * `data-testid="content"`; a `partCloses` entry's `controlled` renders a controlled Root
- * (Dialog only).
+ * `data-testid="content"`. `controlled` (a controlled Root) is passed only by a `partCloses` entry
+ * that sets it (Dialog); a harness without a controlled variant throws on it.
  */
 export interface OverlayViewTransitionProps {
   transition?: ViewTransitionClass;
   className?: string;
-  keepMounted?: boolean;
   controlled?: boolean;
 }
 
@@ -98,8 +97,8 @@ export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
   readonly dismissEvent: "close" | "toggle";
   /** The Trigger carries `aria-expanded` (Popover, Menu; not Dialog). */
   readonly ariaExpanded: boolean;
-  /** `details.returnValue` of an Escape (Dialog: `""`); omitted where details have none. */
-  readonly dismissReturnValue?: string;
+  /** Extra checks on an Escape's `details` (Dialog: `returnValue` is `""`). */
+  readonly dismissDetails?: (details: D) => void;
   readonly viewTransition: {
     readonly Plain: ComponentType<OverlayViewTransitionProps>;
     /** The library-owned closes; the first one is used by the rows that need just one. */
@@ -111,6 +110,141 @@ export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
     readonly dismiss: () => void | Promise<void>;
     /** Extra checks once the open's view transition finished (Dialog: `:modal`; Menu: focus). */
     readonly afterOpen?: () => void;
+  };
+}
+
+/**
+ * A CSS exit on a popup (design 10.1): `opacity` with `display` and `overlay` held for
+ * `duration`. `openPseudo` `":open"` (a modal dialog) also fades the `::backdrop`.
+ * `instantEnter`: no enter fade. `recipe`: the docs' rule that cuts the fade while a view
+ * transition runs (review M2 of Dialog #46).
+ */
+export function addExitStyle(
+  className: string,
+  duration: string,
+  {
+    openPseudo,
+    instantEnter = false,
+    recipe = false,
+  }: { openPseudo: ":open" | ":popover-open"; instantEnter?: boolean; recipe?: boolean },
+): void {
+  const boxes = (state = "") =>
+    openPseudo === ":open"
+      ? `.${className}${state}, .${className}${state}::backdrop`
+      : `.${className}${state}`;
+  addStyle(`
+    ${boxes()} {
+      opacity: 0;
+      transition: opacity ${duration}, display ${duration} allow-discrete, overlay ${duration} allow-discrete;
+    }
+    ${boxes(openPseudo)} { opacity: 1;${instantEnter ? " transition-duration: 0s;" : ""} }
+    ${instantEnter ? "" : `@starting-style { ${boxes(openPseudo)} { opacity: 0; } }`}
+    ${recipe ? `html:active-view-transition .${className} { transition: none; }` : ""}
+  `);
+}
+
+/**
+ * Resolves with the exit animations the engine runs when `popup` closes, read in its `close` /
+ * closing `toggle` (a queued task, so a row awaits it rather than assuming one flush ran it).
+ */
+export function watchExit(popup: Element, type: "close" | "toggle"): Promise<Animation[]> {
+  return new Promise((resolve) => {
+    popup.addEventListener(type, function listener(event) {
+      if (event instanceof ToggleEvent && event.newState !== "closed") return;
+      popup.removeEventListener(type, listener);
+      void getComputedStyle(popup).opacity;
+      resolve(popup.getAnimations({ subtree: true }));
+    });
+  });
+}
+
+/**
+ * Ends the exit; the unmount is an update the Popup makes when the animations finish, so this
+ * runs inside `act`.
+ */
+export function finishExit(animations: readonly Animation[]): Promise<void> {
+  return act(async () => {
+    for (const animation of animations) animation.finish();
+    await Promise.allSettled(animations.map((animation) => animation.finished));
+    await sleep(20);
+  });
+}
+
+/** Counts the elements with `data-testid={testId}` added under `root` until `stop()`. */
+function countMounts(root: Element, testId: string): { stop: () => number } {
+  let mounts = 0;
+  const selector = `[data-testid="${testId}"]`;
+  const count = (records: readonly MutationRecord[]) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof Element && (node.matches(selector) || node.querySelector(selector))) {
+          mounts++;
+        }
+      }
+    }
+  };
+  const observer = new MutationObserver(count);
+  observer.observe(root, { childList: true, subtree: true });
+  return {
+    stop: () => {
+      count(observer.takeRecords());
+      observer.disconnect();
+      return mounts;
+    },
+  };
+}
+
+/** The ViewTransition rows' spy: what `setUpViewTransitionRows` gives a describe block. */
+export interface ViewTransitionRows {
+  /** One entry per `startViewTransition` call: whether the popup was open at the call. */
+  readonly calls: readonly { readonly openAtStart: boolean }[];
+  readonly transitions: readonly ViewTransition[];
+  /** Opens through the Trigger and waits for the open's view transition (if any). */
+  readonly open: () => Promise<void>;
+}
+
+/**
+ * Registers, in the calling describe block, the setup of rows that click in-page outside `act`
+ * and watch document view transitions: the `startViewTransition` spy, React's act environment
+ * off, and the `.pop` keyframes. `isOpen` reads the popup (`data-testid="popup"`).
+ */
+export function setUpViewTransitionRows(isOpen: (popup: Element) => boolean): ViewTransitionRows {
+  let restoreAct: () => void;
+  let calls: { openAtStart: boolean }[] = [];
+  let transitions: ViewTransition[] = [];
+
+  beforeEach(() => {
+    calls = [];
+    ({ transitions } = spyViewTransitions(() => {
+      const element = document.querySelector("[data-testid=popup]");
+      calls.push({ openAtStart: element ? isOpen(element) : false });
+    }));
+    restoreAct = leaveActEnvironment();
+    addStyle(`
+      ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
+      ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
+      @keyframes vt-pop-out { to { opacity: 0; } }
+      @keyframes vt-pop-in { from { opacity: 0; } }
+    `);
+  });
+
+  afterEach(async () => {
+    restoreAct();
+    await Promise.allSettled(transitions.map((transition) => transition.finished));
+  });
+
+  return {
+    get calls() {
+      return calls;
+    },
+    get transitions() {
+      return transitions;
+    },
+    open: async () => {
+      screen.getByTestId("trigger").click();
+      await expect.poll(() => isOpen(screen.getByTestId("popup"))).toBe(true);
+      await Promise.allSettled(transitions.map((t) => t.finished));
+    },
   };
 }
 
@@ -126,31 +260,6 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
   const content = () => screen.queryByTestId("content");
   const isOpen = () => config.isOpen(popup());
 
-  /**
-   * A CSS exit on the popup (design 10.1): `opacity` with `display` and `overlay` held for
-   * `duration`. `instantEnter`: no enter fade. `recipe`: the docs' rule that cuts the fade while a
-   * view transition runs (review M2 of Dialog #46).
-   */
-  function exitStyle(
-    className: string,
-    duration: string,
-    { instantEnter = false, recipe = false } = {},
-  ) {
-    const boxes = (state = "") =>
-      openPseudo === ":open"
-        ? `.${className}${state}, .${className}${state}::backdrop`
-        : `.${className}${state}`;
-    addStyle(`
-      ${boxes()} {
-        opacity: 0;
-        transition: opacity ${duration}, display ${duration} allow-discrete, overlay ${duration} allow-discrete;
-      }
-      ${boxes(openPseudo)} { opacity: 1;${instantEnter ? " transition-duration: 0s;" : ""} }
-      ${instantEnter ? "" : `@starting-style { ${boxes(openPseudo)} { opacity: 0; } }`}
-      ${recipe ? `html:active-view-transition .${className} { transition: none; }` : ""}
-    `);
-  }
-
   describe(`${config.name} (shared overlay browser suite)`, () => {
     it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
       const action = vi.fn<Action>();
@@ -163,33 +272,12 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
       const [next, details] = action.mock.calls[1]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("dismiss");
-      if (config.dismissReturnValue !== undefined) {
-        expect((details as unknown as { returnValue?: string }).returnValue).toBe(
-          config.dismissReturnValue,
-        );
-      }
+      config.dismissDetails?.(details);
       expect(details.event?.type).toBe(config.dismissEvent);
       if (config.ariaExpanded) expect(trigger()).toHaveAttribute("aria-expanded", "false");
     });
 
     describe("exit animation and the deferred unmount", () => {
-      /**
-       * Resolves with the exit animations the engine runs when the popup closes, read in its
-       * `close` / `toggle` (a queued task, so the row awaits it rather than assuming one flush
-       * ran it).
-       */
-      function watchExit(): Promise<Animation[]> {
-        return new Promise((resolve) => {
-          const element = popup();
-          element.addEventListener(config.dismissEvent, function listener(event) {
-            if (event instanceof ToggleEvent && event.newState !== "closed") return;
-            element.removeEventListener(config.dismissEvent, listener);
-            void getComputedStyle(element).opacity;
-            resolve(element.getAnimations({ subtree: true }));
-          });
-        });
-      }
-
       async function expectHeldThenReleased(exit: Promise<Animation[]>) {
         let animations: Animation[] = [];
         await act(async () => {
@@ -200,13 +288,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
         if (animations.length > 0) {
           // Chromium / WebKit: the popup is still fading out; the content stays.
           expect(content()).not.toBeNull();
-          // End the exit; the unmount is an update the Popup makes when the animations finish:
-          // inside `act`.
-          await act(async () => {
-            for (const animation of animations) animation.finish();
-            await Promise.allSettled(animations.map((animation) => animation.finished));
-            await sleep(20);
-          });
+          await finishExit(animations);
           expect(content()).toBeNull();
         } else {
           // Firefox: `display` flips at once (bug 1834877); nothing to wait for.
@@ -225,10 +307,10 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
       it.each(closes)(
         "%s keeps the content while the CSS exit runs; none in Firefox",
         async (_, close) => {
-          exitStyle("held-exit", "60s", { instantEnter: true });
+          addExitStyle("held-exit", "60s", { openPseudo, instantEnter: true });
           render(<Harness className="held-exit" />);
           await config.open();
-          const exit = watchExit();
+          const exit = watchExit(popup(), config.dismissEvent);
           await close();
           await settle(() => expect(isOpen()).toBe(false));
           await expectHeldThenReleased(exit);
@@ -242,7 +324,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
       it.each(closes)(
         "%s ignores a finite animation that was already running inside (#64)",
         async (_, close) => {
-          exitStyle("fade", "300ms");
+          addExitStyle("fade", "300ms", { openPseudo });
           let bar: Animation | undefined;
           render(
             <Harness
@@ -278,36 +360,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
     // (the platform already closed the popup) runs one only for its notification commit. The
     // rows click in-page outside `act`, because `act` would flush React's queue itself.
     describe("ViewTransition", () => {
-      let restoreAct: () => void;
-      let calls: { openAtStart: boolean }[] = [];
-      let transitions: ViewTransition[] = [];
-
-      beforeEach(() => {
-        calls = [];
-        ({ transitions } = spyViewTransitions(() => {
-          const element = document.querySelector("[data-testid=popup]");
-          calls.push({ openAtStart: element ? config.isOpen(element) : false });
-        }));
-        restoreAct = leaveActEnvironment();
-        addStyle(`
-          ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
-          ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
-          @keyframes vt-pop-out { to { opacity: 0; } }
-          @keyframes vt-pop-in { from { opacity: 0; } }
-        `);
-      });
-
-      afterEach(async () => {
-        restoreAct();
-        await Promise.allSettled(transitions.map((transition) => transition.finished));
-      });
-
-      /** Opens through the Trigger and waits for the open's view transition (if any). */
-      async function open(): Promise<void> {
-        trigger().click();
-        await expect.poll(() => isOpen()).toBe(true);
-        await Promise.allSettled(transitions.map((t) => t.finished));
-      }
+      const vt = setUpViewTransitionRows(config.isOpen);
 
       /** The `::view-transition-*` pseudo-elements animating now, by name (read at `ready`). */
       function pseudoNames(): string[] {
@@ -337,21 +390,21 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           render(<Plain transition="pop" controlled={partClose.controlled} />);
           trigger().click();
           // Not waiting for the popup first: shown later than the update callback must fail.
-          await expect.poll(() => calls.length).toBe(1);
+          await expect.poll(() => vt.calls.length).toBe(1);
           // Started before the popup was shown; shown inside the update callback.
-          expect(calls[0]!.openAtStart).toBe(false);
-          await transitions[0]!.updateCallbackDone;
+          expect(vt.calls[0]!.openAtStart).toBe(false);
+          await vt.transitions[0]!.updateCallbackDone;
           expect(isOpen()).toBe(true);
-          await transitions[0]!.finished;
+          await vt.transitions[0]!.finished;
           config.viewTransition.afterOpen?.();
 
           partClose.close();
-          await expect.poll(() => calls.length).toBe(2);
+          await expect.poll(() => vt.calls.length).toBe(2);
           // The library closes inside the update callback, so the popup is open at the start.
-          expect(calls[1]!.openAtStart).toBe(true);
-          await transitions[1]!.updateCallbackDone;
+          expect(vt.calls[1]!.openAtStart).toBe(true);
+          await vt.transitions[1]!.updateCallbackDone;
           expect(isOpen()).toBe(false);
-          await transitions[1]!.ready;
+          await vt.transitions[1]!.ready;
           // The old snapshot carries the popup (with its content) out, in every engine.
           const oldImages = document
             .getAnimations()
@@ -361,50 +414,50 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
               ),
             );
           expect(oldImages.length).toBeGreaterThan(0);
-          await transitions[1]!.finished;
+          await vt.transitions[1]!.finished;
           expect(isOpen()).toBe(false);
           expect(content()).toBeNull();
           await partClose.afterClose?.();
           await quietPeriod(50, "no third view transition");
-          expect(calls).toHaveLength(2);
+          expect(vt.calls).toHaveLength(2);
         },
       );
 
       it('transition="pop": a dismissal runs one only for the notification commit, popup already closed', async () => {
         render(<Plain transition="pop" />);
-        await open();
-        expect(calls).toHaveLength(1);
+        await vt.open();
+        expect(vt.calls).toHaveLength(1);
         await dismiss();
         expect(isOpen()).toBe(false);
-        await expect.poll(() => calls.length).toBe(2);
-        expect(calls[1]!.openAtStart).toBe(false);
-        await transitions[1]!.finished;
+        await expect.poll(() => vt.calls.length).toBe(2);
+        expect(vt.calls[1]!.openAtStart).toBe(false);
+        await vt.transitions[1]!.finished;
         await expect.poll(() => content()).toBeNull();
         await quietPeriod(50, "the release of the held content must not start a view transition");
-        expect(calls).toHaveLength(2);
+        expect(vt.calls).toHaveLength(2);
       });
 
       it.each([false, true])(
         'transition="pop" plus a CSS exit (recipe=%s): a dismissal runs one view transition, not two',
         async (recipe) => {
-          exitStyle("fade", "200ms", { recipe });
+          addExitStyle("fade", "200ms", { openPseudo, recipe });
           render(<Plain transition="pop" className="fade" />);
-          await open();
-          expect(calls).toHaveLength(1);
+          await vt.open();
+          expect(vt.calls).toHaveLength(1);
           await animationsFinished(popup()); // the enter fade
           await dismiss();
           // The notification commit (design 4.4); the content may be held for the CSS fade.
-          await expect.poll(() => calls.length).toBe(2);
-          await transitions[1]!.ready;
+          await expect.poll(() => vt.calls.length).toBe(2);
+          await vt.transitions[1]!.ready;
           // With the recipe, no live new image of the fading popup next to the old one.
           if (recipe && namesReliable) {
             expect(popupImages("new"), JSON.stringify(pseudoNames())).toEqual([]);
           }
-          await transitions[1]!.finished;
+          await vt.transitions[1]!.finished;
           await expect.poll(() => content()).toBeNull();
           // Releasing the hold is a normal update: no second document view transition.
           await quietPeriod(100, "the release of the hold must not start a view transition");
-          expect(calls).toHaveLength(2);
+          expect(vt.calls).toHaveLength(2);
         },
       );
 
@@ -415,15 +468,18 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
       // changed; re-check the docs' recipe.
       describe.each([false, true])("a CSS exit (recipe=%s)", (recipe) => {
         it.each(partCloses.map((close) => [close.name, close] as const))(
-          'transition="pop": %s has the old image, a live new image only in Chromium without the recipe',
+          'transition="pop": %s has the old image, a live new image only where the box still fades (Chromium, recipe=false); the content is not re-mounted',
           async (_, partClose) => {
-            exitStyle("fade", "200ms", { recipe });
+            addExitStyle("fade", "200ms", { openPseudo, recipe });
             render(<Plain transition="pop" className="fade" controlled={partClose.controlled} />);
-            await open();
+            await vt.open();
             await animationsFinished(popup()); // the enter fade
+            // The close commit unmounted the content inside the view transition: no hold may
+            // bring it back for the CSS exit (the old snapshot already carried it out).
+            const remounts = countMounts(popup(), "content");
             partClose.close();
-            await expect.poll(() => calls.length).toBe(2);
-            await transitions[1]!.ready;
+            await expect.poll(() => vt.calls.length).toBe(2);
+            await vt.transitions[1]!.ready;
             const fading = getComputedStyle(popup()).display !== "none";
             const seen = JSON.stringify({ names: pseudoNames(), fading });
             expect(fading, seen).toBe(!recipe && browserName === "chromium");
@@ -431,25 +487,26 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
               expect(popupImages("old").length, seen).toBeGreaterThan(0);
               expect(popupImages("new").length > 0, seen).toBe(fading);
             }
-            await transitions[1]!.finished;
+            await vt.transitions[1]!.finished;
             expect(isOpen()).toBe(false);
             await quietPeriod(100, "the release of the hold must not start a view transition");
-            expect(calls).toHaveLength(2);
+            expect(vt.calls).toHaveLength(2);
+            expect(remounts.stop()).toBe(0);
           },
         );
       });
 
       it("without transition: no view transition for an open, a part-initiated close or a dismissal", async () => {
         render(<Plain />);
-        await open();
+        await vt.open();
         await quietPeriod(50, "the open must not start a view transition");
         partCloses[0].close();
         await expect.poll(() => isOpen()).toBe(false);
-        await open();
+        await vt.open();
         await dismiss();
         await expect.poll(() => isOpen()).toBe(false);
         await quietPeriod(50, "no close may start a view transition");
-        expect(calls).toHaveLength(0);
+        expect(vt.calls).toHaveLength(0);
       });
     });
   });
