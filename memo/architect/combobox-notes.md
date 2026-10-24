@@ -202,3 +202,44 @@ warning, not a snapshot path).
 
 Open: audit T1's sweep ("every click-X-while-open row of every overlay gets a real-mouse browser
 row") is still worth doing after #110 and #112 land; not part of either issue.
+
+## #123: a press on the Input light-dismissed the listbox (2026-10-24)
+
+The #117 developer's plain-DOM probe was right and three of our documents were wrong: `source` is
+not a light-dismiss exemption. I had taken the research's probe table at face value; the probe
+had used a synthesised click, which never runs light dismiss. Lesson, now in conventions 3.5: any
+light-dismiss claim needs a real-pointer browser row, never `element.click()` / `dispatchEvent`.
+
+Verified the spec text (HTML "topmost clicked popover": flat-tree ancestry + button target
+popover only) and the three engines' sources (Chromium `FindTopmostRelatedPopover` /
+`NearestTargetPopoverForInvoker`, Gecko `nsINode::GetTopmostClickedPopover`, WebKit
+`Document::handlePopoverLightDismiss` called from `PointerCaptureController::
+pointerEventWillBeDispatched`). None reads the invoker that `showPopover({ source })` sets.
+Chromium stable is click-based (`LightDismissFromClick`): it records the `pointerdown` and
+`pointerup` targets and compares at the `click`; Gecko and WebKit compare at `pointerup`. No
+engine checks `defaultPrevented`.
+
+Probe scripts: scratchpad `probe/probe.mjs` and `probe2.mjs` (not kept in the repo; the results
+are in the amendment's table). Key facts for the decision:
+
+- Capture at `pointerdown` works for mouse and touch; capture at `mousedown` fails for touch
+  (its compat `mousedown` comes after `pointerup`).
+- The compat `mousedown` is not retargeted by a capture set during `pointerdown` (pending capture
+  takes effect at the next *pointer* event), so the caret and the double click are intact.
+- Firefox routes the mouse drag to the capturing element: drag-to-select in the input does not
+  extend while captured. Chromium's selection drag ignores pointer capture. No Bugzilla entry
+  found for this; Pointer Events does not define selection, so it is a difference, not a bug.
+  If it ever matters more, the only idea I had was releasing the capture on the first
+  `pointermove` (selection extends, but the release then dismisses) — a worse trade.
+- The `click` goes to the Popup under capture in both engines (PE L3 click-target rule), so a
+  consumer `onClick` on the Popup sees it; `openOnClick` is unaffected (only presses while open
+  are captured).
+
+Rejected: accepting the browser shape (the list vanishes under a caret click; `openOnClick`
+blinks), re-show (flicker, false `"dismiss"`), `popover="manual"` (a redesign: Escape, the auto
+stack and nesting all come back to the library for one press). The lead asked to be told if a
+popover-mode redesign were needed: it is not.
+
+Left for the developer: the `capturePointer` helper moves from `menu/menu-dom.ts` to
+`internal/pointer-capture.ts`; the docs page sentence at ComboboxPage.tsx:74; the code comment
+in `combobox-input.tsx`'s ref callback that repeats the wrong claim.

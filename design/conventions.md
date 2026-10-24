@@ -1128,10 +1128,18 @@ Rules:
   across the click is required. The second known trap is **light dismiss** (Combobox's Trigger,
   #112; engine-independent): a press on a part outside the popup that is neither the popover's
   `source` nor a button naming it hides the popup at `pointerup`, a task before the `click`. The
-  exemption is the invoker relationship of HTML's "topmost clicked popover": the element the
-  popover was shown with (`source`) and a `<button>` whose `commandfor` (with a popover
-  `command`) or `popovertarget` names the shown popover count as part of it; Chromium, Firefox
-  and WebKit all implement both attributes there (a custom `command` does not qualify). A part
+  exemption is the invoker relationship of HTML's "topmost clicked popover": a `<button>` whose
+  `commandfor` (with a popover `command`) or `popovertarget` names the shown popover counts as
+  part of it (so do the platform's own invokers, `interestfor` and a `<select>`'s picker);
+  Chromium, Firefox and WebKit all implement both attributes there (a custom `command` does not
+  qualify). **The element the popover was shown with (`showPopover({ source })`) is not exempt**
+  (#123): `source` sets the popover's invoker for nested stacking and the implicit anchor, and
+  nothing in the light-dismiss path reads it (HTML "topmost clicked popover" walks the flat tree
+  and the button's target popover; Chromium `FindTopmostRelatedPopover`, Gecko
+  `nsINode::GetTopmostClickedPopover`, WebKit `Document::handlePopoverLightDismiss`). The earlier
+  claim that it was came from a probe with a synthesised click, which has no `pointerdown` /
+  `pointerup` and never runs light dismiss; light dismiss is only observable with a real pointer,
+  which is why these rows are browser rows. A part
   that closes through its action therefore names the popup with `commandfor` +
   `command="toggle-popover"` and cancels its click so the command never runs (`usePopoverTrigger`
   does both for Popover and Menu; Combobox's Trigger writes the pair through its ref after
@@ -1139,7 +1147,20 @@ Rules:
   popup). The exemption exists for `<button>`s only, so a Trigger rendered as another element
   through `render` keeps a browser-shaped close in library mode (right reason, nothing awaited,
   no veto, no exit transition); the guarantee is stated for a `<button>` Trigger and the
-  non-button dev warning says so (#115, popover.md 2.7). A part whose close is browser-owned by
+  non-button dev warning says so (#115, popover.md 2.7). A part that is not a `<button>` and
+  must survive its own press (Combobox's Input, #123) has one lever left, **pointer capture**:
+  light dismiss compares the popover under the press with the popover under the release (the
+  `pointerup` target in Firefox and WebKit; in Chromium's click-based variant the `pointerup`
+  target recorded for the `click`), and capture retargets the release, so
+  `popup.setPointerCapture(pointerId)` at the part's `pointerdown` (primary button, popover
+  shown) makes the release count as inside the popup and nothing hides, with a mouse, a pen or a
+  finger, wherever the release lands. The compat `mousedown` is not retargeted (the caret still
+  lands where the user pressed); `pointerup`, `mouseup` and the `click` land on the popup, so the
+  part's own `onClick` does not fire for that press. Known cost: Firefox routes the mouse drag to
+  the capturing element, so a drag-to-select in the field does not extend while the popover is
+  open (Chromium's selection drag ignores capture; WebKit is decided by CI). Prevented
+  `pointerdown`, `pointerup` or `click` change nothing: light dismiss is not cancelable, in the
+  spec or in any engine. A part whose close is browser-owned by
   design (Combobox's Clear) needs none of this; nor does a Trigger that never closes: Dialog's
   Trigger only opens, so a Trigger click on an open non-modal `lightDismiss` dialog is a
   dismissal on every path, as native `closedby="any"` (which has no invoker exemption at all)

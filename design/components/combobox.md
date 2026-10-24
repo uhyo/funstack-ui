@@ -53,7 +53,7 @@ and a hidden input that follows the optimistic value.
 | 3 | Two library-owned states, two lanes | `value` (`string \| null`): `value` / `defaultValue` / `valueChangeAction`, a transition with `useOptimistic`, as every other value. `inputValue` (`string`): `inputValue` / `defaultInputValue` / `onInputValueChange`, the **urgent** state the vision reserved for this component (section 4). Same `x` / `defaultX` pair, different lane, and a **handler** instead of an action: `onInputValueChange` is the library's one `on*` prop, named as a handler because it is called synchronously in the event and never wrapped in a transition (conventions 2.1, 2.6; #96, replacing v1's `inputValueChangeAction: UrgentChangeAction`). `fooAction` keeps meaning "a transition" everywhere. |
 | 4 | Results | The library filters nothing. `query` is `useDeferredValue(inputValue)`; `Combobox.List`'s function `children` (and Root's) receive `{ query }` and render the `Option`s for it, under a consumer-owned `<Suspense>` for async search. While `inputValue !== query` the Popup and List carry `data-stale`; the List is `aria-busy="true"` while stale **or loading** (a `Status` mounted inside it, 6.3); the previous results stay visible. No out-of-order results: React renders only the latest deferred value (section 6). |
 | 5 | Active option | `aria-activedescendant` on the input, never DOM focus on options (research). The active option is **urgent library state** (it is focus; focus is never a transition anywhere in the library), exposed as `data-active` on the Option, revalidated whenever the mounted options change; ids are derived from the value so an option keeps its id across result sets. Typing, Home, End, Left and Right clear it (APG: visual focus returns to the textbox), so Enter never accepts an option the user has typed past; `autoHighlight` (default `false`) activates the first option only once results settle (not stale, not loading; 6.5). |
-| 6 | Open | Always library mode (`useOverlayRoot({ mode: "library" })`, Menu's configuration): no JS-free mode. Open by typing, ArrowDown / ArrowUp, Alt+ArrowDown, the Trigger, optionally a click on the input (`openOnClick`); opened with `showPopover({ source: input })` in the apply effect. Closes: an accepted option and a Trigger click while open (library-owned, after the action settles; the Trigger is an invoker of the popup after hydration, so its press is not a light dismiss, #112), Escape, light dismiss and a Clear click while open (browser-owned, notified `"dismiss"`), focus leaving the input and popup (immediate `hidePopover()`, Menu's Tab rule, `"dismiss"`). Keys are judged against `:popover-open`, what the user sees (section 8). |
+| 6 | Open | Always library mode (`useOverlayRoot({ mode: "library" })`, Menu's configuration): no JS-free mode. Open by typing, ArrowDown / ArrowUp, Alt+ArrowDown, the Trigger, optionally a click on the input (`openOnClick`); opened with `showPopover({ source: input })` in the apply effect. Closes: an accepted option and a Trigger click while open (library-owned, after the action settles; the Trigger is an invoker of the popup after hydration, so its press is not a light dismiss, #112), Escape, light dismiss and a Clear click while open (browser-owned, notified `"dismiss"`), focus leaving the input and popup (immediate `hidePopover()`, Menu's Tab rule, `"dismiss"`). Keys are judged against `:popover-open`, what the user sees (section 8). A press on the input while open is **not** a close: `source` is no light-dismiss exemption, so the Input captures the pointer to the Popup at `pointerdown` while the listbox is shown (#123). |
 | 7 | Accepting an option | Enter or click on an option: the input text becomes the option's label **at once** (urgent), the option shows `data-pending`, `valueChangeAction` is awaited inside the Root's transition, and the listbox closes in the commit that ends it (Menu decision 3). A rejection rolls the text and `data-selected` back and leaves the listbox open; a controlled parent that does not adopt the value gets the same rollback but the listbox closes (5.5); typing while the action is pending drops its close (5.2). Tab does **not** accept (manual selection; question 5). |
 | 8 | Free text | `allowCustomValue`: Enter with no active option, or focus leaving, commits the text as the value (`details.custom: true`). Without it the text reverts on focus loss to the committed value's label (React Aria's rule). |
 | 9 | Form | `name` / `form` on Root render `<input type="hidden" name value={optimistic ?? ""}>`; `required` goes on `Combobox.Input` and is native (empty text is `valueMissing`). No `setCustomValidity` (conventions 3.6). Form reset dispatches `"platform"` for both states, with reset targets computed in JS (a hidden input has no reset behaviour, 11.1); a pre-hydration typed text is reconciled at mount for `inputValue`. |
@@ -399,6 +399,7 @@ export interface ComboboxInputProps
   extends Omit<
     ComponentPropsWithRef<"input">,
     | "value" | "defaultValue" | "onChange" | "onInput" | "onKeyDown" | "onBlur" | "onClick"
+    | "onPointerDown"
     | "role" | "aria-autocomplete" | "aria-expanded" | "aria-controls" | "aria-activedescendant"
     | "autoComplete" | "disabled" | "className" | "style" | "children"
   > {
@@ -414,7 +415,9 @@ A void element: no `children`. Owned keys: `id`, `type` (`"text"` unless the `re
 says `"search"`), `role`, `value` (the urgent text), `autoComplete` (`"off"`: the browser's own
 suggestion list would sit over the listbox), `aria-autocomplete` (`"list"`), `aria-expanded`
 (optimistic open), `aria-controls` (the List id, token-merged), `aria-activedescendant`,
-`disabled`, the handlers listed in the `Omit`, `data-open`, `data-pending`, `data-selected`
+`disabled`, the handlers listed in the `Omit` (`onPointerDown` since #123: a primary-button
+press while the listbox is shown captures the pointer to the Popup, so the release is not a light
+dismiss, 5.4), `data-open`, `data-pending`, `data-selected`
 (optimistic `value !== null`), `data-stale`, `data-disabled`. `name` passes through (a second,
 visible field for the raw text; the selection's `name` is the Root's). `placeholder`,
 `aria-describedby`, `inputMode`, `onFocus`, `onCompositionStart` and the rest pass through.
@@ -628,9 +631,12 @@ pending"; React 19.3.1's `requestDeferredLane` claims a deferred lane directly, 
 `useOverlayRoot({ component: "combobox", mode: "library", details: popoverDetails })`: always
 library mode. The popup is
 shown by the apply effect with `showPopover({ source: inputRef.current })`, which (research §6
-probe table) keeps focus in the input, lets typing continue, makes clicks on the input not
-light-dismiss, nests the popup under the input's popover ancestor, and creates the implicit
-anchor the inline `position-area` and `anchor-size(width)` use.
+probe table) keeps focus in the input, lets typing continue, nests the popup under the input's
+popover ancestor, and creates the implicit anchor the inline `position-area` and
+`anchor-size(width)` use. It does **not** exempt a press on the input from light dismiss: `source`
+plays no part in HTML's "topmost clicked popover", and the research's claim that it did came from
+a synthesised click (#123). The Input keeps the listbox open across its own presses with pointer
+capture (5.4, amendment #123).
 
 | Open cause | What happens | `reason` |
 | --- | --- | --- |
@@ -728,6 +734,20 @@ value); focus leaving reverts the text (2.2).
 A click on an option or anywhere in the popup is not focus loss: `pointerdown` and `mousedown`
 are prevented on the Popup (3.4), so the input never blurs and `focusout` never fires. A
 `focusout` whose `relatedTarget` is the Trigger or Clear cannot happen for the same reason.
+
+A press on the **input** is not a close either, although the input is outside the popup and can
+name no popover (#123). Light dismiss compares the popover under the press with the popover under
+the release (the `pointerup` target; in Chromium's click-based variant the `pointerup` target
+recorded for the `click`), and pointer capture retargets the release: the Input's `pointerdown`
+(primary button, listbox shown) calls `popup.setPointerCapture(pointerId)`, so the `pointerup`,
+`mouseup` and `click` land on the Popup and nothing hides, with a mouse, a pen or a finger, nested
+in a Popover or not, and whether the release happens on the input or elsewhere. The compat
+`mousedown` is not retargeted, so the caret still lands where the user pressed and a double click
+still selects a word. Right- and middle-button presses are not captured (the engine's own context
+menu and paste; in Firefox and WebKit such a press light-dismisses as before, in Chromium it never
+did). Firefox routes the mouse drag to the capturing element, so a drag-to-select in the field does
+not extend while the listbox is open there (Chromium's selection drag ignores capture; WebKit is
+decided by CI); Shift+click, Shift+arrows and the double click still select.
 
 ### 5.5 Controlled `open`, overlap, errors
 
@@ -1269,6 +1289,7 @@ Element.prototype` (all three stable engines; asserted true, branch kept for Pla
 | Nested in Popover / Dialog | Opening the listbox keeps the outer open; light dismiss closes the stack; **WebKit 302008 row**: `browserName === "webkit"`, open the listbox inside an open `Popover.Popup` twice with the default `flip-block` under a 15 s timeout so a hang fails instead of stalling. | WebKit row runs regardless |
 | Announcements | `ariaNotify` spied on the List: one call per settled result set with the default or the `announce` string; none while stale. | `supportsAriaNotify`; otherwise assert no throw |
 | Trigger close (#112) | Real mouse (`mouse.down` / `mouse.up`) on the Trigger of an open listbox with `openChangeAction` resolving after 300 ms: at `pointerup` + 20 ms the popup still matches `:popover-open`, `document.activeElement` is the input, the Trigger has `data-pending`, no `data-open` and `aria-expanded="true"` (#118); after the action: hidden, exactly one dispatch `(false, { reason: "activate" })` whose `event` is the `click`. Controlled `open={true}` parent that refuses (async and sync action): `:popover-open` sampled every frame from the press to + 400 ms is never false. With `transition`: `startViewTransition` called once for the Trigger close with a `::view-transition-old` of the popup. A click while closed opens with the popup's inline-start edge on the input's and width `>= input width` (the command never ran; the anchor is still the input). | none: all three engines run the same assertions. WebKit is checked by its CI job (`FUNSTACK_BROWSERS=webkit`); if that job alone fails the + 20 ms assertion, the engine's invoker check does not cover `commandfor` yet and the fallback is `popovertarget` (same exemption, older attribute), recorded in the amendment |
+| Input press (#123) | The #117 row, now passing: a real press (`mouse.down` / 20 ms / `mouse.up`) on the input of an open listbox: at the press and 80 ms after the release the popup matches `:popover-open`, `document.activeElement` is the input, the text is unchanged, nothing dispatched; the `click` landed on the Popup (`openOnClick` neither re-opens nor dispatches). Caret: a press after the third character leaves `selectionStart === selectionEnd === 3`. Nested inside an open `Popover.Popup`: both stay open. Touch (a `hasTouch` context, `touchscreen.tap`): stays open. Drag-to-select from the second to the eighth character while open: `[2, 8]` where the engine's selection drag ignores pointer capture; Firefox: `[2, 2]`, asserted as the documented cost, never skipped. | Drag row: `browserName === "firefox"` with the finding named (conventions 13.3: no feature check fits a drag). WebKit's expectation is `[2, 8]`; if its CI job alone disagrees, record it in the amendment and branch |
 | Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration, one `"platform"` text dispatch, no `valueChangeAction`, nothing opened; the server HTML's Trigger has no `commandfor`, a real click on it before `hydrateRoot` opens nothing, after hydration it carries `commandfor` (#112). | The "keyboard did not reach the iframe" fallback is allowed for WebKit only (the engine not probed locally, review L4); Chromium and Firefox must reach it |
 | ViewTransition | With `transition={{ …, default: "none" }}`: open calls `startViewTransition` once, accept-close once with a `::view-transition-old` of the popup present, a deferred results change zero times; with `transition="pop"` a results change calls it once (documents the cost); without `transition` zero calls. | none |
 | IME | Composition (`compositionstart` … `compositionend` through Playwright's `insertText` / keyboard IME where available): the text updates per composition update, the listbox opens, Enter during composition does not accept. | Chromium (Playwright IME support); others assert the non-composition path |
@@ -1366,8 +1387,10 @@ packages/ui/src/internal/
   `"dismiss"` intent, then the revert / custom commit (`leave()`); if `relatedTarget === null` →
   `setTimeout(0)` (while a pointer is pressed, one task after the last release instead; see 5.4,
   #111), then `leave()` only if `document.hasFocus()` and `document.activeElement` is outside the
-  input and the popup. `onClick` → `openOnClick`. Composition: ignore Enter / arrows
-  while `event.nativeEvent.isComposing`.
+  input and the popup. `onClick` → `openOnClick`. `onPointerDown` → while
+  `popup.matches(":popover-open")` and `button === 0`, `capturePointer(popup, pointerId)` (#123;
+  the helper moves from `menu/menu-dom.ts` to `internal/pointer-capture.ts`). Composition: ignore
+  Enter / arrows while `event.nativeEvent.isComposing`.
 - **Popup.** `usePopoverPopup(ctx, { part, initialFocus: undefined, keepMounted, transition })`;
   `libraryProps`: `id`, `popover: "auto"`, `onPointerDown` and `onMouseDown` →
   `preventDefault()`, `data-stale`, inline `style` (consumer wins per property); content through
@@ -1777,8 +1800,8 @@ decision 6, the anatomy table, section 1 (the `commandfor` bullet), 3.3 (props t
 in conventions 3.5 (the light-dismiss trap under "a part's library-owned close is the single
 source of that close") and the attribute mechanism in conventions 7.4.
 
-Finding (wave 17 audit C1 / D1): the Trigger is not the popover's `source` (the input is) and
-named no popover, so a press on it while the listbox was open was a **light dismiss**: the
+Finding (wave 17 audit C1 / D1): the Trigger named no popover, so a press on it while the
+listbox was open was a **light dismiss** (being the `source` would not have helped either, #123): the
 platform hid the listbox at `pointerup`, in the task before the `click`, on every engine. The
 click's `requestClose(click, "activate")` then ran against a popup already gone: the reason was
 right, but nothing was awaited (5.4 row 1 and the docs said it was), a controlled parent that
@@ -1852,9 +1875,9 @@ Considered and left alone:
   library-owned closes, does not apply, and it behaves the same on every engine. Making Clear an
   invoker would change the designed outcome (the listbox would stay open after clearing), a
   separate product question, not a bug.
-- **Other overlays with a Trigger.** Popover and Menu Triggers are the popover's `source` and
-  render `commandfor`: exempt by both routes (popover.md's "Click on the Trigger" row; #110 was
-  the focus trap, not this one). Dialog's Trigger is the dialog's invoker (`commandfor`,
+- **Other overlays with a Trigger.** Popover and Menu Triggers render `commandfor`: exempt
+  through it (they are also the popover's `source`, which is no exemption, #123; popover.md's
+  "Click on the Trigger" row; #110 was the focus trap, not this one). Dialog's Trigger is the dialog's invoker (`commandfor`,
   cancelled click), and the audit confirmed a non-modal light dismiss excludes it. Select's
   Trigger is the native picker's button inside the `<select>`: the picker is browser-owned
   throughout. Tooltip and Toast have no closing Trigger. A second Trigger in one Root (audit
@@ -1933,3 +1956,145 @@ later while `data-pending` lasts; typing "j" → `"false"` until the `toggle` of
 `"true"` until the close commits and hides (unchanged). Implementation: `popover.shown` on both
 parts; tests as listed in popover.md's revision (the Escape row with a deferred close action, and
 the entangled-save variant, belong here).
+
+## Amendment: a press on the Input while open stays open (#123, 2026-10-24)
+
+Status: architect decision; no API change, no new prop, no new `reason`; `onPointerDown` becomes
+an owned key of `Combobox.Input`. Edited in place: decision 6, 3.2, 5.1, 5.4, 12.2, 14, the #112
+amendment's two sentences that implied `source` mattered, conventions 3.5 (the `source` clause
+and the pointer-capture lever) and the research probe table (`docs/research/select-combobox.md`
+§6, with a correction note).
+
+### Finding
+
+Found by the #117 real-mouse rows. With the listbox open, a real press on `Combobox.Input`
+light-dismissed it (Chromium at the `click`, Firefox at `pointerup`; WebKit runs the same
+algorithm): `openChangeAction(false, { reason: "dismiss", event: <toggle> })`, focus and text
+kept, the listbox gone under the user's caret click, and with `openOnClick` re-opened by the
+click a task later (a blink and two dispatches).
+
+Three documents said otherwise: 5.1 ("makes clicks on the input not light-dismiss"), the
+research probe table ("Clicking the `source` does not light-dismiss") and conventions 3.5 (the
+`source` listed among the light-dismiss exemptions). All three rested on one probe, and the
+probe used a synthesised click, which has no `pointerdown` / `pointerup` and never runs light
+dismiss. Re-probed with a real pointer in plain DOM (no library): an `<input>`, a plain
+`<button>` and a `<span>` as `source` are all dismissed; only a `<button commandfor>` /
+`popovertarget` survives.
+
+### What the spec and the engines do
+
+HTML "light dismiss open popovers" records, at `pointerdown`, the "topmost clicked popover" of
+the event target and, at `pointerup`, hides every popover above the topmost clicked popover of
+*that* target if it is the same one. "Topmost clicked popover" is the higher in the stack of two
+things: the nearest inclusive **open popover** ancestor of the target in the flat tree, and the
+nearest inclusive **target popover**, which comes from a button's `commandfor` (with a popover
+command) or `popovertarget`. `showPopover({ source })` sets the popover's trigger (used to place
+a nested popover under its invoker's popover in the stack) and the implicit anchor; the
+light-dismiss path never reads it.
+
+| Engine | Where it decides | Target used | Reads the `source`? |
+| --- | --- | --- | --- |
+| Chromium (`LightDismissFromClick`, stable) | at the `click`, comparing `FindTopmostRelatedPopover` of the `pointerdown` and `pointerup` targets it recorded (`PointerEventManager`, `MouseEventManager`) | the pointer events' dispatch targets, so pointer capture counts | no (`NearestOpenPopover`, `NearestTargetPopoverForInvoker`: `commandfor`, `popovertarget`, `interestfor`, select picker, base-appearance combobox) |
+| Gecko | `EventStateManager::LightDismissOpenPopovers` at `pointerdown` / `pointerup` | the pointer event's target content | no (`nsINode::GetTopmostClickedPopover`: `GetEffectiveCommandForElement`, `GetEffectivePopoverTargetElement`, select picker) |
+| WebKit | `PointerCaptureController::pointerEventWillBeDispatched` → `Document::handlePopoverLightDismiss` at `pointerdown` / `pointerup` | the element the pointer event is dispatched to | no (`commandForElement`, `popoverTargetElement` on buttons and button-type inputs, select picker) |
+
+None of them checks `defaultPrevented`: a prevented `pointerdown`, `pointerup` or `click` changes
+nothing (probed in Chromium and Firefox, every combination). An `<input type="text">` cannot be an
+invoker by any route: `popovertarget` applies to button-type inputs only and `commandfor` to
+`<button>` (and Chromium's `<menuitem>`).
+
+### Options
+
+| Option | Outcome | Verdict |
+| --- | --- | --- |
+| Accept the browser shape (document "a click in the field closes the listbox") | Engine-consistent and honest, but the user who clicks into the field to move the caret loses the list they were reading; with `openOnClick` the list blinks and dispatches twice. No library does this; APG says nothing because native listboxes never did it | rejected |
+| Re-show after the dismissal | Hide, `toggle`, show: a blink, a `"dismiss"` dispatch that was not one, the `<ViewTransition>` exit and entry both run | rejected |
+| `popover="manual"` with library light dismiss | Loses the platform's close watcher (Escape, decision 9 reversed), the auto stack (another auto popover opening elsewhere no longer closes the listbox; the listbox no longer closes with an enclosing Popover's stack) and `:popover-open`-driven nesting for free; the library would re-implement outside-press, Escape and stacking. A redesign of the Combobox popup model for one press | rejected |
+| An invoker relationship | An `<input>` cannot be one | impossible |
+| **Pointer capture to the Popup at the Input's `pointerdown`** | The release (`pointerup`, and the `pointerup` target Chromium records for the `click`) is dispatched to the Popup, whose topmost clicked popover is the listbox itself: nothing above it, nothing hides. One handler, `popover="auto"` and everything it gives stay | **chosen** |
+
+### Verified (plain DOM, Playwright, Chromium 156 and Firefox 157; both engines unless noted)
+
+| Case | Without capture | With `popup.setPointerCapture(pointerId)` at the input's `pointerdown` |
+| --- | --- | --- |
+| Mouse press and release on the input | hidden (`"dismiss"`) | shown; `pointerup`, `mouseup`, `click` dispatched to the popup; `mousedown` to the input |
+| Caret: click after the third character | `selectionStart === 3` | `selectionStart === 3` (the compat `mousedown` is not retargeted) |
+| Double click on a word | word selected | word selected |
+| Drag from the second to the eighth character | `[2, 8]` | Chromium `[2, 8]`; **Firefox `[2, 2]`** |
+| Drag from the input, released outside | Chromium shown (down and up targets differ), Firefox hidden | shown |
+| Touch tap (`hasTouch`, `touchscreen.tap`) | hidden | shown (the touch compat `mousedown` / `click` arrive at the input after the release; Chromium's click-time comparison still sees the captured `pointerup`) |
+| Capture at `mousedown` instead | | mouse as above; **touch hidden** (its compat `mousedown` comes after `pointerup`): capture must be at `pointerdown` |
+| Nested in an open outer auto popover | listbox hidden, outer kept | both kept |
+| Right click (button 2, not captured) | Chromium shown, Firefox hidden | unchanged |
+| `preventDefault()` on `pointerdown` / `pointerup` / `click` | hidden | n/a |
+
+WebKit could not be run locally; it uses the pointer event's dispatch target, which its
+`PointerCaptureController` overrides under capture, so the expectation is Chromium's. Its CI job
+decides; if the press row alone fails there, the amendment is wrong about WebKit and the fallback
+is to record a browser-shaped close for that engine, not to re-show.
+
+### Decision
+
+`Combobox.Input` owns `onPointerDown`: when `event.button === 0` and the Popup matches
+`:popover-open`, `capturePointer(popup, event.pointerId)` (the Menu helper, moved to
+`internal/pointer-capture.ts`: swallows the `NotFoundError` of a pointer the engine no longer
+tracks, returns whether the capture was taken). Nothing else changes: no `preventDefault` (the
+caret, selection and focus behaviour of the field are the platform's), no `pointerup` handler
+(the engine releases the capture after `pointerup` / `pointercancel`), no change to the #111
+press tracking (its document-level capture-phase `pointerup` listener still sees the release:
+the Popup is in the document), no change to the Trigger (#112), Clear (deviation 5) or the Labels
+(#111).
+
+Why `:popover-open` and not `intended()`: a press during a pending close (the listbox still
+shown, the close in flight) must not dismiss either; the pending close hides it in its commit, as
+every key is judged against what the user sees (section 8). A press while the listbox is closed
+captures nothing, so the `click` reaches the input and `openOnClick` works as before.
+
+Why only the primary button: a right click on the field wants the field's own context menu
+(cut, copy, paste, spelling), which the engines build from the hit test, and a middle click on
+Linux pastes; retargeting their `pointerup` buys nothing and, in Chromium, `contextmenu` follows
+pointer capture. In Firefox and WebKit a secondary-button press therefore still light-dismisses,
+as it does today and as every auto popover does; it is not a case the #117 rows cover.
+
+Consequences, stated:
+
+- The `click` of a press on the open field is dispatched to the Popup, not the input: the Input's
+  `onClick` (`openOnClick`) does not run for it (correct: there is nothing to open), and a
+  consumer `onClick` on the Popup sees a click whose `pointerdown` was on the input. Options are
+  not affected (their `onClick` needs the target inside them).
+- **Firefox: drag-to-select in the field does not extend while the listbox is open.** Gecko
+  routes the mouse drag to the pointer-capturing element; Chromium's selection drag ignores
+  capture. Shift+click, Shift+arrows, the double click and the keyboard still select, and typing,
+  the caret click and Escape are unaffected. Accepted as the cost of the lever: the alternative
+  (no capture) closes the listbox on every click into the field, in every engine. Recorded in
+  5.4, conventions 3.5 and the research note; not a Gecko bug by any spec text (Pointer Events
+  does not define selection), so nothing to report upstream, but worth re-checking when Gecko's
+  pointer capture changes.
+- `gotpointercapture` / `lostpointercapture` fire on the Popup for each such press; harmless.
+- A consumer who needs `onPointerDown` on the field listens on a wrapper, as for the Popup's
+  owned `onPointerDown` (3.4).
+
+### Implementation (developer)
+
+1. `internal/pointer-capture.ts`: move `capturePointer` out of `menu/menu-dom.ts` (re-export or
+   update the Menu's imports; the jsdom `pointer-capture-shim.ts` keeps working).
+2. `combobox-root.tsx`: `inputPointerDown(event: PointerEvent)`: `if (disabled || event.button
+   !== 0) return; const popup = popover.popupRef.current; if (popup !== null &&
+   isPopoverOpen(popup)) capturePointer(popup, event.pointerId);`. Expose it on the context.
+3. `combobox-input.tsx`: add `"onPointerDown"` to the `Omit`, `onPointerDown: (event) =>
+   ctx.inputPointerDown(event.nativeEvent)` to `libraryProps`, list it in the owned keys of the
+   doc comment, and correct the ref-callback comment ("makes clicks on it not light-dismiss" is
+   wrong: the registration is for the anchor and the nested stacking).
+4. Docs (`packages/docs/src/pages/ComboboxPage.tsx`): the overview sentence "clicks on the input
+   never light-dismiss it" (line 74 today) becomes "a press on the input keeps the listbox open
+   (the Input captures the pointer to the Popup; in Firefox a drag-to-select in the field does
+   not extend while the listbox is open)"; the Input's owned keys gain `onPointerDown`.
+5. Tests. jsdom (`combobox.test.tsx`): `setPointerCapture` spied through the shim, called once
+   with the Popup element and the pointer id for a `pointerdown` with `button: 0` while the
+   popup is open (the shim's `:popover-open`), not called while closed, not for `button: 2`, not
+   while `disabled`; `openOnClick` still opens from a click while closed. Browser
+   (`combobox.browser.test.tsx`): flip the #117 row "the input (the popup's source)" from
+   `it.fails` to `it` and rename it ("the input: nothing closes or dispatches; the input keeps
+   focus and its text"), then add the 12.2 "Input press" row's extras: caret at 3, nested in
+   `Popover.Popup`, touch tap, and the drag-selection row with the Firefox branch. Firefox runs
+   browser files serially (#62), so the drag's pointer input is safe there.
