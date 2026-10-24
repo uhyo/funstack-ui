@@ -140,3 +140,35 @@ in the design's Trigger row; no code change needed.
   `@ts-expect-error` row for `commandfor` (menu.test.tsx:2250 has the precedent). Also,
   `render={<button commandfor="x" />}` is still typeable. Its value would be overwritten and
   then removed by the cleanup. Edge case; nit.
+
+## Addendum: against current origin/master (c69c312: #111 a5f9682 + f063234, #113 a49fa8a)
+
+Trial merge of the branch with origin/master (private worktree, removed): git reports no
+conflicts, but the result **does not compile**. Both sides added the same imports:
+
+- **F8 (blocking for the merge):**
+  - packages/ui/src/combobox/combobox.test.tsx: `import { renderToString } from
+    "react-dom/server"` is now there twice (master line 11, branch line 15). The jsdom suite
+    fails to parse: "Identifier `renderToString` has already been declared".
+  - packages/ui/src/combobox/combobox.browser.test.tsx: `mouse` is imported twice (master's
+    `import { mouse } from "../__tests__/browser-commands.js"`, and the branch's
+    `import { mouse, toPagePoint } ...`). tsc reports TS2300.
+  - Fix: rebase onto master and keep one of each import.
+
+With the two duplicates removed locally:
+- `tsc --noEmit` is clean.
+- jsdom combobox: 139 passed.
+- Browser combobox on Chromium + Firefox: 78 passed, 2 skipped (the WebKit-only rows).
+
+Interplay with #111 is fine:
+- The Trigger cancels `pointerdown` and `mousedown`, so the input never blurs and #111's
+  deferred leave check never runs.
+- The press is only recorded in the press set, which `pointerup` clears.
+
+#113's `registerTrigger` registers the Input as the Combobox's `triggerRef` (the `source`).
+Combobox.Trigger is not registered, so there is no conflict with the attribute write.
+
+Status: the local branch has already been rebased onto c69c312 (722835c, 25d62fb). Both
+committed commits still contain the two duplicate imports. The dev-112 worktree has uncommitted
+edits that remove them. Check before landing that the final commit has one `renderToString`
+import and one `mouse` import, and that `pnpm typecheck` passes.
