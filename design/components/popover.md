@@ -281,6 +281,7 @@ What the user sees while the open is pending:
 | Controlled parent sets `open={false}` | library | apply effect `hidePopover()`; the resulting `toggle` is an echo, no dispatch | (no dispatch) | |
 | Escape, Android back, AT dismiss, light dismiss | browser | popover hidden at once; `toggle` → dispatch `false` as a notification: optimistic `false`, action awaited inside the Root's transition, uncontrolled state committed after it | `"dismiss"` | the `toggle` `ToggleEvent` |
 | A foreign `hide-popover` / `toggle-popover` invoker | browser | the Popup's `command` listener records an `"activate"` intent; `toggle` consumes it | `"activate"` | the `CommandEvent` |
+| A foreign `popovertarget` invoker (#125) | browser | no `command` event; the Popup's `beforetoggle` listener records an `"activate"` intent when the close's `ToggleEvent.source` is non-null (the button; `null` for Escape, light dismiss and script), unless one is already recorded for this close (a `commandfor` invoker sets `source` too, and its `command` intent comes first and wins); `toggle` consumes it | `"activate"` | the `beforetoggle` `ToggleEvent` (its `source` is the button) |
 | Script `hidePopover()`, another `auto` popover or modal dialog opening elsewhere | browser | as a dismissal | `"dismiss"` | the `toggle` `ToggleEvent` |
 
 Why the line is drawn here and not at "close is browser-owned" as in Dialog: a dialog's close
@@ -293,13 +294,24 @@ commit" (#39). Dismissals remain the browser's: `beforetoggle` for a close is no
 a user who pressed Escape expects the popup to go away now. The `openChangeAction` doc comment
 says which closes are awaited and which are notified.
 
-Close intents work as in Dialog 2.3: the `toggle` event carries no source, so the Popup records
-what caused the close just before it happens and the `toggle` listener consumes it; a recorded
-intent that did not result in a close is cleared by one `setTimeout(0)` that clears it only if
-the popover is still open. In library mode the only recorded intents are foreign invokers; the
-library's own `hidePopover()` calls are recognised through `intended()` (the latest in-flight
-dispatch's `next`, else the optimistic value): a `toggle` that arrives while the user already
-intends `false` is an echo and dispatches nothing.
+Close intents work as in Dialog 2.3: the `toggle` event names no cause beyond a `popovertarget`
+or `commandfor` invoker (`ToggleEvent.source`: Chrome 140, Firefox 145, Safari 26.5), so the
+Popup records what caused the close just before it happens and the `toggle` listener consumes
+it; a recorded intent that did not result in a close is cleared by one `setTimeout(0)` that
+clears it only if the popover is still open. In library mode the only recorded intents are
+foreign invokers. The library's own Trigger and Close never produce a close with a `source`:
+their clicks are cancelled and the close is the library's `hidePopover()`, whose `source` is
+`null`. The library's own `hidePopover()` calls are recognised through `intended()` (the latest
+in-flight dispatch's `next`, else the optimistic value): a `toggle` that arrives while the user
+already intends `false` is an echo and dispatches nothing.
+
+The `popovertarget` row lives in `usePopoverPopup` (14.2), so Menu and Combobox classify a
+foreign `popovertarget` close the same way (Combobox 5.4 has no row of its own for foreign
+invokers; its opens already follow 2.2). There a press on a foreign button usually moves focus
+out of the menu tree or the input first, and that `focusout` closes the popup as `"dismiss"`
+before the click (Menu 2.2, Combobox 5.4); the `"activate"` row applies to a press that keeps
+focus where it was (a button that prevents its `mousedown`, a platform where a click does not
+focus a button such as Safari on macOS, a script `click()`).
 
 **A controlled parent that refuses a dismissal.** The popup is already closed when the action
 runs. If the parent keeps `open={true}`, optimistic reverts to `true` after the action settles
