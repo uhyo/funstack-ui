@@ -29,6 +29,18 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          <strong>Breaking:</strong> <code>Popover.Trigger</code>, <code>Menu.Trigger</code>,{" "}
+          <code>Menu.SubmenuTrigger</code> and <code>Combobox.Trigger</code> name their popup with{" "}
+          <code>popovertarget</code> instead of <code>commandfor</code> +{" "}
+          <code>command="toggle-popover"</code>, and a <code>&lt;button&gt;</code> Trigger renders
+          no <code>aria-expanded</code>: every browser exposes the popup's state on the invoker.
+          Move CSS from <code>[aria-expanded="true"]</code> to <code>[data-open]</code> (now also
+          written in Popover's JS-free mode), or to <code>:has(+ :popover-open)</code> on a page
+          that never hydrates; move <code>[commandfor]</code> selectors on these Triggers to{" "}
+          <code>[popovertarget]</code>. A link or component <code>render</code> keeps{" "}
+          <code>aria-expanded</code> (<a href={issue(121)}>#121</a>).
+        </li>
+        <li>
           <strong>Breaking:</strong> <code>Combobox.Root</code>'s{" "}
           <code>inputValueChangeAction</code> is renamed <code>onInputValueChange</code> and the
           type <code>UrgentChangeAction</code> is renamed <code>UrgentChangeHandler</code>; an

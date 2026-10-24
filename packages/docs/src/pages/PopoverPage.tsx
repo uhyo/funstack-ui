@@ -40,7 +40,7 @@ export function PopoverPage() {
       <CodeBlock>{`import { Popover } from "@funstack/ui/popover";
 
 <Popover.Root>                                       {/* no DOM: ids, mode, state */}
-  <Popover.Trigger>Filters</Popover.Trigger>         {/* button[commandfor][command=toggle-popover] */}
+  <Popover.Trigger>Filters</Popover.Trigger>         {/* button[popovertarget] */}
   <Popover.Popup side="bottom" align="start">        {/* dialog[popover=auto][aria-modal=false] */}
     <Popover.Title>Filters</Popover.Title>           {/* h2, wired to aria-labelledby */}
     <Popover.Description>…</Popover.Description>     {/* p, wired to aria-describedby */}
@@ -51,12 +51,13 @@ export function PopoverPage() {
       <ul>
         <li>
           <strong>Root renders no DOM.</strong> Trigger and Popup are linked by id through{" "}
-          <code>commandfor</code>. Render the Popup <strong>right after the Trigger</strong> where
-          the layout allows: Safari 27.0 does not put a far-away popover next in the Tab order after
-          its trigger. A <code>&lt;button commandfor command&gt;</code> of your own that targets the
-          popover is a <em>foreign invoker</em>; in library mode an open through it is routed
-          through the library, while a foreign <code>hide-popover</code> closes natively and is
-          reported as <code>"activate"</code>.
+          <code>popovertarget</code>. Render the Popup <strong>right after the Trigger</strong>{" "}
+          where the layout allows: Safari 27.0 does not put a far-away popover next in the Tab order
+          after its trigger. A <code>&lt;button commandfor command&gt;</code> or{" "}
+          <code>&lt;button popovertarget&gt;</code> of your own that targets the popover is a{" "}
+          <em>foreign invoker</em>; in library mode an open through it is routed through the
+          library, while a foreign <code>hide-popover</code> closes natively and is reported as{" "}
+          <code>"activate"</code>.
         </li>
         <li>
           <strong>
@@ -76,8 +77,9 @@ export function PopoverPage() {
         <li>
           <code>render</code>: Popup renders a <code>&lt;dialog&gt;</code> (default) or a{" "}
           <code>&lt;div&gt;</code>; Trigger and Close render a <code>&lt;button&gt;</code> for the
-          command path, and another element works only through the library's click handler (library
-          mode, or a Close with <code>action</code>). Wrong elements are development warnings.
+          native invoker path, and another element works only through the library's click handler
+          (library mode, or a Close with <code>action</code>). Wrong elements are development
+          warnings.
         </li>
       </ul>
 
@@ -93,7 +95,7 @@ export function PopoverPage() {
           ],
           [
             "Open",
-            'the browser runs `command="toggle-popover"`',
+            "the browser toggles it (the Trigger's `popovertarget`)",
             "the click is intercepted and dispatched in the Root's transition; `showPopover({ source: trigger })` runs in the commit that mounts the content. Any other open (a foreign invoker, a script) is cancelled at `beforetoggle` and routed the same way",
           ],
           [
@@ -112,11 +114,16 @@ export function PopoverPage() {
             "rendered from committed `open`; unmounted while closed unless `keepMounted`",
           ],
           [
-            "Trigger `aria-expanded`",
-            "kept current on the element from the popup's `toggle` event",
-            "rendered from whether the popup is shown (mirrored from its `toggle` event)",
+            "Trigger's exposed expanded state",
+            "the browser's, from `popovertarget` (no `aria-expanded` on a `<button>`)",
+            "the same; a link or component `render` renders `aria-expanded` from whether the popup is shown",
           ],
-          ["Trigger `data-open`, `data-pending`", "not emitted", "emitted"],
+          [
+            "Trigger `data-open`",
+            "kept current on the element from the popup's `toggle` event",
+            "optimistic, rendered",
+          ],
+          ["Trigger `data-pending`", "not emitted", "emitted"],
           [
             "Before hydration",
             "everything works",
@@ -154,7 +161,7 @@ export function PopoverPage() {
             name: "defaultOpen",
             type: "boolean",
             description:
-              'Initial open state in uncontrolled library mode. A popover that starts open is shown after hydration (there is no attribute for an open popover in HTML); its content and the Trigger\'s `data-open` are already in the server HTML, while `aria-expanded` is `"false"` until the popup is shown. `defaultOpen={false}` is the usual way to select library mode without an action.',
+              "Initial open state in uncontrolled library mode. A popover that starts open is shown after hydration (there is no attribute for an open popover in HTML); its content and the Trigger's `data-open` are already in the server HTML, while the Trigger is exposed collapsed until the popup is shown. `defaultOpen={false}` is the usual way to select library mode without an action.",
           },
           {
             name: "openChangeAction",
@@ -219,10 +226,10 @@ export function PopoverPage() {
           "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open, a part's close or a dismissal notification."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `commandfor`, `command` (not on a host element other than a `<button>`), `aria-expanded`, `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-expanded` (rendered only without `popoverTarget`), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are omitted from the props type (reserved)."
         }
         note={
-          'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode) is no invoker, so a press on it while open light-dismisses the popup before the click: the close is reported as `"activate"` but not awaited, a controlled parent cannot veto it and there is no exit transition ([#115](https://github.com/uhyo/funstack-ui/issues/115)); a development warning says so. `aria-haspopup` and `aria-controls` pass through.'
+          "A click on a `<button>` Trigger while open is a part's close; a second click during a pending open cancels it (the latest intent wins). A `<button>` Trigger renders no `aria-expanded`: the browser exposes the popup's state on a `popovertarget` invoker ([#121](https://github.com/uhyo/funstack-ui/issues/121)). A Trigger rendered as another element (library mode) is no invoker, so it renders `aria-expanded` from whether the popup is shown, and a press on it while open light-dismisses the popup before the click: the close is reported as `\"activate\"` but not awaited, a controlled parent cannot veto it and there is no exit transition ([#115](https://github.com/uhyo/funstack-ui/issues/115)); a development warning says so. `aria-haspopup` and `aria-controls` pass through."
         }
       />
 
@@ -375,10 +382,14 @@ export function PopoverPage() {
           ],
           [
             "`aria-expanded`",
-            "Trigger",
-            "Whether the popup is shown, both modes (not optimistic in library mode).",
+            "Trigger (link or component `render` only)",
+            "Whether the popup is shown (library mode). A `<button>` Trigger has none: the browser exposes the state.",
           ],
-          ["`data-open`", "Trigger", "Optimistic open state (library mode only)."],
+          [
+            "`data-open`",
+            "Trigger",
+            "Library mode: optimistic open state. JS-free mode: whether the popup is shown, written from its `toggle` event.",
+          ],
           [
             "`data-pending`",
             "Trigger",
@@ -393,6 +404,15 @@ export function PopoverPage() {
           ["`data-disabled`", "Trigger, Close", "The `disabled` prop (both modes)."],
         ]}
       />
+      <p>
+        The Trigger's styling hook is <code>data-open</code> in both modes (optimistic in library
+        mode, written from the popup's <code>toggle</code> event in JS-free mode); a{" "}
+        <code>&lt;button&gt;</code> Trigger has no <code>aria-expanded</code> to select on. On a
+        page that never hydrates, style the Trigger from the popup that follows it:
+      </p>
+      <CodeBlock language="css">{`.trigger[data-open] { color: var(--accent); }
+/* Without JavaScript: the Popup right after the Trigger. */
+.trigger:has(+ :popover-open) { color: var(--accent); }`}</CodeBlock>
       <p>
         The Popup emits no <code>data-open</code>: <code>:popover-open</code> is exact. Enter and
         exit animate in CSS, in both modes:
@@ -481,9 +501,12 @@ export function PopoverPage() {
           <strong>ARIA.</strong> The Popup has <code>role="dialog"</code> and{" "}
           <code>aria-modal="false"</code> explicitly (WebKit implements no minimum role for
           popovers; Chromium would expose a <code>&lt;dialog popover&gt;</code> as modal). The
-          Trigger has <code>aria-expanded</code> in both modes and no <code>aria-haspopup</code>{" "}
-          (the APG disclosure shape); add <code>aria-haspopup="dialog"</code> or{" "}
-          <code>aria-controls</code> yourself if you want them.
+          Trigger is a <code>popovertarget</code> invoker, which every engine exposes as expanded or
+          collapsed from the popover itself, so a <code>&lt;button&gt;</code> Trigger renders no{" "}
+          <code>aria-expanded</code> (ARIA in HTML forbids it there); a link or component{" "}
+          <code>render</code> renders it. No <code>aria-haspopup</code> (the APG disclosure shape);
+          add <code>aria-haspopup="dialog"</code> or <code>aria-controls</code> yourself if you want
+          them.
         </li>
         <li>
           No focus trap and no <code>lightDismiss</code> or <code>modal</code> prop: light dismiss
@@ -544,7 +567,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight; its `aria-expanded` follows the shown popup (mirrored from the popup's `toggle` event), because Chromium and WebKit report an invoker's expanded state from the popover itself and only the shown state is true in every engine. After Escape or a click outside it reads `\"false\"` at once, even while the dismissal notification runs. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown state of the popup it targets, so after Escape or a click outside it is collapsed at once, even while the dismissal notification runs (a link or component `render` renders that shown state as `aria-expanded`). The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
         }
       >
         <h4>Walkthrough (library mode)</h4>
@@ -553,10 +576,10 @@ html:active-view-transition .popover { transition: none; }
         </Example>
         <ol>
           <li>
-            Click ⋯: the click is cancelled (so the native command does not run), the Trigger gets{" "}
-            <code>data-open</code> and <code>data-pending</code> (<code>aria-expanded</code> stays{" "}
-            <code>"false"</code> until the popup is shown), and{" "}
-            <code>openChangeAction(true, {'{ reason: "activate" }'})</code> runs.
+            Click ⋯: the click is cancelled (so the native toggle does not run), the Trigger gets{" "}
+            <code>data-open</code> and <code>data-pending</code> (it is exposed collapsed until the
+            popup is shown), and <code>openChangeAction(true, {'{ reason: "activate" }'})</code>{" "}
+            runs.
           </li>
           <li>
             The commit that sets committed <code>open</code> renders the Popup's children;{" "}
@@ -601,7 +624,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="browser-owned-state"
         summary={
-          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, a click outside, another popover opening) is the browser\'s: the popover closes at once and `openChangeAction(false)` is a notification with `reason: "dismiss"`. Dismissals animate with CSS only.'
+          "JS-free mode: the browser owns everything through the Trigger's `popovertarget` and the Close's Invoker Command. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, a click outside, another popover opening) is the browser's: the popover closes at once and `openChangeAction(false)` is a notification with `reason: \"dismiss\"`. Dismissals animate with CSS only."
         }
       />
 
@@ -622,20 +645,22 @@ html:active-view-transition .popover { transition: none; }
             <code>autofocus</code> on client-rendered elements.
           </li>
           <li>
-            <strong>Before hydration, library mode:</strong> the Trigger already carries the
-            command, so a click opens the popover natively, but the content is not in the HTML yet
-            (with <code>defaultOpen</code> it is, and the Trigger already says it is expanded; only
-            the showing waits for hydration). On hydration the Popup finds it open and dispatches{" "}
+            <strong>Before hydration, library mode:</strong> the Trigger already carries{" "}
+            <code>popovertarget</code>, so a click opens the popover natively, but the content is
+            not in the HTML yet (with <code>defaultOpen</code> it is, and the Trigger already has{" "}
+            <code>data-open</code>; only the showing waits for hydration). On hydration the Popup
+            finds it open and dispatches{" "}
             <code>openChangeAction(true, {'{ reason: "platform" }'})</code> with no event; the
             content mounts into the open popover. If the action rejects or a controlled parent
             refuses, the popover closes again.
           </li>
           <li>
             <strong>Foreign invokers and scripts:</strong> in library mode any open that the library
-            did not start (a <code>&lt;button commandfor command="show-popover"&gt;</code>, a script{" "}
-            <code>showPopover()</code>) is cancelled at <code>beforetoggle</code> and dispatched
-            with that <code>ToggleEvent</code>. A foreign <code>hide-popover</code> closes it
-            natively and is reported as <code>"activate"</code>.
+            did not start (a <code>&lt;button commandfor command="show-popover"&gt;</code>, a{" "}
+            <code>&lt;button popovertarget&gt;</code>, a script <code>showPopover()</code>) is
+            cancelled at <code>beforetoggle</code> and dispatched with that <code>ToggleEvent</code>
+            . A foreign <code>hide-popover</code> closes it natively and is reported as{" "}
+            <code>"activate"</code>.
           </li>
         </ul>
       </BehaviourSection>

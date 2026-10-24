@@ -40,7 +40,7 @@ export function BrowserOwnedStatePage() {
             id: "invoker-command",
             term: "Invoker command",
             definition:
-              "A button's `commandfor` and `command` attributes (Invoker Commands), which make the browser itself open or close a dialog or popover on click, without JavaScript.",
+              "A button's `commandfor` and `command` attributes (Invoker Commands), or its `popovertarget` attribute (the Popover API's invoker, used by the overlay Triggers), which make the browser itself open or close a dialog or popover on click, without JavaScript.",
           },
           {
             id: "platform-path",
@@ -96,8 +96,11 @@ export function BrowserOwnedStatePage() {
         The library never mirrors browser-owned state into React state. It reads the DOM when it
         needs to, and it does not duplicate a pseudo-class with a data attribute. State that nobody
         persists or awaits (whether a hint is showing) is left to the browser entirely, with no prop
-        and no action. Each component page says what it leaves to the browser in its{" "}
-        <strong>Browser-owned state</strong> section.
+        and no action. One read is mirrored: whether an overlay's popup is shown, for the{" "}
+        <code>aria-expanded</code> of the Combobox input and of a trigger rendered as something
+        other than a <code>&lt;button&gt;</code> (a <code>&lt;button&gt;</code> trigger names the
+        popup with <code>popovertarget</code>, and the browser exposes its state). Each component
+        page says what it leaves to the browser in its <strong>Browser-owned state</strong> section.
       </p>
       <ConceptExample component="Tooltip" href="/components/tooltip">
         <p>

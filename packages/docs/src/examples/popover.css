@@ -1,6 +1,6 @@
 /* Popover: the Popup is the <dialog popover> itself. Open state is `:popover-open` on it (exact
-   in both modes); the Trigger carries `aria-expanded` in both modes and `data-open` /
-   `data-pending` in library mode only. */
+   in both modes); the Trigger carries `data-open` in both modes and `data-pending` in library
+   mode only. A <button> Trigger has no `aria-expanded` (the browser exposes its state). */
 
 .demo-popover {
   /* The popover UA stylesheet sets `inset: 0; margin: auto`: reset both for anchored placement. */
@@ -118,10 +118,9 @@ html:active-view-transition .demo-popover-vt {
   font: inherit;
 }
 
-/* The Trigger: `data-open` flips at the click in library mode (`aria-expanded` follows the shown
-   popup, so it lags while an action runs); JS-free mode has only `aria-expanded`. */
-.demo-button[data-open],
-.demo-button[aria-expanded="true"]:not([data-pending]) {
+/* The Trigger: `data-open` flips at the click in library mode and follows the shown popup in
+   JS-free mode. A page that never hydrates can use `.demo-button:has(+ :popover-open)`. */
+.demo-button[data-open] {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }

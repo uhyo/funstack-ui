@@ -380,11 +380,11 @@ export function ContextMenuPage() {
         One Root may hold a <code>Menu.Trigger</code> and a <code>Menu.ContextTrigger</code>: the
         button opens the menu anchored below it (<code>side</code> / <code>align</code>), a
         right-click opens the same menu at the pointer. It is one menu: while it is open from a
-        right-click the button shows <code>aria-expanded="true"</code> and <code>data-open</code>,
-        and a click on it closes the menu. That is the recommended way to satisfy rule 1, and it
-        gives keyboard users a focusable target inside the region. Use one Root per target (a row, a
-        card); several ContextTriggers in one Root are allowed but all show <code>data-open</code>{" "}
-        together.
+        right-click the button is exposed as expanded (the browser's state for its{" "}
+        <code>popovertarget</code>) and shows <code>data-open</code>, and a click on it closes the
+        menu. That is the recommended way to satisfy rule 1, and it gives keyboard users a focusable
+        target inside the region. Use one Root per target (a row, a card); several ContextTriggers
+        in one Root are allowed but all show <code>data-open</code> together.
       </p>
 
       <h3 id="props">Props</h3>

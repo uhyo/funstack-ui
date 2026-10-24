@@ -59,7 +59,7 @@ export function MenuPage() {
       <CodeBlock>{`import { Menu } from "@funstack/ui/menu";
 
 <Menu.Root>                                                {/* no DOM: ids, open state */}
-  <Menu.Trigger>Actions</Menu.Trigger>                     {/* button[commandfor][aria-haspopup=menu] */}
+  <Menu.Trigger>Actions</Menu.Trigger>                     {/* button[popovertarget][aria-haspopup=menu] */}
   <Menu.Popup>                                             {/* div[popover=auto][role=menu] */}
     <Menu.Item action={rename}>Rename</Menu.Item>          {/* button[role=menuitem] */}
     <Menu.Separator />                                     {/* hr */}
@@ -83,9 +83,8 @@ export function MenuPage() {
             Always <a href="/concepts/browser-owned-state#js-free-mode">library mode</a>.
           </strong>{" "}
           A menu cannot follow the APG without JavaScript, so there is no JS-free mode. The Trigger
-          still renders <code>commandfor</code> + <code>command="toggle-popover"</code>: a click
-          before hydration opens the (still empty) menu natively and the items fill in on hydration
-          (<code>reason: "platform"</code>).
+          still renders <code>popovertarget</code>: a click before hydration opens the (still empty)
+          menu natively and the items fill in on hydration (<code>reason: "platform"</code>).
         </li>
         <li>
           <strong>Items are buttons</strong> with explicit roles, <code>tabindex="-1"</code> and{" "}
@@ -140,8 +139,8 @@ export function MenuPage() {
           dropped: it belonged to the previous opening. The re-open itself does not show until that
           action settles: React holds transitions started while an async action is pending, so
           meanwhile the Trigger shows <code>data-open</code> and <code>data-pending</code> without a
-          menu (<code>aria-expanded</code> stays <code>"false"</code>). A slow Server Function
-          behind an item makes this visible (Popover's <code>Close</code> behaves the same).
+          menu (it stays exposed as collapsed: no menu is shown). A slow Server Function behind an
+          item makes this visible (Popover's <code>Close</code> behaves the same).
         </li>
         <li>
           Keyboard activation goes through the item's <code>click()</code>, so{" "}
@@ -279,9 +278,11 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `commandfor`, `command` (not on a host element other than a `<button>`), `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are omitted from the props type (reserved)."
         }
-        note={"Use it in a top-level Root only."}
+        note={
+          "Use it in a top-level Root only. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown menu's state on a `popovertarget` invoker ([#121](https://github.com/uhyo/funstack-ui/issues/121)); a link or component `render` renders it."
+        }
       />
 
       <h4>
@@ -500,7 +501,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `commandfor`, `command` (not on a host element other than a `<button>`), `aria-haspopup`, `aria-expanded`, `data-open`, `data-pending`) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+          "the Trigger's (`type`, `id`, `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction`, `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `data-open`, `data-pending`; `commandfor` and `command` reserved) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
         }
         note={
           "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. Use it in a submenu Root only."
@@ -514,8 +515,8 @@ export function MenuPage() {
           ["`data-open`", "Trigger, SubmenuTrigger", "Optimistic open state of the Root."],
           [
             "`aria-expanded`",
-            "Trigger, SubmenuTrigger",
-            "Whether the menu is shown (mirrored from its `toggle` event, not optimistic).",
+            "Trigger, SubmenuTrigger (link or component `render` only)",
+            "Whether the menu is shown (mirrored from its `toggle` event, not optimistic). A `<button>` has none: the browser exposes the state.",
           ],
           [
             "`data-open`",
@@ -635,10 +636,11 @@ export function MenuPage() {
           menu must not linger once focus has moved on. It is notified as <code>"dismiss"</code>.
         </li>
         <li>
-          <strong>ARIA:</strong> the Trigger has <code>aria-haspopup="menu"</code> and{" "}
-          <code>aria-expanded</code>; the Popup <code>role="menu"</code> and{" "}
-          <code>aria-labelledby</code> pointing at its trigger; items their roles and{" "}
-          <code>aria-checked</code> / <code>aria-disabled</code>.
+          <strong>ARIA:</strong> the Trigger has <code>aria-haspopup="menu"</code> and is a{" "}
+          <code>popovertarget</code> invoker, which every engine exposes as expanded or collapsed
+          from the menu itself, so it renders no <code>aria-expanded</code> (the SubmenuTrigger
+          alike); the Popup <code>role="menu"</code> and <code>aria-labelledby</code> pointing at
+          its trigger; items their roles and <code>aria-checked</code> / <code>aria-disabled</code>.
         </li>
       </ul>
 
@@ -679,7 +681,7 @@ export function MenuPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the Trigger's `aria-expanded` follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
+          "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the state the browser exposes on the Trigger follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
         }
       />
 
@@ -710,7 +712,7 @@ export function MenuPage() {
       <BehaviourSection
         id="before-hydration"
         summary={
-          'The Trigger carries `command="toggle-popover"`: a click before hydration opens the (still empty) menu natively, and the items fill in on hydration (`reason: "platform"`).'
+          'The Trigger carries `popovertarget`: a click before hydration opens the (still empty) menu natively, and the items fill in on hydration (`reason: "platform"`).'
         }
       />
 
