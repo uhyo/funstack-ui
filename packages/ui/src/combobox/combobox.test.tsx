@@ -2129,7 +2129,7 @@ describe("Combobox", () => {
       expect(error).toHaveBeenCalled();
     });
 
-    it("popoverTarget and popoverTargetAction are owned keys; commandfor and command reserved", () => {
+    it("popoverTarget, popoverTargetAction, commandfor and command are owned keys", () => {
       // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
       const popoverTarget: ComboboxTriggerProps = { popoverTarget: "elsewhere" };
       // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
@@ -2143,12 +2143,22 @@ describe("Combobox", () => {
       render(
         <Harness
           trigger={{
-            render: <button type="button" popoverTarget="elsewhere" popoverTargetAction="show" />,
+            render: (
+              <button
+                type="button"
+                popoverTarget="elsewhere"
+                popoverTargetAction="show"
+                commandfor="elsewhere"
+                command="show-popover"
+              />
+            ),
           }}
         />,
       );
       expect(trigger()).toHaveAttribute("popovertarget", popup().id);
       expect(trigger()).not.toHaveAttribute("popovertargetaction");
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(trigger()).not.toHaveAttribute("command");
     });
 
     it("every click is cancelled, closed and open (the command never runs)", async () => {

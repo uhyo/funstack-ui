@@ -82,15 +82,15 @@ function isPointerClick(event: Event): boolean {
 
 /**
  * The menu button: `<button type="button" popovertarget aria-haspopup="menu">`, with no
- * `aria-expanded` (the browser exposes the menu's state on its invoker, #121; a link or component
- * `render` renders it from the shown menu). A click (Enter, Space) toggles the menu through the
+ * `aria-expanded` (the browser exposes the menu's state on its invoker, #121; a link or other
+ * non-button element, or a disabled component `render`, renders it from the shown menu). A click (Enter, Space) toggles the menu through the
  * Root's transition; ArrowDown / ArrowUp open it with the first / last item focused (inside a
  * vertical `Toolbar.Root`: the inline-end arrow, with the first item focused).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
  * (link or component `render`), `popoverTarget`, `aria-haspopup`, `aria-expanded`, `onClick`,
  * `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`; `commandfor`,
- * `command` and `popoverTargetAction` are reserved.
+ * `command` and `popoverTargetAction` (never written; omitted from the props type).
  */
 export function MenuTrigger({
   disabled = false,

@@ -38,22 +38,64 @@ export function axProperty(node: AXNode | undefined, name: string): unknown {
   return node?.properties?.find((p) => p.name === name)?.value.value;
 }
 
+/** The test frame's document in a `DOM.getDocument({ pierce: true })` tree. */
+interface DOMNode {
+  nodeId: number;
+  documentURL?: string;
+  children?: DOMNode[];
+  contentDocument?: DOMNode;
+}
+
+let probeCount = 0;
+
 /**
- * The `expanded` state Chromium exposes for `element`, found by its role (`role` attribute, else
- * `button`) and accessible name (`aria-label`, else its text); the pair must be unique in the
- * frame. `undefined` when the node exposes no expanded state. Used for the overlay Triggers,
- * `popovertarget` invokers whose state the browser computes from the popover (#121).
+ * Chromium's accessibility node for `element` itself: the element is resolved with
+ * `DOM.querySelector` in the test's frame and read with `Accessibility.getPartialAXTree`
+ * (memo/architect/probes/121-popovertarget/ax-chromium.mjs), so neither its role nor its
+ * accessible name matters. A temporary `data-ax-probe` attribute selects it.
+ */
+export async function axNodeOf(element: Element): Promise<AXNode> {
+  const session = cdp();
+  const probe = String(++probeCount);
+  element.setAttribute("data-ax-probe", probe);
+  try {
+    const { root } = (await session.send("DOM.getDocument", { depth: -1, pierce: true })) as {
+      root: DOMNode;
+    };
+    let frameDocument: DOMNode | undefined;
+    const walk = (node: DOMNode) => {
+      if (frameDocument !== undefined) return;
+      if (node.documentURL === location.href) {
+        frameDocument = node;
+        return;
+      }
+      if (node.contentDocument !== undefined) walk(node.contentDocument);
+      node.children?.forEach(walk);
+    };
+    walk(root);
+    if (frameDocument === undefined) throw new Error("axNodeOf: the test frame was not found");
+    const { nodeId } = (await session.send("DOM.querySelector", {
+      nodeId: frameDocument.nodeId,
+      selector: `[data-ax-probe="${probe}"]`,
+    })) as { nodeId: number };
+    if (nodeId === 0) throw new Error("axNodeOf: the element was not found");
+    const { nodes } = (await session.send("Accessibility.getPartialAXTree", {
+      nodeId,
+      fetchRelatives: false,
+    })) as { nodes: AXNode[] };
+    return nodes[0]!;
+  } finally {
+    element.removeAttribute("data-ax-probe");
+  }
+}
+
+/**
+ * The `expanded` state Chromium exposes for `element` (`undefined` when it exposes none). Used for
+ * the overlay Triggers, `popovertarget` invokers whose state the browser computes from the popover
+ * (#121).
  */
 export async function axExpanded(element: Element): Promise<unknown> {
-  const role = element.getAttribute("role") ?? "button";
-  const name = element.getAttribute("aria-label") ?? element.textContent.trim();
-  const matches = (await getAXNodes()).filter(
-    (node) => !node.ignored && node.role?.value === role && node.name?.value === name,
-  );
-  if (matches.length !== 1) {
-    throw new Error(`axExpanded: ${matches.length} ${role} nodes named "${name}"`);
-  }
-  return axProperty(matches[0], "expanded");
+  return axProperty(await axNodeOf(element), "expanded");
 }
 
 /**

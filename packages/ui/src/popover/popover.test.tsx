@@ -459,6 +459,8 @@ describe("Popover", () => {
                 type="submit"
                 popoverTarget="other"
                 popoverTargetAction="show"
+                commandfor="other"
+                command="show-popover"
                 aria-expanded="true"
                 data-open=""
               />
@@ -473,6 +475,9 @@ describe("Popover", () => {
       expect(trigger().getAttribute("popovertarget")).toBe(popup().id);
       // Owned, never written: the platform's default `toggle` (#121).
       expect(trigger()).not.toHaveAttribute("popovertargetaction");
+      // Reserved: an Invoker Command would take precedence over `popovertarget` (#121 review F1).
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(trigger()).not.toHaveAttribute("command");
       // The render element's `aria-expanded` is dropped, not passed through (#121).
       expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(trigger()).not.toHaveAttribute("data-open");
@@ -494,6 +499,38 @@ describe("Popover", () => {
       expect(isOpen()).toBe(true);
       await user.click(screen.getByTestId("close"));
       expect(isOpen()).toBe(false);
+    });
+
+    it("a non-button Trigger warns that only a <button> is a popovertarget invoker", () => {
+      const error = silenceErrors();
+      render(<Harness mode="static" trigger={{ render: <a href="#x" /> }} />);
+      const messages = error.mock.calls.map(([message]) => String(message));
+      expect(
+        messages.filter((m) =>
+          m.includes(
+            "Popover.Trigger: rendered a <a> in JS-free mode. Only a <button> is a `popovertarget` invoker",
+          ),
+        ),
+      ).toHaveLength(1);
+      expect(trigger()).not.toHaveAttribute("popovertarget");
+    });
+
+    it("a render element's commandfor / command are dropped: the Trigger opens its own popup (#121 review F1)", async () => {
+      const user = setupUser();
+      render(
+        <>
+          <div id="other" popover="auto" data-testid="other" />
+          <Harness
+            mode="static"
+            trigger={{ render: <button type="button" commandfor="other" command="show-popover" /> }}
+          />
+        </>,
+      );
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(trigger()).not.toHaveAttribute("command");
+      await user.click(trigger());
+      expect(isOpen()).toBe(true);
+      expect(isOpen(screen.getByTestId("other"))).toBe(false);
     });
 
     it("the activation runs with the Trigger as source (the implicit anchor)", async () => {

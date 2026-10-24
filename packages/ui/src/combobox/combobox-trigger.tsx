@@ -69,7 +69,8 @@ export interface ComboboxTriggerProps extends Omit<
  * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or
  * component `render`), `aria-expanded`, `aria-controls` (token-merged), `popovertarget`,
  * `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`;
- * `commandfor`, `command` and `popoverTargetAction` are reserved.
+ * `popoverTarget`, `popoverTargetAction`, `commandfor` and `command` (never written as props;
+ * omitted from the props type).
  */
 export function ComboboxTrigger({
   disabled: ownDisabled = false,
@@ -130,9 +131,12 @@ export function ComboboxTrigger({
     // optimistic one (#118).
     "aria-expanded": rendersButton(render) ? undefined : popover.shown,
     "aria-controls": ctx.ids.list,
-    // Owned: the ref writes `popovertarget` after hydration; a render element sets neither.
+    // Owned: the ref writes `popovertarget` after hydration; a render element sets none of
+    // these (an Invoker Command would take precedence over `popovertarget`, #121 review F1).
     popoverTarget: undefined,
     popoverTargetAction: undefined,
+    commandfor: undefined,
+    command: undefined,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
     },

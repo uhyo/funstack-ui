@@ -278,8 +278,9 @@ describe("Combobox (browser)", () => {
     });
 
     it("aria-expanded on the Input is false right after Escape, while a slow notification runs (#118)", async () => {
+      const work = deferred();
       const openAction = vi.fn<OpenAction>(async (next) => {
-        if (!next) await sleep(300);
+        if (!next) await work.promise;
       });
       render(<Harness root={{ openChangeAction: openAction }} />);
       await typeInto("ja");
@@ -300,6 +301,7 @@ describe("Combobox (browser)", () => {
       // The Trigger is a `popovertarget` invoker: no attribute, the browser's state (#121).
       await expectInvokerExpanded(screen.getByTestId("trigger"), popup(), false);
       expect(input()).toHaveAttribute("data-pending", "");
+      work.resolve();
       await expect.poll(() => input().hasAttribute("data-pending")).toBe(false);
       expect(input()).toHaveAttribute("aria-expanded", "false");
     });
@@ -976,8 +978,10 @@ describe("Trigger close (#112, browser)", () => {
   }
 
   it("keeps the listbox shown, the input focused, the Trigger pending until the action settles", async () => {
+    // A deferred, not a fixed window: the AX read below may take any time (#121 review F6).
+    const work = deferred();
     const openAction = vi.fn<OpenAction>(async (next) => {
-      if (!next) await sleep(300);
+      if (!next) await work.promise;
     });
     render(<Harness root={{ openChangeAction: openAction }} />);
     await pressTrigger();
@@ -997,6 +1001,7 @@ describe("Trigger close (#112, browser)", () => {
     await expectInvokerExpanded(trigger(), popup(), true);
     expect(isOpen()).toBe(true);
     expect(trigger()).toHaveAttribute("data-pending", "");
+    work.resolve();
     await expect.poll(() => isOpen(), { timeout: 2000 }).toBe(false);
     await expectInvokerExpanded(trigger(), popup(), false);
     expect(document.activeElement).toBe(input());

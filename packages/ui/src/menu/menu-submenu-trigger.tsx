@@ -59,7 +59,7 @@ export interface MenuSubmenuTriggerProps extends Omit<
  *
  * Owned keys (conventions 1.2): the Trigger's (`type`, `id`, `popoverTarget`,
  * `aria-haspopup`, `aria-expanded`, `data-open`, `data-pending`; `commandfor`, `command` and
- * `popoverTargetAction` reserved) and the item's (`role`,
+ * `popoverTargetAction`, never written) and the item's (`role`,
  * `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`,
  * `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`).
  */

@@ -48,7 +48,7 @@ export interface PopoverTriggerProps extends Omit<
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`
  * (library mode, link or component `render`), `popoverTarget`, `aria-expanded`,
  * `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`; `commandfor`,
- * `command` and `popoverTargetAction` are reserved. `aria-haspopup` and `aria-controls` pass
+ * `command` and `popoverTargetAction` (never written; omitted from the props type). `aria-haspopup` and `aria-controls` pass
  * through.
  */
 export function PopoverTrigger({

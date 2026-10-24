@@ -212,6 +212,30 @@ describeOverlayInBrowser<PopoverOpenChangeDetails>({
 });
 
 describe("JS-free mode (browser)", () => {
+  it("a render element's commandfor / command are dropped: a real click opens the Trigger's own popup (#121 review F1)", async () => {
+    render(
+      <>
+        <div id="other" popover="auto" data-testid="other" style={box(100, 50)} />
+        <Popover.Root>
+          <Popover.Trigger
+            data-testid="trigger"
+            render={<button type="button" commandfor="other" command="show-popover" />}
+          >
+            Filters
+          </Popover.Trigger>
+          <Popover.Popup data-testid="popup" style={box(200, 100)}>
+            <Popover.Title>Filters</Popover.Title>
+          </Popover.Popup>
+        </Popover.Root>
+      </>,
+    );
+    expect(trigger()).not.toHaveAttribute("commandfor");
+    expect(trigger()).not.toHaveAttribute("command");
+    await user.click(trigger());
+    await expect.poll(() => isOpen()).toBe(true);
+    expect(screen.getByTestId("other").matches(":popover-open")).toBe(false);
+  });
+
   it("a real popovertarget click opens and closes; data-open and the exposed state follow; Close hides", async () => {
     render(
       <Popover.Root>
@@ -273,9 +297,8 @@ describe("library mode (browser)", () => {
   });
 
   it("the exposed state is collapsed right after an Escape, while a slow dismissal notification runs (#118, #121)", async () => {
-    const action = vi.fn<ActionFn>((next) =>
-      next ? undefined : new Promise<void>((resolve) => setTimeout(resolve, 300)),
-    );
+    const work = deferred();
+    const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
     render(<Library action={action} />);
     await user.click(trigger());
     await expect.poll(() => isOpen()).toBe(true);
@@ -288,6 +311,7 @@ describe("library mode (browser)", () => {
     await expectExpanded(false);
     // Still within the notification.
     expect(trigger()).toHaveAttribute("data-pending", "");
+    await act(async () => work.resolve());
     await expect.poll(() => trigger().hasAttribute("data-pending")).toBe(false);
     await expectExpanded(false);
   });

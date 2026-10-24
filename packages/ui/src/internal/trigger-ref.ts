@@ -9,7 +9,7 @@ const warned = new WeakSet<RefObject<HTMLElement | null>>();
  * Registers `element` as the Root's one Trigger (`triggerRef`, last mounted wins) and returns
  * the ref cleanup. In development, a second Trigger mounting while another is registered
  * warns once per Root (#113 API3): only the registered one is the popup's `source` (anchor,
- * focus return, `aria-expanded`), so a press on the other while open counts as outside.
+ * focus return) and, in JS-free mode, the one whose `data-open` is kept current.
  */
 export function registerTrigger(
   triggerRef: RefObject<HTMLElement | null>,
@@ -23,8 +23,8 @@ export function registerTrigger(
       warned.add(triggerRef);
       console.error(
         `${part}: a second ${part} mounted in the same Root. A Root supports one ${part}: ` +
-          "the popup only follows the last one mounted (its anchor, focus return and " +
-          `aria-expanded). Render one ${part} per Root.`,
+          "the popup only follows the last one mounted (its anchor, focus return and, " +
+          `without an action, data-open). Render one ${part} per Root.`,
       );
     }
   }

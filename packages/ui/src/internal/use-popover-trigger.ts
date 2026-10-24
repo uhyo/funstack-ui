@@ -121,8 +121,8 @@ export function usePopoverTrigger<State>(
               "this element while the popup is open closes it through light dismiss before the " +
               "click, so the close is not awaited, openChangeAction(false) cannot veto it and " +
               "there is no exit transition. Render a <button>."
-          : `${part}: rendered a <${tag}> in JS-free mode. Only a <button> runs ` +
-              '`command="toggle-popover"`; this trigger will not open the popover. Render a ' +
+          : `${part}: rendered a <${tag}> in JS-free mode. Only a <button> is a ` +
+              "`popovertarget` invoker; this trigger will not open the popover. Render a " +
               "<button>, or put the component in library mode (`defaultOpen={false}`).";
       }),
   );
@@ -188,6 +188,10 @@ export function usePopoverTrigger<State>(
     popoverTarget: invoker ? ids.popup : undefined,
     // Never written: the default `toggle` (a render element must not change the action).
     popoverTargetAction: undefined,
+    // Reserved: an Invoker Command on the same button would take precedence over
+    // `popovertarget` and act on another element (#121 review F1).
+    commandfor: undefined,
+    command: undefined,
     // No `aria-expanded` on an invoker: every engine exposes the popover's shown state from
     // `popovertarget`, and ARIA in HTML forbids the attribute there (#121). Otherwise nothing else
     // exposes the state: library mode renders shown (the popup is in the top layer; `data-open`

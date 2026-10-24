@@ -1108,3 +1108,56 @@ describe("Trigger click while open (browser, #110)", () => {
     expect(item("rename")).toHaveFocus();
   });
 });
+
+// #121: the Triggers are `popovertarget` invokers with no `aria-expanded`; on Chromium the
+// accessibility tree is the state assertion (the `menuitem` role included). Firefox and WebKit
+// run the DOM assertions (review F5).
+describe("the exposed state of the Triggers (browser, #121)", () => {
+  it("SubmenuTrigger: collapsed, expanded while the submenu is shown, collapsed after ArrowLeft", async () => {
+    render(
+      <Basic>
+        <Submenu />
+      </Basic>,
+    );
+    await openWithKeyboard();
+    await expectInvokerExpanded(item("move"), sub(), false);
+    item("move").focus();
+    await user.keyboard("{ArrowRight}");
+    await expect.poll(() => isOpen(sub())).toBe(true);
+    await expectInvokerExpanded(item("move"), sub(), true);
+    await user.keyboard("{ArrowLeft}");
+    await expect.poll(() => isOpen(sub())).toBe(false);
+    await expectInvokerExpanded(item("move"), sub(), false);
+    expect(isOpen()).toBe(true);
+  });
+
+  it("Menu.Trigger: collapsed during a deferred open, expanded once the menu is shown", async () => {
+    const work = deferred();
+    const action = vi.fn<OpenAction>((next) => (next ? work.promise : undefined));
+    render(<Basic root={{ openChangeAction: action }} />);
+    await expectInvokerExpanded(trigger(), popup(), false);
+    await user.click(trigger());
+    expect(trigger()).toHaveAttribute("data-open", "");
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    await expectInvokerExpanded(trigger(), popup(), false);
+    expect(isOpen()).toBe(false);
+    await act(async () => work.resolve());
+    await expect.poll(() => isOpen()).toBe(true);
+    await expectInvokerExpanded(trigger(), popup(), true);
+  });
+
+  it("Menu.Trigger: collapsed after a refused Escape while the notification runs, expanded again on the re-show", async () => {
+    const work = deferred();
+    render(<Basic root={{ open: true, openChangeAction: () => work.promise }} />);
+    await expect.poll(() => isOpen()).toBe(true);
+    await expectInvokerExpanded(trigger(), popup(), true);
+    await user.keyboard("{Escape}");
+    await expect.poll(() => isOpen()).toBe(false);
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    await expectInvokerExpanded(trigger(), popup(), false);
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    await act(async () => work.resolve());
+    await expect.poll(() => isOpen()).toBe(true);
+    await expectInvokerExpanded(trigger(), popup(), true);
+  });
+});
