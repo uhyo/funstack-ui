@@ -2,6 +2,7 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
+import { renderOverlayContent } from "./overlay-popup.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { useElementCheck } from "./use-element-check.js";
 import { useExitAnimation } from "./use-exit-animation.js";
@@ -13,14 +14,15 @@ export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */
   readonly part: string;
   /** Element to focus on open: a ref, or a selector resolved inside the popup (design 6.1). */
-  readonly initialFocus: RefObject<HTMLElement | null> | string | undefined;
+  readonly initialFocus?: RefObject<HTMLElement | null> | string | undefined;
   /**
    * Replaces `initialFocus` with a function called right before each library open (Menu: the
    * first or last item by open cause). `null` leaves the choice to the platform. A
    * `QuietFocusTarget` asks for focus without the focus ring (a pointer-opened menu).
    */
   readonly resolveInitialFocus?: (popup: HTMLElement) => HTMLElement | QuietFocusTarget | null;
-  readonly keepMounted: boolean | undefined;
+  /** The consumer's `keepMounted`: `renderContent` keeps the children in an `<Activity>`. */
+  readonly keepMounted?: boolean | undefined;
   /** The consumer's `transition`; decides how a library-driven close keeps its content (4.4). */
   readonly transition: ViewTransitionClass | undefined;
   /** Runs after the library's own `beforetoggle` handling (Menu: focus bookkeeping). */
@@ -62,6 +64,8 @@ export interface PopoverPopupHook {
    * that follows returns focus to the Trigger (design 6.2).
    */
   readonly wrapContent: (children: ReactNode) => ReactNode;
+  /** The popup's children by mode, `visible` and `keepMounted` (`renderOverlayContent`). */
+  readonly renderContent: (children: () => ReactNode) => ReactNode;
   /**
    * Re-shows a shown popup in place (`hidePopover()` + `showPopover({ source })` under the
    * opening flag, initial focus resolved again): Menu's move to a new point
@@ -450,5 +454,11 @@ export function usePopoverPopup(
     needsName,
   );
 
-  return { setElement, visible: ctx.committed || exit.held, wrapContent, reshow };
+  const visible = ctx.committed || exit.held;
+  const renderContent = (children: () => ReactNode): ReactNode =>
+    renderOverlayContent(
+      { isLibrary, keepMounted: options.keepMounted, visible, wrapContent },
+      children,
+    );
+  return { setElement, visible, wrapContent, renderContent, reshow };
 }

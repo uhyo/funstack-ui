@@ -1,13 +1,5 @@
 "use client";
-import {
-  Activity,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -16,8 +8,8 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useContentFocusProbe } from "../internal/content-focus-probe.js";
+import { renderOverlayContent } from "../internal/overlay-popup.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
-import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -647,24 +639,10 @@ export function DialogPopup({
   const state: DialogPopupState = { open: ctx.committed, modal };
   const visible = ctx.committed || exit.held;
 
-  // Not part of an enclosing Toolbar (the engine excludes `dialog`): parts inside the dialog must
-  // not see the Toolbar either.
-  const content = (s: DialogPopupState): ReactNode => (
-    <ToolbarContext value={null}>{contentOf(s)}</ToolbarContext>
-  );
-  const contentOf = (s: DialogPopupState): ReactNode => {
-    if (!isLibrary) return resolveStateValue(children, s);
-    if (keepMounted === true) {
-      // The mode changes with committed state, inside the Root's transition (conventions 5.5);
-      // it stays visible while the close animates (a hidden Activity is `display: none`).
-      return (
-        <Activity mode={visible ? "visible" : "hidden"}>
-          {wrapContent(resolveStateValue(children, s))}
-        </Activity>
-      );
-    }
-    return visible ? wrapContent(resolveStateValue(children, s)) : null;
-  };
+  const content = (s: DialogPopupState): ReactNode =>
+    renderOverlayContent({ isLibrary, keepMounted, visible, wrapContent }, () =>
+      resolveStateValue(children, s),
+    );
 
   const libraryProps: ComponentPropsWithRef<"dialog"> & DataAttributes = {
     id: ids.dialog,

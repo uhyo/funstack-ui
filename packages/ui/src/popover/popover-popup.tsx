@@ -1,5 +1,4 @@
 "use client";
-import { Activity } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,7 +8,6 @@ import type {
 } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
-import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -154,7 +152,7 @@ export function PopoverPopup({
         "always mounted so that the server HTML is complete.",
   );
 
-  const { setElement, visible, wrapContent } = usePopoverPopup(ctx, {
+  const { setElement, renderContent } = usePopoverPopup(ctx, {
     part: "Popover.Popup",
     initialFocus,
     keepMounted,
@@ -169,29 +167,11 @@ export function PopoverPopup({
 
   const state: PopoverPopupState = { open: ctx.committed, side, align };
 
-  const content = (s: PopoverPopupState): ReactNode => {
-    let node: ReactNode;
-    if (!isLibrary) {
-      node = resolveStateValue(children, s);
-    } else if (keepMounted === true) {
-      // The mode changes with committed state, inside the Root's transition (conventions 5.5);
-      // it stays visible while an exit animation runs.
-      node = (
-        <Activity mode={visible ? "visible" : "hidden"}>
-          {wrapContent(resolveStateValue(children, s))}
-        </Activity>
-      );
-    } else {
-      node = visible ? wrapContent(resolveStateValue(children, s)) : null;
-    }
-    // Popup content is not part of an enclosing Toolbar's sequence (the engine excludes
-    // `[popover]`), so parts inside it must not see the Toolbar either.
-    return (
-      <PopoverPopupContext value={s}>
-        <ToolbarContext value={null}>{node}</ToolbarContext>
-      </PopoverPopupContext>
-    );
-  };
+  const content = (s: PopoverPopupState): ReactNode => (
+    <PopoverPopupContext value={s}>
+      {renderContent(() => resolveStateValue(children, s))}
+    </PopoverPopupContext>
+  );
 
   const libraryProps: ComponentPropsWithRef<"dialog"> & DataAttributes = {
     id: ids.popup,

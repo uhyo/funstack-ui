@@ -1,5 +1,4 @@
 "use client";
-import { Activity } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,7 +8,6 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
@@ -88,9 +86,8 @@ export function ComboboxPopup({
   const ctx = useComboboxContext("Combobox.Popup");
   const { popover } = ctx;
 
-  const { setElement, visible, wrapContent } = usePopoverPopup(popover, {
+  const { setElement, renderContent } = usePopoverPopup(popover, {
     part: "Combobox.Popup",
-    initialFocus: undefined,
     // Focus stays in the input: nothing inside the popup is ever focused.
     resolveInitialFocus: () => null,
     keepMounted,
@@ -121,24 +118,11 @@ export function ComboboxPopup({
     "data-stale": dataAttr(ctx.stale),
   };
 
-  const content = (s: ComboboxPopupState): ReactNode => {
-    let node: ReactNode;
-    if (keepMounted === true) {
-      node = (
-        <Activity mode={visible ? "visible" : "hidden"}>
-          {wrapContent(resolveStateValue(children, s))}
-        </Activity>
-      );
-    } else {
-      node = visible ? wrapContent(resolveStateValue(children, s)) : null;
-    }
-    // Not part of an enclosing Toolbar (the engine excludes `[popover]`).
-    return (
-      <ComboboxPopupContext value={true}>
-        <ToolbarContext value={null}>{node}</ToolbarContext>
-      </ComboboxPopupContext>
-    );
-  };
+  const content = (s: ComboboxPopupState): ReactNode => (
+    <ComboboxPopupContext value={true}>
+      {renderContent(() => resolveStateValue(children, s))}
+    </ComboboxPopupContext>
+  );
 
   const element = useRender<ComponentPropsWithRef<"div">, ComboboxPopupState>({
     defaultElement: "div",

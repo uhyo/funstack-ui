@@ -1,5 +1,5 @@
 "use client";
-import { Activity, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { use, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -15,7 +15,6 @@ import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
-import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
@@ -351,9 +350,8 @@ export function MenuPopup({
   }, []);
   useEffect(() => stopOutside, [stopOutside]);
 
-  const { setElement, visible, wrapContent, reshow } = usePopoverPopup(popover, {
+  const { setElement, visible, renderContent, reshow } = usePopoverPopup(popover, {
     part: "Menu.Popup",
-    initialFocus: undefined,
     // Design 6.1: the first (or last) enabled item by open cause, nothing for a hover open, the
     // popup itself when there are no items.
     // A pointer open focuses without the focus ring where the engine can be told so.
@@ -572,25 +570,12 @@ export function MenuPopup({
       </style>
     ) : null;
 
-  const content = (s: MenuPopupState): ReactNode => {
-    let node: ReactNode;
-    if (keepMounted === true) {
-      node = (
-        <Activity mode={visible ? "visible" : "hidden"}>
-          {wrapContent(resolveStateValue(children, s))}
-        </Activity>
-      );
-    } else {
-      node = visible ? wrapContent(resolveStateValue(children, s)) : null;
-    }
-    // Not part of an enclosing Toolbar: a Menu.Trigger or ToggleGroup in here sees no Toolbar.
-    return (
-      <MenuListContext value={listContext}>
-        {pointRules}
-        <ToolbarContext value={null}>{node}</ToolbarContext>
-      </MenuListContext>
-    );
-  };
+  const content = (s: MenuPopupState): ReactNode => (
+    <MenuListContext value={listContext}>
+      {pointRules}
+      {renderContent(() => resolveStateValue(children, s))}
+    </MenuListContext>
+  );
 
   const element = useRender<ComponentPropsWithRef<"div">, MenuPopupState>({
     defaultElement: "div",
