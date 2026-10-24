@@ -65,7 +65,24 @@ upstream). vitest's runner is an iframe, so the touch row branches on
 `window === window.top` and asserts the close with `(false, "dismiss", "toggle")` in a frame.
 Probe script was in the session scratchpad (touch-probe2.mjs); the matrix above is the result.
 
-WebKit: not runnable locally; CI decides the drag and the press rows.
+Minimal repro (plain DOM). Load it as a top-level page and inside a same-origin iframe, then tap
+the input (Playwright: `hasTouch: true` context, `page.touchscreen.tap` at the input). Chromium
+keeps `pop` open at top level but hides it at the tap's `click` in the iframe. Firefox keeps it
+open in both.
+
+```html
+<input id=src style="position:fixed;top:20px;left:20px;width:120px;height:24px">
+<div id=pop popover=auto style="position:fixed;inset:auto;top:100px;left:20px;margin:0">pop</div>
+<script>
+src.addEventListener("pointerdown", (e) => {
+  if (pop.matches(":popover-open") && e.button === 0) pop.setPointerCapture(e.pointerId);
+});
+pop.showPopover({ source: src });
+</script>
+```
+
+WebKit: not runnable locally. CI (all three engines green) ran the press, caret, dblclick, drag
+(WebKit `[2, 8]`) and nested rows; the touch row is Chromium-only.
 
 ## Release notes
 
