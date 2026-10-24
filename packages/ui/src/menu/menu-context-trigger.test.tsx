@@ -1,7 +1,7 @@
 // Menu.ContextTrigger tests (jsdom), mapped to design/components/context-menu.md section 13.1.
 // The Popover shim (src/__tests__/popover-shim.ts) provides the popover half (coalesced `toggle`,
-// the recorded `source`); a no-op `setPointerCapture` below is what the rows spy on. `contextmenu` is
-// dispatched as a real `PointerEvent` (jsdom implements `pointerId` / `pointerType`).
+// the recorded `source`); the rows spy on `setPointerCapture` (src/__tests__/pointer-capture-shim.ts).
+// `contextmenu` is dispatched as a real `PointerEvent` (jsdom implements `pointerId` / `pointerType`).
 //
 // Not testable here, covered by `menu-context-trigger.browser.test.tsx`: real right-clicks, the
 // pending `pointerup` light dismiss in Firefox / WebKit, the placement and its flips, the
@@ -10,7 +10,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { Suspense, startTransition, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
   createSuspender,
@@ -39,24 +39,20 @@ import { watchShow } from "../__tests__/overlay-helpers.js";
 
 type OpenAction = (next: boolean, details: MenuOpenChangeDetails) => unknown;
 
-// jsdom has no pointer capture: a no-op the rows spy on (the Slider and NumberField suites install
-// their own tracking stubs, so the shim does not).
-if (typeof Element.prototype.setPointerCapture !== "function") {
-  Object.assign(Element.prototype, {
-    setPointerCapture() {},
-    releasePointerCapture() {},
-    hasPointerCapture: () => false,
-  });
-}
-
 // jsdom's `focus()` ignores `focusVisible`; read it, so that the library takes the quiet-focus
-// path for pointer opens (`focus({ focusVisible: false })`) as the engines do. Installed before
-// any open: the library detects the option once.
+// path for pointer opens (`focus({ focusVisible: false })`) as the engines do. Installed for this
+// file only and before any open: the library detects the option once (vitest.setup.ts forgets the
+// detection after each test, so the other files keep jsdom's plain `focus()`).
 const nativeFocus = HTMLElement.prototype.focus;
-HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
-  void (options as { focusVisible?: boolean } | undefined)?.focusVisible;
-  nativeFocus.call(this, options);
-};
+beforeAll(() => {
+  HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
+    void (options as { focusVisible?: boolean } | undefined)?.focusVisible;
+    nativeFocus.call(this, options);
+  };
+});
+afterAll(() => {
+  HTMLElement.prototype.focus = nativeFocus;
+});
 
 interface HarnessProps {
   root?: Partial<MenuRootProps>;

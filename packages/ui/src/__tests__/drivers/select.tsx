@@ -18,12 +18,17 @@ const opt = (v: string) => sel().querySelector<HTMLOptionElement>(`option[value=
 const dataSelected = () =>
   [...sel().options].filter((o) => o.hasAttribute("data-selected")).map((o) => o.value);
 
+/** Whether React has already warned about `<selectedcontent>` in this module graph. */
+let selectedContentWarned = false;
+
 /**
- * React warns once per module graph (so once per test file) that `<selectedcontent>` is an
- * unknown tag (jsdom has no customizable select). Call in a `beforeAll` of every file that
- * renders a Select.Value, so rows asserting no `console.error` do not depend on running after
- * another row that rendered one (#101: failed under --sequence.shuffle). The expectation fails
- * the day React stops warning: drop the warm-up then.
+ * React warns once per module graph that `<selectedcontent>` is an unknown tag (jsdom has no
+ * customizable select). Call in a `beforeAll` of every file that renders a Select.Value, so rows
+ * asserting no `console.error` do not depend on running after another row that rendered one (#101:
+ * failed under --sequence.shuffle). The `jsdom` project shares one module graph between the files
+ * of a worker (#107), React's included, so only the first warm-up in a graph sees the warning;
+ * this module lives exactly as long as that graph, so its flag tells which call is the first. The
+ * expectation fails the day React stops warning: drop the warm-up then.
  */
 export function takeSelectedContentWarning(): void {
   const error = silenceErrors();
@@ -37,7 +42,15 @@ export function takeSelectedContentWarning(): void {
   );
   // Unmounts it and removes its container: the first row starts from an empty body.
   cleanup();
-  expect(error).toHaveBeenCalledWith(expect.stringContaining("is unrecognized"), "selectedcontent");
+  if (selectedContentWarned) {
+    expect(error).not.toHaveBeenCalled();
+  } else {
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("is unrecognized"),
+      "selectedcontent",
+    );
+    selectedContentWarned = true;
+  }
   error.mockRestore();
 }
 

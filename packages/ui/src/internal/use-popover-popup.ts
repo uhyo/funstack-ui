@@ -112,6 +112,11 @@ function supportsFocusVisibleOption(doc: Document): boolean {
   return focusVisibleOption;
 }
 
+/** Tests only: forget the detection, so the next pointer open detects the option again. */
+export function resetFocusVisibleOption(): void {
+  focusVisibleOption = undefined;
+}
+
 /** Whether `element` sits inside a popover that is not shown (an outer popup that closed). */
 function insideHiddenPopover(element: Element): boolean {
   for (let node = element.parentElement; node !== null; node = node.parentElement) {

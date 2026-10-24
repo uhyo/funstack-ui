@@ -1,7 +1,8 @@
 // Observes the View Transition types the library adds: jsdom has no `startViewTransition`, so a
 // test file wraps React's `addTransitionType` (conventions 5.3). The mock has to be declared in
-// the test file itself (vi.mock is hoisted per file), and only in a file of its own: a mocked
-// "react" in a big component file would make audit T14 (no isolation) harder.
+// the test file itself (vi.mock is hoisted per file), and only in a file of its own named
+// `*-transition-types.test.tsx`: those run isolated (isolated-files.ts, #107), since in the shared
+// module graph of the `jsdom` project a mocked "react" would leak into other files.
 //
 //   vi.mock("react", async (importOriginal) => {
 //     const { withTransitionTypeSpy } = await import("../__tests__/transition-type-spy.js");

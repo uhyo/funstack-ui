@@ -71,3 +71,13 @@ export function announce(element: Element, message: string): void {
     }, ANNOUNCE_CLEAR_DELAY);
   }, ANNOUNCE_WRITE_DELAY);
 }
+
+/** Tests only: removes the fallback region and cancels its pending writes. */
+export function resetAnnouncer(): void {
+  if (clearTimer !== undefined) clearTimeout(clearTimer);
+  if (writeTimer !== undefined) clearTimeout(writeTimer);
+  clearTimer = undefined;
+  writeTimer = undefined;
+  region?.remove();
+  region = null;
+}

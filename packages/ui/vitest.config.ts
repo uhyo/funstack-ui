@@ -4,6 +4,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { chromium, firefox, webkit } from "playwright";
 import { configDefaults, defineConfig } from "vitest/config";
 import type { BrowserCommand } from "vitest/node";
+import { isolatedTestFiles } from "./src/__tests__/isolated-files.ts";
 
 const browserTypes = { chromium, firefox, webkit } as const;
 type BrowserName = keyof typeof browserTypes;
@@ -117,12 +118,29 @@ export default defineConfig({
           name: "jsdom",
           environment: "jsdom",
           include: ["src/**/*.test.{ts,tsx}"],
-          exclude: [...configDefaults.exclude, "src/**/*.browser.test.{ts,tsx}"],
+          exclude: [
+            ...configDefaults.exclude,
+            "src/**/*.browser.test.{ts,tsx}",
+            ...isolatedTestFiles,
+          ],
           setupFiles: ["./src/__tests__/vitest.setup.ts"],
           globals: true,
+          // Files share a worker's module graph and jsdom window (#107): vitest.setup.ts resets
+          // what one file could leave behind for the next, and the files whose leftovers it
+          // cannot reset run in `jsdom-isolated` (src/__tests__/isolated-files.ts).
+          isolate: false,
           // No `typecheck` here: the type-level rows (`*.types.test.tsx`, `expectTypeOf`) fail
           // through `pnpm typecheck` (tsc over src, test files included). vitest's typecheck
           // matched no file (#101, audit T17).
+        },
+      },
+      {
+        test: {
+          name: "jsdom-isolated",
+          environment: "jsdom",
+          include: isolatedTestFiles,
+          setupFiles: ["./src/__tests__/vitest.setup.ts"],
+          globals: true,
         },
       },
       {

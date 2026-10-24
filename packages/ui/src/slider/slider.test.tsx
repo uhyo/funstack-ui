@@ -9,7 +9,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Component, StrictMode, Suspense, startTransition, useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -43,28 +43,6 @@ import {
 type Value = number | readonly number[];
 type ChangeFn = (next: Value, details: SliderValueChangeDetails) => unknown;
 type CommitFn = (next: Value, details: SliderValueCommitDetails) => unknown;
-
-// --- jsdom polyfills -----------------------------------------------------------------------------
-
-const captured = new Map<number, Element>();
-beforeAll(() => {
-  const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
-  if (typeof proto.setPointerCapture !== "function") {
-    proto.setPointerCapture = function (this: Element, id: number) {
-      captured.set(id, this);
-    };
-    proto.releasePointerCapture = function (this: Element, id: number) {
-      if (captured.get(id) === this) captured.delete(id);
-    };
-    proto.hasPointerCapture = function (this: Element, id: number) {
-      return captured.get(id) === this;
-    };
-  }
-});
-
-afterEach(() => {
-  captured.clear();
-});
 
 // --- Helpers -------------------------------------------------------------------------------------
 

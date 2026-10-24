@@ -60,7 +60,7 @@
     "dev": "tsdown --watch",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:jsdom": "vitest run --project jsdom",
+    "test:jsdom": "vitest run --project jsdom --project jsdom-isolated",
     "test:browser": "vitest run --project browser",
     "test:browser:dev": "vitest --project browser --browser.headless=false",
     "typecheck": "tsc --noEmit"

@@ -12,7 +12,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Component, StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactElement, ReactNode } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -25,6 +25,7 @@ import {
   hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
+import { capturedPointers } from "../__tests__/pointer-capture-shim.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { NumberField } from "./index.js";
@@ -37,26 +38,7 @@ import type {
 
 type Fn = (next: number | null, details: NumberFieldValueChangeDetails) => unknown;
 
-// --- jsdom polyfills -----------------------------------------------------------------------------
-
-const captured = new Map<number, Element>();
-beforeAll(() => {
-  const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
-  if (typeof proto.setPointerCapture !== "function") {
-    proto.setPointerCapture = function (this: Element, id: number) {
-      captured.set(id, this);
-    };
-    proto.releasePointerCapture = function (this: Element, id: number) {
-      if (captured.get(id) === this) captured.delete(id);
-    };
-    proto.hasPointerCapture = function (this: Element, id: number) {
-      return captured.get(id) === this;
-    };
-  }
-});
-
 afterEach(() => {
-  captured.clear();
   vi.useRealTimers();
   document.documentElement.lang = "";
 });
@@ -609,7 +591,7 @@ describe("NumberField", () => {
       render(<Fixture mode="uncontrolled" onChange={onChange} onCommit={onCommit} />);
       const notPrevented = pointer("pointerDown", inc());
       expect(notPrevented).toBe(false);
-      expect(captured.get(1)).toBe(inc());
+      expect(capturedPointers.get(1)).toBe(inc());
       expect(input().value).toBe("2");
       expect(onCommit).not.toHaveBeenCalled();
       act(() => vi.advanceTimersByTime(399));
