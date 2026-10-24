@@ -28,6 +28,7 @@ import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { useElementCheck } from "../internal/use-element-check.js";
+import { useShownNameWarning } from "../internal/use-name-warning.js";
 
 export interface DialogPopupState {
   /** Committed open state (library mode); `false` in JS-free mode. Read `:open` for the DOM truth. */
@@ -632,19 +633,14 @@ export function DialogPopup({
     };
   }, [dialog, modal, lightDismiss, experimental_closedBy, triggerRef]);
 
-  // Development check: the dialog has an accessible name when it is (or can be) shown.
-  const shown = !isLibrary || ctx.committed;
-  useEffect(() => {
-    if (!isDev || dialog === null || !shown) return;
-    if (dialog.hasAttribute("aria-label")) return;
-    const labelledBy = (dialog.getAttribute("aria-labelledby") ?? "").split(/\s+/);
-    const doc = dialog.ownerDocument;
-    if (labelledBy.some((id) => id !== "" && doc.getElementById(id) !== null)) return;
-    console.error(
-      "Dialog.Popup: the dialog has no accessible name. Render a Dialog.Title, or give the " +
-        "Popup an `aria-label`.",
-    );
-  }, [dialog, shown]);
+  // Development check (design 9): the dialog has an accessible name when it is (or can be)
+  // shown.
+  useShownNameWarning(
+    dialog,
+    !isLibrary || ctx.committed,
+    "Dialog.Popup: the dialog has no accessible name. Render a Dialog.Title, or give the " +
+      "Popup an `aria-label`.",
+  );
 
   const state: DialogPopupState = { open: ctx.committed, modal };
   const visible = ctx.committed || exit.held;

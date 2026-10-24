@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
 import { useExitAnimation } from "./use-exit-animation.js";
@@ -7,6 +7,7 @@ import type { PopoverRootValue } from "./use-popover-root.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { useLatest } from "./use-latest.js";
 import { useElementCheck } from "./use-element-check.js";
+import { useShownNameWarning } from "./use-name-warning.js";
 
 export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */
@@ -72,6 +73,12 @@ export interface PopoverPopupHook {
 }
 
 const isDev = process.env.NODE_ENV !== "production";
+
+/** The popup roles that require a name (a listbox's name is checked on the List). */
+function needsName(element: Element): boolean {
+  const role = element.getAttribute("role");
+  return role === "dialog" || role === "alertdialog" || role === "menu";
+}
 
 let focusVisibleOption: boolean | undefined;
 
@@ -433,23 +440,13 @@ export function usePopoverPopup(
 
   // Development check (design 9): `role="dialog"` needs a name once the popup is (or can be)
   // shown.
-  const shown = !isLibrary || ctx.committed;
-  const warnedName = useRef(false);
-  useEffect(() => {
-    const element = popupRef.current;
-    if (!isDev || element === null || !shown || warnedName.current) return;
-    if (element.hasAttribute("aria-label")) return;
-    const labelledBy = (element.getAttribute("aria-labelledby") ?? "").split(/\s+/);
-    const doc = element.ownerDocument;
-    if (labelledBy.some((id) => id !== "" && doc.getElementById(id) !== null)) return;
-    const role = element.getAttribute("role");
-    if (role !== "dialog" && role !== "alertdialog" && role !== "menu") return;
-    warnedName.current = true;
-    console.error(
-      `${part}: the popup has no accessible name. Render a Title, or give the Popup an ` +
-        "`aria-label`.",
-    );
-  }, [popupRef, shown, part]);
+  useShownNameWarning(
+    popupRef,
+    !isLibrary || ctx.committed,
+    `${part}: the popup has no accessible name. Render a Title, or give the Popup an ` +
+      "`aria-label`.",
+    needsName,
+  );
 
   return { setElement, visible: ctx.committed || exit.held, wrapContent, reshow };
 }

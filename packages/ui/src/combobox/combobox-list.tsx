@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useRef } from "react";
+import { use, useCallback } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -11,8 +11,7 @@ import {
   ComboboxPopupContext,
   useComboboxContext,
 } from "./combobox-context.js";
-
-const isDev = process.env.NODE_ENV !== "production";
+import { useNameWarning } from "../internal/use-name-warning.js";
 
 export interface ComboboxListState {
   /** The deferred text the results are for: render the Options for it. */
@@ -56,29 +55,22 @@ export function ComboboxList({ className, style, children, render, ...rest }: Co
       "which is the element the library shows and hides.",
   );
   const { listRef } = ctx;
-  const warnedName = useRef(false);
+  // A mounted Label registers in a layout effect whose re-render is flushed before the check's
+  // microtask, so `aria-labelledby` is in the DOM by then if it ever will be.
+  const checkName = useNameWarning(
+    "Combobox.List: the listbox has no accessible name. Render a Combobox.Label, or give " +
+      "the List an `aria-label` / `aria-labelledby`.",
+  );
 
   const ref = useCallback(
     (element: HTMLElement) => {
       listRef.current = element;
-      if (isDev && !warnedName.current) {
-        // A mounted Label registers in a layout effect whose re-render is flushed before this
-        // microtask, so `aria-labelledby` is in the DOM by then if it ever will be.
-        queueMicrotask(() => {
-          if (warnedName.current || !element.isConnected) return;
-          if (element.hasAttribute("aria-labelledby") || element.hasAttribute("aria-label")) return;
-          warnedName.current = true;
-          console.error(
-            "Combobox.List: the listbox has no accessible name. Render a Combobox.Label, or give " +
-              "the List an `aria-label` / `aria-labelledby`.",
-          );
-        });
-      }
+      checkName?.(element);
       return () => {
         if (listRef.current === element) listRef.current = null;
       };
     },
-    [listRef],
+    [listRef, checkName],
   );
 
   const state: ComboboxListState = { query: ctx.query, stale: ctx.stale, empty: ctx.empty };

@@ -11,7 +11,7 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
-import { useNameWarning } from "./combobox-trigger.js";
+import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 
 export interface ComboboxClearState {
   /** Optimistic selection. */
@@ -63,7 +63,10 @@ export function ComboboxClear({
 }: ComboboxClearProps) {
   const ctx = useComboboxContext("Combobox.Clear");
   const disabled = ownDisabled || ctx.disabled;
-  const ref = useNameWarning("Combobox.Clear");
+  const ref = useNameWarning(
+    "Combobox.Clear: the button has no accessible name. Give it an `aria-label`.",
+    BUTTON_NAME,
+  );
   // A link or component render: native `disabled` would mean nothing on a link; the click
   // handler refuses, so `aria-disabled` (#83).
   const focusable = !isHostButton(render);
