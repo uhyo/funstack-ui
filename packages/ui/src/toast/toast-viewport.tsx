@@ -763,7 +763,7 @@ export function ToastViewport({
     if (target === null || host.parentNode === target) return;
     const moved = host.parentNode !== null;
     target.append(host);
-    // A moved region gets no `pointerleave` (review L3): drop the hover pause; a pointer still
+    // A moved region gets no `pointerleave`: drop the hover pause; a pointer still
     // over it enters it again on its next move.
     if (moved) setPause("hover", false);
   });
@@ -800,7 +800,7 @@ export function ToastViewport({
       }
     }
     // An emptied region is hidden, often right under the pointer (its last toast's Close), and
-    // a hidden element gets no `pointerleave` (review L3): the next toast must not start paused.
+    // a hidden element gets no `pointerleave`: the next toast must not start paused.
     if (current.length === 0 && pauses.current.hover) setPause("hover", false);
     addedSinceEffect.current = false;
 

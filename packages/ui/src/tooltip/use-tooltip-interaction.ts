@@ -25,11 +25,11 @@ export interface TooltipInteractionOptions {
  * in which an Escape or pointerdown does nothing) and detached when `toggle` reports a close,
  * including closes the library did not perform (native light dismiss of `popover="hint"`).
  *
- * Skip-delay (design 6, wave 11): while another tooltip is showing anywhere in the document
+ * Skip-delay (design 6): while another tooltip is showing anywhere in the document
  * (`[role="tooltip"]:popover-open`, FUNSTACK's or not), a hover or keyboard focus hides it and
  * opens this one at once. Stateless: the DOM is read at the start of each hover or focus.
  *
- * Warm opens (design amendment for #93, wave 12): on **both** paths one `beforetoggle` listener on
+ * Warm opens (design, "Amendment: warm opens"): on **both** paths one `beforetoggle` listener on
  * the popup writes `data-instant` by presence: on an open, iff another tooltip is showing at that
  * moment (the skip-delay condition); on a close, never. `beforetoggle` is synchronous and precedes
  * the top-layer insertion, so the open's first style recalc already sees the attribute and
@@ -95,8 +95,9 @@ function attachInteraction(
   // Native path (conventions 8): only when the flag put `interestfor` on the element, and per
   // element, so a `render`ed `<span>` (no `interestForElement`) keeps the JS path. No
   // interaction listener is attached here (only the caller's `beforetoggle`), Escape included:
-  // the browser's interest handling and the `hint` close watcher decide, so in Chromium an Escape that closes the tooltip may also close an enclosing modal
-  // `<dialog>` (the library cannot `preventDefault()` a keydown it never sees).
+  // the browser's interest handling and the `hint` close watcher decide, so in Chromium an Escape
+  // that closes the tooltip may also close an enclosing modal `<dialog>` (the library cannot
+  // `preventDefault()` a keydown it never sees).
   if (
     interestForRequested &&
     trigger.hasAttribute("interestfor") &&

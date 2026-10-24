@@ -48,10 +48,8 @@ export interface CheckboxGroupItemProps extends Omit<
    * commit that settles the action (or rolls it back), never on the optimistic check; animate the
    * check itself with CSS on `:checked`.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
+   * included, makes a mount inside a transition start a document view transition.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxGroupItemState>;

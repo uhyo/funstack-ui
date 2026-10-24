@@ -274,7 +274,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   );
 
   // The two dispatchers below read the last committed optimistic set through `latest`, so they
-  // keep one identity and the Items' contexts are reused across open-state changes (#48): a
+  // keep one identity and the Items' contexts are reused across open-state changes: a
   // handler only ever runs against the committed UI, so this is the set it closed over before.
   const latest = useLatest({ optimistic, exclusive });
 
@@ -293,7 +293,7 @@ export function AccordionRoot(props: AccordionRootProps) {
       // The browser flipped one item (design 2.3). `next` builds on what the user already
       // intends (the latest in-flight dispatch, else the optimistic set), never on the DOM: a
       // pending optimistic open would otherwise be lost to latest-wins. Exclusive mode therefore
-      // lets the toggled item win when it opened (walkthrough 9.6).
+      // lets the toggled item win when it opened (design walkthrough 9.6).
       const base = latestInFlight()?.next ?? optimistic;
       const next = reduce(base, item, open, exclusive);
       if (setsEqual(next, base)) return;
@@ -360,7 +360,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   const contextCommitted = isLibrary ? committed : EMPTY_SET;
   const contextOptimistic = isLibrary ? optimistic : EMPTY_SET;
 
-  // Memoised (design 12, #48): the dispatchers are stable, so this changes only with the open
+  // Memoised (design 12): the dispatchers are stable, so this changes only with the open
   // sets, pending and the props below.
   const context = useMemo<AccordionRootContextValue>(
     () => ({

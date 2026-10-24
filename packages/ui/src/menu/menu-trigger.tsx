@@ -32,7 +32,7 @@ export interface MenuTriggerProps extends Omit<
 
 /**
  * Opens with the first (`"first"`) or last (`"last"`) item focused, or focuses that item when the
- * menu is already open (a pre-hydration open, walkthrough 10). Shared with SubmenuTrigger.
+ * menu is already open (a pre-hydration open, design walkthrough 10). Shared with SubmenuTrigger.
  */
 export function openMenuWithFocus(
   menu: MenuContextValue,
@@ -64,8 +64,8 @@ function isPointerClick(event: Event): boolean {
  * vertical `Toolbar.Root`: the inline-end arrow, with the first item focused).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
- * (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `data-open`,
- * `data-pending`, `data-disabled`.
+ * (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`,
+ * `onClick`, `onKeyDown`, `data-open`, `data-pending`, `data-disabled`.
  */
 export function MenuTrigger({
   disabled = false,

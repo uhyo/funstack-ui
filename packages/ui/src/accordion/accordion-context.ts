@@ -41,7 +41,7 @@ export interface AccordionItemContextValue {
   /**
    * The Root's mode is `"library"`. The Root members the Trigger and Panel need are copied here
    * so they read only this context, which is memoised per item: opening another item re-renders
-   * every Item (they read the Root's sets) but not their Triggers and Panels (#48).
+   * every Item (they read the Root's sets) but not their Triggers and Panels.
    */
   readonly library: boolean;
   /** The Root's `dispatch` (stable); `undefined` outside a Root. */

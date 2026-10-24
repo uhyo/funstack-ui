@@ -92,7 +92,7 @@ export function DialogForm({
   const [pending, setPending] = useState(false);
   const submission = useRef<{ event: Event; returnValue: string } | null>(null);
   // The dialog closed after the last submit (Escape, a Close part): the settle must not close it
-  // again, also when the user re-opened it meanwhile (the review's walkthrough 11.8 variant).
+  // again, also when the user re-opened it meanwhile.
   const closedSinceSubmit = useRef(false);
   const watches = typeof action === "function";
 

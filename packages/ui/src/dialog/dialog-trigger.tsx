@@ -105,12 +105,12 @@ export function DialogTrigger({
   // modal JS-free mode is the browser's command.
   const installClick = isLibrary || !modal;
   // A link or component render whose click this part handles: native `disabled` would mean
-  // nothing on a link; the handler refuses and cancels, so `aria-disabled` is safe (#83). The
-  // modal JS-free command needs native `disabled` to stop it.
+  // nothing on a link; the handler refuses and cancels, so `aria-disabled` is safe. The modal
+  // JS-free command needs native `disabled` to stop it.
   const focusable = installClick && !isHostButton(render);
   // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
   // `disabled` the element would still be a live invoker before hydration (a component render
-  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  // spreading onto a real <button>), and the command would run.
   const invoker = modal && !(focusable && disabled);
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (isLibrary) {
@@ -145,7 +145,7 @@ export function DialogTrigger({
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),
     // Every mode: the styling hook agrees with the rendered `disabled` / `aria-disabled`
-    // (conventions 1.2, wave 9 fold W8).
+    // (conventions 1.2).
     "data-disabled": dataAttr(disabled),
   };
 

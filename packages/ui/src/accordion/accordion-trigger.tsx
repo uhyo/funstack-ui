@@ -28,10 +28,8 @@ export interface AccordionTriggerProps extends Omit<
    * Animates only the commit that ends an action (for example a spinner rendered from `pending`
    * disappearing); the optimistic `data-open` flip is a CSS job.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
+   * included, makes a mount inside a transition start a document view transition.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionTriggerState>;
@@ -76,7 +74,7 @@ export function AccordionTrigger({
   render,
   ...rest
 }: AccordionTriggerProps) {
-  // Only the Item's context (memoised per item, #48), which carries what is needed of the Root's.
+  // Only the Item's context (memoised per item), which carries what is needed of the Root's.
   const item = use(AccordionItemContext);
   if (item === null) {
     throw new Error("Accordion.Trigger must be rendered inside an Accordion.Item.");

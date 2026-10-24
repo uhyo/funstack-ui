@@ -85,7 +85,7 @@ TooltipRoot.displayName = "TooltipRoot";
  * The containers that move focus among their items with the arrow keys (roving tabindex, or a
  * native `focusgroup`): Menu, Tabs, Toolbar, a radio group, and the other APG composites, plus
  * `role="group"`, which a standalone `ToggleGroup.Root` renders while its roving engine writes
- * the Items' `tabindex` (#75, design/components/toggle-group.md 18).
+ * the Items' `tabindex` (design/components/toggle-group.md 18).
  */
 const COMPOSITE =
   '[role="menu"],[role="menubar"],[role="tablist"],[role="toolbar"],[role="group"],[role="radiogroup"],[role="listbox"],[role="grid"],[role="treegrid"],[role="tree"],[focusgroup]';
@@ -93,7 +93,7 @@ const COMPOSITE =
 /**
  * Whether keyboard users can focus the trigger: it is in the tab order, or it is a
  * roving-tabindex item (`tabindex="-1"` set explicitly, so script can focus it) inside a
- * composite widget that moves focus to it (#57).
+ * composite widget that moves focus to it.
  */
 function isKeyboardReachable(trigger: HTMLElement): boolean {
   if (trigger.tabIndex >= 0) return true;

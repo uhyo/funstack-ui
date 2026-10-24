@@ -38,7 +38,7 @@ export interface UsePopoverPopupOptions {
 /**
  * An initial focus target opened by a pointer: where the engine reads `focus({ focusVisible })`,
  * the library focuses it with `focusVisible: false` right after `showPopover()` instead of
- * writing `autofocus` (WebKit shows the ring for an `autofocus` target after a click; review H1).
+ * writing `autofocus` (WebKit shows the ring for an `autofocus` target after a click).
  * Elsewhere it is an ordinary target.
  */
 export interface QuietFocusTarget {
@@ -163,7 +163,7 @@ export function usePopoverPopup(
     if (isLibrary && prevCommitted && transition === undefined) exit.holdDuringRender();
   }
 
-  // Whether the content unmounted while holding focus since the popup was last shown (H1).
+  // Whether the content unmounted while holding focus since the popup was last shown.
   const contentProbe = useContentFocusProbe(popupRef);
   const { wrapContent } = contentProbe;
 
@@ -278,13 +278,12 @@ export function usePopoverPopup(
   }, []);
 
   // The apply effect (design 2.5): after every commit that re-renders the Popup, once nothing is
-  // in flight, the DOM follows committed state. Since the Root's value is memoised (#48) an
-  // unrelated Root render does not re-render the Popup, so this does not run for it; every path
-  // that makes the DOM diverge from state goes through a dispatch, whose `pending` flips re-render
-  // the Popup (review of #48, finding 4). Do not rely on an unrelated render to re-apply state.
-  // One effect covers the normal open, `defaultOpen`, a controlled open
-  // or close, a library-driven close after `openChangeAction(false)` settled, the re-open of a
-  // refused dismissal, and the close after a refused or failed pre-hydration open.
+  // in flight, the DOM follows committed state. One effect covers the normal open, `defaultOpen`,
+  // a controlled open or close, a library-driven close after `openChangeAction(false)` settled,
+  // the re-open of a refused dismissal, and the close after a refused or failed pre-hydration
+  // open. The Root's value is memoised, so an unrelated Root render does not re-render the Popup
+  // and does not run this; every path that makes the DOM diverge from state goes through a
+  // dispatch, whose `pending` flips do. Do not rely on an unrelated render to re-apply state.
   useLayoutEffect(() => {
     if (!isLibrary) return;
     const element = popupRef.current;
@@ -297,7 +296,7 @@ export function usePopoverPopup(
         // An echo: the `toggle` listener finds `false` intended and skips the dispatch.
         ctx.recordCloseIntent(undefined);
         element.hidePopover();
-        // The close commit may have unmounted the focused content before the hide (H1): the
+        // The close commit may have unmounted the focused content before the hide: the
         // platform restores focus only from inside the popover, so do it now.
         if (focusWasInside.current) returnFocus(element);
       }

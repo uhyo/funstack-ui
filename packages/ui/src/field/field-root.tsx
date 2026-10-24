@@ -246,7 +246,7 @@ export function FieldRoot({
     (options: RefreshOptions = {}): readonly string[] => {
       const registration = controlRef.current;
       if (registration === null) return NONE;
-      // The element whose validity is real (field-form.md amendment `validityElement`) and the
+      // The element whose validity is real (field-form.md, `validityElement`) and the
       // element whose `:user-invalid` the user's interaction sets; the same for every control but
       // NumberField.
       const surface = validityElementOf(registration.element);

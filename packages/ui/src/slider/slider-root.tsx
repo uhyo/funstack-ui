@@ -850,7 +850,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     [shownValue, shown, pending, dragging, orientation, disabled, min, max, step],
   );
 
-  // Memoised (#48): the functions are stable, so this changes only with the state below.
+  // Memoised: the functions are stable, so this changes only with the state below.
   const context = useMemo<SliderContextValue>(
     () => ({
       state: state as SliderRootState<SliderValue>,

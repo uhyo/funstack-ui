@@ -68,7 +68,7 @@ export function ComboboxClear({
     BUTTON_NAME,
   );
   // A link or component render: native `disabled` would mean nothing on a link; the click
-  // handler refuses, so `aria-disabled` (#83).
+  // handler refuses, so `aria-disabled`.
   const focusable = !isHostButton(render);
   const state: ComboboxClearState = { value: ctx.value, inputValue: ctx.inputValue, disabled };
 

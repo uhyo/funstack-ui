@@ -81,7 +81,7 @@ export function ComboboxTrigger({
   );
 
   // A link or component render: native `disabled` would mean nothing on a link; the click
-  // handler refuses, so `aria-disabled` (#83).
+  // handler refuses, so `aria-disabled`.
   const focusable = !isHostButton(render);
 
   const state: ComboboxTriggerState = {

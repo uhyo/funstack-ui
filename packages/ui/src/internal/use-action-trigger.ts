@@ -12,7 +12,7 @@ export interface ActionTriggerOptions {
    * nothing. In flight means the hook's synchronous in-flight counter is non-zero (it also sees
    * two activations in one task, before React re-rendered); the last render's `pending` is not
    * consulted, so a click in a settled-but-held commit window runs. Default `true`: every pure
-   * trigger ignores re-entry (#79, #81). Only the continuous controls (`Slider`, `NumberField`)
+   * trigger ignores re-entry. Only the continuous controls (`Slider`, `NumberField`)
    * pass `false`, because a step is not a re-entry: every step must run.
    */
   readonly ignoreWhilePending?: boolean | undefined;
@@ -79,7 +79,7 @@ export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrig
     if (ignoreWhilePending && inFlight.current > 0) return false;
     inFlight.current++;
     const id = ++latest.current;
-    // The open this run belongs to (design/components/popover.md, review M2 / PO rule): if the
+    // The open this run belongs to (design/components/popover.md 3.4): if the
     // user dismisses and re-opens while the action runs, its close must not close the new open.
     const generation = openGeneration?.();
     startOwnTransition(async () => {

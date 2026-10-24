@@ -60,7 +60,7 @@ export function useStepButtonElement(
   const buttonState: NumberFieldButtonState = { pending, disabled };
   const handlers = useStepButton(ctx, direction, disabled);
   // A link or component render: native `disabled` would mean nothing on a link; the press and
-  // click handlers refuse, so `aria-disabled` (#83). The at-bound case follows the same branch.
+  // click handlers refuse, so `aria-disabled`. The at-bound case follows the same branch.
   const focusable = !isHostButton(render);
 
   useDevWarning(

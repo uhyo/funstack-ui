@@ -130,14 +130,14 @@ export function TabsRoot({
     warn: { component: "Tabs.Root", prop: "value" },
   });
   // `null` is a legitimate default (no panel), but forgetting both props is the likelier cause
-  // of an empty Tabs (design open question 2, product owner decision).
+  // of an empty Tabs (design/components/tabs.md, resolved question 2).
   useDevWarning(
     value === undefined && defaultValue === undefined,
     "Tabs.Root: neither `value` nor `defaultValue` was passed, so no tab is selected and no " +
       "panel is shown. Pass `defaultValue`, or `defaultValue={null}` to start with no selection.",
   );
 
-  // Memoised (#48): `dispatch` is stable, so this changes only with the state and the props below.
+  // Memoised: `dispatch` is stable, so this changes only with the state and the props below.
   const context = useMemo<TabsContextValue>(
     () => ({
       rootId,

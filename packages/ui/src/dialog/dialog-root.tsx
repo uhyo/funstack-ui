@@ -142,9 +142,9 @@ export function DialogRoot({
     closeIntent.current = undefined;
     return intent;
   }, []);
-  // Advanced on every open (the open dispatch and the Popup's native `beforetoggle` to open), so a Close action that
-  // settles after the user dismissed and re-opened the dialog does not close the new open (the
-  // PO's open-generation rule, design/components/popover.md 3.4; review M2).
+  // Advanced on every open (the open dispatch and the Popup's native `beforetoggle` to open), so a
+  // Close action that settles after the user dismissed and re-opened the dialog does not close the
+  // new open (the open-generation rule, design/components/popover.md 3.4).
   const generation = useRef(0);
   const openGeneration = useCallback(() => generation.current, []);
   const nextOpenGeneration = useCallback(() => {
@@ -154,7 +154,7 @@ export function DialogRoot({
   // The optimistic value of the last commit, for callers that run after an `await` (a Close
   // action's continuation) and would otherwise read the value of the render they were created in
   // (Popover 14.1). Through `useLatest`, as `usePopoverRoot`, so `intended` and everything built
-  // on it keep their identity (review of #48, finding 5).
+  // on it keep their identity.
   const committedOptimistic = useLatest(optimistic);
 
   // What the user already intends: the latest in-flight dispatch, else the optimistic value
@@ -210,7 +210,7 @@ export function DialogRoot({
   const pendingState = isLibrary && pending;
   const committedState = isLibrary && committed;
 
-  // Memoised (#48): `dispatch` is stable, so the value changes only with the open state, pending
+  // Memoised: `dispatch` is stable, so the value changes only with the open state, pending
   // and `modal`, and the parts do not re-render for an unrelated render of the Root.
   const context = useMemo<DialogContextValue>(
     () => ({

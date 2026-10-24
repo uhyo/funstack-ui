@@ -72,8 +72,9 @@ export interface ButtonProps extends Omit<
   focusableWhenDisabled?: boolean;
   /**
    * Forwarded as `default` to the Button's `<ViewTransition>`: animates the commit that ends the
-   * action (content keyed on `pending`), not a click. Static; any value makes a mount inside a
-   * transition start a document view transition (issue #35).
+   * action (content keyed on `pending`), not a click.
+   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
+   * included, makes a mount inside a transition start a document view transition.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, ButtonState>;
@@ -107,7 +108,7 @@ export function Button({
 }: ButtonProps) {
   const toolbar = useToolbarContext();
   // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
-  // browser and hide the state from AT, so the focusable-disabled branch (review fold F1).
+  // browser and hide the state from AT, so the focusable-disabled branch.
   const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
   const { pending: ownPending, run } = useActionTrigger();
 

@@ -8,7 +8,8 @@ export const MENU_POINT_X = "--menu-point-x";
 export const MENU_POINT_Y = "--menu-point-y";
 /**
  * Custom property carrying the vertical gap between the point and the menu: `0px` for a mouse or
- * keyboard open, `16px` for a touch or pen open, which is placed above the finger (#88, 4.7).
+ * keyboard open, `16px` for a touch or pen open, which is placed above the finger
+ * (context-menu.md 4.7).
  */
 export const MENU_POINT_GAP = "--menu-point-gap";
 /** The gap of a touch or pen open (context-menu.md 4.7). */

@@ -39,8 +39,9 @@ export interface ToggleGroupItemProps extends Omit<
   /**
    * Forwarded as `default` to the Item's `<ViewTransition>`. As on Toggle: animates the commit
    * that ends the group's action (and rollbacks), not the optimistic flip, which is a CSS
-   * `transition` on `[data-pressed]`. Static; any value makes a mount inside a transition start a
-   * document view transition (issue #35).
+   * `transition` on `[data-pressed]`.
+   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
+   * included, makes a mount inside a transition start a document view transition.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, ToggleGroupItemState>;
@@ -77,8 +78,8 @@ export function ToggleGroupItem({
   const { register } = ctx;
   const registerRef = useCallback((el: HTMLElement) => register(el, value), [register, value]);
 
-  // Not a host <button> (a link, a component): `aria-disabled`, enforced by the click handler
-  // (#83). The roving engine skips `:disabled` only, so such an Item is reached by the arrows.
+  // Not a host <button> (a link, a component): `aria-disabled`, enforced by the click handler.
+  // The roving engine skips `:disabled` only, so such an Item is reached by the arrows.
   const focusable = !isHostButton(render);
 
   const state: ToggleGroupItemState = {

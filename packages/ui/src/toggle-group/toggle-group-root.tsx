@@ -251,7 +251,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
     warn: { component: "ToggleGroup.Root", prop: "value" },
   });
 
-  // Read by the stable `toggle` (#48): a handler only runs against the committed UI.
+  // Read by the stable `toggle`: a handler only runs against the committed UI.
   const latest = useLatest({ optimistic, exclusive: mountExclusive, deselectable });
   const toggle = useCallback(
     (itemValue: string, event: Event) => {

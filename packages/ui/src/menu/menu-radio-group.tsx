@@ -70,7 +70,7 @@ export function MenuRadioGroup({
     warn: { component: "Menu.RadioGroup", prop: "value" },
   });
 
-  // Memoised (#48): `dispatch` is stable.
+  // Memoised: `dispatch` is stable.
   const context = useMemo<MenuRadioGroupContextValue>(
     () => ({
       value: optimistic,

@@ -18,7 +18,7 @@ export interface FormSubmitProps extends Omit<
 > {
   /**
    * Native `disabled`; owned. Never set by the library (conventions 3.6). Always native, also
-   * with a component `render`: a submitter has no handler to honour `aria-disabled` (#83).
+   * with a component `render`: a submitter has no handler to honour `aria-disabled`.
    */
   disabled?: boolean;
   className?: StateValue<string | undefined, FormSubmitState>;

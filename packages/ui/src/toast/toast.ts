@@ -194,7 +194,7 @@ let warnedServer = false;
  */
 let nextId = 0;
 
-/** On the server every method is a no-op, never buffered (design 13, product-owner amendment). */
+/** On the server every method is a no-op, never buffered (design 13). */
 function onServer(): boolean {
   if (typeof document !== "undefined") return false;
   if (isDev && !warnedServer) {

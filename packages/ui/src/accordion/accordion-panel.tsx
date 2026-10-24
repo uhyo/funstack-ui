@@ -23,10 +23,8 @@ export interface AccordionPanelProps extends Omit<
    * Library mode only. Forwarded as `default` to the `<ViewTransition>` around the panel's
    * `div`; animates content that mounts or changes in the commit that ends an action.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
+   * included, makes a mount inside a transition start a document view transition.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionPanelState>;
@@ -52,7 +50,7 @@ export function AccordionPanel({
   render,
   ...rest
 }: AccordionPanelProps) {
-  // Only the Item's context (memoised per item, #48).
+  // Only the Item's context (memoised per item).
   const item = use(AccordionItemContext);
   if (item === null) {
     throw new Error("Accordion.Panel must be rendered inside an Accordion.Item.");

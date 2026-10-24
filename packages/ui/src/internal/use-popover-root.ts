@@ -200,7 +200,7 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   );
 
   // `details` and `onDispatch` are usually inline functions: read the committed render's through a
-  // ref so that the functions below, and with them the returned value, stay stable (#48).
+  // ref so that the functions below, and with them the returned value, stay stable.
   const callbacks = useLatest({ details, onDispatch });
 
   const send = useCallback(
@@ -239,7 +239,7 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   );
 
   // Memoised: every function above is stable, so the value changes only with the open state and
-  // pending, and the components' context values built on it are reused otherwise (#48).
+  // pending, and the components' context values built on it are reused otherwise.
   return useMemo(
     () => ({
       mode,

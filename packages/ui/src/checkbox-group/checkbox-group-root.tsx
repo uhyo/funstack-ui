@@ -66,7 +66,7 @@ export interface CheckboxGroupRootState {
   readonly value: readonly string[];
   /** An action dispatched through this group is in flight. */
   readonly pending: boolean;
-  /** The `disabled` prop. */
+  /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
 }
 

@@ -44,7 +44,7 @@ export interface UsePopoverTriggerOptions<State> {
    * How `disabled` is rendered. `"native"` (default): the `disabled` attribute, so the button is
    * no invoker at all; in library mode a link or component `render` still gets the `"aria"`
    * branch, because native `disabled` means nothing on a link and the installed click handler is
-   * what refuses (#83). `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
+   * what refuses. `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
    * focusable); the click handler still refuses.
    */
   readonly disabledAs?: "native" | "aria";
@@ -134,12 +134,12 @@ export function usePopoverTrigger<State>(
           };
   }
   // A link or component render in library mode: the click handler (installed only there) cancels
-  // and refuses, so `aria-disabled` is safe and native `disabled` would mean nothing (#83). In
-  // JS-free mode the command needs native `disabled` to stop it.
+  // and refuses, so `aria-disabled` is safe and native `disabled` would mean nothing. In JS-free
+  // mode the command needs native `disabled` to stop it.
   const ariaDisabled = disabledAs === "aria" || (isLibrary && !isHostButton(render));
   // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
   // `disabled` the element would still be a live invoker before hydration (a component render
-  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  // spreading onto a real <button>), and the command would run.
   const noInvoker = ariaDisabled && disabled;
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -158,7 +158,7 @@ export function usePopoverTrigger<State>(
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),
     // Every mode: the styling hook agrees with the rendered `disabled` / `aria-disabled`
-    // (conventions 1.2, wave 9 fold W8).
+    // (conventions 1.2).
     "data-disabled": dataAttr(disabled),
   };
 

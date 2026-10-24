@@ -47,10 +47,8 @@ export interface AccordionItemProps extends Omit<
    * animates the commit that ends an action (the `open` attribute flip), not the optimistic
    * `data-open` flip. Ignored (dev warning) in JS-free mode.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. Any value, `"none"` included, makes a mount or
-   * `<Activity>` reveal of this part inside a transition start a document view transition: the
-   * page cross-fades for about 250 ms and the next transition commit waits for it (issue #35).
+   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
+   * included, makes a mount inside a transition start a document view transition.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionItemState>;
@@ -136,7 +134,7 @@ export function AccordionItem({
   const state: AccordionItemState = { value, open: optimisticOpen, pending, disabled };
   const dispatch = root?.dispatch;
   const registerTrigger = root?.registerTrigger;
-  // Memoised (#48): changes only with this item's own values, not with every Root change.
+  // Memoised: changes only with this item's own values, not with every Root change.
   const itemContext = useMemo<AccordionItemContextValue>(
     () => ({
       value,

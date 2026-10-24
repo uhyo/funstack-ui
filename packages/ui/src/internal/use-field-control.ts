@@ -20,7 +20,7 @@ export interface UseFieldControlOptions {
   readonly component: string;
   /**
    * The element whose validity is real when it is not the registered one (NumberField's hidden
-   * number input; field-form.md amendment `validityElement`). Keep its identity stable.
+   * number input; field-form.md `validityElement`). Keep its identity stable.
    */
   readonly validityElement?: (() => ValidatableElement | null) | undefined;
 }

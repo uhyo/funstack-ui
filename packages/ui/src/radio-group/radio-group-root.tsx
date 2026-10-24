@@ -38,7 +38,7 @@ export interface RadioGroupRootState {
   readonly value: string | null;
   /** An action dispatched through this group is in flight. */
   readonly pending: boolean;
-  /** The `disabled` prop. */
+  /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
 }
 
@@ -258,7 +258,7 @@ export function RadioGroupRoot({
   );
   const rootRef = useMergedRefs<HTMLFieldSetElement>(libraryRef, field.ref);
 
-  // Memoised (#48): `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with
+  // Memoised: `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with
   // the state and the props below.
   const contextDefault = value === undefined ? (defaultValue ?? null) : undefined;
   const context = useMemo<RadioGroupContextValue>(

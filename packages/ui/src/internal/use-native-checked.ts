@@ -22,7 +22,8 @@ export interface UseNativeCheckedOptions {
   /** Checkbox only: `el.indeterminate` after every commit (the part passes `indeterminate && !pending`). */
   readonly indeterminate?: boolean | undefined;
   /**
-   * `true` inside a group (`RadioGroup.Item`): the hook does the element check and the re-apply
+   * `true` inside a group (`RadioGroup.Item`, `CheckboxGroup.Item` and `.Parent`): the hook does
+   * the element check and the re-apply
    * only; mount reconciliation and form reset are reported once per group by the Root through
    * `useNativeGroupReconciliation`. Default `false`: the hook reports both paths itself.
    */
@@ -122,14 +123,10 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
     if (mountToken.current === null) mountToken.current = renderToken;
     const el = node.current;
     if (el === null) return;
-    // The order defaultChecked -> checked -> indeterminate is load-bearing for the first two.
-    // React's automatic reset after a <form action> runs in the mutation phase, after react-dom
-    // wrote `checked` and before this effect, and clears the dirty-checkedness flag; writing
-    // `defaultChecked` (a new default from the same transition) then moves `checked` too, and the
-    // `checked` write that follows restores the intended value. The other way round, the `checked`
-    // write is skipped (it still matches) and the DOM ends up on the new default.
-    // `indeterminate` is independent of both writes and goes last. Tested in
-    // use-native-checked.test.tsx ("re-apply order").
+    // defaultChecked before checked (conventions 3.8): after React's automatic `<form action>`
+    // reset clears the dirty flag, writing `defaultChecked` moves `checked` too, and the `checked`
+    // write that follows restores the intended value. `indeterminate` is independent and goes
+    // last. Pinned by use-native-checked.test.tsx ("re-apply order").
     if (defaultChecked !== undefined && el.defaultChecked !== defaultChecked) {
       el.defaultChecked = defaultChecked;
     }

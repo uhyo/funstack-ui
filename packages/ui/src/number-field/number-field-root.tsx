@@ -375,7 +375,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       // A revert has no commit after it: the optimistic value already shows the committed one.
       if (reason !== "dismiss") setStepHeld(true);
       const { valueChangeAction: action, runStep: run } = latest.current;
-      // Without a step action nothing runs and no transition starts (Slider M2).
+      // Without a step action nothing runs and no transition starts (as Slider).
       if (action === undefined) return true;
       run(() => {
         for (const type of STEP_TYPES) addTransitionType(type);

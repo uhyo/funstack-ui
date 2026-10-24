@@ -503,7 +503,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
       autoArmed.current = false;
     } else if (autoHighlight && autoArmed.current && !stale && enabled.length > 0) {
       // Only settled results: a stale list's first option is never auto-highlighted, so a fast
-      // Enter commits the typed text or does nothing (design L5).
+      // Enter commits the typed text or does nothing (design 6.5).
       next = enabled[0]!.value;
       autoArmed.current = false;
     }
@@ -569,7 +569,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     if (message !== null) list.ariaNotify(message);
   });
 
-  // --- Form: hidden input, reset, mount reconciliation (design 11.1, walkthroughs 10, 11) ----
+  // --- Form: hidden input, reset, mount reconciliation (design 11.1, walkthroughs 10 and 11) ---
 
   const [mountValue] = useState(value);
   const [mountText] = useState(inputValueProp);

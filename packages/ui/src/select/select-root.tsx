@@ -140,7 +140,7 @@ export function SelectRoot({
   // controlled change) re-reads validity and `validate` after the commit.
   useFieldValueChange(optimistic);
   // Deliberately no warning when neither `value` nor `defaultValue` is given: the browser's
-  // first-option default is adopted (design decision 3, product-owner decision 4).
+  // first-option default is adopted (design decisions 3 and 4).
 
   // Controlled: the mount-time value is the reset target (conventions 3.8 rule 6). Neither
   // `value` nor `defaultValue`: the value adopted at mount, chosen inside the hook.
@@ -167,7 +167,7 @@ export function SelectRoot({
       dispatchChange(next, createActionDetails(event, { reason: "platform" })),
   });
 
-  // Memoised (#48): every member is a state value, a prop or a stable callback.
+  // Memoised: every member is a state value, a prop or a stable callback.
   const context = useMemo<SelectContextValue>(
     () => ({ optimistic, pending, disabled, groupDisabled: false, optionMounted }),
     [optimistic, pending, disabled, optionMounted],

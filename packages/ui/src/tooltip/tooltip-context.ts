@@ -3,7 +3,7 @@ import { createContext, use } from "react";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 
 /**
- * `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). While
+ * `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). While
  * shown, the state carries the resolved physical side.
  */
 export type TooltipSide = AnchorSide;

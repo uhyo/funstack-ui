@@ -20,12 +20,15 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
 
-/** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
+/** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type PopoverSide = AnchorSide;
 export type PopoverAlign = AnchorAlign;
 
 export interface PopoverPopupState {
-  /** Committed open state (library mode); `false` in JS-free mode. Read `:popover-open` for the DOM truth. */
+  /**
+   * Committed open state (library mode); `false` in JS-free mode. Read `:popover-open` for the
+   * DOM truth.
+   */
   readonly open: boolean;
   /**
    * While shown: the physical side the browser placed the popup on (after any fallback flip;
@@ -89,10 +92,9 @@ export interface PopoverPopupProps extends Omit<
    * click outside) are the browser's and animate with CSS only. Ignored (dev warning) in JS-free
    * mode.
    *
-   * Static: without `transition` the part renders no `<ViewTransition>`; changing it between
-   * `undefined` and a value remounts the element. A Root inserted by a transition with
-   * `transition` set on its Popup pays the page cross-fade (issue #35); a plain open does not,
-   * because the children mount under the already-mounted popover element.
+   * Static (conventions 5.1): setting or unsetting it remounts the element, and any value, `"none"`
+   * included, makes a mount inside a transition start a document view transition.
+   * A plain open does not pay it: the children mount under the already-mounted popover element.
    */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, PopoverPopupState>;

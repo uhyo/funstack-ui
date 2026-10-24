@@ -124,7 +124,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
 
   // The functions below keep one identity for the hook's lifetime, so the returned object changes
   // only with `committed`, `optimistic` and `pending`, and the components' memoised context values
-  // are reused across renders that change none of them (#48). They read the props of the last
+  // are reused across renders that change none of them. They read the props of the last
   // committed render through `props`; they run from handlers, actions and effects, never render.
   const props = useLatest({ committed, isControlled, action, transitionTypes });
 

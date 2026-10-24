@@ -80,12 +80,12 @@ export function DialogClose({
   const hasAction = action !== undefined;
   const installClick = isLibrary || hasAction;
   // A link or component render whose click this part handles: `aria-disabled`, enforced by the
-  // handler (#83). JS-free mode without `action` is the browser's `request-close` command,
+  // handler. JS-free mode without `action` is the browser's `request-close` command,
   // which only native `disabled` stops.
   const focusable = installClick && !isHostButton(render);
   // Disabled in the `aria-disabled` branch: no `commandfor` / `command` either. Without native
   // `disabled` the element would still be a live invoker before hydration (a component render
-  // spreading onto a real <button>), and the command would run (wave 9 review M1).
+  // spreading onto a real <button>), and the command would run.
   const noInvoker = focusable && disabled;
 
   const state: DialogCloseState = { pending, disabled };
@@ -126,7 +126,7 @@ export function DialogClose({
     }
     const details = createActionDetails(native, { returnValue });
     // A second activation while this Close's own run is in flight starts nothing (the hook's
-    // guard; the click is already cancelled above, #81). A close whose open was superseded by a
+    // guard; the click is already cancelled above). A close whose open was superseded by a
     // newer one (dismissed and re-opened meanwhile) is dropped by the hook.
     run(
       () => action(details),
@@ -142,7 +142,7 @@ export function DialogClose({
     command: noInvoker ? undefined : "request-close",
     value,
     ...(installClick && { onClick }),
-    // Exactly while `data-pending` (#81): a Close that will not act is unavailable to AT. Owned,
+    // Exactly while `data-pending`: a Close that will not act is unavailable to AT. Owned,
     // so an idle Close removes a render element's own `aria-disabled`.
     "aria-disabled": pending || (focusable && disabled) ? true : undefined,
     "data-pending": dataAttr(pending),

@@ -9,7 +9,7 @@ const subscribeNever = () => () => {};
  * engine implements it. Detected only with the flag, and never during SSR or hydration
  * (conventions 8): the server snapshot is `false`, so hydration markup matches the server and
  * React re-renders with the client answer afterwards. The IDL attribute is camel-cased
- * `focusGroup` (`"focusgroup" in HTMLElement.prototype` is always false, issue #43).
+ * `focusGroup` (`"focusgroup" in HTMLElement.prototype` is always false).
  */
 export function useNativeFocusgroup(flag: boolean): boolean {
   return useSyncExternalStore(
