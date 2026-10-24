@@ -643,6 +643,42 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
     });
 
+    // #116: native `closedby="any"` has no invoker exemption, so the JS baseline has none
+    // either; with the flag, jsdom (no `closedBy`) runs the same JS listeners.
+    it.each([
+      ["without experimental_closedBy", false],
+      ["with experimental_closedBy (JS fallback)", true],
+    ])(
+      "non-modal: a Trigger click while open is a dismissal (%s, #116)",
+      async (_label, experimental_closedBy) => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode="uncontrolled"
+            modal={false}
+            action={action}
+            popup={{ lightDismiss: true, experimental_closedBy }}
+          />,
+        );
+        await openThroughTrigger(user);
+        await flushTasks(2); // the `toggle` task attaches the document listeners
+        expect(action).toHaveBeenCalledTimes(1);
+        await user.click(trigger());
+        await flushTasks(2);
+        expect(popup().open).toBe(false);
+        expect(action).toHaveBeenCalledTimes(2);
+        const [next, details] = action.mock.calls[1]!;
+        expect(next).toBe(false);
+        expect(details.reason).toBe("dismiss");
+        expect(details.event?.type).toBe("close");
+        // The click ran while the dialog was still optimistically open: no re-open.
+        await flushTasks(2);
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(popup().open).toBe(false);
+      },
+    );
+
     it("experimental_closedBy without native closedBy keeps the JS fallback", async () => {
       const user = setupUser();
       render(

@@ -263,7 +263,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Close on a click outside the dialog (the `::backdrop` for a modal). JS `pointerdown` and `click` listeners: both the press and the click must land outside, so a drag that starts inside (selecting text) never closes. With `experimental_closedBy`, native `closedby="any"`, which behaves the same.',
+              'Close on a click outside the dialog (the `::backdrop` for a modal). JS `pointerdown` and `click` listeners: both the press and the click must land outside, so a drag that starts inside (selecting text) never closes. With `experimental_closedBy`, native `closedby="any"`, which behaves the same. A click on the Trigger of an open non-modal dialog counts as outside, as native `closedby="any"` treats it.',
           },
           {
             name: "experimental_closedBy",

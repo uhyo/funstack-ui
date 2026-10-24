@@ -751,3 +751,54 @@ describe("scroll lock recipe (browser)", () => {
     expect(getComputedStyle(html).overflow).not.toBe("hidden");
   });
 });
+
+// #116: the dialog light-dismiss algorithm has no invoker exemption (and a non-modal dialog's
+// Trigger is no invoker), so a Trigger click on an open non-modal `lightDismiss` dialog is a
+// dismissal on every engine and path: native `closedby="any"` where supported with the flag, the
+// JS baseline otherwise. Only the mechanism is branched on; the outcome is the same.
+describe("non-modal lightDismiss: a Trigger click while open (browser, #116)", () => {
+  it.each([
+    ["without experimental_closedBy", false],
+    ["with experimental_closedBy", true],
+  ])("closes with one (false, 'dismiss') from the close event, %s", async (_label, flag) => {
+    const action = vi.fn<ActionFn>();
+    const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
+    render(
+      <div style={{ padding: 40 }}>
+        <Dialog.Root defaultOpen={false} modal={false} openChangeAction={action}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup
+            data-testid="popup"
+            aria-label="Help"
+            lightDismiss
+            experimental_closedBy={flag}
+          >
+            <button type="button">Inside</button>
+          </Dialog.Popup>
+        </Dialog.Root>
+      </div>,
+    );
+    await openWithTrigger();
+    expect(isModal()).toBe(false);
+    await flushFor(); // the `toggle` task attaches the JS baseline's document listeners
+    expect(action).toHaveBeenCalledTimes(1);
+    await user.click(trigger());
+    await settle(() => expect(popup().open).toBe(false));
+    if (flag && supportsDialogClosedBy) {
+      // The platform dismissed it; the library's JS listener was not attached.
+      expect(requestClose).not.toHaveBeenCalled();
+    } else {
+      expect(requestClose).toHaveBeenCalledTimes(1);
+    }
+    await settle(() => expect(action).toHaveBeenCalledTimes(2));
+    const [next, details] = action.mock.calls[1]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("dismiss");
+    expect(details.event?.type).toBe("close");
+    // No re-open: the click ran while the dialog was still optimistically open.
+    await flushFor(50);
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(popup().open).toBe(false);
+    expect(trigger()).not.toHaveAttribute("data-open");
+  });
+});

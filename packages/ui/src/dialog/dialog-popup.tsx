@@ -63,7 +63,8 @@ export interface DialogPopupProps extends Omit<
    * Close on a click outside the dialog (on the backdrop for modal dialogs). Default `false`.
    * Baseline: JS `pointerdown` + `click` listeners, which close only when both the press and the
    * click land outside (a drag that starts inside, such as selecting text, never closes); with
-   * `experimental_closedBy`, native `closedby="any"`, which behaves the same.
+   * `experimental_closedBy`, native `closedby="any"`, which behaves the same. A click on the
+   * Trigger of an open non-modal dialog counts as outside, as it does natively.
    */
   lightDismiss?: boolean;
   /**
@@ -480,10 +481,8 @@ export function DialogPopup({
     let pressedOutside = false;
 
     const isOutside = (target: EventTarget | null): boolean => {
-      if (!(target instanceof Node)) return true;
-      if (dialog.contains(target)) return false;
-      // The Trigger re-opening a non-modal dialog is not a click outside.
-      return !(triggerRef.current?.contains(target) ?? false);
+      // The Trigger counts as outside, as native `closedby="any"` treats it (#116).
+      return !(target instanceof Node) || !dialog.contains(target);
     };
     let outsideAttached = false;
     const onOutsidePointerDown = (event: Event) => {
@@ -554,7 +553,7 @@ export function DialogPopup({
         doc.removeEventListener("click", onOutsideClick, true);
       }
     };
-  }, [dialog, modal, lightDismiss, experimental_closedBy, triggerRef]);
+  }, [dialog, modal, lightDismiss, experimental_closedBy]);
 
   // Development check (design 9): the dialog has an accessible name when it is (or can be)
   // shown.
