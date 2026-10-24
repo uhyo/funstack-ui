@@ -1,0 +1,61 @@
+chromium 156.0.8078.4
+--- static: all closed
+  a-cf-false         dom=false popupOpen=false      AX: button expanded=false
+  a-pt-false         dom=false popupOpen=false      AX: button expanded=false
+  b-cf-true          dom=true popupOpen=false       AX: button expanded=false
+  b-pt-true          dom=true popupOpen=false       AX: button expanded=false
+  c-cf-none          dom=null popupOpen=false       AX: button expanded=false
+  c-pt-none          dom=null popupOpen=false       AX: button expanded=false
+  d-cfshow-false     dom=false popupOpen=false      AX: button expanded=false
+  e-plain-true       dom=true popupOpen=n/a         AX: button expanded=true
+  f-cfcustom-false   dom=false popupOpen=false      AX: button expanded=false
+--- static: all open
+  a-cf-false         dom=false popupOpen=true       AX: button expanded=true details
+  a-pt-false         dom=false popupOpen=true       AX: button expanded=true details
+  b-cf-true          dom=true popupOpen=true        AX: button expanded=true details
+  b-pt-true          dom=true popupOpen=true        AX: button expanded=true details
+  c-cf-none          dom=null popupOpen=true        AX: button expanded=true details
+  c-pt-none          dom=null popupOpen=true        AX: button expanded=true details
+  d-cfshow-false     dom=false popupOpen=true       AX: button expanded=true details
+  e-plain-true       dom=true popupOpen=n/a         AX: button expanded=true
+  f-cfcustom-false   dom=false popupOpen=true       AX: button expanded=false
+--- pl-trigger: closed
+  pl-trigger         dom=false popupOpen=false      AX: button expanded=false
+--- pl-trigger: PENDING OPEN (optimistic true, popup not shown yet)
+  pl-trigger         dom=true popupOpen=false       AX: button expanded=false
+--- pl-trigger: open
+  pl-trigger         dom=true popupOpen=true        AX: button expanded=true details
+--- pl-trigger: PENDING CLOSE (optimistic false, popup still shown)
+  pl-trigger         dom=false popupOpen=true       AX: button expanded=true details
+--- pl-trigger: closed after release
+  pl-trigger         dom=false popupOpen=false      AX: button expanded=false
+--- m-trigger: closed
+  m-trigger          dom=false popupOpen=false      AX: button expanded=false hasPopup=menu
+--- m-trigger: PENDING OPEN (optimistic true, popup not shown yet)
+  m-trigger          dom=true popupOpen=false       AX: button expanded=false hasPopup=menu
+--- m-trigger: open
+  m-trigger          dom=true popupOpen=true        AX: button expanded=true hasPopup=menu
+--- m-trigger: PENDING CLOSE (optimistic false, popup still shown)
+  m-trigger          dom=false popupOpen=true       AX: button expanded=true hasPopup=menu
+--- m-trigger: closed after release
+  m-trigger          dom=false popupOpen=false      AX: button expanded=false hasPopup=menu
+--- cb-trigger: closed
+  cb-trigger         dom=false popupOpen=false      AX: button expanded=false
+--- cb-trigger: PENDING OPEN (optimistic true, popup not shown yet)
+  cb-trigger         dom=true popupOpen=false       AX: button expanded=false
+--- cb-trigger: open
+  cb-trigger         dom=true popupOpen=true        AX: button expanded=true
+--- cb-trigger: PENDING CLOSE (optimistic false, popup still shown)
+  cb-trigger         dom=false popupOpen=true       AX: button expanded=true
+--- cb-trigger: closed after release
+  cb-trigger         dom=false popupOpen=false      AX: button expanded=false
+--- pj-trigger (JS-free): closed
+  pj-trigger         dom=false popupOpen=false      AX: button expanded=false
+--- pj-trigger (JS-free): open
+  pj-trigger         dom=true popupOpen=true        AX: button expanded=true details
+--- cb2-trigger (no commandfor): open
+  cb2-trigger        dom=true popupOpen=n/a         AX: button expanded=true
+  cb2-input          dom=true popupOpen=n/a         AX: combobox expanded=true hasPopup=listbox
+--- cb2-trigger (no commandfor): closed
+  cb2-trigger        dom=false popupOpen=n/a        AX: button expanded=false
+  cb2-input          dom=false popupOpen=n/a        AX: combobox expanded=false hasPopup=listbox

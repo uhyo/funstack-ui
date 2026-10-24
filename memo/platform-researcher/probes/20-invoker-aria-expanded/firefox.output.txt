@@ -1,0 +1,61 @@
+firefox 157.0
+--- static: all closed
+  a-cf-false         dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+  a-pt-false         dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+  b-cf-true          dom=true popupOpen=false       AX: pushbutton [expanded,expandable]
+  b-pt-true          dom=true popupOpen=false       AX: pushbutton [expanded,expandable]
+  c-cf-none          dom=null popupOpen=false       AX: pushbutton []
+  c-pt-none          dom=null popupOpen=false       AX: pushbutton [collapsed,expandable]
+  d-cfshow-false     dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+  e-plain-true       dom=true popupOpen=n/a         AX: pushbutton [expanded,expandable]
+  f-cfcustom-false   dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- static: all open
+  a-cf-false         dom=false popupOpen=true       AX: pushbutton [collapsed,expandable]
+  a-pt-false         dom=false popupOpen=true       AX: pushbutton [expanded,expandable]
+  b-cf-true          dom=true popupOpen=true        AX: pushbutton [expanded,expandable]
+  b-pt-true          dom=true popupOpen=true        AX: pushbutton [expanded,expandable]
+  c-cf-none          dom=null popupOpen=true        AX: pushbutton []
+  c-pt-none          dom=null popupOpen=true        AX: pushbutton [expanded,expandable]
+  d-cfshow-false     dom=false popupOpen=true       AX: pushbutton [collapsed,expandable]
+  e-plain-true       dom=true popupOpen=n/a         AX: pushbutton [expanded,expandable]
+  f-cfcustom-false   dom=false popupOpen=true       AX: pushbutton [collapsed,expandable]
+--- pl-trigger: closed
+  pl-trigger         dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- pl-trigger: PENDING OPEN (optimistic true, popup not shown yet)
+  pl-trigger         dom=true popupOpen=false       AX: pushbutton [expanded,expandable]
+--- pl-trigger: open
+  pl-trigger         dom=true popupOpen=true        AX: pushbutton [expanded,expandable]
+--- pl-trigger: PENDING CLOSE (optimistic false, popup still shown)
+  pl-trigger         dom=false popupOpen=true       AX: pushbutton [collapsed,expandable]
+--- pl-trigger: closed after release
+  pl-trigger         dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- m-trigger: closed
+  m-trigger          dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- m-trigger: PENDING OPEN (optimistic true, popup not shown yet)
+  m-trigger          dom=true popupOpen=false       AX: pushbutton [expanded,expandable]
+--- m-trigger: open
+  m-trigger          dom=true popupOpen=true        AX: pushbutton [expanded,expandable]
+--- m-trigger: PENDING CLOSE (optimistic false, popup still shown)
+  m-trigger          dom=false popupOpen=true       AX: pushbutton [collapsed,expandable]
+--- m-trigger: closed after release
+  m-trigger          dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- cb-trigger: closed
+  cb-trigger         dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- cb-trigger: PENDING OPEN (optimistic true, popup not shown yet)
+  cb-trigger         dom=true popupOpen=false       AX: pushbutton [expanded,expandable]
+--- cb-trigger: open
+  cb-trigger         dom=true popupOpen=true        AX: pushbutton [expanded,expandable]
+--- cb-trigger: PENDING CLOSE (optimistic false, popup still shown)
+  cb-trigger         dom=false popupOpen=true       AX: pushbutton [collapsed,expandable]
+--- cb-trigger: closed after release
+  cb-trigger         dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- pj-trigger (JS-free): closed
+  pj-trigger         dom=false popupOpen=false      AX: pushbutton [collapsed,expandable]
+--- pj-trigger (JS-free): open
+  pj-trigger         dom=true popupOpen=true        AX: pushbutton [expanded,expandable]
+--- cb2-trigger (no commandfor): open
+  cb2-trigger        dom=true popupOpen=n/a         AX: pushbutton [expanded,expandable]
+  cb2-input          dom=true popupOpen=n/a         AX: editcombobox [expanded,expandable]
+--- cb2-trigger (no commandfor): closed
+  cb2-trigger        dom=false popupOpen=n/a        AX: pushbutton [collapsed,expandable]
+  cb2-input          dom=false popupOpen=n/a        AX: editcombobox [collapsed,expandable]
