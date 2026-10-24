@@ -249,6 +249,31 @@ describe("Field: native validation (display)", () => {
     expect(screen.getByTestId("second-error")).toBeInTheDocument();
   });
 
+  it("a second attempt before the timer is its own batch: focus moves from the submitter", async () => {
+    // Enter in the first invalid field, then a click on Submit, with no task between them (as
+    // `delay: null` user-event can do): the second attempt must not join the first one's batch,
+    // whose focus-before was the field (#120).
+    render(
+      <TestForm>
+        <EmailField name="first" />
+        <EmailField name="second" />
+      </TestForm>,
+    );
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    const first = screen.getByTestId("first-control");
+    const button = screen.getByRole("button", { name: "Submit" });
+    await act(async () => {
+      first.focus();
+      form.requestSubmit();
+      await Promise.resolve();
+      expect(document.activeElement).toBe(first);
+      button.focus();
+      form.requestSubmit(button);
+      await Promise.resolve();
+    });
+    expect(document.activeElement).toBe(first);
+  });
+
   it("without a Field.Error the invalid event is left to the platform", async () => {
     render(
       <TestForm>

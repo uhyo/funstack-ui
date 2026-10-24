@@ -325,7 +325,7 @@ export function FieldRoot({
       if (attempt && errorCount.current > 0) {
         event.preventDefault();
         const messages = refresh();
-        collectInvalid(focusTargetOf(element), messages.join(" "));
+        collectInvalid(focusTargetOf(element), messages.join(" "), target);
         return;
       }
       refresh();
