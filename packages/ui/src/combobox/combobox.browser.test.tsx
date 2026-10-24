@@ -31,6 +31,7 @@ import {
   browserName,
   supportsAriaNotify,
 } from "../__tests__/engine.js";
+import { axProperty, getAXNodes } from "../__tests__/ax-tree.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Field } from "../field/index.js";
@@ -274,6 +275,30 @@ describe("Combobox (browser)", () => {
       expect(document.activeElement).toBe(input());
       expect(input().value).toBe("ja");
       expect(input()).not.toHaveAttribute("aria-activedescendant");
+    });
+
+    it("aria-expanded on the Input is false right after Escape, while a slow notification runs (#118)", async () => {
+      const openAction = vi.fn<OpenAction>(async (next) => {
+        if (!next) await sleep(300);
+      });
+      render(<Harness root={{ openChangeAction: openAction }} />);
+      await typeInto("ja");
+      await expect.poll(() => isOpen()).toBe(true);
+      await expect.poll(() => input().getAttribute("aria-expanded")).toBe("true");
+      await user.keyboard("{Escape}");
+      await sleep(60);
+      expect(isOpen()).toBe(false);
+      expect(document.activeElement).toBe(input());
+      expect(input()).toHaveAttribute("data-pending", "");
+      // The Input is no invoker: every engine reads this attribute (#118 review, M1).
+      expect(input()).toHaveAttribute("aria-expanded", "false");
+      if (browserName === "chromium") {
+        const node = (await getAXNodes()).find((n) => n.role?.value === "combobox");
+        expect(node).toBeDefined();
+        expect(axProperty(node, "expanded")).toBe(false);
+      }
+      await expect.poll(() => input().hasAttribute("data-pending")).toBe(false);
+      expect(input()).toHaveAttribute("aria-expanded", "false");
     });
 
     it("inside a Dialog: the first Escape closes the listbox, the second the Dialog", async () => {

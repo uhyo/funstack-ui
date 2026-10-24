@@ -138,7 +138,7 @@ export function usePopoverPopup(
   const { part, initialFocus, transition, onBeforeToggle: onBeforeToggleOption } = options;
   const onToggleOption = options.onToggle;
   const isLibrary = ctx.mode === "library";
-  const { popupRef, triggerRef } = ctx;
+  const { popupRef, triggerRef, setShown } = ctx;
 
   // The opening `beforetoggle` lets this one through: the library's own `showPopover()`.
   const opening = useRef(false);
@@ -309,7 +309,9 @@ export function usePopoverPopup(
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
     awaitingClose.current = false;
-    if (!isLibrary) syncExpanded(element);
+    // `aria-expanded`: JS-free mode writes the DOM, library mode mirrors into the Root (#118).
+    if (isLibrary) setShown(isPopoverOpen(element));
+    else syncExpanded(element);
 
     if (!isPopoverOpen(element)) {
       // Focus return for what the platform leaves out (design 6.2): a nested popover restores
@@ -368,6 +370,9 @@ export function usePopoverPopup(
         ["command", (event) => handlers.current.onCommand(event)],
       ];
       for (const [type, listener] of listeners) element.addEventListener(type, listener);
+      // A pre-hydration open is shown from the first commit; a popup removed while open fires no
+      // `toggle`, so the detach clears the mirror (#118).
+      if (isLibrary) setShown(isPopoverOpen(element));
 
       let autofocused: HTMLElement | null = null;
       if (!isLibrary && initialFocus !== undefined) {
@@ -380,11 +385,12 @@ export function usePopoverPopup(
 
       return () => {
         for (const [type, listener] of listeners) element.removeEventListener(type, listener);
+        if (isLibrary) setShown(false);
         autofocused?.removeAttribute("autofocus");
         if (popupRef.current === element) popupRef.current = null;
       };
     },
-    [checkElement, popupRef, handlers, isLibrary, initialFocus],
+    [checkElement, popupRef, setShown, handlers, isLibrary, initialFocus],
   );
 
   // Development check (design 9): `role="dialog"` needs a name once the popup is (or can be)

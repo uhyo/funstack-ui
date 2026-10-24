@@ -123,8 +123,8 @@ export function ComboboxTrigger({
     ...(rendersButton(render) && { type: "button" as const }),
     tabIndex: -1,
     ...disabledButton(render, disabled).props,
-    // Committed, the shown listbox; `data-open` is the optimistic one (#118).
-    "aria-expanded": popover.committed,
+    // Shown (the listbox is in the top layer); `data-open` is the optimistic one (#118).
+    "aria-expanded": popover.shown,
     "aria-controls": ctx.ids.list,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();

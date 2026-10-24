@@ -273,18 +273,19 @@ describe("Popover", () => {
     });
 
     it("library mode: aria-expanded is the shown popup, data-open the intent (#118)", async () => {
-      const html = renderToString(
-        <Popover.Root defaultOpen>
-          <Popover.Trigger>Open</Popover.Trigger>
-          <Popover.Popup aria-label="x">content</Popover.Popup>
-        </Popover.Root>,
-      );
-      expect(html).toMatch(/<button[^>]*aria-expanded="true"/);
+      // `defaultOpen`: not shown before hydration, so not expanded in the server HTML nor on
+      // hydration; expanded with the `toggle` of the apply effect's `showPopover()`.
+      const ui = <Harness mode="uncontrolled" initialOpen action={vi.fn<ActionFn>()} />;
+      expect(renderToString(ui)).toMatch(/<button[^>]*aria-expanded="false"[^>]*data-open=""/);
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      render(<Harness mode="uncontrolled" initialOpen action={action} />);
-      await flushTasks(2);
+      await hydrateFromServer(<Harness mode="uncontrolled" initialOpen action={action} />, {
+        flush: null,
+      });
       expect(isOpen()).toBe(true);
+      expect(trigger()).toHaveAttribute("data-open", "");
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      await flushTasks(2);
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
       // A deferred part close: optimistically closed, still shown.
       const closing = deferred();
@@ -325,6 +326,77 @@ describe("Popover", () => {
       expect(isOpen()).toBe(true);
       expect(trigger()).toHaveAttribute("data-open", "");
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("library mode: a Popup unmounted while open leaves the Trigger not expanded (#118)", async () => {
+      function Removable() {
+        const [mounted, setMounted] = useState(true);
+        return (
+          <>
+            <button type="button" data-testid="remove" onClick={() => setMounted(false)} />
+            <Popover.Root defaultOpen>
+              <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+              {mounted && (
+                <Popover.Popup data-testid="popup" aria-label="x">
+                  content
+                </Popover.Popup>
+              )}
+            </Popover.Root>
+          </>
+        );
+      }
+      render(<Removable />);
+      await flushTasks(2);
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      fireEvent.click(screen.getByTestId("remove"));
+      await flushTasks(2);
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      // Still optimistically and committed open: only the mirror follows the removal.
+      expect(trigger()).toHaveAttribute("data-open", "");
+    });
+
+    it("library mode: the mirror costs one render per show and per hide, none otherwise (#118)", async () => {
+      const user = setupUser();
+      // [committed, pending, shown] per render of a Root context consumer.
+      const seen: [boolean, boolean, boolean][] = [];
+      function Probe() {
+        const ctx = use(PopoverContext)!;
+        seen.push([ctx.committed, ctx.pending, ctx.shown]);
+        return null;
+      }
+      render(
+        <Popover.Root defaultOpen={false}>
+          <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+          <Popover.Popup data-testid="popup" aria-label="x">
+            content
+          </Popover.Popup>
+          <Probe />
+        </Popover.Root>,
+      );
+      await flushTasks(2);
+      // The attach wrote `false` over `false`: no render for an unchanged value.
+      expect(seen).toEqual([[false, false, false]]);
+      await user.click(trigger());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      // The open's commit, then exactly one render for the `toggle` that reports it shown.
+      expect(seen.slice(-2)).toEqual([
+        [true, false, false],
+        [true, false, true],
+      ]);
+      expect(seen.filter(([, , shown]) => shown)).toHaveLength(1);
+      const settled = seen.length;
+      await flushTasks(2);
+      expect(seen).toHaveLength(settled);
+      await user.click(trigger());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(seen.slice(-2)).toEqual([
+        [false, false, true],
+        [false, false, false],
+      ]);
+      expect(seen.slice(settled).filter(([, , shown]) => !shown)).toHaveLength(1);
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
     });
 
     it("never lets a render element override the owned keys", () => {
@@ -791,6 +863,18 @@ describe("Popover", () => {
       await act(async () => {
         await hydrate(<Harness mode="static" />);
       });
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("library mode: expanded from the first commit while the 'platform' dispatch is pending (#118)", async () => {
+      const d = deferred();
+      const action = vi.fn<ActionFn>(() => d.promise);
+      await hydrate(<Harness mode="uncontrolled" initialOpen={false} action={action} />);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls[0]![1].reason).toBe("platform");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      await act(async () => d.resolve());
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
     });
   });

@@ -401,6 +401,8 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(open).toHaveBeenCalledWith(...config.openArgs());
         expect(isOpen()).toBe(true);
         expect(content()).toBeInTheDocument();
+        // `aria-expanded` mirrors the popup's `toggle`, a task after `showPopover()` (#118).
+        await flushTasks(2);
         expectExpanded(true);
         expect(trigger()).toHaveAttribute("data-open", "");
         expectNotPending(trigger());
@@ -472,8 +474,9 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(details.event!.type).toBe(config.dismissEvent);
         expectPending(trigger());
         expect(trigger()).not.toHaveAttribute("data-open");
-        // The accepted gap (#118): committed until the notification settles, though hidden.
-        expectExpanded(true);
+        // `aria-expanded` mirrors the hidden popup from its `toggle`, though committed is still
+        // true until the notification settles (#118).
+        expectExpanded(false);
         expect(content()).toBeInTheDocument(); // committed is still true
         await act(async () => d.resolve());
         expectNotPending(trigger());
@@ -651,13 +654,15 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(isOpen()).toBe(false);
         await flushTasks(2);
         expectPending(trigger());
-        // Committed never left true (#118).
-        expectExpanded(true);
+        // Hidden while the notification runs: the mirror says so though committed stays true (#118).
+        expectExpanded(false);
         expect(open).not.toHaveBeenCalled();
         await act(async () => d.resolve());
         expect(open).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
         expect(trigger()).toHaveAttribute("data-open", "");
+        // Expanded again with the re-show's `toggle`.
+        await flushTasks(2);
         expectExpanded(true);
         expectNotPending(trigger());
       });
@@ -861,6 +866,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(open).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
         expect(screen.getByTestId("suspender")).toHaveTextContent("Order details");
+        await flushTasks(2);
         expectExpanded(true);
         expectNotPending(trigger());
       });
@@ -1007,6 +1013,9 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(open).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
         expect(content()).toBeInTheDocument();
+        // Not expanded until the popup's `toggle` reports it shown (#118).
+        expectExpanded(false);
+        await flushTasks(2);
         expectExpanded(true);
       });
     });

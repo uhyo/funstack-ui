@@ -114,7 +114,7 @@ export function PopoverPage() {
           [
             "Trigger `aria-expanded`",
             "kept current on the element from the popup's `toggle` event",
-            "rendered from committed state: the shown popup",
+            "rendered from whether the popup is shown (mirrored from its `toggle` event)",
           ],
           ["Trigger `data-open`, `data-pending`", "not emitted", "emitted"],
           [
@@ -154,7 +154,7 @@ export function PopoverPage() {
             name: "defaultOpen",
             type: "boolean",
             description:
-              'Initial open state in uncontrolled library mode. A popover that starts open is shown after hydration (there is no attribute for an open popover in HTML); its content and the Trigger\'s open state (`aria-expanded="true"`, `data-open`) are already in the server HTML. `defaultOpen={false}` is the usual way to select library mode without an action.',
+              'Initial open state in uncontrolled library mode. A popover that starts open is shown after hydration (there is no attribute for an open popover in HTML); its content and the Trigger\'s `data-open` are already in the server HTML, while `aria-expanded` is `"false"` until the popup is shown. `defaultOpen={false}` is the usual way to select library mode without an action.',
           },
           {
             name: "openChangeAction",
@@ -376,7 +376,7 @@ export function PopoverPage() {
           [
             "`aria-expanded`",
             "Trigger",
-            "Whether the popup is shown, both modes (committed, not optimistic, in library mode).",
+            "Whether the popup is shown, both modes (not optimistic in library mode).",
           ],
           ["`data-open`", "Trigger", "Optimistic open state (library mode only)."],
           [
@@ -544,7 +544,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight; its `aria-expanded` follows the shown popup, because Chromium and WebKit report an invoker's expanded state from the popover itself and only the shown state is true in every engine. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight; its `aria-expanded` follows the shown popup (mirrored from the popup's `toggle` event), because Chromium and WebKit report an invoker's expanded state from the popover itself and only the shown state is true in every engine. After Escape or a click outside it reads `\"false\"` at once, even while the dismissal notification runs. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
         }
       >
         <h4>Walkthrough (library mode)</h4>

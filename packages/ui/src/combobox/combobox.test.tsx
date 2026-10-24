@@ -2154,6 +2154,52 @@ describe("Combobox", () => {
       expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[true, "activate"]]);
     });
 
+    it("a dismissal: not expanded once the listbox is hidden, while the notification runs (#118)", async () => {
+      const close = deferred();
+      const openAction = vi.fn<OpenAction>((next) => (next ? undefined : close.promise));
+      render(<Harness root={{ openChangeAction: openAction }} />);
+      act(() => trigger().click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      // The `toggle` that reports it shown is a task after `showPopover()`.
+      await flushTasks(2);
+      expect(input()).toHaveAttribute("aria-expanded", "true");
+      // What Escape or a light dismiss does: the browser hides the listbox at once.
+      act(() => popup().hidePopover());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expectPending(input());
+      expect(input()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      await act(async () => close.resolve());
+      await flushTasks(2);
+      expectNotPending(input());
+      expect(input()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("a dismissal entangled with an unrelated pending action: not expanded meanwhile (#118)", async () => {
+      const save = deferred();
+      const openAction = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: openAction }} />);
+      act(() => trigger().click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      // An unrelated async action holds every transition, the notification's included.
+      act(() => startTransition(() => save.promise));
+      act(() => popup().hidePopover());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(openAction.mock.calls.at(-1)![0]).toBe(false);
+      expectPending(input());
+      expect(input()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      await act(async () => save.resolve());
+      await flushTasks(2);
+      expectNotPending(input());
+      expect(input()).toHaveAttribute("aria-expanded", "false");
+    });
+
     it("a controlled open={true} parent that refuses the close keeps the listbox shown", async () => {
       const close = deferred();
       const openAction = vi.fn<OpenAction>(() => close.promise);

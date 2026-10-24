@@ -187,8 +187,9 @@ export function PendingOptimisticPage() {
         optimistic data attribute is visual only; the component page says so when that applies (for
         example <a href="/components/accordion">Accordion</a>). The same holds for a trigger's{" "}
         <code>aria-expanded</code> on a popup (Popover, Menu, Combobox): Chromium and Safari report
-        a popover invoker's state from the popup itself, so the attribute follows the shown popup
-        and every browser agrees; <code>data-open</code> is the optimistic one.
+        it from the popup itself, and the library mirrors the popup's <code>toggle</code> event, so
+        the attribute follows the shown popup in every browser; <code>data-open</code> is the
+        optimistic one.
       </p>
     </DocPage>
   );

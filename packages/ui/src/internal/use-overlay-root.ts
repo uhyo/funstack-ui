@@ -46,6 +46,14 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   readonly committed: boolean;
   /** Optimistic open state (library mode); `false` in JS-free mode. */
   readonly optimistic: boolean;
+  /**
+   * The popup is in the top layer, mirrored from its `toggle` (urgent, conventions 3.5): what
+   * `aria-expanded` renders (#118). Written by a popover Popup in library mode; Dialog does not
+   * maintain it.
+   */
+  readonly shown: boolean;
+  /** Writes `shown` from the DOM (`:popover-open`); the Popup's `toggle`, ref attach and detach. */
+  readonly setShown: (shown: boolean) => void;
   /** The Root's transition is pending (library mode). */
   readonly pending: boolean;
   /**
@@ -265,6 +273,8 @@ export function useOverlayRoot<
     [isLibrary, intended, send],
   );
 
+  const [shown, setShown] = useState(false);
+
   const ids = useMemo(
     () => ({ popup: id, title: `${id}-title`, description: `${id}-description` }),
     [id],
@@ -278,6 +288,8 @@ export function useOverlayRoot<
       ids,
       committed: isLibrary && committed,
       optimistic: isLibrary && optimistic,
+      shown,
+      setShown,
       pending: isLibrary && pending,
       intended,
       openGeneration,
@@ -299,6 +311,7 @@ export function useOverlayRoot<
       isLibrary,
       committed,
       optimistic,
+      shown,
       pending,
       intended,
       openGeneration,

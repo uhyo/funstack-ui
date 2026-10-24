@@ -137,8 +137,8 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     value: ctx.inputValue,
     autoComplete: "off",
     "aria-autocomplete": "list",
-    // Committed, the shown listbox; `data-open` is the optimistic one (#118).
-    "aria-expanded": popover.committed,
+    // Shown (the listbox is in the top layer); `data-open` is the optimistic one (#118).
+    "aria-expanded": popover.shown,
     "aria-controls": ids.list,
     "aria-activedescendant":
       ctx.activeValue === null ? undefined : optionId(ids.optionPrefix, ctx.activeValue),

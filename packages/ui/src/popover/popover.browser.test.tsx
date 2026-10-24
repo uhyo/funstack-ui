@@ -209,20 +209,22 @@ describe("JS-free mode (browser)", () => {
 describe("library mode (browser)", () => {
   // The attribute and, on Chromium, the computed AX state agree in every pending phase: Chromium
   // and WebKit compute an invoker's state from the popover, Firefox reads the attribute (#118).
-  // CDP is Chromium-only; Firefox and WebKit run the DOM assertions.
+  // CDP is Chromium-only; Firefox and WebKit run the DOM assertions. The attribute mirrors the
+  // popup's `toggle`, a task after the DOM change, hence the poll.
+  const expectExpanded = async (expanded: boolean) => {
+    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe(String(expanded));
+    if (browserName !== "chromium") return;
+    const node = (await getAXNodes()).find(
+      (n) => n.role?.value === "button" && n.name?.value === "Filters",
+    );
+    expect(node).toBeDefined();
+    expect(axProperty(node, "expanded")).toBe(expanded);
+  };
+
   it("aria-expanded is the shown popup during a deferred open and a deferred Trigger close (#118)", async () => {
     let work = deferred();
     const action = vi.fn<ActionFn>(() => work.promise);
     render(<Library action={action} />);
-    const expectExpanded = async (expanded: boolean) => {
-      expect(trigger()).toHaveAttribute("aria-expanded", String(expanded));
-      if (browserName !== "chromium") return;
-      const node = (await getAXNodes()).find(
-        (n) => n.role?.value === "button" && n.name?.value === "Filters",
-      );
-      expect(node).toBeDefined();
-      expect(axProperty(node, "expanded")).toBe(expanded);
-    };
     await user.click(trigger());
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveAttribute("data-open", "");
@@ -238,6 +240,25 @@ describe("library mode (browser)", () => {
     await expectExpanded(true);
     await act(async () => work.resolve());
     await expect.poll(() => isOpen()).toBe(false);
+    await expectExpanded(false);
+  });
+
+  it("aria-expanded is false right after an Escape, while a slow dismissal notification runs (#118)", async () => {
+    const action = vi.fn<ActionFn>((next) =>
+      next ? undefined : new Promise<void>((resolve) => setTimeout(resolve, 300)),
+    );
+    render(<Library action={action} />);
+    await user.click(trigger());
+    await expect.poll(() => isOpen()).toBe(true);
+    await expectExpanded(true);
+    await user.keyboard("{Escape}");
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(isOpen()).toBe(false);
+    expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    await expectExpanded(false);
+    await expect.poll(() => trigger().hasAttribute("data-pending")).toBe(false);
     await expectExpanded(false);
   });
 

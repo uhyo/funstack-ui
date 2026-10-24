@@ -515,7 +515,7 @@ export function MenuPage() {
           [
             "`aria-expanded`",
             "Trigger, SubmenuTrigger",
-            "Whether the menu is shown (the Root's committed open state).",
+            "Whether the menu is shown (mirrored from its `toggle` event, not optimistic).",
           ],
           [
             "`data-open`",
