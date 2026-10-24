@@ -3,7 +3,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { isAtBound } from "./number-field-arithmetic.js";
 import { useNumberFieldContext } from "./number-field-context.js";
@@ -61,9 +61,6 @@ export function useStepButtonElement(
   const pending = ctx.pendingSource === direction;
   const buttonState: NumberFieldButtonState = { pending, disabled };
   const handlers = useStepButton(ctx, direction, disabled);
-  // A link or component render: native `disabled` would mean nothing on a link; the press and
-  // click handlers refuse, so `aria-disabled`. The at-bound case follows the same branch.
-  const focusable = !isHostButton(render);
 
   useDevWarning(
     rest["aria-label"] === "",
@@ -90,8 +87,9 @@ export function useStepButtonElement(
       ...(rendersButton(render) ? { type: "button" as const } : {}),
       tabIndex: -1,
       "aria-controls": ctx.inputId,
-      disabled: focusable ? undefined : disabled,
-      ...(focusable && { "aria-disabled": disabled ? true : undefined }),
+      // A link or component render: native `disabled` would mean nothing on a link; the press and
+      // click handlers refuse, so `aria-disabled`. The at-bound case follows the same branch.
+      ...disabledButton(render, disabled).props,
       onPointerDown: handlers.onPointerDown,
       onClick: handlers.onClick,
       onContextMenu: handlers.onContextMenu,
