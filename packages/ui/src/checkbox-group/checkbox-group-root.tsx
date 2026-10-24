@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -14,17 +14,11 @@ import type {
 import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
 import { useFieldValueChange } from "../internal/use-field-control.js";
 import { useFieldsetGroup } from "../internal/use-fieldset-group.js";
+import { useItemOrder } from "../internal/use-item-order.js";
+import type { ItemLayout } from "../internal/use-item-order.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
-import {
-  applyPatch,
-  arraysEqual,
-  EMPTY_SET,
-  firstDuplicate,
-  setsEqual,
-  sortByOrder,
-  toSet,
-} from "../internal/value-set.js";
+import { applyPatch, EMPTY_SET, setsEqual, sortByOrder, toSet } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
 import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
 import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
@@ -148,6 +142,8 @@ function mapsEqual(a: ReadonlyMap<string, boolean>, b: ReadonlyMap<string, boole
   return true;
 }
 
+const NO_ORDER: ItemLayout = { order: [] };
+
 /** The group's Items: checkboxes of this `name` in the fieldset (Parents have none). */
 function readItems(fieldset: HTMLFieldSetElement | null, name: string): HTMLInputElement[] {
   if (fieldset === null) return [];
@@ -191,7 +187,6 @@ export function CheckboxGroupRoot({
     disabled: disabledProp,
     required: requiredProp,
   });
-  const warnedDuplicate = useRef(false);
   /** Parent reports waiting for the next mount read (design 8.1). */
   const parentReports = useRef<{ values: readonly string[]; checked: boolean }[]>([]);
 
@@ -351,33 +346,16 @@ export function CheckboxGroupRoot({
     }
   };
 
-  // The state's `value` is in document order. Render cannot read the DOM, so the Items' order is
-  // kept in state, refreshed after a commit only when the rendered `value` would change (a value
-  // given out of document order, Items reordered or added). The first render, and the server,
-  // use the value's own order.
-  const [itemOrder, setItemOrder] = useState<readonly string[]>([]);
-  const renderedValue = sortByOrder(optimistic, itemOrder);
-  // After every commit of the Root (a deps-less layout effect runs only when the Root itself
-  // committed: Items moved by a child that re-renders alone are picked up at the Root's next
-  // render). The comparison ends the chain: the re-render it causes renders exactly the value
-  // just compared against.
-  const syncItemOrder = useEffectEvent(() => {
-    const order = readItems(fieldsetRef.current, name).map((item) => item.value);
-    if (!arraysEqual(sortByOrder(optimistic, order), renderedValue)) setItemOrder(order);
-
-    // Dev only: Item values must be unique within the Root (design 14.6).
-    if (!isDev || warnedDuplicate.current) return;
-    const duplicate = firstDuplicate(order);
-    if (duplicate !== undefined) {
-      warnedDuplicate.current = true;
-      console.error(
+  // The state's `value` is in document order (design 14.6: Item values are unique).
+  const { renderedValue } = useItemOrder({
+    optimistic,
+    initial: NO_ORDER,
+    read: () => ({ order: readItems(fieldsetRef.current, name).map((item) => item.value) }),
+    duplicateMessage:
+      isDev &&
+      ((duplicate) =>
         `CheckboxGroup.Item: two Items share the value "${duplicate}" in one ` +
-          `CheckboxGroup.Root. Item values must be unique; both boxes follow the same value.`,
-      );
-    }
-  });
-  useLayoutEffect(() => {
-    syncItemOrder();
+        `CheckboxGroup.Root. Item values must be unique; both boxes follow the same value.`),
   });
 
   const itemsRequired =

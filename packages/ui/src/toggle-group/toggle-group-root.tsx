@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -9,18 +9,13 @@ import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useItemOrder } from "../internal/use-item-order.js";
+import type { ItemLayout } from "../internal/use-item-order.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
-import {
-  applyPatch,
-  EMPTY_SET,
-  arraysEqual,
-  firstDuplicate,
-  sortByOrder,
-  toSet,
-} from "../internal/value-set.js";
+import { applyPatch, EMPTY_SET, arraysEqual, sortByOrder, toSet } from "../internal/value-set.js";
 import type { SetPatch, ValueSet } from "../internal/value-set.js";
 import { ToggleGroupContext } from "./toggle-group-context.js";
 import type { ToggleGroupContextValue, ToggleGroupOrientation } from "./toggle-group-context.js";
@@ -138,12 +133,11 @@ function pressedFirst(items: readonly HTMLElement[]): HTMLElement | undefined {
 }
 
 /** The Items' document order and their disabled values, as of the Root's last commit. */
-interface ItemLayout {
-  readonly order: readonly string[];
+interface ToggleGroupLayout extends ItemLayout {
   readonly disabled: readonly string[];
 }
 
-const NO_LAYOUT: ItemLayout = { order: [], disabled: [] };
+const NO_LAYOUT: ToggleGroupLayout = { order: [], disabled: [] };
 
 /**
  * `<div role="group">` that owns the pressed set, the transition and, when standalone, the roving
@@ -273,35 +267,25 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
     [dispatch, latest],
   );
 
-  // `state.value` is in document order. Render cannot read the DOM, so the Items' order (and,
-  // for `focusgroupstart`, which values have a disabled Item) is kept in state, refreshed after a
-  // commit of the Root only when what renders from it would change (CheckboxGroup's approach).
-  const [layout, setLayout] = useState<ItemLayout>(NO_LAYOUT);
-  const renderedValue = sortByOrder(optimistic, layout.order);
-  const warnedDuplicate = useRef(false);
-  const syncLayout = useEffectEvent(() => {
-    const items = sortedItems();
-    const order = items.map(([, v]) => v);
-    const disabledValues = items.filter(([el]) => el.matches(":disabled")).map(([, v]) => v);
-    const valueChanged = !arraysEqual(sortByOrder(optimistic, order), renderedValue);
-    const startChanged =
-      flag && (!arraysEqual(order, layout.order) || !arraysEqual(disabledValues, layout.disabled));
-    // A DOM read (the Items' order) that render cannot do; the comparison ends the chain.
-    if (valueChanged || startChanged) setLayout({ order, disabled: disabledValues });
-
-    if (!isDev || warnedDuplicate.current) return;
-    const duplicate = firstDuplicate(order);
-    if (duplicate !== undefined) {
-      warnedDuplicate.current = true;
-      console.error(
+  // `state.value` is in document order; `focusgroupstart` also renders from which values have a
+  // disabled Item.
+  const { layout, renderedValue } = useItemOrder<ToggleGroupLayout>({
+    optimistic,
+    initial: NO_LAYOUT,
+    read: () => {
+      const items = sortedItems();
+      return {
+        order: items.map(([, v]) => v),
+        disabled: items.filter(([el]) => el.matches(":disabled")).map(([, v]) => v),
+      };
+    },
+    changed: (prev, next) =>
+      flag && (!arraysEqual(next.order, prev.order) || !arraysEqual(next.disabled, prev.disabled)),
+    duplicateMessage:
+      isDev &&
+      ((duplicate) =>
         `ToggleGroup.Item: two Items share the value "${duplicate}" in one ToggleGroup.Root. ` +
-          "Item values must be unique; both follow the same pressed state.",
-      );
-    }
-  });
-  useLayoutEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- a DOM read render cannot do (as CheckboxGroup.Root)
-    syncLayout();
+        "Item values must be unique; both follow the same pressed state."),
   });
 
   const native = useNativeFocusgroup(flag);
