@@ -33,7 +33,8 @@ import { usePopoverRoot } from "../internal/use-popover-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import { comboboxKeyDown } from "./combobox-keyboard.js";
-import type { ComboboxContextValue, ComboboxOptionEntry } from "./combobox-context.js";
+import { useOptionRegistry } from "./use-option-registry.js";
+import type { ComboboxContextValue } from "./combobox-context.js";
 
 /** Details passed as the second argument of `Combobox.Root`'s `valueChangeAction`. */
 export interface ComboboxValueChangeDetails extends ActionDetails {
@@ -198,10 +199,6 @@ interface TextRecord {
   readonly value: string | null;
   readonly text: string;
   settled: boolean;
-}
-
-interface OrderedOption extends ComboboxOptionEntry {
-  readonly value: string;
 }
 
 /**
@@ -404,55 +401,17 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   // --- Option registry and the active option (design 2, 6.5) --------------------------------
 
-  const [registry] = useState(() => new Map<string, ComboboxOptionEntry>());
-  const [optionCount, setOptionCount] = useState(0);
-  const [statusCount, setStatusCount] = useState(0);
-  // The same count for the announcement effect: the open commit's passive effects can run before
-  // the re-render the Status's registration scheduled (the race `registry` avoids for options).
-  const statusCountRef = useRef(0);
-  const [labelCount, setLabelCount] = useState(0);
-  const warnedDuplicate = useRef(false);
-
-  const registerOption = useCallback(
-    (optionValue: string, entry: ComboboxOptionEntry) => {
-      const existing = registry.get(optionValue);
-      if (
-        isDev &&
-        !warnedDuplicate.current &&
-        existing !== undefined &&
-        existing.element !== entry.element &&
-        existing.element.isConnected
-      ) {
-        warnedDuplicate.current = true;
-        console.error(
-          `Combobox.Option: two options have the value ${JSON.stringify(optionValue)}. ` +
-            "Option ids are derived from the value, so they must be unique within one Combobox.",
-        );
-      }
-      registry.set(optionValue, entry);
-      labels.set(optionValue, entry.label ?? (entry.element.textContent ?? "").trim());
-      setOptionCount(registry.size);
-      return () => {
-        if (registry.get(optionValue) === entry) registry.delete(optionValue);
-        setOptionCount(registry.size);
-      };
-    },
-    [registry, labels],
-  );
-
-  const registerStatus = useCallback(() => {
-    statusCountRef.current += 1;
-    setStatusCount((count) => count + 1);
-    return () => {
-      statusCountRef.current -= 1;
-      setStatusCount((count) => count - 1);
-    };
-  }, []);
-
-  const registerLabel = useCallback(() => {
-    setLabelCount((count) => count + 1);
-    return () => setLabelCount((count) => count - 1);
-  }, []);
+  const {
+    registry,
+    optionCount,
+    statusCount,
+    statusCountRef,
+    labelCount,
+    registerOption,
+    registerStatus,
+    registerLabel,
+    orderedOptions,
+  } = useOptionRegistry(labels);
 
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
@@ -466,15 +425,6 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   // the results for it settle. Home / End / Left / Right clear the active option without
   // re-arming it, so the caret keys really return visual focus to the input.
   const autoArmed = useRef(true);
-
-  const orderedOptions = useCallback((): OrderedOption[] => {
-    const options: OrderedOption[] = [];
-    for (const [optionValue, entry] of registry) options.push({ value: optionValue, ...entry });
-    options.sort((a, b) =>
-      a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
-    );
-    return options;
-  }, [registry]);
 
   // A Status inside the List is a Suspense fallback: the results are loading (design 6.3).
   const loading = statusCount > 0;
