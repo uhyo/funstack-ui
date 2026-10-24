@@ -10,19 +10,16 @@ function languageOf(tag: string): string {
   return tag.split("-")[0]?.toLowerCase() ?? "";
 }
 
+/** The Root's props (as given) and derived values the warnings read. */
 export interface NumberFieldDevWarningsOptions {
-  /** The `value` / `defaultValue` props as given (before `NaN` / `Infinity` become empty). */
   readonly value: number | null | undefined;
   readonly defaultValue: number | null | undefined;
-  /** The `min` / `max` props as given, and the bounds in use. */
   readonly min: number | undefined;
   readonly max: number | undefined;
   readonly bounds: StepBounds;
-  /** `step` and `largeStep` are absent or positive numbers. */
   readonly stepValid: boolean;
   readonly largeStepValid: boolean;
   readonly formatter: NumberFormatter;
-  /** The `locale` prop. */
   readonly locale: string | readonly string[] | undefined;
 }
 

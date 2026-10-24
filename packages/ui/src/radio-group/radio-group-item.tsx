@@ -128,7 +128,7 @@ export function RadioGroupItem({
       required: ctx.required,
       checked,
       pending,
-      disabled,
+      effectiveDisabled: disabled,
       ownDisabled: disabledProp,
       activate: (event) => ctx.select(value, event),
     }),

@@ -127,7 +127,7 @@ export function Checkbox({
     defaultChecked,
     checkedChangeAction,
     disabled,
-    rest,
+    own: rest,
     transitionTypes: (next) => transitionTypes("checkbox", next ? "check" : "uncheck"),
     indeterminate,
   });

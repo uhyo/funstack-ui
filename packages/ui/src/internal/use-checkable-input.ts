@@ -22,8 +22,8 @@ export interface UseCheckableInputOptions {
   readonly checkedChangeAction: ChangeAction<boolean, CheckableChangeDetails> | undefined;
   /** The `disabled` prop. */
   readonly disabled: boolean | undefined;
-  /** The pass-through props, for the Field's "own or the Field's" `name` / `required` / `id`. */
-  readonly rest: Pick<ComponentPropsWithRef<"input">, "name" | "required" | "id">;
+  /** The control's own `name` / `required` / `id` (the Field's "own or the Field's"). */
+  readonly own: Pick<ComponentPropsWithRef<"input">, "name" | "required" | "id">;
   /** View Transition types of a dispatch of `next`. */
   readonly transitionTypes: (next: boolean) => readonly string[];
   /** Switch only: the owned `role`. */
@@ -57,7 +57,7 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     defaultChecked,
     checkedChangeAction,
     disabled: disabledProp,
-    rest,
+    own,
     transitionTypes,
     role,
     indeterminate,
@@ -66,10 +66,10 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
   // wiring, and `name` / `required` / `disabled` default from it.
   const field = useFieldControl({
     labelable: true,
-    name: rest.name,
+    name: own.name,
     disabled: disabledProp,
-    required: rest.required,
-    id: rest.id,
+    required: own.required,
+    id: own.id,
     component,
   });
   const disabled = field.disabled;

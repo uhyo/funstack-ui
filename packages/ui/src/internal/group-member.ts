@@ -17,7 +17,7 @@ export interface GroupMemberPropsOptions {
   readonly checked: boolean;
   readonly pending: boolean;
   /** Own `disabled` prop or the Root's: `data-disabled` and the click guard. */
-  readonly disabled: boolean;
+  readonly effectiveDisabled: boolean;
   /** The member's own `disabled` prop only: the Root's reaches it through `<fieldset disabled>`. */
   readonly ownDisabled: boolean;
   /** CheckboxGroup inside a Field: the group's `aria-invalid` (the fieldset cannot carry it). */
@@ -35,7 +35,7 @@ export interface GroupMemberPropsOptions {
 export function groupMemberProps(
   options: GroupMemberPropsOptions,
 ): Partial<ComponentPropsWithRef<"input">> & DataAttributes {
-  const { type, component, checked, pending, disabled, invalid, activate } = options;
+  const { type, component, checked, pending, effectiveDisabled, invalid, activate } = options;
   return {
     type,
     name: options.name,
@@ -50,12 +50,12 @@ export function groupMemberProps(
     required: options.required,
     "data-checked": dataAttr(checked),
     "data-pending": dataAttr(pending),
-    "data-disabled": dataAttr(disabled),
+    "data-disabled": dataAttr(effectiveDisabled),
     ...(invalid !== undefined && { "aria-invalid": invalid }),
     onChange: (event: ChangeEvent<HTMLInputElement>) => {
       // A natively disabled input fires no click; this covers `render` elements that do not
       // honour `disabled`.
-      if (disabled) return;
+      if (effectiveDisabled) return;
       const nativeEvent = event.nativeEvent;
       guardCheckableChange(nativeEvent, () => activate(nativeEvent), component);
     },

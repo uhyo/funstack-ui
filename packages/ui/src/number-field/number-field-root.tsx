@@ -29,7 +29,6 @@ import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field
 import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import { useRegisterCount } from "../internal/use-register-count.js";
 import { useSupersededRejection } from "../internal/use-superseded-rejection.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -595,7 +594,11 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // --- Labels ---------------------------------------------------------------------------------
 
-  const { count: labelCount, register: registerLabel } = useRegisterCount();
+  const [labelCount, setLabelCount] = useState(0);
+  const registerLabel = useCallback(() => {
+    setLabelCount((count) => count + 1);
+    return () => setLabelCount((count) => count - 1);
+  }, []);
 
   // --- Residual browser paths: mount reconciliation and form reset (design 4.5, 6.4) ----------
 

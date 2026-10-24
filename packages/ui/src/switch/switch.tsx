@@ -113,7 +113,7 @@ export function Switch({
     defaultChecked,
     checkedChangeAction,
     disabled,
-    rest,
+    own: rest,
     transitionTypes: (next) => transitionTypes("switch", next ? "on" : "off"),
     role: "switch",
   });

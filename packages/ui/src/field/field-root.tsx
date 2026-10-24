@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { useFormStatus } from "react-dom";
 import { FieldContext, fieldDataAttributes, FormContext } from "../internal/field-context.js";
 import type {
@@ -18,12 +18,12 @@ import type {
   FieldState,
   FormFieldRegistration,
 } from "../internal/field-context.js";
+import { collectInvalid } from "../internal/focus-first-invalid.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useFormOwnerEvent } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
-import { useFieldListeners } from "./use-field-listeners.js";
-import type { RefreshOptions } from "./use-field-listeners.js";
 import { useServerErrorVisibility } from "./use-server-error-visibility.js";
 import {
   focusTargetOf,
@@ -88,6 +88,13 @@ interface Mirror {
 
 const NONE: readonly string[] = Object.freeze([]);
 const INITIAL_MIRROR: Mirror = { userInvalid: false, validity: VALID, messages: NONE };
+
+interface RefreshOptions {
+  /** The user edited the control: the server message is dropped from the slot at once. */
+  readonly dismiss?: boolean;
+  /** After a form reset: the user-validity flag is clear again. */
+  readonly reset?: boolean;
+}
 
 function mirrorEquals(a: Mirror, b: Mirror): boolean {
   return (
@@ -300,15 +307,69 @@ export function FieldRoot({
     [],
   );
 
-  // The control's own events and the form owner's (another field's edit re-runs `validate`).
-  useFieldListeners({
-    controlRef,
-    element: control?.element ?? null,
-    refresh,
-    dismiss,
-    setSuppressNext,
-    attempted,
-    errorCount,
+  // The control's own events (capture, so a group's members are seen on its fieldset).
+  const element = control?.element ?? null;
+  useLayoutEffect(() => {
+    if (element === null) return;
+    const onEdit = () => {
+      dismiss();
+      refresh({ dismiss: true });
+    };
+    const onBlur = () => refresh();
+    const onInvalid = (event: Event) => {
+      const target = event.target as ValidatableElement;
+      // A submission attempt sets user validity before validating; `checkValidity()` and
+      // `reportValidity()` do not (design 2.5). The fallback cannot tell them apart.
+      const attempt = supportsUserInvalid() ? target.matches(":user-invalid") : true;
+      if (!supportsUserInvalid()) attempted.current = true;
+      if (attempt && errorCount.current > 0) {
+        event.preventDefault();
+        const messages = refresh();
+        collectInvalid(focusTargetOf(element), messages.join(" "));
+        return;
+      }
+      refresh();
+    };
+    element.addEventListener("input", onEdit, true);
+    element.addEventListener("change", onEdit, true);
+    element.addEventListener("focusout", onBlur, true);
+    element.addEventListener("invalid", onInvalid, true);
+    return () => {
+      element.removeEventListener("input", onEdit, true);
+      element.removeEventListener("change", onEdit, true);
+      element.removeEventListener("focusout", onBlur, true);
+      element.removeEventListener("invalid", onInvalid, true);
+    };
+  }, [element, refresh, dismiss]);
+
+  // The form owner's events: another field's edit re-runs `validate` (cross-field rules); a reset
+  // clears the user-validity flag, re-read when the controls hold their reset values.
+  const ownerRef = useMemo<RefObject<Element | null>>(
+    () => ({
+      get current() {
+        return controlRef.current?.element ?? null;
+      },
+      set current(_ignored) {},
+    }),
+    [],
+  );
+  const onOwnerEdit = (event: Event) => {
+    const target = event.target;
+    if (target instanceof Node && controlRef.current?.element.contains(target) === true) return;
+    refresh();
+  };
+  useFormOwnerEvent(ownerRef, "input", onOwnerEdit);
+  useFormOwnerEvent(ownerRef, "change", onOwnerEdit);
+  // A new submission sends the current values: nothing differs from it yet (a queued second
+  // submit arrives while the status stays pending, so the pending edge alone would miss it).
+  useFormOwnerEvent(ownerRef, "submit", () => {
+    setSuppressNext(false);
+  });
+  useFormOwnerEvent(ownerRef, "reset", (event) => {
+    queueMicrotask(() => {
+      if (event.defaultPrevented) return;
+      refresh({ reset: true });
+    });
   });
 
   // Registration with the Form, for the first-error focus after a settle (design 3.5) and the

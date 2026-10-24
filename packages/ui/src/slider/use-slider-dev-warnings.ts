@@ -6,21 +6,17 @@ import { isMaxReachable, isOnGrid, shapeOf, toArray } from "./slider-arithmetic.
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/** The Root's props (as given) and derived values the warnings read. */
 export interface SliderDevWarningsOptions {
-  /** The `step` prop as given, and whether it is a positive number. */
   readonly stepProp: number;
   readonly stepValid: boolean;
   readonly min: number;
   readonly max: number;
-  /** The step in use. */
   readonly step: number;
   readonly value: number | readonly number[] | undefined;
   readonly defaultValue: number | readonly number[] | undefined;
-  /** The shape fixed at mount. */
   readonly shape: "number" | "array";
-  /** Several thumbs with no name: outside a Field, no `aria-label` / `aria-labelledby`. */
   readonly unnamedGroup: boolean;
-  /** Mounted `Slider.Label`s, current before the re-render their registration scheduled. */
   readonly labelCountRef: RefObject<number>;
 }
 

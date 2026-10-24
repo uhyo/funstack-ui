@@ -135,7 +135,7 @@ export function CheckboxGroupItem({
       required,
       checked,
       pending,
-      disabled,
+      effectiveDisabled: disabled,
       ownDisabled: disabledProp,
       // Inside a Field (owned there): the group's invalid state, since the fieldset cannot carry it.
       invalid: ctx.fieldInvalid,
