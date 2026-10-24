@@ -114,19 +114,7 @@ function Fruits({
 }
 
 describe("Select (browser)", () => {
-  it("environment: the feature checks match the engine", () => {
-    // Chromium ships customizable select; Firefox keeps it behind prefs. Safari 27 ships it too,
-    // but Playwright's WebKit is a trunk build whose features need not match a Safari release,
-    // so WebKit's values are logged, not pinned: the other rows branch on the feature checks.
-    if (browserName !== "webkit") {
-      expect(supportsBaseSelect).toBe(browserName === "chromium");
-      expect(supportsSelectedContent).toBe(browserName === "chromium");
-    }
-    console.info(
-      `[${browserName}] base-select: ${supportsBaseSelect}, selectedcontent: ${supportsSelectedContent}`,
-    );
-  });
-
+  // The feature checks are pinned per engine in __tests__/environment.browser.test.tsx.
   it("degradation: styled button and cloned content with base-select, the native select without; the value contract is identical", async () => {
     const action = vi.fn<ActionFn>();
     render(

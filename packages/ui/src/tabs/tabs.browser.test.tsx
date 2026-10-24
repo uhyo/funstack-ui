@@ -5,7 +5,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
-import { browserName, supportsFocusgroup } from "../__tests__/engine.js";
+import { supportsFocusgroup } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Tabs } from "./index.js";
 import type { TabsValueChangeDetails } from "./index.js";
@@ -152,11 +152,7 @@ describe("Tabs pointer activation", () => {
 });
 
 describe("Tabs.List experimental_focusgroup", () => {
-  it("Chromium has native focusgroup; Firefox and WebKit do not", () => {
-    // Pins the feature check (issue #43: `"focusgroup" in HTMLElement.prototype` is always false).
-    expect(supportsFocusgroup).toBe(browserName === "chromium");
-  });
-
+  // The feature check itself is pinned per engine in __tests__/environment.browser.test.tsx.
   it.each([
     ["horizontal", "ArrowRight", "ArrowLeft"],
     ["vertical", "ArrowDown", "ArrowUp"],

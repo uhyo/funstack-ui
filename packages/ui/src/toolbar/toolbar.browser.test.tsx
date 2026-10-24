@@ -299,12 +299,6 @@ describe.each([
   });
 });
 
-describe("Toolbar: native focusgroup detection", () => {
-  it("Chromium has native focusgroup; Firefox and WebKit do not", () => {
-    expect(supportsFocusgroup).toBe(browserName === "chromium");
-  });
-});
-
 describe("Toolbar: a click makes the item the Tab stop (row 22)", () => {
   it("Tab from outside lands on the clicked item, also where a click does not focus", async () => {
     render(<Editor flag={false} />);
