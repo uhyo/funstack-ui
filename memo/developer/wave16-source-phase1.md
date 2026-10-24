@@ -30,6 +30,24 @@ are phase 2.
   the `decimalsOf` re-export and its duplicate assertions in `slider.test.tsx`.
 - Kept issue numbers: #44, #89, #92 (open upstream, human tasks). All closed ones dropped.
 
+## Review fixes (memo/reviewer/wave16-source-review.md)
+
+- M1: dev texts must sit behind the calling module's own `isDev`. Every message argument of
+  `useDevWarning`, `useElementCheck`, `useNameWarning`, `useShownNameWarning` is `isDev && (...)`;
+  the hooks accept `false`, and each hook module exports `isDev ? useXDev : noop`, so production
+  runs no hook at all. Bundle of `src/index.ts` (rolldown, production, minified): master 194,307 B
+  / 59,282 gzip; branch before 198,140 / 60,931; after 184,613 / 56,014.
+- Guard: `src/__tests__/production-bundle.test.ts` (node environment, jsdom project, so
+  `test:run` and CI's `test:jsdom` run it) bundles with rolldown (devDependency pinned to
+  tsdown's version) and fails if any string from the arguments of `console.error`/`console.warn`
+  or the four hooks appears. Chosen over a build step because the build is unbundled (dist keeps
+  the strings legitimately for consumers' bundlers to fold); only a bundled, minified production
+  build shows a leak, and a test reports exactly which file and text leaked.
+- L3: Toast.Close's name warning is now once per instance too (was once per ref attach, which
+  for its stable ref was once per mount). Accepted.
+- Nits: `TEXT_NAME` lives beside `BUTTON_NAME`; `menu-point.ts` moved to `menu/`; integer case
+  of `decimalsOf` added to `number-field-format.test.ts`.
+
 ## Deferred
 
 - O18's `createActionDetails(...) as unknown as Details` double cast in `use-popover-root.ts`:
