@@ -929,7 +929,7 @@ describe("Skip-delay (wave 11, #21)", () => {
       expect(styles()[0]!.getAttribute("nonce")).toBe("n0nce");
     });
 
-    it("a render element with its own children keeps the <style> (review M1)", () => {
+    it("a render element with its own children keeps the <style>", () => {
       // `mergeProps` lets the render element's children win over `children`, so the rule must
       // not travel in them.
       const doc = document.implementation.createHTMLDocument("");

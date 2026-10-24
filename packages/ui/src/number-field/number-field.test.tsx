@@ -828,7 +828,7 @@ describe("NumberField", () => {
       );
 
       it.each(cases)(
-        "disabled by %s with a component render: a press keeps focus in the input (review L3)",
+        "disabled by %s with a component render: a press keeps focus in the input",
         async (_, own, rootProps) => {
           render(
             <Box

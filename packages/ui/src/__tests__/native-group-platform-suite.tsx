@@ -88,7 +88,7 @@ export function describeNativeGroupPlatform<V, D extends PlatformDetails>(
           expect(consoleError).not.toHaveBeenCalled();
         });
 
-        it("dispatches once under StrictMode, for several pre-hydration changes", async () => {
+        it("dispatches once under StrictMode", async () => {
           const action = vi.fn<ActionFn>();
           await hydrateFromServer(
             <StrictMode>

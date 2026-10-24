@@ -618,3 +618,27 @@ On the coordinator's request, titles only: "(review L2/H1/M1/M2/L4/L6/L3/L1)" su
 Mapping is suffix/prefix removal only (8 titles in menu-context-trigger.test.tsx, 12 jsdom tests
 since the H1 describe holds 5 rows; 1 in the browser file). Counts unchanged (3172 jsdom; the
 browser file 78 passed + 2 skipped on Chromium/Firefox).
+
+## Review follow-ups (branch wave16/suites-followup, review memo/reviewer/wave16-suites-review.md)
+
+- L1: native platform suite title "dispatches once under StrictMode, for several pre-hydration
+  changes" -> "dispatches once under StrictMode" (6 tests: 3 components x 2 modes; the row still
+  uses values[2], several changes). T20 mapping: that rename only.
+- L2: the late-member gates in use-native-group-reconciliation.test.tsx (`hydrateLate`) and
+  checkable-input-suite.tsx (row 22, late boundary) use `hydrationGate()` / `open()` instead of a
+  plain deferred; no title change. Both still pass, so nothing needed the plain deferred.
+- L3: checkable-input-suite row 20 (both modes) "two synchronous form.reset() calls while
+  actions are pending dispatch once" (new, 4 tests for Checkbox + Switch; a third reset in a later
+  task too). Mutation: use-native-checked.ts reset base = `checked` (ignores `latestInFlight`):
+  exactly these 4 rows fail.
+- L4: review ids removed from titles: form.test.tsx describe "announcement when focus does not
+  move (review M2)" (4 tests) and "… preventDefault() cancels the submission (review L3)",
+  tooltip.test.tsx "… keeps the <style> (review M1)", number-field.test.tsx it.each "… keeps focus
+  in the input (review L3)" (3 tests). Suffix removal only. A grep of packages/ui/src finds
+  "review X0" only in comments now.
+- N1: use-native-checked "never reports with group: true" is an it.each: "reports the reset
+  without `group` (control)" (new title, the former in-row control) and "never reports with
+  group: true" (unchanged).
+- N2: view-transition-mount.tsx unmounts and restores the spy in a `finally`.
+jsdom 3172 -> 3177 (+4 L3, +1 N1). Gate, a shuffled jsdom run and the browser files of Button,
+Toolbar, ToggleGroup, CheckboxGroup, Checkbox, Switch (Chromium, Firefox) pass.

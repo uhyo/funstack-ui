@@ -342,7 +342,7 @@ describe("Form: server errors", () => {
     expect(document.activeElement).toBe(control());
   });
 
-  describe("announcement when focus does not move (review M2)", () => {
+  describe("announcement when focus does not move", () => {
     function stubAriaNotify() {
       const notify = vi.fn();
       Object.defineProperty(Element.prototype, "ariaNotify", {
@@ -659,7 +659,7 @@ describe("Form: function props and render", () => {
     expect(button).toHaveTextContent("Save");
   });
 
-  it("a render element's onSubmit preventDefault() cancels the submission (review L3)", async () => {
+  it("a render element's onSubmit preventDefault() cancels the submission", async () => {
     const action = vi.fn();
     render(
       <Form.Root action={action} render={<form onSubmit={(event) => event.preventDefault()} />}>

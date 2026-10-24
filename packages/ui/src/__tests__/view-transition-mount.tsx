@@ -39,12 +39,15 @@ export async function countLateMountViewTransitions(
     );
   }
   const { unmount } = render(<Late />);
-  await outsideAct(async () => {
-    screen.getByRole("button", { name: "show" }).click();
-    await expect.poll(mounted).not.toBeNull();
-  });
-  unmount();
-  vt.restore();
+  try {
+    await outsideAct(async () => {
+      screen.getByRole("button", { name: "show" }).click();
+      await expect.poll(mounted).not.toBeNull();
+    });
+  } finally {
+    unmount();
+    vt.restore();
+  }
   return vt.calls();
 }
 

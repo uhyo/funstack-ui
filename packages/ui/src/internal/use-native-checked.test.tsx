@@ -254,26 +254,24 @@ describe("useNativeChecked", () => {
       );
     }
 
-    it("never reports with group: true", async () => {
-      // Control first: without `group` the same flip and reset report `false` with the event.
-      for (const group of [false, true]) {
-        const onPlatformChange = vi.fn();
-        const { unmount } = render(
-          <Controlled onPlatformChange={onPlatformChange} group={group} />,
-        );
-        await act(async () => {
-          screen.getByRole("button", { name: "flip" }).click();
-        });
-        (screen.getByTestId("form") as HTMLFormElement).reset();
-        await flushMicrotasks();
-        if (group) {
-          expect(onPlatformChange).not.toHaveBeenCalled();
-        } else {
-          expect(onPlatformChange).toHaveBeenCalledTimes(1);
-          expect(onPlatformChange.mock.calls[0]![0]).toBe(false);
-          expect((onPlatformChange.mock.calls[0]![1] as Event).type).toBe("reset");
-        }
-        unmount();
+    // The first row is the positive control of the second: the same flip and reset.
+    it.each([
+      ["reports the reset without `group` (control)", false],
+      ["never reports with group: true", true],
+    ] as const)("%s", async (_title, group) => {
+      const onPlatformChange = vi.fn();
+      render(<Controlled onPlatformChange={onPlatformChange} group={group} />);
+      await act(async () => {
+        screen.getByRole("button", { name: "flip" }).click();
+      });
+      (screen.getByTestId("form") as HTMLFormElement).reset();
+      await flushMicrotasks();
+      if (group) {
+        expect(onPlatformChange).not.toHaveBeenCalled();
+      } else {
+        expect(onPlatformChange).toHaveBeenCalledTimes(1);
+        expect(onPlatformChange.mock.calls[0]![0]).toBe(false);
+        expect((onPlatformChange.mock.calls[0]![1] as Event).type).toBe("reset");
       }
     });
   });

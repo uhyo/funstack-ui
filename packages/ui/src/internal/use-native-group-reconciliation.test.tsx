@@ -11,7 +11,7 @@ import { StrictMode, Suspense, createContext, startTransition, use, useRef, useS
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
-  deferred,
+  hydrationGate,
   renderBoth,
   setupUser,
   flushMicrotasks,
@@ -213,7 +213,7 @@ describe("useNativeGroupReconciliation", () => {
       beforeRelease: (container: HTMLElement) => void,
       wrap: (ui: ReactNode) => ReactNode = (ui) => ui,
     ) {
-      const gate = deferred();
+      const gate = hydrationGate();
       const { container } = await hydrateFromServer(
         wrap(<Harness mode={mode} initial="s" action={action} late={fulfilledPromise()} />),
         { client: wrap(<Harness mode={mode} initial="s" action={action} late={gate.promise} />) },
@@ -225,7 +225,7 @@ describe("useNativeGroupReconciliation", () => {
       });
       return async () => {
         await act(async () => {
-          gate.resolve();
+          gate.open();
         });
         await flushMicrotasks();
       };

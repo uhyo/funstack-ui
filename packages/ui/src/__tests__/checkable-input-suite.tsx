@@ -12,6 +12,7 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import type { SwitchCheckedChangeDetails, SwitchProps, SwitchState } from "../switch/switch.js";
 import {
+  hydrationGate,
   createSuspender,
   deferred,
   sequencedDeferreds,
@@ -969,6 +970,46 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         expect(input().checked).toBe(true);
       });
 
+      // The base of a reset is the latest in-flight value (conventions 3.8 rule 1): a reset in the
+      // same task as an earlier one reads what that one dispatched, not the rendered value.
+      it("two synchronous form.reset() calls while actions are pending dispatch once", async () => {
+        const d = deferred();
+        const actions: [boolean, string][] = [];
+        render(
+          <Harness
+            mode={mode}
+            action={(next, details) => {
+              actions.push([next, details.reason]);
+              return d.promise;
+            }}
+            inForm
+          />,
+        );
+        await setupUser().click(input());
+        expectPending(input());
+        await act(async () => {
+          (screen.getByTestId("form") as HTMLFormElement).reset();
+          (screen.getByTestId("form") as HTMLFormElement).reset();
+        });
+        // A third one in a later task, still while both actions are pending.
+        await act(async () => {
+          (screen.getByTestId("form") as HTMLFormElement).reset();
+        });
+        expect(actions).toEqual([
+          [true, "activate"],
+          [false, "platform"],
+        ]);
+        expect(input().checked).toBe(false);
+        await act(async () => {
+          d.resolve();
+        });
+        await flushMicrotasks();
+        expect(actions).toHaveLength(2);
+        expectNotPending(input());
+        expect(input().checked).toBe(false);
+        expect(committed()).toHaveTextContent("false");
+      });
+
       it("a reset to the value the user already intends dispatches nothing", async () => {
         const action = vi.fn<ActionFn>();
         render(<Harness mode={mode} action={action} inForm initial />);
@@ -1210,7 +1251,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
             const action = vi.fn<ActionFn>();
             const wrap = (ui: ReactNode) => (strict ? <StrictMode>{ui}</StrictMode> : ui);
             const ready = fulfilledPromise();
-            const gate = deferred();
+            const gate = hydrationGate();
             const { container } = await hydrateFromServer(
               wrap(<Page gate={ready} action={action} />),
               { client: wrap(<Page gate={gate.promise} action={action} />) },
@@ -1223,7 +1264,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
             expect(action).not.toHaveBeenCalled();
 
             await act(async () => {
-              gate.resolve();
+              gate.open();
             });
             await flushMicrotasks();
             expect(action).toHaveBeenCalledTimes(1);
