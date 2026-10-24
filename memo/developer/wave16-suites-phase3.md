@@ -446,3 +446,86 @@ Mutations (reverted):
 1. select-option.tsx: every Option pending while the Root is: 19 rows fail (18 suite rows).
 2. select-root.tsx: types `fsui-selectx`: the 3 type rows fail.
 3. select-trigger.tsx: Trigger never pending: 18 suite rows fail.
+
+### Hydration gate helpers (commit 0a7c155)
+
+`fulfilledPromise()`, `hydrationGate()` (`{ promise, open() }`) and `Gate` in helpers.tsx replace
+the private copies in radio-group, checkbox-group and select (late-hydration sections), the
+reconciliation hook test and the checkable suite. Mutation: `open()` without marking the promise
+fulfilled (and a plain `Promise.resolve()` for the server): 27 late-hydration rows fail.
+
+### T3: native platform suite (commit 3h)
+
+`__tests__/native-group-platform-suite.tsx`, `describeNativeGroupPlatform(driver)`. The driver is
+the value-action driver plus `setDomValue(container, v)` (server HTML before hydration),
+`platformDetails(from, to)` (serialisable fields of a platform dispatch) and
+`expectResetTarget(v)` (`defaultChecked` / `defaultSelected`; CheckboxGroup also asserts the
+Parent keeps React's mount-time `defaultChecked`). `ValueHarness` gained `inForm` (form + Reset
+button), `refusePlatform` and `forHydration` (passed to `render`: the Select driver leaves out its
+Trigger, which jsdom's old parser drops inside a `<select>`).
+
+The CheckboxGroup driver's gestures were reordered (click a, click c, Parent) so values[2] = ["a"]
+differs from ["c"] by an addition and a removal: the hydration row with several pre-hydration
+clicks and the reset rows carry both (the old "a reset that both checks and unchecks" and
+"several pre-hydration clicks" rows). Its `pendingOn` / `pendingOff` now derive from the values.
+
+Rows (mount and form-reset sections in both modes):
+mount reconciliation: hydrated DOM value once (platform, no event, details JSON, DOM, committed,
+no console.error); once under StrictMode for several pre-hydration changes (values[2]); nothing
+when the DOM matches; a controlled parent that refuses gets the DOM back; createRoot never.
+form reset: `<button type=reset>` after two gestures (reset event, details JSON, DOM, not pending,
+committed); form.reset() with a pending platform action (Root pending, committed after resolve:
+new for CheckboxGroup and Select); cancelled; target = intended value; disabled group; two
+synchronous resets plus a third in a later task while pending (Select's old row reset in two
+tasks, Radio's and CheckboxGroup's in one: both now).
+controlled parent refusing the reset; reset target: uncontrolled latest defaultValue after a
+gesture and untouched (Select's old row was the untouched, non-dirty case; Radio and
+CheckboxGroup had the gesture case: both now for all three), controlled mount-time value
+(sync setValue in the action as the old Radio / CheckboxGroup rows; reset target asserted before
+and after the gestures as the old Select row; the parent's value checked after the reset);
+React's automatic reset: one dispatch and in sync afterwards, and without a valueChangeAction.
+
+Removed title -> suite row (`<Name>.Root: native platform conformance …`):
+- RadioGroup: hydration (both) dispatches the hydrated DOM value once … / dispatches once under
+  StrictMode -> same / "… for several pre-hydration changes"; "dispatches from an empty server
+  render too, and nothing when the DOM matches" -> split: the empty-server part stays local
+  ("dispatches from an empty server render too", now also asserting reason platform), the
+  matching part -> "dispatches nothing when the DOM matches"; a refused (or rejected-and-caught)
+  dispatch rolls the DOM back -> a controlled parent that refuses gets the DOM back on its value;
+  createRoot never dispatches -> same; form reset (both) button / cancelled / optimistic value /
+  disabled -> same rows ("… target is the intended value"); a parent that refuses gets the DOM
+  re-synced to its radio -> "… to its value"; reset target uncontrolled latest default ->
+  "(after a gesture)" + "(untouched)"; controlled mount-time value -> same; automatic reset
+  "returns to the default (a value)" -> "returns to the default with one dispatch, in sync
+  afterwards". Kept local: also to null, the null base-comparison row, defaultValue null, the
+  automatic reset to null (now a plain `it`, same title) and "works without a valueChangeAction"
+  (null default), late hydration rows.
+- CheckboxGroup: the three hydration rows, refuses, createRoot, button reset, "a reset that both
+  checks and unchecks carries added and removed" (-> the button row: from ["a"] back to ["c"],
+  added and removed, Parent state through `expectShown`), cancelled, set-equals (-> intended
+  value; `equals` still guarded: mutation 3 below), disabled, base comparison and equals (-> two
+  synchronous resets), refusing parent, uncontrolled latest default, controlled mount-time values,
+  automatic reset "also without a valueChangeAction" (-> two rows). Kept local: value with no
+  Item (mount and reset), the pre-hydration Parent click section, late parts, the stale Parent
+  reset target.
+- Select: the three hydration rows, refused, createRoot, button reset, cancelled, optimistic
+  value, "a disabled Select still follows the reset" (-> "a disabled group …"), "two synchronous
+  form.reset() calls while one is pending dispatch once (base rule)", refusing parent, reset target
+  (design 6.1) "uncontrolled: follows the latest defaultValue, without moving the current
+  selection" (-> "(untouched)") and "controlled client render: defaultSelected on the mount-time
+  option; reset returns to it" (-> controlled mount-time value). Kept local: no option matching,
+  the "without value or defaultValue" block, placeholder reset and automatic reset rows, an Option
+  added later, late options.
+jsdom titles: 3096 -> 3111 (-67, +82; the CheckboxGroup transition-type rows 1 and 2 swapped
+types with the gesture order).
+
+Mutations (reverted):
+1. use-native-group-reconciliation.ts: no mount reconciliation: 15 suite rows fail (5 per
+   component: the hydration rows and the refusing parent).
+2. reset dispatched without its event: 18 suite rows (button, reset targets, automatic reset).
+3. `equals` ignored (Object.is): 22 CheckboxGroup suite rows fail (all reset and mount rows).
+4. use-form-reset.ts ignores `defaultPrevented`: the 6 cancelled-reset rows fail.
+5. checkbox-group-root.tsx `base()` = optimistic only (ignores the in-flight value): the two
+   synchronous-reset rows and the StrictMode several-changes rows fail.
+CheckboxGroup value-action mutations re-run after the reorder: item pending 22 (18 suite), types
+swapped 4, Parent never pending 21 (18 suite).

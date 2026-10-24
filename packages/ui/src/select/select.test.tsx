@@ -38,6 +38,7 @@ import {
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { selectDriver, takeSelectedContentWarning } from "../__tests__/drivers/select.js";
+import { describeNativeGroupPlatform } from "../__tests__/native-group-platform-suite.js";
 import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
@@ -176,6 +177,7 @@ beforeAll(takeSelectedContentWarning);
 // driver __tests__/drivers/select.tsx; the transition types are in
 // select-transition-types.test.tsx.
 describeValueAction(selectDriver);
+describeNativeGroupPlatform(selectDriver);
 
 describe("Select", () => {
   describe("roles and ARIA", () => {
@@ -557,62 +559,6 @@ describe("Select", () => {
       c.querySelector("select")!.value = "c";
     };
 
-    renderBoth("hydration", (mode) => {
-      it("dispatches the hydrated DOM value once with reason platform and no event", async () => {
-        const consoleError = silenceErrors();
-        const action = vi.fn<ActionFn>();
-        await hydrate(<Harness mode={mode} action={action} trigger={false} />, pickC);
-        expect(action).toHaveBeenCalledTimes(1);
-        const [next, details] = action.mock.calls[0]!;
-        expect(next).toBe("c");
-        expect(details.reason).toBe("platform");
-        expect(details.event).toBeUndefined();
-        expect(JSON.stringify(details)).toBe('{"reason":"platform"}');
-        expect(sel().value).toBe("c");
-        expect(dataSelected()).toEqual(["c"]);
-        expect(committed()).toHaveTextContent("c");
-        expect(consoleError).not.toHaveBeenCalled();
-      });
-
-      it("dispatches once under StrictMode", async () => {
-        const action = vi.fn<ActionFn>();
-        await hydrate(
-          <StrictMode>
-            <Harness mode={mode} action={action} trigger={false} />
-          </StrictMode>,
-          pickC,
-        );
-        expect(action).toHaveBeenCalledTimes(1);
-        expect(action.mock.calls[0]?.[0]).toBe("c");
-        expect(sel().value).toBe("c");
-      });
-
-      it("dispatches nothing when the DOM matches", async () => {
-        const action = vi.fn<ActionFn>();
-        await hydrate(
-          <Harness mode={mode} initial="b" action={action} trigger={false} />,
-          () => {},
-        );
-        expect(action).not.toHaveBeenCalled();
-        expect(sel().value).toBe("b");
-      });
-    });
-
-    it("a refused dispatch rolls the DOM back to the server value", async () => {
-      const action = vi.fn<ActionFn>();
-      await hydrate(
-        <Select.Root aria-label="Fruit" value="a" valueChangeAction={action}>
-          <Select.Option value="a">A</Select.Option>
-          <Select.Option value="b">B</Select.Option>
-          <Select.Option value="c">C</Select.Option>
-        </Select.Root>,
-        pickC,
-      );
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(sel().value).toBe("a");
-      expect(dataSelected()).toEqual(["a"]);
-    });
-
     it("no dispatch when the value matches no option (fallback-only DOM)", async () => {
       const action = vi.fn<ActionFn>();
       await hydrate(
@@ -625,18 +571,6 @@ describe("Select", () => {
         },
       );
       expect(action).not.toHaveBeenCalled();
-    });
-
-    it("createRoot never dispatches on mount", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <StrictMode>
-          <Harness mode="uncontrolled" initial="b" action={action} />
-        </StrictMode>,
-      );
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-      expect(sel().value).toBe("b");
     });
 
     describe("without value or defaultValue (the browser's default, design 5)", () => {
@@ -844,23 +778,6 @@ describe("Select", () => {
   });
 
   renderBoth("platform: form reset", (mode) => {
-    it("<button type=reset> dispatches once with the reset event and commits", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "c");
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe("a");
-      expect(details.reason).toBe("platform");
-      expect(details.event?.type).toBe("reset");
-      expect(sel().value).toBe("a");
-      expect(dataSelected()).toEqual(["a"]);
-      expect(committed()).toHaveTextContent("a");
-    });
-
     it("form.reset() dispatches once, also to the placeholder", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} inForm initial="" options={["", "a", "b"]} />);
@@ -877,152 +794,9 @@ describe("Select", () => {
       expect(sel().value).toBe("");
       expect(committed()).toHaveTextContent("");
     });
-
-    it("a cancelled reset dispatches nothing and leaves the DOM", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      form().addEventListener("reset", (e) => e.preventDefault());
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(sel().value).toBe("b");
-    });
-
-    it("a reset whose target is the optimistic value dispatches nothing", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm />);
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-      expect(sel().value).toBe("a");
-    });
-
-    it("a disabled Select still follows the reset", async () => {
-      const action = vi.fn<ActionFn>();
-      function Toggleable() {
-        const [disabled, setDisabled] = useState(false);
-        return (
-          <>
-            <Harness mode={mode} action={action} inForm disabled={disabled} />
-            <button type="button" onClick={() => setDisabled(true)}>
-              disable
-            </button>
-          </>
-        );
-      }
-      render(<Toggleable />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await user.click(screen.getByRole("button", { name: "disable" }));
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n]) => n)).toEqual(["b", "a"]);
-      expect(sel().value).toBe("a");
-    });
-
-    it("two synchronous form.reset() calls while one is pending dispatch once (base rule)", async () => {
-      const d = deferred();
-      const action = vi.fn<ActionFn>((_n, details) =>
-        details.reason === "platform" ? d.promise : undefined,
-      );
-      render(<Harness mode={mode} action={action} inForm />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await act(async () => {
-        form().reset();
-      });
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n]) => n)).toEqual(["b", "a"]);
-      await act(async () => {
-        d.resolve();
-      });
-      expect(sel().value).toBe("a");
-    });
-  });
-
-  describe("platform: form reset, controlled parent decides", () => {
-    it("a parent that refuses gets the DOM re-synced to its option after settle", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" action={action} inForm refusePlatform />);
-      const user = setupUser();
-      await user.selectOptions(sel(), "b");
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
-        ["b", "activate"],
-        ["a", "platform"],
-      ]);
-      expect(sel().value).toBe("b");
-      expect(dataSelected()).toEqual(["b"]);
-    });
   });
 
   describe("reset target (design 6.1)", () => {
-    it("uncontrolled: follows the latest defaultValue, without moving the current selection", async () => {
-      const action = vi.fn<ActionFn>();
-      function Parent() {
-        const [def, setDef] = useState("a");
-        return (
-          <form data-testid="form">
-            <Select.Root aria-label="Fruit" defaultValue={def} valueChangeAction={action}>
-              <Select.Option value="a">A</Select.Option>
-              <Select.Option value="b">B</Select.Option>
-              <Select.Option value="c">C</Select.Option>
-            </Select.Root>
-            <button type="button" onClick={() => startTransition(() => setDef("c"))}>
-              default c
-            </button>
-          </form>
-        );
-      }
-      render(<Parent />);
-      expect(defaultSelected()).toEqual(["a"]);
-      const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "default c" }));
-      // "c" is non-dirty: its new defaultSelected would select it; the re-apply keeps "a".
-      expect(defaultSelected()).toEqual(["c"]);
-      expect(sel().value).toBe("a");
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(sel().value).toBe("c");
-      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["c", "platform"]]);
-    });
-
-    it("controlled client render: defaultSelected on the mount-time option; reset returns to it", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" initial="b" action={action} inForm />);
-      // react-dom alone writes no defaultSelected for a controlled select.
-      expect(defaultSelected()).toEqual(["b"]);
-      const user = setupUser();
-      await user.selectOptions(sel(), "c");
-      expect(defaultSelected()).toEqual(["b"]);
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
-        ["c", "activate"],
-        ["b", "platform"],
-      ]);
-      expect(sel().value).toBe("b");
-      expect(committed()).toHaveTextContent("b");
-    });
-
     it("an Option added later never gains defaultSelected", async () => {
       function Parent() {
         const [extra, setExtra] = useState(false);

@@ -1,12 +1,13 @@
-// RadioGroup as seen by the value-action suite (value-action-suite.tsx): radios a, b, c starting
-// on "a"; the gestures click b, c, a. The checked radio (DOM `checked` and `data-checked`) is
+// RadioGroup as seen by the value-action suite (value-action-suite.tsx) and the native platform
+// suite (native-group-platform-suite.tsx): radios a, b, c starting on "a"; the gestures click b,
+// c, a. The checked radio (DOM `checked` and `data-checked`) is
 // optimistic; only the optimistic Item is pending, with the Root.
 import { screen } from "@testing-library/react";
 import { expect } from "vitest";
 import { RadioGroup } from "../../radio-group/index.js";
 import type { RadioGroupValueChangeDetails } from "../../radio-group/index.js";
+import type { NativeGroupPlatformDriver } from "../native-group-platform-suite.js";
 import { definedProps } from "../value-action-suite.js";
-import type { ValueActionDriver } from "../value-action-suite.js";
 
 const ITEMS = ["a", "b", "c"] as const;
 const radio = (v: string) => screen.getByRole("radio", { name: v }) as HTMLInputElement;
@@ -20,7 +21,10 @@ const dataChecked = () =>
     .filter((r) => r.hasAttribute("data-checked"))
     .map((r) => r.value);
 
-export const radioGroupDriver: ValueActionDriver<string | null, RadioGroupValueChangeDetails> = {
+export const radioGroupDriver: NativeGroupPlatformDriver<
+  string | null,
+  RadioGroupValueChangeDetails
+> = {
   name: "RadioGroup.Root",
   render: ({ value, defaultValue, changeAction, transition, extra }) => (
     <RadioGroup.Root
@@ -49,4 +53,13 @@ export const radioGroupDriver: ValueActionDriver<string | null, RadioGroupValueC
   props: { value: "value", defaultValue: "defaultValue" },
   format: String,
   transitionTypes: [["fsui-radio-group"], ["fsui-radio-group"], ["fsui-radio-group"]],
+  setDomValue: (container, v) => {
+    for (const r of container.querySelectorAll<HTMLInputElement>('input[type="radio"]')) {
+      r.checked = r.value === v;
+    }
+  },
+  platformDetails: () => ({ reason: "platform" }),
+  expectResetTarget: (v) => {
+    for (const x of ITEMS) expect(radio(x).defaultChecked).toBe(x === v);
+  },
 };

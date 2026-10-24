@@ -1,14 +1,17 @@
-// CheckboxGroup as seen by the value-action suite (value-action-suite.tsx): a Label, a Parent
-// ("all") over Items a, b, c, starting from ["c"]; the gestures click a (inserted before c: `next`
-// is in document order), click the mixed Parent (checks all, adds b) and click c. The "update on
-// success" parent patches its value with `details.added` / `removed` (design 2.6). Item and Parent
-// state (DOM `checked`, `data-checked`, the Parent's mixed state) is optimistic.
+// CheckboxGroup as seen by the value-action suite (value-action-suite.tsx) and the native platform
+// suite (native-group-platform-suite.tsx): a Label, a Parent ("all") over Items a, b, c, starting
+// from ["c"]; the gestures click a (inserted before c: `next` is in document order), click c
+// (uncheck) and click the mixed Parent (checks all: adds b and c). values[2] differs from
+// values[0] by an added and a removed value, so the platform rows that go there (several
+// pre-hydration clicks, a reset) carry both. The "update on success" parent patches its value with
+// `details.added` / `removed` (design 2.6). Item and Parent state (DOM `checked`, `data-checked`,
+// the Parent's mixed state) is optimistic.
 import { screen } from "@testing-library/react";
 import { expect } from "vitest";
 import { CheckboxGroup } from "../../checkbox-group/index.js";
 import type { CheckboxGroupValueChangeDetails } from "../../checkbox-group/index.js";
+import type { NativeGroupPlatformDriver } from "../native-group-platform-suite.js";
 import { definedProps } from "../value-action-suite.js";
-import type { ValueActionDriver } from "../value-action-suite.js";
 
 const ITEMS = ["a", "b", "c"] as const;
 const box = (name: string) => screen.getByRole("checkbox", { name }) as HTMLInputElement;
@@ -38,7 +41,16 @@ function parentShows(): string {
   return el.checked ? "checked" : el.indeterminate ? "mixed" : "unchecked";
 }
 
-export const checkboxGroupDriver: ValueActionDriver<string[], CheckboxGroupValueChangeDetails> = {
+/** The added and removed values from `from` to `to`, in document order. */
+const diff = (from: readonly string[], to: readonly string[]) => ({
+  added: ITEMS.filter((x) => to.includes(x) && !from.includes(x)),
+  removed: ITEMS.filter((x) => from.includes(x) && !to.includes(x)),
+});
+
+export const checkboxGroupDriver: NativeGroupPlatformDriver<
+  string[],
+  CheckboxGroupValueChangeDetails
+> = {
   name: "CheckboxGroup.Root",
   render: ({ value, defaultValue, changeAction, transition, extra }) => (
     <CheckboxGroup.Root
@@ -56,14 +68,14 @@ export const checkboxGroupDriver: ValueActionDriver<string[], CheckboxGroupValue
       ))}
     </CheckboxGroup.Root>
   ),
-  values: [["c"], ["a", "c"], ["a", "b", "c"], ["a", "b"]],
-  gesture: (user, i) => user.click(i === 1 ? parentBox() : box(ITEMS[i]!)),
+  values: [["c"], ["a", "c"], ["a"], ["a", "b", "c"]],
+  gesture: (user, i) => user.click(i === 2 ? parentBox() : box(["a", "c"][i]!)),
   eventType: () => "click",
   detailsFields: (i) =>
     [
       { reason: "activate", added: ["a"], removed: [] },
-      { reason: "activate", added: ["b"], removed: [] },
       { reason: "activate", added: [], removed: ["c"] },
+      { reason: "activate", added: ["b", "c"], removed: [] },
     ][i]!,
   expectShown: (v) => {
     expect(checkedValues()).toEqual(v);
@@ -77,10 +89,19 @@ export const checkboxGroupDriver: ValueActionDriver<string[], CheckboxGroupValue
     return `${checkedValues().join(",")}/${parent}`;
   },
   shown: (v) => `${v.join(",")}/${parentOf(v)}`,
-  // Gesture i changes Item ITEMS[i]; an Item is pending while its own box differs from the
-  // committed value, the Parent while any of its values does, the Root while any action runs.
-  pendingOn: (i) => [screen.getByRole("group"), parentBox(), ...ITEMS.slice(0, i + 1).map(box)],
-  pendingOff: (i) => ITEMS.slice(i + 1).map(box),
+  // While gestures 0..i are in flight (nothing committed yet), an Item is pending when its box
+  // differs from values[0], the Parent when any of its values does, the Root while any action
+  // runs.
+  pendingOn: (i) => {
+    const { values } = checkboxGroupDriver;
+    const { added, removed } = diff(values[0], values[i + 1]!);
+    return [screen.getByRole("group"), parentBox(), ...[...added, ...removed].map(box)];
+  },
+  pendingOff: (i) => {
+    const { values } = checkboxGroupDriver;
+    const { added, removed } = diff(values[0], values[i + 1]!);
+    return ITEMS.filter((x) => !added.includes(x) && !removed.includes(x)).map(box);
+  },
   queryControl: () => screen.queryByRole("group"),
   props: { value: "value", defaultValue: "defaultValue" },
   commit: (prev, _next, details) => [
@@ -91,7 +112,20 @@ export const checkboxGroupDriver: ValueActionDriver<string[], CheckboxGroupValue
   format: (v) => [...v].sort().join(","),
   transitionTypes: [
     ["fsui-checkbox-group", "fsui-checkbox-group-check"],
-    ["fsui-checkbox-group", "fsui-checkbox-group-check"],
     ["fsui-checkbox-group", "fsui-checkbox-group-uncheck"],
+    ["fsui-checkbox-group", "fsui-checkbox-group-check"],
   ],
+  setDomValue: (container, v) => {
+    for (const x of ITEMS) {
+      container.querySelector<HTMLInputElement>(`input[name][value="${x}"]`)!.checked =
+        v.includes(x);
+    }
+  },
+  platformDetails: (from, to) => ({ reason: "platform", ...diff(from, to) }),
+  // The Parent is not part of the reset target: it keeps the defaultChecked React gave it at
+  // mount, from its derivation over values[0] (mixed: unchecked).
+  expectResetTarget: (v) => {
+    for (const x of ITEMS) expect(box(x).defaultChecked).toBe(v.includes(x));
+    expect(parentBox().defaultChecked).toBe(false);
+  },
 };

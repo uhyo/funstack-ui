@@ -31,6 +31,7 @@ import {
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { checkboxGroupDriver } from "../__tests__/drivers/checkbox-group.js";
+import { describeNativeGroupPlatform } from "../__tests__/native-group-platform-suite.js";
 import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
@@ -192,6 +193,7 @@ function parentShows(el: HTMLInputElement = parentBox()): string {
 // __tests__/value-action-suite.tsx with the driver __tests__/drivers/checkbox-group.tsx (a Parent
 // and three Items); the transition types are in checkbox-group-transition-types.test.tsx.
 describeValueAction(checkboxGroupDriver);
+describeNativeGroupPlatform(checkboxGroupDriver);
 
 describe("CheckboxGroup", () => {
   describe("roles and ARIA", () => {
@@ -1376,90 +1378,15 @@ describe("CheckboxGroup", () => {
   });
 
   describe("platform: mount reconciliation", () => {
-    const hydrate = (ui: ReactNode, mutate: (container: HTMLElement) => void) =>
-      hydrateFromServer(ui, { mutate });
-    const setChecked =
-      (value: string, checked = true) =>
-      (c: HTMLElement) => {
-        (c.querySelector(`input[value="${value}"]`) as HTMLInputElement).checked = checked;
-      };
-
-    renderBoth("hydration", (mode) => {
-      it("dispatches the hydrated DOM value once with reason platform and no event", async () => {
-        const consoleError = silenceErrors();
-        const action = vi.fn<ActionFn>();
-        await hydrate(<Harness mode={mode} initial={["a"]} action={action} />, setChecked("c"));
-        expect(action).toHaveBeenCalledTimes(1);
-        const [next, details] = action.mock.calls[0]!;
-        expect(next).toEqual(["a", "c"]);
-        expect(details.event).toBeUndefined();
-        expect(JSON.stringify(details)).toBe('{"reason":"platform","added":["c"],"removed":[]}');
-        expect(checkedValues()).toEqual(["a", "c"]);
-        expect(dataChecked()).toEqual(["a", "c"]);
-        expect(committedText()).toBe("a,c");
-        expect(consoleError).not.toHaveBeenCalled();
-      });
-
-      it("dispatches once under StrictMode, for several pre-hydration clicks", async () => {
-        const action = vi.fn<ActionFn>();
-        await hydrate(
-          <StrictMode>
-            <Harness mode={mode} initial={["a"]} action={action} />
-          </StrictMode>,
-          (c) => {
-            setChecked("c")(c);
-            setChecked("a", false)(c);
-          },
-        );
-        expect(calls(action)).toEqual([[["c"], "platform", ["c"], ["a"]]]);
-        expect(checkedValues()).toEqual(["c"]);
-      });
-
-      it("nothing when the DOM matches", async () => {
-        const action = vi.fn<ActionFn>();
-        await hydrate(<Harness mode={mode} initial={["b"]} action={action} />, () => {});
-        expect(action).not.toHaveBeenCalled();
-        expect(checkedValues()).toEqual(["b"]);
-      });
-    });
-
-    it("a controlled parent that refuses gets the DOM back on its value after settle", async () => {
-      const action = vi.fn<ActionFn>();
-      await hydrate(
-        <CheckboxGroup.Root aria-label="T" value={["a"]} valueChangeAction={action}>
-          <CheckboxGroup.Item value="a" aria-label="a" />
-          <CheckboxGroup.Item value="b" aria-label="b" />
-          <CheckboxGroup.Item value="c" aria-label="c" />
-        </CheckboxGroup.Root>,
-        setChecked("c"),
-      );
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(checkedValues()).toEqual(["a"]);
-      expect(dataChecked()).toEqual(["a"]);
-    });
-
     it("a controlled value with no Item is not removed by the mount read", async () => {
       const action = vi.fn<ActionFn>();
-      await hydrate(
+      await hydrateFromServer(
         <CheckboxGroup.Root aria-label="T" value={["ghost", "a"]} valueChangeAction={action}>
           <CheckboxGroup.Item value="a" aria-label="a" />
           <CheckboxGroup.Item value="b" aria-label="b" />
         </CheckboxGroup.Root>,
-        () => {},
       );
       expect(action).not.toHaveBeenCalled();
-    });
-
-    it("createRoot never dispatches on mount", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <StrictMode>
-          <Harness mode="uncontrolled" initial={["b"]} action={action} parent={["a", "b"]} />
-        </StrictMode>,
-      );
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-      expect(checkedValues()).toEqual(["b"]);
     });
   });
 
@@ -1755,191 +1682,7 @@ describe("CheckboxGroup", () => {
     });
   });
 
-  renderBoth("platform: form reset", (mode) => {
-    it("<button type=reset> dispatches once with the reset event and commits", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm />);
-      const user = setupUser();
-      await user.click(box("b"));
-      await user.click(box("c"));
-      expect(committedText()).toBe("a,b,c");
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(3);
-      const [next, details] = action.mock.calls[2]!;
-      expect(next).toEqual(["a"]);
-      expect(details.reason).toBe("platform");
-      expect(details.event?.type).toBe("reset");
-      expect(details.added).toEqual([]);
-      expect(details.removed).toEqual(["b", "c"]);
-      expect(checkedValues()).toEqual(["a"]);
-      expect(dataChecked()).toEqual(["a"]);
-      expect(committedText()).toBe("a");
-    });
-
-    it("a reset that both checks and unchecks carries added and removed", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm parent={["a", "b", "c"]} />);
-      const user = setupUser();
-      await user.click(box("a"));
-      await user.click(box("b"));
-      expect(checkedValues()).toEqual(["b"]);
-      await act(async () => {
-        form().reset();
-      });
-      expect(calls(action).at(-1)).toEqual([["a"], "platform", ["a"], ["b"]]);
-      expect(checkedValues()).toEqual(["a"]);
-      expect(parentShows()).toBe("mixed");
-    });
-
-    it("a cancelled reset dispatches nothing and leaves the DOM", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm />);
-      const user = setupUser();
-      await user.click(box("b"));
-      form().addEventListener("reset", (e) => e.preventDefault());
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(checkedValues()).toEqual(["a", "b"]);
-    });
-
-    it("a reset whose target set-equals the optimistic set dispatches nothing", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm initial={["b", "c"]} />);
-      const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-      expect(checkedValues()).toEqual(["b", "c"]);
-    });
-
-    it("a disabled group still follows the reset", async () => {
-      const action = vi.fn<ActionFn>();
-      function Toggleable() {
-        const [disabled, setDisabled] = useState(false);
-        return (
-          <>
-            <Harness mode={mode} action={action} inForm disabled={disabled} />
-            <button type="button" onClick={() => setDisabled(true)}>
-              disable
-            </button>
-          </>
-        );
-      }
-      render(<Toggleable />);
-      const user = setupUser();
-      await user.click(box("b"));
-      await user.click(screen.getByRole("button", { name: "disable" }));
-      expect(group()).toBeDisabled();
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(calls(action)).toEqual([
-        [["a", "b"], "activate", ["b"], []],
-        [["a"], "platform", [], ["b"]],
-      ]);
-      expect(checkedValues()).toEqual(["a"]);
-      expect(committedText()).toBe("a");
-    });
-  });
-
-  renderBoth("platform: base comparison and equals", (mode) => {
-    // Guards the explicit null check in `base()` and the `equals` option: with `Object.is` every
-    // reset read (a new Set) would differ from the base and dispatch.
-    it("two synchronous form.reset() calls while a reset is pending dispatch once", async () => {
-      const d = deferred();
-      const actions: [string[], string][] = [];
-      render(
-        <Harness
-          mode={mode}
-          initial={[]}
-          inForm
-          action={(next, details) => {
-            actions.push([next, details.reason]);
-            return d.promise;
-          }}
-        />,
-      );
-      const user = setupUser();
-      await user.click(box("c"));
-      await act(async () => {
-        form().reset();
-        form().reset();
-      });
-      expect(actions).toEqual([
-        [["c"], "activate"],
-        [[], "platform"],
-      ]);
-      expect(checkedValues()).toEqual([]);
-      await act(async () => {
-        d.resolve();
-      });
-      await flushMicrotasks();
-      expect(actions).toHaveLength(2);
-      expect(checkedValues()).toEqual([]);
-      expect(committedText()).toBe("");
-    });
-  });
-
-  describe("platform: form reset, controlled parent decides", () => {
-    it("a parent that refuses gets the DOM re-synced to its value after settle", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" action={action} inForm refusePlatform />);
-      const user = setupUser();
-      await user.click(box("b"));
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(calls(action)).toEqual([
-        [["a", "b"], "activate", ["b"], []],
-        [["a"], "platform", [], ["b"]],
-      ]);
-      expect(checkedValues()).toEqual(["a", "b"]);
-      expect(dataChecked()).toEqual(["a", "b"]);
-      expect(committedText()).toBe("a,b");
-    });
-  });
-
   describe("platform: reset target by mode", () => {
-    it("uncontrolled: the reset returns to the latest defaultValue", async () => {
-      const action = vi.fn<ActionFn>();
-      function Parent() {
-        const [def, setDef] = useState(["a"]);
-        return (
-          <form data-testid="form">
-            <CheckboxGroup.Root aria-label="T" defaultValue={def} valueChangeAction={action}>
-              <CheckboxGroup.Parent values={["a", "b", "c"]} aria-label="all" />
-              <CheckboxGroup.Item value="a" aria-label="a" />
-              <CheckboxGroup.Item value="b" aria-label="b" />
-              <CheckboxGroup.Item value="c" aria-label="c" />
-            </CheckboxGroup.Root>
-            <button type="button" onClick={() => startTransition(() => setDef(["b", "c"]))}>
-              new default
-            </button>
-          </form>
-        );
-      }
-      render(<Parent />);
-      const user = setupUser();
-      await user.click(box("b"));
-      await user.click(screen.getByRole("button", { name: "new default" }));
-      expect(box("a").defaultChecked).toBe(false);
-      expect(box("b").defaultChecked).toBe(true);
-      expect(box("c").defaultChecked).toBe(true);
-      expect(parentBox().defaultChecked).toBe(false);
-      expect(checkedValues()).toEqual(["a", "b"]);
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(calls(action)).toEqual([
-        [["a", "b"], "activate", ["b"], []],
-        [["b", "c"], "platform", ["c"], ["a"]],
-      ]);
-      expect(checkedValues()).toEqual(["b", "c"]);
-    });
-
     it("uncontrolled: a value with no Item returns to defaultValue too", async () => {
       const action = vi.fn<ActionFn>();
       render(
@@ -1994,88 +1737,6 @@ describe("CheckboxGroup", () => {
       // The Items reset to the value the group already has: no dispatch, no re-render.
       expect(action).not.toHaveBeenCalled();
       expect(parentShows()).toBe("unchecked");
-    });
-
-    it("controlled: the reset returns to the mount-time values and the parent is notified", async () => {
-      const action = vi.fn<ActionFn>();
-      function Parent() {
-        const [value, setValue] = useState(["a"]);
-        return (
-          <form data-testid="form">
-            <CheckboxGroup.Root
-              aria-label="T"
-              value={value}
-              valueChangeAction={(next, details) => {
-                action(next, details);
-                setValue(next);
-              }}
-            >
-              <CheckboxGroup.Item value="a" aria-label="a" />
-              <CheckboxGroup.Item value="b" aria-label="b" />
-            </CheckboxGroup.Root>
-          </form>
-        );
-      }
-      render(<Parent />);
-      const user = setupUser();
-      await user.click(box("b"));
-      await user.click(box("a"));
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
-        [["a", "b"], "activate", "click"],
-        [["b"], "activate", "click"],
-        [["a"], "platform", "reset"],
-      ]);
-      expect(checkedValues()).toEqual(["a"]);
-    });
-  });
-
-  describe("platform: React's automatic reset after a form action", () => {
-    it("returns to the default with one dispatch, also without a valueChangeAction", async () => {
-      for (const withAction of [true, false]) {
-        const d = deferred();
-        const action = vi.fn<ActionFn>();
-        const { unmount } = render(
-          <form
-            action={async () => {
-              await d.promise;
-            }}
-          >
-            <CheckboxGroup.Root
-              aria-label="T"
-              name="t"
-              defaultValue={["a"]}
-              {...(withAction && { valueChangeAction: action })}
-            >
-              <CheckboxGroup.Item value="a" aria-label="a" />
-              <CheckboxGroup.Item value="b" aria-label="b" />
-            </CheckboxGroup.Root>
-            <button type="submit">Save</button>
-          </form>,
-        );
-        const user = setupUser();
-        await user.click(box("b"));
-        await user.click(screen.getByRole("button", { name: "Save" }));
-        await act(async () => {
-          d.resolve();
-        });
-        await flushMicrotasks();
-        if (withAction) {
-          expect(calls(action)).toEqual([
-            [["a", "b"], "activate", ["b"], []],
-            [["a"], "platform", [], ["b"]],
-          ]);
-        }
-        expect(checkedValues()).toEqual(["a"]);
-        expect(dataChecked()).toEqual(["a"]);
-        // Still in sync: the next click checks again.
-        await user.click(box("b"));
-        expect(checkedValues()).toEqual(["a", "b"]);
-        unmount();
-      }
     });
   });
 

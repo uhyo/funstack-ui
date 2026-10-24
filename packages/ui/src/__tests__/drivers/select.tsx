@@ -1,5 +1,6 @@
-// Select as seen by the value-action suite (value-action-suite.tsx): a Trigger with a Value and
-// options a, b, c starting on "a"; the gestures pick b, c, a with `user.selectOptions` (jsdom has
+// Select as seen by the value-action suite (value-action-suite.tsx) and the native platform suite
+// (native-group-platform-suite.tsx): a Trigger with a Value (left out for hydration: jsdom's old
+// parser drops a `<button>` inside a `<select>`) and options a, b, c starting on "a"; the gestures pick b, c, a with `user.selectOptions` (jsdom has
 // no picker: it sets the value and fires `input` + `change`). The selected option (DOM value,
 // `selected`, `data-selected`) is optimistic; the select, the Trigger and the optimistic Option
 // are pending. No part takes `transition` (design decision 13).
@@ -8,8 +9,8 @@ import { expect } from "vitest";
 import { Select } from "../../select/index.js";
 import type { SelectValueChangeDetails } from "../../select/index.js";
 import { silenceErrors } from "../helpers.js";
+import type { NativeGroupPlatformDriver } from "../native-group-platform-suite.js";
 import { definedProps } from "../value-action-suite.js";
-import type { ValueActionDriver } from "../value-action-suite.js";
 
 const OPTIONS = ["a", "b", "c"] as const;
 const sel = () => screen.getByRole("combobox") as HTMLSelectElement;
@@ -40,17 +41,19 @@ export function takeSelectedContentWarning(): void {
   error.mockRestore();
 }
 
-export const selectDriver: ValueActionDriver<string, SelectValueChangeDetails> = {
+export const selectDriver: NativeGroupPlatformDriver<string, SelectValueChangeDetails> = {
   name: "Select.Root",
-  render: ({ value, defaultValue, changeAction, extra }) => (
+  render: ({ value, defaultValue, changeAction, extra, forHydration }) => (
     <Select.Root
       aria-label="Fruit"
       {...definedProps({ value, defaultValue, valueChangeAction: changeAction })}
       {...extra}
     >
-      <Select.Trigger data-testid="trigger">
-        <Select.Value />
-      </Select.Trigger>
+      {!forHydration && (
+        <Select.Trigger data-testid="trigger">
+          <Select.Value />
+        </Select.Trigger>
+      )}
       {OPTIONS.map((v) => (
         <Select.Option key={v} value={v}>
           {v.toUpperCase()}
@@ -76,4 +79,11 @@ export const selectDriver: ValueActionDriver<string, SelectValueChangeDetails> =
   props: { value: "value", defaultValue: "defaultValue" },
   format: String,
   transitionTypes: [["fsui-select"], ["fsui-select"], ["fsui-select"]],
+  setDomValue: (container, v) => {
+    container.querySelector("select")!.value = v;
+  },
+  platformDetails: () => ({ reason: "platform" }),
+  expectResetTarget: (v) => {
+    expect([...sel().options].filter((o) => o.defaultSelected).map((o) => o.value)).toEqual([v]);
+  },
 };

@@ -31,6 +31,7 @@ import {
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { radioGroupDriver } from "../__tests__/drivers/radio-group.js";
+import { describeNativeGroupPlatform } from "../__tests__/native-group-platform-suite.js";
 import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
@@ -162,6 +163,7 @@ const form = () => screen.getByTestId("form") as HTMLFormElement;
 // __tests__/value-action-suite.tsx with the driver __tests__/drivers/radio-group.tsx; the
 // transition types are in radio-group-transition-types.test.tsx.
 describeValueAction(radioGroupDriver);
+describeNativeGroupPlatform(radioGroupDriver);
 
 describe("RadioGroup", () => {
   describe("roles and ARIA", () => {
@@ -614,73 +616,12 @@ describe("RadioGroup", () => {
     };
 
     renderBoth("hydration", (mode) => {
-      it("dispatches the hydrated DOM value once with reason platform and no event", async () => {
-        const consoleError = silenceErrors();
-        const action = vi.fn<ActionFn>();
-        await hydrate(<Harness mode={mode} initial="a" action={action} />, checkC);
-        expect(action).toHaveBeenCalledTimes(1);
-        const [next, details] = action.mock.calls[0]!;
-        expect(next).toBe("c");
-        expect(details.reason).toBe("platform");
-        expect(details.event).toBeUndefined();
-        expect(JSON.stringify(details)).toBe('{"reason":"platform"}');
-        expect(checkedValues()).toEqual(["c"]);
-        expect(dataChecked()).toEqual(["c"]);
-        expect(committed()).toHaveTextContent("c");
-        expect(consoleError).not.toHaveBeenCalled();
-      });
-
-      it("dispatches once under StrictMode", async () => {
-        const action = vi.fn<ActionFn>();
-        await hydrate(
-          <StrictMode>
-            <Harness mode={mode} initial="a" action={action} />
-          </StrictMode>,
-          checkC,
-        );
-        expect(action).toHaveBeenCalledTimes(1);
-        expect(action.mock.calls[0]?.[0]).toBe("c");
-        expect(checkedValues()).toEqual(["c"]);
-      });
-
-      it("dispatches from an empty server render too, and nothing when the DOM matches", async () => {
+      it("dispatches from an empty server render too", async () => {
         const action = vi.fn<ActionFn>();
         await hydrate(<Harness mode={mode} initial={null} action={action} />, checkC);
-        expect(action.mock.calls.map(([n]) => n)).toEqual(["c"]);
-        document.body.innerHTML = "";
-
-        const quiet = vi.fn<ActionFn>();
-        await hydrate(<Harness mode={mode} initial="b" action={quiet} />, () => {});
-        expect(quiet).not.toHaveBeenCalled();
-        expect(checkedValues()).toEqual(["b"]);
+        expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["c", "platform"]]);
+        expect(checkedValues()).toEqual(["c"]);
       });
-    });
-
-    it("a refused (or rejected-and-caught) dispatch rolls the DOM back to the server value", async () => {
-      const action = vi.fn<ActionFn>();
-      await hydrate(
-        <RadioGroup.Root aria-label="Fruit" value="a" valueChangeAction={action}>
-          <RadioGroup.Item value="a" aria-label="a" />
-          <RadioGroup.Item value="b" aria-label="b" />
-          <RadioGroup.Item value="c" aria-label="c" />
-        </RadioGroup.Root>,
-        checkC,
-      );
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(checkedValues()).toEqual(["a"]);
-      expect(dataChecked()).toEqual(["a"]);
-    });
-
-    it("createRoot never dispatches on mount", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <StrictMode>
-          <Harness mode="uncontrolled" initial="b" action={action} />
-        </StrictMode>,
-      );
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-      expect(checkedValues()).toEqual(["b"]);
     });
   });
 
@@ -854,24 +795,6 @@ describe("RadioGroup", () => {
   });
 
   renderBoth("platform: form reset", (mode) => {
-    it("<button type=reset> dispatches once with the reset event and commits", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      expect(committed()).toHaveTextContent("b");
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe("a");
-      expect(details.reason).toBe("platform");
-      expect(details.event?.type).toBe("reset");
-      expect(checkedValues()).toEqual(["a"]);
-      expect(dataChecked()).toEqual(["a"]);
-      expect(committed()).toHaveTextContent("a");
-    });
-
     it("form.reset() dispatches once, also to null", async () => {
       const d = deferred();
       const actions: [string | null, string][] = [];
@@ -905,58 +828,6 @@ describe("RadioGroup", () => {
       expectNotPending(group());
       expect(checkedValues()).toEqual([]);
       expect(committed()).toHaveTextContent("null");
-    });
-
-    it("a cancelled reset dispatches nothing and leaves the DOM", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      form().addEventListener("reset", (e) => e.preventDefault());
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(checkedValues()).toEqual(["b"]);
-    });
-
-    it("a reset whose target is the optimistic value dispatches nothing", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} inForm initial="b" />);
-      const user = setupUser();
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).not.toHaveBeenCalled();
-      expect(checkedValues()).toEqual(["b"]);
-    });
-
-    it("a disabled group still follows the reset", async () => {
-      const action = vi.fn<ActionFn>();
-      function Toggleable() {
-        const [disabled, setDisabled] = useState(false);
-        return (
-          <>
-            <Harness mode={mode} action={action} inForm disabled={disabled} />
-            <button type="button" onClick={() => setDisabled(true)}>
-              disable
-            </button>
-          </>
-        );
-      }
-      render(<Toggleable />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      await user.click(screen.getByRole("button", { name: "disable" }));
-      expect(group()).toBeDisabled();
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
-        ["b", "activate"],
-        ["a", "platform"],
-      ]);
-      expect(checkedValues()).toEqual(["a"]);
-      expect(committed()).toHaveTextContent("a");
     });
   });
 
@@ -999,60 +870,7 @@ describe("RadioGroup", () => {
     });
   });
 
-  describe("platform: form reset, controlled parent decides", () => {
-    it("a parent that refuses gets the DOM re-synced to its radio after settle", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" action={action} inForm refusePlatform />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      await user.click(screen.getByRole("button", { name: "Reset" }));
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]?.[0]).toBe("a");
-      expect(action.mock.calls[1]?.[1].reason).toBe("platform");
-      expect(checkedValues()).toEqual(["b"]);
-      expect(dataChecked()).toEqual(["b"]);
-      expect(committed()).toHaveTextContent("b");
-    });
-  });
-
   describe("platform: reset target by mode", () => {
-    it("uncontrolled: the reset returns to the latest defaultValue", async () => {
-      const action = vi.fn<ActionFn>();
-      function Parent() {
-        const [def, setDef] = useState("a");
-        return (
-          <form data-testid="form">
-            <RadioGroup.Root aria-label="Fruit" defaultValue={def} valueChangeAction={action}>
-              <RadioGroup.Item value="a" aria-label="a" />
-              <RadioGroup.Item value="b" aria-label="b" />
-              <RadioGroup.Item value="c" aria-label="c" />
-            </RadioGroup.Root>
-            <button type="button" onClick={() => startTransition(() => setDef("c"))}>
-              new default
-            </button>
-          </form>
-        );
-      }
-      render(<Parent />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      await user.click(screen.getByRole("button", { name: "new default" }));
-      expect(radio("c").defaultChecked).toBe(true);
-      expect(radio("a").defaultChecked).toBe(false);
-      // Changing the default does not move the current value.
-      expect(checkedValues()).toEqual(["b"]);
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
-        ["b", "activate"],
-        ["c", "platform"],
-      ]);
-      expect(checkedValues()).toEqual(["c"]);
-    });
-
     it("uncontrolled: a defaultValue of null resets to nothing checked", async () => {
       const action = vi.fn<ActionFn>();
       function Parent() {
@@ -1078,43 +896,6 @@ describe("RadioGroup", () => {
       await flushMicrotasks();
       expect(action.mock.calls.map(([n]) => n)).toEqual([null]);
       expect(checkedValues()).toEqual([]);
-    });
-
-    it("controlled: the reset returns to the mount-time value and the parent is notified", async () => {
-      const action = vi.fn<ActionFn>();
-      function Parent() {
-        const [value, setValue] = useState<string | null>("a");
-        return (
-          <form data-testid="form">
-            <RadioGroup.Root
-              aria-label="Fruit"
-              value={value}
-              valueChangeAction={(next, details) => {
-                action(next, details);
-                setValue(next);
-              }}
-            >
-              <RadioGroup.Item value="a" aria-label="a" />
-              <RadioGroup.Item value="b" aria-label="b" />
-              <RadioGroup.Item value="c" aria-label="c" />
-            </RadioGroup.Root>
-          </form>
-        );
-      }
-      render(<Parent />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      await user.click(radio("c"));
-      await act(async () => {
-        form().reset();
-      });
-      await flushMicrotasks();
-      expect(action.mock.calls.map(([n, d]) => [n, d.reason, d.event?.type])).toEqual([
-        ["b", "activate", "click"],
-        ["c", "activate", "click"],
-        ["a", "platform", "reset"],
-      ]);
-      expect(checkedValues()).toEqual(["a"]);
     });
   });
 
@@ -1148,13 +929,11 @@ describe("RadioGroup", () => {
       );
     }
 
-    it.each([
-      ["a value", "free"],
-      ["null", null],
-    ] as const)("returns to the default (%s) with one dispatch", async (_label, initial) => {
+    // A value as the default: the native platform suite.
+    it("returns to the default (null) with one dispatch", async () => {
       const d = deferred();
       const action = vi.fn<ActionFn>();
-      render(<PlanForm submit={d.promise} initial={initial} action={action} />);
+      render(<PlanForm submit={d.promise} initial={null} action={action} />);
       const user = setupUser();
       await user.click(radio("pro"));
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -1164,11 +943,11 @@ describe("RadioGroup", () => {
       await flushMicrotasks();
       expect(action).toHaveBeenCalledTimes(2);
       const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe(initial);
+      expect(next).toBe(null);
       expect(details.reason).toBe("platform");
       expect(details.event?.type).toBe("reset");
-      expect(checkedValues()).toEqual(initial === null ? [] : [initial]);
-      expect(dataChecked()).toEqual(initial === null ? [] : [initial]);
+      expect(checkedValues()).toEqual([]);
+      expect(dataChecked()).toEqual([]);
       expectNotPending(group());
       // Still in sync: the next click checks again.
       await user.click(radio("pro"));

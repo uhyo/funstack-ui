@@ -37,6 +37,11 @@ export interface ControlProps<V, D> {
   readonly transition?: TransitionProp;
   /** Pass-through props for the part that owns the value (a ref, `disabled`, …). */
   readonly extra?: Readonly<Record<string, unknown>>;
+  /**
+   * Render only what jsdom's HTML parser keeps, for server HTML that is hydrated (Select: no
+   * Trigger, whose `<button>` the old parser drops inside a `<select>`).
+   */
+  readonly forHydration?: boolean;
 }
 
 /**
@@ -128,6 +133,11 @@ export interface ValueHarnessProps<V, D extends { readonly event: Event | undefi
   readonly catchErrors?: boolean;
   /** Controlled only: the parent never adopts a value. */
   readonly veto?: boolean;
+  /** Controlled only: the parent does not adopt `"platform"` dispatches (form reset, hydration). */
+  readonly refusePlatform?: boolean;
+  /** Wrap the component in `<form data-testid="form">` with a `<button type="reset">Reset`. */
+  readonly inForm?: boolean;
+  readonly forHydration?: boolean;
   /** Commit with a plain `setState` after the await instead of `startTransition` (row 17). */
   readonly commitOutsideTransition?: boolean;
   /** Wrap only the component in an `ErrorCatcher` that reports to this callback. */
@@ -152,6 +162,9 @@ export function ValueHarness<V, D extends { readonly event: Event | undefined }>
   action,
   catchErrors = false,
   veto = false,
+  refusePlatform = false,
+  inForm = false,
+  forHydration,
   commitOutsideTransition = false,
   boundary,
   suspender,
@@ -172,6 +185,7 @@ export function ValueHarness<V, D extends { readonly event: Event | undefined }>
       return;
     }
     if (veto) return;
+    if (refusePlatform && (details as { reason?: unknown }).reason === "platform") return;
     const update = (prev: V) => (driver.commit ? driver.commit(prev, next, details) : next);
     if (commitOutsideTransition) setCommitted(update);
     else startTransition(() => setCommitted(update));
@@ -182,6 +196,7 @@ export function ValueHarness<V, D extends { readonly event: Event | undefined }>
     changeAction,
     transition,
     extra,
+    forHydration,
   });
   if (onCommit) {
     control = (
@@ -191,6 +206,14 @@ export function ValueHarness<V, D extends { readonly event: Event | undefined }>
     );
   }
   if (boundary) control = <ErrorCatcher onError={boundary}>{control}</ErrorCatcher>;
+  if (inForm) {
+    control = (
+      <form data-testid="form">
+        {control}
+        <button type="reset">Reset</button>
+      </form>
+    );
+  }
 
   const content = (
     <>
