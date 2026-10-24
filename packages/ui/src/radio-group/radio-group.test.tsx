@@ -10,7 +10,7 @@
 // adopt the value (veto, or an error caught inside the action), which is the same optimistic
 // revert and the same settle commit.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
+import { StrictMode, Suspense, startTransition, use, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -27,6 +27,8 @@ import {
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { radioGroupDriver } from "../__tests__/drivers/radio-group.js";
+import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { RadioGroup } from "./index.js";
@@ -150,6 +152,13 @@ const dataPending = () =>
     .filter((r) => r.hasAttribute("data-pending"))
     .map((r) => (r as HTMLInputElement).value);
 const form = () => screen.getByTestId("form") as HTMLFormElement;
+
+// The action-prop rows shared by every value component (sync and async actions, rejection,
+// overlap, superseded rejection, suspending content, the post-await rule, the controlled veto,
+// `transition`, details, the value/defaultValue warnings) come from
+// __tests__/value-action-suite.tsx with the driver __tests__/drivers/radio-group.tsx; the
+// transition types are in radio-group-transition-types.test.tsx.
+describeValueAction(radioGroupDriver);
 
 describe("RadioGroup", () => {
   describe("roles and ARIA", () => {
@@ -462,25 +471,6 @@ describe("RadioGroup", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("calls valueChangeAction(next, details) with the native click", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(radio("b"));
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toBe("b");
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(details.event?.type).toBe("click");
-      expect(details.reason).toBe("activate");
-      expect(checkedValues()).toEqual(["b"]);
-      expect(dataChecked()).toEqual(["b"]);
-      expect(dataPending()).toEqual([]);
-      expectNotPending(group());
-      expect(committed()).toHaveTextContent("b");
-    });
-
     it("clicking the checked radio, a disabled radio or a radio under Root disabled never dispatches", async () => {
       const action = vi.fn<ActionFn>();
       const { unmount } = render(<Harness mode={mode} action={action} disabledItems={["c"]} />);
@@ -539,72 +529,6 @@ describe("RadioGroup", () => {
     });
   });
 
-  renderBoth("async action", (mode) => {
-    it("shows the optimistic radio and data-pending on Root and that Item until resolve", async () => {
-      const d = deferred();
-      const action = vi.fn<ActionFn>(() => d.promise);
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(radio("b"));
-      expect(checkedValues()).toEqual(["b"]);
-      expect(dataChecked()).toEqual(["b"]);
-      expect(dataPending()).toEqual(["b"]);
-      expectPending(group());
-      expect(committed()).toHaveTextContent("a");
-
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(group());
-      expect(dataPending()).toEqual([]);
-      expect(checkedValues()).toEqual(["b"]);
-      expect(committed()).toHaveTextContent("b");
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("reaches the Error Boundary and leaves committed state", async () => {
-      silenceErrors();
-      const d = deferred();
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(radio("b"));
-      expect(checkedValues()).toEqual(["b"]);
-      expectPending(group());
-
-      const err = new Error("save failed");
-      await act(async () => {
-        d.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
-      expect(committed()).toHaveTextContent("a");
-    });
-
-    it("caught inside the action counts as success", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} catchErrors />);
-      const user = setupUser();
-
-      await user.click(radio("b"));
-      expectPending(group());
-      await act(async () => {
-        d.reject(new Error("vetoed"));
-      });
-      expectNotPending(group());
-      expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
-      expect(committed()).toHaveTextContent("a");
-      // Only a controlled parent can veto: uncontrolled commits "b"; controlled rolls the DOM back.
-      expect(checkedValues()).toEqual([mode === "uncontrolled" ? "b" : "a"]);
-      expect(dataChecked()).toEqual([mode === "uncontrolled" ? "b" : "a"]);
-    });
-  });
-
   describe("rollback of the DOM to the previous radio", () => {
     it("a controlled parent that does not adopt the value re-checks the old radio after settle", async () => {
       const d = deferred();
@@ -657,23 +581,6 @@ describe("RadioGroup", () => {
       // which is the library's committed value.
     });
 
-    it("resolved in order, the latest still wins", async () => {
-      const deferreds = sequencedDeferreds(2);
-      render(<Harness mode="uncontrolled" initial="a" action={() => deferreds.next()} />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      await user.click(radio("c"));
-      await act(async () => {
-        deferreds[0]!.resolve();
-      });
-      expect(checkedValues()).toEqual(["c"]);
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(checkedValues()).toEqual(["c"]);
-      expect(committed()).toHaveTextContent("c");
-    });
-
     it("clicking back to the committed radio while another is pending (walkthrough 9.6)", async () => {
       const deferreds = sequencedDeferreds(2);
       const action = vi.fn<ActionFn>(() => deferreds.next());
@@ -693,87 +600,6 @@ describe("RadioGroup", () => {
       expect(checkedValues()).toEqual(["a"]);
       expect(committed()).toHaveTextContent("a");
       expectNotPending(group());
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    function renderTwo(onError: (error: unknown) => void) {
-      const deferreds = sequencedDeferreds(2);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode={mode} action={action} boundary={onError} />);
-      return { deferreds, action };
-    }
-
-    it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds, action } = renderTwo(onError);
-      const user = setupUser();
-      await user.click(radio("b"));
-      await user.click(radio("c"));
-      expect(action.mock.calls.map(([n]) => n)).toEqual(["b", "c"]);
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).not.toHaveBeenCalled();
-      expect(checkedValues()).toEqual(["c"]);
-
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
-      expect(committed()).toHaveTextContent("c");
-    });
-
-    it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds } = renderTwo(onError);
-      const user = setupUser();
-      await user.click(radio("b"));
-      await user.click(radio("c"));
-      expectPending(group());
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      // The newer action's outcome is unaffected: it resolved and the parent adopted it.
-      expect(committed()).toHaveTextContent("c");
-    });
-  });
-
-  renderBoth("suspending content", (mode) => {
-    it("keeps old content, no fallback, Root pending while the new content loads", async () => {
-      const suspender = createSuspender();
-      suspender.resolve("a");
-      render(<Harness mode={mode} suspender={suspender} />);
-      const user = setupUser();
-      expect(screen.getByTestId("suspender")).toHaveTextContent("a");
-
-      await user.click(radio("b"));
-      expect(checkedValues()).toEqual(["b"]);
-      expectPending(group());
-      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
-      expect(screen.getByTestId("suspender")).toHaveTextContent("a");
-
-      await act(async () => {
-        suspender.resolve("b");
-      });
-      expect(screen.getByTestId("suspender")).toHaveTextContent("b");
-      expect(committed()).toHaveTextContent("b");
-      expectNotPending(group());
-      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
     });
   });
 
@@ -1433,44 +1259,6 @@ describe("RadioGroup", () => {
     });
   });
 
-  describe("details", () => {
-    it("exposes `event` as a virtual, non-own property", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <RadioGroup.Root aria-label="Fruit" valueChangeAction={action}>
-          <RadioGroup.Item value="a" aria-label="a" />
-        </RadioGroup.Root>,
-      );
-      const user = setupUser();
-      await user.click(radio("a"));
-      const details = action.mock.calls[0]![1];
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(details.event?.type).toBe("click");
-      expect("event" in details).toBe(true);
-      expect(Object.keys(details)).not.toContain("event");
-      expect({ ...details }).not.toHaveProperty("event");
-      expect(JSON.stringify(details)).toBe('{"reason":"activate"}');
-      expect(Object.isExtensible(details)).toBe(true);
-    });
-
-    it("can be passed straight to a Server-Function-shaped action", async () => {
-      const serverFn = vi.fn(async (_next: string | null, _details: Details) => {});
-      render(
-        <RadioGroup.Root aria-label="Fruit" valueChangeAction={serverFn}>
-          <RadioGroup.Item value="a" aria-label="a" />
-          <RadioGroup.Item value="b" aria-label="b" />
-        </RadioGroup.Root>,
-      );
-      const user = setupUser();
-      await user.click(radio("b"));
-      expect(serverFn).toHaveBeenCalledTimes(1);
-      const [next, details] = serverFn.mock.calls[0]!;
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(JSON.parse(JSON.stringify([next, details]))).toEqual(["b", { reason: "activate" }]);
-      expect(checkedValues()).toEqual(["b"]);
-    });
-  });
-
   describe("forms", () => {
     it("contributes name=value of the checked radio to FormData", async () => {
       render(
@@ -1704,57 +1492,6 @@ describe("RadioGroup", () => {
     });
   });
 
-  describe("post-await rule", () => {
-    it("checked and data-pending converge with startTransition after the await", async () => {
-      const d = deferred();
-      const snapshots: { checked: string[]; pending: boolean }[] = [];
-      function Recorder() {
-        useLayoutEffect(() => {
-          const radios = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
-          snapshots.push({
-            checked: radios.filter((r) => r.checked).map((r) => r.value),
-            pending: document.querySelector("fieldset")?.hasAttribute("data-pending") ?? false,
-          });
-        });
-        return null;
-      }
-      function Parent() {
-        const [value, setValue] = useState<string | null>("a");
-        return (
-          <RadioGroup.Root
-            aria-label="Fruit"
-            value={value}
-            valueChangeAction={async (next) => {
-              await d.promise;
-              startTransition(() => setValue(next));
-            }}
-          >
-            {/* Function children: re-created on every Root render, so the Recorder's layout effect
-                sees each intermediate commit. */}
-            {() => (
-              <>
-                <RadioGroup.Item value="a" aria-label="a" />
-                <RadioGroup.Item value="b" aria-label="b" />
-                <Recorder />
-              </>
-            )}
-          </RadioGroup.Root>
-        );
-      }
-      render(<Parent />);
-      const user = setupUser();
-      await user.click(radio("b"));
-      const inFlight = snapshots.at(-1);
-      // Resolve before asserting: an unsettled action would entangle later tests' transitions.
-      await act(async () => {
-        d.resolve();
-      });
-      expect(inFlight).toEqual({ checked: ["b"], pending: true });
-      expect(snapshots.at(-1)).toEqual({ checked: ["b"], pending: false });
-      expect(snapshots.slice(1).every((s) => s.checked.join() === "b")).toBe(true);
-    });
-  });
-
   describe("controlled edge cases", () => {
     it("a value prop change while pending converges after settle (walkthrough 9.9)", async () => {
       const d = deferred();
@@ -1796,68 +1533,7 @@ describe("RadioGroup", () => {
     });
   });
 
-  describe("transition prop", () => {
-    it("Item renders the same markup with and without `transition`", () => {
-      const ui = (transition?: string) =>
-        render(
-          <RadioGroup.Root aria-label="x" defaultValue="a">
-            <RadioGroup.Label>x</RadioGroup.Label>
-            <RadioGroup.Item value="a" aria-label="a" {...(transition && { transition })} />
-          </RadioGroup.Root>,
-        ).container.innerHTML.replace(/_r_[0-9a-z]+_/g, "ID");
-      const plain = ui();
-      expect(ui("fsui-fade")).toBe(plain);
-    });
-
-    it("attaches the transition types without throwing (wiring smoke test)", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <RadioGroup.Root aria-label="x" valueChangeAction={action}>
-          <RadioGroup.Item
-            value="a"
-            aria-label="a"
-            transition={{ "fsui-radio-group": "fade", default: "none" }}
-          />
-          <RadioGroup.Item value="b" aria-label="b" />
-        </RadioGroup.Root>,
-      );
-      const user = setupUser();
-      await user.click(radio("a"));
-      await user.click(radio("b"));
-      expect(action.mock.calls.map(([n]) => n)).toEqual(["a", "b"]);
-    });
-  });
-
   describe("dev warnings", () => {
-    it("warns once when value and defaultValue are both set", () => {
-      const consoleError = silenceErrors();
-      const ui = (
-        <RadioGroup.Root aria-label="x" value="a" defaultValue="a">
-          <RadioGroup.Item value="a" aria-label="a" />
-        </RadioGroup.Root>
-      );
-      const { rerender } = render(ui);
-      rerender(ui);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(
-        /^RadioGroup\.Root: both `value` and `defaultValue`/,
-      );
-    });
-
-    it("warns once when switching from uncontrolled to controlled", () => {
-      const consoleError = silenceErrors();
-      const ui = (value?: string) => (
-        <RadioGroup.Root aria-label="x" {...(value !== undefined && { value })}>
-          <RadioGroup.Item value="a" aria-label="a" />
-        </RadioGroup.Root>
-      );
-      const { rerender } = render(ui());
-      rerender(ui("a"));
-      rerender(ui("b"));
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(/uncontrolled to controlled/);
-    });
-
     it("does not warn in normal use, nor without value or defaultValue", async () => {
       const consoleError = silenceErrors();
       render(

@@ -267,3 +267,54 @@ Mutations (reverted):
 1. accordion-item.tsx renders `open` from the optimistic state: 23 rows fail (21 suite rows).
 2. accordion-root.tsx swaps expand / collapse: all 6 type rows fail.
 3. accordion-item.tsx marks every Item pending while the Root is: 38 rows fail (36 suite rows).
+### RadioGroup (commit 3e)
+
+Suite change: the overlap row resolved in dispatch order ("first then second") now asserts the
+committed value is the newer one for every driver (a whole-value parent commits in completion
+order, which is dispatch order there); RadioGroup's "resolved in order, the latest still wins"
+asserted exactly that.
+
+Driver: radios a, b, c from "a"; gestures click b, c, a; `expectShown` = DOM `checked` and
+`data-checked` lists; `pendingOn` = the fieldset and the optimistic radio, `pendingOff` the others;
+`format` = `String` (the old harness's mirror).
+
+Removed title (radio-group.test.tsx, `RadioGroup …`) -> suite row (`RadioGroup.Root: value action
+conformance …`):
+
+- sync action (both) calls valueChangeAction(next, details) with the native click -> sync action
+  (both) (next, event type click, reason activate, checked and data-checked lists, no pending,
+  committed)
+- async action (both) shows the optimistic radio and data-pending on Root and that Item until
+  resolve -> async action (both) (`dataPending()` = `["b"]` becomes pendingOn radio b + pendingOff a,
+  c)
+- rejection (both) reaches the Error Boundary and leaves committed state / caught inside the action
+  counts as success -> rejection rows (both); the checked and data-checked lists by mode
+- overlapping actions resolved in order, the latest still wins -> overlapping actions (uncontrolled)
+  the latest dispatch wins when resolved first then second (checked c throughout, committed c)
+- superseded rejection (both), two rows -> suite superseded rows (committed c)
+- suspending content (both) keeps old content, no fallback, Root pending … -> suspending content
+- details: exposes `event` …, can be passed straight to a Server-Function-shaped action -> details
+  rows (JSON `{"reason":"activate"}`, keys exactly `["reason"]`)
+- post-await rule checked and data-pending converge with startTransition after the await (layout
+  effect in function children; DOM `checked` + fieldset pending) -> post-await rule (controlled
+  parent) (Profiler; `readShown` = DOM `checked`, `pendingOn(0)[0]` = the fieldset)
+- transition prop Item renders the same markup with and without `transition` -> transition prop
+  markup row (also with a type map; `transition` on every Item); attaches the transition types
+  without throwing (wiring smoke test) -> still dispatches with a class / a type map, and
+  radio-group-transition-types.test.tsx now asserts the actual types
+- dev warnings warns once when value and defaultValue are both set (anchored `^RadioGroup.Root:`)
+  -> dev warnings both set (message matched, and exactly one warning starting with the name);
+  warns once when switching from uncontrolled to controlled -> same (first render with neither prop)
+  Kept: disabled / checked / cancelled-click no-ops, the controlled DOM rollback with focus, the
+  arrow-key overlap, walkthrough 9.6, platform rows, preventDefault, forms, function props, render,
+  9.9 value change while pending, unmatched value, "does not warn … nor without value or
+  defaultValue" (the suite's no-warning row starts from defaultValue), Field rows.
+  New: radio-group-transition-types.test.tsx (3 rows; RadioGroup had no type assertion before).
+  jsdom titles: 3034 -> 3055 (-22, +43).
+
+Mutations (reverted):
+
+1. radio-group-item.tsx: every Item pending while the Root is: 23 rows fail (18 suite rows).
+2. radio-group-root.tsx: types `fsui-radio` instead of `fsui-radio-group`: the 3 type rows fail.
+3. radio-group-root.tsx: an extra serialisable details field: 4 suite rows fail (both sync rows and
+   both details rows).

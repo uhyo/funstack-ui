@@ -399,9 +399,12 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         driver.expectCommitted?.(values[2]);
         expectNonePending(1);
         expect(action).toHaveBeenCalledTimes(2);
-        // A parent committing whole values writes them in completion order; one that patches
-        // (ToggleGroup, CheckboxGroup) ends with both changes whatever the order.
-        if (driver.orderIndependentCommit) expect(committed().textContent).toBe(format(values[2]));
+        // A parent committing whole values writes them in completion order (so in dispatch order
+        // it ends on the newer one); one that patches (ToggleGroup, CheckboxGroup) ends with both
+        // changes whatever the order.
+        if (order[0] === 0 || driver.orderIndependentCommit) {
+          expect(committed().textContent).toBe(format(values[2]));
+        }
       });
 
       it("stays pending until every in-flight action settles", async () => {
