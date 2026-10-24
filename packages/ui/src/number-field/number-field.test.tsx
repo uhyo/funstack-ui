@@ -1371,6 +1371,53 @@ describe("NumberField", () => {
     });
   });
 
+  describe("superseded rejection across channels", () => {
+    // Each channel (steps, commits) surfaces the rejection of a superseded run by throwing it from
+    // render. That must not wait for the other channel's pending action (#105).
+    function setup() {
+      silenceErrors();
+      const steps = [deferred(), deferred()];
+      const commits = [deferred(), deferred()];
+      const caught = vi.fn();
+      const onChange = vi
+        .fn<Fn>()
+        .mockImplementationOnce(() => steps[0]!.promise)
+        .mockImplementationOnce(() => steps[1]!.promise);
+      const onCommit = vi
+        .fn<Fn>()
+        .mockImplementationOnce(() => commits[0]!.promise)
+        .mockImplementationOnce(() => commits[1]!.promise);
+      render(
+        <Fixture mode="uncontrolled" onChange={onChange} onCommit={onCommit} boundary={caught} />,
+      );
+      return { steps, commits, caught, onChange, onCommit };
+    }
+
+    it("a superseded step's rejection reaches the boundary while commits are pending", async () => {
+      const { steps, caught, onChange, onCommit } = setup();
+      key("ArrowUp");
+      await flushMicrotasks();
+      key("ArrowUp");
+      await flushMicrotasks();
+      expect(onChange).toHaveBeenCalledTimes(2);
+      expect(onCommit).toHaveBeenCalledTimes(2);
+      await act(async () => steps[0]!.reject(new Error("older step")));
+      expect(caught).toHaveBeenCalledTimes(1);
+      expect((caught.mock.calls[0]![0] as Error).message).toBe("older step");
+    });
+
+    it("a superseded commit's rejection reaches the boundary while a step is pending", async () => {
+      const { commits, caught } = setup();
+      key("ArrowUp");
+      await flushMicrotasks();
+      key("ArrowUp");
+      await flushMicrotasks();
+      await act(async () => commits[0]!.reject(new Error("older commit")));
+      expect(caught).toHaveBeenCalledTimes(1);
+      expect((caught.mock.calls[0]![0] as Error).message).toBe("older commit");
+    });
+  });
+
   describe("suspending content", () => {
     it("an adopt-steps parent's content keyed on the value keeps the old content", async () => {
       const { Suspender, resolve } = createSuspender();

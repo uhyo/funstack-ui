@@ -30,6 +30,7 @@ import type { FormAssociatedElement } from "../internal/use-form-owner-event.js"
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
+import { useSupersededRejection } from "../internal/use-superseded-rejection.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { keyStep, stepValue } from "./number-field-arithmetic.js";
@@ -301,9 +302,15 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     if (visible.validationMessage !== message) visible.setCustomValidity(message);
   }, []);
 
+  // One capture for both channels, before both transitions (see `captureSuperseded`).
+  const captureSuperseded = useSupersededRejection();
+
   // A step is not a re-entry: a continuous control dispatches one step per key press or pointer
   // move and every step must run (design/components/button.md 16.1), so no in-flight guard.
-  const { pending: stepPending, run: runStep } = useActionTrigger({ ignoreWhilePending: false });
+  const { pending: stepPending, run: runStep } = useActionTrigger({
+    ignoreWhilePending: false,
+    captureSuperseded,
+  });
 
   const runCommit = async (
     next: number | null,
@@ -331,6 +338,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     action: runCommit,
     transitionTypes: () => COMMIT_TYPES,
     warn: { component: "NumberField.Root", prop: "value" },
+    captureSuperseded,
   });
   const { optimistic, committed, dispatch } = commitState;
   const committedRef = useLatest(committed);

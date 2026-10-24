@@ -36,6 +36,13 @@ export interface UseControllableActionOptions<T, Details extends ActionDetails> 
   reducer?: (prev: T, next: T, details: Details) => T;
   /** Names used in development warnings. */
   warn?: { readonly component: string; readonly prop: string };
+  /**
+   * A component with two transition channels (Slider, NumberField) passes one
+   * `useSupersededRejection()` called before both hooks, so a superseded rejection of either
+   * channel is thrown before both `useTransition`s and never waits for the other channel's
+   * pending action. Stable. Default: the hook's own.
+   */
+  readonly captureSuperseded?: ((error: unknown) => void) | undefined;
 }
 
 export interface ControllableAction<T, Details extends ActionDetails> {
@@ -94,8 +101,9 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const { controlled, defaultValue, initialValue, action, transitionTypes, reducer, warn } =
     options;
 
-  // Before `useTransition` on purpose (see the hook).
-  const captureSuperseded = useSupersededRejection();
+  // Before `useTransition` on purpose (see the hook). Unused (never throws) with an external one.
+  const ownCapture = useSupersededRejection();
+  const captureSuperseded = options.captureSuperseded ?? ownCapture;
 
   const [internal, setInternal] = useState<T>(
     defaultValue === undefined ? initialValue : defaultValue,

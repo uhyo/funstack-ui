@@ -17,6 +17,13 @@ export interface ActionTriggerOptions {
    * pass `false`, because a step is not a re-entry: every step must run.
    */
   readonly ignoreWhilePending?: boolean | undefined;
+  /**
+   * A component with two transition channels (Slider, NumberField) passes one
+   * `useSupersededRejection()` called before both hooks, so a superseded rejection of either
+   * channel is thrown before both `useTransition`s and never waits for the other channel's
+   * pending action. Stable. Default: the hook's own.
+   */
+  readonly captureSuperseded?: ((error: unknown) => void) | undefined;
 }
 
 export interface ActionTrigger {
@@ -48,8 +55,9 @@ export interface ActionTrigger {
 export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrigger {
   const { openGeneration, ignoreWhilePending = true } = options;
 
-  // Before `useTransition` on purpose (see the hook).
-  const captureSuperseded = useSupersededRejection();
+  // Before `useTransition` on purpose (see the hook). Unused (never throws) with an external one.
+  const ownCapture = useSupersededRejection();
+  const captureSuperseded = options.captureSuperseded ?? ownCapture;
 
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);

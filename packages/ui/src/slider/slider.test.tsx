@@ -1039,6 +1039,64 @@ describe("Slider", () => {
     });
   });
 
+  // --- Superseded rejections across the two channels ------------------------------------------------
+
+  describe("superseded rejection across channels", () => {
+    // Each channel (steps, commits) surfaces the rejection of a superseded run by throwing it from
+    // render. That must not wait for the other channel's pending action (#105).
+    it("a superseded step's rejection reaches the boundary while commits are pending", async () => {
+      silenceErrors();
+      const steps = [deferred(), deferred()];
+      const commits = [deferred(), deferred()];
+      const caught = vi.fn();
+      const onChange = vi
+        .fn<ChangeFn>()
+        .mockImplementationOnce(() => steps[0]!.promise)
+        .mockImplementationOnce(() => steps[1]!.promise);
+      const onCommit = vi
+        .fn<CommitFn>()
+        .mockImplementationOnce(() => commits[0]!.promise)
+        .mockImplementationOnce(() => commits[1]!.promise);
+      render(
+        <Fixture mode="uncontrolled" onChange={onChange} onCommit={onCommit} boundary={caught} />,
+      );
+      press(thumbInput(), 41);
+      await flushMicrotasks();
+      press(thumbInput(), 42);
+      await flushMicrotasks();
+      expect(onChange).toHaveBeenCalledTimes(2);
+      expect(onCommit).toHaveBeenCalledTimes(2);
+      await act(async () => steps[0]!.reject(new Error("older step")));
+      expect(caught).toHaveBeenCalledTimes(1);
+      expect((caught.mock.calls[0]![0] as Error).message).toBe("older step");
+    });
+
+    it("a superseded commit's rejection reaches the boundary while a step is pending", async () => {
+      silenceErrors();
+      const steps = [deferred(), deferred()];
+      const commits = [deferred(), deferred()];
+      const caught = vi.fn();
+      const onChange = vi
+        .fn<ChangeFn>()
+        .mockImplementationOnce(() => steps[0]!.promise)
+        .mockImplementationOnce(() => steps[1]!.promise);
+      const onCommit = vi
+        .fn<CommitFn>()
+        .mockImplementationOnce(() => commits[0]!.promise)
+        .mockImplementationOnce(() => commits[1]!.promise);
+      render(
+        <Fixture mode="uncontrolled" onChange={onChange} onCommit={onCommit} boundary={caught} />,
+      );
+      press(thumbInput(), 41);
+      await flushMicrotasks();
+      press(thumbInput(), 42);
+      await flushMicrotasks();
+      await act(async () => commits[0]!.reject(new Error("older commit")));
+      expect(caught).toHaveBeenCalledTimes(1);
+      expect((caught.mock.calls[0]![0] as Error).message).toBe("older commit");
+    });
+  });
+
   // --- Suspending content --------------------------------------------------------------------------
 
   describe("suspending content", () => {
