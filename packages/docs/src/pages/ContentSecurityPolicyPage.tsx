@@ -1,6 +1,6 @@
 import { STYLE_SHA256 } from "@funstack/ui/csp";
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
 import { DocPage } from "../components/DocPage.js";
 import { PropsTable, Table } from "../components/Tables.js";
 

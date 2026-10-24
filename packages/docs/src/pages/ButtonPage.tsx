@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example, ExampleSource } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example, ExampleSource } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";

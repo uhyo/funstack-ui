@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { DocPage } from "../components/DocPage.js";
 import { stylingProps } from "./shared-props.js";

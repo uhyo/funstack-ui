@@ -1,6 +1,7 @@
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample, Term, Terms } from "../components/Concept.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { DocPage } from "../components/DocPage.js";
 import { Table } from "../components/Tables.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";

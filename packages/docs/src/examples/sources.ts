@@ -1,5 +1,7 @@
 // Server-only: import this module from Server Components only. A "use client" module importing it
-// would ship the source of every example to the browser.
+// would ship the source of every example to the browser; the "server-only" import makes that an error.
+import "server-only";
+
 const sources = import.meta.glob<string>("./*.{tsx,css}", {
   query: "?raw",
   import: "default",

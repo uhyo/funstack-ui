@@ -1,5 +1,6 @@
 import { CodeBlock } from "../components/CodeBlock.js";
-import { Callout, Example } from "../components/Example.js";
+import { Callout } from "../components/Callout.js";
+import { Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
 import { componentNavItems } from "../navigation.js";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
