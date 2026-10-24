@@ -63,14 +63,11 @@ export interface PopoverPopupHook {
    */
   readonly visible: boolean;
   /**
-   * Wraps the library-mode content: call it only while `visible` (`visible ? wrapContent(x) :
-   * null`), or inside the `<Activity>` for `keepMounted`. When a close commit unmounts the
-   * content while it holds focus (a library-driven close with `transition`, where the focused
-   * element is gone before `hidePopover()` runs and the platform restores nothing), the hide
-   * that follows returns focus to the Trigger (design 6.2).
+   * The popup's children by mode, `visible` and `keepMounted` (`renderOverlayContent`), inside
+   * the focus probe: when a close commit unmounts the content while it holds focus (a
+   * library-driven close with `transition`), the hide that follows returns focus to the Trigger
+   * (design 6.2).
    */
-  readonly wrapContent: (children: ReactNode) => ReactNode;
-  /** The popup's children by mode, `visible` and `keepMounted` (`renderOverlayContent`). */
   readonly renderContent: (children: () => ReactNode) => ReactNode;
   /**
    * Re-shows a shown popup in place (`hidePopover()` + `showPopover({ source })` under the
@@ -402,5 +399,5 @@ export function usePopoverPopup(
       { isLibrary, keepMounted: options.keepMounted, visible, wrapContent },
       children,
     );
-  return { setElement, visible, wrapContent, renderContent, reshow };
+  return { setElement, visible, renderContent, reshow };
 }

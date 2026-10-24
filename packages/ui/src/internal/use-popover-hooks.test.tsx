@@ -1,6 +1,6 @@
 // The extension points of the shared popover hooks that Menu (#39, design/components/menu.md 14)
 // uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, a
-// `<div popover>` popup (no dialog focusing steps), and `wrapContent` with a Menu-style
+// `<div popover>` popup (no dialog focusing steps), and `renderContent` with a Menu-style
 // `requestClose`. Popover's own behaviour is covered by src/popover/popover.test.tsx.
 import { render, screen } from "@testing-library/react";
 import type { Ref, ViewTransitionClass } from "react";
@@ -38,7 +38,7 @@ function Mini({
     disabled: false,
     render: undefined,
   });
-  const { setElement, visible, wrapContent } = usePopoverPopup(ctx, {
+  const { setElement, renderContent } = usePopoverPopup(ctx, {
     part: "Mini.Popup",
     initialFocus: undefined,
     resolveInitialFocus: resolve,
@@ -58,22 +58,21 @@ function Mini({
         ref={setElement as Ref<HTMLDivElement>}
         data-testid="popup"
       >
-        {visible &&
-          wrapContent(
-            <>
-              <button
-                type="button"
-                data-testid="one"
-                // Menu's item activation: a library-owned close.
-                onClick={(event) => ctx.requestClose(event.nativeEvent, "activate")}
-              >
-                One
-              </button>
-              <button type="button" data-testid="two">
-                Two
-              </button>
-            </>,
-          )}
+        {renderContent(() => (
+          <>
+            <button
+              type="button"
+              data-testid="one"
+              // Menu's item activation: a library-owned close.
+              onClick={(event) => ctx.requestClose(event.nativeEvent, "activate")}
+            >
+              One
+            </button>
+            <button type="button" data-testid="two">
+              Two
+            </button>
+          </>
+        ))}
       </div>
     </>
   );
