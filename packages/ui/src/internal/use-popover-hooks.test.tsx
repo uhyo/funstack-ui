@@ -3,7 +3,7 @@
 // `<div popover>` popup (no dialog focusing steps), and `renderContent` with a Menu-style
 // `requestClose`. Popover's own behaviour is covered by src/popover/popover.test.tsx.
 import { render, screen } from "@testing-library/react";
-import type { Ref, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, Ref, ViewTransitionClass } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { setupUser, flushTasks } from "../__tests__/helpers.js";
 import type { ChangeReason } from "./types.js";
@@ -16,10 +16,13 @@ function Mini({
   onDispatch,
   resolve,
   transition,
+  link = false,
 }: {
   onDispatch?: (next: boolean, details: OverlayDetails) => void;
   resolve?: (popup: HTMLElement) => HTMLElement | null;
   transition?: ViewTransitionClass;
+  /** Render the Trigger as a link (no invoker) instead of a `<button>`. */
+  link?: boolean;
 }) {
   const ctx = useOverlayRoot<OverlayDetails>({
     component: "menu",
@@ -36,7 +39,7 @@ function Mini({
   const { libraryProps: triggerProps, ref: triggerRef } = usePopoverTrigger(ctx, {
     part: "Mini.Trigger",
     disabled: false,
-    render: undefined,
+    render: link ? <a href="#" /> : undefined,
   });
   const { setElement, renderContent } = usePopoverPopup(ctx, {
     part: "Mini.Popup",
@@ -47,9 +50,20 @@ function Mini({
   });
   return (
     <>
-      <button {...triggerProps} ref={triggerRef as Ref<HTMLButtonElement>} data-testid="trigger">
-        Menu
-      </button>
+      {link ? (
+        <a
+          href="#"
+          {...(triggerProps as ComponentPropsWithRef<"a">)}
+          ref={triggerRef as Ref<HTMLAnchorElement>}
+          data-testid="trigger"
+        >
+          Menu
+        </a>
+      ) : (
+        <button {...triggerProps} ref={triggerRef as Ref<HTMLButtonElement>} data-testid="trigger">
+          Menu
+        </button>
+      )}
       <div
         id={ctx.ids.popup}
         popover="auto"
@@ -92,11 +106,33 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(details.reason satisfies ChangeReason).toBe("activate");
     expect(details.event!.defaultPrevented).toBe(true);
     expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
-    expect(screen.getByTestId("trigger")).toHaveAttribute("aria-expanded", "true");
+    // A `popovertarget` invoker: the browser exposes the state, no `aria-expanded` (#121).
+    expect(screen.getByTestId("trigger")).toHaveAttribute(
+      "popovertarget",
+      screen.getByTestId("popup").id,
+    );
+    expect(screen.getByTestId("trigger")).not.toHaveAttribute("aria-expanded");
     await user.click(screen.getByTestId("trigger"));
     await flushTasks();
     expect(onDispatch.mock.calls.map(([n]) => n)).toEqual([true, false]);
     expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
+  });
+
+  it("a non-button render is no invoker and renders aria-expanded from the shown popup (#121)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {}); // the non-button warning
+    const user = setupUser();
+    render(<Mini link />);
+    const trigger = screen.getByTestId("trigger");
+    expect(trigger).not.toHaveAttribute("popovertarget");
+    expect(trigger).not.toHaveAttribute("popovertargetaction");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await user.click(trigger);
+    await flushTasks();
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await user.click(trigger);
+    await flushTasks();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
   it("resolveInitialFocus writes autofocus on its result right before showPopover()", async () => {

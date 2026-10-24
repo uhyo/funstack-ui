@@ -2,7 +2,7 @@
 // API and no Invoker Commands; `src/__tests__/popover-shim.ts` and `invoker-shim.ts` provide them
 // (13.1): a synchronous `beforetoggle` (cancelable for an open), a task-queued `toggle`,
 // `:popover-open`, the recorded `source`, and invoker clicks for `show-popover` / `hide-popover` /
-// `toggle-popover`.
+// `toggle-popover` and for `popovertarget` (#121).
 //
 // Not testable here, covered by `popover.browser.test.tsx` (conventions 10.1):
 // - Escape and light dismiss (no close watcher in jsdom): the dismiss path is driven with
@@ -146,10 +146,11 @@ describeOverlayDisabledRenders<PopoverOpenChangeDetails, { close?: DisabledPartP
   Harness,
   isOpen: () => isOpen(),
   spyOpen: spyShow,
+  popoverTarget: true,
   close: {
     props: (props) => ({ close: props }),
     spyClose: spyHide,
-    // JS-free: the Trigger's `toggle-popover` command opens it.
+    // JS-free: the Trigger's `popovertarget` activation opens it.
     openStatic: (user) => user.click(trigger()),
   },
 });
@@ -161,11 +162,15 @@ describe("Popover", () => {
       const t = trigger();
       expect(t.tagName).toBe("BUTTON");
       expect(t).toHaveAttribute("type", "button");
-      expect(t).toHaveAttribute("command", "toggle-popover");
-      expect(t).toHaveAttribute("aria-expanded", "false");
+      // A `popovertarget` invoker: the browser exposes the popover's state, no `aria-expanded`
+      // (#121).
+      expect(t).not.toHaveAttribute("commandfor");
+      expect(t).not.toHaveAttribute("command");
+      expect(t).not.toHaveAttribute("aria-expanded");
+      expect(t).not.toHaveAttribute("data-open");
       expect(t).not.toHaveAttribute("aria-haspopup");
       expect(t).not.toHaveAttribute("aria-controls");
-      const id = t.getAttribute("commandfor");
+      const id = t.getAttribute("popovertarget");
       expect(id).toBeTruthy();
       const p = popup();
       expect(p.tagName).toBe("DIALOG");
@@ -197,8 +202,10 @@ describe("Popover", () => {
 
     it("renders the same markup in library mode, minus the content", () => {
       render(<Harness mode="uncontrolled" />);
-      expect(trigger()).toHaveAttribute("command", "toggle-popover");
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(trigger()).not.toHaveAttribute("command");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(popup()).toHaveAttribute("popover", "auto");
       expect(popup()).toHaveAttribute("aria-modal", "false");
       expect(content()).toBeNull();
@@ -247,7 +254,7 @@ describe("Popover", () => {
       expect(p).toHaveAttribute("role", "dialog");
       expect(p).toHaveAttribute("aria-modal", "false");
       expect(p).toHaveAttribute("popover", "auto");
-      expect(p.id).toBe(trigger().getAttribute("commandfor"));
+      expect(p.id).toBe(trigger().getAttribute("popovertarget"));
       expect(p.getAttribute("aria-labelledby")).toBe(screen.getByTestId("title").id);
     });
 
@@ -272,16 +279,47 @@ describe("Popover", () => {
       expect(closed).not.toContain("secret content");
     });
 
-    it("library mode: aria-expanded is the shown popup, data-open the intent (#118)", async () => {
-      // `defaultOpen`: not shown before hydration, so not expanded in the server HTML nor on
-      // hydration; expanded with the `toggle` of the apply effect's `showPopover()`.
-      const ui = <Harness mode="uncontrolled" initialOpen action={vi.fn<ActionFn>()} />;
-      expect(renderToString(ui)).toMatch(/<button[^>]*aria-expanded="false"[^>]*data-open=""/);
+    it.each([
+      ["JS-free", "static"],
+      ["library mode", "uncontrolled"],
+      ["library mode, defaultOpen", "uncontrolled"],
+    ] as const)(
+      "%s: the server HTML's Trigger names the popup with popoverTarget, no aria-expanded; hydrates cleanly (#121)",
+      async (label, mode) => {
+        const error = silenceErrors();
+        const ui = <Harness mode={mode} initialOpen={label.endsWith("defaultOpen")} />;
+        const html = renderToString(ui);
+        const button = /<button[^>]*data-testid="trigger"[^>]*>/.exec(html)![0];
+        // React serialises the camelCase name; HTML attribute names are case-insensitive.
+        expect(button).toMatch(/\spopoverTarget="[^"]+"/);
+        expect(button).not.toContain("aria-expanded");
+        expect(button).not.toContain("commandfor");
+        await hydrateFromServer(ui);
+        await flushTasks(2);
+        expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+        expect(trigger()).not.toHaveAttribute("aria-expanded");
+        expect(error).not.toHaveBeenCalled();
+      },
+    );
+
+    it("library mode: a link Trigger's aria-expanded is the shown popup, data-open the intent (#118)", async () => {
+      // A non-button Trigger is no invoker, so it renders the mirror (#121). `defaultOpen`: not
+      // shown before hydration, so not expanded in the server HTML nor on hydration; expanded
+      // with the `toggle` of the apply effect's `showPopover()`.
+      silenceErrors(); // the non-button warning
+      const link = { render: <a href="#" /> };
+      const ui = (
+        <Harness mode="uncontrolled" initialOpen action={vi.fn<ActionFn>()} trigger={link} />
+      );
+      expect(renderToString(ui)).toMatch(/<a[^>]*aria-expanded="false"[^>]*data-open=""/);
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      await hydrateFromServer(<Harness mode="uncontrolled" initialOpen action={action} />, {
-        flush: null,
-      });
+      await hydrateFromServer(
+        <Harness mode="uncontrolled" initialOpen action={action} trigger={link} />,
+        { flush: null },
+      );
+      expect(trigger().tagName).toBe("A");
+      expect(trigger()).not.toHaveAttribute("popovertarget");
       expect(isOpen()).toBe(true);
       expect(trigger()).toHaveAttribute("data-open", "");
       expect(trigger()).toHaveAttribute("aria-expanded", "false");
@@ -311,10 +349,18 @@ describe("Popover", () => {
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("library mode: a refused controlled close keeps aria-expanded true throughout (#118)", async () => {
+    it("library mode: a refused controlled close keeps a link Trigger's aria-expanded true throughout (#118)", async () => {
+      silenceErrors(); // the non-button warning
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" action={action} refuseClose />);
+      render(
+        <Harness
+          mode="controlled"
+          action={action}
+          refuseClose
+          trigger={{ render: <a href="#" /> }}
+        />,
+      );
       await openThroughTrigger(user);
       const closing = deferred();
       action.mockImplementation(() => closing.promise);
@@ -328,14 +374,17 @@ describe("Popover", () => {
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("library mode: a Popup unmounted while open leaves the Trigger not expanded (#118)", async () => {
+    it("library mode: a Popup unmounted while open leaves a link Trigger not expanded (#118)", async () => {
+      silenceErrors(); // the non-button warning
       function Removable() {
         const [mounted, setMounted] = useState(true);
         return (
           <>
             <button type="button" data-testid="remove" onClick={() => setMounted(false)} />
             <Popover.Root defaultOpen>
-              <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+              <Popover.Trigger data-testid="trigger" render={<a href="#" />}>
+                Filters
+              </Popover.Trigger>
               {mounted && (
                 <Popover.Popup data-testid="popup" aria-label="x">
                   content
@@ -396,7 +445,8 @@ describe("Popover", () => {
         [false, false, false],
       ]);
       expect(seen.slice(settled).filter(([, , shown]) => !shown)).toHaveLength(1);
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      // A button Trigger renders no `aria-expanded` from the mirror (#121).
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
     });
 
     it("never lets a render element override the owned keys", () => {
@@ -407,8 +457,8 @@ describe("Popover", () => {
             render: (
               <button
                 type="submit"
-                commandfor="other"
-                command="show-popover"
+                popoverTarget="other"
+                popoverTargetAction="show"
                 aria-expanded="true"
                 data-open=""
               />
@@ -420,9 +470,11 @@ describe("Popover", () => {
         />,
       );
       expect(trigger()).toHaveAttribute("type", "button");
-      expect(trigger()).toHaveAttribute("command", "toggle-popover");
-      expect(trigger().getAttribute("commandfor")).toBe(popup().id);
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger().getAttribute("popovertarget")).toBe(popup().id);
+      // Owned, never written: the platform's default `toggle` (#121).
+      expect(trigger()).not.toHaveAttribute("popovertargetaction");
+      // The render element's `aria-expanded` is dropped, not passed through (#121).
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(trigger()).not.toHaveAttribute("data-open");
       expect(popup().id).not.toBe("other");
       expect(popup()).toHaveAttribute("popover", "auto");
@@ -431,7 +483,7 @@ describe("Popover", () => {
   });
 
   describe("JS-free mode", () => {
-    it("the Trigger's command opens and closes the popup; Close hides it", async () => {
+    it("the Trigger's popovertarget activation opens and closes the popup; Close hides it", async () => {
       const user = setupUser();
       render(<Harness mode="static" />);
       await user.click(trigger());
@@ -444,7 +496,7 @@ describe("Popover", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("the command runs with the Trigger as source (the implicit anchor)", async () => {
+    it("the activation runs with the Trigger as source (the implicit anchor)", async () => {
       const user = setupUser();
       render(<Harness mode="static" />);
       await user.click(trigger());
@@ -462,7 +514,7 @@ describe("Popover", () => {
       expect(trigger()).toHaveAttribute("data-disabled", "");
     });
 
-    it("keeps aria-expanded current on the Trigger element without a React render", async () => {
+    it("keeps data-open current on the Trigger element without a React render (#121)", async () => {
       const user = setupUser();
       let renders = 0;
       render(
@@ -482,17 +534,48 @@ describe("Popover", () => {
       );
       await flushTasks(2);
       const before = renders;
+      // The shim's `popovertarget` activation toggles the popover natively.
       await user.click(trigger());
       await flushTasks(2);
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(isOpen()).toBe(true);
+      expect(trigger()).toHaveAttribute("data-open", "");
+      // The browser exposes the state: no `aria-expanded` is written (#121).
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       await act(async () => popup().hidePopover());
       await flushTasks(2);
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).not.toHaveAttribute("data-open");
       // A foreign open (script) is followed too.
       await act(async () => popup().showPopover());
       await flushTasks(2);
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).toHaveAttribute("data-open", "");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(renders).toBe(before);
+    });
+
+    it("a Trigger that mounts while the popup is shown picks up data-open (#121)", async () => {
+      function Late() {
+        const [mounted, setMounted] = useState(false);
+        return (
+          <>
+            <button type="button" data-testid="mount" onClick={() => setMounted(true)} />
+            <Popover.Root>
+              {mounted && <Popover.Trigger data-testid="trigger">Open</Popover.Trigger>}
+              <Popover.Popup data-testid="popup" aria-label="x">
+                content
+              </Popover.Popup>
+            </Popover.Root>
+          </>
+        );
+      }
+      render(<Late />);
+      await act(async () => popup().showPopover());
+      await flushTasks(2);
+      fireEvent.click(screen.getByTestId("mount"));
+      expect(trigger()).toHaveAttribute("data-open", "");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
+      await act(async () => popup().hidePopover());
+      await flushTasks(2);
+      expect(trigger()).not.toHaveAttribute("data-open");
     });
   });
 
@@ -514,7 +597,7 @@ describe("Popover", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("Enter on the Trigger runs the native command in JS-free mode", async () => {
+    it("Enter on the Trigger runs the native popovertarget activation in JS-free mode", async () => {
       const user = setupUser();
       render(<Harness mode="static" />);
       trigger().focus();
@@ -852,24 +935,34 @@ describe("Popover", () => {
     const hydrate = (ui: ReactNode) =>
       hydrateFromServer(ui, {
         mutate: async (container) => {
-          // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+          // A click before hydration ran the `popovertarget` toggle natively; its `toggle` task
+          // ran too.
           container.querySelector<HTMLElement>("[popover]")!.showPopover();
           await new Promise((resolve) => setTimeout(resolve, 0));
         },
         flush: null,
       });
 
-    it("JS-free mode syncs aria-expanded for a pre-hydration open", async () => {
+    it("JS-free mode syncs data-open for a pre-hydration open (#121)", async () => {
       await act(async () => {
         await hydrate(<Harness mode="static" />);
       });
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).toHaveAttribute("data-open", "");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
     });
 
-    it("library mode: expanded from the first commit while the 'platform' dispatch is pending (#118)", async () => {
+    it("library mode: a link Trigger is expanded from the first commit while the 'platform' dispatch is pending (#118)", async () => {
+      silenceErrors(); // the non-button warning
       const d = deferred();
       const action = vi.fn<ActionFn>(() => d.promise);
-      await hydrate(<Harness mode="uncontrolled" initialOpen={false} action={action} />);
+      await hydrate(
+        <Harness
+          mode="uncontrolled"
+          initialOpen={false}
+          action={action}
+          trigger={{ render: <a href="#" /> }}
+        />,
+      );
       expect(isOpen()).toBe(true);
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]![1].reason).toBe("platform");

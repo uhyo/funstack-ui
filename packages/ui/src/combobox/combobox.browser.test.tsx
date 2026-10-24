@@ -31,7 +31,7 @@ import {
   browserName,
   supportsAriaNotify,
 } from "../__tests__/engine.js";
-import { axProperty, getAXNodes } from "../__tests__/ax-tree.js";
+import { axProperty, expectInvokerExpanded, getAXNodes } from "../__tests__/ax-tree.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Field } from "../field/index.js";
@@ -297,6 +297,9 @@ describe("Combobox (browser)", () => {
         expect(node).toBeDefined();
         expect(axProperty(node, "expanded")).toBe(false);
       }
+      // The Trigger is a `popovertarget` invoker: no attribute, the browser's state (#121).
+      await expectInvokerExpanded(screen.getByTestId("trigger"), popup(), false);
+      expect(input()).toHaveAttribute("data-pending", "");
       await expect.poll(() => input().hasAttribute("data-pending")).toBe(false);
       expect(input()).toHaveAttribute("aria-expanded", "false");
     });
@@ -712,10 +715,12 @@ describe("Combobox (browser)", () => {
       const field = container.querySelector("input")!;
       const triggerButton = container.querySelector("button")!;
       const listbox = container.querySelector("[popover]")!;
-      // The server HTML's Trigger names no popover (#112): a real click before hydration opens
-      // nothing, neither a command nor anything else.
+      // The server HTML's Trigger names no popover (#112, #121): a real click before hydration
+      // opens nothing.
+      expect(triggerButton.hasAttribute("popovertarget")).toBe(false);
       expect(triggerButton.hasAttribute("commandfor")).toBe(false);
       expect(triggerButton.hasAttribute("command")).toBe(false);
+      expect(triggerButton.hasAttribute("aria-expanded")).toBe(false);
       await clickInFrame(iframe, triggerButton);
       expect(listbox.matches(":popover-open")).toBe(false);
       // The real keyboard, before any JS is attached (the locator-based click cannot reach into
@@ -748,8 +753,9 @@ describe("Combobox (browser)", () => {
       expect(listbox.matches(":popover-open")).toBe(false);
       // After hydration the Trigger is the listbox's invoker.
       expect(container.querySelector("button")).toBe(triggerButton);
-      expect(triggerButton.getAttribute("commandfor")).toBe(listbox.id);
-      expect(triggerButton.getAttribute("command")).toBe("toggle-popover");
+      expect(triggerButton.getAttribute("popovertarget")).toBe(listbox.id);
+      expect(triggerButton.hasAttribute("commandfor")).toBe(false);
+      expect(triggerButton.hasAttribute("aria-expanded")).toBe(false);
     } finally {
       iframe.remove();
       // Firefox keeps keyboard focus in the removed frame otherwise (the next row's keys go
@@ -919,7 +925,7 @@ describe("ViewTransition (browser)", () => {
 });
 
 // Design 12.2 "Trigger close (#112)": after hydration the Trigger names the popup
-// (`commandfor` + `command="toggle-popover"`), so a real press on it while the listbox is open is
+// (`popovertarget`, #121), so a real press on it while the listbox is open is
 // not a light dismiss; the click's `requestClose` is the single source of the close. Real mouse
 // input (`mouse.down` / `mouse.up`), outside React's act environment so the timing is real. No
 // engine branch: WebKit is verified by its CI job.
@@ -985,11 +991,14 @@ describe("Trigger close (#112, browser)", () => {
     expect(isOpen()).toBe(true);
     expect(document.activeElement).toBe(input());
     expect(trigger()).toHaveAttribute("data-pending", "");
-    // Optimistically closed, still shown: `aria-expanded` is the shown state (#118).
+    // Optimistically closed, still shown: exposed expanded, no `aria-expanded` (#118, #121; the AX
+    // state on Chromium).
     expect(trigger()).not.toHaveAttribute("data-open");
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    await expectInvokerExpanded(trigger(), popup(), true);
+    expect(isOpen()).toBe(true);
+    expect(trigger()).toHaveAttribute("data-pending", "");
     await expect.poll(() => isOpen(), { timeout: 2000 }).toBe(false);
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    await expectInvokerExpanded(trigger(), popup(), false);
     expect(document.activeElement).toBe(input());
     expect(openAction).toHaveBeenCalledTimes(1);
     const [next, details] = openAction.mock.calls[0]!;
@@ -1030,10 +1039,13 @@ describe("Trigger close (#112, browser)", () => {
       <Harness root={{ openChangeAction: openAction }} trigger={{ render: <a href="#" /> }} />,
     );
     expect(trigger().tagName).toBe("A");
-    expect(trigger()).not.toHaveAttribute("commandfor");
+    expect(trigger()).not.toHaveAttribute("popovertarget");
+    // No invoker: the link exposes the shown mirror itself (#118, #121).
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
     await pressTrigger();
     await expect.poll(() => isOpen()).toBe(true);
     await flushFor();
+    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("true");
     openAction.mockClear();
     const toggles: string[] = [];
     popup().addEventListener("beforetoggle", (event) => toggles.push(event.newState));

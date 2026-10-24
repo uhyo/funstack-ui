@@ -28,6 +28,7 @@ import {
   sleep,
   spyViewTransitions,
 } from "./browser-helpers.js";
+import { expectInvokerExpanded } from "./ax-tree.js";
 import { mouse } from "./browser-commands.js";
 import { user } from "./browser-user.js";
 import { browserName, pressFocusesButtons } from "./engine.js";
@@ -164,8 +165,11 @@ export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
   readonly partClose: () => Promise<void>;
   /** The event the platform's close fires and a dismissal's notification carries. */
   readonly dismissEvent: "close" | "toggle";
-  /** The Trigger carries `aria-expanded` (Popover, Menu; not Dialog). */
-  readonly ariaExpanded: boolean;
+  /**
+   * The Trigger is a `popovertarget` invoker with no `aria-expanded`, whose exposed state the
+   * browser computes from the popup (Popover, Menu, #121; not Dialog).
+   */
+  readonly popoverTarget: boolean;
   /** Extra checks on an Escape's `details` (Dialog: `returnValue` is `""`). */
   readonly dismissDetails?: (details: D) => void;
   /** The "click X while open" rows of the closing table (#117). */
@@ -345,7 +349,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
       expect(details.reason).toBe("dismiss");
       config.dismissDetails?.(details);
       expect(details.event?.type).toBe(config.dismissEvent);
-      if (config.ariaExpanded) expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      if (config.popoverTarget) await expectInvokerExpanded(trigger(), popup(), false);
     });
 
     describe("exit animation and the deferred unmount", () => {
@@ -494,11 +498,11 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
             // The pending window: shown, focus where the press left it, one dispatch.
             expect(isOpen()).toBe(true);
             expect(document.activeElement).toBe(focusAtPress);
-            // The Trigger's optimistic feedback: pending, no longer `data-open`; `aria-expanded`
-            // stays on the shown popup (#118).
+            // The Trigger's optimistic feedback: pending, no longer `data-open`; still exposed
+            // expanded, the popup is shown (#118, #121).
             expect(trigger()).toHaveAttribute("data-pending", "");
             expect(trigger()).not.toHaveAttribute("data-open");
-            if (config.ariaExpanded) expect(trigger()).toHaveAttribute("aria-expanded", "true");
+            if (config.popoverTarget) await expectInvokerExpanded(trigger(), popup(), true);
             expect(action).toHaveBeenCalledTimes(calls + 1);
             expect(last()[0]).toBe(false);
             expect(last()[1].reason).toBe("activate");
@@ -519,9 +523,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           }
 
           await expect.poll(() => document.activeElement).toBe(press.focusAfter({ pressFocused }));
-          if (config.ariaExpanded) {
-            await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
-          }
+          if (config.popoverTarget) await expectInvokerExpanded(trigger(), popup(), false);
           await quietPeriod(50, "no re-open and no second dispatch");
           expect(isOpen()).toBe(false);
           expect(action).toHaveBeenCalledTimes(calls + 1);

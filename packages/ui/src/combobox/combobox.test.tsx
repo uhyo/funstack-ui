@@ -89,6 +89,7 @@ function Options({ query }: { query: string }) {
 
 interface HarnessProps {
   root?: Partial<ComboboxRootProps>;
+  trigger?: Partial<ComboboxTriggerProps>;
   popup?: Partial<ComboboxPopupProps>;
   /** List content for a query; default: the countries matching it. */
   results?: (query: string) => ReactNode;
@@ -97,12 +98,12 @@ interface HarnessProps {
   boundary?: (error: unknown) => void;
 }
 
-function Harness({ root, popup, results, afterList, boundary }: HarnessProps) {
+function Harness({ root, trigger, popup, results, afterList, boundary }: HarnessProps) {
   let box: ReactNode = (
     <Combobox.Root {...root}>
       <Combobox.Label data-testid="label">Country</Combobox.Label>
       <Combobox.Input data-testid="input" />
-      <Combobox.Trigger data-testid="trigger" aria-label="Show all" />
+      <Combobox.Trigger data-testid="trigger" aria-label="Show all" {...trigger} />
       <Combobox.Clear data-testid="clear" aria-label="Clear" />
       <Combobox.Popup data-testid="popup" {...popup}>
         <Combobox.List data-testid="list">
@@ -247,11 +248,15 @@ describe("Combobox", () => {
       const t = trigger();
       expect(t).toHaveAttribute("type", "button");
       expect(t).toHaveAttribute("tabindex", "-1");
-      expect(t).toHaveAttribute("aria-expanded", "false");
+      // The browser exposes the listbox's state on the invoker: no `aria-expanded` (#121).
+      expect(t).not.toHaveAttribute("aria-expanded");
       expect(t).toHaveAttribute("aria-controls", i.getAttribute("aria-controls"));
-      // Written after hydration (#112); absent from the server HTML (the "Trigger close" rows).
-      expect(t).toHaveAttribute("commandfor", popup().id);
-      expect(t).toHaveAttribute("command", "toggle-popover");
+      // Written after hydration (#112, #121); absent from the server HTML (the "Trigger close"
+      // rows).
+      expect(t).toHaveAttribute("popovertarget", popup().id);
+      expect(t).not.toHaveAttribute("popovertargetaction");
+      expect(t).not.toHaveAttribute("commandfor");
+      expect(t).not.toHaveAttribute("command");
       expect(clearButton()).toHaveAttribute("type", "button");
       expect(clearButton()).toHaveAttribute("tabindex", "-1");
       const p = popup();
@@ -745,7 +750,8 @@ describe("Combobox", () => {
       await flushTasks(2);
       expect(isOpen()).toBe(true);
       expect(document.activeElement).toBe(input());
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(input()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(trigger()).toHaveAttribute("data-open", "");
       await user.click(trigger());
       await flushTasks(2);
@@ -2048,14 +2054,19 @@ describe("Combobox", () => {
       server.innerHTML = html;
       const serverTrigger = server.querySelector('[data-testid="trigger"]')!;
       expect(serverTrigger.tagName).toBe("BUTTON");
+      expect(serverTrigger).not.toHaveAttribute("popovertarget");
       expect(serverTrigger).not.toHaveAttribute("commandfor");
       expect(serverTrigger).not.toHaveAttribute("command");
+      // No state before hydration either (#121): the Input carries it.
+      expect(serverTrigger).not.toHaveAttribute("aria-expanded");
       render(<Harness />);
-      expect(trigger()).toHaveAttribute("commandfor", popup().id);
-      expect(trigger()).toHaveAttribute("command", "toggle-popover");
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(trigger()).not.toHaveAttribute("command");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
     });
 
-    it("a non-button render gets neither attribute and a development warning", () => {
+    it("a non-button render gets no popovertarget, renders aria-expanded from shown and warns", async () => {
       const error = silenceErrors();
       render(
         <Combobox.Root>
@@ -2069,15 +2080,27 @@ describe("Combobox", () => {
         </Combobox.Root>,
       );
       expect(trigger().tagName).toBe("SPAN");
+      expect(trigger()).not.toHaveAttribute("popovertarget");
       expect(trigger()).not.toHaveAttribute("commandfor");
       expect(trigger()).not.toHaveAttribute("command");
+      // No invoker, so the Trigger exposes the shown listbox itself (#118, #121).
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      act(() => trigger().click());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      // The `toggle` that reports it shown is a task after `showPopover()`.
+      await flushTasks(2);
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      act(() => popup().hidePopover());
+      await flushTasks(2);
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
       const messages = error.mock.calls.map(([message]) => String(message));
       expect(
         messages.filter((m) => m.includes("Combobox.Trigger: rendered a <span>. Only a <button>")),
       ).toHaveLength(1);
     });
 
-    it("removes both attributes when the Trigger's element goes away (a render swap)", () => {
+    it("removes popovertarget when the Trigger's element goes away (a render swap)", () => {
       const error = silenceErrors();
       function Swap({ span }: { span: boolean }) {
         return (
@@ -2098,21 +2121,34 @@ describe("Combobox", () => {
       }
       const { rerender } = render(<Swap span={false} />);
       const button = trigger();
-      expect(button).toHaveAttribute("commandfor", popup().id);
+      expect(button).toHaveAttribute("popovertarget", popup().id);
       rerender(<Swap span />);
       expect(trigger()).not.toBe(button);
-      expect(button).not.toHaveAttribute("commandfor");
-      expect(button).not.toHaveAttribute("command");
-      expect(trigger()).not.toHaveAttribute("commandfor");
+      expect(button).not.toHaveAttribute("popovertarget");
+      expect(trigger()).not.toHaveAttribute("popovertarget");
       expect(error).toHaveBeenCalled();
     });
 
-    it("commandfor and command are owned keys", () => {
+    it("popoverTarget and popoverTargetAction are owned keys; commandfor and command reserved", () => {
       // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
+      const popoverTarget: ComboboxTriggerProps = { popoverTarget: "elsewhere" };
+      // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
+      const popoverTargetAction: ComboboxTriggerProps = { popoverTargetAction: "show" };
+      // @ts-expect-error -- reserved key, omitted from ComboboxTriggerProps
       const commandfor: ComboboxTriggerProps = { commandfor: "elsewhere" };
-      // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
+      // @ts-expect-error -- reserved key, omitted from ComboboxTriggerProps
       const command: ComboboxTriggerProps = { command: "show-popover" };
-      expect([commandfor, command]).toHaveLength(2);
+      expect([popoverTarget, popoverTargetAction, commandfor, command]).toHaveLength(4);
+      // A render element cannot set them either: the ref writes the Popup's id.
+      render(
+        <Harness
+          trigger={{
+            render: <button type="button" popoverTarget="elsewhere" popoverTargetAction="show" />,
+          }}
+        />,
+      );
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("popovertargetaction");
     });
 
     it("every click is cancelled, closed and open (the command never runs)", async () => {
@@ -2172,12 +2208,12 @@ describe("Combobox", () => {
       expect(isOpen()).toBe(false);
       expectPending(input());
       expect(input()).toHaveAttribute("aria-expanded", "false");
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       await act(async () => close.resolve());
       await flushTasks(2);
       expectNotPending(input());
       expect(input()).toHaveAttribute("aria-expanded", "false");
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
     });
 
     it("a dismissal entangled with an unrelated pending action: not expanded meanwhile (#118)", async () => {
@@ -2195,7 +2231,7 @@ describe("Combobox", () => {
       expect(openAction.mock.calls.at(-1)![0]).toBe(false);
       expectPending(input());
       expect(input()).toHaveAttribute("aria-expanded", "false");
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       await act(async () => save.resolve());
       await flushTasks(2);
       expectNotPending(input());
@@ -2213,16 +2249,18 @@ describe("Combobox", () => {
       await flushTasks(2);
       expect(isOpen()).toBe(true);
       expectPending(trigger());
-      // Optimistically closed, but the listbox is still shown: `aria-expanded` is the shown state
-      // on the Trigger and the input alike (#118).
+      // Optimistically closed, but the listbox is still shown: the input's `aria-expanded` is the
+      // shown state (#118); the Trigger renders none, the browser exposes it (#121).
       expect(trigger()).not.toHaveAttribute("data-open");
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(input()).toHaveAttribute("aria-expanded", "true");
       await act(async () => close.resolve());
       await flushTasks(2);
       expect(isOpen()).toBe(true);
       expectNotPending(trigger());
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(input()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(hide).not.toHaveBeenCalled();
       expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "activate"]]);
     });
@@ -2636,14 +2674,14 @@ describe("Combobox", () => {
       // Optimistically open, nothing shown yet (#118).
       expect(input()).toHaveAttribute("data-open", "");
       expect(input()).toHaveAttribute("aria-expanded", "false");
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(shows).toHaveLength(0);
       await act(async () => results.resolve("all"));
       await flushTasks(2);
       expect(shows).toHaveLength(1);
       expect(isOpen()).toBe(true);
       expect(input()).toHaveAttribute("aria-expanded", "true");
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expectNotPending(input());
     });
   });

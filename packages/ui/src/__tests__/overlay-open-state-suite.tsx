@@ -13,7 +13,7 @@
 // which is what Escape or a light dismiss does.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentPropsWithRef, ComponentType, ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
 import type { OverlayCloseIntent } from "../internal/use-overlay-root.js";
@@ -135,13 +135,18 @@ export function createOverlayHarness<D, P extends object>(
 
 /** The harness props the suite uses; a component harness accepts at least these. */
 export interface OverlaySuiteHarnessProps<D> extends OverlayHarnessProps<D> {
-  trigger?: { disabled?: boolean } | false;
+  trigger?:
+    | { disabled?: boolean; render?: ReactElement<Partial<ComponentPropsWithRef<"button">>> }
+    | false;
   popup?: { className?: string; keepMounted?: boolean };
   /** Popup content; the default renders `data-testid="content"` (and Dialog's Close, value "x"). */
   content?: ReactNode;
 }
 
 type User = ReturnType<typeof setupUser>;
+
+/** How a row renders the Trigger: the default `<button>`, or a link `render` (no invoker). */
+type TriggerKind = "button" | "link";
 
 /** The Root's close-intent record, read through the component's context. */
 interface CloseIntents {
@@ -199,8 +204,11 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
    * the click is the only close (design/components/menu.md 2.2, #110).
    */
   readonly triggerToggles: boolean;
-  /** The Trigger carries `aria-expanded` (Popover, Menu; not Dialog). */
-  readonly ariaExpanded: boolean;
+  /**
+   * The Trigger is a `popovertarget` invoker with no `aria-expanded`, and a non-button `render`
+   * renders the `shown` mirror instead (Popover, Menu, #121; not Dialog).
+   */
+  readonly popoverTarget: boolean;
   /**
    * An open the library did not start (Dialog: a `show-modal` command; Popover: a script's
    * `showPopover()`), run inside `act`. Returns the event the library cancels and passes as
@@ -249,7 +257,7 @@ export function popoverLikeDriver<D extends OverlayDetailsLike>(): Omit<
     dismissEvent: "toggle",
     detailsKeys: ["reason"],
     triggerToggles: true,
-    ariaExpanded: true,
+    popoverTarget: true,
     // A script's showPopover(): cancelled at `beforetoggle`, which is the dispatched event.
     foreignOpen: () => {
       let before!: Event;
@@ -258,7 +266,7 @@ export function popoverLikeDriver<D extends OverlayDetailsLike>(): Omit<
       return before;
     },
     foreignOpenCallsOpen: true,
-    // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+    // A click before hydration ran the `popovertarget` toggle natively; its `toggle` task ran too.
     openBeforeHydration: async (element) => {
       element.showPopover();
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -281,8 +289,36 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
   const committedText = () => screen.getByTestId("committed").textContent;
   const returnValueOf = (details: D) =>
     (details as unknown as { returnValue?: unknown }).returnValue;
-  const expectExpanded = (expanded: boolean) => {
-    if (config.ariaExpanded) expect(trigger()).toHaveAttribute("aria-expanded", String(expanded));
+  /**
+   * The Trigger kinds a row that reads the exposed open state runs with. A `<button>` Trigger is a
+   * `popovertarget` invoker with no `aria-expanded`: the browser exposes the popup's state (#121),
+   * which jsdom has no accessibility tree to show. A link `render` is no invoker and renders the
+   * `shown` mirror as `aria-expanded` (#118), so the mirror's phases stay observable here. Dialog:
+   * the button only.
+   */
+  const triggerKinds: readonly TriggerKind[] = config.popoverTarget
+    ? ["button", "link"]
+    : ["button"];
+  const kindName = (kind: TriggerKind) => (kind === "link" ? " [link Trigger]" : "");
+  const triggerProps = (kind: TriggerKind): Pick<OverlaySuiteHarnessProps<D>, "trigger"> => {
+    if (kind === "button") return {};
+    // The non-button Trigger's development warning (#115) is expected.
+    silenceErrors();
+    return { trigger: { render: <a href="#" /> } };
+  };
+  /**
+   * Whether the popup is exposed as shown: a button Trigger names the popup in every phase and
+   * renders no `aria-expanded`; a link Trigger renders the mirror's value.
+   */
+  const expectShown = (kind: TriggerKind, shown: boolean) => {
+    if (!config.popoverTarget) return;
+    if (kind === "button") {
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
+    } else {
+      expect(trigger()).not.toHaveAttribute("popovertarget");
+      expect(trigger()).toHaveAttribute("aria-expanded", String(shown));
+    }
   };
 
   /** Opens through the Trigger and waits for the popup to be shown. */
@@ -383,108 +419,111 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
     });
 
     renderBoth("async action", (mode) => {
-      it("open: pending Trigger, popup closed and content unmounted until it resolves", async () => {
-        const user = setupUser();
-        const open = spyOpen();
-        const d = deferred();
-        render(<Harness mode={mode} action={() => d.promise} />);
-        await user.click(trigger());
-        // `aria-expanded` is the shown popup (committed); `data-open` the optimistic intent (#118).
-        expectExpanded(false);
-        expect(trigger()).toHaveAttribute("data-open", "");
-        expectPending(trigger());
-        expect(open).not.toHaveBeenCalled();
-        expect(isOpen()).toBe(false);
-        expect(content()).toBeNull();
-        await act(async () => d.resolve());
-        expect(open).toHaveBeenCalledTimes(1);
-        expect(open).toHaveBeenCalledWith(...config.openArgs());
-        expect(isOpen()).toBe(true);
-        expect(content()).toBeInTheDocument();
-        // `aria-expanded` mirrors the popup's `toggle`, a task after `showPopover()` (#118).
-        await flushTasks(2);
-        expectExpanded(true);
-        expect(trigger()).toHaveAttribute("data-open", "");
-        expectNotPending(trigger());
-      });
+      for (const kind of triggerKinds)
+        it(`open: pending Trigger, popup closed and content unmounted until it resolves${kindName(kind)}`, async () => {
+          const user = setupUser();
+          const open = spyOpen();
+          const d = deferred();
+          render(<Harness mode={mode} {...triggerProps(kind)} action={() => d.promise} />);
+          await user.click(trigger());
+          // `aria-expanded` is the shown popup (committed); `data-open` the optimistic intent (#118).
+          expectShown(kind, false);
+          expect(trigger()).toHaveAttribute("data-open", "");
+          expectPending(trigger());
+          expect(open).not.toHaveBeenCalled();
+          expect(isOpen()).toBe(false);
+          expect(content()).toBeNull();
+          await act(async () => d.resolve());
+          expect(open).toHaveBeenCalledTimes(1);
+          expect(open).toHaveBeenCalledWith(...config.openArgs());
+          expect(isOpen()).toBe(true);
+          expect(content()).toBeInTheDocument();
+          // `aria-expanded` mirrors the popup's `toggle`, a task after `showPopover()` (#118).
+          await flushTasks(2);
+          expectShown(kind, true);
+          expect(trigger()).toHaveAttribute("data-open", "");
+          expectNotPending(trigger());
+        });
 
-      it("part-initiated close: library-owned, open while openChangeAction(false) runs, closed on resolve", async () => {
-        const user = setupUser();
-        const action = vi.fn<Action>();
-        render(<Harness mode={mode} action={action} />);
-        await openThroughTrigger(user);
-        const d = deferred();
-        action.mockImplementation(() => d.promise);
-        const close = spyClose();
-        await partClose(user);
-        // The Root dispatched (a part with a native close command: its click was cancelled).
-        expect(action).toHaveBeenCalledTimes(2);
-        const [next, details] = action.mock.calls[1]!;
-        expect(next).toBe(false);
-        expect(details.reason).toBe("activate");
-        if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
-        expect(details.event!.type).toBe("click");
-        expect(details.event!.defaultPrevented).toBe(config.partCloseCancelsClick);
-        // Still open while the action runs; the Trigger shows the Root's pending.
-        expect(isOpen()).toBe(true);
-        expect(close).not.toHaveBeenCalled();
-        expect(content()).toBeInTheDocument();
-        expectPending(trigger());
-        expect(trigger()).not.toHaveAttribute("data-open");
-        // Still shown, so still expanded until the close commits (#118).
-        expectExpanded(true);
-        if (config.partCloseReturnsFocus) expect(trigger()).not.toHaveFocus();
-        await flushTasks(2);
-        expect(isOpen()).toBe(true);
-        expect(close).not.toHaveBeenCalled();
-        expect(content()).toBeInTheDocument();
-        expectPending(trigger());
-        await act(async () => d.resolve());
-        expect(close).toHaveBeenCalledTimes(1);
-        expect(close).toHaveBeenCalledWith(...config.partCloseArgs);
-        expect(isOpen()).toBe(false);
-        if (hasReturnValue) expect((popup() as HTMLDialogElement).returnValue).toBe("x");
-        expect(committedText()).toBe("false");
-        expectNotPending(trigger());
-        await flushTasks(2);
-        expect(content()).toBeNull();
-        // The close event is an echo: no second notification.
-        expect(action).toHaveBeenCalledTimes(2);
-        // Focus moved back from the part to the Trigger.
-        if (config.partCloseReturnsFocus) expect(trigger()).toHaveFocus();
-      });
+      for (const kind of triggerKinds)
+        it(`part-initiated close: library-owned, open while openChangeAction(false) runs, closed on resolve${kindName(kind)}`, async () => {
+          const user = setupUser();
+          const action = vi.fn<Action>();
+          render(<Harness mode={mode} {...triggerProps(kind)} action={action} />);
+          await openThroughTrigger(user);
+          const d = deferred();
+          action.mockImplementation(() => d.promise);
+          const close = spyClose();
+          await partClose(user);
+          // The Root dispatched (a part with a native close command: its click was cancelled).
+          expect(action).toHaveBeenCalledTimes(2);
+          const [next, details] = action.mock.calls[1]!;
+          expect(next).toBe(false);
+          expect(details.reason).toBe("activate");
+          if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
+          expect(details.event!.type).toBe("click");
+          expect(details.event!.defaultPrevented).toBe(config.partCloseCancelsClick);
+          // Still open while the action runs; the Trigger shows the Root's pending.
+          expect(isOpen()).toBe(true);
+          expect(close).not.toHaveBeenCalled();
+          expect(content()).toBeInTheDocument();
+          expectPending(trigger());
+          expect(trigger()).not.toHaveAttribute("data-open");
+          // Still shown, so still expanded until the close commits (#118).
+          expectShown(kind, true);
+          if (config.partCloseReturnsFocus) expect(trigger()).not.toHaveFocus();
+          await flushTasks(2);
+          expect(isOpen()).toBe(true);
+          expect(close).not.toHaveBeenCalled();
+          expect(content()).toBeInTheDocument();
+          expectPending(trigger());
+          await act(async () => d.resolve());
+          expect(close).toHaveBeenCalledTimes(1);
+          expect(close).toHaveBeenCalledWith(...config.partCloseArgs);
+          expect(isOpen()).toBe(false);
+          if (hasReturnValue) expect((popup() as HTMLDialogElement).returnValue).toBe("x");
+          expect(committedText()).toBe("false");
+          expectNotPending(trigger());
+          await flushTasks(2);
+          expect(content()).toBeNull();
+          // The close event is an echo: no second notification.
+          expect(action).toHaveBeenCalledTimes(2);
+          // Focus moved back from the part to the Trigger.
+          if (config.partCloseReturnsFocus) expect(trigger()).toHaveFocus();
+        });
 
-      it("dismissal: notified as (false, 'dismiss') with the platform's event; pending meanwhile", async () => {
-        const user = setupUser();
-        const action = vi.fn<Action>();
-        render(<Harness mode={mode} action={action} />);
-        await openThroughTrigger(user);
-        const d = deferred();
-        action.mockImplementation(() => d.promise);
-        // What Escape or a click outside does: the platform closes at once.
-        await act(async () => dismiss("x"));
-        expect(isOpen()).toBe(false);
-        // The notification follows the platform's event.
-        await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(2);
-        const [next, details] = action.mock.calls[1]!;
-        expect(next).toBe(false);
-        expect(details.reason).toBe("dismiss");
-        if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
-        expect(details.event!.type).toBe(config.dismissEvent);
-        expectPending(trigger());
-        expect(trigger()).not.toHaveAttribute("data-open");
-        // `aria-expanded` mirrors the hidden popup from its `toggle`, though committed is still
-        // true until the notification settles (#118).
-        expectExpanded(false);
-        expect(content()).toBeInTheDocument(); // committed is still true
-        await act(async () => d.resolve());
-        expectNotPending(trigger());
-        expectExpanded(false);
-        expect(content()).toBeNull();
-        expect(committedText()).toBe("false");
-        expect(isOpen()).toBe(false);
-      });
+      for (const kind of triggerKinds)
+        it(`dismissal: notified as (false, 'dismiss') with the platform's event; pending meanwhile${kindName(kind)}`, async () => {
+          const user = setupUser();
+          const action = vi.fn<Action>();
+          render(<Harness mode={mode} {...triggerProps(kind)} action={action} />);
+          await openThroughTrigger(user);
+          const d = deferred();
+          action.mockImplementation(() => d.promise);
+          // What Escape or a click outside does: the platform closes at once.
+          await act(async () => dismiss("x"));
+          expect(isOpen()).toBe(false);
+          // The notification follows the platform's event.
+          await flushTasks(2);
+          expect(action).toHaveBeenCalledTimes(2);
+          const [next, details] = action.mock.calls[1]!;
+          expect(next).toBe(false);
+          expect(details.reason).toBe("dismiss");
+          if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
+          expect(details.event!.type).toBe(config.dismissEvent);
+          expectPending(trigger());
+          expect(trigger()).not.toHaveAttribute("data-open");
+          // `aria-expanded` mirrors the hidden popup from its `toggle`, though committed is still
+          // true until the notification settles (#118).
+          expectShown(kind, false);
+          expect(content()).toBeInTheDocument(); // committed is still true
+          await act(async () => d.resolve());
+          expectNotPending(trigger());
+          expectShown(kind, false);
+          expect(content()).toBeNull();
+          expect(committedText()).toBe("false");
+          expect(isOpen()).toBe(false);
+        });
 
       it("a commit between the platform's close and its event does not re-open", async () => {
         const user = setupUser();
@@ -642,54 +681,56 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
     });
 
     describe("controlled refusal and veto", () => {
-      it("a refused dismissal re-opens the popup once the notification settles; not a veto", async () => {
-        const user = setupUser();
-        const d = deferred();
-        const action = vi.fn<Action>();
-        render(<Harness mode="controlled" action={action} refuseClose />);
-        await openThroughTrigger(user);
-        const open = spyOpen();
-        action.mockImplementation(() => d.promise);
-        await act(async () => dismiss());
-        expect(isOpen()).toBe(false);
-        await flushTasks(2);
-        expectPending(trigger());
-        // Hidden while the notification runs: the mirror says so though committed stays true (#118).
-        expectExpanded(false);
-        expect(open).not.toHaveBeenCalled();
-        await act(async () => d.resolve());
-        expect(open).toHaveBeenCalledTimes(1);
-        expect(isOpen()).toBe(true);
-        expect(trigger()).toHaveAttribute("data-open", "");
-        // Expanded again with the re-show's `toggle`.
-        await flushTasks(2);
-        expectExpanded(true);
-        expectNotPending(trigger());
-      });
+      for (const kind of triggerKinds)
+        it(`a refused dismissal re-opens the popup once the notification settles; not a veto${kindName(kind)}`, async () => {
+          const user = setupUser();
+          const d = deferred();
+          const action = vi.fn<Action>();
+          render(<Harness mode="controlled" {...triggerProps(kind)} action={action} refuseClose />);
+          await openThroughTrigger(user);
+          const open = spyOpen();
+          action.mockImplementation(() => d.promise);
+          await act(async () => dismiss());
+          expect(isOpen()).toBe(false);
+          await flushTasks(2);
+          expectPending(trigger());
+          // Hidden while the notification runs: the mirror says so though committed stays true (#118).
+          expectShown(kind, false);
+          expect(open).not.toHaveBeenCalled();
+          await act(async () => d.resolve());
+          expect(open).toHaveBeenCalledTimes(1);
+          expect(isOpen()).toBe(true);
+          expect(trigger()).toHaveAttribute("data-open", "");
+          // Expanded again with the re-show's `toggle`.
+          await flushTasks(2);
+          expectShown(kind, true);
+          expectNotPending(trigger());
+        });
 
-      it("a refused part-initiated close is a real veto: never closed, data-open snaps back (11.14)", async () => {
-        const user = setupUser();
-        const action = vi.fn<Action>();
-        const open = spyOpen();
-        render(<Harness mode="controlled" action={action} refuseClose />);
-        await openThroughTrigger(user);
-        open.mockClear();
-        const close = spyClose();
-        const d = deferred();
-        action.mockImplementation(() => d.promise);
-        await partClose(user);
-        expect(trigger()).not.toHaveAttribute("data-open");
-        expectExpanded(true);
-        await act(async () => d.resolve());
-        await flushTasks(2);
-        expect(close).not.toHaveBeenCalled();
-        expect(open).not.toHaveBeenCalled(); // never blinked
-        expect(isOpen()).toBe(true);
-        expect(content()).toBeInTheDocument();
-        expect(trigger()).toHaveAttribute("data-open", "");
-        expectExpanded(true);
-        expectNotPending(trigger());
-      });
+      for (const kind of triggerKinds)
+        it(`a refused part-initiated close is a real veto: never closed, data-open snaps back (11.14)${kindName(kind)}`, async () => {
+          const user = setupUser();
+          const action = vi.fn<Action>();
+          const open = spyOpen();
+          render(<Harness mode="controlled" {...triggerProps(kind)} action={action} refuseClose />);
+          await openThroughTrigger(user);
+          open.mockClear();
+          const close = spyClose();
+          const d = deferred();
+          action.mockImplementation(() => d.promise);
+          await partClose(user);
+          expect(trigger()).not.toHaveAttribute("data-open");
+          expectShown(kind, true);
+          await act(async () => d.resolve());
+          await flushTasks(2);
+          expect(close).not.toHaveBeenCalled();
+          expect(open).not.toHaveBeenCalled(); // never blinked
+          expect(isOpen()).toBe(true);
+          expect(content()).toBeInTheDocument();
+          expect(trigger()).toHaveAttribute("data-open", "");
+          expectShown(kind, true);
+          expectNotPending(trigger());
+        });
 
       it("a vetoed open snaps back and the popup never opens", async () => {
         const user = setupUser();
@@ -751,39 +792,40 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
 
       if (config.triggerToggles) {
         renderBoth("second click during a pending open (walkthrough 11.7)", (mode) => {
-          it("both actions run, the popup never opens, the latest intent wins", async () => {
-            const user = setupUser();
-            const open = spyOpen();
-            const opening = deferred();
-            const closing = deferred();
-            const action = vi.fn<Action>();
-            action.mockImplementationOnce(() => opening.promise);
-            action.mockImplementationOnce(() => closing.promise);
-            render(<Harness mode={mode} action={action} />);
-            await user.click(trigger());
-            await user.click(trigger());
-            expect(action).toHaveBeenCalledTimes(2);
-            expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
-            expectExpanded(false);
-            expect(trigger()).not.toHaveAttribute("data-open");
-            expectPending(trigger());
-            // Out of order: the close first, then the superseded open.
-            await act(async () => closing.resolve());
-            await act(async () => opening.resolve());
-            await flushTasks(2);
-            expectNotPending(trigger());
-            if (mode === "uncontrolled") {
-              expectExpanded(false);
+          for (const kind of triggerKinds)
+            it(`both actions run, the popup never opens, the latest intent wins${kindName(kind)}`, async () => {
+              const user = setupUser();
+              const open = spyOpen();
+              const opening = deferred();
+              const closing = deferred();
+              const action = vi.fn<Action>();
+              action.mockImplementationOnce(() => opening.promise);
+              action.mockImplementationOnce(() => closing.promise);
+              render(<Harness mode={mode} {...triggerProps(kind)} action={action} />);
+              await user.click(trigger());
+              await user.click(trigger());
+              expect(action).toHaveBeenCalledTimes(2);
+              expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
+              expectShown(kind, false);
               expect(trigger()).not.toHaveAttribute("data-open");
-              expect(open).not.toHaveBeenCalled();
-              expect(isOpen()).toBe(false);
-            } else {
-              // A controlled parent that adopts every resolution in arrival order ends with the
-              // slower one (conventions 2.5); the DOM follows the parent.
-              expect(committedText()).toBe("true");
-              expect(isOpen()).toBe(true);
-            }
-          });
+              expectPending(trigger());
+              // Out of order: the close first, then the superseded open.
+              await act(async () => closing.resolve());
+              await act(async () => opening.resolve());
+              await flushTasks(2);
+              expectNotPending(trigger());
+              if (mode === "uncontrolled") {
+                expectShown(kind, false);
+                expect(trigger()).not.toHaveAttribute("data-open");
+                expect(open).not.toHaveBeenCalled();
+                expect(isOpen()).toBe(false);
+              } else {
+                // A controlled parent that adopts every resolution in arrival order ends with the
+                // slower one (conventions 2.5); the DOM follows the parent.
+                expect(committedText()).toBe("true");
+                expect(isOpen()).toBe(true);
+              }
+            });
         });
       }
     });
@@ -850,26 +892,34 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
     });
 
     renderBoth("suspending content", (mode) => {
-      it("keeps the popup closed and the Trigger pending until the content is ready", async () => {
-        const user = setupUser();
-        const open = spyOpen();
-        const suspender = createSuspender();
-        render(<Harness mode={mode} suspense content={<suspender.Suspender value="details" />} />);
-        await user.click(trigger());
-        await flushTasks(2);
-        expect(open).not.toHaveBeenCalled();
-        expect(isOpen()).toBe(false);
-        expectPending(trigger());
-        expectExpanded(false);
-        expect(screen.queryByTestId("fallback")).toBeNull();
-        await act(async () => suspender.resolve("details", "Order details"));
-        expect(open).toHaveBeenCalledTimes(1);
-        expect(isOpen()).toBe(true);
-        expect(screen.getByTestId("suspender")).toHaveTextContent("Order details");
-        await flushTasks(2);
-        expectExpanded(true);
-        expectNotPending(trigger());
-      });
+      for (const kind of triggerKinds)
+        it(`keeps the popup closed and the Trigger pending until the content is ready${kindName(kind)}`, async () => {
+          const user = setupUser();
+          const open = spyOpen();
+          const suspender = createSuspender();
+          render(
+            <Harness
+              mode={mode}
+              {...triggerProps(kind)}
+              suspense
+              content={<suspender.Suspender value="details" />}
+            />,
+          );
+          await user.click(trigger());
+          await flushTasks(2);
+          expect(open).not.toHaveBeenCalled();
+          expect(isOpen()).toBe(false);
+          expectPending(trigger());
+          expectShown(kind, false);
+          expect(screen.queryByTestId("fallback")).toBeNull();
+          await act(async () => suspender.resolve("details", "Order details"));
+          expect(open).toHaveBeenCalledTimes(1);
+          expect(isOpen()).toBe(true);
+          expect(screen.getByTestId("suspender")).toHaveTextContent("Order details");
+          await flushTasks(2);
+          expectShown(kind, true);
+          expectNotPending(trigger());
+        });
 
       it("keepMounted: content is pre-rendered hidden inside <Activity>", async () => {
         const user = setupUser();
@@ -910,25 +960,26 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
       }
 
       renderBoth("pre-hydration open", (mode) => {
-        it("one dispatch with reason 'platform' and no event; accepted: content mounts", async () => {
-          silenceErrors();
-          let open!: MockInstance;
-          const action = vi.fn<Action>();
-          await hydrate(<Harness mode={mode} action={action} />, () => {
-            open = spyOpen();
+        for (const kind of triggerKinds)
+          it(`one dispatch with reason 'platform' and no event; accepted: content mounts${kindName(kind)}`, async () => {
+            silenceErrors();
+            let open!: MockInstance;
+            const action = vi.fn<Action>();
+            await hydrate(<Harness mode={mode} {...triggerProps(kind)} action={action} />, () => {
+              open = spyOpen();
+            });
+            await flushTasks(2);
+            expect(action).toHaveBeenCalledTimes(1);
+            const [next, details] = action.mock.calls[0]!;
+            expect(next).toBe(true);
+            expect(details.reason).toBe("platform");
+            expect(details.event).toBeUndefined();
+            if (hasReturnValue) expect(returnValueOf(details)).toBeUndefined();
+            expect(content()).toBeInTheDocument();
+            expect(isOpen()).toBe(true);
+            expect(open).not.toHaveBeenCalled();
+            expectShown(kind, true);
           });
-          await flushTasks(2);
-          expect(action).toHaveBeenCalledTimes(1);
-          const [next, details] = action.mock.calls[0]!;
-          expect(next).toBe(true);
-          expect(details.reason).toBe("platform");
-          expect(details.event).toBeUndefined();
-          if (hasReturnValue) expect(returnValueOf(details)).toBeUndefined();
-          expect(content()).toBeInTheDocument();
-          expect(isOpen()).toBe(true);
-          expect(open).not.toHaveBeenCalled();
-          expectExpanded(true);
-        });
 
         it("StrictMode still dispatches once", async () => {
           silenceErrors();
@@ -1007,17 +1058,18 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(content()).toBeNull();
       });
 
-      it("defaultOpen opens after mount", async () => {
-        const open = spyOpen();
-        render(<Harness mode="uncontrolled" initialOpen />);
-        expect(open).toHaveBeenCalledTimes(1);
-        expect(isOpen()).toBe(true);
-        expect(content()).toBeInTheDocument();
-        // Not expanded until the popup's `toggle` reports it shown (#118).
-        expectExpanded(false);
-        await flushTasks(2);
-        expectExpanded(true);
-      });
+      for (const kind of triggerKinds)
+        it(`defaultOpen opens after mount${kindName(kind)}`, async () => {
+          const open = spyOpen();
+          render(<Harness mode="uncontrolled" {...triggerProps(kind)} initialOpen />);
+          expect(open).toHaveBeenCalledTimes(1);
+          expect(isOpen()).toBe(true);
+          expect(content()).toBeInTheDocument();
+          // Not expanded until the popup's `toggle` reports it shown (#118).
+          expectShown(kind, false);
+          await flushTasks(2);
+          expectShown(kind, true);
+        });
     });
 
     describe("close intents", () => {

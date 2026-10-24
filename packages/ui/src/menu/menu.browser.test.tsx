@@ -24,6 +24,7 @@ import { act, render, screen } from "@testing-library/react";
 import { userEvent } from "vitest/browser";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
 import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import { deferred } from "../__tests__/helpers.js";
@@ -209,7 +210,7 @@ describeOverlayInBrowser<MenuOpenChangeDetails>({
   open: () => openWithKeyboard(),
   partClose: () => user.keyboard("{Enter}"),
   dismissEvent: "toggle",
-  ariaExpanded: true,
+  popoverTarget: true,
   // Design 2.2. The Trigger is #110's rows below; a submenu's presses are in "submenus".
   pressesWhileOpen: [
     {
@@ -553,7 +554,7 @@ describe("submenus (browser)", () => {
       await quietPeriod(80, "neither menu may close");
       expect(isOpen(sub())).toBe(true);
       expect(isOpen()).toBe(true);
-      expect(item("move")).toHaveAttribute("aria-expanded", "true");
+      await expectInvokerExpanded(item("move"), sub(), true);
       expect([action.mock.calls.length, subAction.mock.calls.length]).toEqual(calls);
     });
 
@@ -580,7 +581,7 @@ describe("submenus (browser)", () => {
       expect(document.activeElement).toBe(item("delete"));
       expect(trigger()).toHaveAttribute("data-pending", "");
       expect(trigger()).not.toHaveAttribute("data-open");
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      await expectInvokerExpanded(trigger(), popup(), true);
       expect(action).toHaveBeenCalledTimes(calls + 1);
       const [next, details] = action.mock.calls.at(-1)!;
       expect(next).toBe(false);
@@ -614,7 +615,7 @@ describe("submenus (browser)", () => {
       expect(isOpen(subElement)).toBe(true);
       expect(isOpen()).toBe(true);
       expect(trigger()).toHaveAttribute("data-pending", "");
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      await expectInvokerExpanded(trigger(), popup(), true);
       expect(action).toHaveBeenCalledTimes(calls + 1);
       const [next, details] = action.mock.calls.at(-1)!;
       expect(next).toBe(false);
@@ -933,7 +934,7 @@ describe("checkbox and radio items (browser)", () => {
     expect(item("name")).toHaveAttribute("aria-checked", "false");
     expect(onKeep).toHaveBeenCalledTimes(1);
     expect(action).toHaveBeenCalledTimes(calls);
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    await expectInvokerExpanded(trigger(), popup(), true);
   });
 
   it("closeOnActivate closes after the change action", async () => {
@@ -1033,12 +1034,13 @@ describe("Trigger click while open (browser, #110)", () => {
 
   /**
    * Pending close through the click: menu shown, item focused, optimistic feedback on the Trigger;
-   * `aria-expanded` stays on the shown menu (#118).
+   * exposed expanded while the menu is shown, with no `aria-expanded` (#118, #121; the AX state on
+   * Chromium).
    */
-  function expectPendingClose(action: ReturnType<typeof setup>["action"], calls: number) {
+  async function expectPendingClose(action: ReturnType<typeof setup>["action"], calls: number) {
     expect(document.activeElement).toBe(item("rename"));
     expect(isOpen()).toBe(true);
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    await expectInvokerExpanded(trigger(), popup(), true);
     expect(trigger()).not.toHaveAttribute("data-open");
     expect(trigger()).toHaveAttribute("data-pending", "");
     expect(action).toHaveBeenCalledTimes(calls);
@@ -1056,9 +1058,10 @@ describe("Trigger click while open (browser, #110)", () => {
     const calls = action.mock.calls.length;
     await user.click(trigger());
     await flushFor();
-    expectPendingClose(action, calls + 1);
+    await expectPendingClose(action, calls + 1);
     await act(async () => work.resolve());
     await settle(() => expect(isOpen()).toBe(false));
+    await expectInvokerExpanded(trigger(), popup(), false);
     expect(trigger()).toHaveFocus();
     expect(action).toHaveBeenCalledTimes(calls + 1);
   });
@@ -1081,9 +1084,10 @@ describe("Trigger click while open (browser, #110)", () => {
       await mouse.up(x, y);
     });
     await flushFor();
-    expectPendingClose(action, calls + 1);
+    await expectPendingClose(action, calls + 1);
     await act(async () => work.resolve());
     await settle(() => expect(isOpen()).toBe(false));
+    await expectInvokerExpanded(trigger(), popup(), false);
     expect(trigger()).toHaveFocus();
     expect(action).toHaveBeenCalledTimes(calls + 1);
   });

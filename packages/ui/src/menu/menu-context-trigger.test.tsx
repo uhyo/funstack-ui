@@ -1135,7 +1135,7 @@ describe("Menu.ContextTrigger", () => {
   });
 
   describe("dual-trigger Root", () => {
-    it("Trigger: anchored; region: point; aria-expanded on the Trigger during a context open", async () => {
+    it("Trigger: anchored; region: point; the Trigger names the menu during a context open", async () => {
       const user = setupUser();
       const { calls } = watchShow();
       render(<Harness withTrigger />);
@@ -1150,7 +1150,10 @@ describe("Menu.ContextTrigger", () => {
       await rightClick(screen.getByTestId("label"));
       expect(calls.at(-1)!.source).toBe(region());
       expect(popup()).toHaveAttribute("data-context", "");
-      expect(t).toHaveAttribute("aria-expanded", "true");
+      // Still the menu's `popovertarget` invoker, so the browser exposes it expanded whoever
+      // opened the menu; no `aria-expanded` (#121).
+      expect(t).toHaveAttribute("popovertarget", popup().id);
+      expect(t).not.toHaveAttribute("aria-expanded");
       expect(t).toHaveAttribute("data-open", "");
     });
 
@@ -1588,7 +1591,7 @@ describe("Menu.ContextTrigger", () => {
     });
 
     // The gesture finds the submenu through the SubmenuTrigger's registration, not its
-    // `commandfor`, which a non-button SubmenuTrigger does not get (#115 review F4).
+    // `popovertarget`, which a non-button SubmenuTrigger does not get (#115 review F4).
     it.each([
       ["a <button>", undefined],
       ["a <div>", <div key="div" />],
@@ -1608,7 +1611,7 @@ describe("Menu.ContextTrigger", () => {
         await elapse(150);
         const submenu = screen.getByTestId("submenu");
         expect(isOpen(submenu)).toBe(true);
-        expect(item("move").hasAttribute("commandfor")).toBe(element === undefined);
+        expect(item("move").hasAttribute("popovertarget")).toBe(element === undefined);
         // Over the submenu itself, not an item: focus stays on the SubmenuTrigger.
         hit = submenu;
         captured("pointermove", 420, 230);

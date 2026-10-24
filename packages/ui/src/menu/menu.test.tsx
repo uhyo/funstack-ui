@@ -206,6 +206,7 @@ describeOverlayDisabledRenders<MenuOpenChangeDetails, object>({
   Harness: OpenStateHarness,
   isOpen: () => isOpen(),
   spyOpen: spyShow,
+  popoverTarget: true,
 });
 
 describe("Menu", () => {
@@ -217,9 +218,11 @@ describe("Menu", () => {
       expect(t.tagName).toBe("BUTTON");
       expect(t).toHaveAttribute("type", "button");
       expect(t).toHaveAttribute("aria-haspopup", "menu");
-      expect(t).toHaveAttribute("aria-expanded", "false");
-      expect(t).toHaveAttribute("command", "toggle-popover");
-      expect(t).toHaveAttribute("commandfor", p.id);
+      // A `popovertarget` invoker: the browser exposes the menu's state (#121).
+      expect(t).not.toHaveAttribute("aria-expanded");
+      expect(t).toHaveAttribute("popovertarget", p.id);
+      expect(t).not.toHaveAttribute("commandfor");
+      expect(t).not.toHaveAttribute("command");
       expect(t.id).toBe(`${p.id}-trigger`);
       expect(p.tagName).toBe("DIV");
       expect(p).toHaveAttribute("popover", "auto");
@@ -291,7 +294,8 @@ describe("Menu", () => {
       expect(item("by-date")).toHaveAttribute("aria-checked", "false");
       expect(item("by-date")).not.toHaveAttribute("data-checked");
       expect(item("by-date")).not.toHaveAttribute("value");
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
       expect(trigger()).toHaveAttribute("data-open", "");
     });
 
@@ -315,9 +319,11 @@ describe("Menu", () => {
       expect(move).toHaveAttribute("role", "menuitem");
       expect(move).toHaveAttribute("tabindex", "-1");
       expect(move).toHaveAttribute("aria-haspopup", "menu");
-      expect(move).toHaveAttribute("aria-expanded", "false");
-      expect(move).toHaveAttribute("commandfor", sub.id);
-      expect(move).toHaveAttribute("command", "toggle-popover");
+      // A `popovertarget` invoker, `menuitem` included: no `aria-expanded` (#121).
+      expect(move).not.toHaveAttribute("aria-expanded");
+      expect(move).toHaveAttribute("popovertarget", sub.id);
+      expect(move).not.toHaveAttribute("commandfor");
+      expect(move).not.toHaveAttribute("command");
       expect(move.id).toBe(`${sub.id}-trigger`);
       expect(sub).toHaveAttribute("aria-labelledby", move.id);
       // Wave 11 (#53): the inline-end side, the right in LTR and the left in RTL.
@@ -425,7 +431,7 @@ describe("Menu", () => {
       expect(calls[0]!.autofocus).toBe(popup());
     });
 
-    it("server HTML: a disabled Trigger with a component render is an enabled button with no command", () => {
+    it("server HTML: a disabled Trigger with a component render is an enabled button with no popovertarget", () => {
       const container = document.createElement("div");
       container.innerHTML = renderToString(
         <Menu.Root>
@@ -439,9 +445,12 @@ describe("Menu", () => {
       );
       const button = container.querySelector("button")!;
       expect(button).toHaveAttribute("aria-disabled", "true");
+      expect(button).not.toHaveAttribute("popovertarget");
       expect(button).not.toHaveAttribute("commandfor");
       expect(button).not.toHaveAttribute("command");
-      // Enabled again: the command is back.
+      // No invoker: the Trigger exposes the (closed) state itself (#121).
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      // Enabled again: the invoker attribute is back.
       container.innerHTML = renderToString(
         <Menu.Root>
           <Menu.Trigger render={<PlainButton />}>Actions</Menu.Trigger>
@@ -450,7 +459,9 @@ describe("Menu", () => {
           </Menu.Popup>
         </Menu.Root>,
       );
-      expect(container.querySelector("button")).toHaveAttribute("command", "toggle-popover");
+      const enabled = container.querySelector("button")!;
+      expect(enabled).toHaveAttribute("popovertarget", container.querySelector("[popover]")!.id);
+      expect(enabled).not.toHaveAttribute("aria-expanded");
     });
 
     it("a disabled Trigger with a host <button> render stays natively disabled", () => {
@@ -1694,16 +1705,19 @@ describe("Menu.Root", () => {
     await user.click(trigger());
     await flushTasks(2);
     expectPending(trigger());
-    // Optimistically open, but nothing is shown yet: `aria-expanded` is the shown state (#118).
+    // Optimistically open, but nothing is shown yet: the browser exposes the shown state on the
+    // invoker, so the Trigger renders no `aria-expanded` (#121; the link-render mirror's phases
+    // are in the shared suite).
     expect(trigger()).toHaveAttribute("data-open", "");
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+    expect(trigger()).not.toHaveAttribute("aria-expanded");
     expect(calls).toHaveLength(0);
     expect(screen.queryByTestId("fallback")).toBeNull();
     await act(async () => resolve("recent"));
     await flushTasks(2);
     expect(calls).toHaveLength(1);
     expect(calls[0]!.autofocus).toBe(item("first"));
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    expect(trigger()).not.toHaveAttribute("aria-expanded");
     expectNotPending(trigger());
   });
 
@@ -1751,7 +1765,8 @@ describe("Menu.Root", () => {
     );
     await hydrateFromServer(ui, {
       mutate: async (container) => {
-        // A click before hydration ran `toggle-popover` natively; its `toggle` task ran too.
+        // A click before hydration ran the `popovertarget` toggle natively; its `toggle` task ran
+        // too.
         container.querySelector<HTMLElement>("[popover]")!.showPopover();
         await new Promise((resolve) => setTimeout(resolve, 0));
       },
@@ -1953,7 +1968,8 @@ describe("submenus", () => {
     expect(last.source).toBe(item("move"));
     expect(popoverSource(sub())).toBe(item("move"));
     expect(last.autofocus).toBe(item("inbox"));
-    expect(item("move")).toHaveAttribute("aria-expanded", "true");
+    expect(item("move")).toHaveAttribute("popovertarget", sub().id);
+    expect(item("move")).not.toHaveAttribute("aria-expanded");
     expect(item("move")).toHaveAttribute("data-open", "");
   });
 
@@ -2266,11 +2282,12 @@ describe("submenus", () => {
       const hide = spyHide();
       await user.click(trigger());
       // The click is the only close: shown, item focused, optimistic feedback on the Trigger;
-      // `aria-expanded` stays on the shown menu (#118).
+      // the browser exposes the shown menu on the invoker, no `aria-expanded` (#121).
       expect(isOpen()).toBe(true);
       expect(item("rename")).toHaveFocus();
       expect(trigger()).not.toHaveAttribute("data-open");
-      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(trigger()).toHaveAttribute("data-pending", "");
       expect(hide).not.toHaveBeenCalled();
       expect(action).toHaveBeenCalledTimes(2);
@@ -2287,7 +2304,7 @@ describe("submenus", () => {
       await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(hide).toHaveBeenCalledTimes(1);
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
       expect(trigger()).not.toHaveAttribute("data-pending");
       expect(action).toHaveBeenCalledTimes(2);
     });

@@ -21,7 +21,7 @@ import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import { axProperty, getAXNodes } from "../__tests__/ax-tree.js";
+import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
 import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import {
@@ -173,7 +173,7 @@ describeOverlayInBrowser<PopoverOpenChangeDetails>({
   },
   partClose: () => user.click(trigger()),
   dismissEvent: "toggle",
-  ariaExpanded: true,
+  popoverTarget: true,
   // Design 2.3 and 7. The non-button Trigger (#115) is its own row below.
   pressesWhileOpen: [
     {
@@ -212,7 +212,7 @@ describeOverlayInBrowser<PopoverOpenChangeDetails>({
 });
 
 describe("JS-free mode (browser)", () => {
-  it("a real toggle-popover click opens and closes; aria-expanded follows; Close hides", async () => {
+  it("a real popovertarget click opens and closes; data-open and the exposed state follow; Close hides", async () => {
     render(
       <Popover.Root>
         <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
@@ -222,39 +222,35 @@ describe("JS-free mode (browser)", () => {
         </Popover.Popup>
       </Popover.Root>,
     );
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    // The `toggle` listener writes `data-open` (#121); the browser exposes the state.
+    expect(trigger()).not.toHaveAttribute("data-open");
+    await expectInvokerExpanded(trigger(), popup(), false);
     await user.click(trigger());
     expect(isOpen()).toBe(true);
-    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("true");
+    await expect.poll(() => trigger().hasAttribute("data-open")).toBe(true);
+    await expectInvokerExpanded(trigger(), popup(), true);
     await user.click(trigger());
     expect(isOpen()).toBe(false);
-    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
+    await expect.poll(() => trigger().hasAttribute("data-open")).toBe(false);
+    await expectInvokerExpanded(trigger(), popup(), false);
     await user.click(trigger());
     expect(isOpen()).toBe(true);
     await user.click(screen.getByTestId("close"));
     expect(isOpen()).toBe(false);
-    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
+    await expect.poll(() => trigger().hasAttribute("data-open")).toBe(false);
+    await expectInvokerExpanded(trigger(), popup(), false);
     // The platform returned focus to the invoker (first popover in a stack).
     expect(trigger()).toHaveFocus();
   });
 });
 
 describe("library mode (browser)", () => {
-  // The attribute and, on Chromium, the computed AX state agree in every pending phase: Chromium
-  // and WebKit compute an invoker's state from the popover, Firefox reads the attribute (#118).
-  // CDP is Chromium-only; Firefox and WebKit run the DOM assertions. The attribute mirrors the
-  // popup's `toggle`, a task after the DOM change, hence the poll.
-  const expectExpanded = async (expanded: boolean) => {
-    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe(String(expanded));
-    if (browserName !== "chromium") return;
-    const node = (await getAXNodes()).find(
-      (n) => n.role?.value === "button" && n.name?.value === "Filters",
-    );
-    expect(node).toBeDefined();
-    expect(axProperty(node, "expanded")).toBe(expanded);
-  };
+  // The Trigger is a `popovertarget` invoker with no `aria-expanded` in every pending phase; on
+  // Chromium the computed AX state is the shown popup (#121, the state #118 rendered). CDP is
+  // Chromium-only; Firefox and WebKit run the DOM assertions.
+  const expectExpanded = (expanded: boolean) => expectInvokerExpanded(trigger(), popup(), expanded);
 
-  it("aria-expanded is the shown popup during a deferred open and a deferred Trigger close (#118)", async () => {
+  it("the exposed state is the shown popup during a deferred open and a deferred Trigger close (#118, #121)", async () => {
     let work = deferred();
     const action = vi.fn<ActionFn>(() => work.promise);
     render(<Library action={action} />);
@@ -276,7 +272,7 @@ describe("library mode (browser)", () => {
     await expectExpanded(false);
   });
 
-  it("aria-expanded is false right after an Escape, while a slow dismissal notification runs (#118)", async () => {
+  it("the exposed state is collapsed right after an Escape, while a slow dismissal notification runs (#118, #121)", async () => {
     const action = vi.fn<ActionFn>((next) =>
       next ? undefined : new Promise<void>((resolve) => setTimeout(resolve, 300)),
     );
@@ -289,8 +285,9 @@ describe("library mode (browser)", () => {
     expect(isOpen()).toBe(false);
     expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
     expect(trigger()).toHaveAttribute("data-pending", "");
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
     await expectExpanded(false);
+    // Still within the notification.
+    expect(trigger()).toHaveAttribute("data-pending", "");
     await expect.poll(() => trigger().hasAttribute("data-pending")).toBe(false);
     await expectExpanded(false);
   });
@@ -312,12 +309,12 @@ describe("library mode (browser)", () => {
     // The command was cancelled: the popup is still hidden while the action runs.
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveAttribute("data-pending", "");
-    // Optimistically open (`data-open`), not shown: `aria-expanded` is the shown state (#118).
+    // Optimistically open (`data-open`), not shown: exposed collapsed (#118, #121).
     expect(trigger()).toHaveAttribute("data-open", "");
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    await expectInvokerExpanded(trigger(), popup(), false);
     await act(async () => release());
     expect(isOpen()).toBe(true);
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    await expectInvokerExpanded(trigger(), popup(), true);
     expect(trigger()).not.toHaveAttribute("data-pending");
     // `showPopover({ source: trigger })`: the implicit anchor; `position-area: bottom`.
     const t = trigger().getBoundingClientRect();
@@ -579,7 +576,7 @@ describe("nested popovers (browser)", () => {
       const innerTrigger = screen.getByTestId("inner-trigger");
       expect(innerTrigger).toHaveAttribute("data-pending", "");
       expect(innerTrigger).not.toHaveAttribute("data-open");
-      expect(innerTrigger).toHaveAttribute("aria-expanded", "true");
+      await expectInvokerExpanded(innerTrigger, inner(), true);
       expect(innerAction).toHaveBeenCalledTimes(innerCalls + 1);
       const [next, details] = innerAction.mock.calls.at(-1)!;
       expect(next).toBe(false);
@@ -589,7 +586,7 @@ describe("nested popovers (browser)", () => {
       expect(isOpen(inner())).toBe(true);
       work.resolve();
       await expect.poll(() => isOpen(inner())).toBe(false);
-      await expect.poll(() => innerTrigger.getAttribute("aria-expanded")).toBe("false");
+      await expectInvokerExpanded(innerTrigger, inner(), false);
       expect(isOpen()).toBe(true);
       expect(action).toHaveBeenCalledTimes(outerCalls);
       expect(popup().contains(document.activeElement)).toBe(true);
@@ -873,9 +870,9 @@ describe("resolved side (wave 11, #20)", () => {
     await closePlaced();
   });
 
-  it("JS-free mode (a commandfor click) reports the resolved side the same way", async () => {
+  it("JS-free mode (a popovertarget click) reports the resolved side the same way", async () => {
     render(<Placed top={window.innerHeight - 40} jsFree />);
-    expect(trigger()).toHaveAttribute("commandfor", popup().id);
+    expect(trigger()).toHaveAttribute("popovertarget", popup().id);
     await user.click(trigger());
     await actPoll(() => isOpen(), true);
     await actPoll(side, "top");
@@ -1064,8 +1061,10 @@ describe("non-button Trigger click while open (browser, #115)", () => {
       </div>,
     );
     expect(trigger().tagName).toBe("A");
-    // No invoker attributes: only a button is an invoker.
+    // No invoker attribute: only a button is an invoker; it exposes the mirror itself (#121).
+    expect(trigger()).not.toHaveAttribute("popovertarget");
     expect(trigger()).not.toHaveAttribute("commandfor");
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
     await user.click(trigger());
     await settle(() => expect(isOpen()).toBe(true));
     expect(action).toHaveBeenCalledTimes(1);
@@ -1154,7 +1153,7 @@ describe("a real press on a foreign invoker while open (browser, #117)", () => {
       expect(details.reason).toBe("activate");
       expect(details.event?.type).toBe("command");
       work.resolve();
-      await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("false");
+      await expectInvokerExpanded(trigger(), popup(), false);
       // Focus moved to the invoker at the press (outside the popup): the hide returns nothing.
       expect(document.activeElement).toBe(focusesButtons ? foreign : trigger());
       await quietPeriod(50, "no re-open and no second dispatch");
@@ -1204,7 +1203,7 @@ describe("a real press on a Close with action (browser, #117)", () => {
     expect(close).toHaveAttribute("data-pending", "");
     await quietPeriod(50, "the popup must stay shown while the Close's action runs");
     expect(isOpen()).toBe(true);
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    await expectInvokerExpanded(trigger(), popup(), true);
     expect(action).toHaveBeenCalledTimes(calls);
     save.resolve();
     await expect.poll(() => isOpen()).toBe(false);

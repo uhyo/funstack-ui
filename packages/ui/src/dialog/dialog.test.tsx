@@ -83,7 +83,7 @@ describeOverlayOpenState<DialogOpenChangeDetails>({
   partCloseReturnsFocus: true,
   detailsKeys: ["reason", "returnValue"],
   triggerToggles: false,
-  ariaExpanded: false,
+  popoverTarget: false,
   foreignOpen: () => dispatchCommand(popup(), "show-modal", screen.getByTestId("elsewhere")),
   foreignOpenCallsOpen: false,
   openBeforeHydration: (element) => element.setAttribute("open", ""),

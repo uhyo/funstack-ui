@@ -193,7 +193,7 @@ describeOverlayInBrowser<DialogOpenChangeDetails>({
   open: openWithTrigger,
   partClose: () => user.click(screen.getByTestId("close")),
   dismissEvent: "close",
-  ariaExpanded: false,
+  popoverTarget: false,
   dismissDetails: (details) => expect(details.returnValue).toBe(""),
   // Design 2.3 and 7, a modal dialog (the Trigger is under the `::backdrop`). The non-modal
   // Trigger press (#116) is its own describe below.

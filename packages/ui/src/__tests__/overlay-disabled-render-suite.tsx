@@ -2,8 +2,10 @@
 // (design/components/button.md 17.3, #83): Dialog, Popover and Menu (#109). A disabled part that
 // renders a link or a component cannot be natively disabled, so it is `aria-disabled` and the
 // library cancels its click; a host `<button>` render (or none) is natively disabled; a disabled
-// component render is no invoker (no `commandfor` / `command`), except a JS-free part without an
-// action, whose native command the platform must skip (native `disabled`).
+// component render is no invoker (no `commandfor` / `command`, no `popovertarget`), except a
+// JS-free part without an action, whose native command the platform must skip (native
+// `disabled`). A Popover or Menu Trigger that is no invoker renders `aria-expanded` from the
+// `shown` mirror instead; an invoker one renders none (#121).
 //
 // Each component's test file calls `describeOverlayDisabledRenders` with its open-state harness
 // (`createOverlayHarness`); the Close rows run where the overlay has a Close part and a JS-free
@@ -37,6 +39,11 @@ export interface OverlayDisabledRenderConfig<D, P extends object> {
   readonly isOpen: () => boolean;
   /** Spies on the method the library opens the popup with (`showModal`, `showPopover`). */
   readonly spyOpen: () => MockInstance;
+  /**
+   * The Trigger is a `popovertarget` invoker with no `aria-expanded`, and renders `aria-expanded`
+   * from the `shown` mirror when it is no invoker (Popover, Menu, #121; not Dialog).
+   */
+  readonly popoverTarget?: boolean;
   /** The Trigger rows run once per variant, with its extra Harness props (Dialog: `modal`). */
   readonly triggerVariants?: readonly (readonly [label: string, props: P])[];
   /** The Close part (`data-testid="close"`) and the JS-free mode, where the overlay has them. */
@@ -72,6 +79,7 @@ function expectAriaDisabled(el: Element) {
 function expectNoInvoker(el: Element) {
   expect(el).not.toHaveAttribute("commandfor");
   expect(el).not.toHaveAttribute("command");
+  expect(el).not.toHaveAttribute("popovertarget");
 }
 
 export function describeOverlayDisabledRenders<D, P extends object>(
@@ -88,6 +96,11 @@ export function describeOverlayDisabledRenders<D, P extends object>(
 
   const trigger = () => screen.getByTestId("trigger");
   const closePart = () => screen.getByTestId("close");
+  /** A Trigger that is no invoker: a popover-like one exposes the mirror itself (#118, #121). */
+  const expectTriggerNoInvoker = (shown: boolean) => {
+    expectNoInvoker(trigger());
+    if (config.popoverTarget) expect(trigger()).toHaveAttribute("aria-expanded", String(shown));
+  };
 
   describe(`${config.name} disabled on link and component renders (shared suite, design/components/button.md 17.3)`, () => {
     describe.each(renders)("Trigger, %s render", (_, element) => {
@@ -106,6 +119,8 @@ export function describeOverlayDisabledRenders<D, P extends object>(
             />,
           );
           expectAriaDisabled(trigger());
+          // Nothing native stops an activation here, so it is no invoker (#83 M1, #115).
+          expectTriggerNoInvoker(false);
           // Cancelled: a link does not navigate.
           expect(cancelled(trigger())).toBe(true);
           trigger().focus();
@@ -132,6 +147,12 @@ export function describeOverlayDisabledRenders<D, P extends object>(
         );
         expect(trigger()).toBeDisabled();
         expect(trigger()).not.toHaveAttribute("aria-disabled");
+        if (config.popoverTarget) {
+          // Native `disabled` stops the activation: still names the popup, still no attribute
+          // (a disabled button is no invoker to the browser and exposes no state, #121 sub-decision 5).
+          expect(trigger()).toHaveAttribute("popovertarget", screen.getByTestId("popup").id);
+          expect(trigger()).not.toHaveAttribute("aria-expanded");
+        }
         fireEvent.keyDown(trigger(), { key: "ArrowDown" });
         fireEvent.click(trigger());
         await flushTasks(2);
@@ -141,7 +162,7 @@ export function describeOverlayDisabledRenders<D, P extends object>(
     );
 
     // Review M1 of #83.
-    it("library mode, disabled component renders are no invokers: no commandfor / command", async () => {
+    it("library mode, disabled component renders are no invokers: no commandfor / command / popovertarget", async () => {
       render(
         <Harness
           mode="uncontrolled"
@@ -151,12 +172,14 @@ export function describeOverlayDisabledRenders<D, P extends object>(
         />,
       );
       await flushTasks(2);
-      expectNoInvoker(trigger());
+      // `defaultOpen`: shown.
+      expectTriggerNoInvoker(true);
       if (close) expectNoInvoker(closePart());
     });
 
     // #115 review F4: a host element other than a button is no invoker, enabled or not, so it
-    // gets no `commandfor` / `command` (a component render is assumed to render a button).
+    // gets no `commandfor` / `command` / `popovertarget` (a component render is assumed to render a
+    // button).
     it.each(variants)("library mode%s, an enabled link render is no invoker", async (_, extra) => {
       render(
         <Harness
@@ -168,7 +191,7 @@ export function describeOverlayDisabledRenders<D, P extends object>(
         />,
       );
       await flushTasks(2);
-      expectNoInvoker(trigger());
+      expectTriggerNoInvoker(true);
       if (close) {
         expectNoInvoker(closePart());
         // Still available: no invoker attributes does not mean unavailable.
@@ -260,6 +283,11 @@ export function describeOverlayDisabledRenders<D, P extends object>(
       for (const el of [trigger(), closePart()]) {
         expect(el).toBeDisabled();
         expect(el).not.toHaveAttribute("aria-disabled");
+      }
+      if (config.popoverTarget) {
+        // Natively disabled, so still the named invoker with no `aria-expanded` (#121).
+        expect(trigger()).toHaveAttribute("popovertarget", screen.getByTestId("popup").id);
+        expect(trigger()).not.toHaveAttribute("aria-expanded");
       }
     });
 
