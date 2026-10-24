@@ -33,7 +33,7 @@ import { useNativeGroupReconciliation } from "../internal/use-native-group-recon
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { boundValue, stepBy, stepValue } from "./number-field-arithmetic.js";
+import { keyStep, stepValue } from "./number-field-arithmetic.js";
 import type { StepBounds } from "./number-field-arithmetic.js";
 import { NumberFieldContext } from "./number-field-context.js";
 import type {
@@ -487,36 +487,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
         return;
       }
       if (event.altKey || event.ctrlKey || event.metaKey) return;
-      let compute: ((base: number | null) => number | null) | null = null;
-      switch (event.key) {
-        case "ArrowUp":
-          compute = event.shiftKey ? (v) => stepBy(v, large, b) : (v) => stepValue(v, 1, b);
-          break;
-        case "ArrowDown":
-          compute = event.shiftKey ? (v) => stepBy(v, -large, b) : (v) => stepValue(v, -1, b);
-          break;
-        case "PageUp":
-          compute = (v) => stepBy(v, large, b);
-          break;
-        case "PageDown":
-          compute = (v) => stepBy(v, -large, b);
-          break;
-        case "Home": {
-          // Shift+Home / Shift+End are text selection.
-          if (event.shiftKey) break;
-          const target = boundValue("min", b);
-          if (target !== undefined) compute = () => target;
-          break;
-        }
-        case "End": {
-          if (event.shiftKey) break;
-          const target = boundValue("max", b);
-          if (target !== undefined) compute = () => target;
-          break;
-        }
-        default:
-          break;
-      }
+      const compute = keyStep(event.key, event.shiftKey, b, large);
       if (compute === null) return;
       event.preventDefault();
       oneStep(compute, "keyboard", event);

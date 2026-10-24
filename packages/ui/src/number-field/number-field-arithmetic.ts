@@ -99,3 +99,35 @@ export function isAtBound(value: number | null, direction: 1 | -1, bounds: StepB
   if (value === null) return false;
   return stepValue(value, direction, bounds) === value;
 }
+
+/**
+ * The step a key makes (design 4.2) from the value it steps from: ArrowUp / ArrowDown one step
+ * (with Shift `± largeStep`), PageUp / PageDown `± largeStep`, Home / End the bound
+ * (`boundValue`; nothing without one, and nothing with Shift, which selects text). `null`: the key
+ * is not a NumberField key.
+ */
+export function keyStep(
+  key: string,
+  shiftKey: boolean,
+  bounds: StepBounds,
+  largeStep: number,
+): ((base: number | null) => number | null) | null {
+  switch (key) {
+    case "ArrowUp":
+      return shiftKey ? (v) => stepBy(v, largeStep, bounds) : (v) => stepValue(v, 1, bounds);
+    case "ArrowDown":
+      return shiftKey ? (v) => stepBy(v, -largeStep, bounds) : (v) => stepValue(v, -1, bounds);
+    case "PageUp":
+      return (v) => stepBy(v, largeStep, bounds);
+    case "PageDown":
+      return (v) => stepBy(v, -largeStep, bounds);
+    case "Home":
+    case "End": {
+      if (shiftKey) return null;
+      const target = boundValue(key === "Home" ? "min" : "max", bounds);
+      return target === undefined ? null : () => target;
+    }
+    default:
+      return null;
+  }
+}
