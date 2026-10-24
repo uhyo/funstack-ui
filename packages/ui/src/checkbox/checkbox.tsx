@@ -1,8 +1,6 @@
 "use client";
-import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
-import { createActionDetails } from "../internal/action-details.js";
-import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
   ActionDetails,
@@ -11,14 +9,7 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
-import {
-  fieldInputProps,
-  useFieldControl,
-  useFieldValueChange,
-} from "../internal/use-field-control.js";
-import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
+import { useCheckableInput } from "../internal/use-checkable-input.js";
 import { useRender } from "../internal/use-render.js";
 
 export interface CheckboxState {
@@ -123,64 +114,30 @@ export function Checkbox({
   defaultChecked,
   indeterminate = false,
   checkedChangeAction,
-  disabled: disabledProp,
+  disabled,
   transition,
   className,
   style,
   render,
   ...rest
 }: CheckboxProps) {
-  // Inside a Field.Root (design/components/field-form.md 7.2) the Field owns the id and the ARIA
-  // wiring, and `name` / `required` / `disabled` default from it.
-  const field = useFieldControl({
-    labelable: true,
-    name: rest.name,
-    disabled: disabledProp,
-    required: rest.required,
-    id: rest.id,
+  const input = useCheckableInput({
     component: "Checkbox",
-  });
-  const disabled = field.disabled;
-
-  const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
-    boolean,
-    CheckboxCheckedChangeDetails
-  >({
-    controlled: checked,
-    defaultValue: defaultChecked,
-    initialValue: false,
-    action: checkedChangeAction,
+    checked,
+    defaultChecked,
+    checkedChangeAction,
+    disabled,
+    rest,
     transitionTypes: (next) => transitionTypes("checkbox", next ? "check" : "uncheck"),
-    warn: { component: "Checkbox", prop: "checked" },
-  });
-  // Inside a Field: a value React writes with no event (a rejected action rolling back, a
-  // controlled change) re-reads validity and `validate` after the commit.
-  useFieldValueChange(optimistic);
-
-  // Suspended while pending (conventions 4.1): the browser clears the property on the click, and
-  // the parent may not have recomputed yet. Restored on settle if the parent still says mixed.
-  const shownIndeterminate = indeterminate && !pending;
-
-  const inputRef = useNativeChecked({
-    type: "checkbox",
-    component: "Checkbox",
-    checked: optimistic,
-    // Uncontrolled: the latest prop is the reset target. Controlled: React's mount-time value.
-    defaultChecked: checked === undefined ? (defaultChecked ?? false) : undefined,
-    indeterminate: shownIndeterminate,
-    latestInFlight,
-    onPlatformChange: (next, event) =>
-      dispatch(next, createActionDetails(event, { reason: "platform" })),
+    indeterminate,
   });
 
   const state: CheckboxState = {
-    checked: optimistic,
-    indeterminate: shownIndeterminate,
-    pending,
-    disabled,
+    checked: input.optimistic,
+    indeterminate: input.shownIndeterminate,
+    pending: input.pending,
+    disabled: input.disabled,
   };
-
-  const ref = useMergedRefs<HTMLInputElement>(inputRef, field.ref);
 
   const element = useRender<ComponentPropsWithRef<"input">, CheckboxState>({
     defaultElement: "input",
@@ -189,40 +146,10 @@ export function Checkbox({
     className,
     style,
     children: undefined,
-    ref,
+    ref: input.ref,
     // Pass-through layer: a `render` element's own props win over these (`role` included).
     props: rest,
-    // Library-controlled layer (owned keys, conventions 1.2).
-    libraryProps: {
-      ...fieldInputProps(field),
-      type: "checkbox",
-      // The DOM state is the optimistic state (conventions 3.2).
-      checked: optimistic,
-      defaultChecked: undefined,
-      // Not a DOM attribute; the hook sets the property. Owned so a `render` element's own
-      // `indeterminate` prop (which react-dom would warn about) is stripped.
-      ...{ indeterminate: undefined },
-      "aria-checked": undefined,
-      // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
-      // `render` element cannot re-enable (`disabled={false}`) or disable the input on its own.
-      disabled,
-      "data-checked": dataAttr(optimistic),
-      "data-indeterminate": dataAttr(shownIndeterminate),
-      "data-pending": dataAttr(pending),
-      "data-disabled": dataAttr(disabled),
-      onChange: (event: ChangeEvent<HTMLInputElement>) => {
-        // A natively disabled input fires no click; this covers `render` elements that do not
-        // honour `disabled`.
-        if (disabled) return;
-        const nativeEvent = event.nativeEvent;
-        // `indeterminate` plays no part: the platform's rule is "flip checked, clear mixed".
-        guardCheckableChange(
-          nativeEvent,
-          () => dispatch(!optimistic, createActionDetails(nativeEvent, { reason: "activate" })),
-          "Checkbox",
-        );
-      },
-    },
+    libraryProps: input.libraryProps,
   });
 
   return useTransitionBoundary("Checkbox", transition, element);
