@@ -76,8 +76,11 @@ export function ToggleGroupItem({
   const pressed = ctx.optimistic.has(value);
   const pending = ctx.pending && pressed !== ctx.committed.has(value);
   const disabled = ctx.disabled || disabledProp;
-  const { register } = ctx;
-  const registerRef = useCallback((el: HTMLElement) => register(el, value), [register, value]);
+  const { registerItem } = ctx;
+  const registerRef = useCallback(
+    (el: HTMLElement) => registerItem(el, value),
+    [registerItem, value],
+  );
 
   const state: ToggleGroupItemState = {
     pressed,

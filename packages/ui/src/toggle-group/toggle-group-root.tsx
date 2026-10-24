@@ -214,7 +214,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
 
   // Item registration (design 16.2): element → value, written from the Items' callback refs.
   const registry = useRef(new Map<HTMLElement, string>());
-  const register = useCallback((element: HTMLElement, itemValue: string) => {
+  const registerItem = useCallback((element: HTMLElement, itemValue: string) => {
     registry.current.set(element, itemValue);
     return () => {
       registry.current.delete(element);
@@ -317,9 +317,18 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
       orientation,
       focusgroupStartValue,
       toggle,
-      register,
+      registerItem,
     }),
-    [optimistic, committed, pending, disabled, orientation, focusgroupStartValue, toggle, register],
+    [
+      optimistic,
+      committed,
+      pending,
+      disabled,
+      orientation,
+      focusgroupStartValue,
+      toggle,
+      registerItem,
+    ],
   );
 
   const state: ToggleGroupRootState = { value: renderedValue, pending, disabled, orientation };

@@ -22,7 +22,7 @@ export interface ToggleGroupContextValue {
   /** An Item was activated (stable). Computes the patch of design 5.2 against the optimistic set. */
   readonly toggle: (value: string, event: Event) => void;
   /** Registers an Item's element and value; returns the cleanup (stable; used as a callback ref). */
-  readonly register: (element: HTMLElement, value: string) => () => void;
+  readonly registerItem: (element: HTMLElement, value: string) => () => void;
 }
 
 export const ToggleGroupContext = createContext<ToggleGroupContextValue | null>(null);
