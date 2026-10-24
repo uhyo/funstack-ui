@@ -321,3 +321,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #108 merged a6a9ab8 (CheckboxGroup JSON-key value + memoised context) — awaiting dev report.
 - P4 #107 running: p4-no-isolate on wave16/no-isolate (stop if <25% speedup or flaky).
 - Next: after #107 → final line count, release 0.1.0-alpha.12 (Breaking: Tabs/Accordion reason → ChangeReason; fixes: superseded cross-channel Slider/NumberField, CheckboxGroup value-by-content #108, docs sidebar group class).
+- #108 merged + design doc 5.1 fixed. #107 merged ad3b232 (jsdom −38%: 30s→18.5s; jsdom-isolated project for vi.mock(react)/stream-render files + guard test; shared pointer-capture shim; test-only resets in announce/use-popover-popup). Firefox toggle-ordering fragility noted on #109.
+- WAVE 16 DONE, #100 closed. Released 0.1.0-alpha.12 (Publish + Deploy Docs running at release time). Final vs 1208aa2: src +562, tests −693 (tests 2865→3182), docs+example −943, bundle −9.7KB min.
+- Open follow-ups: #109 shared browser overlay suite, #110 WebKit async menu close (architect).
