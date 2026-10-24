@@ -274,7 +274,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown` (a press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `commandfor`, `command`, `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`."
         }
         note={"Use it in a top-level Root only."}
       />
@@ -614,9 +614,10 @@ export function MenuPage() {
           <strong>Moving the pointer over an item focuses it</strong>, so keyboard and pointer
           always agree on the current item: style <code>:focus</code> as the hover state. A press on
           the menu's own space (padding, a <code>Separator</code>, a <code>GroupLabel</code>) keeps
-          focus on the current item, so the arrow keys keep working. So does a press on the Trigger
-          while the menu is open: the click then closes it like an item's activation, on every
-          browser.
+          focus on the current item, so the arrow keys keep working. So does a press on a{" "}
+          <code>&lt;button&gt;</code> Trigger while the menu is open: the click then closes it like
+          an item's activation, on every browser (a Trigger rendered as another element is
+          light-dismissed first, <a href="https://github.com/uhyo/funstack-ui/issues/115">#115</a>).
         </li>
         <li>
           <strong>Hover intent</strong> for submenus: the submenu opens <code>delay</code> ms (100)

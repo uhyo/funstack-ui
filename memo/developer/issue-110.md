@@ -31,3 +31,11 @@ clicked button (macOS Safari does not; already in cross-engine.md "Focus on mous
 buttons"). The issue's "WebKit doesn't focus buttons" is macOS behaviour. Row 6's WebKit branch
 now accepts either, requiring only that any focus came while closed. Rows 4 and 5 passed on
 WebKit unchanged.
+
+## Review (memo/reviewer/issue-110-review.md)
+
+- F5, for the release notes: `MenuTriggerProps` now omits `onMouseDown` (type-level breaking
+  change for consumers passing it as a prop; a `render` element's own handler still runs first).
+- F3: row 6 now clicks the plain "outside" button as a baseline and expects the Trigger to be
+  focused exactly as that button was (`[true]` or `[]`), one outcome on every engine.
+- F1: docs qualify the Trigger press to a `<button>` Trigger; non-button Triggers are #115.

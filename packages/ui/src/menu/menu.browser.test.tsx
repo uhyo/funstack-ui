@@ -26,6 +26,7 @@ import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
+import { deferred } from "../__tests__/helpers.js";
 import {
   anchorPositionHonoursParentDirection,
   browserName,
@@ -41,7 +42,6 @@ import {
 } from "../__tests__/placement-browser.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
-import { deferred } from "../__tests__/helpers.js";
 import { Menu } from "./index.js";
 import type { MenuOpenChangeDetails, MenuPopupProps, MenuRootProps } from "./index.js";
 import {
@@ -997,18 +997,19 @@ describe("Trigger click while open (browser, #110)", () => {
     expect(action).toHaveBeenCalledTimes(calls + 1);
   });
 
-  it("while closed the press is not prevented: it focuses the Trigger before the open", async () => {
+  it("while closed the press is not prevented: it focuses the Trigger as a plain button", async () => {
     render(<Basic />);
+    // Baseline: whether this engine focuses a clicked button (Chromium, Firefox and Playwright's
+    // Linux WebKit do; Safari on macOS does not).
+    await user.click(item("outside"));
+    const focusesButtons = document.activeElement === item("outside");
     const focusedWhileClosed: boolean[] = [];
     trigger().addEventListener("focus", () => focusedWhileClosed.push(!isOpen()));
     await user.click(trigger());
     await expect.poll(() => isOpen()).toBe(true);
     await flushFor();
-    // Chromium and Firefox focus the button on mousedown, before the open. Safari on macOS never
-    // focuses a clicked button, but Playwright's Linux WebKit (CI) does: either way, never while
-    // open.
-    if (browserName === "webkit") expect(focusedWhileClosed.every(Boolean)).toBe(true);
-    else expect(focusedWhileClosed).toEqual([true]);
+    // Focused on mousedown, before the open, exactly as the plain button was.
+    expect(focusedWhileClosed).toEqual(focusesButtons ? [true] : []);
     expect(item("rename")).toHaveFocus();
   });
 });
