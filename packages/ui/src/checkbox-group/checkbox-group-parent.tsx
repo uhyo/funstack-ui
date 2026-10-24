@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -10,6 +10,7 @@ import { useRender } from "../internal/use-render.js";
 import { enabledValues, useCheckboxGroupContext } from "./checkbox-group-context.js";
 import type { CheckboxGroupPatch } from "./checkbox-group-context.js";
 import { syncPresence } from "../internal/sync-presence.js";
+import { useHydratedMount } from "../internal/use-hydrated-mount.js";
 
 export interface CheckboxGroupParentState {
   readonly values: readonly string[];
@@ -74,8 +75,6 @@ export interface CheckboxGroupParentProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"input">, CheckboxGroupParentState>;
 }
 
-const subscribeNothing = () => () => {};
-
 /** `checked` / `indeterminate` of a Parent over `values` against `set` (design 6.1). */
 function derive(values: readonly string[], set: ReadonlySet<string>) {
   let inSet = 0;
@@ -112,11 +111,7 @@ export function CheckboxGroupParent({
   // render uses every value, as the server did (it cannot know which Items are disabled), so
   // that the DOM `checked` it hydrates can be compared with the derivation for the
   // pre-hydration report below, also when this Parent hydrates after the Items registered.
-  const hydrating = useSyncExternalStore(
-    subscribeNothing,
-    () => false,
-    () => true,
-  );
+  const hydrating = useHydratedMount();
   const { disabledItems } = ctx;
   const effective = useMemo(
     () => (hydrating ? values : enabledValues(values, disabledItems)),

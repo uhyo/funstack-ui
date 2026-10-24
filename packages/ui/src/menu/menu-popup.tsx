@@ -1,14 +1,5 @@
 "use client";
-import {
-  Activity,
-  use,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useSyncExternalStore,
-} from "react";
+import { Activity, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -56,6 +47,7 @@ import { scheduleHoverClose } from "./menu-hover.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useElementCheck } from "../internal/use-element-check.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type MenuSide = AnchorSide;
@@ -143,9 +135,6 @@ export interface MenuPopupProps extends Omit<
   /** Should render a `<div>`; a `<dialog>` would run the dialog focusing steps. */
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuPopupState>;
 }
-
-/** Engine capabilities never change while the page lives. */
-const subscribeNever = () => () => {};
 
 /** Typeahead buffer lifetime after the last keystroke (design 5.1). */
 const TYPEAHEAD_RESET_MS = 500;
@@ -345,12 +334,7 @@ export function MenuPopup({
   const { side } = placement;
   const resolvedAlign = placement.align;
 
-  // As Tabs.List (#43): detected only with the flag, never during SSR or hydration.
-  const nativeFocusgroup = useSyncExternalStore(
-    subscribeNever,
-    () => experimental_focusgroup && "focusGroup" in HTMLElement.prototype,
-    () => false,
-  );
+  const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
 
   const typeahead = useRef({ text: "", at: 0 });
   const typingAhead = useCallback(() => {

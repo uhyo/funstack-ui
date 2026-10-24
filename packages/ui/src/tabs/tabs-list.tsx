@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -13,6 +13,8 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { TabsListContext, useTabsContext } from "./tabs-context.js";
 import type { TabsListContextValue, TabsOrientation } from "./tabs-context.js";
+import { focusWithRing, resolveArrowKey } from "../internal/arrow-keys.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 
 export interface TabsListState {
   readonly orientation: TabsOrientation;
@@ -35,41 +37,12 @@ export interface TabsListProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, TabsListState>;
 }
 
-type Move = "next" | "prev" | "first" | "last";
-
-function resolveKey(key: string, orientation: TabsOrientation, rtl: boolean): Move | null {
-  switch (key) {
-    case "Home":
-      return "first";
-    case "End":
-      return "last";
-    case "ArrowRight":
-      return orientation === "horizontal" ? (rtl ? "prev" : "next") : null;
-    case "ArrowLeft":
-      return orientation === "horizontal" ? (rtl ? "next" : "prev") : null;
-    case "ArrowDown":
-      return orientation === "vertical" ? "next" : null;
-    case "ArrowUp":
-      return orientation === "vertical" ? "prev" : null;
-    default:
-      return null;
-  }
-}
-
 /** The tabs that belong to `list` (not to a nested tablist), in DOM order. Disabled included. */
 function tabsOf(list: Element): HTMLElement[] {
   return Array.from(list.querySelectorAll<HTMLElement>('[role="tab"]')).filter(
     (tab) => tab.closest('[role="tablist"]') === list,
   );
 }
-
-function focusTab(tab: HTMLElement): void {
-  // `focusVisible` shows the ring even where the engine's heuristic would not (survey: adopt).
-  tab.focus({ focusVisible: true } as FocusOptions);
-}
-
-/** Engine capabilities never change while the page lives. */
-const subscribeNever = () => () => {};
 
 /**
  * The `role="tablist"` container. Owns arrow-key / Home / End navigation between Tabs: it only
@@ -90,16 +63,8 @@ export function TabsList({
   const ctx = useTabsContext("Tabs.List");
   const { orientation, loop, disabled, optimistic } = ctx;
 
-  // Feature detection only when the flag is on, and never during SSR or hydration (conventions
-  // 8): the server snapshot is `false`, so hydration markup matches the server and React re-renders
-  // with the client answer afterwards. The IDL attribute is camel-cased `focusGroup`
-  // (`"focusgroup" in HTMLElement.prototype` is always false, issue #43). The Tabs read it too:
-  // they drop `tabindex="-1"` on the native path (TabsListContextValue).
-  const nativeFocusgroup = useSyncExternalStore(
-    subscribeNever,
-    () => experimental_focusgroup && "focusGroup" in HTMLElement.prototype,
-    () => false,
-  );
+  // The Tabs read it too: they drop `tabindex="-1"` on the native path (TabsListContextValue).
+  const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
   const listContext = useMemo<TabsListContextValue>(
     () => ({ focusgroup: experimental_focusgroup, nativeFocusgroup }),
     [experimental_focusgroup, nativeFocusgroup],
@@ -137,7 +102,7 @@ export function TabsList({
       return;
     }
     const rtl = orientation === "horizontal" && getComputedStyle(list).direction === "rtl";
-    const move = resolveKey(event.key, orientation, rtl);
+    const move = resolveArrowKey(event.key, orientation, rtl);
     if (move === null) return;
     // The browser moves focus itself where `focusgroup` is implemented.
     if (nativeFocusgroup) return;
@@ -163,7 +128,7 @@ export function TabsList({
         break;
     }
     const next = tabs[nextIndex];
-    if (next !== undefined && next !== target) focusTab(next);
+    if (next !== undefined && next !== target) focusWithRing(next);
   };
 
   // With no selected tab (value null or matching no Tab) no Tab has tabindex=0, so the list
@@ -178,7 +143,7 @@ export function TabsList({
     if (from instanceof Node && list.contains(from)) return;
     const tabs = tabsOf(list);
     const first = tabs.find((tab) => tab.getAttribute("aria-disabled") !== "true") ?? tabs[0];
-    if (first !== undefined) focusTab(first);
+    if (first !== undefined) focusWithRing(first);
   };
 
   const focusgroup = experimental_focusgroup

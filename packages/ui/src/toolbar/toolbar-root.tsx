@@ -1,11 +1,12 @@
 "use client";
-import { useMemo, useRef, useSyncExternalStore } from "react";
+import { useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import type { ToolbarContextValue } from "../internal/toolbar-context.js";
 import type { Orientation, RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 
 export type ToolbarOrientation = Orientation;
 
@@ -50,9 +51,6 @@ function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
   return items[0];
 }
 
-/** Engine capabilities never change while the page lives. */
-const subscribeNever = () => () => {};
-
 /**
  * `<div role="toolbar" aria-orientation>` (WAI-ARIA APG Toolbar). Its items are its focusable
  * descendants, found in the DOM: one Tab stop (the last focused item), arrow keys, Home and End
@@ -72,12 +70,7 @@ export function ToolbarRoot({
   render,
   ...rest
 }: ToolbarRootProps) {
-  // Conventions 8: the server snapshot is `false`, so hydration markup matches the server.
-  const native = useSyncExternalStore(
-    subscribeNever,
-    () => experimental_focusgroup && "focusGroup" in HTMLElement.prototype,
-    () => false,
-  );
+  const native = useNativeFocusgroup(experimental_focusgroup);
   const rootRef = useRef<HTMLElement | null>(null);
   const roving = useRovingFocus(rootRef, {
     orientation,

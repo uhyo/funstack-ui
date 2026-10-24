@@ -1,13 +1,5 @@
 "use client";
-import {
-  useCallback,
-  useEffectEvent,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -31,6 +23,7 @@ import {
   toSet,
 } from "../internal/value-set.js";
 import type { SetPatch, ValueSet } from "../internal/value-set.js";
+import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 
 export type { ToggleGroupOrientation } from "./toggle-group-context.js";
 
@@ -143,9 +136,6 @@ interface InternalProps extends ToggleGroupRootBaseProps {
 function pressedFirst(items: readonly HTMLElement[]): HTMLElement | undefined {
   return items.find((el) => el.getAttribute("aria-pressed") === "true") ?? items[0];
 }
-
-/** Engine capabilities never change while the page lives. */
-const subscribeNever = () => () => {};
 
 /** The Items' document order and their disabled values, as of the Root's last commit. */
 interface ItemLayout {
@@ -310,12 +300,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
     syncLayout();
   });
 
-  // Feature detection only when the flag is on, never during SSR or hydration (conventions 8).
-  const native = useSyncExternalStore(
-    subscribeNever,
-    () => flag && "focusGroup" in HTMLElement.prototype,
-    () => false,
-  );
+  const native = useNativeFocusgroup(flag);
 
   const focusgroupStartValue =
     flag && !disabled
