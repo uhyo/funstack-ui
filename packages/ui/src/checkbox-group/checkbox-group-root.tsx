@@ -21,14 +21,11 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import {
-  useFieldControl,
-  useFieldValueChange,
-  useMergedRef,
-} from "../internal/use-field-control.js";
+import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
 import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -446,7 +443,7 @@ export function CheckboxGroupRoot({
       fieldsetRef.current = null;
     };
   }, []);
-  const rootRef = useMergedRef<HTMLFieldSetElement>(libraryRef, field.ref);
+  const rootRef = useMergedRefs<HTMLFieldSetElement>(libraryRef, field.ref);
 
   const itemsRequired =
     required &&

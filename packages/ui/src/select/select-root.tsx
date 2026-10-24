@@ -17,12 +17,12 @@ import {
   fieldInputProps,
   useFieldControl,
   useFieldValueChange,
-  useMergedRef,
 } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
 import type { SelectContextValue } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 /** Details passed as the second argument of `valueChangeAction`. */
 export interface SelectValueChangeDetails extends ActionDetails {
@@ -123,7 +123,7 @@ export function SelectRoot({
     component: "Select.Root",
   });
   const disabled = field.disabled;
-  const rootRef = useMergedRef<HTMLSelectElement>(libraryRef, field.ref);
+  const rootRef = useMergedRefs<HTMLSelectElement>(libraryRef, field.ref);
 
   const { optimistic, pending, dispatch, latestInFlight, adopt } = useControllableAction<
     string,

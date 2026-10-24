@@ -1,5 +1,5 @@
 "use client";
-import { useEffectEvent, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffectEvent, useLayoutEffect, useRef } from "react";
 import type {
   ChangeEvent,
   ComponentPropsWithRef,
@@ -9,7 +9,7 @@ import type {
   Ref,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { mergeRefs, mergeTokenLists } from "../internal/merge-props.js";
+import { mergeTokenLists } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -17,6 +17,7 @@ import type { DataAttributes } from "../internal/use-render.js";
 import { percent, thumbBounds } from "./slider-arithmetic.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderOrientation } from "./slider-root.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export interface SliderThumbState {
   readonly index: number;
@@ -124,9 +125,10 @@ export function SliderThumb({
   const inputRef = useRef<HTMLInputElement | null>(null);
   // Inside a Field with one thumb, Thumb 0's input is the Field's control (design 9.4.1).
   const fieldInputRef = index === 0 ? ctx.field?.inputRef : undefined;
-  const mergedInputRef = useMemo(
-    () => mergeRefs<HTMLInputElement | null>(inputRef, consumerInputRef, fieldInputRef),
-    [consumerInputRef, fieldInputRef],
+  const mergedInputRef = useMergedRefs<HTMLInputElement | null>(
+    inputRef,
+    consumerInputRef,
+    fieldInputRef,
   );
 
   // Registration with the Root (pointer focus, reconciliation, reset), from a layout effect so

@@ -10,10 +10,11 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import { useFieldControl } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { optionId, useComboboxContext } from "./combobox-context.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export interface ComboboxInputState {
   /** Optimistic selection. */
@@ -119,7 +120,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     component: "Combobox.Input",
   });
   const fieldRef = field.ref;
-  const mergedRef = useMergedRef<HTMLElement>(ref, fieldRef);
+  const mergedRef = useMergedRefs<HTMLElement>(ref, fieldRef);
 
   const searchType = isValidElement<{ type?: unknown }>(render) && render.props.type === "search";
 

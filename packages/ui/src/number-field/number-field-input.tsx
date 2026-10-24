@@ -1,12 +1,5 @@
 "use client";
-import {
-  isValidElement,
-  useCallback,
-  useEffectEvent,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { isValidElement, useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type {
   ChangeEvent,
   ComponentPropsWithRef,
@@ -16,15 +9,15 @@ import type {
   Ref,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { mergeRefs } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import { useFieldControl } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { hiddenText } from "./number-field-root.js";
 import type { NumberFieldState } from "./number-field-root.js";
 import { useNumberFieldContext } from "./number-field-context.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export interface NumberFieldInputProps extends Omit<
   ComponentPropsWithRef<"input">,
@@ -132,12 +125,9 @@ export function NumberFieldInput({
     },
     [visibleRef],
   );
-  const mergedRef = useMergedRef<HTMLElement>(libraryRef, field.ref);
+  const mergedRef = useMergedRefs<HTMLElement>(libraryRef, field.ref);
 
-  const hiddenMergedRef = useMemo(
-    () => mergeRefs<HTMLInputElement | null>(hiddenRef, hiddenInputRef),
-    [hiddenRef, hiddenInputRef],
-  );
+  const hiddenMergedRef = useMergedRefs<HTMLInputElement | null>(hiddenRef, hiddenInputRef);
 
   // After every commit: the hidden input holds the shown value (a rollback, a controlled change,
   // a reset) and the visible input mirrors its validity (a changed `min` / `max` / `required`).

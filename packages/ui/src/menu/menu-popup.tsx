@@ -32,7 +32,6 @@ import {
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
-import { mergeRefs } from "../internal/merge-props.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -55,6 +54,7 @@ import {
 } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type MenuSide = AnchorSide;
@@ -435,10 +435,7 @@ export function MenuPopup({
     return () => element.removeEventListener("pointerdown", onPointerDown);
   }, []);
   const placementRef = placement.ref;
-  const ref = useMemo(
-    () => mergeRefs(setElement, devRef, placementRef),
-    [setElement, devRef, placementRef],
-  );
+  const ref = useMergedRefs(setElement, devRef, placementRef);
 
   const listContext = useMemo<MenuListContextValue>(
     () => ({ menu, nativeFocusgroup, typingAhead }),

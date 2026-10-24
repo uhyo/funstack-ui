@@ -1,5 +1,5 @@
 "use client";
-import { Activity, useMemo } from "react";
+import { Activity } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,7 +9,6 @@ import type {
 } from "react";
 import { POSITION_TRY_FALLBACKS, positionArea } from "../internal/anchor-position.js";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
-import { mergeRefs } from "../internal/merge-props.js";
 import { ToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -19,6 +18,7 @@ import { useResolvedPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (wave 11; conventions 13.1). */
 export type PopoverSide = AnchorSide;
@@ -158,7 +158,7 @@ export function PopoverPopup({
   // the platform's `toggle`, not off library state).
   const placement = useResolvedPlacement({ side: sideProp, align: alignProp });
   const { side, align } = placement;
-  const ref = useMemo(() => mergeRefs(setElement, placement.ref), [setElement, placement.ref]);
+  const ref = useMergedRefs(setElement, placement.ref);
 
   const state: PopoverPopupState = { open: ctx.committed, side, align };
 

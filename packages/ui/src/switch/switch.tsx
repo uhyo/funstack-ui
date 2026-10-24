@@ -16,10 +16,10 @@ import {
   fieldInputProps,
   useFieldControl,
   useFieldValueChange,
-  useMergedRef,
 } from "../internal/use-field-control.js";
 import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export interface SwitchState {
   /** Optimistic checked state: what the user sees, including an in-flight change. */
@@ -157,7 +157,7 @@ export function Switch({
 
   const state: SwitchState = { checked: optimistic, pending, disabled };
 
-  const ref = useMergedRef<HTMLInputElement>(inputRef, field.ref);
+  const ref = useMergedRefs<HTMLInputElement>(inputRef, field.ref);
 
   const element = useRender<ComponentPropsWithRef<"input">, SwitchState>({
     defaultElement: "input",

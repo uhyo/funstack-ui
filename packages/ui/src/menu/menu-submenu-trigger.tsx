@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -7,7 +7,6 @@ import type {
   PointerEvent,
   ReactNode,
 } from "react";
-import { mergeRefs } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -20,6 +19,7 @@ import type { MenuItemProps } from "./menu-item.js";
 import { openMenuWithFocus } from "./menu-trigger.js";
 import type { MenuTriggerState } from "./menu-trigger.js";
 import { useMenuItem } from "./use-menu-item.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 export type MenuSubmenuTriggerState = MenuTriggerState;
 
@@ -144,7 +144,7 @@ export function MenuSubmenuTrigger({
     // A click opens (or moves focus into the open submenu); it never closes.
     activate: (event) => open(event.nativeEvent),
   });
-  const ref = useMemo(() => mergeRefs(triggerRef, hoverRef), [triggerRef, hoverRef]);
+  const ref = useMergedRefs(triggerRef, hoverRef);
 
   return useRender<ComponentPropsWithRef<"button">, MenuSubmenuTriggerState>({
     defaultElement: "button",

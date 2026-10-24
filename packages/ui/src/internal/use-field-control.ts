@@ -1,10 +1,9 @@
 "use client";
-import { use, useCallback, useLayoutEffect, useMemo, useRef } from "react";
-import type { Ref, RefCallback } from "react";
+import { use, useCallback, useLayoutEffect, useRef } from "react";
+import type { RefCallback } from "react";
 import { dataAttr } from "./data-attr.js";
 import { FieldContext } from "./field-context.js";
 import type { FieldState } from "./field-context.js";
-import { mergeRefs } from "./merge-props.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import type { ValidatableElement } from "./validity.js";
 
@@ -70,14 +69,6 @@ export function fieldInputProps(field: FieldControlBinding): FieldControlAttribu
 } {
   if (!field.inField) return {};
   return { ...field.attributes, name: field.name, required: field.required };
-}
-
-/** `mergeRefs` with a stable identity while both refs keep theirs. */
-export function useMergedRef<T>(
-  a: Ref<T> | undefined,
-  b: Ref<T> | undefined,
-): RefCallback<T> | Ref<T> | undefined {
-  return useMemo(() => (b === undefined ? a : a === undefined ? b : mergeRefs(a, b)), [a, b]);
 }
 
 /**

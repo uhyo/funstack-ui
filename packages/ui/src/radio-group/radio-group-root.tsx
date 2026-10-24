@@ -13,14 +13,11 @@ import type {
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import {
-  useFieldControl,
-  useFieldValueChange,
-  useMergedRef,
-} from "../internal/use-field-control.js";
+import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { RadioGroupContext } from "./radio-group-context.js";
 import type { RadioGroupContextValue } from "./radio-group-context.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -256,7 +253,7 @@ export function RadioGroupRoot({
       fieldsetRef.current = null;
     };
   }, []);
-  const rootRef = useMergedRef<HTMLFieldSetElement>(libraryRef, field.ref);
+  const rootRef = useMergedRefs<HTMLFieldSetElement>(libraryRef, field.ref);
 
   // Memoised (#48): `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with
   // the state and the props below.

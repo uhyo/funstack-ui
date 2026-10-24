@@ -26,11 +26,7 @@ import type {
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import {
-  useFieldControl,
-  useFieldValueChange,
-  useMergedRef,
-} from "../internal/use-field-control.js";
+import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/use-form-reset.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
@@ -340,7 +336,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     (index: number) => (index === 0 && fieldId !== undefined ? fieldId : `${id}-thumb-${index}`),
     [id, fieldId],
   );
-  const rootRef = useMergedRef<HTMLElement>(undefined, thumbCount > 1 ? field.ref : undefined);
+  const rootRef = thumbCount > 1 ? field.ref : undefined;
   useDevWarning(
     field.inField && field.required,
     "Slider.Root: a range is never empty, so `required` on the enclosing Field.Root has no " +

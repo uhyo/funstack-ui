@@ -4,9 +4,10 @@ import type { ComponentPropsWithRef, CSSProperties } from "react";
 import { useFieldContext } from "../internal/field-context.js";
 import type { FieldState } from "../internal/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useFieldControl, useMergedRef } from "../internal/use-field-control.js";
+import { useFieldControl } from "../internal/use-field-control.js";
 import { useRender } from "../internal/use-render.js";
 import { fieldDataAttributes } from "./field-root.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -72,7 +73,7 @@ export function FieldControl({
     // A cleanup, so the merged ref never calls this with `null`.
     return () => {};
   }, []);
-  const ref = useMergedRef<HTMLElement>(checkElement, field.ref);
+  const ref = useMergedRefs<HTMLElement>(checkElement, field.ref);
 
   return useRender<ComponentPropsWithRef<"input">, FieldState>({
     defaultElement: "input",
