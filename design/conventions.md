@@ -1129,7 +1129,11 @@ Rules:
   through `render` keeps a browser-shaped close in library mode (right reason, nothing awaited,
   no veto, no exit transition); the guarantee is stated for a `<button>` Trigger and the
   non-button dev warning says so (#115, popover.md 2.7). A part whose close is browser-owned by
-  design (Combobox's Clear) needs none of this.
+  design (Combobox's Clear) needs none of this; nor does a Trigger that never closes: Dialog's
+  Trigger only opens, so a Trigger click on an open non-modal `lightDismiss` dialog is a
+  dismissal on every path, as native `closedby="any"` (which has no invoker exemption at all)
+  treats it, and the JS baseline follows the platform rather than exempting it (#116, dialog.md
+  13).
   The browser-row requirement is the same: assert `:popover-open` across the click's pending
   window.
 
