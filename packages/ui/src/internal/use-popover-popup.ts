@@ -1,11 +1,17 @@
 "use client";
-import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
-import { renderOverlayContent } from "./overlay-popup.js";
+import {
+  commandOf,
+  renderOverlayContent,
+  resolveInitialFocus,
+  returnFocusToTrigger,
+  useCloseHold,
+  useInitialFocusTarget,
+} from "./overlay-popup.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { useElementCheck } from "./use-element-check.js";
-import { useExitAnimation } from "./use-exit-animation.js";
 import { useLatest } from "./use-latest.js";
 import { useShownNameWarning } from "./use-name-warning.js";
 import type { PopoverRootValue } from "./use-popover-root.js";
@@ -109,15 +115,6 @@ function supportsFocusVisibleOption(doc: Document): boolean {
   return focusVisibleOption;
 }
 
-/** Resolves `initialFocus` against the popup (a ref, or a selector inside the popup). */
-function resolveInitialFocus(
-  popup: HTMLElement,
-  initialFocus: RefObject<HTMLElement | null> | string,
-): HTMLElement | null {
-  if (typeof initialFocus === "string") return popup.querySelector<HTMLElement>(initialFocus);
-  return initialFocus.current;
-}
-
 /** Whether `element` sits inside a popover that is not shown (an outer popup that closed). */
 function insideHiddenPopover(element: Element): boolean {
   for (let node = element.parentElement; node !== null; node = node.parentElement) {
@@ -151,21 +148,10 @@ export function usePopoverPopup(
   const awaitingClose = useRef(false);
   // Whether focus was inside the popup when its last close began (design 6.2 rule 1).
   const focusWasInside = useRef(false);
-  const warnedFocus = useRef(false);
+  const initialFocusTarget = useInitialFocusTarget(part, "popup");
 
-  // --- `held`: children stay mounted while the hide animates (design 4.4) -------------------
-
-  const exit = useExitAnimation();
-
-  // A library-driven close commits `false` first and hides in the layout effect, so without
-  // `transition` the children are held through the close commit ("previous value in state").
-  // With `transition` the close commit unmounts them inside the view transition, whose old
-  // snapshot carries the content out.
-  const [prevCommitted, setPrevCommitted] = useState(ctx.committed);
-  if (prevCommitted !== ctx.committed) {
-    setPrevCommitted(ctx.committed);
-    if (isLibrary && prevCommitted && transition === undefined) exit.holdDuringRender();
-  }
+  // `held`: children stay mounted while the hide animates (design 4.4).
+  const exit = useCloseHold(ctx.committed, isLibrary, transition);
 
   // Whether the content unmounted while holding focus since the popup was last shown.
   const contentProbe = useContentFocusProbe(popupRef);
@@ -176,22 +162,10 @@ export function usePopoverPopup(
     triggerRef.current?.setAttribute("aria-expanded", String(isPopoverOpen(element)));
   };
 
-  /**
-   * Design 6.2 rule 2, for a close that began with focus inside: when focus is now on `<body>`
-   * or still inside the hidden popup, focus the Trigger (connected, not inside a hidden
-   * popover), else blur what holds focus.
-   */
-  const returnFocus = (element: HTMLElement): void => {
-    const doc = element.ownerDocument;
-    const active = doc.activeElement;
-    if (active !== null && active !== doc.body && !element.contains(active)) return;
-    const trigger = triggerRef.current;
-    if (trigger !== null && trigger.isConnected && !insideHiddenPopover(trigger)) {
-      trigger.focus();
-    } else if (active instanceof HTMLElement && active !== doc.body) {
-      active.blur();
-    }
-  };
+  // Design 6.2 rule 2, for a close that began with focus inside; not to a Trigger inside a
+  // hidden popover.
+  const returnFocus = (element: HTMLElement): void =>
+    returnFocusToTrigger(element, triggerRef.current, (trigger) => !insideHiddenPopover(trigger));
 
   // --- Opening ------------------------------------------------------------------------------
 
@@ -202,18 +176,7 @@ export function usePopoverPopup(
       const target = resolved instanceof HTMLElement ? resolved : resolved.element;
       return element.contains(target) ? resolved : null;
     }
-    if (initialFocus === undefined) return null;
-    const target = resolveInitialFocus(element, initialFocus);
-    if (target !== null && element.contains(target)) return target;
-    if (isDev && !warnedFocus.current) {
-      warnedFocus.current = true;
-      console.error(
-        target === null
-          ? `${part}: \`initialFocus\` resolved to no element; the platform picks the focus target.`
-          : `${part}: \`initialFocus\` is outside the popup; the platform picks the focus target.`,
-      );
-    }
-    return null;
+    return initialFocusTarget(element, initialFocus);
   };
 
   const showPopup = (element: HTMLElement): void => {
@@ -307,17 +270,7 @@ export function usePopoverPopup(
     }
     // Content that unmounted while the popup stays open (not a close): forget it.
     if (ctx.committed && isPopoverOpen(element)) contentProbe.forget();
-    // A hold the close commit set (or a dismissal's notification commit) that no hide animation
-    // is going to release: the popup is already hidden and its `toggle` has been handled.
-    if (
-      exit.held &&
-      !ctx.committed &&
-      !exit.waiting() &&
-      !awaitingClose.current &&
-      !isPopoverOpen(element)
-    ) {
-      exit.release();
-    }
+    exit.releaseIfIdle(ctx.committed, awaitingClose.current, isPopoverOpen(element));
   });
 
   // --- Native listeners (conventions 7.4; filtered on target: React 19.3.1 emulates bubbling
@@ -365,20 +318,9 @@ export function usePopoverPopup(
 
       const intent = ctx.takeCloseIntent();
       if (isLibrary) {
-        // `false` already intended: the library's own hide (or a dismissal during a pending
-        // part-initiated close). With `transition` such a close needs no hold (4.4).
-        const echo = !ctx.intended();
-        if (!echo || transition === undefined) {
-          const animations = exit.exitAnimations(element);
-          if (animations.length > 0) {
-            // Before the notification, so its commit keeps the children (urgent, internal).
-            exit.holdUntil(animations);
-          } else {
-            // Nothing animates (Firefox, or no CSS exit): release a hold now; the commit is
-            // invisible, the popup is already `display: none`.
-            exit.release();
-          }
-        }
+        // An echo: `false` already intended (the library's own hide, or a dismissal during a
+        // pending part-initiated close).
+        exit.afterClose(element, !ctx.intended());
         ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
       }
     }
@@ -388,7 +330,7 @@ export function usePopoverPopup(
   const onCommand = (event: Event): void => {
     const element = popupRef.current;
     if (element === null || event.target !== element || event.defaultPrevented) return;
-    const command = String((event as Event & { command?: string }).command ?? "").toLowerCase();
+    const command = commandOf(event);
     // A foreign invoker closing the popup (design 2.3). Opens are caught at `beforetoggle`.
     if (command === "hide-popover" || (command === "toggle-popover" && isPopoverOpen(element))) {
       ctx.recordCloseIntent({ reason: "activate", event });

@@ -9,15 +9,13 @@ import type {
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useJsFreePropWarnings } from "../internal/overlay-popup.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverPopup } from "../internal/use-popover-popup.js";
 import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type PopoverSide = AnchorSide;
@@ -138,18 +136,7 @@ export function PopoverPopup({
   const isLibrary = ctx.mode === "library";
   const { ids } = ctx;
 
-  useDevWarning(
-    !isLibrary && transition !== undefined,
-    isDev &&
-      "Popover.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
-        "popover outside any React transition. Animate it with CSS (`@starting-style`).",
-  );
-  useDevWarning(
-    !isLibrary && keepMounted === false,
-    isDev &&
-      "Popover.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
-        "always mounted so that the server HTML is complete.",
-  );
+  useJsFreePropWarnings("Popover.Popup", "popover", isLibrary, transition, keepMounted);
 
   const { setElement, renderContent } = usePopoverPopup(ctx, {
     part: "Popover.Popup",

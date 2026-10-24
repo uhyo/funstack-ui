@@ -8,14 +8,20 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useContentFocusProbe } from "../internal/content-focus-probe.js";
-import { renderOverlayContent } from "../internal/overlay-popup.js";
+import {
+  commandOf,
+  renderOverlayContent,
+  resolveInitialFocus,
+  returnFocusToTrigger,
+  useCloseHold,
+  useInitialFocusTarget,
+  useJsFreePropWarnings,
+} from "../internal/overlay-popup.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useElementCheck } from "../internal/use-element-check.js";
-import { useExitAnimation } from "../internal/use-exit-animation.js";
 import { useModalRegistration } from "../internal/use-modal-registration.js";
 import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -87,15 +93,6 @@ export interface DialogPopupProps extends Omit<
 }
 
 const isDev = process.env.NODE_ENV !== "production";
-
-/** Resolves `initialFocus` against the dialog (a ref, or a selector inside the dialog). */
-function resolveInitialFocus(
-  dialog: HTMLDialogElement,
-  initialFocus: RefObject<HTMLElement | null> | string,
-): HTMLElement | null {
-  if (typeof initialFocus === "string") return dialog.querySelector<HTMLElement>(initialFocus);
-  return initialFocus.current;
-}
 
 /** The nearest `<dialog>` around a node (the dialog itself counts). */
 function closestDialog(target: EventTarget | null): Element | null {
@@ -209,22 +206,10 @@ export function DialogPopup({
     readonly returnValue: string;
     readonly generation: number;
   } | null>(null);
-  const warnedFocus = useRef(false);
+  const initialFocusTarget = useInitialFocusTarget("Dialog.Popup", "dialog");
 
-  // --- `held`: children stay mounted while the close animates (design 4.4) -----------------
-
-  const exit = useExitAnimation();
-
-  // A library-driven close commits `false` first and closes in the layout effect, so without
-  // `transition` the children are held through the close commit ("previous value in state").
-  // With `transition` the close commit unmounts them inside the view transition, whose old
-  // snapshot carries the content out. (A dismissal's notification commit sets it too; the apply
-  // effect's release rule clears that one.)
-  const [prevCommitted, setPrevCommitted] = useState(ctx.committed);
-  if (prevCommitted !== ctx.committed) {
-    setPrevCommitted(ctx.committed);
-    if (isLibrary && prevCommitted && transition === undefined) exit.holdDuringRender();
-  }
+  // `held`: children stay mounted while the close animates (design 4.4).
+  const exit = useCloseHold(ctx.committed, isLibrary, transition);
 
   // Whether the content unmounted while holding focus since the dialog was last shown: a close
   // with `transition` removes the focused Close part before `close()` runs (design 6.2 rule 2).
@@ -234,18 +219,7 @@ export function DialogPopup({
   // Toast's Viewport moves its region into the topmost open modal (design/components/toast.md 4.3).
   useModalRegistration(dialog);
 
-  useDevWarning(
-    !isLibrary && transition !== undefined,
-    isDev &&
-      "Dialog.Popup: `transition` has no effect in JS-free mode; the browser opens and closes the " +
-        "dialog outside any React transition. Animate it with CSS (`@starting-style`).",
-  );
-  useDevWarning(
-    !isLibrary && keepMounted === false,
-    isDev &&
-      "Dialog.Popup: `keepMounted={false}` cannot be honoured in JS-free mode; the content is " +
-        "always mounted so that the server HTML is complete.",
-  );
+  useJsFreePropWarnings("Dialog.Popup", "dialog", isLibrary, transition, keepMounted);
 
   const checkElement = useElementCheck<HTMLDialogElement>(
     isDev &&
@@ -271,30 +245,16 @@ export function DialogPopup({
   // --- Opening -----------------------------------------------------------------------------
 
   const openDialog = (element: HTMLDialogElement): void => {
-    let target: HTMLElement | null = null;
-    if (initialFocus !== undefined) {
-      target = resolveInitialFocus(element, initialFocus);
-      if (target === null || !element.contains(target)) {
-        if (isDev && !warnedFocus.current) {
-          warnedFocus.current = true;
-          console.error(
-            target === null
-              ? "Dialog.Popup: `initialFocus` resolved to no element; the platform picks the focus target."
-              : "Dialog.Popup: `initialFocus` is outside the dialog; the platform picks the focus target.",
-          );
-        }
-        target = null;
-      }
-    }
+    const target = initialFocusTarget(element, initialFocus);
     // The platform's dialog focusing steps honour `autofocus`; React drops `autoFocus` on
     // client-rendered content (react/react#23301). Never `.focus()` (design 6.1).
     const added = target !== null && !target.hasAttribute("autofocus");
-    if (added) target!.setAttribute("autofocus", "");
+    if (added) target.setAttribute("autofocus", "");
     try {
       if (modal) element.showModal();
       else element.show();
     } finally {
-      if (added) target!.removeAttribute("autofocus");
+      if (added) target.removeAttribute("autofocus");
     }
   };
 
@@ -308,21 +268,6 @@ export function DialogPopup({
   useLayoutEffect(() => {
     if (isLibrary) reconcileOnMount();
   }, [isLibrary]);
-
-  /**
-   * Design 6.2 rule 2, after a close whose commit unmounted the focused content: when focus is
-   * now on `<body>` or still inside the closed dialog, focus the Trigger (if connected), else
-   * blur what holds focus. A modal dialog never needs it (the platform restores focus on
-   * `close()` unconditionally); a non-modal one restores only when focus is inside.
-   */
-  const returnFocus = (element: HTMLDialogElement): void => {
-    const doc = element.ownerDocument;
-    const active = doc.activeElement;
-    if (active !== null && active !== doc.body && !element.contains(active)) return;
-    const trigger = triggerRef.current;
-    if (trigger !== null && trigger.isConnected) trigger.focus();
-    else if (active instanceof HTMLElement && active !== doc.body) active.blur();
-  };
 
   // The apply effect (design 2.5), as usePopoverPopup's: once nothing is in flight, the DOM
   // follows committed state. Opens on the user's dispatch, `defaultOpen`, a controlled parent,
@@ -360,10 +305,11 @@ export function DialogPopup({
         libraryClose.current = true;
         element.close(ctx.takeCloseReturnValue());
         // The close commit may have unmounted the focused content before `close()`: a
-        // non-modal dialog restores focus only from inside, so do it now.
+        // non-modal dialog restores focus only from inside, so do it now (a modal one always
+        // restores it on `close()`).
         if (contentProbe.hadFocus()) {
           contentProbe.forget();
-          returnFocus(element);
+          returnFocusToTrigger(element, triggerRef.current);
         }
       }
     }
@@ -375,9 +321,7 @@ export function DialogPopup({
     if (ctx.committed && element.open) contentProbe.forget();
     // A hold the close commit set (or a dismissal's notification commit) that no exit animation
     // is going to release: the dialog is closed and its `close` event has been handled.
-    if (exit.held && !ctx.committed && !exit.waiting() && !awaitingClose.current && !element.open) {
-      exit.release();
-    }
+    exit.releaseIfIdle(ctx.committed, awaitingClose.current, element.open);
   });
 
   // JS-free mode: there is no "right before showModal()" (the browser runs the command), so the
@@ -394,7 +338,7 @@ export function DialogPopup({
 
   const onCommand = useEffectEvent((event: Event) => {
     if (event.target !== popupRef.current || event.defaultPrevented) return;
-    const command = String((event as Event & { command?: string }).command ?? "").toLowerCase();
+    const command = commandOf(event);
     if (command === "show-modal") {
       // A foreign invoker (design 2.2): opening goes through the library in library mode.
       if (!isLibrary) return;
@@ -447,12 +391,9 @@ export function DialogPopup({
 
     // Focus return is the platform's; it leaves focus inside the hidden dialog only when the
     // opener is gone (design 6.2).
-    const doc = element.ownerDocument;
-    const active = doc.activeElement;
-    if (active !== null && active !== doc.body && element.contains(active)) {
-      const trigger = triggerRef.current;
-      if (trigger !== null && trigger.isConnected) trigger.focus();
-      else if (active instanceof HTMLElement) active.blur();
+    const active = element.ownerDocument.activeElement;
+    if (active !== null && element.contains(active)) {
+      returnFocusToTrigger(element, triggerRef.current);
     }
 
     const intent = ctx.takeCloseIntent();
@@ -460,19 +401,8 @@ export function DialogPopup({
     libraryClose.current = false;
     if (!isLibrary) return;
 
-    // The library's own `close()` needs no notification, and with `transition` no hold either:
-    // the close commit's view transition carried the content out (4.4).
-    if (!echo || transition === undefined) {
-      const animations = exit.exitAnimations(element);
-      if (animations.length > 0) {
-        // Before the notification, so its commit keeps the children (urgent, internal).
-        exit.holdUntil(animations);
-      } else {
-        // Nothing animates (Firefox, or no CSS exit): release a hold now; the commit is
-        // invisible, the dialog is already `display: none`.
-        exit.release();
-      }
-    }
+    // The library's own `close()` needs no notification.
+    exit.afterClose(element, echo);
 
     if (echo) return;
     // Closed by the browser: a returnValue a pending part close recorded will never be used.
