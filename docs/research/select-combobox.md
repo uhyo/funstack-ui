@@ -97,7 +97,7 @@ The probes found five problems in React 19.3.1. They affect the design:
 | `selectedcontentelement` attribute, `<selectedcontent>` in `multiple` | **Not yet** | Chromium `experimental` flags only. |
 | `HTMLSelectElement.showPicker()` | **Not yet** (not needed) | Chrome 121, Firefox 122. Safari: Technology Preview behind a flag. Needs user activation. |
 | Controlled `open` / `openChangeAction` / `<ViewTransition>` on the Select popup | **Not possible** with a native select | No events, no close API, no element. |
-| APG combobox: `<input role="combobox">` + `role="listbox"` `popover="auto"` + `showPopover({ source })` + `aria-activedescendant` | **Adopt** | All Baseline (popover-menu.md). Verified in Chromium and Firefox: typing keeps focus, clicks on the input do not light-dismiss, Escape closes and is cancelable, nesting in Dialog and Popover works. |
+| APG combobox: `<input role="combobox">` + `role="listbox"` `popover="auto"` + `showPopover({ source })` + `aria-activedescendant` | **Adopt** | All Baseline (popover-menu.md). Verified in Chromium and Firefox: typing keeps focus, Escape closes and is cancelable, nesting in Dialog and Popover works. ~~Clicks on the input do not light-dismiss~~: **wrong, corrected 2026-10-24 (#123)**, a real press on the input light-dismisses; see the probe table's correction in §6. |
 | `Element.ariaActiveDescendantElement` | **Adopt** (optional) | Chrome 135, Firefox 136, Safari 16.4. Safari 27.0 fixed "comboboxes did not forward focus to their `aria-activedescendant`". |
 | `min-width: anchor-size(width)` with the implicit anchor | **Adopt** | Verified in Chromium and Firefox (listbox width = input width + border). |
 | `Element.ariaNotify()` for "N results" announcements | **Adopt** (optional) | Chrome 141, Firefox 150, Safari 27. |
@@ -371,13 +371,43 @@ Menu rule, and popover-menu.md already set Combobox aside for `aria-activedescen
 | --- | --- |
 | Open on `input`/`click` by script (no activation needed) | Opens. Focus stays in the input. Typing continues. |
 | Placement `position-area: block-end span-inline-end` + `min-width: anchor-size(width)` | Listbox top = input bottom, same left edge, width = input width + border. No JS. |
-| Click the input while open | Stays open. Clicking the `source` does not light-dismiss. |
+| Click the input while open | ~~Stays open. Clicking the `source` does not light-dismiss.~~ **Corrected 2026-10-24 (#123): a real press light-dismisses the listbox** (Chromium 156 at the `click`, Firefox 157 at `pointerup`; WebKit runs the same algorithm). See the correction note below the table. |
 | Click an option | **Focus moves to `<body>`** (input blurs) unless `pointerdown` is `preventDefault()`ed. With it, focus stays in the input. |
 | Escape | Closes, focus stays in the input. With `keydown` `preventDefault()`, the popover **stays open**, so the library can own Escape (APG "clear if already closed"). |
 | Tab while open | Focus moves past (options are not focusable), and **the popover stays open**. The library closes it on `focusout`. |
 | `popover="manual"` | Never light-dismisses (outside click leaves it open). Not recommended: `auto` gives outside click, nesting and Escape for free. |
 | Inside a modal `<dialog>` / inside an auto Popover | Works. Escape closes only the listbox. The dialog or popover stays open. |
 | Chromium AX | `combobox "Fruit" autocomplete=list hasPopup=listbox expanded=true activedescendant=o2 controls=lb`; the active option is `selected`. |
+
+**Correction (2026-10-24, issue #123).** The "click the input while open" row above was probed
+with a synthesised click (`element.click()` / `dispatchEvent`), which has no `pointerdown` /
+`pointerup` and therefore never runs HTML's light dismiss. Re-probed with Playwright's real
+mouse and touch (Chromium 156, Firefox 157; plain DOM, no library):
+
+- `showPopover({ source })` is **not** a light-dismiss exemption. HTML's "topmost clicked
+  popover" uses only the flat-tree ancestry of the event target ("nearest inclusive open
+  popover") and a button's `commandfor` / `popovertarget` ("nearest inclusive target popover");
+  `source` sets the popover trigger (nested stacking) and the implicit anchor, nothing else.
+  Chromium (`FindTopmostRelatedPopover`), Gecko (`nsINode::GetTopmostClickedPopover`) and WebKit
+  (`Document::handlePopoverLightDismiss`) read no invoker set by `showPopover`. With an
+  `<input>`, a plain `<button>` or a `<span>` as `source`, a real press on it hides the popover;
+  only a `<button commandfor>` / `popovertarget` is exempt. An `<input type="text">` can be
+  neither (the popover target attributes apply to button-type inputs only).
+- `preventDefault()` on `pointerdown`, `pointerup` or `click` changes nothing; light dismiss is
+  not cancelable. Chromium (flag `LightDismissFromClick`, stable) decides at the `click` from the
+  `pointerdown` and `pointerup` targets it recorded; Firefox and WebKit decide at `pointerup`
+  against the popover recorded at `pointerdown`.
+- **Pointer capture to the popup keeps it open**: `pop.setPointerCapture(e.pointerId)` in the
+  input's `pointerdown` (while `pop.matches(":popover-open")`) retargets `pointerup`, `mouseup`
+  and `click` to the popup, so the release counts as inside it and nothing hides. Verified for
+  mouse and touch (`hasTouch` context, tap) in both engines, nested inside another open auto
+  popover (both stay open), and for a drag that leaves the input. The compat `mousedown` is not
+  retargeted: the caret lands at the press point and a double click still selects the word.
+  Capturing at `mousedown` instead fails for touch (its compat `mousedown` comes after
+  `pointerup`). Cost: in Firefox the mouse drag follows the capture, so a drag-to-select in the
+  input does not extend while captured (`[2, 2]` instead of `[2, 8]`); Chromium's selection
+  drag ignores pointer capture. WebKit was not run locally. The library adopts this
+  (combobox.md, amendment #123).
 
 **`<datalist>`.** Rejected for Combobox:
 
