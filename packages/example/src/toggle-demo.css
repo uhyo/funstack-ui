@@ -1,9 +1,5 @@
 /* Toggle demo: data attributes are the styling hook; interaction state comes from pseudo-classes. */
 
-.demo section {
-  margin-block: 1.5rem;
-}
-
 .chip {
   display: inline-flex;
   align-items: center;
@@ -55,40 +51,6 @@
   text-align: center;
 }
 
-.spinner {
-  inline-size: 1em;
-  block-size: 1em;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: spin 700ms linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.readout {
-  display: block;
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: #555;
-}
-
-.inline-error {
-  color: #b91c1c;
-}
-
-.error-box {
-  padding: 0.75rem 1rem;
-  border: 1px solid #b91c1c;
-  border-radius: 6px;
-  background: #fef2f2;
-  color: #7f1d1d;
-}
-
 /* View transition for the commit that ends an action (`transition="fsui-fade"`). */
 ::view-transition-old(.fsui-fade) {
   animation: 160ms ease-in both fade-out;
@@ -114,13 +76,5 @@
   from {
     opacity: 0;
     transform: scale(0.8);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
   }
 }

@@ -91,11 +91,6 @@ html:active-view-transition .pop-vt {
   .pop {
     transition: none;
   }
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
-  }
 }
 
 /* Dim the popup while a Close action runs (the Close button carries data-pending). */
