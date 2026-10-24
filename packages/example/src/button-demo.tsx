@@ -2,9 +2,9 @@ import { startTransition, useState } from "react";
 import { Button } from "@funstack/ui/button";
 import { Form } from "@funstack/ui/form";
 import { Tooltip } from "@funstack/ui/tooltip";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./button-demo.css";
 
 /** Fake backend call; 1 s by default. */

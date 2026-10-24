@@ -1,9 +1,9 @@
 import { Suspense, use, useState } from "react";
 import { Tabs } from "@funstack/ui/tabs";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { sleep } from "./shared/fake-backend";
-import { Spinner } from "./shared/Spinner";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { sleep } from "./shared/fake-backend.js";
+import { Spinner } from "./shared/Spinner.js";
+import { Demo } from "./shared/Demo.js";
 import "./tabs-demo.css";
 
 /**

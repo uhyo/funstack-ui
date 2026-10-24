@@ -1,8 +1,8 @@
 import { Suspense, startTransition, use, useState } from "react";
 import { Select } from "@funstack/ui/select";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave, sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./select-demo.css";
 
 /** A decorative swatch: an SVG with no text, so the option still reads as plain text. */

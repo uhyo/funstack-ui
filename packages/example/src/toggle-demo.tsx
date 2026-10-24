@@ -1,9 +1,9 @@
 import { startTransition, useRef, useState } from "react";
 import { Toggle } from "@funstack/ui/toggle";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave } from "./shared/fake-backend";
-import { Spinner } from "./shared/Spinner";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave } from "./shared/fake-backend.js";
+import { Spinner } from "./shared/Spinner.js";
+import { Demo } from "./shared/Demo.js";
 import "./toggle-demo.css";
 
 function StarIcon({ filled }: { filled: boolean }) {

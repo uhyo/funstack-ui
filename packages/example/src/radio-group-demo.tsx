@@ -1,9 +1,9 @@
 import { startTransition, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { RadioGroup } from "@funstack/ui/radio-group";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./radio-group-demo.css";
 
 const themes = [

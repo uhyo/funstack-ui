@@ -3,8 +3,8 @@ import { Dialog } from "@funstack/ui/dialog";
 import { Menu } from "@funstack/ui/menu";
 import { Toast, toast } from "@funstack/ui/toast";
 import type { ToastItem } from "@funstack/ui/toast";
-import { sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./toast-demo.css";
 
 /* The Viewport, rendered once. It moves into an open modal Dialog by itself. ------------------- */

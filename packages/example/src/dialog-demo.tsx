@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Dialog } from "@funstack/ui/dialog";
 import type { DialogOpenChangeDetails } from "@funstack/ui/dialog";
-import { sleep } from "./shared/fake-backend";
-import { Spinner } from "./shared/Spinner";
-import { Demo } from "./shared/Demo";
+import { sleep } from "./shared/fake-backend.js";
+import { Spinner } from "./shared/Spinner.js";
+import { Demo } from "./shared/Demo.js";
 import "./dialog-demo.css";
 
 function logChange(label: string) {

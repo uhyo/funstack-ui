@@ -2,9 +2,9 @@ import { startTransition, useOptimistic, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Checkbox } from "@funstack/ui/checkbox";
 import { Switch } from "@funstack/ui/switch";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./switch-checkbox-demo.css";
 
 function AutosaveDemo() {

@@ -1,8 +1,8 @@
 import { startTransition, use, useState } from "react";
 import { Menu } from "@funstack/ui/menu";
 import type { MenuOpenChangeDetails } from "@funstack/ui/menu";
-import { sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./menu-demo.css";
 
 function logChange(label: string) {

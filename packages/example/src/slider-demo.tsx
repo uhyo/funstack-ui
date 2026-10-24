@@ -1,8 +1,8 @@
 import { Suspense, use, useRef, useState } from "react";
 import { Slider } from "@funstack/ui/slider";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave, sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./slider-demo.css";
 
 function VolumeDemo() {

@@ -3,8 +3,8 @@ import { useFormStatus } from "react-dom";
 import { Dialog } from "@funstack/ui/dialog";
 import { Popover } from "@funstack/ui/popover";
 import type { PopoverOpenChangeDetails } from "@funstack/ui/popover";
-import { sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./popover-demo.css";
 
 function logChange(label: string) {

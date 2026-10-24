@@ -1,9 +1,9 @@
 import { Suspense, startTransition, use, useState } from "react";
 import { Combobox } from "@funstack/ui/combobox";
 import { Dialog } from "@funstack/ui/dialog";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave, sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./combobox-demo.css";
 
 interface Country {

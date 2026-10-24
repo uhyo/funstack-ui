@@ -5,9 +5,9 @@ import { Menu } from "@funstack/ui/menu";
 import { ToggleGroup } from "@funstack/ui/toggle-group";
 import { Toolbar } from "@funstack/ui/toolbar";
 import { Tooltip } from "@funstack/ui/tooltip";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 // The tooltip and menu inside the toolbar reuse those demos' .tip and .menu rules.
 import "./menu-demo.css";
 import "./tooltip-demo.css";

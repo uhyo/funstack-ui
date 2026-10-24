@@ -1,9 +1,9 @@
 import { startTransition, use, useState } from "react";
 import { Accordion } from "@funstack/ui/accordion";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave, sleep } from "./shared/fake-backend";
-import { Spinner } from "./shared/Spinner";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Spinner } from "./shared/Spinner.js";
+import { Demo } from "./shared/Demo.js";
 import "./accordion-demo.css";
 
 const faq = [

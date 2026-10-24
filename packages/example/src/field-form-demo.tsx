@@ -6,9 +6,9 @@ import { Form } from "@funstack/ui/form";
 import type { FormErrors } from "@funstack/ui/form";
 import { RadioGroup } from "@funstack/ui/radio-group";
 import { Select } from "@funstack/ui/select";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./field-form-demo.css";
 
 interface State {

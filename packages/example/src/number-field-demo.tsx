@@ -3,9 +3,9 @@ import { Field } from "@funstack/ui/field";
 import { Form } from "@funstack/ui/form";
 import type { FormErrors } from "@funstack/ui/form";
 import { NumberField } from "@funstack/ui/number-field";
-import { DemoErrorBoundary } from "./shared/DemoErrorBoundary";
-import { fakeSave, sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
+import { fakeSave, sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./number-field-demo.css";
 
 function Stepper({ label }: { label: string }) {

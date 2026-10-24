@@ -1,8 +1,8 @@
 import { startTransition, useState, useTransition } from "react";
 import { Meter } from "@funstack/ui/meter";
 import { Progress } from "@funstack/ui/progress";
-import { sleep } from "./shared/fake-backend";
-import { Demo } from "./shared/Demo";
+import { sleep } from "./shared/fake-backend.js";
+import { Demo } from "./shared/Demo.js";
 import "./progress-meter-demo.css";
 
 const FILE_SIZE = 8_400_000;

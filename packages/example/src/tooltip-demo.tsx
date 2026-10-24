@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Tooltip } from "@funstack/ui/tooltip";
 import type { TooltipAlign, TooltipSide } from "@funstack/ui/tooltip";
-import { Demo } from "./shared/Demo";
+import { Demo } from "./shared/Demo.js";
 import "./tooltip-demo.css";
 
 function BoldIcon() {
