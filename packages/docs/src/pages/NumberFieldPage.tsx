@@ -467,8 +467,9 @@ export function NumberFieldPage() {
         </li>
         <li>
           <strong>Announcements</strong> go through <code>ariaNotify()</code> on the input (every
-          supported browser has it; no live region is rendered). The default is the formatted text (<code>"2"</code>,{" "}
-          <code>"1,50 €"</code>, <code>"50%"</code>); override with <code>announce</code>.
+          supported browser has it; no live region is rendered). The default is the formatted text (
+          <code>"2"</code>, <code>"1,50 €"</code>, <code>"50%"</code>); override with{" "}
+          <code>announce</code>.
         </li>
         <li>
           <strong>
