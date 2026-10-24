@@ -292,3 +292,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
   #106 P3 shared test suites (after P2) | #107 P4 jsdom --no-isolate
 - P1 running: 3 developers in agent worktrees, branches wave16/test-infra, wave16/source-cleanup, wave16/docs-example. Branch CI before master; PO merges after reviewer pass. Release alpha.12 at wave end (Breaking: C14).
 - #103 MERGED 005e5c9 (docs −657, example −329 net; D3 sidebar bug fixed; server-only guard). Closed. #101/#102 still running.
+- #102 done on wave16/source-cleanup (CI 40061449481 green, −153 src lines; C14 BREAKING: TabsValueChangeDetails/AccordionValueChangeDetails.reason → ChangeReason). Reviewer running. Deferred to P2: O18 double cast (with O1), long comment blocks, C3 item-order hook.
+- Lesson: scratchpad dir is shared between agents → brief agents to use a private subdirectory.
+- #102 review (wave16-source-review.md): M1 dev strings shipped in prod (+3.8KB) → fixing + prod-bundle guard + pre-existing useDevWarning; L1 transition JSDoc restore; L2 menu doc. ARCHITECT TODO (batch at P2 fold): design docs rename useMergedRef→useMergedRefs (field-form.md, slider.md, toggle-group.md, conventions ~1158), context-menu.md ~1120 MENU_POINT_* location.
+- #102 MERGED (prod bundle −9.7KB min vs before; guard test). Closed. Waiting on #101 → then P2 (#104/#105).
