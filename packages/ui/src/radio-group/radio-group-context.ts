@@ -1,16 +1,17 @@
 "use client";
 import { createContext, use } from "react";
+import type { RadioGroupRootState } from "./radio-group-root.js";
 
 export interface RadioGroupContextValue {
   /** The `name` shared by every radio of the group (prop or `useId()`). */
   readonly name: string;
   readonly form: string | undefined;
   readonly required: boolean;
-  /** Optimistic value: Items render `checked` from it. */
-  readonly optimistic: string | null;
-  readonly pending: boolean;
-  /** `Root disabled` (reaches the radios natively through `<fieldset disabled>`). */
-  readonly disabled: boolean;
+  /**
+   * The Root's state: Items render `checked` from its optimistic `value`. Its `disabled` is
+   * `Root disabled`, which reaches the radios natively through `<fieldset disabled>`.
+   */
+  readonly state: RadioGroupRootState;
   /**
    * Uncontrolled mode: the latest `defaultValue` (`null` when omitted), mirrored by each Item into
    * `el.defaultChecked` so that a form reset returns to it. `undefined` in controlled mode, where

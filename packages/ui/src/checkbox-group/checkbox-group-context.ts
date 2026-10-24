@@ -1,6 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { SetPatch } from "../internal/value-set.js";
+import type { CheckboxGroupRootState } from "./checkbox-group-root.js";
 
 /** A change to the group's set of checked values (design/components/checkbox-group.md 5.2). */
 export type CheckboxGroupPatch = SetPatch;
@@ -22,9 +23,11 @@ export interface CheckboxGroupContextValue {
   readonly optimistic: ReadonlySet<string>;
   /** Committed checked values. For per-part pending and the Parent's restore memory only. */
   readonly committed: ReadonlySet<string>;
-  readonly pending: boolean;
-  /** `Root disabled` (reaches the boxes natively through `<fieldset disabled>`). */
-  readonly disabled: boolean;
+  /**
+   * The Root's state. Its `disabled` is `Root disabled`, which reaches the boxes natively through
+   * `<fieldset disabled>`.
+   */
+  readonly state: CheckboxGroupRootState;
   /**
    * Uncontrolled mode: the latest `defaultValue` as a set, mirrored by each Item into
    * `el.defaultChecked` (and by each Parent, derived) so that a form reset returns to it.
@@ -57,11 +60,6 @@ export interface CheckboxGroupContextValue {
    * `values` (design 8.1). Call before `onItemMounted`.
    */
   readonly reportParent: (values: readonly string[], checked: boolean) => void;
-  /**
-   * The optimistic set as the Root state's `value`: an array in the Items' document order as of
-   * the Root's last render (see `CheckboxGroupRootState.value`).
-   */
-  readonly value: readonly string[];
   /**
    * Sorts values by the current document order of the group's Items (a DOM read); values with no
    * Item keep their iteration order, after them. Call from handlers and effects only.

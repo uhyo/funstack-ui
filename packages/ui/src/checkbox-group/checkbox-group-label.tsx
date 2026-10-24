@@ -27,12 +27,7 @@ export function CheckboxGroupLabel({
   render,
   ...rest
 }: CheckboxGroupLabelProps) {
-  const ctx = useCheckboxGroupContext("CheckboxGroup.Label");
-  const state: CheckboxGroupRootState = {
-    value: ctx.value,
-    pending: ctx.pending,
-    disabled: ctx.disabled,
-  };
+  const { state } = useCheckboxGroupContext("CheckboxGroup.Label");
   return useRender<ComponentPropsWithRef<"legend">, CheckboxGroupRootState>({
     defaultElement: "legend",
     render,

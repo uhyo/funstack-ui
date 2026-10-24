@@ -83,8 +83,8 @@ export function CheckboxGroupItem({
 }: CheckboxGroupItemProps) {
   const ctx = useCheckboxGroupContext("CheckboxGroup.Item");
   const checked = ctx.optimistic.has(value);
-  const pending = ctx.pending && checked !== ctx.committed.has(value);
-  const disabled = ctx.disabled || disabledProp;
+  const pending = ctx.state.pending && checked !== ctx.committed.has(value);
+  const disabled = ctx.state.disabled || disabledProp;
   const required = ctx.required;
 
   // The Root needs every Item's own `disabled` for the Parents and `required` (design 6.2, 7).

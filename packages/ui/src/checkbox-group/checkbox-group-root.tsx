@@ -393,6 +393,8 @@ export function CheckboxGroupRoot({
   // `aria-describedby`, read when focus enters the group.
   const { "aria-invalid": fieldInvalid, ...groupAttributes } = field.attributes;
 
+  const state: CheckboxGroupRootState = { value: renderedValue, pending, disabled };
+
   const context: CheckboxGroupContextValue = {
     name,
     form,
@@ -402,14 +404,12 @@ export function CheckboxGroupRoot({
     registerItem,
     optimistic,
     committed,
-    pending,
-    disabled,
+    state,
     defaultValue: value === undefined ? (defaultSet ?? EMPTY_SET) : undefined,
     onItemMounted,
     reportParent: (values, checked) => {
       parentReports.current.push({ values, checked });
     },
-    value: renderedValue,
     sortByDocument,
     toggle: (item, checked, event) => {
       // No-op rule against the optimistic set (conventions 2.3 item 8).
@@ -423,12 +423,6 @@ export function CheckboxGroupRoot({
       if (added.length === 0 && removed.length === 0) return;
       dispatchPatch(optimistic, { added, removed }, "activate", event);
     },
-  };
-
-  const state: CheckboxGroupRootState = {
-    value: renderedValue,
-    pending,
-    disabled,
   };
 
   const element = useRender<ComponentPropsWithRef<"fieldset">, CheckboxGroupRootState>({

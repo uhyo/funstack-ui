@@ -117,8 +117,9 @@ export function CheckboxGroupParent({
     [hydrating, values, disabledItems],
   );
   const { checked, indeterminate } = derive(effective, ctx.optimistic);
-  const pending = ctx.pending && values.some((v) => ctx.optimistic.has(v) !== ctx.committed.has(v));
-  const disabled = ctx.disabled || disabledProp;
+  const pending =
+    ctx.state.pending && values.some((v) => ctx.optimistic.has(v) !== ctx.committed.has(v));
+  const disabled = ctx.state.disabled || disabledProp;
 
   // The APG restore memory: the last partial combination of `values` the group committed
   // (design 6.2). Committed, not optimistic, so a partial state that only ever rolled back is

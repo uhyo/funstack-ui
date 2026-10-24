@@ -87,7 +87,7 @@ export function NumberFieldInput({
   ...rest
 }: NumberFieldInputProps) {
   const ctx = useNumberFieldContext("NumberField.Input");
-  const { state, visibleRef, hiddenRef, mirror, onInputMounted } = ctx;
+  const { state, visibleRef, hiddenRef, mirror, onItemMounted } = ctx;
 
   // --- The Field contract (design 7.1): the visible input registers, the hidden one validates.
   const validityElement = useCallback(() => hiddenRef.current, [hiddenRef]);
@@ -171,8 +171,8 @@ export function NumberFieldInput({
   useLayoutEffect(() => {
     if (mounted.current) return;
     mounted.current = true;
-    onInputMounted();
-  }, [onInputMounted]);
+    onItemMounted();
+  }, [onItemMounted]);
 
   const renderType =
     isValidElement<{ type?: unknown }>(render) && typeof render.props.type === "string"

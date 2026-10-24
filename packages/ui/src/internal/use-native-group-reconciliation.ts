@@ -2,7 +2,7 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { useFormReset } from "./use-form-reset.js";
-import type { FormAssociatedElement } from "./use-form-reset.js";
+import type { FormAssociatedElement } from "./use-form-owner-event.js";
 import { useLatest } from "./use-latest.js";
 
 export interface UseNativeGroupReconciliationOptions<T> {

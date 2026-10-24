@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useInsertionEffect,
   useMemo,
   useRef,
   useState,
@@ -28,9 +27,10 @@ import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
-import type { FormAssociatedElement } from "../internal/use-form-reset.js";
+import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useRegisterCount } from "../internal/use-register-count.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { boundValue, stepBy, stepValue } from "./number-field-arithmetic.js";
@@ -252,7 +252,6 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   const holdRef = useRef<StepDirection | null>(null);
   const commitSeq = useRef(0);
   const lastReason = useRef<ChangeReason | null>(null);
-  const shownRef = useRef<number | null>(null);
   const visibleRef = useRef<HTMLInputElement | null>(null);
   const hiddenRef = useRef<HTMLInputElement | null>(null);
 
@@ -324,9 +323,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   // The value a button press steps from (4.3 step 3): the parsed draft while one is open.
   const parsedDraft = draft === null ? undefined : formatter.parse(draft);
   const stepBase = parsedDraft === undefined ? shown : parsedDraft;
-  useInsertionEffect(() => {
-    shownRef.current = shown;
-  });
+  /** What the input shows, for handlers; also written by `step` ahead of the render. */
+  const shownRef = useLatest(shown);
 
   const state = useMemo<NumberFieldState>(
     () => ({ value: shown, text, pending, disabled, readOnly, required }),
@@ -386,7 +384,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       });
       return true;
     },
-    [clearDraft, latest, writeHidden],
+    [clearDraft, latest, shownRef, writeHidden],
   );
 
   const announceValue = useCallback(
@@ -423,7 +421,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   const openGesture = useCallback(() => {
     gestureStart.current = { value: shownRef.current };
     liveRef.current = shownRef.current;
-  }, []);
+  }, [shownRef]);
 
   /** The value a key or a button steps from: the parsed draft if one is open, else the shown value. */
   const resolveBase = useCallback((): number | null => {
@@ -434,7 +432,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       if (parsed !== undefined) return parsed;
     }
     return shownRef.current;
-  }, [clearDraft, latest]);
+  }, [clearDraft, latest, shownRef]);
 
   /** A one-step gesture: a key press, a wheel event, a click activation. */
   const oneStep = useCallback(
@@ -473,7 +471,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       step(parsed, "input", "activate", event);
       commit("input", "activate", event);
     },
-    [clearDraft, commit, latest, openGesture, step],
+    [clearDraft, commit, latest, openGesture, shownRef, step],
   );
 
   // --- Keyboard and wheel (design 4.2, 4.4) ----------------------------------------------------
@@ -584,7 +582,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       setHold(direction);
       return tickHold(direction, event);
     },
-    [latest, openGesture, resolveBase, tickHold],
+    [latest, openGesture, resolveBase, shownRef, tickHold],
   );
 
   const activate = useCallback(
@@ -599,11 +597,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // --- Labels ---------------------------------------------------------------------------------
 
-  const [labelCount, setLabelCount] = useState(0);
-  const registerLabel = useCallback(() => {
-    setLabelCount((count) => count + 1);
-    return () => setLabelCount((count) => count - 1);
-  }, []);
+  const { count: labelCount, register: registerLabel } = useRegisterCount();
 
   // --- Residual browser paths: mount reconciliation and form reset (design 4.5, 6.4) ----------
 
@@ -727,7 +721,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       activate,
       mirror,
       registerLabel,
-      onInputMounted: onItemMounted,
+      onItemMounted,
     }),
     [
       state,

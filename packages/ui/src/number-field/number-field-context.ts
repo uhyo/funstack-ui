@@ -54,7 +54,7 @@ export interface NumberFieldContextValue {
   /** Called by the Label from a layout effect; returns the unregistration. */
   readonly registerLabel: () => () => void;
   /** Called by the Input from its mount layout effect (late mount reconciliation). */
-  readonly onInputMounted: () => void;
+  readonly onItemMounted: () => void;
 }
 
 export const NumberFieldContext = createContext<NumberFieldContextValue | null>(null);

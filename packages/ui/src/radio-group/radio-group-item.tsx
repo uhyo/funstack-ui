@@ -78,9 +78,9 @@ export function RadioGroupItem({
   ...rest
 }: RadioGroupItemProps) {
   const ctx = useRadioGroupContext("RadioGroup.Item");
-  const checked = ctx.optimistic === value;
-  const pending = ctx.pending && checked;
-  const disabled = ctx.disabled || disabledProp;
+  const checked = ctx.state.value === value;
+  const pending = ctx.state.pending && checked;
+  const disabled = ctx.state.disabled || disabledProp;
 
   // Group mode: element check and re-apply only; the Root reports the residual paths once. The
   // hook calls `onItemMounted` at mount so that an Item mounting after its Root (a Suspense

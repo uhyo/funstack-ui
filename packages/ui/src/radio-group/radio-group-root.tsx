@@ -227,14 +227,16 @@ export function RadioGroupRoot({
   // Memoised: `dispatch` and `onItemMountedWithCheck` are stable, so this changes only with
   // the state and the props below.
   const contextDefault = value === undefined ? (defaultValue ?? null) : undefined;
+  const state = useMemo<RadioGroupRootState>(
+    () => ({ value: optimistic, pending, disabled }),
+    [optimistic, pending, disabled],
+  );
   const context = useMemo<RadioGroupContextValue>(
     () => ({
       name,
       form,
       required,
-      optimistic,
-      pending,
-      disabled,
+      state,
       defaultValue: contextDefault,
       onItemMounted: onItemMountedWithCheck,
       select: (next, event) => {
@@ -243,20 +245,8 @@ export function RadioGroupRoot({
         dispatch(next, createActionDetails(event, { reason: "activate" }));
       },
     }),
-    [
-      name,
-      form,
-      required,
-      optimistic,
-      pending,
-      disabled,
-      contextDefault,
-      onItemMountedWithCheck,
-      dispatch,
-    ],
+    [name, form, required, state, optimistic, contextDefault, onItemMountedWithCheck, dispatch],
   );
-
-  const state: RadioGroupRootState = { value: optimistic, pending, disabled };
 
   const element = useRender<ComponentPropsWithRef<"fieldset">, RadioGroupRootState>({
     defaultElement: "fieldset",

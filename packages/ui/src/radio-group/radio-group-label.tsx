@@ -27,12 +27,7 @@ export function RadioGroupLabel({
   render,
   ...rest
 }: RadioGroupLabelProps) {
-  const ctx = useRadioGroupContext("RadioGroup.Label");
-  const state: RadioGroupRootState = {
-    value: ctx.optimistic,
-    pending: ctx.pending,
-    disabled: ctx.disabled,
-  };
+  const { state } = useRadioGroupContext("RadioGroup.Label");
   return useRender<ComponentPropsWithRef<"legend">, RadioGroupRootState>({
     defaultElement: "legend",
     render,

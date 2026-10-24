@@ -17,9 +17,10 @@ import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
-import type { FormAssociatedElement } from "../internal/use-form-reset.js";
+import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useRegisterCount } from "../internal/use-register-count.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import {
@@ -485,18 +486,12 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   // --- Labels --------------------------------------------------------------------------------
 
-  const [labelCount, setLabelCount] = useState(0);
-  // The same count for the dev warning, which can run before the re-render the registration
-  // scheduled.
-  const labelCountRef = useRef(0);
-  const registerLabel = useCallback(() => {
-    labelCountRef.current += 1;
-    setLabelCount((count) => count + 1);
-    return () => {
-      labelCountRef.current -= 1;
-      setLabelCount((count) => count - 1);
-    };
-  }, []);
+  // The ref is for the dev warning, which can run before the re-render the registration scheduled.
+  const {
+    count: labelCount,
+    register: registerLabel,
+    countRef: labelCountRef,
+  } = useRegisterCount();
 
   // --- Residual browser paths: mount reconciliation and form reset (design 9.2, 9.3) --------
 
@@ -814,7 +809,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       "Slider.Root: a slider with several thumbs is a `group` and needs a name: render a " +
         "Slider.Label, or pass `aria-label` / `aria-labelledby` to the Root.",
     );
-  }, [unnamedGroup]);
+  }, [unnamedGroup, labelCountRef]);
 
   // --- Render --------------------------------------------------------------------------------
 
