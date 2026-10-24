@@ -19,6 +19,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
+  sequencedDeferreds,
   ErrorCatcher,
   expectNotPending,
   expectPending,
@@ -653,9 +654,8 @@ describe("Accordion", () => {
     });
 
     it("clicking again while pending reverts the intent: item no longer pending, Root still is", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode={mode} action={action} />);
       const user = setupUser();
 
@@ -738,9 +738,8 @@ describe("Accordion", () => {
       ["B then C", [0, 1]],
       ["C then B", [1, 0]],
     ] as const)("latest dispatch wins when resolved %s", async (_label, order) => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode="uncontrolled" exclusive initial="a" action={action} />);
       const user = setupUser();
 
@@ -772,9 +771,8 @@ describe("Accordion", () => {
     });
 
     it("stays pending until every in-flight action settles", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      render(<Harness mode="uncontrolled" exclusive action={() => deferreds[calls++]!.promise} />);
+      const deferreds = sequencedDeferreds(2);
+      render(<Harness mode="uncontrolled" exclusive action={() => deferreds.next()} />);
       const user = setupUser();
       await user.click(trigger("a"));
       await user.click(trigger("b"));
@@ -795,9 +793,8 @@ describe("Accordion", () => {
       ["A then B", [0, 1]],
       ["B then A", [1, 0]],
     ] as const)("both opens survive when resolved %s", async (_label, order) => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode="uncontrolled" action={action} />);
       const user = setupUser();
 
@@ -822,9 +819,8 @@ describe("Accordion", () => {
 
   renderBoth("superseded rejection", (mode) => {
     function renderTwoClicks(onError: (error: unknown) => void) {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode={mode} action={action} boundary={onError} />);
       return { deferreds, action };
     }

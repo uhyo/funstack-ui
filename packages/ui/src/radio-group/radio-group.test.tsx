@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
+  sequencedDeferreds,
   ErrorCatcher,
   expectNotPending,
   expectPending,
@@ -629,9 +630,8 @@ describe("RadioGroup", () => {
 
   describe("overlapping actions", () => {
     it("rapid arrows: the latest wins, DOM stays on it while earlier ones resolve last", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode="uncontrolled" initial="a" action={action} />);
       const user = setupUser();
       radio("a").focus();
@@ -658,11 +658,8 @@ describe("RadioGroup", () => {
     });
 
     it("resolved in order, the latest still wins", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      render(
-        <Harness mode="uncontrolled" initial="a" action={() => deferreds[calls++]!.promise} />,
-      );
+      const deferreds = sequencedDeferreds(2);
+      render(<Harness mode="uncontrolled" initial="a" action={() => deferreds.next()} />);
       const user = setupUser();
       await user.click(radio("b"));
       await user.click(radio("c"));
@@ -678,9 +675,8 @@ describe("RadioGroup", () => {
     });
 
     it("clicking back to the committed radio while another is pending (walkthrough 9.6)", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode="uncontrolled" initial="a" action={action} />);
       const user = setupUser();
       await user.click(radio("b"));
@@ -702,9 +698,8 @@ describe("RadioGroup", () => {
 
   renderBoth("superseded rejection", (mode) => {
     function renderTwo(onError: (error: unknown) => void) {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode={mode} action={action} boundary={onError} />);
       return { deferreds, action };
     }

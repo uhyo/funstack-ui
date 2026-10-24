@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "v
 import {
   createSuspender,
   deferred,
+  sequencedDeferreds,
   ErrorCatcher,
   expectNotPending,
   expectPending,
@@ -298,11 +299,10 @@ describe("Button", () => {
     });
 
     it("caught inside: the action resolves and the next click runs (no stuck guard)", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
+      const deferreds = sequencedDeferreds(2);
       const action = vi.fn(async () => {
         try {
-          await deferreds[calls++]!.promise;
+          await deferreds.next();
         } catch {
           // The consumer's inline error.
         }
@@ -677,15 +677,14 @@ describe("Button", () => {
 
   describe("consumer state after await (row 10)", () => {
     it("commits once per accepted click", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
+      const deferreds = sequencedDeferreds(2);
       function Counter() {
         const [count, setCount] = useState(0);
         return (
           <>
             <Button
               action={async () => {
-                await deferreds[calls++]!.promise;
+                await deferreds.next();
                 startTransition(() => setCount((c) => c + 1));
               }}
             >
@@ -709,7 +708,7 @@ describe("Button", () => {
         deferreds[1]!.resolve();
       });
       expect(screen.getByTestId("count")).toHaveTextContent("2");
-      expect(calls).toBe(2);
+      expect(deferreds.calls).toBe(2);
     });
   });
 

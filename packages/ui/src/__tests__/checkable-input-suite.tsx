@@ -14,6 +14,7 @@ import type { SwitchCheckedChangeDetails, SwitchProps, SwitchState } from "../sw
 import {
   createSuspender,
   deferred,
+  sequencedDeferreds,
   ErrorCatcher,
   expectNotPending,
   expectPending,
@@ -449,9 +450,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         ["second then first", [1, 0]],
         ["first then second", [0, 1]],
       ] as const)("latest dispatch wins when resolved %s (row 11)", async (_label, order) => {
-        const deferreds = [deferred(), deferred()];
-        let calls = 0;
-        const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+        const deferreds = sequencedDeferreds(2);
+        const action = vi.fn<ActionFn>(() => deferreds.next());
         render(<Harness mode="uncontrolled" action={action} />);
         const user = setupUser();
 
@@ -471,9 +471,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
 
       it("stays pending until every in-flight action settles (row 12)", async () => {
-        const deferreds = [deferred(), deferred()];
-        let calls = 0;
-        render(<Harness mode="uncontrolled" action={() => deferreds[calls++]!.promise} />);
+        const deferreds = sequencedDeferreds(2);
+        render(<Harness mode="uncontrolled" action={() => deferreds.next()} />);
         const user = setupUser();
 
         await user.click(input());
@@ -492,9 +491,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
 
     renderBoth("superseded rejection", (mode) => {
       function renderTwoClicks(onError: (error: unknown) => void) {
-        const deferreds = [deferred(), deferred()];
-        let calls = 0;
-        const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+        const deferreds = sequencedDeferreds(2);
+        const action = vi.fn<ActionFn>(() => deferreds.next());
         render(<Harness mode={mode} action={action} boundary={onError} />);
         return { deferreds, action };
       }
@@ -861,14 +859,13 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
 
       it("preventDefault() in the action warns once and desyncs only while pending", async () => {
         const consoleError = silenceErrors();
-        const deferreds = [deferred(), deferred()];
-        let calls = 0;
+        const deferreds = sequencedDeferreds(2);
         render(
           <Control
             aria-label="x"
             checkedChangeAction={(_next, details) => {
               details.event?.preventDefault();
-              return deferreds[calls++]!.promise;
+              return deferreds.next();
             }}
           />,
         );

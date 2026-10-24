@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
+  sequencedDeferreds,
   ErrorCatcher,
   expectNotPending,
   expectPending,
@@ -300,9 +301,8 @@ describe("ToggleGroup", () => {
     });
 
     it("a second click on the same Item clears its pending while the Root keeps it", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      render(<Harness mode={mode} action={() => deferreds[calls++]!.promise} />);
+      const deferreds = sequencedDeferreds(2);
+      render(<Harness mode={mode} action={() => deferreds.next()} />);
       const user = setupUser();
 
       await user.click(item("bold"));
@@ -366,11 +366,8 @@ describe("ToggleGroup", () => {
       async (_label, italicFirst) => {
         // Controlled "update on success": a failed save (caught by the consumer, so the group
         // stays mounted) leaves the parent's value alone, which is the rejection's rollback.
-        const deferreds = [deferred(), deferred()];
-        let calls = 0;
-        render(
-          <Harness mode="controlled" action={() => deferreds[calls++]!.promise} catchErrors />,
-        );
+        const deferreds = sequencedDeferreds(2);
+        render(<Harness mode="controlled" action={() => deferreds.next()} catchErrors />);
         const user = setupUser();
         await user.click(item("bold"));
         await user.click(item("italic"));
@@ -399,8 +396,7 @@ describe("ToggleGroup", () => {
       // settles, so the rejection's rollback is only visible at the end (test above). The
       // re-basing itself shows when the committed value changes while presses are pending: the
       // patches re-apply on the new base, rather than a stale whole set replacing it.
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
+      const deferreds = sequencedDeferreds(2);
       function Parent() {
         const [value, setValue] = useState<string[]>([]);
         return (
@@ -411,7 +407,7 @@ describe("ToggleGroup", () => {
             <ToggleGroup.Root
               aria-label="x"
               value={value}
-              valueChangeAction={() => deferreds[calls++]!.promise}
+              valueChangeAction={() => deferreds.next()}
             >
               <ToggleGroup.Item value="bold">bold</ToggleGroup.Item>
               <ToggleGroup.Item value="italic">italic</ToggleGroup.Item>
@@ -440,9 +436,8 @@ describe("ToggleGroup", () => {
       ["2 then 1", [1, 0]],
       ["1 then 2", [0, 1]],
     ] as const)("Bold then Italic resolved %s commits both", async (_label, order) => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode="uncontrolled" action={action} />);
       const user = setupUser();
 
@@ -461,14 +456,9 @@ describe("ToggleGroup", () => {
     });
 
     it("stacked patches re-base: Italic stays pressed while Bold's save is still in flight", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
+      const deferreds = sequencedDeferreds(2);
       render(
-        <ToggleGroup.Root
-          aria-label="x"
-          value={[]}
-          valueChangeAction={() => deferreds[calls++]!.promise}
-        >
+        <ToggleGroup.Root aria-label="x" value={[]} valueChangeAction={() => deferreds.next()}>
           <ToggleGroup.Item value="bold">bold</ToggleGroup.Item>
           <ToggleGroup.Item value="italic">italic</ToggleGroup.Item>
         </ToggleGroup.Root>,
@@ -491,10 +481,9 @@ describe("ToggleGroup", () => {
   renderBoth("superseded rejection (row 6)", (mode) => {
     it("older rejects after the newer resolved: the catcher records it", async () => {
       silenceErrors();
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
+      const deferreds = sequencedDeferreds(2);
       const onError = vi.fn();
-      render(<Harness mode={mode} action={() => deferreds[calls++]!.promise} boundary={onError} />);
+      render(<Harness mode={mode} action={() => deferreds.next()} boundary={onError} />);
       const user = setupUser();
       await user.click(item("bold"));
       await user.click(item("italic"));
@@ -513,10 +502,9 @@ describe("ToggleGroup", () => {
 
     it("older rejects while the newer pends: the catcher records it once", async () => {
       silenceErrors();
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
+      const deferreds = sequencedDeferreds(2);
       const onError = vi.fn();
-      render(<Harness mode={mode} action={() => deferreds[calls++]!.promise} boundary={onError} />);
+      render(<Harness mode={mode} action={() => deferreds.next()} boundary={onError} />);
       const user = setupUser();
       await user.click(item("bold"));
       await user.click(item("italic"));

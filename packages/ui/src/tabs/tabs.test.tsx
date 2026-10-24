@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
+  sequencedDeferreds,
   ErrorCatcher,
   expectNotPending,
   expectPending,
@@ -791,9 +792,8 @@ describe("Tabs", () => {
 
   describe("overlapping actions (uncontrolled)", () => {
     it("dispatch b then c, resolve b last: optimistic c throughout, committed c", async () => {
-      const ds = [deferred(), deferred()];
-      let calls = 0;
-      render(<Harness mode="uncontrolled" action={() => ds[calls++]!.promise} />);
+      const ds = sequencedDeferreds(2);
+      render(<Harness mode="uncontrolled" action={() => ds.next()} />);
       const user = setupUser();
 
       await user.click(tab("B"));
@@ -818,9 +818,8 @@ describe("Tabs", () => {
     });
 
     it("clicking back to the committed tab cancels the intent; its panel never leaves (9.4)", async () => {
-      const ds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => ds[calls++]!.promise);
+      const ds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => ds.next());
       render(<Harness mode="uncontrolled" action={action} />);
       const user = setupUser();
 
@@ -861,10 +860,9 @@ describe("Tabs", () => {
   renderBoth("superseded rejection", (mode) => {
     it("older rejects after the newer resolved: reaches the boundary", async () => {
       silenceErrors();
-      const ds = [deferred(), deferred()];
-      let calls = 0;
+      const ds = sequencedDeferreds(2);
       const onError = vi.fn();
-      render(<Harness mode={mode} action={() => ds[calls++]!.promise} boundary={onError} />);
+      render(<Harness mode={mode} action={() => ds.next()} boundary={onError} />);
       const user = setupUser();
 
       await user.click(tab("B"));
@@ -885,10 +883,9 @@ describe("Tabs", () => {
 
     it("older rejects while the newer is pending: reaches the boundary", async () => {
       silenceErrors();
-      const ds = [deferred(), deferred()];
-      let calls = 0;
+      const ds = sequencedDeferreds(2);
       const onError = vi.fn();
-      render(<Harness mode={mode} action={() => ds[calls++]!.promise} boundary={onError} />);
+      render(<Harness mode={mode} action={() => ds.next()} boundary={onError} />);
       const user = setupUser();
 
       await user.click(tab("B"));

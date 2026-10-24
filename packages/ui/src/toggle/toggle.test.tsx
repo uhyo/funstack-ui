@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
+  sequencedDeferreds,
   ErrorCatcher,
   expectNotPending,
   expectPending,
@@ -368,9 +369,8 @@ describe("Toggle", () => {
       ["second then first", [1, 0]],
       ["first then second", [0, 1]],
     ] as const)("latest dispatch wins when resolved %s (row 11)", async (_label, order) => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode="uncontrolled" action={action} />);
       const user = setupUser();
 
@@ -390,9 +390,8 @@ describe("Toggle", () => {
     });
 
     it("stays pending until every in-flight action settles (row 12)", async () => {
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode="uncontrolled" action={action} />);
       const user = setupUser();
 
@@ -413,9 +412,8 @@ describe("Toggle", () => {
 
   renderBoth("superseded rejection", (mode) => {
     function renderTwoClicks(onError: (error: unknown) => void, count = 2) {
-      const deferreds = Array.from({ length: count }, () => deferred());
-      let calls = 0;
-      const action = vi.fn<ActionFn>(() => deferreds[calls++]!.promise);
+      const deferreds = sequencedDeferreds(count);
+      const action = vi.fn<ActionFn>(() => deferreds.next());
       render(<Harness mode={mode} action={action} boundary={onError} />);
       return { deferreds, action };
     }
@@ -511,10 +509,9 @@ describe("Toggle", () => {
       const reportError = vi.fn();
       vi.stubGlobal("reportError", reportError);
       const onError = vi.fn();
-      const deferreds = [deferred(), deferred()];
-      let calls = 0;
+      const deferreds = sequencedDeferreds(2);
       const { unmount } = render(
-        <Harness mode={mode} action={() => deferreds[calls++]!.promise} boundary={onError} />,
+        <Harness mode={mode} action={() => deferreds.next()} boundary={onError} />,
       );
       const user = setupUser();
 

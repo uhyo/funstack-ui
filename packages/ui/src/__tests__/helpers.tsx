@@ -44,6 +44,35 @@ export function deferred<T = void>(): Deferred<T> {
   };
 }
 
+/** `count` deferreds handed out in order by `next()`: the n-th call of an action awaits `[n]`. */
+export interface DeferredSequence<T> extends ReadonlyArray<Deferred<T>> {
+  /** The promise of the next unused deferred; throws once all `count` are used. */
+  next(): Promise<T>;
+  /** How many times `next()` has been called. */
+  readonly calls: number;
+}
+
+/**
+ * Deferreds for overlapping calls of one action: `action={() => ds.next()}` makes the first call
+ * await `ds[0]`, the second `ds[1]`, so the test settles them in any order.
+ */
+export function sequencedDeferreds<T = void>(count: number): DeferredSequence<T> {
+  const list = Array.from({ length: count }, () => deferred<T>());
+  let calls = 0;
+  return Object.defineProperties(list, {
+    next: {
+      value: () => {
+        const d = list[calls++];
+        if (d === undefined) {
+          throw new Error(`sequencedDeferreds: call ${calls} but only ${count} deferreds`);
+        }
+        return d.promise;
+      },
+    },
+    calls: { get: () => calls },
+  }) as unknown as DeferredSequence<T>;
+}
+
 /**
  * Resolves every deferred (and `createSuspender` entry) still open, with `undefined`, inside
  * `act()` so that the async actions waiting on them finish and leave no entangled transition
