@@ -27,7 +27,7 @@ import type {
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useFieldValueChange } from "../internal/use-field-control.js";
+import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/use-form-reset.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
@@ -221,10 +221,13 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // --- Field ----------------------------------------------------------------------------------
 
+  // NumberField.Input registers the control (design 7.1); the Root only resolves the defaults.
   const fieldContext = use(FieldContext);
-  const disabled = disabledProp || (fieldContext?.disabled ?? false);
-  const required = requiredProp || (fieldContext?.required ?? false);
-  const name = nameProp ?? fieldContext?.name;
+  const { disabled, required, name } = resolveFieldDefaults(fieldContext, {
+    name: nameProp,
+    disabled: disabledProp,
+    required: requiredProp,
+  });
   const fieldInvalid = fieldContext === null ? undefined : fieldContext.state.invalid;
 
   const id = useId();

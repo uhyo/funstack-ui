@@ -3,7 +3,7 @@ import { use, useCallback, useLayoutEffect, useRef } from "react";
 import type { RefCallback } from "react";
 import { dataAttr } from "./data-attr.js";
 import { FieldContext } from "./field-context.js";
-import type { FieldState } from "./field-context.js";
+import type { FieldContextValue, FieldState } from "./field-context.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import type { ValidatableElement } from "./validity.js";
 
@@ -46,6 +46,8 @@ export interface FieldControlBinding {
   readonly id: string | undefined;
   /** Own `name` ?? the Field's. */
   readonly name: string | undefined;
+  /** The Field's own `name` (`undefined` outside a Field or when it has none). */
+  readonly fieldName: string | undefined;
   /** Own `disabled` || the Field's. */
   readonly disabled: boolean;
   /** Own `required` || the Field's. */
@@ -58,6 +60,26 @@ export interface FieldControlBinding {
   readonly attributes: FieldControlAttributes;
   /** The Field's state, `undefined` outside a Field. */
   readonly state: FieldState | undefined;
+}
+
+/**
+ * "Own or the Field's" (design/components/field-form.md 7.1): `name` falls back to the Field's,
+ * `disabled` and `required` are either's. Outside a Field (`field === null`) the own props.
+ */
+export function resolveFieldDefaults(
+  field: Pick<FieldContextValue, "name" | "disabled" | "required"> | null,
+  own: {
+    readonly name: string | undefined;
+    readonly disabled: boolean;
+    readonly required: boolean;
+  },
+): { name: string | undefined; disabled: boolean; required: boolean } {
+  if (field === null) return { name: own.name, disabled: own.disabled, required: own.required };
+  return {
+    name: own.name ?? field.name,
+    disabled: own.disabled || field.disabled,
+    required: own.required || field.required,
+  };
 }
 
 /**
@@ -122,6 +144,7 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
       ref: undefined,
       id,
       name,
+      fieldName: undefined,
       disabled,
       required,
       attributes: {},
@@ -142,9 +165,8 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
     inField: true,
     ref,
     id: labelable ? ids.control : undefined,
-    name: name ?? field.name,
-    disabled: disabled || field.disabled,
-    required: required || field.required,
+    ...resolveFieldDefaults(field, { name, disabled, required }),
+    fieldName: field.name,
     attributes,
     state,
   };

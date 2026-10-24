@@ -1,18 +1,8 @@
 "use client";
-import {
-  addTransitionType,
-  use,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { addTransitionType, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
-import { FieldContext } from "../internal/field-context.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
@@ -328,7 +318,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     disabled: disabledProp,
     component: "Slider.Root",
   });
-  const fieldName = use(FieldContext)?.name;
+  const fieldName = field.fieldName;
   const name = field.name;
   const disabled = field.disabled;
   const fieldId = field.id;
