@@ -22,7 +22,10 @@ export interface PopoverTriggerProps extends Omit<
   style?: StateValue<CSSProperties | undefined, PopoverTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, PopoverTriggerState>;
-  /** Should render a `<button>`; another element works only in library mode (click handler). */
+  /**
+   * Should render a `<button>`; another element works only in library mode (click handler), and
+   * a press on it while the popup is open is a light dismiss rather than the awaited close.
+   */
   render?: RenderProp<ComponentPropsWithRef<"button">, PopoverTriggerState>;
 }
 

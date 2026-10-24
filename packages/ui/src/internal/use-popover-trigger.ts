@@ -87,12 +87,20 @@ export function usePopoverTrigger<State>(
 
   const checkElement = useElementCheck(
     isDev &&
-      ((element) =>
-        !isLibrary && element.tagName !== "BUTTON"
-          ? `${part}: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
-            '<button> runs `command="toggle-popover"`; this trigger will not open the popover. ' +
-            "Render a <button>, or put the component in library mode (`defaultOpen={false}`)."
-          : null),
+      ((element) => {
+        if (element.tagName === "BUTTON") return null;
+        const tag = element.tagName.toLowerCase();
+        // Library mode: the click handler works, but only an invoker button is spared by the
+        // popover's light dismiss, so a press while open hides the popup before the click (#115).
+        return isLibrary
+          ? `${part}: rendered a <${tag}>. Only a <button> is the popover's invoker: a press on ` +
+              "this element while the popup is open closes it through light dismiss before the " +
+              "click, so the close is not awaited, openChangeAction(false) cannot veto it and " +
+              "there is no exit transition. Render a <button>."
+          : `${part}: rendered a <${tag}> in JS-free mode. Only a <button> runs ` +
+              '`command="toggle-popover"`; this trigger will not open the popover. Render a ' +
+              "<button>, or put the component in library mode (`defaultOpen={false}`).";
+      }),
   );
   const ref = useCallback(
     (element: HTMLElement) => {

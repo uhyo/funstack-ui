@@ -659,6 +659,26 @@ describe("Popover", () => {
       expect(messages.some((m) => m.includes("Popover.Close: rendered a <span>"))).toBe(true);
     });
 
+    it("warns for a non-button Trigger in library mode: its close while open is a light dismiss (#115)", () => {
+      const error = silenceErrors();
+      render(<Harness mode="uncontrolled" trigger={{ render: <a href="#x" /> }} />);
+      const messages = error.mock.calls.map(([message]) => String(message));
+      const warning = messages.find((m) => m.includes("Popover.Trigger: rendered a <a>"));
+      expect(warning).toBeDefined();
+      expect(warning).not.toContain("JS-free mode");
+      expect(warning).toContain("closes it through light dismiss before the click");
+      expect(warning).toContain("not awaited");
+      expect(warning).toContain("cannot veto");
+      expect(warning).toContain("no exit transition");
+    });
+
+    it("does not warn for a <button> Trigger in either mode", () => {
+      const error = silenceErrors();
+      render(<Harness mode="uncontrolled" />);
+      render(<Harness mode="static" />);
+      expect(error.mock.calls.some(([m]) => String(m).includes("Popover.Trigger:"))).toBe(false);
+    });
+
     it("warns when the Popup renders something other than a <dialog> or a <div>", () => {
       const error = silenceErrors();
       render(<Harness mode="static" popup={{ render: <section /> }} />);

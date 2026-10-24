@@ -1817,6 +1817,22 @@ describe("Menu.Root", () => {
       true,
     );
   });
+
+  it("warns for a non-button Trigger: its close while open is a light dismiss (#115)", () => {
+    const error = silenceErrors();
+    render(
+      <Menu.Root>
+        <Menu.Trigger render={<span tabIndex={0} />}>Actions</Menu.Trigger>
+        <Menu.Popup>
+          <Menu.Item>Edit</Menu.Item>
+        </Menu.Popup>
+      </Menu.Root>,
+    );
+    const warning = error.mock.calls
+      .map((call) => String(call[0]))
+      .find((m) => m.includes("Menu.Trigger: rendered a <span>"));
+    expect(warning).toContain("closes it through light dismiss before the click");
+  });
 });
 
 describe("submenus", () => {

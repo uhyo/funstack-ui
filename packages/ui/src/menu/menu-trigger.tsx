@@ -41,7 +41,11 @@ export interface MenuTriggerProps extends Omit<
   style?: StateValue<CSSProperties | undefined, MenuTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, MenuTriggerState>;
-  /** Should render a `<button>` (the command path before hydration). */
+  /**
+   * Should render a `<button>` (the command path before hydration). Another element works through
+   * the click handler, but a press on it while the menu is open is a light dismiss rather than the
+   * awaited close.
+   */
   render?: RenderProp<ComponentPropsWithRef<"button">, MenuTriggerState>;
 }
 

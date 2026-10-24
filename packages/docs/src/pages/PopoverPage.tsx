@@ -222,7 +222,7 @@ export function PopoverPage() {
           "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `commandfor`, `command`, `aria-expanded`, `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`."
         }
         note={
-          "A click while open is a part's close; a second click during a pending open cancels it (the latest intent wins). `aria-haspopup` and `aria-controls` pass through."
+          'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode) is no invoker, so a press on it while open light-dismisses the popup before the click: the close is reported as `"activate"` but not awaited, a controlled parent cannot veto it and there is no exit transition ([#115](https://github.com/uhyo/funstack-ui/issues/115)); a development warning says so. `aria-haspopup` and `aria-controls` pass through.'
         }
       />
 

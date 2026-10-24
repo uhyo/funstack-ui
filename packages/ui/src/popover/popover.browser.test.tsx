@@ -21,6 +21,7 @@ import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
+import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import {
   anchorPositionHonoursParentDirection,
@@ -34,6 +35,7 @@ import {
   placedSide,
   withPageDirection,
 } from "../__tests__/placement-browser.js";
+import { deferred, silenceErrors } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import {
@@ -861,5 +863,75 @@ describe("direction (wave 11, #53)", () => {
       expect(near(p.left, t.right)).toBe(false);
     }
     await closePlaced();
+  });
+});
+
+// #115: only an invoker <button> is spared by the popover's light dismiss, so a Trigger rendered
+// as a link is light-dismissed at `pointerup`, before its click. The click still dispatches the
+// right direction, but the close is browser-shaped: not awaited (hidden while the action is still
+// pending), no veto, no exit transition. The degraded shape is the same on every engine; the
+// `<button>` Trigger's awaited close is Menu's #110 rows and "a Trigger click while open" above.
+describe("non-button Trigger click while open (browser, #115)", () => {
+  afterEach(async () => {
+    // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
+    await mouse.releaseHeld();
+  });
+
+  it("a link Trigger's press while open hides the popup before the click's (false, 'activate')", async () => {
+    silenceErrors();
+    const work = deferred();
+    const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
+    render(
+      <div style={{ padding: "40px 160px" }}>
+        <Popover.Root defaultOpen={false} openChangeAction={action}>
+          <Popover.Trigger
+            data-testid="trigger"
+            render={<a href="#x" />}
+            style={{ display: "inline-block", width: 100, height: 30 }}
+          >
+            Filters
+          </Popover.Trigger>
+          <Popover.Popup data-testid="popup" style={box(200, 120)}>
+            <Popover.Title>Filters</Popover.Title>
+          </Popover.Popup>
+        </Popover.Root>
+      </div>,
+    );
+    expect(trigger().tagName).toBe("A");
+    // It carries `commandfor`, but only a button is an invoker.
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    expect(action).toHaveBeenCalledTimes(1);
+
+    const clicks: boolean[] = [];
+    // Whether the popup was still shown when the click arrived.
+    trigger().addEventListener("click", () => clicks.push(isOpen()));
+    const rect = trigger().getBoundingClientRect();
+    const x = Math.round(rect.left + rect.width / 2);
+    const y = Math.round(rect.top + rect.height / 2);
+    await act(async () => {
+      await mouse.down(x, y);
+    });
+    await flushFor();
+    // The press alone dismisses nothing: light dismiss runs at `pointerup`.
+    expect(isOpen()).toBe(true);
+    expect(action).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await mouse.up(x, y);
+    });
+    await flushFor();
+    // Hidden by the light dismiss before the click, while the action's close is still pending.
+    expect(clicks).toEqual([false]);
+    expect(isOpen()).toBe(false);
+    expect(action).toHaveBeenCalledTimes(2);
+    const [next, details] = action.mock.calls[1]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event).toBeInstanceOf(MouseEvent);
+    expect(details.event!.type).toBe("click");
+    await act(async () => work.resolve());
+    await flushFor();
+    expect(isOpen()).toBe(false);
+    expect(action).toHaveBeenCalledTimes(2);
   });
 });
