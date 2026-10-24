@@ -219,7 +219,7 @@ export function DialogPage() {
           "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, a part's close waiting for `openChangeAction(false)`, a close notification in flight, or a re-open requested while a close notification is still settling."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a host element other than a `<button>`), `onClick` (when it installs one), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a host element other than a `<button>`), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
         }
       />
 
@@ -263,7 +263,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Close on a click outside the dialog (the `::backdrop` for a modal). JS `pointerdown` and `click` listeners: both the press and the click must land outside, so a drag that starts inside (selecting text) never closes. With `experimental_closedBy`, native `closedby="any"`, which behaves the same. A click on the Trigger of an open non-modal dialog counts as outside, as native `closedby="any"` treats it.',
+              'Close on a click outside the dialog (the `::backdrop` for a modal). JS `pointerdown` and `click` listeners: both the press and the click must land outside, so a drag that starts inside (selecting text) never closes. With `experimental_closedBy`, native `closedby="any"`, which behaves the same. A click on the Trigger of an open non-modal dialog counts as outside, as native `closedby="any"` treats it: the dialog ends closed and the click does not re-open it, in both modes.',
           },
           {
             name: "experimental_closedBy",

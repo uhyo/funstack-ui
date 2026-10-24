@@ -801,4 +801,66 @@ describe("non-modal lightDismiss: a Trigger click while open (browser, #116)", (
     expect(popup().open).toBe(false);
     expect(trigger()).not.toHaveAttribute("data-open");
   });
+
+  // JS-free mode (review F1): the light dismiss closes the dialog before the click, and the
+  // Trigger, which saw it open at the press, does not `show()` it again.
+  function JsFree({ flag }: { flag: boolean }) {
+    return (
+      <div style={{ padding: 40 }}>
+        <Dialog.Root modal={false}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup
+            data-testid="popup"
+            aria-label="Help"
+            lightDismiss
+            experimental_closedBy={flag}
+          >
+            <button type="button">Inside</button>
+          </Dialog.Popup>
+        </Dialog.Root>
+      </div>
+    );
+  }
+
+  it.each([
+    ["without experimental_closedBy", false],
+    ["with experimental_closedBy", true],
+  ])("JS-free: closes once and does not re-open, %s", async (_label, flag) => {
+    const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
+    render(<JsFree flag={flag} />);
+    await user.click(trigger());
+    expect(popup().open).toBe(true);
+    await flushFor(); // the `toggle` task attaches the JS baseline's document listeners
+    const toggles: string[] = [];
+    popup().addEventListener("toggle", (event) => toggles.push((event as ToggleEvent).newState));
+    const closes = vi.fn();
+    popup().addEventListener("close", closes);
+    await user.click(trigger());
+    await flushFor(50);
+    expect(popup().open).toBe(false);
+    expect(closes).toHaveBeenCalledTimes(1);
+    expect(toggles).toEqual(["closed"]);
+    if (flag && supportsDialogClosedBy) {
+      expect(requestClose).not.toHaveBeenCalled();
+    } else {
+      expect(requestClose).toHaveBeenCalledTimes(1);
+    }
+    // The next click opens again.
+    await user.click(trigger());
+    expect(popup().open).toBe(true);
+  });
+
+  it("JS-free: Enter on the Trigger while open does nothing", async () => {
+    render(<JsFree flag={false} />);
+    await user.click(trigger());
+    expect(popup().open).toBe(true);
+    await flushFor();
+    const toggles: string[] = [];
+    popup().addEventListener("toggle", (event) => toggles.push((event as ToggleEvent).newState));
+    trigger().focus();
+    await user.keyboard("{Enter}");
+    await flushFor(50);
+    expect(popup().open).toBe(true);
+    expect(toggles).toEqual([]);
+  });
 });

@@ -574,6 +574,50 @@ describe("Dialog", () => {
         expect(content()).toBeInTheDocument();
         expectNotPending(trigger());
       });
+
+      // #116: with `lightDismiss` the Trigger click is also a click outside the still-open
+      // dialog. Its `requestOpen` dispatches during the click; the dismissal's queued `close`
+      // event dispatches after it, so the dismissal is the last intent and the dialog ends
+      // closed, on the JS path and the native one alike.
+      it.each([
+        ["without experimental_closedBy", false],
+        ["with experimental_closedBy (JS fallback)", true],
+      ])(
+        "non-modal lightDismiss: the Trigger click is a dismissal too; the dialog ends closed (%s)",
+        async (_label, experimental_closedBy) => {
+          const user = setupUser();
+          const action = vi.fn<ActionFn>();
+          render(
+            <Harness
+              mode="uncontrolled"
+              action={action}
+              modal={false}
+              popup={{ lightDismiss: true, experimental_closedBy }}
+            />,
+          );
+          await openThroughTrigger(user);
+          await flushTasks(2); // the `toggle` task attaches the document listeners
+          const closing = deferred();
+          action.mockImplementation((next) => (next ? undefined : closing.promise));
+          await user.click(screen.getByTestId("close"));
+          expect(popup().open).toBe(true);
+          await user.click(trigger());
+          await flushTasks(2);
+          await act(async () => closing.resolve());
+          await flushTasks(2);
+          expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+            [true, "activate"],
+            [false, "activate"],
+            [true, "activate"],
+            [false, "dismiss"],
+          ]);
+          expect(action.mock.calls[3]![1].event!.type).toBe("close");
+          expect(popup().open).toBe(false);
+          expect(trigger()).not.toHaveAttribute("data-open");
+          expect(content()).toBeNull();
+          expectNotPending(trigger());
+        },
+      );
     });
 
     it("a render={<a href />} Close closes through the click handler in library mode", async () => {

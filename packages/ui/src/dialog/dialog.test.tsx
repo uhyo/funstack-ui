@@ -679,6 +679,67 @@ describe("Dialog", () => {
       },
     );
 
+    // #116 in JS-free mode: the light dismiss closes the dialog before the click, and the
+    // Trigger, which saw it open at the press, does not `show()` it again.
+    it.each([
+      ["without experimental_closedBy", false],
+      ["with experimental_closedBy (JS fallback)", true],
+    ])(
+      "non-modal JS-free: a Trigger click while open closes it and does not re-open (%s, #116)",
+      async (_label, experimental_closedBy) => {
+        const user = setupUser();
+        render(
+          <Harness
+            mode="static"
+            modal={false}
+            popup={{ lightDismiss: true, experimental_closedBy }}
+          />,
+        );
+        await user.click(trigger());
+        expect(popup().open).toBe(true);
+        await flushTasks(2); // the `toggle` task attaches the document listeners
+        const show = vi.spyOn(HTMLDialogElement.prototype, "show");
+        const closes = vi.fn();
+        popup().addEventListener("close", closes);
+        await user.click(trigger());
+        await flushTasks(2);
+        expect(popup().open).toBe(false);
+        expect(show).not.toHaveBeenCalled();
+        expect(closes).toHaveBeenCalledTimes(1);
+        // The next click opens again: the press saw it closed.
+        await user.click(trigger());
+        expect(popup().open).toBe(true);
+      },
+    );
+
+    it("non-modal JS-free: keyboard activation of the Trigger while open does nothing (#116)", async () => {
+      const user = setupUser();
+      render(<Harness mode="static" modal={false} popup={{ lightDismiss: true }} />);
+      await user.click(trigger());
+      await flushTasks(2);
+      const show = vi.spyOn(HTMLDialogElement.prototype, "show");
+      trigger().focus();
+      await user.keyboard("{Enter}");
+      await user.keyboard(" ");
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      expect(show).not.toHaveBeenCalled();
+    });
+
+    it("non-modal JS-free: a press on the open dialog's Trigger released elsewhere swallows no later keyboard open (#116)", async () => {
+      const user = setupUser();
+      render(<Harness mode="static" modal={false} />);
+      await user.click(trigger());
+      expect(popup().open).toBe(true);
+      // A press that never becomes a click on the Trigger.
+      fireEvent.pointerDown(trigger());
+      act(() => popup().close());
+      expect(popup().open).toBe(false);
+      trigger().focus();
+      await user.keyboard("{Enter}");
+      expect(popup().open).toBe(true);
+    });
+
     it("experimental_closedBy without native closedBy keeps the JS fallback", async () => {
       const user = setupUser();
       render(

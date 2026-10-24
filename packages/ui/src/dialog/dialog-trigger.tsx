@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -50,7 +50,8 @@ const isDev = process.env.NODE_ENV !== "production";
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled` (a
  * link or component `render` with the click handler installed), `commandfor`, `command`,
- * `onClick`, `data-open`, `data-pending`, `data-disabled`.
+ * `onClick`, `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`,
+ * `data-disabled`.
  */
 export function DialogTrigger({
   disabled = false,
@@ -108,6 +109,16 @@ export function DialogTrigger({
   const disabledProps = disabledButton(render, disabled, { handlesClick: installClick });
   // Only on a button (or a component, assumed to render one): another element is no invoker.
   const invoker = modal && disabledProps.invoker && rendersButton(render);
+  // Non-modal JS-free mode: whether the dialog was open when the press began. A press on the
+  // Trigger of an open `lightDismiss` dialog is a dismissal (the JS listeners or native
+  // `closedby="any"` close it before the click), so that click must not `show()` it again
+  // (#116). Pointer clicks only (`detail > 0`): a keyboard click has no press, and a press that
+  // never became a click must not swallow a later one.
+  const pressedOpen = useRef(false);
+  const installPress = !isLibrary && !modal;
+  const onPointerDown = () => {
+    pressedOpen.current = popupRef.current?.open ?? false;
+  };
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (isLibrary) {
       // Cancelling the click cancels the command (it runs as the button's activation
@@ -122,8 +133,10 @@ export function DialogTrigger({
       event.preventDefault();
       return;
     }
+    const wasOpen = event.detail > 0 && pressedOpen.current;
+    pressedOpen.current = false;
     const dialog = popupRef.current;
-    if (dialog !== null && !dialog.open && dialog.isConnected) dialog.show();
+    if (dialog !== null && !dialog.open && !wasOpen && dialog.isConnected) dialog.show();
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -137,6 +150,7 @@ export function DialogTrigger({
     // Only owned when installed, so a render element keeps its own `onClick` in modal JS-free
     // mode (Accordion's rule).
     ...(installClick && { onClick }),
+    ...(installPress && { onPointerDown }),
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),
     // Every mode: the styling hook agrees with the rendered `disabled` / `aria-disabled`
