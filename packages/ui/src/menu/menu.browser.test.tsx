@@ -929,7 +929,7 @@ describe("light dismiss and layering (browser)", () => {
 // #110: a press on the Trigger of an open menu moves no focus (its mousedown is prevented), so the
 // Popup's focusout never hides the menu first; the click is the single source of the close
 // (design/components/menu.md 2.2, "A press on the Trigger is not a focus-out"). One outcome on
-// every engine: WebKit, which never focuses a clicked button, already took this path.
+// every engine.
 describe("Trigger click while open (browser, #110)", () => {
   afterEach(async () => {
     // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
@@ -997,15 +997,18 @@ describe("Trigger click while open (browser, #110)", () => {
     expect(action).toHaveBeenCalledTimes(calls + 1);
   });
 
-  it("while closed the press is not prevented: Chromium and Firefox focus the Trigger first", async () => {
+  it("while closed the press is not prevented: it focuses the Trigger before the open", async () => {
     render(<Basic />);
     const focusedWhileClosed: boolean[] = [];
     trigger().addEventListener("focus", () => focusedWhileClosed.push(!isOpen()));
     await user.click(trigger());
     await expect.poll(() => isOpen()).toBe(true);
     await flushFor();
-    // WebKit never focuses a clicked button; the other engines do on mousedown, before the open.
-    expect(focusedWhileClosed).toEqual(browserName === "webkit" ? [] : [true]);
+    // Chromium and Firefox focus the button on mousedown, before the open. Safari on macOS never
+    // focuses a clicked button, but Playwright's Linux WebKit (CI) does: either way, never while
+    // open.
+    if (browserName === "webkit") expect(focusedWhileClosed.every(Boolean)).toBe(true);
+    else expect(focusedWhileClosed).toEqual([true]);
     expect(item("rename")).toHaveFocus();
   });
 });

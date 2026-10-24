@@ -23,3 +23,11 @@ Branch `fix/110-menu-trigger-close`. Design: menu.md decision 10 / 2.2 / amendme
 - M1 no prevent: 3 jsdom + 4 browser (chromium/firefox rows 4, 5) fail.
 - M2 prevent regardless of `intended()`: jsdom row 1 + browser row 6 (chromium, firefox) fail.
 - M3 any button: jsdom row 1 (right-button check) fails; browser rows don't cover it.
+
+## CI round 1
+
+Chromium, Firefox, jsdom/ci green; WebKit failed only row 6: Playwright's Linux WebKit focuses a
+clicked button (macOS Safari does not; already in cross-engine.md "Focus on mousedown for
+buttons"). The issue's "WebKit doesn't focus buttons" is macOS behaviour. Row 6's WebKit branch
+now accepts either, requiring only that any focus came while closed. Rows 4 and 5 passed on
+WebKit unchanged.
