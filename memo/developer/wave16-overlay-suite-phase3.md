@@ -201,3 +201,27 @@ image").
 
 Not renamed: "re-entry (#81, design/components/button.md 16.4)" and its D1-D6 ids (design test-plan
 ids, not review ids).
+
+### Commit 5: T7, the browser late-mount ViewTransition row
+
+`src/__tests__/view-transition-mount.tsx`: `countLateMountViewTransitions(transition, config)` and
+`itStartsNoViewTransitionOnMount({ late, wrap?, mounted })` (a new module, not browser-helpers.ts,
+which the parallel value-suite work may touch). Converted: button.browser and toolbar.browser
+(same counts per engine).
+
+| Old | New |
+| --- | --- |
+| button.browser > ViewTransition (row 25) > a mount in a transition: none without `transition`, one with `none` | same describe > a mount in a transition starts no view transition without `transition`, one with `none` |
+| toolbar.browser > Button view transitions in a Toolbar (row 23) > without `transition` a mount starts no view transition; with `none` it does | same describe > a mount in a transition starts no view transition without `transition`, one with `none` |
+
+Left for the value-suite developer (their files): toggle-group.browser (row 23, `mountItem`),
+checkbox-group.browser ("view transitions", `mountItem`; it asserts `> 0` for `none`, the shared row
+asserts exactly 1: check all three engines when converting) and select.browser (its `Late` is a
+different shape: an option list). The "never starts a document view transition" rows of slider,
+number-field, progress, toast and select drive component-specific interactions; not the same row,
+left as they are.
+
+Mutations (transition-boundary.tsx, browser project, Chromium + Firefox):
+1. Always wrap in `<ViewTransition default={transition ?? "none"}>`: both converted rows fail on
+   both engines (4 failures).
+2. Never wrap: both converted rows fail (plus Button's `transition="auto"` settle row), 6 failures.

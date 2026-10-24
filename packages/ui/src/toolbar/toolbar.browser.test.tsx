@@ -2,8 +2,6 @@
 // Tab order, the native `focusgroup` path in Chromium against the JS path everywhere (and in
 // Chromium without the flag), Safari's click-does-not-focus, and the ViewTransition mount cost.
 import { render, screen } from "@testing-library/react";
-import { startTransition, useState } from "react";
-import type { ViewTransitionClass } from "react";
 import { describe, expect, it } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsFocusgroup } from "../__tests__/engine.js";
@@ -11,7 +9,7 @@ import { Button } from "../button/index.js";
 import { Menu } from "../menu/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
 import { Toolbar } from "./index.js";
-import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
+import { itStartsNoViewTransitionOnMount } from "../__tests__/view-transition-mount.js";
 
 const button = (name: string) => screen.getByRole("button", { name });
 const focused = () => document.activeElement;
@@ -309,35 +307,14 @@ describe("Toolbar: a click makes the item the Tab stop (row 22)", () => {
 });
 
 describe("Button view transitions in a Toolbar (row 23)", () => {
-  async function mountButton(transition: ViewTransitionClass | undefined): Promise<number> {
-    const vt = spyViewTransitions();
-    function Late() {
-      const [shown, setShown] = useState(false);
-      return (
-        <>
-          <button type="button" onClick={() => startTransition(() => setShown(true))}>
-            show
-          </button>
-          <Toolbar.Root aria-label="T">
-            <Button>A</Button>
-            {shown && <Button {...(transition !== undefined && { transition })}>B</Button>}
-          </Toolbar.Root>
-        </>
-      );
-    }
-    const { unmount } = render(<Late />);
-    // A view transition commits in its callback, after any `act` scope (issue #49).
-    await outsideAct(async () => {
-      button("show").click();
-      await expect.poll(() => screen.queryByRole("button", { name: "B" })).not.toBeNull();
-    });
-    unmount();
-    vt.restore();
-    return vt.calls();
-  }
-
-  it("without `transition` a mount starts no view transition; with `none` it does", async () => {
-    expect(await mountButton(undefined)).toBe(0);
-    expect(await mountButton("none")).toBe(1);
+  itStartsNoViewTransitionOnMount({
+    late: (props) => <Button {...props}>B</Button>,
+    wrap: (late) => (
+      <Toolbar.Root aria-label="T">
+        <Button>A</Button>
+        {late}
+      </Toolbar.Root>
+    ),
+    mounted: () => screen.queryByRole("button", { name: "B" }),
   });
 });

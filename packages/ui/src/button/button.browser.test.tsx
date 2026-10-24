@@ -3,8 +3,6 @@
 // action, a Tooltip on a pending Button (real hover and focus, `:popover-open`), implicit form
 // submission, the ViewTransition cost, and Chromium's accessibility tree.
 import { act, render, screen } from "@testing-library/react";
-import { startTransition, useState } from "react";
-import type { ViewTransitionClass } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { getAXNodes, axProperty } from "../__tests__/ax-tree.js";
@@ -15,6 +13,7 @@ import { Form } from "../form/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import { Button } from "./index.js";
 import { outsideAct, spyViewTransitions } from "../__tests__/browser-helpers.js";
+import { itStartsNoViewTransitionOnMount } from "../__tests__/view-transition-mount.js";
 
 afterEach(async () => {
   await userEvent.unhover(document.body);
@@ -187,32 +186,9 @@ describe("implicit submission (row 24)", () => {
 });
 
 describe("ViewTransition (row 25)", () => {
-  async function mount(transition: ViewTransitionClass | undefined): Promise<number> {
-    const counter = spyViewTransitions();
-    function Late() {
-      const [shown, setShown] = useState(false);
-      return (
-        <>
-          <button type="button" onClick={() => startTransition(() => setShown(true))}>
-            show
-          </button>
-          {shown && <Button {...(transition !== undefined && { transition })}>B</Button>}
-        </>
-      );
-    }
-    const { unmount } = render(<Late />);
-    await outsideAct(async () => {
-      button("show").click();
-      await expect.poll(() => screen.queryByRole("button", { name: "B" })).not.toBeNull();
-    });
-    unmount();
-    vi.restoreAllMocks();
-    return counter.calls();
-  }
-
-  it("a mount in a transition: none without `transition`, one with `none`", async () => {
-    expect(await mount(undefined)).toBe(0);
-    expect(await mount("none")).toBe(1);
+  itStartsNoViewTransitionOnMount({
+    late: (props) => <Button {...props}>B</Button>,
+    mounted: () => screen.queryByRole("button", { name: "B" }),
   });
 
   // react-dom 19.3 starts no view transition for an update of a `"none"` boundary (only for a
