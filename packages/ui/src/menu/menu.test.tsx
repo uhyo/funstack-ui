@@ -44,9 +44,11 @@ import type {
   MenuRadioItemState,
   MenuRootProps,
   MenuRootState,
+  MenuTriggerProps,
   MenuTriggerState,
 } from "./index.js";
-import { recordClicks, spyHide, watchShow } from "../__tests__/overlay-helpers.js";
+import { recordClicks, spyHide, spyShow, watchShow } from "../__tests__/overlay-helpers.js";
+import { describeOverlayDisabledRenders } from "../__tests__/overlay-disabled-render-suite.js";
 import {
   createOverlayHarness,
   describeOverlayOpenState,
@@ -145,7 +147,7 @@ afterEach(() => {
 });
 
 interface OpenStateHarnessProps {
-  trigger?: { disabled?: boolean } | false;
+  trigger?: Partial<MenuTriggerProps> | false;
   popup?: Partial<MenuPopupProps>;
   /** Popup content; default: two items, `content` and the action-less `close`. */
   content?: ReactNode;
@@ -196,6 +198,14 @@ describeOverlayOpenState<MenuOpenChangeDetails>({
     ),
     useIntents: () => use(MenuContext)!.popover,
   },
+});
+
+// Menu has no Close part and no JS-free mode: the Trigger rows only.
+describeOverlayDisabledRenders<MenuOpenChangeDetails, object>({
+  name: "Menu",
+  Harness: OpenStateHarness,
+  isOpen: () => isOpen(),
+  spyOpen: spyShow,
 });
 
 describe("Menu", () => {
@@ -413,70 +423,6 @@ describe("Menu", () => {
       render(<Harness content={<span>Nothing here</span>} />);
       await openMenu(user);
       expect(calls[0]!.autofocus).toBe(popup());
-    });
-
-    it("a disabled Trigger is natively disabled and never opens", async () => {
-      render(
-        <Menu.Root>
-          <Menu.Trigger data-testid="trigger" disabled>
-            Actions
-          </Menu.Trigger>
-          <Menu.Popup data-testid="popup">
-            <Menu.Item>A</Menu.Item>
-          </Menu.Popup>
-        </Menu.Root>,
-      );
-      expect(trigger()).toBeDisabled();
-      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
-      fireEvent.click(trigger());
-      await flushTasks(2);
-      expect(isOpen()).toBe(false);
-    });
-
-    it.each([
-      ["a link", <a key="link" href="#x" />],
-      ["a component", <PlainButton key="component" />],
-    ] as const)(
-      "a disabled Trigger with %s render is aria-disabled; click, Enter and ArrowDown do not open (#83)",
-      async (_, element) => {
-        const user = setupUser();
-        const openChange = vi.fn<OpenAction>();
-        render(
-          <Menu.Root openChangeAction={openChange}>
-            <Menu.Trigger data-testid="trigger" disabled render={element}>
-              Actions
-            </Menu.Trigger>
-            <Menu.Popup data-testid="popup">
-              <Menu.Item>A</Menu.Item>
-            </Menu.Popup>
-          </Menu.Root>,
-        );
-        expect(trigger()).toHaveAttribute("aria-disabled", "true");
-        expect(trigger()).not.toHaveAttribute("disabled");
-        expect(trigger()).toHaveAttribute("data-disabled", "");
-        expect(fireEvent.click(trigger())).toBe(false); // cancelled: a link does not navigate
-        trigger().focus();
-        await user.keyboard("{Enter}");
-        await user.keyboard("{ArrowDown}");
-        await flushTasks(2);
-        expect(isOpen()).toBe(false);
-        expect(openChange).not.toHaveBeenCalled();
-      },
-    );
-
-    it("a disabled Trigger with a component render is no invoker: no commandfor / command", () => {
-      render(
-        <Menu.Root>
-          <Menu.Trigger data-testid="trigger" disabled render={<PlainButton />}>
-            Actions
-          </Menu.Trigger>
-          <Menu.Popup data-testid="popup">
-            <Menu.Item>A</Menu.Item>
-          </Menu.Popup>
-        </Menu.Root>,
-      );
-      expect(trigger()).not.toHaveAttribute("commandfor");
-      expect(trigger()).not.toHaveAttribute("command");
     });
 
     it("server HTML: a disabled Trigger with a component render is an enabled button with no command", () => {
