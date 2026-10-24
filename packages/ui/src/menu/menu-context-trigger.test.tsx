@@ -6,7 +6,7 @@
 // Not testable here, covered by `menu-context-trigger.browser.test.tsx`: real right-clicks, the
 // pending `pointerup` light dismiss in Firefox / WebKit, the placement and its flips, the
 // remembered position option, keyboard `contextmenu`, platform focus return.
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { Suspense, startTransition, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -174,7 +174,12 @@ function watchShow() {
   return calls;
 }
 
-/** Calls of `focus({ focusVisible: false })` (the quiet path), by element. */
+/**
+ * Calls of `focus({ focusVisible: false })` (the quiet path), by element. The library's one-time
+ * probe for the option focuses a detached `<div>` the first time a test opens with a pointer; it
+ * is not a focus move, so detached elements are left out (#101, T15: the row that ran first in a
+ * shuffled order saw the probe).
+ */
 function watchQuietFocus() {
   const quiet: Element[] = [];
   const original = HTMLElement.prototype.focus;
@@ -182,7 +187,10 @@ function watchQuietFocus() {
     this: HTMLElement,
     options?: FocusOptions,
   ) {
-    if ((options as { focusVisible?: boolean } | undefined)?.focusVisible === false) {
+    if (
+      this.isConnected &&
+      (options as { focusVisible?: boolean } | undefined)?.focusVisible === false
+    ) {
       quiet.push(this);
     }
     original.call(this, options);
@@ -204,10 +212,28 @@ function pointStyle(element: HTMLElement) {
   };
 }
 
-const rulesInHead = () =>
-  Array.from(document.head.querySelectorAll("style")).filter((style) =>
+const rulesInHead = (doc: Document = document) =>
+  Array.from(doc.head.querySelectorAll("style")).filter((style) =>
     (style.textContent ?? "").includes("@position-try --fsui-menu-up"),
   );
+
+/**
+ * Renders `ui` into a new document. React records a hoisted `<style>` per document and never
+ * removes it, so rows about the hoisted style start from a document that has none.
+ */
+function renderFresh(ui: ReactNode) {
+  const doc = document.implementation.createHTMLDocument("");
+  // A created document has no window; the library reads computed styles and frames through
+  // `defaultView`, and user-event needs one. Lend it the test window (same prototypes, so the
+  // Popover shim applies).
+  Object.defineProperty(doc, "defaultView", { value: window });
+  const container = doc.createElement("div");
+  doc.body.append(container);
+  render(ui, { container });
+  const regionIn = container.querySelector<HTMLElement>('[data-testid="region"]')!;
+  const styles = () => doc.head.querySelectorAll('style[data-href="@funstack/ui/menu-point"]');
+  return { doc, container, regionIn, styles, inside: within(container) };
+}
 
 afterEach(() => {
   vi.useRealTimers();
@@ -1296,8 +1322,11 @@ describe("Menu.ContextTrigger", () => {
   });
 
   describe("<style> resource", () => {
+    // React keeps a hoisted `<style>` in <head> after its Root unmounts and remembers it per
+    // document, so with one shared document an earlier row's open decided what these rows saw
+    // (#101, T15: failed under --sequence.shuffle). Each row renders into a document of its own.
     it("one hoisted <style> after the first point open; a second Root adds none", async () => {
-      render(
+      const { doc, regionIn, inside } = renderFresh(
         <>
           <Harness />
           <Menu.Root>
@@ -1308,9 +1337,10 @@ describe("Menu.ContextTrigger", () => {
           </Menu.Root>
         </>,
       );
-      await rightClick(region());
-      expect(rulesInHead()).toHaveLength(1);
-      const style = rulesInHead()[0]!;
+      expect(rulesInHead(doc)).toHaveLength(0);
+      await rightClick(regionIn);
+      expect(rulesInHead(doc)).toHaveLength(1);
+      const style = rulesInHead(doc)[0]!;
       expect(style.getAttribute("data-href")).toBe("@funstack/ui/menu-point");
       expect(style.getAttribute("data-precedence")).toBe("fsui");
       // Eight options since wave 11: mirrored for an RTL menu, offset for a touch open (#88).
@@ -1327,21 +1357,20 @@ describe("Menu.ContextTrigger", () => {
         expect(style.textContent).toContain(`@position-try --fsui-menu-${name} {`);
       }
       // Nothing lands inside the popup.
-      expect(popup().querySelector("style")).toBeNull();
-      await rightClick(screen.getByTestId("region2"));
-      expect(isOpen(screen.getByTestId("popup2"))).toBe(true);
-      expect(rulesInHead()).toHaveLength(1);
+      expect(inside.getByTestId("popup").querySelector("style")).toBeNull();
+      await rightClick(inside.getByTestId("region2"));
+      expect(isOpen(inside.getByTestId("popup2"))).toBe(true);
+      expect(rulesInHead(doc)).toHaveLength(1);
     });
 
     it("side={null}: no <style>, only the two custom properties", async () => {
-      // React leaves a hoisted style in <head> (a previous test's); start from none.
-      for (const style of rulesInHead()) style.remove();
-      render(<Harness popup={{ side: null }} />);
-      await rightClick(region(), 20, 30);
-      expect(isOpen()).toBe(true);
-      expect(rulesInHead()).toHaveLength(0);
-      expect(popup()).toHaveAttribute("data-context", "");
-      expect(pointStyle(popup())).toEqual({
+      const { doc, regionIn, inside } = renderFresh(<Harness popup={{ side: null }} />);
+      await rightClick(regionIn, 20, 30);
+      const popupIn = inside.getByTestId("popup");
+      expect(isOpen(popupIn)).toBe(true);
+      expect(rulesInHead(doc)).toHaveLength(0);
+      expect(popupIn).toHaveAttribute("data-context", "");
+      expect(pointStyle(popupIn)).toEqual({
         x: "20px",
         y: "30px",
         left: "",
@@ -1354,9 +1383,7 @@ describe("Menu.ContextTrigger", () => {
     });
 
     it("an anchored-only Root renders none", async () => {
-      for (const style of rulesInHead()) style.remove();
-      const user = setupUser();
-      render(
+      const { doc, inside } = renderFresh(
         <Menu.Root>
           <Menu.Trigger data-testid="trigger">More</Menu.Trigger>
           <Menu.Popup data-testid="popup">
@@ -1364,10 +1391,11 @@ describe("Menu.ContextTrigger", () => {
           </Menu.Popup>
         </Menu.Root>,
       );
-      await user.click(screen.getByTestId("trigger"));
+      const user = setupUser({ document: doc });
+      await user.click(inside.getByTestId("trigger"));
       await flush();
-      expect(isOpen()).toBe(true);
-      expect(rulesInHead()).toHaveLength(0);
+      expect(isOpen(inside.getByTestId("popup"))).toBe(true);
+      expect(rulesInHead(doc)).toHaveLength(0);
     });
 
     it("the consumer's style wins over the inline point placement", async () => {
@@ -1888,13 +1916,20 @@ describe("Menu.ContextTrigger", () => {
         target.dispatchEvent(new Event("scroll"));
       });
     };
+    // Frames advance only when a row says so. With jsdom's timer-driven frames, a frame could
+    // pass inside `rightClick`'s task flush on a loaded machine and end the in-flight scroll
+    // window before the row's first scroll (#101: flaky under a shuffled, parallel run).
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    });
     /**
-     * One animation frame. Registered after the library's frame callback, so that callback has
-     * run when this resolves. Scroll events in flight at the open are ignored until the first
-     * frame that had none (review L6).
+     * One animation frame: runs the library's frame callback. Scroll events in flight at the
+     * open are ignored until the first frame that had none (review L6).
      */
     const nextFrame = () =>
-      act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
 
     it("a point menu closes on a scroll of the document, with 'dismiss'", async () => {
       const open = vi.fn<OpenAction>();
@@ -2023,16 +2058,7 @@ describe("Menu.ContextTrigger", () => {
 
   describe("CSP (wave 11, #88)", () => {
     // React records a hoisted style per document and never removes it: each row renders into a
-    // document of its own.
-    function renderFresh(ui: ReactNode) {
-      const doc = document.implementation.createHTMLDocument("");
-      const container = doc.createElement("div");
-      doc.body.append(container);
-      render(ui, { container });
-      const regionIn = container.querySelector<HTMLElement>('[data-testid="region"]')!;
-      const styles = () => doc.head.querySelectorAll('style[data-href="@funstack/ui/menu-point"]');
-      return { regionIn, styles };
-    }
+    // document of its own (renderFresh).
 
     it("the nonce of a <CSPProvider> lands on the hoisted <style>", async () => {
       const { regionIn, styles } = renderFresh(
