@@ -5,6 +5,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { exitAnimations } from "../internal/use-exit-animation.js";
 import { useLatest } from "../internal/use-latest.js";
+import { ownsArrows } from "../internal/use-roving-focus.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastItem, ToastPriority } from "./toast.js";
@@ -238,6 +239,8 @@ export function ToastRoot({
       event.preventDefault();
       close("dismiss", event.nativeEvent);
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      // A text field, select or slider inside the toast keeps its arrows (#113 A3).
+      if (ownsArrows(event.target as Element)) return;
       event.preventDefault();
       viewport.focusSibling(id, event.key === "ArrowDown" ? 1 : -1);
     }

@@ -462,7 +462,11 @@ toast({ title: "Link copied" });`}</CodeBlock>
             "region",
             "Through each toast and its buttons in DOM order; nothing is trapped",
           ],
-          ["ArrowDown / ArrowUp", "a toast", "Next / previous toast, no wrap"],
+          [
+            "ArrowDown / ArrowUp",
+            "a toast",
+            "Next / previous toast, no wrap; a text field, `select` or slider inside keeps its arrows",
+          ],
           ["Escape", "a toast", "Dismiss it"],
           ["Enter / Space", "Action, Close", "Native button activation"],
         ]}

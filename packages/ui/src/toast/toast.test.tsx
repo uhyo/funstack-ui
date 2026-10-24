@@ -1393,6 +1393,46 @@ describe("Toast", () => {
       expect(root(ids[0]!)).toHaveFocus();
     });
 
+    it("leaves ArrowDown / ArrowUp to a text field, textarea, select or contenteditable inside a toast (#113 A3)", async () => {
+      const user = setupUser();
+      const list = ({ toasts }: ToastViewportState) =>
+        toasts.map((t) =>
+          renderToast(
+            t,
+            <>
+              <input data-testid={`input-${t.id}`} aria-label="Reply" />
+              <textarea data-testid={`textarea-${t.id}`} aria-label="Note" />
+              <select data-testid={`select-${t.id}`} aria-label="Pick">
+                <option>a</option>
+                <option>b</option>
+              </select>
+              <div data-testid={`editable-${t.id}`} contentEditable tabIndex={0} />
+              <input type="checkbox" data-testid={`checkbox-${t.id}`} aria-label="Check" />
+            </>,
+          ),
+        );
+      render(<Harness manager={manager} list={list} />);
+      const ids = await call(() => ["A", "B"].map((t) => manager({ title: t, duration: null })));
+      for (const part of ["input", "textarea", "select", "editable"]) {
+        const field = screen.getByTestId(`${part}-${ids[1]!}`);
+        act(() => field.focus());
+        const event = new KeyboardEvent("keydown", {
+          key: "ArrowUp",
+          bubbles: true,
+          cancelable: true,
+        });
+        act(() => {
+          field.dispatchEvent(event);
+        });
+        expect(event.defaultPrevented, part).toBe(false);
+        expect(field, part).toHaveFocus();
+      }
+      // A checkbox does not use the arrows: they still move between toasts.
+      act(() => screen.getByTestId(`checkbox-${ids[1]!}`).focus());
+      await user.keyboard("{ArrowUp}");
+      expect(root(ids[0]!)).toHaveFocus();
+    });
+
     it("Escape dismisses the toast containing focus and moves focus to the next, else the previous", async () => {
       const user = setupUser();
       render(<Harness manager={manager} />);
