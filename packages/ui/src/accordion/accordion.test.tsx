@@ -10,8 +10,14 @@
 //   Library-mode exclusivity (which does not use `name`) is tested fully here.
 // - Find-in-page cannot be simulated. The platform path is driven by `setAttribute("open", "")`,
 //   which makes jsdom fire `toggle` on a macrotask exactly like a browser does.
-// - ViewTransition: jsdom has no `startViewTransition`, so `transition` is smoke-tested here;
-//   `internal/transition-boundary.browser.test.tsx` ("Accordion expand") covers it in browsers.
+// - ViewTransition: jsdom has no `startViewTransition`, so `transition` is smoke-tested by the
+//   value-action suite; `internal/transition-boundary.browser.test.tsx` ("Accordion expand")
+//   covers it in browsers. The `fsui-accordion` types are in accordion-transition-types.test.tsx.
+//
+// The action-prop rows shared by every value component (sync and async actions, rejection,
+// overlap, superseded rejection, the post-await rule, the controlled veto, `transition`, details,
+// the value/defaultValue warnings) come from __tests__/value-action-suite.tsx, run twice: multiple
+// and exclusive (drivers in __tests__/drivers/accordion.tsx).
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
@@ -29,6 +35,8 @@ import {
   silenceErrors,
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
+import { accordionDriver, accordionExclusiveDriver } from "../__tests__/drivers/accordion.js";
+import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Accordion } from "./index.js";
 import type {
   AccordionItemState,
@@ -180,6 +188,9 @@ function expectOpenAttr(el: Element, open: boolean) {
   if (open) expect(el).toHaveAttribute("open");
   else expect(el).not.toHaveAttribute("open");
 }
+
+describeValueAction(accordionDriver);
+describeValueAction(accordionExclusiveDriver);
 
 describe("Accordion", () => {
   describe("roles and ARIA", () => {
@@ -463,52 +474,6 @@ describe("Accordion", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("click dispatches (next, { event, reason: 'activate', item, open }) and opens", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(trigger("a"));
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toEqual(["a"]);
-      expect(details.reason).toBe("activate");
-      expect(details.item).toBe("a");
-      expect(details.open).toBe(true);
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(details.event?.type).toBe("click");
-      expectOpenAttr(item("a"), true);
-      expect(item("a").open).toBe(true);
-      expect(trigger("a")).toHaveAttribute("data-open", "");
-      expectNotPending(trigger("a"));
-      expectNotPending(root());
-      expect(panelOpen("a")).toHaveTextContent("true");
-      expect(committed()).toEqual(["a"]);
-
-      await user.click(trigger("a"));
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]?.[0]).toEqual([]);
-      expect(action.mock.calls[1]?.[1].open).toBe(false);
-      expect(item("a").open).toBe(false);
-      expect(trigger("a")).not.toHaveAttribute("data-open");
-      expect(committed()).toEqual([]);
-    });
-
-    it("multiple mode accumulates open items", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-      await user.click(trigger("a"));
-      await user.click(trigger("b"));
-      expect(action.mock.calls.map(([next]) => next)).toEqual([["a"], ["a", "b"]]);
-      expect(item("a").open).toBe(true);
-      expect(item("b").open).toBe(true);
-      await user.click(trigger("a"));
-      expect(action.mock.calls[2]?.[0]).toEqual(["b"]);
-      expect(item("a").open).toBe(false);
-      expect(item("b").open).toBe(true);
-    });
-
     it("exclusive mode replaces the open item and closes to null", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} exclusive action={action} />);
@@ -596,63 +561,6 @@ describe("Accordion", () => {
   });
 
   renderBoth("async action", (mode) => {
-    it("shows optimistic data-open and data-pending; <details> and Panel wait for the commit", async () => {
-      const d = deferred();
-      const action = vi.fn<ActionFn>(() => d.promise);
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(trigger("a"));
-      expectPending(root());
-      expectPending(item("a"));
-      expectPending(trigger("a"));
-      expect(trigger("a")).toHaveAttribute("data-open", "");
-      expect(item("a")).toHaveAttribute("data-open", "");
-      expect(item("a").open).toBe(false);
-      expectOpenAttr(item("a"), false);
-      expect(panelOpen("a")).toHaveTextContent("false");
-      expect(panel("a")).not.toHaveAttribute("data-pending");
-      // Other items are untouched.
-      expectNotPending(item("b"));
-      expectNotPending(trigger("b"));
-      expect(committed()).toEqual([]);
-
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(root());
-      expectNotPending(item("a"));
-      expectNotPending(trigger("a"));
-      expect(item("a").open).toBe(true);
-      expect(trigger("a")).toHaveAttribute("data-open", "");
-      expect(panelOpen("a")).toHaveTextContent("true");
-      expect(committed()).toEqual(["a"]);
-    });
-
-    it("exclusive: the closing and the opening item are both pending", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} exclusive initial="a" action={() => d.promise} />);
-      const user = setupUser();
-      expect(item("a").open).toBe(true);
-
-      await user.click(trigger("b"));
-      expectPending(trigger("a"));
-      expectPending(trigger("b"));
-      expectNotPending(trigger("c"));
-      expect(trigger("a")).not.toHaveAttribute("data-open");
-      expect(trigger("b")).toHaveAttribute("data-open", "");
-      expect(item("a").open).toBe(true);
-      expect(item("b").open).toBe(false);
-
-      await act(async () => {
-        d.resolve();
-      });
-      expect(item("a").open).toBe(false);
-      expect(item("b").open).toBe(true);
-      expectNotPending(trigger("a"));
-      expectNotPending(trigger("b"));
-    });
-
     it("clicking again while pending reverts the intent: item no longer pending, Root still is", async () => {
       const deferreds = sequencedDeferreds(2);
       const action = vi.fn<ActionFn>(() => deferreds.next());
@@ -672,209 +580,6 @@ describe("Accordion", () => {
       });
       expectNotPending(root());
       expect(item("a").open).toBe(false);
-    });
-
-    it("keeps working after unmounting while pending", async () => {
-      const consoleError = silenceErrors();
-      const d = deferred();
-      const { unmount } = render(<Harness mode={mode} action={() => d.promise} />);
-      const user = setupUser();
-      await user.click(trigger("a"));
-      expectPending(root());
-      unmount();
-      await act(async () => {
-        d.resolve();
-      });
-      expect(consoleError).not.toHaveBeenCalled();
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("reaches the Error Boundary around the Root; nothing was committed", async () => {
-      silenceErrors();
-      const d = deferred();
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(trigger("a"));
-      expect(trigger("a")).toHaveAttribute("data-open", "");
-      expectPending(trigger("a"));
-      expect(item("a").open).toBe(false);
-
-      const err = new Error("save failed");
-      await act(async () => {
-        d.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByTestId("root")).not.toBeInTheDocument();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
-      expect(committed()).toEqual([]);
-    });
-
-    it("caught inside the action counts as success", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} catchErrors />);
-      const user = setupUser();
-
-      await user.click(trigger("a"));
-      expectPending(trigger("a"));
-      await act(async () => {
-        d.reject(new Error("vetoed"));
-      });
-      expectNotPending(trigger("a"));
-      expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
-      // The harness never adopted the value in either mode...
-      expect(committed()).toEqual([]);
-      // ...but only a controlled parent can veto: uncontrolled commits the open item.
-      expect(item("a").open).toBe(mode === "uncontrolled");
-      if (mode === "controlled") expect(trigger("a")).not.toHaveAttribute("data-open");
-    });
-  });
-
-  describe("overlapping actions (uncontrolled, exclusive; walkthrough 9.3)", () => {
-    it.each([
-      ["B then C", [0, 1]],
-      ["C then B", [1, 0]],
-    ] as const)("latest dispatch wins when resolved %s", async (_label, order) => {
-      const deferreds = sequencedDeferreds(2);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode="uncontrolled" exclusive initial="a" action={action} />);
-      const user = setupUser();
-
-      await user.click(trigger("b"));
-      expect(trigger("a")).not.toHaveAttribute("data-open");
-      expect(trigger("b")).toHaveAttribute("data-open", "");
-      expectPending(trigger("a"));
-      expectPending(trigger("b"));
-
-      await user.click(trigger("c"));
-      expect(action.mock.calls.map(([next]) => next)).toEqual(["b", "c"]);
-      expect(trigger("b")).not.toHaveAttribute("data-open");
-      expect(trigger("c")).toHaveAttribute("data-open", "");
-      expectPending(trigger("a"));
-      expectNotPending(trigger("b")); // optimistic === committed (closed) again
-      expectPending(trigger("c"));
-      expect(item("a").open).toBe(true);
-
-      for (const i of order) {
-        await act(async () => {
-          deferreds[i]!.resolve();
-        });
-      }
-      expect(item("a").open).toBe(false);
-      expect(item("b").open).toBe(false);
-      expect(item("c").open).toBe(true);
-      expectNotPending(root());
-      expect(action).toHaveBeenCalledTimes(2);
-    });
-
-    it("stays pending until every in-flight action settles", async () => {
-      const deferreds = sequencedDeferreds(2);
-      render(<Harness mode="uncontrolled" exclusive action={() => deferreds.next()} />);
-      const user = setupUser();
-      await user.click(trigger("a"));
-      await user.click(trigger("b"));
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expectPending(root());
-      await act(async () => {
-        deferreds[0]!.resolve();
-      });
-      expectNotPending(root());
-      expect(item("b").open).toBe(true);
-    });
-  });
-
-  describe("overlapping actions (uncontrolled, multiple)", () => {
-    it.each([
-      ["A then B", [0, 1]],
-      ["B then A", [1, 0]],
-    ] as const)("both opens survive when resolved %s", async (_label, order) => {
-      const deferreds = sequencedDeferreds(2);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode="uncontrolled" action={action} />);
-      const user = setupUser();
-
-      await user.click(trigger("a"));
-      await user.click(trigger("b"));
-      expect(action.mock.calls.map(([next]) => next)).toEqual([["a"], ["a", "b"]]);
-      expect(trigger("a")).toHaveAttribute("data-open", "");
-      expect(trigger("b")).toHaveAttribute("data-open", "");
-
-      for (const i of order) {
-        await act(async () => {
-          deferreds[i]!.resolve();
-        });
-      }
-      expect(item("a").open).toBe(true);
-      expect(item("b").open).toBe(true);
-      expectNotPending(root());
-      // Not asserted: the harness mirror writes in completion order (a controlled parent using
-      // "update on success" with a whole-set `next` has the same property; see the memo).
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    function renderTwoClicks(onError: (error: unknown) => void) {
-      const deferreds = sequencedDeferreds(2);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode={mode} action={action} boundary={onError} />);
-      return { deferreds, action };
-    }
-
-    it("reaches the boundary when the older action rejects after the newer resolved", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds, action } = renderTwoClicks(onError);
-      const user = setupUser();
-
-      await user.click(trigger("a"));
-      await user.click(trigger("b"));
-      expect(action.mock.calls.map(([next]) => next)).toEqual([["a"], ["a", "b"]]);
-
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).not.toHaveBeenCalled();
-
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByTestId("root")).not.toBeInTheDocument();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-      // The newer action's outcome was unaffected.
-      expect(committed()).toEqual(["a", "b"]);
-    });
-
-    it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds } = renderTwoClicks(onError);
-      const user = setupUser();
-
-      await user.click(trigger("a"));
-      await user.click(trigger("b"));
-      expectPending(root());
-
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByTestId("root")).not.toBeInTheDocument();
-
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
     });
   });
 
@@ -1159,84 +864,7 @@ describe("Accordion", () => {
     });
   });
 
-  describe("post-await rule", () => {
-    function Parent({ promise, wrap }: { promise: Promise<void>; wrap: boolean }) {
-      const [value, setValue] = useState<string | null>(null);
-      return (
-        <Accordion.Root
-          exclusive
-          value={value}
-          valueChangeAction={async (next) => {
-            await promise;
-            if (wrap) startTransition(() => setValue(next));
-            else setValue(next);
-          }}
-        >
-          <Accordion.Item value="a" data-testid="item-a">
-            <Accordion.Trigger data-testid="trigger-a">A</Accordion.Trigger>
-          </Accordion.Item>
-        </Accordion.Root>
-      );
-    }
-
-    it("`open` and data-pending converge in one commit with startTransition", async () => {
-      const d = deferred();
-      render(<Parent promise={d.promise} wrap />);
-      const user = setupUser();
-      const el = item("a");
-      const snapshots: { open: boolean; pending: boolean }[] = [];
-      const observer = new MutationObserver(() => {
-        snapshots.push({ open: el.hasAttribute("open"), pending: el.hasAttribute("data-pending") });
-      });
-      observer.observe(el, { attributes: true });
-
-      await user.click(trigger("a"));
-      await act(async () => {
-        d.resolve();
-      });
-      observer.disconnect();
-
-      expect(snapshots[0]).toEqual({ open: false, pending: true });
-      expect(snapshots.at(-1)).toEqual({ open: true, pending: false });
-      // The attribute never flipped while still pending.
-      expect(snapshots.every((s) => !s.open || !s.pending)).toBe(true);
-    });
-
-    it("still ends in the right state without startTransition (documented limitation)", async () => {
-      const d = deferred();
-      render(<Parent promise={d.promise} wrap={false} />);
-      const user = setupUser();
-      await user.click(trigger("a"));
-      await act(async () => {
-        d.resolve();
-      });
-      expect(item("a").open).toBe(true);
-      expectNotPending(item("a"));
-    });
-  });
-
   describe("controlled edge cases", () => {
-    it("snaps back when the parent never adopts the value (veto)", async () => {
-      const d = deferred();
-      render(
-        <Accordion.Root value={[]} valueChangeAction={() => d.promise} data-testid="root">
-          <Accordion.Item value="a" data-testid="item-a">
-            <Accordion.Trigger data-testid="trigger-a">A</Accordion.Trigger>
-          </Accordion.Item>
-        </Accordion.Root>,
-      );
-      const user = setupUser();
-      await user.click(trigger("a"));
-      expect(trigger("a")).toHaveAttribute("data-open", "");
-      expectPending(trigger("a"));
-      await act(async () => {
-        d.resolve();
-      });
-      expect(trigger("a")).not.toHaveAttribute("data-open");
-      expect(item("a").open).toBe(false);
-      expectNotPending(root());
-    });
-
     it("rebases the optimistic set when `value` changes externally while pending", async () => {
       const d = deferred();
       function Parent() {
@@ -1659,13 +1287,6 @@ describe("Accordion", () => {
       expect(consoleError.mock.calls[0]?.[0]).toMatch(/mode changed after mount/);
     });
 
-    it("warns once when `value` and `defaultValue` are both set", () => {
-      const consoleError = silenceErrors();
-      render(<Accordion.Root value={[]} defaultValue={[]} />);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(/both `value` and `defaultValue`/);
-    });
-
     it("does not warn in normal use of either mode", async () => {
       const consoleError = silenceErrors();
       const { unmount } = render(<Harness mode="uncontrolled" />);
@@ -1698,41 +1319,6 @@ describe("Accordion", () => {
   });
 
   describe("transition prop (smoke)", () => {
-    const tree = (transition: string | undefined) => (
-      <Accordion.Root defaultValue={["a"]}>
-        <Accordion.Item value="a" transition={transition}>
-          <Accordion.Trigger transition={transition}>A</Accordion.Trigger>
-          <Accordion.Panel transition={transition}>Alpha</Accordion.Panel>
-        </Accordion.Item>
-      </Accordion.Root>
-    );
-
-    it("renders the same markup with and without `transition` in library mode", () => {
-      const consoleError = silenceErrors();
-      const plain = render(tree(undefined)).container.innerHTML;
-      const withTransition = render(tree("fsui-grow")).container.innerHTML;
-      expect(withTransition).toBe(plain);
-      expect(consoleError).not.toHaveBeenCalled();
-    });
-
-    it("still dispatches with a transition set", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <Accordion.Root defaultValue={[]} valueChangeAction={action}>
-          <Accordion.Item value="a" transition="fsui-grow" data-testid="item-a">
-            <Accordion.Trigger transition="fsui-grow" data-testid="trigger-a">
-              A
-            </Accordion.Trigger>
-            <Accordion.Panel transition="fsui-grow">Alpha</Accordion.Panel>
-          </Accordion.Item>
-        </Accordion.Root>,
-      );
-      const user = setupUser();
-      await user.click(trigger("a"));
-      expect(action).toHaveBeenCalledWith(["a"], expect.anything());
-      expect(item("a").open).toBe(true);
-    });
-
     it("warns on each part in JS-free mode", () => {
       const consoleError = silenceErrors();
       render(
@@ -1782,24 +1368,6 @@ describe("Accordion", () => {
     it("adds nothing when off", () => {
       render(<Accordion.Root data-testid="root" />);
       expect(root()).not.toHaveAttribute("style");
-    });
-  });
-
-  describe("details (virtual `event`)", () => {
-    it("serialises to the plain fields only", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="uncontrolled" action={action} />);
-      const user = setupUser();
-      await user.click(trigger("a"));
-      const details = action.mock.calls[0]![1];
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect("event" in details).toBe(true);
-      expect(Object.keys(details)).toEqual(["reason", "item", "open"]);
-      expect(JSON.parse(JSON.stringify(details))).toEqual({
-        reason: "activate",
-        item: "a",
-        open: true,
-      });
     });
   });
 

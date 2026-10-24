@@ -25,7 +25,7 @@ export const toggleDriver: ValueActionDriver<boolean, TogglePressedChangeDetails
   ),
   values: [false, true, false, true],
   gesture: (user) => user.click(button()),
-  eventType: "click",
+  eventType: () => "click",
   detailsFields: () => ({}),
   expectShown: (pressed) => {
     expect(button()).toHaveAttribute("aria-pressed", String(pressed));

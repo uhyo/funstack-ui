@@ -202,3 +202,68 @@ Mutations (reverted):
 3. toggle-group-root.tsx: releasing a pressed Item dispatches an empty patch: before the sync-row
    change only the gesture-2 type row of the suite failed (+5 local rows); after it, the suite's
    sync rows (both modes) fail too.
+### Accordion (commit 3d)
+
+Suite changes: `label` (two drivers per component); `eventType(i)` per gesture (Tabs: in automatic
+mode a click from one tab to another dispatches through `focusin`; the sync row now runs three
+gestures); `detailsFields(i)` checked for every gesture of the sync row, keys in order (the old
+Accordion row compared `["reason","item","open"]` in order; the others sorted, now stronger);
+the overlap row checks the shown value and pending parts after the first gesture, the committed DOM
+before any resolve and the call count after; the post-await snapshots also record the committed DOM
+(`readCommitted`) and assert it never showed the new value while pending; the markup row asserts no
+console.error.
+
+Two drivers: multiple (open a, open b, close a) and exclusive (from "a": open b, open c, open a),
+with the old harness's test ids; `pendingOn` lists Root plus Item and Trigger of every item whose
+optimistic state differs from the committed one; `pendingOff` the other Items/Triggers and every
+Panel; `expectShown` = `data-open` on Trigger and Item; `expectCommitted` = `details.open`, the
+`open` attribute and the Panel's `open` state.
+
+Removed title (accordion.test.tsx, `Accordion …`) -> suite row:
+
+- sync action (both) click dispatches (next, { event, reason: 'activate', item, open }) and opens
+  -> `Accordion.Root: …` sync action (both) (gestures 0 and 2 open and close "a": next, every
+  details field, event type, open attribute, `.open`, data-open, Trigger/Root not pending, panel
+  state, committed)
+- sync action (both) multiple mode accumulates open items -> same suite row (a, then a+b, then b)
+- async action (both) shows optimistic data-open and data-pending; details and Panel wait for the
+  commit -> `Accordion.Root: …` async action (both)
+- async action (both) exclusive: the closing and the opening item are both pending ->
+  `Accordion.Root exclusive: …` async action (both) (from a, open b: a and b Item/Trigger pending,
+  c not; data-open moved; the details element unchanged until resolve)
+- async action (both) keeps working after unmounting while pending -> settles quietly when
+  unmounted while pending (both drivers)
+- rejection (both), two rows -> rejection rows of both drivers
+- overlapping actions (uncontrolled, exclusive; walkthrough 9.3) latest dispatch wins when resolved
+  B then C / C then B -> `Accordion.Root exclusive: …` overlapping actions the latest dispatch wins
+  when resolved first then second / second then first (after b: a, b pending; after c: a, c
+  pending and b not; a still open; finally only c open, Root idle, two calls)
+- … (exclusive) stays pending until every in-flight action settles -> exclusive driver's row (from
+  "a" instead of null)
+- overlapping actions (uncontrolled, multiple) both opens survive when resolved %s -> multiple
+  driver's "the latest dispatch wins when resolved %s" (both open after; the harness mirror is
+  still not asserted: whole-set commits land in completion order)
+- superseded rejection (both), two rows -> both drivers (committed `["a","b"]` for multiple)
+- post-await rule `open` and data-pending converge in one commit with startTransition (exclusive,
+  from null, MutationObserver on the item) -> post-await rows of both drivers (Profiler snapshots of
+  data-open, data-pending and the `open` attributes; the `open` attribute never shows the new value
+  while pending; the exclusive driver starts from "a")
+- post-await rule still ends in the right state without startTransition -> both drivers
+- controlled edge cases snaps back when the parent never adopts the value (veto) -> controlled veto
+  rows of both drivers
+- dev warnings warns once when `value` and `defaultValue` are both set -> both drivers
+- transition prop (smoke) renders the same markup … in library mode (no console.error) / still
+  dispatches with a transition set -> transition prop rows (the drivers put `transition` on Item,
+  Trigger and Panel; no console.error asserted)
+- details (virtual `event`) serialises to the plain fields only -> details rows of both drivers
+  Kept: closing to null (exclusive), disabled and nested interactive content, the same-item second
+  click, the lazily mounted panel content row, rebase, platform and hydration rows, mode-change and
+  JS-free warnings, JS-free transition warnings.
+  New: accordion-transition-types.test.tsx (6 rows; Accordion had no type assertion before).
+  jsdom titles: 2978 -> 3034 (-30, +86).
+
+Mutations (reverted):
+
+1. accordion-item.tsx renders `open` from the optimistic state: 23 rows fail (21 suite rows).
+2. accordion-root.tsx swaps expand / collapse: all 6 type rows fail.
+3. accordion-item.tsx marks every Item pending while the Root is: 38 rows fail (36 suite rows).

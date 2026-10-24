@@ -30,8 +30,13 @@ export const toggleGroupDriver: ValueActionDriver<string[], ToggleGroupValueChan
   ),
   values: [[], ["bold"], ["bold", "italic"], ["italic"]],
   gesture: (user, i) => user.click(item(CLICKS[i]!)),
-  eventType: "click",
-  detailsFields: () => ({ added: ["bold"], removed: [] }),
+  eventType: () => "click",
+  detailsFields: (i) =>
+    [
+      { added: ["bold"], removed: [] },
+      { added: ["italic"], removed: [] },
+      { added: [], removed: ["bold"] },
+    ][i]!,
   expectShown: (pressed) => {
     for (const v of STYLES) {
       expect(item(v)).toHaveAttribute("aria-pressed", String(pressed.includes(v)));

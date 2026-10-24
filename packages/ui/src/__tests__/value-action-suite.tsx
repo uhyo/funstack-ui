@@ -46,14 +46,16 @@ export interface ControlProps<V, D> {
 export interface ValueActionDriver<V, D extends { readonly event: Event | undefined }> {
   /** The component name used in dev warnings and suite titles (`Toggle`, `Tabs.Root`). */
   readonly name: string;
+  /** The suite title when one component has several drivers (`Accordion.Root exclusive`). */
+  readonly label?: string;
   /** Renders the component with the given props; pass only the props that are defined. */
   render(props: ControlProps<V, D>): ReactNode;
   /** `values[0]` is the initial value, `values[i + 1]` the value gesture `i` dispatches. */
   readonly values: readonly [V, V, V, V];
   /** Performs gesture `i` (0-based). */
   gesture(user: UserEvent, i: number): Promise<void>;
-  /** The DOM event type of a gesture's dispatch (`"click"`, `"change"`, …). */
-  readonly eventType: string;
+  /** The DOM event type of gesture `i`'s dispatch (`"click"`, `"change"`, …). */
+  eventType(i: number): string;
   /** The serialisable fields of the details of gesture `i` (`Object.keys` and `JSON` agree). */
   detailsFields(i: number): Readonly<Record<string, unknown>>;
   /** Asserts the optimistic value as shown in the DOM (aria-pressed, aria-selected, data-open…). */
@@ -67,6 +69,13 @@ export interface ValueActionDriver<V, D extends { readonly event: Event | undefi
   readShown(): string;
   /** `readShown()` of a value. */
   shown(v: V): string;
+  /**
+   * A string of the committed DOM (`<details open>`), also recorded at every commit: the
+   * post-await row then asserts it never shows the new value while still pending.
+   */
+  readCommitted?(): string;
+  /** `readCommitted()` of a value; required with `readCommitted`. */
+  committedShown?(v: V): string;
   /** Elements that carry `data-pending` while gesture `i` is in flight. */
   pendingOn(i: number): readonly Element[];
   /** Elements that must not carry `data-pending` while gesture `i` is in flight. */
@@ -218,29 +227,22 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
     <ValueHarness driver={driver} {...props} />
   );
 
-  describe(`${driver.name}: value action conformance`, () => {
+  describe(`${driver.label ?? driver.name}: value action conformance`, () => {
     renderBoth("sync action", (mode) => {
       it("dispatches (next, details) with the event and commits each gesture", async () => {
         const action = vi.fn<ActionFn>();
         render(<Harness mode={mode} action={action} />);
         const user = setupUser();
 
-        await driver.gesture(user, 0);
-        expect(action).toHaveBeenCalledTimes(1);
-        const [next, details] = action.mock.calls[0]!;
-        expect(next).toEqual(values[1]);
-        expect(details.event).toBeInstanceOf(window.Event);
-        expect(details.event?.type).toBe(driver.eventType);
-        expect(JSON.parse(JSON.stringify(details))).toEqual(driver.detailsFields(0));
-        expect(Object.keys(details).sort()).toEqual(Object.keys(driver.detailsFields(0)).sort());
-        driver.expectShown(values[1]);
-        expectNonePending(0);
-        expectCommittedValue(values[1]);
-
-        for (const i of [1, 2]) {
+        for (const i of [0, 1, 2]) {
           await driver.gesture(user, i);
           expect(action).toHaveBeenCalledTimes(i + 1);
-          expect(action.mock.calls[i]?.[0]).toEqual(values[i + 1]);
+          const [next, details] = action.mock.calls[i]!;
+          expect(next).toEqual(values[i + 1]);
+          expect(details.event).toBeInstanceOf(window.Event);
+          expect(details.event?.type).toBe(driver.eventType(i));
+          expect(JSON.parse(JSON.stringify(details))).toEqual(driver.detailsFields(i));
+          expect(Object.keys(details)).toEqual(Object.keys(driver.detailsFields(i)));
           driver.expectShown(values[i + 1]!);
           expectNonePending(i);
           expectCommittedValue(values[i + 1]!);
@@ -380,10 +382,13 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         const user = setupUser();
 
         await driver.gesture(user, 0);
+        driver.expectShown(values[1]);
+        expectAllPending(0);
         await driver.gesture(user, 1);
         expect(action.mock.calls.map(([next]) => next)).toEqual([values[1], values[2]]);
         driver.expectShown(values[2]);
         expectAllPending(1);
+        driver.expectCommitted?.(values[0]);
 
         for (const i of order) {
           await act(async () => {
@@ -393,6 +398,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         driver.expectShown(values[2]);
         driver.expectCommitted?.(values[2]);
         expectNonePending(1);
+        expect(action).toHaveBeenCalledTimes(2);
         // A parent committing whole values writes them in completion order; one that patches
         // (ToggleGroup, CheckboxGroup) ends with both changes whatever the order.
         if (driver.orderIndependentCommit) expect(committed().textContent).toBe(format(values[2]));
@@ -579,22 +585,28 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         const d = deferred();
         // Every commit of the component's subtree, read from the DOM in the Profiler callback (a
         // MutationObserver would coalesce commits made in the same task).
-        const snapshots: { shown: string; pending: boolean }[] = [];
+        const snapshots: { shown: string; pending: boolean; committed: string | null }[] = [];
         const record = () => {
           if (driver.queryControl() === null) return;
           snapshots.push({
             shown: driver.readShown(),
             pending: driver.pendingOn(0).some((el) => el.hasAttribute("data-pending")),
+            committed: driver.readCommitted?.() ?? null,
           });
         };
+        const snapshot = (shown: V, pending: boolean, committedValue: V) => ({
+          shown: driver.shown(shown),
+          pending,
+          committed: driver.readCommitted ? driver.committedShown!(committedValue) : null,
+        });
         render(<Harness mode="controlled" action={() => d.promise} onCommit={record} />);
-        const initial = { shown: driver.shown(values[0]), pending: false };
+        const initial = snapshot(values[0], false, values[0]);
         expect(snapshots.length).toBeGreaterThan(0);
-        expect(snapshots.every((s) => s.shown === initial.shown && !s.pending)).toBe(true);
+        expect(snapshots.every((s) => JSON.stringify(s) === JSON.stringify(initial))).toBe(true);
         const beforeClick = snapshots.length;
 
         await driver.gesture(setupUser(), 0);
-        expect(snapshots.at(-1)).toEqual({ shown: driver.shown(values[1]), pending: true });
+        expect(snapshots.at(-1)).toEqual(snapshot(values[1], true, values[0]));
         expectCommittedValue(values[0]);
         const afterClick = snapshots.length;
         await act(async () => {
@@ -602,11 +614,16 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         });
 
         expect(snapshots.length).toBeGreaterThan(afterClick);
-        expect(snapshots.at(-1)).toEqual({ shown: driver.shown(values[1]), pending: false });
-        // No commit after the gesture ever showed the old value again.
+        expect(snapshots.at(-1)).toEqual(snapshot(values[1], false, values[1]));
+        // No commit after the gesture ever showed the old value again, and the committed DOM
+        // never showed the new value while still pending (one commit converges both).
         expect(snapshots.slice(beforeClick).every((s) => s.shown === driver.shown(values[1]))).toBe(
           true,
         );
+        if (driver.readCommitted) {
+          const settled = driver.committedShown!(values[1]);
+          expect(snapshots.every((s) => !(s.pending && s.committed === settled))).toBe(true);
+        }
         expectCommittedValue(values[1]);
       });
 
@@ -646,6 +663,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
       ]);
 
       it("renders the same markup with and without `transition` (class or type map)", () => {
+        const consoleError = silenceErrors();
         const markup = (transition?: TransitionProp) => {
           const { container, unmount } = render(
             <>{driver.render(definedProps({ defaultValue: values[1], transition }))}</>,
@@ -658,6 +676,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         const plain = markup();
         expect(markup("fsui-fade")).toBe(plain);
         expect(markup(typeMap)).toBe(plain);
+        expect(consoleError).not.toHaveBeenCalled();
       });
 
       it.each([
@@ -681,9 +700,9 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         await driver.gesture(setupUser(), 0);
         const details = action.mock.calls[0]![1];
         expect(details.event).toBeInstanceOf(window.Event);
-        expect(details.event?.type).toBe(driver.eventType);
+        expect(details.event?.type).toBe(driver.eventType(0));
         expect("event" in details).toBe(true);
-        expect(Object.keys(details).sort()).toEqual(Object.keys(driver.detailsFields(0)).sort());
+        expect(Object.keys(details)).toEqual(Object.keys(driver.detailsFields(0)));
         expect({ ...details }).not.toHaveProperty("event");
         expect(JSON.stringify(details)).toBe(JSON.stringify(driver.detailsFields(0)));
         expect(Object.isExtensible(details)).toBe(true);
@@ -755,7 +774,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
 export function describeValueTransitionTypes<V, D extends { readonly event: Event | undefined }>(
   driver: AnyDriver<V, D>,
 ): void {
-  describe(`${driver.name}: transition types`, () => {
+  describe(`${driver.label ?? driver.name}: transition types`, () => {
     it.each(driver.transitionTypes.map((types, i) => [i, types] as const))(
       "gesture %i adds %j",
       async (i, types) => {

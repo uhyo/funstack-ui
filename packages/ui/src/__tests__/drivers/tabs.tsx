@@ -38,7 +38,9 @@ export const tabsDriver: ValueActionDriver<string, TabsValueChangeDetails> = {
   ),
   values: ["a", "b", "c", "a"],
   gesture: (user, i) => user.click(tab(tabsDriver.values[i + 1]!)),
-  eventType: "click",
+  // Automatic activation: a click on a tab while another tab has focus dispatches from the
+  // focus move (the first click comes from outside the list).
+  eventType: (i) => (i === 0 ? "click" : "focusin"),
   detailsFields: () => ({ reason: "activate" }),
   expectShown: (selected) => {
     for (const v of VALUES) {
