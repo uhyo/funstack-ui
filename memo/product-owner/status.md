@@ -343,3 +343,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
   Behaviour: Menu/Combobox Trigger click while open = awaited library close on all engines; non-modal lightDismiss Dialog Trigger click = dismiss on all paths; Trigger aria-expanded = shown state (SSR defaultOpen renders "false"); non-button Triggers get no commandfor/command + dev warning; announcer fallback live region removed.
   Features: ToggleGroupItemState/MenuRadioItemState.value; dev warning for 2nd Trigger per Root.
   Fixes: Combobox label press keeps text (#111); Toast arrows in text fields (#113 A3); focus-first-invalid repeated submit (#120).
+- #117 merged (real-press browser rows across overlays) → found #123 (Combobox input press light-dismissed; `source` gives no exemption) → fixed with pointer capture; Chromium touch-in-iframe hole #124 (upstream, human). #120 flaky = real focus-first-invalid race, fixed.
+- RELEASED 0.1.0-alpha.13 (Publish + Deploy Docs green).
+- Next: #121 evaluation (popovertarget Triggers, no aria-expanded) — architect evaluation; ask user before any large redesign.
+- Human tasks open: #114 (+ macOS Ctrl+click Combobox), #119, #122, #124, older upstream issues.
