@@ -503,8 +503,8 @@ export interface PopoverTriggerProps
 }
 ```
 
-Owned keys: `type` (`"button"`, on a `<button>` only), `commandfor`, `command`, `disabled`,
-`aria-expanded`, `data-open`, `data-pending`, `data-disabled`, and `onClick` only when installed
+Owned keys: `type` (`"button"`, on a `<button>` only), `commandfor`, `command` (on a `<button>`
+or a component render only: another element is no invoker, #115), `disabled`, `aria-expanded`, `data-open`, `data-pending`, `data-disabled`, and `onClick` only when installed
 (library mode; in JS-free mode the Trigger installs no handler and a `render` element's own
 `onClick` passes through). `aria-haspopup` is not rendered and passes through (a consumer may
 set `"dialog"`; Menu's trigger sets `"menu"`). `aria-expanded` is owned in both modes: in JS-free
@@ -627,7 +627,8 @@ export interface PopoverCloseProps
 }
 ```
 
-Owned keys: `type`, `commandfor`, `command` (`"hide-popover"`), `disabled`, `onClick` (library
+Owned keys: `type`, `commandfor`, `command` (`"hide-popover"`; on a `<button>` or a component
+render only, #115), `disabled`, `onClick` (library
 mode, or with `action`), `data-pending`, `data-disabled`. No `value` and no `returnValue`:
 popovers have none. In library mode the click is always intercepted, with or without `action`,
 so every Close goes through the Root's transition and the apply effect; in JS-free mode without
@@ -1775,3 +1776,12 @@ in library mode too and asserts the new text; browser (Chromium / Firefox / WebK
 a `render={<a href="#" />}` Trigger with an async `openChangeAction`, real mouse: popup hidden at
 `pointerup` + 20 ms, one dispatch `(false, "activate")` with the `click`, documenting the
 degraded shape, next to #110's `<button>` row that asserts the awaited one.
+
+Review follow-ups (#115 review, PO decisions, 2026-10-24): F3, the shared hook's library-mode
+warning has a SubmenuTrigger text (option `opensOnly`; not `activate !== undefined`, which
+Menu.Trigger also passes): a press on a non-button SubmenuTrigger while its submenu is open
+dismisses the submenu instead of moving focus into it (menu.md element constraints). F4, the
+overlay Triggers and Close parts render `commandfor` / `command` only on a `<button>` or a
+component render (`invoker && rendersButton(render)` at each call site; `disabledButton().invoker`
+is unchanged, since Close derives its `aria-disabled` from it). Menu's press-drag gesture finds
+a SubmenuTrigger's submenu through its hover registration instead of `commandfor`.

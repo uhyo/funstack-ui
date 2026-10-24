@@ -170,7 +170,9 @@ Why these parts:
 Element constraints for `render`: `Trigger` and `SubmenuTrigger` should render a `<button>` for
 the command path (another element works through the click handler, but a non-button `Trigger`'s
 press while the menu is open is a light dismiss, not the awaited close of 2.2 / #110: the
-platform exempts invoker buttons only; dev warning, popover.md 2.7 and #115); items may render anything
+platform exempts invoker buttons only; dev warning, popover.md 2.7 and #115; a non-button
+`SubmenuTrigger`'s press while its submenu is open dismisses the submenu instead of moving focus
+into it, with its own warning text); items may render anything
 focusable (a link, a `div` with `tabIndex`), with the keydown handler providing Enter / Space;
 `Popup` should render a `<div>` (a `<dialog>` would run the dialog focusing steps and fight the
 item focus); `RadioGroup` / `Group` any element; `Separator` any element with `role="separator"`
@@ -530,7 +532,8 @@ dangling is harmless). `GroupLabel`: `div` with the owned `id` (reads the neares
 ### 3.8 `Menu.SubmenuTrigger`
 
 `MenuItemProps` minus `action` / `closeOnActivate`, plus `MenuTriggerState` (`open`, `pending`,
-`disabled`). Owned keys: the Trigger's (`id`, `commandfor`, `command`, `aria-haspopup`,
+`disabled`). Owned keys: the Trigger's (`id`, `commandfor`, `command` (on a `<button>` or a
+component render only, #115), `aria-haspopup`,
 `aria-expanded`, `data-open`, `data-pending`) and the item's (`role="menuitem"`, `tabIndex`,
 `aria-disabled`, `data-disabled`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`,
 `onPointerLeave`). Only valid in a submenu Root (dev warning otherwise).

@@ -496,17 +496,22 @@ apply effect calls `close(returnValue)` after `show()` as after `showModal()`, a
 the platform restores focus on `close()` unconditionally for a modal dialog but only when focus
 is *inside* a non-modal one, so a non-modal close whose commit unmounted the focused Close part
 (default mounting with `transition`) relies on the library's focus return (6.2). The Trigger
-remains open-only (a click while open is a no-op; it is not a toggle, there being no
-`toggle` command for dialogs), reachable or not.
+remains open-only (it is not a toggle, there being no `toggle` command for dialogs), reachable
+or not: its own handler opens nothing while the dialog is open. With `lightDismiss`, though, a
+pointer click on it while open is a click outside and dismisses the dialog (#116, section 13);
+in JS-free mode the Trigger records `dialog.open` at `pointerdown` and skips `show()` on that
+click if it was open, so the outcome is "closed" on every path (a keyboard click has no press
+and stays a no-op).
 
 Baseline JS for non-modal dialogs (both modes): a `keydown` listener on the dialog closes it on
 Escape with `requestClose()`, leaving the event alone while it belongs to an inner layer (the
 target is inside an open nested `<dialog>` or an open `auto` / `hint` popover, or any open
 `auto` / `hint` popover inside the dialog would take the close request; section 9), so the APG
 expectation holds; with `lightDismiss`, document `pointerdown` and `click` listeners (capture)
-close it when both the press and the click land outside the dialog, **ignoring the Trigger**
-(otherwise the Trigger's own click would close and immediately re-open the dialog, or in
-JS-free mode close it on every second click). With `experimental_closedBy`
+close it when both the press and the click land outside the dialog, **the Trigger included**,
+as native `closedby="any"` does (#116; the click does not re-open the dialog: in library mode
+it arrives while the dialog is still optimistically open, in JS-free mode the Trigger saw it
+open at `pointerdown`). With `experimental_closedBy`
 the dialog renders `closedby="closerequest"` or `"any"` and both listeners are skipped where
 `closedBy` is implemented. Non-modal dialogs never lock scroll (the CSS recipe keys on `:modal`).
 
@@ -616,7 +621,9 @@ export interface DialogTriggerProps
 ```
 
 Owned keys: `type` (`"button"`, only when the rendered element is a `<button>`), `commandfor`,
-`command`, `disabled`, `data-open`, `data-pending`, `data-disabled`, and `onClick` **only when installed**
+`command` (only on a `<button>` or a component render: another element is no invoker, #115),
+`disabled`, `data-open`, `data-pending`, `data-disabled`, `onPointerDown` (non-modal JS-free
+mode, #116), and `onClick` **only when installed**
 (library mode, or non-modal JS-free mode), the Accordion rule: in modal JS-free mode the Trigger
 installs no handler, owns no `onClick`, and a `render` element's own `onClick` passes through.
 `onClick` is still omitted from the props type because the library installs it in the other
@@ -1166,7 +1173,7 @@ Menu opened from inside the dialog renders inside its subtree and the top layer 
 | Close request | Modal, baseline | Modal, `experimental_closedBy` | Non-modal, baseline | Non-modal, `experimental_closedBy` |
 | --- | --- | --- | --- | --- |
 | Escape, Android back, AT dismiss | platform | platform (`closedby="closerequest"`) | JS `keydown` on the dialog → `requestClose()` | platform where `closedBy` exists, else JS |
-| Backdrop / outside click | nothing; with `lightDismiss`: JS `pointerdown` + `click` on the dialog, target is the dialog and both points are outside its border box → `requestClose()` | with `lightDismiss`: platform (`closedby="any"`) | nothing; with `lightDismiss`: document `pointerdown` + `click` (capture), both outside the dialog → `requestClose()`; **the Trigger counts as outside** (#116: native `closedby="any"` has no invoker exemption, so a Trigger click on an open non-modal dialog is a dismissal on every path and engine; it does not re-open, because the click arrives while the dialog is still optimistically open) | with `lightDismiss`: platform where `closedBy` exists, else JS |
+| Backdrop / outside click | nothing; with `lightDismiss`: JS `pointerdown` + `click` on the dialog, target is the dialog and both points are outside its border box → `requestClose()` | with `lightDismiss`: platform (`closedby="any"`) | nothing; with `lightDismiss`: document `pointerdown` + `click` (capture), both outside the dialog → `requestClose()`; **the Trigger counts as outside** (#116: native `closedby="any"` has no invoker exemption, so a Trigger click on an open non-modal dialog is a dismissal on every path and engine; it does not re-open: in library mode the click arrives while the dialog is still optimistically open, in JS-free mode the Trigger saw it open at `pointerdown` and skips `show()`) | with `lightDismiss`: platform where `closedBy` exists, else JS |
 | Close part, Form submit | platform (`request-close` / `method="dialog"`) | same | same | same |
 
 - **Escape cannot be turned off** in v0. `cancel.preventDefault()` holds once per user
@@ -1195,9 +1202,12 @@ Menu opened from inside the dialog renders inside its subtree and the top layer 
   for `show()`). So under native `closedby="any"` a Trigger click on an open non-modal dialog
   is a click outside, and the JS baseline, which exists to behave the same where `closedBy` is
   missing, treats it the same: `(false, "dismiss")`, on every engine, with or without the flag,
-  and surviving the flag's graduation. The dialog does not re-open from that click: `close()`
-  queues its `close` event, so the Trigger's handler runs while the dialog is still optimistically
-  open and dispatches nothing. Modal dialogs already behaved this way (a Trigger click lands on
+  and surviving the flag's graduation. The dialog does not re-open from that click: in library
+  mode `close()` queues its `close` event, so the Trigger's handler runs while the dialog is
+  still optimistically open and dispatches nothing; in JS-free mode the Trigger records
+  `dialog.open` at `pointerdown` and skips `show()` on a click whose press saw it open (the
+  dismissal has already closed it by the click, natively at `pointerup` or in the JS capture
+  listener). Modal dialogs already behaved this way (a Trigger click lands on
   the `::backdrop`). This is not a 3.5 "single source of the close" case: the Dialog Trigger
   has no library-owned close to protect (it only opens), and dismissals are browser-owned by
   design (decision 2).
@@ -1896,7 +1906,7 @@ update-on-success). Library mode unless stated.
 | Close part, dismissal during a pending close | `requestClose` pending (deferred `openChangeAction(false)`), then `requestClose()` on the dialog (Escape): one `openChangeAction(false)` in total, the first with `"activate"`; after it resolves `close` is not called again; the dialog ends closed. |
 | Close part, dismissal then veto (11.13, review M1) | Controlled: a Close click with a deferred `openChangeAction(false)`, then `requestClose()` on the dialog, then the parent settles without adopting: `openChangeAction` saw `[true ("activate"), false ("activate", value), false ("dismiss", "")]`, the third `event` is the `close` event; `showModal` was called once (never re-opened); the dialog ends closed, content unmounted, Trigger neither `data-pending` nor `data-open`. Variant: the Trigger re-opens between the Escape and the settle: `[true, false ("activate"), true]`, no `"dismiss"`, the dialog ends open. |
 | Close part with `action`, controlled veto | The action runs once, `openChangeAction(false)` is called, the parent keeps `open`: `close` never called, `showModal` once (no blink), `data-open` back on the Trigger. |
-| Re-open during a pending part close (reviewer P2) | Uncontrolled, non-modal: a Trigger click while `openChangeAction(false)` runs: `[true, false ("activate"), true]`, `close` never called, `data-open` back, the dialog stays open. Uncontrolled only: a controlled harness that adopts in arrival order ends with the superseded `false` (conventions 2.5). |
+| Re-open during a pending part close (reviewer P2) | Uncontrolled, non-modal: a Trigger click while `openChangeAction(false)` runs: `[true, false ("activate"), true]`, `close` never called, `data-open` back, the dialog stays open. Uncontrolled only: a controlled harness that adopts in arrival order ends with the superseded `false` (conventions 2.5). With `lightDismiss` (with and without the flag) the click is also a dismissal and ends closed: `[true, false ("activate"), true, false ("dismiss")]`, the last from the `close` event (#116). |
 | Walkthrough 11.16 | A controlled `setOpen(false)` while a Close `action` runs: one `openChangeAction(false)`, one `close(value)`, the dialog closed with `returnValue` the Close's value. |
 | Submit opt-out on a document root (review M3) | A `document` `submit` listener registered **before** mount that calls `stopPropagation()` (stands for React's root on the document, FUNSTACK Static): the library does not cancel the submit (`cancelBubble`), the shim closes natively, notified `"dismiss"`. Fails without the `cancelBubble` check. |
 | Shadow root (review L1) | The Root rendered into a shadow root: a `method="dialog"` submit is intercepted and closes through the Root (the listener sits on `getRootNode()`); with a document listener the submit never arrives and the dialog stays open. |
@@ -1905,7 +1915,7 @@ update-on-success). Library mode unless stated.
 | Form part | `method="dialog"` without `action`. **Library mode:** a submit (user-event click on the submitter) does not close natively: the `submit` event is default-prevented by the library, `openChangeAction(false, { reason: "activate", returnValue: submitterValue, event: SubmitEvent })` is called, `close(submitterValue)` after it resolves; a consumer `onSubmit` that calls `preventDefault()` keeps the dialog open and dispatches nothing; a submitter with `formMethod="dialog"` in a `method="post"`-less form behaves the same; a `method="dialog"` form rendered inside the Popup without `Dialog.Form` is intercepted too. **JS-free:** the shim closes natively, as today. With a function `action`: `method` absent, the action receives `FormData`, the settle close goes through the Root in library mode (`openChangeAction(false)` with the submitter's value, then `close(submitterValue)`; fake the status through a resolved `deferred()`) and through `close()` directly in JS-free mode; not called when it throws. `closeOnSettle`: a plain `Dialog.Form` closes on a `useActionState` validation result by default; with `false` the dialog stays open showing the result and a `Dialog.Close` closes it. Rendered as a `Form.Root` (`form.test.tsx`, #59): a result with errors keeps the dialog open and focuses the field; a clean settle resets and closes with `reason: "activate"` and the submitter's `value`; a hidden stale error neither closes, resets nor focuses; `closeOnSettle={false}` never closes; the reverse orientation (`<Form.Root render={<Dialog.Form />}>`) behaves the same; the composition without a function `action` warns in development. A close since the submit (Escape during the save, then a re-open through the Trigger) blocks the settle close: the dialog ends open, `close` not called again. `method="post"` is kept with a string `action` and replaced by `"dialog"` without one. |
 | Foreign close command | A `command` event with `request-close` (and with `close`) dispatched on the dialog in library mode is default-prevented and dispatches `openChangeAction(false)` with `reason: "activate"`, `details.event` the `CommandEvent`, `returnValue` the source's `value`; `close(value)` after it resolves. JS-free: records the intent only (the shim closes). |
 | Held content (jsdom) | A controlled close (`open` flipped to `false`) without `transition`: the children are still in the DOM inside the `close` spy (the close commit holds them), and gone after the `close` event with no animations (release is a normal update: assert no `startViewTransition` call with the jsdom stub, 10.1). With `transition="none"`: the children are gone inside the `close` spy. `keepMounted`: the `<Activity>` is visible inside the spy without `transition`. |
-| Light dismiss (baseline) | With `lightDismiss`: a `pointerdown` + `click` on the dialog with coordinates outside `getBoundingClientRect()` (mocked) calls `requestClose`; inside, on a descendant, or a `pointerdown` inside followed by a `click` outside (drag out) does not; without the prop nothing. Non-modal: document pointerdown + click outside closes; a press + click on the Trigger closes too, `(false, "dismiss")`, and does not re-open (#116). |
+| Light dismiss (baseline) | With `lightDismiss`: a `pointerdown` + `click` on the dialog with coordinates outside `getBoundingClientRect()` (mocked) calls `requestClose`; inside, on a descendant, or a `pointerdown` inside followed by a `click` outside (drag out) does not; without the prop nothing. Non-modal: document pointerdown + click outside closes; a press + click on the Trigger closes too, `(false, "dismiss")`, and does not re-open (#116); JS-free mode, with and without the flag: closed, one `close` event, no `show()`; keyboard activation of the Trigger while open does nothing; a press on the Trigger that never became a click swallows no later keyboard open. |
 | Focus | `initialFocus` ref/selector: the element has `autofocus=""` when `showModal` is called (spy inspects the DOM) and not afterwards; missing target warns. Opener removed: after `close`, if `activeElement` is inside the dialog the Trigger is focused when connected. |
 | Mode guard | Changing Root from JS-free to library mode after mount warns; `transition` / `keepMounted={false}` in JS-free mode warn. |
 | `transition` smoke | Popup renders with and without `transition`. **Browser:** a plain open calls `document.startViewTransition` zero times with `transition` absent **and** with `transition="none"` (the children mount under the `<dialog>`, which shields the boundary); a nested `Dialog.Root` mounted by a transition together with outer content, with `transition="none"` on its Popup, calls it once (conventions 10.1). |
@@ -2628,10 +2638,12 @@ JS outside-click listeners for non-modal dialogs under the flag, would diverge f
 permanently and keep JS alive past graduation for one case.
 
 Edge noted, same on both paths: with `lightDismiss`, a Trigger click during a pending
-part-initiated close (test row "Re-open during a pending part close") is now a dismissal of the
-still-open dialog followed by the click's `requestOpen` (optimistic is `false` during the pending
-close); the last dispatch wins as conventions 2.5 says. Without `lightDismiss` that row is
-unchanged.
+part-initiated close (test row "Re-open during a pending part close") is now also a dismissal of
+the still-open dialog. The click's `requestOpen` dispatches during the click (optimistic is
+`false` during the pending close); the dismissal's `close` event is queued and dispatches
+`(false, "dismiss")` after it, so the dismissal is the last intent and the dialog ends closed
+(conventions 2.5), as the platform's own outcome. Accepted (PO, #116 review F2). Without
+`lightDismiss` that row is unchanged.
 
 Implementation (developer), `packages/ui/src/dialog/dialog-popup.tsx`: in the light-dismiss
 effect's `isOutside`, drop the `triggerRef` branch (and its comment); `lightDismiss`'s JSDoc
@@ -2643,3 +2655,11 @@ Chromium / Firefox / WebKit, real mouse, non-modal + `lightDismiss`, with and wi
 `(false, "dismiss")` whose event is the `close` event, no `true` dispatch; branch on
 `supportsDialogClosedBy` only to assert which mechanism closed it (native where supported, JS
 elsewhere), the outcome identical.
+
+Review follow-ups (#116 review, PO decisions, 2026-10-24): F1, JS-free mode re-opened the
+dialog (the light dismiss closed it, then the Trigger's `!dialog.open` check called `show()`),
+on the JS path and natively with the flag. The JS-free Trigger now records `dialog.open` at
+`pointerdown` and skips `show()` on a pointer click (`detail > 0`) whose press saw it open; a
+keyboard click (no press) is unaffected, and a stale press cannot swallow a later keyboard
+open. Owned key `onPointerDown` (non-modal JS-free mode). F2, the pending-close edge ends
+closed (corrected above). F5, section 2.6 edited to match.
