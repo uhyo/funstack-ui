@@ -5,7 +5,7 @@ import type { UrgentChangeAction } from "../index.js";
 
 /**
  * Type-level checks for the action signatures (conventions 2.2). `expectTypeOf` is a no-op at
- * runtime; `pnpm typecheck` and vitest's typecheck are what make these fail.
+ * runtime; `pnpm typecheck` (`tsc` over the test files) is what makes these fail.
  */
 describe("Action types", () => {
   it("accepts sync, async and non-void returning callbacks", () => {

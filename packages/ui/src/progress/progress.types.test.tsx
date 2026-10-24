@@ -6,7 +6,7 @@ import type { ProgressRootProps, ProgressState } from "./index.js";
 
 /**
  * Type-level checks (design/components/progress.md 12.1 "Types"). `expectTypeOf` is a no-op at
- * runtime; `pnpm typecheck` and vitest's typecheck make these fail.
+ * runtime; `pnpm typecheck` (`tsc` over the test files) makes these fail.
  */
 describe("Progress / Meter props", () => {
   it("value is optional on Progress.Root and required on Meter.Root", () => {

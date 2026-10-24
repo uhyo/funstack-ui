@@ -10,7 +10,7 @@ import type {
 
 /**
  * Type-level checks (design/components/number-field.md 14.1 "Types"). `expectTypeOf` is a no-op
- * at runtime; `pnpm typecheck` and vitest's typecheck make these fail.
+ * at runtime; `pnpm typecheck` (`tsc` over the test files) makes these fail.
  */
 describe("NumberField types", () => {
   it("value / defaultValue accept number | null; both actions receive it", () => {

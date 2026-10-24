@@ -4,7 +4,8 @@ import type { AccordionRootProps, AccordionValueChangeDetails } from "./index.js
 
 /**
  * Type-level checks for the `exclusive` discrimination of `AccordionRootProps` (design 3.1).
- * `expectTypeOf` is a no-op at runtime; `pnpm typecheck` and vitest's typecheck make these fail.
+ * `expectTypeOf` is a no-op at runtime; `pnpm typecheck` (`tsc` over the test files) makes
+ * these fail.
  */
 describe("AccordionRootProps", () => {
   it("narrows `next` and `value` on `exclusive`", () => {

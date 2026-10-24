@@ -11,7 +11,7 @@ import type {
 
 /**
  * Type-level checks for the value shape of `Slider.Root` (design 3.1, 9.4). `expectTypeOf` is a
- * no-op at runtime; `pnpm typecheck` and vitest's typecheck make these fail.
+ * no-op at runtime; `pnpm typecheck` (`tsc` over the test files) makes these fail.
  */
 describe("SliderRootProps", () => {
   it("infers readonly number[] from an array defaultValue", () => {

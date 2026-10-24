@@ -120,9 +120,9 @@ export default defineConfig({
           exclude: [...configDefaults.exclude, "src/**/*.browser.test.{ts,tsx}"],
           setupFiles: ["./src/__tests__/vitest.setup.ts"],
           globals: true,
-          typecheck: {
-            enabled: true,
-          },
+          // No `typecheck` here: the type-level rows (`*.types.test.tsx`, `expectTypeOf`) fail
+          // through `pnpm typecheck` (tsc over src, test files included). vitest's typecheck
+          // matched no file (#101, audit T17).
         },
       },
       {
