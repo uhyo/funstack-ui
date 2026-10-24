@@ -134,7 +134,7 @@ export class ErrorCatcher extends Component<
 
 export type ControlMode = "uncontrolled" | "controlled";
 
-export const controlModes: readonly ControlMode[] = ["uncontrolled", "controlled"];
+const controlModes: readonly ControlMode[] = ["uncontrolled", "controlled"];
 
 /**
  * Runs a block of tests against both control modes (`describe.each`). The component test file
