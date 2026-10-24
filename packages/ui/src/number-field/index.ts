@@ -35,4 +35,4 @@ export type {
   NumberFieldButtonState,
   NumberFieldIncrementProps,
   NumberFieldDecrementProps,
-} from "./number-field-increment.js";
+} from "./use-step-button.js";

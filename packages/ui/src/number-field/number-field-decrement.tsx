@@ -1,8 +1,8 @@
 "use client";
-import { useStepButtonElement } from "./number-field-increment.js";
-import type { NumberFieldDecrementProps } from "./number-field-increment.js";
+import { useStepButtonElement } from "./use-step-button.js";
+import type { NumberFieldDecrementProps } from "./use-step-button.js";
 
-export type { NumberFieldDecrementProps } from "./number-field-increment.js";
+export type { NumberFieldDecrementProps } from "./use-step-button.js";
 
 /**
  * Steps the value down: `button[type=button][tabindex=-1]` with `aria-controls` → the input and
