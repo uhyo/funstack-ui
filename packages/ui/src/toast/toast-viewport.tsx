@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   useTransition,
 } from "react";
 import type { ComponentPropsWithRef, CSSProperties, FocusEvent, ReactNode } from "react";
@@ -16,11 +15,6 @@ import { DialogContext } from "../dialog/dialog-context.js";
 import { createActionDetails } from "../internal/action-details.js";
 import type { AriaNotifyTarget } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
-import {
-  getServerTopmostModal,
-  getTopmostModal,
-  subscribeModals,
-} from "../internal/modal-registry.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import type { ChangeReason, RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -40,6 +34,9 @@ import type {
 import { ToastViewportContext } from "./toast-context.js";
 import type { ToastViewportContextValue } from "./toast-context.js";
 import { DEFAULT_HOTKEY, matchesHotkey, regionLabel } from "./toast-hotkey.js";
+import { clearToastTimers, syncToastTimers } from "./toast-timers.js";
+import type { ToastTimer } from "./toast-timers.js";
+import { useModalPortalHost } from "./use-modal-portal-host.js";
 import { applyCommands, makeEntry, partition, plainText, withFlags } from "./toast-queue.js";
 import type { Entry } from "./toast-queue.js";
 
@@ -91,35 +88,10 @@ export interface ToastViewportProps extends Omit<
 
 const isDev = process.env.NODE_ENV !== "production";
 
-/** No store: `useSyncExternalStore` only tells the hydration render from a client render. */
-const subscribeNothing = (): (() => void) => () => {};
-const onClient = (): boolean => true;
-const onServerOrHydrating = (): boolean => false;
-
-/**
- * The element the region is portalled into for its whole client life. The library moves this
- * element (between its inline anchor and the topmost modal dialog); React never sees the move, so
- * the toasts keep their state (an Undo in flight stays pending). `display: contents`: no box.
- */
-function createHost(): HTMLElement | null {
-  if (typeof document === "undefined") return null;
-  const host = document.createElement("div");
-  host.style.display = "contents";
-  return host;
-}
-
 /** Document order. */
 function byDocumentPosition(a: Element, b: Element): number {
   if (a === b) return 0;
   return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-}
-
-interface Timer {
-  /** The duration the timer was started with; a different effective duration restarts it. */
-  readonly duration: number;
-  remaining: number;
-  startedAt: number;
-  handle: ReturnType<typeof setTimeout> | null;
 }
 
 interface PauseSources {
@@ -177,7 +149,7 @@ export function ToastViewport({
   const regionRef = useRef<HTMLElement | null>(null);
   const roots = useRef(new Map<string, HTMLElement>());
   const suspended = useRef(new Set<string>());
-  const timers = useRef(new Map<string, Timer>());
+  const timers = useRef(new Map<string, ToastTimer>());
   const pauses = useRef<PauseSources>({
     hover: false,
     focus: false,
@@ -196,8 +168,6 @@ export function ToastViewport({
 
   const latest = useLatest({ limit, duration, hotkey, announce });
 
-  const container = useSyncExternalStore(subscribeModals, getTopmostModal, getServerTopmostModal);
-
   const write = (next: readonly Entry[]): void => {
     entriesRef.current = next;
     setEntries(next);
@@ -205,53 +175,13 @@ export function ToastViewport({
 
   // --- Timers (design 6) ----------------------------------------------------------------------
 
-  const effectiveDuration = (entry: Entry): number | null => {
-    const own = entry.options.duration;
-    if (own !== undefined) return own;
-    return entry.options.action !== undefined ? null : latest.current.duration;
-  };
-
   const syncTimers = (): void => {
-    const map = timers.current;
-    const { visible } = partition(entriesRef.current, latest.current.limit);
-    const now = Date.now();
-    const live = new Set<string>();
-    const halted = !mounted.current || anyPause(pauses.current);
-    for (const entry of visible) {
-      if (entry.ending) continue;
-      const id = entry.options.id;
-      const ms = effectiveDuration(entry);
-      if (ms === null) continue;
-      live.add(id);
-      let timer = map.get(id);
-      if (timer === undefined || timer.duration !== ms) {
-        if (timer?.handle != null) clearTimeout(timer.handle);
-        timer = { duration: ms, remaining: ms, startedAt: 0, handle: null };
-        map.set(id, timer);
-      }
-      const run = !halted && !entry.item.pending && !suspended.current.has(id);
-      if (run && timer.handle === null) {
-        const current = timer;
-        current.startedAt = now;
-        current.handle = setTimeout(
-          () => {
-            current.handle = null;
-            current.remaining = 0;
-            close([id], "timeout", undefined);
-          },
-          Math.max(0, current.remaining),
-        );
-      } else if (!run && timer.handle !== null) {
-        clearTimeout(timer.handle);
-        timer.handle = null;
-        timer.remaining -= now - timer.startedAt;
-      }
-    }
-    for (const [id, timer] of map) {
-      if (live.has(id)) continue;
-      if (timer.handle !== null) clearTimeout(timer.handle);
-      map.delete(id);
-    }
+    syncToastTimers(timers.current, partition(entriesRef.current, latest.current.limit).visible, {
+      halted: !mounted.current || anyPause(pauses.current),
+      suspended: suspended.current,
+      defaultDuration: latest.current.duration,
+      expire: (id) => close([id], "timeout", undefined),
+    });
   };
 
   const setPause = (source: keyof PauseSources, value: boolean): void => {
@@ -318,12 +248,6 @@ export function ToastViewport({
     }
   };
 
-  const clearTimer = (id: string): void => {
-    const timer = timers.current.get(id);
-    if (timer?.handle != null) clearTimeout(timer.handle);
-    timers.current.delete(id);
-  };
-
   const scheduleCloseActions = (
     closed: readonly Entry[],
     reason: ChangeReason,
@@ -370,7 +294,7 @@ export function ToastViewport({
 
   const apply = (commands: readonly ToastCommand[]): void => {
     const result = applyCommands(entriesRef.current, commands, (id) => roots.current.has(id));
-    for (const id of result.replaced) clearTimer(id);
+    for (const id of result.replaced) clearToastTimers(timers.current, id);
     for (const id of result.forgotten) {
       lastAnnounced.current.delete(id);
       exitBaselines.current.delete(id);
@@ -452,10 +376,7 @@ export function ToastViewport({
   /** Forgets the queue of the previous manager (its own copy is retained by that manager). */
   const reset = (): void => {
     moveFocusOut(new Set(entriesRef.current.filter((e) => !e.ending).map((e) => e.options.id)));
-    for (const timer of timers.current.values()) {
-      if (timer.handle !== null) clearTimeout(timer.handle);
-    }
-    timers.current.clear();
+    clearToastTimers(timers.current);
     lastAnnounced.current.clear();
     exitBaselines.current.clear();
     write([]);
@@ -558,8 +479,7 @@ export function ToastViewport({
       view.removeEventListener("blur", onWindowBlur);
       view.removeEventListener("focus", onWindowFocus);
       // Unmounting stops the timers; the queue itself is retained by the manager.
-      for (const timer of map.values()) if (timer.handle !== null) clearTimeout(timer.handle);
-      map.clear();
+      clearToastTimers(map);
     };
   }, [handlers, rejected]);
 
@@ -587,29 +507,9 @@ export function ToastViewport({
 
   // --- The portal host (design 4.3) ------------------------------------------------------------
 
-  // The hydration render matches the server's inline region; every later render portals into
-  // `host`, whose place the library changes without React noticing.
-  const portalled = useSyncExternalStore(subscribeNothing, onClient, onServerOrHydrating);
-  const [host] = useState(createHost);
-  const anchorRef = useRef<HTMLDivElement | null>(null);
-
-  useLayoutEffect(() => {
-    if (host === null) return;
-    return () => host.remove();
-  }, [host]);
-
-  // Before the region effect below: a move hides the popover (removal steps), which that effect
-  // shows again in the same commit.
-  useLayoutEffect(() => {
-    if (host === null || !portalled) return;
-    const target = container ?? anchorRef.current;
-    if (target === null || host.parentNode === target) return;
-    const moved = host.parentNode !== null;
-    target.append(host);
-    // A moved region gets no `pointerleave`: drop the hover pause; a pointer still
-    // over it enters it again on its next move.
-    if (moved) setPause("hover", false);
-  });
+  // A moved region gets no `pointerleave`: drop the hover pause; a pointer still over it enters
+  // it again on its next move.
+  const { portalled, host, anchorRef } = useModalPortalHost(() => setPause("hover", false));
 
   // --- After every commit: region, timers, queued announcements, orphan exits ----------------
 
