@@ -530,15 +530,12 @@ describe("NumberField (browser)", () => {
       expect(notify).toHaveBeenLastCalledWith(input().value);
       notify.mockRestore();
     } else {
+      // A test build without ariaNotify: the step happens and nothing is announced (#113 A1).
       render(<Fixture defaultValue={1000} />);
       await focusInput();
       await user.keyboard("{ArrowUp}");
-      // The fallback region writes a tick after it is cleared.
-      await vi.waitFor(() =>
-        expect(document.querySelector('[role="status"][data-fsui-announcer]')).toHaveTextContent(
-          "1,001",
-        ),
-      );
+      expect(input()).toHaveValue("1,001");
+      expect(document.querySelector("[aria-live]")).toBeNull();
     }
   });
 

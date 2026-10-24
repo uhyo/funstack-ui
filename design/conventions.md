@@ -1904,9 +1904,9 @@ a flag (`docs/vision.md`). Mechanism:
 
    Adopted without a flag because every stable engine has it: `Element.ariaNotify()` (Chrome
    141, Firefox 150, Safari 27; Combobox announcements; NumberField's step announcements, #67,
-   through `internal/announce.ts`, which speaks through `ariaNotify()` where it exists and
-   otherwise through one module-level `role="status"` live region in `document.body`; a
-   component announcing through it renders no live region of its own). Recorded as a future `experimental_`
+   through `internal/announce.ts`, which speaks through `ariaNotify()` only: its former
+   `role="status"` fallback region in `document.body` was dropped under the no-fallbacks policy,
+   #113 A1; a component announcing through it renders no live region). Recorded as a future `experimental_`
    rendering candidate: the Open UI customizable combobox (`<input list>` + `<datalist>` with
    `appearance: base`), Chromium `experimental` only.
 

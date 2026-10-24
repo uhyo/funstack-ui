@@ -1,6 +1,6 @@
 // NumberField tests (jsdom), mapped to design/components/number-field.md section 14.1. jsdom has
 // full ICU and native constraint validation for `type="number"`, no `:user-invalid` (the Field's
-// fallback), no `ariaNotify` (a stub covers that branch; the fallback region is tested), no
+// fallback), no `ariaNotify` (a stub covers that branch; without it nothing is announced), no
 // layout. Pointer capture is polyfilled; the hold uses fake timers.
 //
 // "both" rows run over three wrappers: uncontrolled, a controlled parent that adopts every step,
@@ -1962,51 +1962,13 @@ describe("NumberField", () => {
       }
     });
 
-    it("falls back to one module-level status region, cleared after a second and reused", () => {
+    it("without ariaNotify, steps announce nothing and insert no live region (#113 A1)", () => {
       vi.useFakeTimers();
-      render(
-        <>
-          <Fixture mode="uncontrolled" />
-          <NumberField.Root defaultValue={10} locale="en-US">
-            <NumberField.Input data-testid="second" />
-          </NumberField.Root>
-        </>,
-      );
-      key("ArrowUp");
-      const regions = document.querySelectorAll('[role="status"]');
-      expect(regions).toHaveLength(1);
-      const region = regions[0]!;
-      expect(region.parentElement).toBe(document.body);
-      expect(region).toHaveAttribute("aria-live", "polite");
-      expect(region).toHaveAttribute("aria-atomic", "true");
-      // Inserted empty; the message is written a tick later (a region inserted together with its
-      // first message is skipped by some screen readers).
-      expect(region).toHaveTextContent("");
-      act(() => vi.advanceTimersByTime(100));
-      expect(region).toHaveTextContent("2");
-      act(() => vi.advanceTimersByTime(1000));
-      expect(region).toHaveTextContent("");
-      key("ArrowDown", {}, screen.getByTestId("second"));
-      act(() => vi.advanceTimersByTime(100));
-      expect(document.querySelectorAll('[role="status"]')).toHaveLength(1);
-      expect(region).toHaveTextContent("9");
-    });
-
-    it("a repeat of the same text within the clear window is a fresh change", () => {
-      vi.useFakeTimers();
-      render(<Fixture mode="uncontrolled" initial={1} />);
-      key("ArrowUp");
-      act(() => vi.advanceTimersByTime(100));
-      const region = document.querySelector('[role="status"]')!;
-      expect(region).toHaveTextContent("2");
-      // Down then up again: "1" is replaced by a second "2" before it is written. The region is
-      // cleared at once and written a tick later, so the repeated "2" is a DOM change a screen
-      // reader hears again.
-      key("ArrowDown");
-      key("ArrowUp");
-      expect(region).toHaveTextContent("");
-      act(() => vi.advanceTimersByTime(100));
-      expect(region).toHaveTextContent("2");
+      render(<Fixture mode="uncontrolled" />);
+      expect(() => key("ArrowUp")).not.toThrow();
+      act(() => vi.advanceTimersByTime(2000));
+      expect(input()).toHaveValue("2");
+      expect(document.querySelector('[role="status"], [aria-live]')).toBeNull();
     });
   });
 

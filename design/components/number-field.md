@@ -57,7 +57,7 @@ in Slider.
 | 10 | Wheel | **Off by default**; `stepOnWheel` enables it **only while the input is focused**, through a native non-passive `wheel` listener (React's `onWheel` is passive and cannot stop the page scroll). Each wheel event with a vertical delta is a one-step gesture; `deltaY === 0` (a horizontal scroll) is ignored and not prevented (4.4). |
 | 11 | Hidden native input | `<input type="number">` right after the visible input, `aria-hidden="true" tabindex="-1" autocomplete="off"`, visually hidden; carries `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readOnly` and the canonical value (`String(number)`, `""` for empty). **Uncontrolled**: its `defaultValue` prop is the reset target (uncontrolled: the latest `defaultValue`; controlled: the mount-time value), which react-dom keeps in the `value` attribute, so the platform's own reset applies to it; the library writes its `.value` synchronously at every step and re-applies the shown value after every commit. The library always cancels its `invalid` event, so the browser never reports on an `aria-hidden` element (section 6). |
 | 12 | The validity mirror | After every write to the hidden input, `visible.setCustomValidity(hidden.validationMessage)`: the visible input is invalid exactly when the hidden one is, with the browser-localised message, so `invalid`, the native bubble, the browser's focus move and `:user-invalid` all land on the visible input in every engine (research finding 5). Inside a Field the Field writes its slot (`validate`, server errors) on the **hidden** input and mirrors the same way (section 7). |
-| 13 | No `role="spinbutton"` | Accepted deviation from APG (product owner, research finding 4: VoiceOver announces "50%" or "0" for a text spinbutton, WebKit 221102 / 250380). The visible input is a plain `textbox`; stepped values are announced with `ariaNotify()` (fallback: a module-level live region). **No `aria-roledescription`** (8.2): it would replace the role name a user relies on to know they can type, and it would be the library's third built-in string for a gain the announcements already give. |
+| 13 | No `role="spinbutton"` | Accepted deviation from APG (product owner, research finding 4: VoiceOver announces "50%" or "0" for a text spinbutton, WebKit 221102 / 250380). The visible input is a plain `textbox`; stepped values are announced with `ariaNotify()` (no fallback region since #113 A1, 8.3). **No `aria-roledescription`** (8.2): it would replace the role name a user relies on to know they can type, and it would be the library's third built-in string for a gain the announcements already give. |
 | 14 | Forms | `name` / `form` on Root (the hidden input posts the number, never the text). Reset: the hidden input resets natively; the visible input's `defaultValue` mirror is written in the `reset` event (`useFormReset`'s `onResetEvent`); the JS-computed target is dispatched as one `"platform"` step + commit in the microtask. Mount reconciliation adopts the text of a still-focused input as the draft **first**, then parses text typed before hydration (4.5; review M1). Both inputs are `autocomplete="off"`, so the browser's form-state restoration never produces a hidden value the text does not show (6.1). |
 | 15 | Exposure | `data-pending` on Root, Input and the button the latest step or commit came from; `data-disabled` on every part; `data-invalid` (from a Field) on Root and Input. No `data-readonly` (`:read-only`), no `data-holding` (`:active` on the held button), no `data-editing`. `state.value` is the shown value (`live` while held, else optimistic), `state.text` the shown text. |
 | 16 | ViewTransition | **No `transition` prop on any part** (Select / Slider precedent): every change is urgent or optimistic. Types `fsui-number-field`, `fsui-number-field-change` (step), `fsui-number-field-commit` (gesture) for consumers' own boundaries. |
@@ -986,7 +986,7 @@ the consumer would then have to supply everywhere. A consumer who wants it passe
 `aria-roledescription` through `NumberField.Input` (pass-through). This follows the product
 owner's lean; item 8 records it.
 
-### 8.3 Announcing steps: `ariaNotify()`, with a fallback
+### 8.3 Announcing steps: `ariaNotify()`
 
 A text input whose value changes under the user's hands (ArrowUp, a button) is not reliably
 announced: the screen reader read the old value at focus and heard no typing. After every
@@ -994,17 +994,15 @@ discrete step (a key press, a wheel event, a click activation) and at the **rele
 (not per tick: the user hears the final value, as React Aria's announcer coalesces), the Root
 calls `announce(value, state)` (default `state.text`, so "2", "€ 1,50", "50%") and speaks it:
 
-- `visible.ariaNotify(message)` where it exists (Chrome 141, Firefox 150, Safari 27: every
-  supported engine, adopted without a flag for Combobox, conventions 8);
-- otherwise, the **fallback** the product owner asked for: `internal/announce.ts` keeps one
-  module-level, visually hidden `div[role=status][aria-live=polite][aria-atomic=true]` appended
-  to `document.body` on first use (React Aria's live announcer shape, a module-level element
-  like `modal-registry.ts` is a module-level store). It **clears the region, then writes the
-  message 100 ms later** (`ANNOUNCE_WRITE_DELAY`) and clears it again after a second
-  (`ANNOUNCE_CLEAR_DELAY`): some screen readers skip the first change of a region inserted in
-  the same task, and an unchanged text is not spoken again, so every message is a fresh
-  change (review N4); a newer message replaces one not yet written. Nothing is rendered by any
-  part; the region exists only in engines without `ariaNotify`, which today means test builds.
+`visible.ariaNotify(message)` (Chrome 141, Firefox 150, Safari 27: every supported engine,
+adopted without a flag for Combobox, conventions 8), through `internal/announce.ts`. An engine
+without it announces nothing.
+
+**No fallback region (#113 A1, 2026-10-24).** The first version kept, at the product owner's
+request, a module-level visually hidden `div[role=status]` appended to `document.body` for
+engines without `ariaNotify` (cleared, written 100 ms later, cleared after a second; review N4).
+It never ran in a supported browser (docs/vision.md: latest stable of each engine, no
+fallbacks), and in `document.body` it was inert under a modal dialog, so it was dropped.
 
 `null` from `announce` announces nothing. Combobox keeps its own `ariaNotify` call and
 `focus-first-invalid.ts` its own `announce` in v1; moving them onto `announce.ts` (which would
@@ -1173,8 +1171,8 @@ commit success). jsdom has full ICU (`Intl.NumberFormat` for every locale in 5.3
 native constraint validation for `type="number"` (`rangeUnderflow` / `rangeOverflow` /
 `stepMismatch` / `valueMissing` / `customError`, `validationMessage` "Constraints not
 satisfied", probed), which keeps the validity rows in jsdom; it has no `:user-invalid` (Field's
-fallback), no `ariaNotify` (the fallback region is tested; a stub covers the `ariaNotify`
-branch), no layout; `setPointerCapture` is polyfilled by `vitest.setup.ts` if absent; the
+fallback), no `ariaNotify` (a stub covers the `ariaNotify` branch; without it nothing is
+announced), no layout; `setPointerCapture` is polyfilled by `vitest.setup.ts` if absent; the
 hold uses fake timers; the wheel row dispatches a `WheelEvent` on the input.
 
 ### 14.1 jsdom
@@ -1197,7 +1195,7 @@ hold uses fake timers; the wheel row dispatches a `WheelEvent` on the input.
 | Platform path (both) | Mount reconciliation: `renderToString`, set the visible input's value to `"3"` before `hydrateRoot` → one `"platform"` step + commit (`source: null`, `event: undefined`), hidden written to `3`, StrictMode still one; the input focused at hydration → adopted as the draft, no dispatch, **also when the text is unparsable (`"12,"` stays under the caret, review M1)**; a value formatted by another locale (`"1.234,5"` under `en`) → no dispatch and the text re-synced to `"1,234.5"`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → the visible `defaultValue` attribute equals `format(target)` at the `reset` event, the hidden resets natively, one step + commit with the `reset` event, a cancelled reset dispatches nothing, a refusing controlled parent is re-synced; a draft open at reset is cleared. |
 | Forms | `FormData` has `name` = `String(value)`, absent when `disabled`, `""` when `null`; `form` attribute honoured; Enter's implicit submission (a `submit` listener) sees the committed value in `FormData`; the text is never posted. |
 | Inside a Field | The 7.4 table. |
-| Announcements | `ariaNotify` stubbed on `Element.prototype`: called on the visible input once per key press, wheel event, click activation and hold release (not per tick), with `state.text` or the consumer's `announce` string, never when it returns `null`, never for a typed commit; stub removed: the fallback region exists once in `document.body` with `role="status"`, is empty right after the call, holds the text 100 ms later, is cleared after a further second (fake timers), speaks a repeated message as a fresh change, and is reused by a second field. |
+| Announcements | `ariaNotify` stubbed on `Element.prototype`: called on the visible input once per key press, wheel event, click activation and hold release (not per tick), with `state.text` or the consumer's `announce` string, never when it returns `null`, never for a typed commit; stub removed: the step still happens and no live region is inserted (#113 A1). |
 | Function props / `render` | Every part's documented state (`NumberFieldState` on Root / Label / Input, `NumberFieldButtonState` on the buttons with `disabled` true at the bound); `render={<input type="search" />}` keeps the handlers and the hidden sibling; button `render={<a />}` gets no `type`; `className` / `style` merge; `aria-label` on a button replaces the default and `aria-labelledby` removes it; `onCompositionStart` / `onCompositionEnd` on the Input pass through and fire. |
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` in `valueCommitAction`. |
 | Directive | Every file under `src/number-field/` except `index.ts`, `number-field-format.ts` and `number-field-arithmetic.ts` begins with `"use client"`. |
@@ -1213,7 +1211,7 @@ hold uses fake timers; the wheel row dispatches a `WheelEvent` on the input.
 | Enter submits with the new value | A `Form.Root` with an action spy: type `12`, Enter: the action runs once with `quantity=12`. | all three; document any engine where the sync flush lands after submission (Combobox's row passed on all three) |
 | Wheel | With `stepOnWheel` and the input focused, a real wheel over it changes the value and the page does not scroll; unfocused, the page scrolls and the value stays; without the prop the page scrolls either way. | none |
 | Real hold | A real pointer press on `+` held for a measured duration: the value advanced by `1 + ceil((held − 400) / 60)` ± 1 ticks (the row measures the press duration rather than assuming it, 5fe8ae6), one commit at release; focus never left the input (`document.activeElement` before and after); no text selection; `:focus-visible` is false on the button. **Not written**: touch emulation (a press opens no keyboard and no context menu); vitest's `userEvent` has no touch hold, CDP `Input.dispatchTouchEvent` can drive it (#77). | touch row `browserName === "chromium"`, when written |
-| Announcements | `ariaNotify` spied on the input: one call per key press with the formatted text; one per hold release. | `supportsAriaNotify`; otherwise the fallback region row |
+| Announcements | `ariaNotify` spied on the input: one call per key press with the formatted text; one per hold release. | `supportsAriaNotify`; otherwise: the step happens, no live region |
 | Accessibility tree (Chromium) | CDP: the input is a `textbox` named "Quantity" with no `valuenow`; the Root a `group` named "Quantity"; the buttons named "Increase" / "Decrease"; the hidden input absent from the tree. | `browserName === "chromium"`; others assert attributes |
 | Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration; blurred before hydration → one `"platform"` step + commit; still focused → adopted as the draft, committed at blur. | WebKit may use the keyboard fallback (Combobox L4 rule) |
 | Firefox restoration | **Moot, not written**: both inputs are `autocomplete="off"` (6.1), so Firefox restores neither across a reload; Slider's equivalent row mostly logs "not restored" for `srcdoc` frames anyway. Recorded here instead of a row (review S4). | — |
@@ -1253,7 +1251,7 @@ packages/ui/src/number-field/
 packages/ui/src/internal/
   decimal.ts                      # no directive: decimalsOf / gridDecimals / roundTo, shared with Slider
   use-superseded-rejection.ts     # conventions 2.4: called once in the Root, passed as `captureSuperseded` to both hooks
-  announce.ts                     # "use client": announce(element, message): ariaNotify, else the module-level live region (clear, write after 100 ms, clear after 1 s)
+  announce.ts                     # "use client": announce(element, message): ariaNotify only (the fallback live region was dropped, #113 A1)
   field-context.ts                # FieldControlRegistration gains `validityElement?: () => ValidatableElement | null`
   use-field-control.ts            # the option, passed through to registerControl
   ../field/field-root.tsx         # reads validity / writes the slot on the validity element, `:user-invalid` on the element, mirrors after the slot write

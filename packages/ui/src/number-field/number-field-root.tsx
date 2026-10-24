@@ -127,7 +127,7 @@ export interface NumberFieldRootProps extends Omit<
   /** Native `required` on the hidden input (empty is `valueMissing`); or the Field's. */
   required?: boolean;
   /**
-   * What is announced (`ariaNotify()`, else a live region) after a key press, a wheel event, a
+   * What is announced (`ariaNotify()`) after a key press, a wheel event, a
    * click activation and a hold's release. Default: `(_, state) => state.text`. Return `null` to
    * announce nothing.
    */
