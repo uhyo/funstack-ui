@@ -19,22 +19,12 @@
 // are N/A: the re-entry guard means a Close never has two of its own runs in flight (#79, #81);
 // the Close "re-entry" rows (D1-D6, design/components/button.md 16.4) replace them.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import {
-  StrictMode,
-  Suspense,
-  startTransition,
-  use,
-  useActionState,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { startTransition, use, useActionState, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchCommand, isModal } from "../__tests__/dialog-shim.js";
 import {
-  createSuspender,
   deferred,
   ErrorCatcher,
   expectNotPending,
@@ -45,152 +35,68 @@ import {
   flushTasks,
   silenceErrors,
 } from "../__tests__/helpers.js";
-import type { ControlMode } from "../__tests__/helpers.js";
 import { DialogContext } from "./dialog-context.js";
-import type { DialogContextValue } from "./dialog-context.js";
 import { Dialog } from "./index.js";
 import type {
   DialogCloseState,
   DialogFormState,
   DialogOpenChangeDetails,
-  DialogPopupProps,
   DialogPopupState,
   DialogRootState,
-  DialogTriggerProps,
   DialogTriggerState,
 } from "./index.js";
 import { recordClicks } from "../__tests__/overlay-helpers.js";
 
-type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
-type Mode = ControlMode | "static";
-
-interface HarnessProps {
-  mode: Mode;
-  /** Initial committed open state. */
-  initialOpen?: boolean;
-  /** The consumer's work, awaited by the harness's `openChangeAction`. */
-  action?: ActionFn;
-  /** Catch errors thrown by `action` (turns a rejection into success for the library). */
-  catchErrors?: boolean;
-  /** Controlled mode: never adopt `false` (a parent that refuses to close). */
-  refuseClose?: boolean;
-  /** Controlled mode: never adopt `true` (a parent that vetoes the open). */
-  refuseOpen?: boolean;
-  /** Wrap the Root in an `ErrorCatcher` that reports to this callback. */
-  boundary?: (error: unknown) => void;
-  /** Wrap everything in a Suspense boundary (above the Root). */
-  suspense?: boolean;
-  modal?: boolean;
-  trigger?: Partial<DialogTriggerProps> | false;
-  popup?: Partial<DialogPopupProps>;
-  /** Popup content; default: a span, a Close button with value "x". */
-  content?: ReactNode;
-  /** Rendered next to the Root (for controlled tests that flip `open` from outside). */
-  outside?: (setOpen: (open: boolean) => void) => ReactNode;
-}
-
-/**
- * Controlled/uncontrolled parity harness. The controlled variant follows "update on success"
- * (`startTransition` after the await, design 2.2); the uncontrolled variant mirrors the value the
- * action saw succeed so both modes expose it the same way.
- */
-function Harness({
-  mode,
-  initialOpen = false,
-  action,
-  catchErrors = false,
-  refuseClose = false,
-  refuseOpen = false,
-  boundary,
-  suspense = false,
-  modal,
-  trigger,
-  popup,
+import {
+  committedText,
   content,
-  outside,
-}: HarnessProps) {
-  const [open, setOpen] = useState(initialOpen);
-
-  const openChangeAction = async (next: boolean, details: DialogOpenChangeDetails) => {
-    try {
-      await action?.(next, details);
-    } catch (error) {
-      if (!catchErrors) throw error;
-      return;
-    }
-    if ((next && refuseOpen) || (!next && refuseClose)) return;
-    startTransition(() => setOpen(next));
-  };
-
-  const rootProps =
-    mode === "static"
-      ? {}
-      : mode === "controlled"
-        ? { open, openChangeAction }
-        : { defaultOpen: initialOpen, openChangeAction };
-
-  let dialog: ReactNode = (
-    <Dialog.Root {...rootProps} modal={modal}>
-      {trigger !== false && (
-        <Dialog.Trigger data-testid="trigger" {...trigger}>
-          Open
-        </Dialog.Trigger>
-      )}
-      <Dialog.Popup data-testid="popup" {...popup}>
-        <Dialog.Title data-testid="title">Edit profile</Dialog.Title>
-        <Dialog.Description data-testid="description">Saved to your account.</Dialog.Description>
-        {content ?? (
-          <>
-            <span data-testid="content">content</span>
-            <Dialog.Close data-testid="close" value="x">
-              Cancel
-            </Dialog.Close>
-          </>
-        )}
-      </Dialog.Popup>
-    </Dialog.Root>
-  );
-  if (boundary) dialog = <ErrorCatcher onError={boundary}>{dialog}</ErrorCatcher>;
-
-  const body = (
-    <>
-      <button type="button" data-testid="elsewhere">
-        Elsewhere
-      </button>
-      {dialog}
-      {outside?.((next) => startTransition(() => setOpen(next)))}
-      <output data-testid="committed">{String(open)}</output>
-    </>
-  );
-  return suspense ? (
-    <Suspense fallback={<span data-testid="fallback">loading</span>}>{body}</Suspense>
-  ) : (
-    body
-  );
-}
-
-const trigger = () => screen.getByTestId("trigger");
-const popup = () => screen.getByTestId("popup") as HTMLDialogElement;
-const content = () => screen.queryByTestId("content");
-const committedText = () => screen.getByTestId("committed").textContent;
-
-function spyShowModal() {
-  return vi.spyOn(HTMLDialogElement.prototype, "showModal");
-}
-function spyClose() {
-  return vi.spyOn(HTMLDialogElement.prototype, "close");
-}
-
-/** Opens a library-mode dialog through the Trigger and waits for it to be shown. */
-async function openThroughTrigger(user: ReturnType<typeof setupUser>) {
-  await user.click(trigger());
-  await flushTasks(2);
-}
+  Harness,
+  openThroughTrigger,
+  popup,
+  spyClose,
+  spyShowModal,
+  trigger,
+} from "../__tests__/dialog-harness.js";
+import type { ActionFn } from "../__tests__/dialog-harness.js";
+import { describeOverlayOpenState } from "../__tests__/overlay-open-state-suite.js";
 
 afterEach(() => {
   // Restored here as well as in the setup file: the DOM is cleared below with real methods.
   vi.restoreAllMocks();
   document.body.innerHTML = "";
+});
+
+describeOverlayOpenState<DialogOpenChangeDetails>({
+  name: "Dialog",
+  Harness,
+  isOpen: () => popup().open,
+  spyOpen: spyShowModal,
+  spyClose,
+  openArgs: () => [],
+  dismiss: (value) => popup().requestClose(value),
+  dismissEvent: "close",
+  partClose: (user) => user.click(screen.getByTestId("close")),
+  partCloseArgs: ["x"],
+  returnValue: true,
+  detailsKeys: ["reason", "returnValue"],
+  triggerToggles: false,
+  ariaExpanded: false,
+  foreignOpen: () => dispatchCommand(popup(), "show-modal", screen.getByTestId("elsewhere")),
+  foreignOpenCallsOpen: false,
+  openBeforeHydration: (element) => element.setAttribute("open", ""),
+  controlledOpenArgs: [],
+  controlledCloseArgs: [""],
+  closeIntents: {
+    render: (probe) => (
+      <Dialog.Root>
+        <Dialog.Popup data-testid="popup" aria-label="Probe">
+          {probe}
+        </Dialog.Popup>
+      </Dialog.Root>
+    ),
+    useIntents: () => use(DialogContext)!,
+    open: (element) => (element as HTMLDialogElement).showModal(),
+  },
 });
 
 describe("Dialog", () => {
@@ -338,38 +244,6 @@ describe("Dialog", () => {
       await user.click(trigger());
       expect(popup().open).toBe(false);
     });
-
-    // Close intents are recorded only in JS-free mode (a native close command, a Close with
-    // `action`, a `method="dialog"` submit), where nothing reports them, so the stale-intent clear
-    // (design/components/popover.md 2.3, through the Root's `isShown`: `dialog.open`, not
-    // `:popover-open`) is pinned on the context itself.
-    it("a close intent is dropped a task later while the dialog stays open, kept once closed", async () => {
-      let ctx: DialogContextValue | null = null;
-      function Probe() {
-        ctx = use(DialogContext);
-        return null;
-      }
-      render(
-        <Dialog.Root>
-          <Dialog.Popup data-testid="popup" aria-label="Probe">
-            <Probe />
-          </Dialog.Popup>
-        </Dialog.Root>,
-      );
-      const root = ctx! as DialogContextValue;
-      act(() => popup().showModal());
-      // A close that was cancelled (a prevented `cancel`): the dialog is still open.
-      root.recordCloseIntent({ reason: "activate", event: undefined });
-      await flushTasks(1);
-      expect(root.takeCloseIntent()).toBeUndefined();
-      // A closed dialog: the intent is not stale (it waits for its `close` event).
-      act(() => popup().close());
-      await flushTasks(1);
-      const intent = { reason: "activate", event: undefined } as const;
-      root.recordCloseIntent(intent);
-      await flushTasks(1);
-      expect(root.takeCloseIntent()).toBe(intent);
-    });
   });
 
   describe("keyboard", () => {
@@ -417,152 +291,7 @@ describe("Dialog", () => {
     });
   });
 
-  renderBoth("sync action", (mode) => {
-    it("a Trigger click dispatches (true, details) with the native click, cancelled", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      await user.click(trigger());
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toBe(true);
-      expect(details.reason).toBe("activate");
-      expect(details.returnValue).toBeUndefined();
-      expect(details.event).toBeInstanceOf(MouseEvent);
-      expect(details.event!.type).toBe("click");
-      // The command was cancelled: the library opens the dialog, not the browser.
-      expect(details.event!.defaultPrevented).toBe(true);
-      // `details` is serialisable; `event` is virtual (conventions 2.2).
-      expect(Object.keys(details).sort()).toEqual(["reason", "returnValue"]);
-      await flushTasks(2);
-      expect(popup().open).toBe(true);
-      expect(committedText()).toBe("true");
-    });
-
-    it("a disabled Trigger never dispatches", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} trigger={{ disabled: true }} />);
-      await user.click(trigger());
-      fireEvent.click(trigger());
-      await flushTasks(2);
-      expect(action).not.toHaveBeenCalled();
-      expect(popup().open).toBe(false);
-      expect(trigger()).toHaveAttribute("data-disabled", "");
-    });
-
-    it("a click while optimistically open never dispatches", async () => {
-      const user = setupUser();
-      const d = deferred();
-      const action = vi.fn<ActionFn>(() => d.promise);
-      render(<Harness mode={mode} action={action} />);
-      await user.click(trigger());
-      await user.click(trigger());
-      expect(action).toHaveBeenCalledTimes(1);
-      await act(async () => d.resolve());
-      await flushTasks(2);
-    });
-
-    it("a foreign show-modal command is cancelled and dispatched with the CommandEvent", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      const source = screen.getByTestId("elsewhere");
-      let event!: Event;
-      await act(async () => {
-        event = dispatchCommand(popup(), "show-modal", source);
-      });
-      expect(event.defaultPrevented).toBe(true);
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(action.mock.calls[0]![1].event).toBe(event);
-      expect(action.mock.calls[0]![1].reason).toBe("activate");
-      await flushTasks(2);
-      expect(popup().open).toBe(true);
-    });
-  });
-
   renderBoth("async action", (mode) => {
-    it("open: pending Trigger, dialog closed and content unmounted until it resolves", async () => {
-      const user = setupUser();
-      const showModal = spyShowModal();
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} />);
-      await user.click(trigger());
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expectPending(trigger());
-      expect(showModal).not.toHaveBeenCalled();
-      expect(popup().open).toBe(false);
-      expect(content()).toBeNull();
-      await act(async () => d.resolve());
-      expect(showModal).toHaveBeenCalledTimes(1);
-      expect(popup().open).toBe(true);
-      expect(content()).toBeInTheDocument();
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expectNotPending(trigger());
-    });
-
-    it("close: a dismiss notifies (false, { reason: 'dismiss', returnValue }) and shows pending", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      await openThroughTrigger(user);
-      const d = deferred();
-      action.mockImplementation(() => d.promise);
-      await act(async () => popup().requestClose("x"));
-      // Closed natively and at once; the notification follows the `close` event.
-      expect(popup().open).toBe(false);
-      await flushTasks(2);
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe(false);
-      expect(details.reason).toBe("dismiss");
-      expect(details.returnValue).toBe("x");
-      expect(details.event!.type).toBe("close");
-      expectPending(trigger());
-      expect(trigger()).not.toHaveAttribute("data-open");
-      expect(content()).toBeInTheDocument(); // committed is still true
-      await act(async () => d.resolve());
-      expectNotPending(trigger());
-      expect(content()).toBeNull();
-      expect(committedText()).toBe("false");
-      expect(popup().open).toBe(false);
-    });
-
-    it("close: the Close part is library-owned: openChangeAction(false) awaited, then close(value)", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      await openThroughTrigger(user);
-      const d = deferred();
-      action.mockImplementation(() => d.promise);
-      const close = spyClose();
-      await user.click(screen.getByTestId("close"));
-      // The click was cancelled (no `request-close` command); the Root dispatched.
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe(false);
-      expect(details.reason).toBe("activate");
-      expect(details.returnValue).toBe("x");
-      expect(details.event!.type).toBe("click");
-      expect(details.event!.defaultPrevented).toBe(true);
-      // Still open while the action runs; the Trigger shows the Root's pending.
-      expect(popup().open).toBe(true);
-      expect(close).not.toHaveBeenCalled();
-      expect(content()).toBeInTheDocument();
-      expectPending(trigger());
-      expect(trigger()).not.toHaveAttribute("data-open");
-      await act(async () => d.resolve());
-      expect(close).toHaveBeenCalledTimes(1);
-      expect(close).toHaveBeenCalledWith("x");
-      expect(popup().open).toBe(false);
-      expect(popup().returnValue).toBe("x");
-      expect(committedText()).toBe("false");
-      expectNotPending(trigger());
-      await flushTasks(2);
-      // The `close` event is an echo: no second notification.
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(trigger()).toHaveFocus();
-    });
-
     it("close: a method='dialog' submit is 'activate' with the submitter's value", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
@@ -590,25 +319,6 @@ describe("Dialog", () => {
       expect(details.event!.type).toBe("submit");
     });
 
-    it("a commit between the native close and its `close` event does not re-open", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      const { rerender } = render(<Harness mode={mode} action={action} />);
-      await openThroughTrigger(user);
-      const showModal = spyShowModal();
-      await act(async () => {
-        popup().close("x");
-        // A re-render of the Root lands before the queued `close` event.
-        rerender(<Harness mode={mode} action={action} popup={{ className: "re-rendered" }} />);
-      });
-      expect(popup()).toHaveClass("re-rendered");
-      expect(popup().open).toBe(false);
-      await flushTasks(2);
-      expect(showModal).not.toHaveBeenCalled();
-      expect(popup().open).toBe(false);
-      expect(action).toHaveBeenLastCalledWith(false, expect.anything());
-    });
-
     it("a Close part's close is not a close request: `cancel` neither fires nor blocks it", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
@@ -620,243 +330,7 @@ describe("Dialog", () => {
       // The veto point of a part's close is openChangeAction, not `cancel` (design 7).
       expect(onCancel).not.toHaveBeenCalled();
       expect(popup().open).toBe(false);
-      // A later dismissal is labelled as one (no stale intent from the part's close).
-      await openThroughTrigger(user);
-      await act(async () => popup().close());
-      await flushTasks(2);
-      expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
-        [true, "activate"],
-        [false, "activate"],
-        [true, "activate"],
-        [false, "dismiss"],
-      ]);
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("open rejects: the boundary gets it, the dialog never opened, no data-open", async () => {
-      const user = setupUser();
-      silenceErrors();
-      const showModal = spyShowModal();
-      const d = deferred();
-      const caught = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={caught} />);
-      await user.click(trigger());
-      expect(trigger()).toHaveAttribute("data-open", "");
-      await act(async () => d.reject(new Error("nope")));
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "nope" }));
-      expect(showModal).not.toHaveBeenCalled();
-      expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
-    });
-
-    it("open rejects, caught inside: resolves, commits, opens", async () => {
-      const user = setupUser();
-      render(
-        <Harness
-          mode={mode}
-          catchErrors
-          action={async () => {
-            throw new Error("handled");
-          }}
-        />,
-      );
-      await openThroughTrigger(user);
-      // A swallowed error is success: uncontrolled commits; the controlled harness returns early
-      // (does not adopt) so it stays closed.
-      if (mode === "uncontrolled") expect(popup().open).toBe(true);
-      else expect(popup().open).toBe(false);
-      if (mode === "uncontrolled") expect(trigger()).toHaveAttribute("data-open", "");
-      else expect(trigger()).not.toHaveAttribute("data-open");
-    });
-
-    it("close notification rejects: the boundary gets it (the dialog was already closed)", async () => {
-      const user = setupUser();
-      silenceErrors();
-      const caught = vi.fn();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} boundary={caught} />);
-      await openThroughTrigger(user);
-      action.mockImplementation(async () => {
-        throw new Error("save failed");
-      });
-      await act(async () => popup().requestClose());
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
-    });
-
-    it("close notification rejects, caught inside: commits false in uncontrolled mode", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} catchErrors />);
-      await openThroughTrigger(user);
-      action.mockImplementation(async () => {
-        throw new Error("handled");
-      });
-      const showModal = spyShowModal();
-      await act(async () => popup().requestClose());
-      await flushTasks(2);
-      if (mode === "uncontrolled") {
-        expect(popup().open).toBe(false);
-        expect(showModal).not.toHaveBeenCalled();
-      } else {
-        // The controlled harness does not adopt `false` on failure: the dialog re-opens.
-        expect(popup().open).toBe(true);
-        expect(showModal).toHaveBeenCalledTimes(1);
-      }
-    });
-  });
-
-  describe("refused close (controlled)", () => {
-    it("re-opens the dialog after the notification settles; not a veto", async () => {
-      const user = setupUser();
-      const d = deferred();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="controlled" action={action} refuseClose />);
-      await openThroughTrigger(user);
-      const showModal = spyShowModal();
-      action.mockImplementation(() => d.promise);
-      await act(async () => popup().requestClose());
-      expect(popup().open).toBe(false);
-      await flushTasks(2);
-      expectPending(trigger());
-      expect(showModal).not.toHaveBeenCalled();
-      await act(async () => d.resolve());
-      expect(showModal).toHaveBeenCalledTimes(1);
-      expect(popup().open).toBe(true);
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expectNotPending(trigger());
-    });
-
-    it("a vetoed open snaps back and the dialog never opens", async () => {
-      const user = setupUser();
-      const showModal = spyShowModal();
-      const d = deferred();
-      render(<Harness mode="controlled" action={() => d.promise} refuseOpen />);
-      await user.click(trigger());
-      expect(trigger()).toHaveAttribute("data-open", "");
-      await act(async () => d.resolve());
-      expect(trigger()).not.toHaveAttribute("data-open");
-      expect(showModal).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("overlap (walkthrough 11.8)", () => {
-    renderBoth("close pending, user re-opens", (mode) => {
-      it("both actions run; the latest intent wins", async () => {
-        const user = setupUser();
-        const action = vi.fn<ActionFn>();
-        render(<Harness mode={mode} action={action} />);
-        await openThroughTrigger(user);
-        const closing = deferred();
-        const opening = deferred();
-        action.mockImplementationOnce(() => closing.promise);
-        action.mockImplementationOnce(() => opening.promise);
-        const showModal = spyShowModal();
-        await act(async () => popup().requestClose());
-        await flushTasks(2);
-        expect(trigger()).not.toHaveAttribute("data-open");
-        await user.click(trigger());
-        expect(action).toHaveBeenCalledTimes(3);
-        expect(action.mock.calls[2]![0]).toBe(true);
-        expect(trigger()).toHaveAttribute("data-open", "");
-        // Optimistic and committed are both `true` (the close never committed), yet the Root is
-        // pending and the dialog is closed: the Trigger shows it.
-        expectPending(trigger());
-        expect(popup().open).toBe(false);
-        // Resolve out of order: the open first, then the superseded close.
-        await act(async () => opening.resolve());
-        await act(async () => closing.resolve());
-        await flushTasks(2);
-        expectNotPending(trigger());
-        if (mode === "uncontrolled") {
-          // The latest-dispatch guard ignores the superseded close.
-          expect(trigger()).toHaveAttribute("data-open", "");
-          expect(popup().open).toBe(true);
-          expect(showModal).toHaveBeenCalledTimes(1);
-          expect(content()).toBeInTheDocument();
-        } else {
-          // A controlled parent that adopts every resolution in arrival order ends with the
-          // slower one (conventions 2.5: the guard is the parent's job in controlled mode); the
-          // DOM follows the parent.
-          expect(committedText()).toBe("false");
-          expect(trigger()).not.toHaveAttribute("data-open");
-          expect(popup().open).toBe(false);
-        }
-      });
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    async function setup() {
-      const user = setupUser();
-      silenceErrors();
-      const caught = vi.fn();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} boundary={caught} />);
-      await openThroughTrigger(user);
-      const closing = deferred();
-      const opening = deferred();
-      action.mockImplementationOnce(() => closing.promise);
-      action.mockImplementationOnce(() => opening.promise);
-      await act(async () => popup().requestClose());
-      await flushTasks(2);
-      await user.click(trigger());
-      return { caught, closing, opening };
-    }
-
-    it("the older dispatch rejects after the newer resolved: the boundary gets it", async () => {
-      const { caught, closing, opening } = await setup();
-      await act(async () => opening.resolve());
-      await act(async () => closing.reject(new Error("older")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
-    });
-
-    it("the older dispatch rejects while the newer is pending: the boundary gets it", async () => {
-      const { caught, closing, opening } = await setup();
-      await act(async () => closing.reject(new Error("older")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
-      await act(async () => opening.resolve());
-    });
-  });
-
-  renderBoth("suspending content", (mode) => {
-    it("keeps the dialog closed and the Trigger pending until the content is ready", async () => {
-      const user = setupUser();
-      const showModal = spyShowModal();
-      const suspender = createSuspender();
-      render(<Harness mode={mode} suspense content={<suspender.Suspender value="details" />} />);
-      await user.click(trigger());
-      await flushTasks(2);
-      expect(showModal).not.toHaveBeenCalled();
-      expect(popup().open).toBe(false);
-      expectPending(trigger());
-      expect(screen.queryByTestId("fallback")).toBeNull();
-      await act(async () => suspender.resolve("details", "Order details"));
-      expect(showModal).toHaveBeenCalledTimes(1);
-      expect(popup().open).toBe(true);
-      expect(screen.getByTestId("suspender")).toHaveTextContent("Order details");
-      expectNotPending(trigger());
-    });
-
-    it("keepMounted: content is pre-rendered hidden inside <Activity>", async () => {
-      const user = setupUser();
-      const suspender = createSuspender();
-      suspender.resolve("details", "Ready");
-      render(
-        <Harness
-          mode={mode}
-          popup={{ keepMounted: true }}
-          content={<suspender.Suspender value="details" />}
-        />,
-      );
-      await flushTasks(2);
-      const hidden = screen.getByTestId("suspender");
-      expect(hidden).not.toBeVisible();
-      await openThroughTrigger(user);
-      expect(screen.getByTestId("suspender")).toBe(hidden); // same DOM node: state preserved
-      expect(hidden).toBeVisible();
+      // A later dismissal being labelled as one is a suite row ("close intents").
     });
   });
 
@@ -1080,121 +554,6 @@ describe("Dialog", () => {
       await flushTasks(2);
       expect(content()).toBeNull();
       expect(trigger()).not.toHaveAttribute("data-open");
-    });
-  });
-
-  describe("platform path", () => {
-    async function hydrate(ui: ReactNode) {
-      const container = document.createElement("div");
-      container.innerHTML = renderToString(ui);
-      document.body.append(container);
-      // A click before hydration ran `show-modal` natively.
-      container.querySelector("dialog")!.setAttribute("open", "");
-      return render(ui, { container, hydrate: true });
-    }
-
-    renderBoth("pre-hydration open", (mode) => {
-      it("one dispatch with reason 'platform' and no event; accepted: content mounts", async () => {
-        silenceErrors();
-        const showModal = spyShowModal();
-        const action = vi.fn<ActionFn>();
-        await act(async () => {
-          await hydrate(<Harness mode={mode} action={action} />);
-        });
-        await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(1);
-        const [next, details] = action.mock.calls[0]!;
-        expect(next).toBe(true);
-        expect(details.reason).toBe("platform");
-        expect(details.event).toBeUndefined();
-        expect(details.returnValue).toBeUndefined();
-        expect(content()).toBeInTheDocument();
-        expect(popup().open).toBe(true);
-        expect(showModal).not.toHaveBeenCalled();
-      });
-
-      it("StrictMode still dispatches once", async () => {
-        silenceErrors();
-        const action = vi.fn<ActionFn>();
-        await act(async () => {
-          await hydrate(
-            <StrictMode>
-              <Harness mode={mode} action={action} />
-            </StrictMode>,
-          );
-        });
-        await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(1);
-      });
-
-      it("rejected: the dialog is closed again and no close notification follows", async () => {
-        silenceErrors();
-        const close = spyClose();
-        const action = vi.fn<ActionFn>(async (next) => {
-          if (next) throw new Error("not now");
-        });
-        await act(async () => {
-          await hydrate(<Harness mode={mode} action={action} catchErrors />);
-        });
-        await flushTasks(2);
-        if (mode === "controlled") {
-          expect(close).toHaveBeenCalledTimes(1);
-          expect(popup().open).toBe(false);
-          expect(action).toHaveBeenCalledTimes(1); // the echo did not dispatch
-        } else {
-          // Uncontrolled: a caught error is success, so it commits `true` and stays open.
-          expect(popup().open).toBe(true);
-        }
-      });
-    });
-
-    it("controlled parent refusing the pre-hydration open closes the dialog", async () => {
-      silenceErrors();
-      const close = spyClose();
-      const action = vi.fn<ActionFn>();
-      await act(async () => {
-        await hydrate(<Harness mode="controlled" action={action} refuseOpen />);
-      });
-      await flushTasks(2);
-      expect(close).toHaveBeenCalledTimes(1);
-      expect(popup().open).toBe(false);
-      expect(action).toHaveBeenCalledTimes(1);
-    });
-
-    it("a controlled `open` flipped programmatically calls showModal / close, no echo dispatch", async () => {
-      const showModal = spyShowModal();
-      const close = spyClose();
-      const action = vi.fn<ActionFn>();
-      let setOpen!: (open: boolean) => void;
-      render(
-        <Harness
-          mode="controlled"
-          action={action}
-          trigger={false}
-          outside={(set) => {
-            setOpen = set;
-            return null;
-          }}
-        />,
-      );
-      await act(async () => setOpen(true));
-      expect(showModal).toHaveBeenCalledTimes(1);
-      expect(popup().open).toBe(true);
-      await act(async () => setOpen(false));
-      expect(close).toHaveBeenCalledTimes(1);
-      expect(close).toHaveBeenCalledWith(""); // no part's value: a controlled close
-      expect(popup().open).toBe(false);
-      await flushTasks(2);
-      expect(action).not.toHaveBeenCalled();
-      expect(content()).toBeNull();
-    });
-
-    it("defaultOpen opens after mount", async () => {
-      const showModal = spyShowModal();
-      render(<Harness mode="uncontrolled" initialOpen />);
-      expect(showModal).toHaveBeenCalledTimes(1);
-      expect(popup().open).toBe(true);
-      expect(content()).toBeInTheDocument();
     });
   });
 
@@ -1661,25 +1020,6 @@ describe("Dialog", () => {
 
   describe("library-owned part-initiated closes (#46)", () => {
     renderBoth("Close part", (mode) => {
-      it("openChangeAction(false) rejects uncaught: the boundary above Root gets it, close() never ran", async () => {
-        const user = setupUser();
-        silenceErrors();
-        const caught = vi.fn();
-        const action = vi.fn<ActionFn>();
-        render(<Harness mode={mode} action={action} boundary={caught} />);
-        await openThroughTrigger(user);
-        const close = spyClose();
-        const d = deferred();
-        action.mockImplementation(() => d.promise);
-        await user.click(screen.getByTestId("close"));
-        expect(popup().open).toBe(true);
-        await act(async () => d.reject(new Error("keep it")));
-        expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "keep it" }));
-        // Nothing was closed by the library; the boundary replaced the whole component.
-        expect(close).not.toHaveBeenCalled();
-        expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
-      });
-
       it("with action: openChangeAction(false) runs after the action; the Close stays pending until the close commits", async () => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
@@ -1723,55 +1063,6 @@ describe("Dialog", () => {
         expect(popup().open).toBe(false);
         expectNotPending(trigger());
       });
-
-      it("a dismissal during a pending part-initiated close notifies nothing more (walkthrough 11.13)", async () => {
-        const user = setupUser();
-        const action = vi.fn<ActionFn>();
-        render(<Harness mode={mode} action={action} />);
-        await openThroughTrigger(user);
-        const closing = deferred();
-        action.mockImplementation(() => closing.promise);
-        const close = spyClose();
-        await user.click(screen.getByTestId("close"));
-        expect(popup().open).toBe(true);
-        // Escape while openChangeAction(false) runs: the platform closes at once.
-        await act(async () => popup().requestClose());
-        await flushTasks(2);
-        expect(popup().open).toBe(false);
-        close.mockClear();
-        await act(async () => closing.resolve());
-        await flushTasks(2);
-        expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
-          [true, "activate"],
-          [false, "activate"],
-        ]);
-        // The apply effect found the dialog closed: no second close().
-        expect(close).not.toHaveBeenCalled();
-        expect(popup().open).toBe(false);
-        expect(content()).toBeNull();
-      });
-    });
-
-    it("a controlled parent that keeps `open` vetoes a part's close: snap-back, nothing closed (11.14)", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      const showModal = spyShowModal();
-      render(<Harness mode="controlled" action={action} refuseClose />);
-      await openThroughTrigger(user);
-      showModal.mockClear();
-      const close = spyClose();
-      const d = deferred();
-      action.mockImplementation(() => d.promise);
-      await user.click(screen.getByTestId("close"));
-      expect(trigger()).not.toHaveAttribute("data-open");
-      await act(async () => d.resolve());
-      await flushTasks(2);
-      expect(close).not.toHaveBeenCalled();
-      expect(showModal).not.toHaveBeenCalled(); // never blinked
-      expect(popup().open).toBe(true);
-      expect(content()).toBeInTheDocument();
-      expect(trigger()).toHaveAttribute("data-open", "");
-      expectNotPending(trigger());
     });
 
     it("a vetoed close's returnValue does not leak into a later controlled close", async () => {

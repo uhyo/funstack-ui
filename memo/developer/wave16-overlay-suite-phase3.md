@@ -1,0 +1,69 @@
+# Wave 16, overlay open-state suite, phase 3 (#106, tracker #100)
+
+Branch `wave16/overlay-suite`. Audit `memo/reviewer/refactor-audit-tests.md` T8, T16 leftovers
+(Dialog's history-named sections, long titles), T7.
+
+New shared modules (`packages/ui/src/__tests__/`):
+- `overlay-open-state-suite.tsx`: `createOverlayHarness` (the controlled/uncontrolled/static parity
+  harness every overlay file had a copy of) and `describeOverlayOpenState(config)`, the suite. The
+  driver: `isOpen`, `spyOpen` / `spyClose`, `dismiss(value?)` (the platform close), `partClose(user)`
+  (a library-owned close by a click), the details shape (`detailsKeys`, `returnValue`), flags
+  (`triggerToggles`, `ariaExpanded`), `foreignOpen`, `openBeforeHydration`, the call arguments of
+  the library's open / close, and `closeIntents` (the stale-intent probe, JS-free components only).
+- `dialog-harness.tsx`: the Dialog harness and queries, shared by the dialog*.test.tsx files.
+
+## T20 guard rail: titles removed or renamed, and where they are now
+
+Lists from the JSON reporter (`titles.mjs` in my scratchpad): file > full name. `S:` below stands
+for `<Component> open state (shared overlay suite)`. Where a suite row runs in both modes the
+`(uncontrolled)` / `(controlled)` pair maps one to one.
+
+### Commit 1: suite + Dialog (dialog.test.tsx 183 -> 187 tests)
+
+| Removed (Dialog > ...) | Now (Dialog S: ...) |
+| --- | --- |
+| sync action (both) a Trigger click dispatches (true, details) with the native click, cancelled | sync action (both) same title |
+| sync action (both) a disabled Trigger never dispatches | sync action (both) same title |
+| sync action (both) a click while optimistically open never dispatches | sync action (both) same title (`triggerToggles: false`) |
+| sync action (both) a foreign show-modal command is cancelled and dispatched with the CommandEvent | sync action (both) a foreign open is cancelled and dispatched with its event (driver `foreignOpen` = the show-modal command) |
+| async action (both) open: pending Trigger, dialog closed and content unmounted until it resolves | async action (both) open: pending Trigger, popup closed and content unmounted until it resolves (+ `showModal` called with no args) |
+| async action (both) close: a dismiss notifies (false, { reason: 'dismiss', returnValue }) and shows pending | async action (both) dismissal: notified as (false, 'dismiss') with the platform's event; pending meanwhile |
+| async action (both) close: the Close part is library-owned: openChangeAction(false) awaited, then close(value) | async action (both) part-initiated close: library-owned, open while openChangeAction(false) runs, closed on resolve (+ the pending state re-checked after two tasks, content gone after the close) |
+| async action (both) a commit between the native close and its `close` event does not re-open | async action (both) a commit between the platform's close and its event does not re-open (the close is `requestClose()` now, was `close("x")`: both are platform closes the library did not start) |
+| async action (both) a Close part's close is not a close request ... | stays (same title); its tail "a later dismissal is labelled as one" moved to S: close intents > a part-initiated close, then a dismissal (both) > the dismissal is reported as 'dismiss' (no stale intent from the part's close) (dismissal by `requestClose()`, was `close()`) |
+| rejection (both) open rejects: the boundary gets it, the dialog never opened, no data-open | rejection (both) open rejects: the boundary gets it, the popup never opened, no data-open |
+| rejection (both) open rejects, caught inside: resolves, commits, opens | rejection (both) open rejects, caught inside: resolves and commits (uncontrolled opens) |
+| rejection (both) close notification rejects: the boundary gets it (the dialog was already closed) | rejection (both) dismissal notification rejects: the boundary gets it (the popup was already closed) |
+| rejection (both) close notification rejects, caught inside: commits false in uncontrolled mode | rejection (both) dismissal notification rejects, caught inside: uncontrolled stays closed, controlled re-opens |
+| library-owned part-initiated closes (#46) > Close part (both) openChangeAction(false) rejects uncaught: the boundary above Root gets it, close() never ran | rejection (both) part-initiated close rejects: the boundary gets it, the library never closed the popup |
+| library-owned part-initiated closes (#46) > Close part (both) a dismissal during a pending part-initiated close notifies nothing more (walkthrough 11.13) | async action (both) same title |
+| library-owned part-initiated closes (#46) > a controlled parent that keeps `open` vetoes a part's close: snap-back, nothing closed (11.14) | controlled refusal and veto > a refused part-initiated close is a real veto: never closed, data-open snaps back (11.14) |
+| refused close (controlled) > re-opens the dialog after the notification settles; not a veto | controlled refusal and veto > a refused dismissal re-opens the popup once the notification settles; not a veto |
+| refused close (controlled) > a vetoed open snaps back and the dialog never opens | controlled refusal and veto > a vetoed open snaps back and the popup never opens |
+| overlap (walkthrough 11.8) > close pending, user re-opens (both) both actions run; the latest intent wins | overlap > dismissal notification pending, the user re-opens (walkthrough 11.8) (both) same title |
+| superseded rejection (both) the older dispatch rejects after the newer resolved / while the newer is pending | superseded rejection > a dismissal, then a re-open (both) same titles |
+| suspending content (both) keeps the dialog closed and the Trigger pending until the content is ready | suspending content (both) keeps the popup closed and the Trigger pending until the content is ready |
+| suspending content (both) keepMounted: content is pre-rendered hidden inside <Activity> | suspending content (both) same title |
+| platform path > pre-hydration open (both) one dispatch with reason 'platform' ...; StrictMode still dispatches once; rejected: the dialog is closed again and no close notification follows | platform path > pre-hydration open (both) same titles ("the popup is closed again"); the spies are now created after the native pre-open, right before hydration |
+| platform path > controlled parent refusing the pre-hydration open closes the dialog | platform path > a controlled parent refusing the pre-hydration open closes it, with no notification |
+| platform path > a controlled `open` flipped programmatically calls showModal / close, no echo dispatch | platform path > a controlled `open` flipped programmatically opens and closes, no echo dispatch (+ `showModal` called with no args) |
+| platform path > defaultOpen opens after mount | platform path > defaultOpen opens after mount |
+| JS-free mode > a close intent is dropped a task later while the dialog stays open, kept once closed | close intents > an intent is dropped a task later while the popup stays open, kept once closed (the close is `requestClose()`, was `close()`; + `isOpen` false asserted) |
+
+New for Dialog (rows Popover had): rejection (both) part-initiated close rejects, caught inside:
+uncontrolled closes, controlled stays; close intents (both) as above (split from the Close row).
+
+Mutations (library source edited in the worktree, run, reverted with `git checkout`):
+1. dialog-popup.tsx: a dismissal without intent reported as `"activate"`: 11 failures, including S:
+   dismissal (both) and S: close intents (both).
+2. use-controllable-action.ts: the uncontrolled latest-dispatch guard dropped: 3 failures, including
+   S: overlap (uncontrolled).
+3. use-overlay-root.ts: a stale intent never cleared: S: close intents > an intent is dropped ...
+   fails (only that row).
+4. dialog-root.tsx: `details` without `returnValue`: 31 failures, including S: sync action (both)
+   (details keys), part-initiated close (both), dismissal (both).
+5. dialog-close.tsx: the Close part closes the dialog before openChangeAction(false) settles (no
+   revert possible): 15 failures, including S: part-initiated close (both), 11.13 (both), part close
+   rejects (both) and the 11.14 veto row.
+(Tried first: removing the apply effect's `openDialog` branch: 108 failures, too broad to tell
+anything; replaced by 5.)
