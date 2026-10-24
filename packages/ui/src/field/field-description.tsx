@@ -1,10 +1,9 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { useFieldContext } from "../internal/field-context.js";
+import { fieldDataAttributes, useFieldContext } from "../internal/field-context.js";
 import type { FieldState } from "../internal/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
-import { fieldDataAttributes } from "./field-root.js";
 
 export interface FieldDescriptionProps extends Omit<
   ComponentPropsWithRef<"p">,

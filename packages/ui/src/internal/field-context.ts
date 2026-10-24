@@ -1,5 +1,6 @@
 "use client";
 import { createContext, use } from "react";
+import { dataAttr } from "./data-attr.js";
 import type { FieldValidity, FormErrors, ValidatableElement } from "./validity.js";
 
 /** The state every Field part receives (design/components/field-form.md 4.1). */
@@ -101,3 +102,13 @@ export interface FormContextValue {
 }
 
 export const FormContext = createContext<FormContextValue | null>(null);
+
+/** The four state attributes every Field part renders (design 6.1). */
+export function fieldDataAttributes(state: FieldState) {
+  return {
+    "data-invalid": dataAttr(state.invalid),
+    "data-disabled": dataAttr(state.disabled),
+    "data-required": dataAttr(state.required),
+    "data-pending": dataAttr(state.pending),
+  };
+}

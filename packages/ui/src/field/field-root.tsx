@@ -11,8 +11,7 @@ import {
 } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { useFormStatus } from "react-dom";
-import { dataAttr } from "../internal/data-attr.js";
-import { FieldContext, FormContext } from "../internal/field-context.js";
+import { FieldContext, fieldDataAttributes, FormContext } from "../internal/field-context.js";
 import type {
   FieldContextValue,
   FieldControlRegistration,
@@ -493,13 +492,3 @@ export function FieldRoot({
 }
 
 FieldRoot.displayName = "FieldRoot";
-
-/** The four state attributes every Field part renders (design 6.1). */
-export function fieldDataAttributes(state: FieldState) {
-  return {
-    "data-invalid": dataAttr(state.invalid),
-    "data-disabled": dataAttr(state.disabled),
-    "data-required": dataAttr(state.required),
-    "data-pending": dataAttr(state.pending),
-  };
-}

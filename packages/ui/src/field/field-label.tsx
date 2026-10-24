@@ -1,11 +1,10 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { useFieldContext } from "../internal/field-context.js";
+import { fieldDataAttributes, useFieldContext } from "../internal/field-context.js";
 import type { FieldState } from "../internal/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
-import { fieldDataAttributes } from "./field-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
