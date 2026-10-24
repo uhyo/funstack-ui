@@ -2291,6 +2291,17 @@ is on `details.event.source` instead. Focus: the platform's lost-interest hide a
 `hidePopover()` both run the "focus previous element" steps, so a focus-driven interest open
 closed by blur leaves focus where the user moved it, and a hover open never moved focus unless
 `initialFocus` / the dialog focusing steps did, which behave as for any library open (6.1).
+**The lost-interest hide skips the 6.2 rule-2 fallback** (developer finding, dev-127): when
+the dialog focusing steps had moved focus into the popup and nothing was focused before the
+hover open, `hidePopover()` leaves focus on `<body>`, and the fallback's `focus()` on the Trigger
+would grant a Trigger that carries `interestfor` interest by focus, re-opening the popup the user
+just left (measured: hide, `toggle(closed)`, focus return, `interest`, re-open, in one frame).
+The platform's own lost-interest hide restores only the previously focused element (which the
+`hidePopover()` call already does when focus is inside) and never focuses the invoker, so the
+library does the same here: a flag set in the task before `hidePopover()` and consumed by
+`onToggle(closed)` suppresses the Trigger fallback for this one hide; a foreign button's hide
+behaves identically (focus to the previous element, else `<body>`). Nested interest-opened
+popups therefore leave focus on `<body>` after a lost-interest hide, as the platform does.
 Other engines: `interestfor` is inert in Firefox and WebKit, so the button does nothing there;
 a consumer who needs the hover card everywhere makes the button the Trigger (click opens in
 every engine, interest adds hover on Chromium). Menu and Combobox inherit the rows (shared
@@ -2317,7 +2328,10 @@ the callback ref and removed in its cleanup; the events exist only where `intere
   interestInvoker.current`; clear `interestInvoker`; return unless `interestOpen.current`. If
   `isPopoverOpen(popup)`: `setTimeout(() => { if (!isPopoverOpen(popup) || !ctx.intended())
   return; ctx.recordCloseIntent({ reason: "dismiss", event }); popup.hidePopover(); }, 0)`,
-  the timer id kept in a ref and cleared on detach. Else if `ctx.intended()`:
+  the timer id kept in a ref and cleared on detach, and an `interestHide` flag set right before
+  `hidePopover()` that `onToggle(closed)` reads and clears to skip `returnFocus` (the 6.2
+  rule-2 Trigger fallback; the platform never focuses the invoker after a lost-interest hide, and
+  focusing a Trigger with `interestfor` re-opens the popup). Else if `ctx.intended()`:
   `interestOpen.current = false; ctx.requestClose(event, "dismiss")` (`PopoverRootValue` has no
   close args). The intent is recorded inside the task right before the hide, so its one-task
   clear (which clears only while the popover is still open) cannot run first.
