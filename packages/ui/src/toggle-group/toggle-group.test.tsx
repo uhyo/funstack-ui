@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -105,10 +105,6 @@ const root = () => screen.getByRole("group");
 const committedText = () => screen.getByTestId("committed");
 const tabStops = () =>
   screen.getAllByRole("button").filter((b) => b.getAttribute("tabindex") === "0");
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("ToggleGroup", () => {
   describe("roles and ARIA (row 1)", () => {

@@ -147,7 +147,6 @@ function expectAnchoredTo(name: string): void {
 }
 
 afterEach(() => {
-  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 

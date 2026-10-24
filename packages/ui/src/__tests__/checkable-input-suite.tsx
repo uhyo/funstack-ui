@@ -8,7 +8,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ComponentType, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import type { SwitchCheckedChangeDetails, SwitchProps, SwitchState } from "../switch/switch.js";
@@ -142,10 +142,6 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
   const committed = () => screen.getByTestId("committed");
   /** Lets queued microtasks (the reset handler) and the resulting renders run. */
   const flush = () => act(async () => {});
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
 
   describe(name, () => {
     describe("roles and ARIA", () => {

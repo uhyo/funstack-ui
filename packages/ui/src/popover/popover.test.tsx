@@ -193,6 +193,8 @@ async function openThroughTrigger(user: ReturnType<typeof setupUser>) {
 }
 
 afterEach(() => {
+  // Restored here as well as in the setup file (which runs after this hook): the loop below
+  // must reach the real `hidePopover`, not a test's spy.
   vi.restoreAllMocks();
   for (const element of document.querySelectorAll("[popover]")) {
     if (element.matches(":popover-open")) (element as HTMLElement).hidePopover();

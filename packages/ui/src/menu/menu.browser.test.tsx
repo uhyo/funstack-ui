@@ -73,7 +73,6 @@ afterEach(async () => {
     if (element.matches(":popover-open")) element.hidePopover();
   }
   for (const cleanup of cleanups.splice(0)) cleanup();
-  vi.restoreAllMocks();
 });
 
 const popupStyle = {

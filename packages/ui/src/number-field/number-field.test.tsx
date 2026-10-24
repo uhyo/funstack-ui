@@ -55,7 +55,6 @@ beforeAll(() => {
 afterEach(() => {
   captured.clear();
   vi.useRealTimers();
-  vi.restoreAllMocks();
   document.documentElement.lang = "";
 });
 

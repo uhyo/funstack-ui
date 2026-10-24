@@ -4,14 +4,10 @@
 import { render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ViewTransitionClass } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { supportsFocusgroup } from "../__tests__/engine.js";
 import { ToggleGroup } from "./index.js";
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 const button = (name: string) => screen.getByRole("button", { name });
 const focused = () => document.activeElement;

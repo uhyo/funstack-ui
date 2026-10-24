@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { StrictMode, useRef, useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { deferred, setupUser } from "../__tests__/helpers.js";
 import { useFormReset } from "./use-form-reset.js";
 
@@ -27,10 +27,6 @@ function Probe({
 
 const probe = () => screen.getByLabelText("probe") as HTMLInputElement;
 const flush = () => act(async () => {});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("useFormReset", () => {
   it("calls onReset in a microtask after the reset, with the reset event", async () => {

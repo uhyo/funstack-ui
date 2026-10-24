@@ -64,7 +64,6 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 afterEach(async () => {
   // Park the real mouse away from any trigger so the next test starts un-hovered.
   await userEvent.unhover(document.body);
-  vi.restoreAllMocks();
 });
 
 describe("JS path (baseline) in a real browser", () => {

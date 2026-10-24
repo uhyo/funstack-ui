@@ -4,7 +4,7 @@
 // `requestClose`. Popover's own behaviour is covered by src/popover/popover.test.tsx.
 import { act, render, screen } from "@testing-library/react";
 import type { Ref, ViewTransitionClass } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { setupUser } from "../__tests__/helpers.js";
 import type { ChangeReason } from "./types.js";
 import { usePopoverPopup } from "./use-popover-popup.js";
@@ -82,10 +82,6 @@ const flush = () =>
   act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("shared popover hooks: Menu's extension points", () => {
   it('mode: "library" without any prop: the Trigger click is intercepted and opens', async () => {

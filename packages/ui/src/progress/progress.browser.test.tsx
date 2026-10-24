@@ -36,7 +36,6 @@ let removeStyles: (() => void) | undefined;
 afterEach(() => {
   removeStyles?.();
   removeStyles = undefined;
-  vi.restoreAllMocks();
 });
 
 function Bar({ value, className = "p" }: { value: number | null; className?: string }) {

@@ -21,7 +21,7 @@ import { act, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -161,10 +161,6 @@ const defaultSelected = () =>
 /** Lets queued microtasks (the reset handler, late reconciliation) and the renders run. */
 const flush = () => act(async () => {});
 const form = () => screen.getByTestId("form") as HTMLFormElement;
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("Select", () => {
   describe("roles and ARIA", () => {

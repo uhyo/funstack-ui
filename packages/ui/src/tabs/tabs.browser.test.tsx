@@ -3,16 +3,12 @@
 // switch reaches `document.startViewTransition` with the Tabs transition types; a real pointer
 // click (mousedown focus, then click) dispatches once.
 import { act, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { supportsFocusgroup } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Tabs } from "./index.js";
 import type { TabsValueChangeDetails } from "./index.js";
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("Tabs.Indicator anchor positioning", () => {
   it("is placed under the optimistic tab and moves before the action resolves", async () => {

@@ -5,7 +5,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { describeCheckableInput } from "../__tests__/checkable-input-suite.js";
 import {
   deferred,
@@ -30,10 +30,6 @@ type ActionFn = (next: boolean, details: CheckboxCheckedChangeDetails) => unknow
 
 const box = () => screen.getByRole("checkbox") as HTMLInputElement;
 const flush = () => act(async () => {});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 /**
  * A "select all"-style parent: `checked` (controlled mode) or `defaultChecked` (uncontrolled) plus

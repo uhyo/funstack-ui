@@ -7,7 +7,7 @@ import { act, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, createContext, startTransition, use, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { deferred, renderBoth, setupUser } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { createActionDetails } from "./action-details.js";
@@ -181,10 +181,6 @@ async function hydrate(ui: ReactNode, mutate: (container: HTMLElement) => void) 
   await flush();
   return container;
 }
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("useNativeGroupReconciliation", () => {
   renderBoth("mount reconciliation", (mode) => {

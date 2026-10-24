@@ -13,7 +13,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -149,10 +149,6 @@ const dataPending = () =>
 /** Lets queued microtasks (the reset handler) and the resulting renders run. */
 const flush = () => act(async () => {});
 const form = () => screen.getByTestId("form") as HTMLFormElement;
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("RadioGroup", () => {
   describe("roles and ARIA", () => {

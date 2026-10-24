@@ -179,10 +179,6 @@ function expectOpenAttr(el: Element, open: boolean) {
   else expect(el).not.toHaveAttribute("open");
 }
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe("Accordion", () => {
   describe("roles and ARIA", () => {
     it("renders div > details > summary + div with no added ARIA", () => {

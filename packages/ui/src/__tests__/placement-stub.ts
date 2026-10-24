@@ -22,7 +22,7 @@ export interface PlacementStub {
 
 /**
  * Stubs `getComputedStyle` for the element `target()` returns (looked up on each call, so the
- * element may mount later). Restored by `vi.restoreAllMocks()`.
+ * element may mount later). Restored after each test (vitest.setup.ts restores every spy).
  */
 export function stubComputedPlacement(
   target: () => Element | null,

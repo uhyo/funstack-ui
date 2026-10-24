@@ -51,7 +51,6 @@ afterEach(async () => {
   await (
     document as Document & { __reactViewTransition?: ViewTransition | null }
   ).__reactViewTransition?.finished.catch(() => {});
-  vi.restoreAllMocks();
 });
 
 /** Resolves with `performance.now()` at the first DOM mutation (or check) where `cond` holds. */

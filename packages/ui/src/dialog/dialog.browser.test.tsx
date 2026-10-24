@@ -70,7 +70,6 @@ afterEach(async () => {
   // Close anything left open so the next test starts with an interactive page.
   for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
   for (const cleanup of cleanups.splice(0)) cleanup();
-  vi.restoreAllMocks();
 });
 
 function Library({

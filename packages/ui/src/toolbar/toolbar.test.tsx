@@ -6,7 +6,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { setupUser } from "../__tests__/helpers.js";
 import { Button } from "../button/index.js";
 import { Dialog } from "../dialog/index.js";
@@ -36,10 +36,6 @@ function press(target: Element, key: string, init: KeyboardEventInit = {}): Keyb
   });
   return event;
 }
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 /** Mixed children (row 12). */
 function Mixed({

@@ -68,7 +68,6 @@ afterEach(async () => {
     if (element.matches(":popover-open")) element.hidePopover();
   }
   for (const cleanup of cleanups.splice(0)) cleanup();
-  vi.restoreAllMocks();
 });
 
 /** Box styles that make positions predictable (the popover and dialog UA styles reset). */

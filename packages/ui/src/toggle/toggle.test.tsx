@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Suspense, startTransition, useLayoutEffect, useRef, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -87,10 +87,6 @@ function Harness({
 
 const button = () => screen.getByRole("button");
 const committed = () => screen.getByTestId("committed");
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("Toggle", () => {
   describe("roles and ARIA", () => {

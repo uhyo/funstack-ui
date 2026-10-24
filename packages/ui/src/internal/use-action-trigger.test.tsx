@@ -2,7 +2,7 @@
 // (Button, Dialog.Close, Popover.Close, Menu.Item, Toast.Action, the Slider and NumberField steps)
 // cover it through their own suites; these rows pin the default and the opt-out.
 import { act, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { deferred, ErrorCatcher } from "../__tests__/helpers.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import type { ActionTrigger, ActionTriggerOptions } from "./use-action-trigger.js";
@@ -29,10 +29,6 @@ function setup(options?: ActionTriggerOptions, onError?: (error: unknown) => voi
     caught: () => view.queryByTestId("error-catcher"),
   };
 }
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("useActionTrigger: re-entry (default)", () => {
   it("a second run while the first is in flight is ignored; after settle it runs", async () => {

@@ -9,7 +9,7 @@ import { act, render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { cdp } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
@@ -27,10 +27,6 @@ const checkedValues = () =>
   items()
     .filter((b) => b.matches(":checked"))
     .map((b) => b.value);
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("CheckboxGroup (browser)", () => {
   describe("Parent :indeterminate", () => {

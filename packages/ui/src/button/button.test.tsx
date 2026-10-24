@@ -55,7 +55,6 @@ function recordClicks(): boolean[] {
 const cleanups: (() => void)[] = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
-  vi.restoreAllMocks();
 });
 
 describe("Button", () => {

@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { StrictMode, startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { guardCheckableChange, useNativeChecked } from "./use-native-checked.js";
 import type { UseNativeCheckedOptions } from "./use-native-checked.js";
 
@@ -37,10 +37,6 @@ function Probe({ as = "input", inputType = "checkbox", tick = 0, ...options }: P
 
 const probe = () => screen.getByLabelText("probe") as HTMLInputElement;
 const flush = () => act(async () => {});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 async function hydrate(ui: ReactNode, mutate: (el: HTMLInputElement) => void) {
   const container = document.createElement("div");

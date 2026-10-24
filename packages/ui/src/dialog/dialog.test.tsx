@@ -191,6 +191,7 @@ async function openThroughTrigger(user: ReturnType<typeof setupUser>) {
 }
 
 afterEach(() => {
+  // Restored here as well as in the setup file: the DOM is cleared below with real methods.
   vi.restoreAllMocks();
   document.body.innerHTML = "";
 });

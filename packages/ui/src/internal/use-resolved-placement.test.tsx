@@ -5,7 +5,7 @@
 // layout after the event, so the stub is changed between the first and the second frame, which
 // is where the hook must see it. The browser rows cover the real engines.
 import { act, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import type { PlacementStub } from "../__tests__/placement-stub.js";
@@ -71,10 +71,6 @@ beforeEach(() => {
   winAdd = vi.spyOn(window, "addEventListener");
   winRemove = vi.spyOn(window, "removeEventListener");
   stub = stubComputedPlacement(() => screen.queryByTestId("popup"), { positionArea: "top" });
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
 
 describe("useResolvedPlacement: scroll and resize (conventions 13.2)", () => {

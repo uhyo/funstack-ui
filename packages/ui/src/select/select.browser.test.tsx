@@ -69,7 +69,6 @@ afterEach(async () => {
   for (const el of document.querySelectorAll<HTMLElement>("[popover]")) {
     if (el.matches(":popover-open")) el.hidePopover();
   }
-  vi.restoreAllMocks();
 });
 
 function Fruits({

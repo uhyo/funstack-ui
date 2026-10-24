@@ -17,7 +17,6 @@ import { Button } from "./index.js";
 
 afterEach(async () => {
   await userEvent.unhover(document.body);
-  vi.restoreAllMocks();
 });
 
 const button = (name: string) => screen.getByRole("button", { name });

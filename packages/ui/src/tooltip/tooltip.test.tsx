@@ -111,7 +111,6 @@ afterEach(() => {
   document.removeEventListener("keydown", onKeyInput, true);
   document.removeEventListener("pointerdown", onPointerInput, true);
   document.removeEventListener("mousedown", onPointerInput, true);
-  vi.restoreAllMocks();
   vi.useRealTimers();
   delete (globalThis as { jest?: unknown }).jest;
 });

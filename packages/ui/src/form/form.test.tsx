@@ -31,10 +31,6 @@ import { Field } from "../field/index.js";
 import { Form } from "./index.js";
 import type { FormErrors, FormRootState, FormSubmitState } from "./index.js";
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 const flush = () => act(async () => {});
 
 function silenceErrors() {

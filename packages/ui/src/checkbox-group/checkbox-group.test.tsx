@@ -14,7 +14,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -180,10 +180,6 @@ function parentShows(el: HTMLInputElement = parentBox()): string {
   if (el.checked && mixed) return "checked+mixed";
   return el.checked ? "checked" : mixed ? "mixed" : "unchecked";
 }
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("CheckboxGroup", () => {
   describe("roles and ARIA", () => {

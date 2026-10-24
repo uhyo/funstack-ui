@@ -646,7 +646,6 @@ describe("NumberField (browser)", () => {
     await flush();
     expect(input().value).toBe("9");
     expect(start).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   it("a rejected commit starts no document view transition either (boundary and rollback)", async () => {
@@ -688,6 +687,5 @@ describe("NumberField (browser)", () => {
     expect(onChange.mock.calls.at(-1)?.[1].reason).toBe("dismiss");
     expect(screen.queryByTestId("root")).toBeNull();
     expect(start).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 });

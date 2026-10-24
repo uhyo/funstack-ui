@@ -15,7 +15,7 @@
 // The form channel (pending, server errors, the reset policy) is covered in `form.test.tsx`.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { setupUser } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
 import { RadioGroup } from "../radio-group/index.js";
@@ -24,10 +24,6 @@ import { Field } from "./index.js";
 import type { FieldState } from "./index.js";
 
 const JSDOM_MESSAGE = "Constraints not satisfied";
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 function silenceErrors() {
   return vi.spyOn(console, "error").mockImplementation(() => {});
