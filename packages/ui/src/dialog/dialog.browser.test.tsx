@@ -347,6 +347,37 @@ describe("library mode (browser)", () => {
     expect(action.mock.calls[1]![1].reason).toBe("activate");
     expect(action.mock.calls[1]![1].returnValue).toBe("save");
   });
+
+  // review M2 (memo/reviewer/dialog.md).
+  it("non-modal: Escape inside a popover closes the popover only", async () => {
+    render(
+      <Dialog.Root defaultOpen={false} modal={false}>
+        <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+        <Dialog.Popup data-testid="popup" aria-label="Help">
+          <button type="button" data-testid="inside">
+            Inside
+          </button>
+          <div popover="auto" data-testid="menu">
+            <button type="button" data-testid="item">
+              Item
+            </button>
+          </div>
+        </Dialog.Popup>
+      </Dialog.Root>,
+    );
+    await openWithTrigger();
+    const menu = screen.getByTestId("menu");
+    act(() => menu.showPopover());
+    screen.getByTestId("item").focus();
+    await user.keyboard("{Escape}");
+    await flushFor();
+    expect(menu.matches(":popover-open")).toBe(false);
+    expect(popup().open).toBe(true);
+    // With no popover open, Escape inside the dialog closes it.
+    screen.getByTestId("inside").focus();
+    await user.keyboard("{Escape}");
+    expect(popup().open).toBe(false);
+  });
 });
 
 describe("light dismiss (browser)", () => {
@@ -413,10 +444,35 @@ describe("light dismiss (browser)", () => {
     await user.click(screen.getByTestId("outside"));
     expect(popup().open).toBe(false);
   });
+
+  // review M1 (memo/reviewer/dialog.md).
+  it("lightDismiss (JS baseline): a drag from inside that ends on the backdrop does not close", async () => {
+    const action = vi.fn<ActionFn>();
+    render(
+      <Library action={action} popup={{ lightDismiss: true }}>
+        <input data-testid="field" defaultValue="Ada Lovelace" />
+      </Library>,
+    );
+    await openWithTrigger();
+    // Select text in the input and release over the backdrop. Chromium fires `click` on the
+    // common ancestor, the dialog, outside its box; native `closedby="any"` stays open too.
+    await user.dragAndDrop(screen.getByTestId("field"), popup(), {
+      sourcePosition: { x: 4, y: 4 },
+      targetPosition: { x: -20, y: -20 },
+      force: true,
+    });
+    await flushFor();
+    expect(popup().open).toBe(true);
+    expect(action).toHaveBeenCalledTimes(1);
+    // A real backdrop click still closes.
+    await user.click(popup(), { position: { x: -20, y: -20 }, force: true });
+    expect(popup().open).toBe(false);
+  });
 });
 
-describe("review rows (browser)", () => {
-  /** Design 12.5 as reworked: no action awaits user input (H1). */
+// review H1 (memo/reviewer/dialog.md).
+describe("nested confirm (browser)", () => {
+  /** Design 12.5 as reworked: no action awaits user input. */
   function Editor({ discard }: { discard: () => Promise<void> }) {
     const [open, setOpen] = useState(false);
     const [count, setCount] = useState(0);
@@ -457,7 +513,7 @@ describe("review rows (browser)", () => {
     );
   }
 
-  it("nested confirm: the inner dialog opens at once; the outer closes after the confirm (H1)", async () => {
+  it("the inner dialog opens at once; the outer closes after the confirm", async () => {
     const discarding = deferred();
     render(<Editor discard={() => discarding.promise} />);
     await openWithTrigger();
@@ -482,59 +538,6 @@ describe("review rows (browser)", () => {
     // Nothing stays entangled: an unrelated transition commits.
     await user.click(screen.getByTestId("unrelated"));
     await settle(() => expect(screen.getByTestId("unrelated")).toHaveTextContent("1"));
-  });
-
-  it("lightDismiss (JS baseline): a drag from inside that ends on the backdrop does not close (M1)", async () => {
-    const action = vi.fn<ActionFn>();
-    render(
-      <Library action={action} popup={{ lightDismiss: true }}>
-        <input data-testid="field" defaultValue="Ada Lovelace" />
-      </Library>,
-    );
-    await openWithTrigger();
-    // Select text in the input and release over the backdrop. Chromium fires `click` on the
-    // common ancestor, the dialog, outside its box; native `closedby="any"` stays open too.
-    await user.dragAndDrop(screen.getByTestId("field"), popup(), {
-      sourcePosition: { x: 4, y: 4 },
-      targetPosition: { x: -20, y: -20 },
-      force: true,
-    });
-    await flushFor();
-    expect(popup().open).toBe(true);
-    expect(action).toHaveBeenCalledTimes(1);
-    // A real backdrop click still closes.
-    await user.click(popup(), { position: { x: -20, y: -20 }, force: true });
-    expect(popup().open).toBe(false);
-  });
-
-  it("non-modal: Escape inside a popover closes the popover only (M2)", async () => {
-    render(
-      <Dialog.Root defaultOpen={false} modal={false}>
-        <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
-        <Dialog.Popup data-testid="popup" aria-label="Help">
-          <button type="button" data-testid="inside">
-            Inside
-          </button>
-          <div popover="auto" data-testid="menu">
-            <button type="button" data-testid="item">
-              Item
-            </button>
-          </div>
-        </Dialog.Popup>
-      </Dialog.Root>,
-    );
-    await openWithTrigger();
-    const menu = screen.getByTestId("menu");
-    act(() => menu.showPopover());
-    screen.getByTestId("item").focus();
-    await user.keyboard("{Escape}");
-    await flushFor();
-    expect(menu.matches(":popover-open")).toBe(false);
-    expect(popup().open).toBe(true);
-    // With no popover open, Escape inside the dialog closes it.
-    screen.getByTestId("inside").focus();
-    await user.keyboard("{Escape}");
-    expect(popup().open).toBe(false);
   });
 });
 
@@ -698,7 +701,8 @@ describe("exit animation and the deferred unmount (browser)", () => {
   });
 });
 
-describe("ViewTransition (browser, #46)", () => {
+// The library-owned closes are captured since #46.
+describe("ViewTransition (browser)", () => {
   let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
   let transitions: ViewTransition[] = [];
@@ -891,7 +895,7 @@ describe("ViewTransition (browser, #46)", () => {
     ${recipe ? "html:active-view-transition .fade { transition: none; }" : ""}
   `;
 
-  it('transition="pop" plus a CSS exit and the recipe: an Escape runs one view transition, no new image of the dialog', async () => {
+  it('transition="pop", a CSS exit and the recipe: an Escape runs one view transition, no new dialog image', async () => {
     addStyle(cssExit(true));
     render(<Plain transition="pop" className="fade" />);
     await open();

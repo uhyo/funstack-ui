@@ -1,0 +1,987 @@
+// Dialog tests (jsdom): the Close part and the library-owned closes (design/components/dialog.md
+// 2.3, 3.4, 4.4, 13.2). The shims and the browser-only rows are described in dialog.test.tsx; the
+// open-state rows every overlay shares are in src/__tests__/overlay-open-state-suite.tsx.
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { startTransition, useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { dispatchCommand } from "../__tests__/dialog-shim.js";
+import {
+  deferred,
+  ErrorCatcher,
+  expectNotPending,
+  expectPending,
+  renderBoth,
+  setupUser,
+  flushTasks,
+  silenceErrors,
+} from "../__tests__/helpers.js";
+import { Dialog } from "./index.js";
+import { recordClicks } from "../__tests__/overlay-helpers.js";
+import {
+  committedText,
+  content,
+  Harness,
+  openThroughTrigger,
+  popup,
+  spyClose,
+  spyShowModal,
+  trigger,
+} from "../__tests__/dialog-harness.js";
+import type { ActionFn } from "../__tests__/dialog-harness.js";
+
+afterEach(() => {
+  // Restored here as well as in the setup file: the DOM is cleared below with real methods.
+  vi.restoreAllMocks();
+  document.body.innerHTML = "";
+});
+
+describe("Dialog", () => {
+  describe("Close part", () => {
+    it("with action: the click is cancelled, data-pending while it runs, close(value) on resolve", async () => {
+      const user = setupUser();
+      const close = spyClose();
+      const d = deferred();
+      const closeAction = vi.fn(() => d.promise);
+      const action = vi.fn<ActionFn>();
+      render(
+        <Harness
+          mode="uncontrolled"
+          action={action}
+          content={
+            <Dialog.Close data-testid="delete" value="deleted" action={closeAction}>
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      await user.click(screen.getByTestId("delete"));
+      expect(closeAction).toHaveBeenCalledTimes(1);
+      const details = (closeAction.mock.calls[0] as unknown[])[0] as {
+        event: Event;
+        returnValue: string;
+      };
+      expect(details.event.defaultPrevented).toBe(true);
+      expect(details.returnValue).toBe("deleted");
+      expect(popup().open).toBe(true); // the command was cancelled
+      expectPending(screen.getByTestId("delete"));
+      expectNotPending(trigger()); // the Root's pending is for openChangeAction only
+      expect(close).not.toHaveBeenCalled();
+      await act(async () => d.resolve());
+      expect(close).toHaveBeenCalledWith("deleted");
+      await flushTasks(2);
+      const [next, notify] = action.mock.calls[1]!;
+      expect(next).toBe(false);
+      expect(notify.reason).toBe("activate");
+      expect(notify.returnValue).toBe("deleted");
+      expect(notify.event!.type).toBe("click");
+    });
+
+    it("with action that rejects: the boundary inside the dialog gets it, the dialog stays open", async () => {
+      const user = setupUser();
+      silenceErrors();
+      const close = spyClose();
+      const caught = vi.fn();
+      render(
+        <Harness
+          mode="uncontrolled"
+          content={
+            <ErrorCatcher onError={caught}>
+              <Dialog.Close
+                data-testid="delete"
+                action={async () => {
+                  throw new Error("delete failed");
+                }}
+              >
+                Delete
+              </Dialog.Close>
+            </ErrorCatcher>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      await user.click(screen.getByTestId("delete"));
+      await flushTasks(2);
+      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "delete failed" }));
+      expect(close).not.toHaveBeenCalled();
+      expect(popup().open).toBe(true);
+    });
+
+    it("with action: a rejection reaches the boundary; after a reset the Close runs again (D4)", async () => {
+      const user = setupUser();
+      silenceErrors();
+      const caught = vi.fn();
+      const close = spyClose();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      function Resettable() {
+        const [key, setKey] = useState(0);
+        return (
+          <>
+            <button type="button" data-testid="reset" onClick={() => setKey((k) => k + 1)} />
+            <ErrorCatcher key={key} onError={caught}>
+              <Dialog.Close data-testid="delete" action={() => runs[call++]!.promise}>
+                Delete
+              </Dialog.Close>
+            </ErrorCatcher>
+          </>
+        );
+      }
+      render(<Harness mode="uncontrolled" content={<Resettable />} />);
+      await openThroughTrigger(user);
+      await user.click(screen.getByTestId("delete"));
+      await act(async () => runs[0]!.reject(new Error("first failed")));
+      await flushTasks(2);
+      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
+      expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
+      expect(popup().open).toBe(true);
+      expect(close).not.toHaveBeenCalled();
+      // The boundary sits above the Close: reset it and the next click runs the action again.
+      fireEvent.click(screen.getByTestId("reset"));
+      await user.click(screen.getByTestId("delete"));
+      expect(call).toBe(2);
+      await act(async () => runs[1]!.resolve());
+      await flushTasks(2);
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(popup().open).toBe(false);
+    });
+
+    describe("re-entry (#81, design/components/button.md 16.4)", () => {
+      it("D1: library mode, a second click, Enter and Space while pending are ignored and cancelled", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(
+          <Harness
+            mode="uncontrolled"
+            action={action}
+            content={
+              <Dialog.Close data-testid="delete" value="deleted" action={closeAction}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        const close = spyClose();
+        const button = screen.getByTestId("delete");
+        expect(button).not.toHaveAttribute("aria-disabled");
+        const clicks = recordClicks();
+        try {
+          await user.click(button);
+          await user.click(button);
+          button.focus();
+          await user.keyboard("{Enter}");
+          await user.keyboard(" ");
+        } finally {
+          clicks.stop();
+        }
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        // Library mode cancels every Close click (the command); the ignored ones are no exception.
+        expect(clicks.seen).toEqual([true, true, true, true]);
+        expect(button).toHaveAttribute("aria-disabled", "true");
+        expectPending(button);
+        expect(button).not.toHaveAttribute("data-disabled");
+        expect(button).not.toBeDisabled();
+        expect(document.activeElement).toBe(button);
+        expect(action).toHaveBeenCalledTimes(1); // the open only
+        await act(async () => work.resolve());
+        await flushTasks(2);
+        expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+          [true, "activate"],
+          [false, "activate"],
+        ]);
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(close).toHaveBeenCalledWith("deleted");
+        expect(popup().open).toBe(false);
+        // The element reference: the attributes are gone with the settle.
+        expect(button).not.toHaveAttribute("aria-disabled");
+        expectNotPending(button);
+      });
+
+      it("D1: JS-free mode with action, a second click while pending is ignored; one close(value)", async () => {
+        const user = setupUser();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(
+          <Harness
+            mode="static"
+            content={
+              <Dialog.Close data-testid="delete" value="deleted" action={closeAction}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await act(async () => popup().showModal());
+        const close = spyClose();
+        const button = screen.getByTestId("delete");
+        const clicks = recordClicks();
+        try {
+          await user.click(button);
+          await user.click(button);
+          button.focus();
+          await user.keyboard("{Enter}");
+        } finally {
+          clicks.stop();
+        }
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        expect(clicks.seen).toEqual([true, true, true]);
+        expect(button).toHaveAttribute("aria-disabled", "true");
+        expectPending(button);
+        expect(popup().open).toBe(true);
+        await act(async () => work.resolve());
+        await flushTasks(2);
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(close).toHaveBeenCalledWith("deleted");
+        expect(button).not.toHaveAttribute("aria-disabled");
+      });
+
+      it("D2: two clicks in one task call the action once", async () => {
+        const user = setupUser();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(
+          <Harness
+            mode="uncontrolled"
+            content={
+              <Dialog.Close data-testid="delete" action={closeAction}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        act(() => {
+          fireEvent.click(screen.getByTestId("delete"));
+          fireEvent.click(screen.getByTestId("delete"));
+        });
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        await act(async () => work.resolve());
+        await flushTasks(2);
+        expect(popup().open).toBe(false);
+      });
+
+      it("D3: without action, a second click while the Root's close is pending changes nothing", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        render(<Harness mode="uncontrolled" action={action} />);
+        await openThroughTrigger(user);
+        const closing = deferred();
+        action.mockImplementation(() => closing.promise);
+        const close = spyClose();
+        await user.click(screen.getByTestId("close"));
+        await user.click(screen.getByTestId("close"));
+        // `requestClose` is a no-op against `intended()`: one dispatch. No own run, so no
+        // pending and no aria-disabled on the Close.
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(screen.getByTestId("close")).not.toHaveAttribute("aria-disabled");
+        expectNotPending(screen.getByTestId("close"));
+        await act(async () => closing.resolve());
+        await flushTasks(2);
+        expect(close).toHaveBeenCalledTimes(1);
+      });
+
+      it("D6: a render element's aria-disabled is removed while the Close is idle (owned)", async () => {
+        const user = setupUser();
+        render(
+          <Harness
+            mode="uncontrolled"
+            content={
+              <Dialog.Close
+                data-testid="delete"
+                action={() => {}}
+                render={<button type="button" aria-disabled="true" />}
+              >
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        expect(screen.getByTestId("delete")).not.toHaveAttribute("aria-disabled");
+      });
+    });
+
+    renderBoth("open-generation guard", (mode) => {
+      it("action pending, closed by Escape and re-opened: the settle does not close the new open", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        const close = spyClose();
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={
+              <Dialog.Close data-testid="delete" action={() => work.promise}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        await user.click(screen.getByTestId("delete"));
+        // Escape while the action runs: the dialog closes natively.
+        await act(async () => popup().requestClose());
+        await flushTasks(2);
+        expect(popup().open).toBe(false);
+        // The re-open is entangled with the Close's pending async transition (React batches
+        // them), so it commits together with the action's end.
+        await user.click(trigger());
+        close.mockClear();
+        await act(async () => work.resolve());
+        await flushTasks(2);
+        expect(popup().open).toBe(true);
+        expect(close).not.toHaveBeenCalled();
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+      });
+    });
+
+    it("JS-free: action pending, closed by Escape and re-opened natively: the dialog stays open", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const close = spyClose();
+      render(
+        <Harness
+          mode="static"
+          content={
+            <Dialog.Close data-testid="delete" action={() => work.promise}>
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      await act(async () => popup().showModal());
+      await user.click(screen.getByTestId("delete"));
+      await act(async () => popup().requestClose());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      close.mockClear();
+      // The action may settle after the native re-open but before its queued `toggle` task (the
+      // order varied in CI when the guard counted opens at `toggle`). Hold that task's event
+      // back for good, so only the synchronous `beforetoggle` can count the re-open.
+      const holdToggle = (event: Event) => event.stopImmediatePropagation();
+      window.addEventListener("toggle", holdToggle, true);
+      try {
+        await act(async () => popup().showModal());
+        await act(async () => work.resolve());
+        await flushTasks(2);
+      } finally {
+        window.removeEventListener("toggle", holdToggle, true);
+      }
+      expect(popup().open).toBe(true);
+      expect(close).not.toHaveBeenCalled();
+    });
+
+    it("a disabled Close never runs its action", async () => {
+      const user = setupUser();
+      const closeAction = vi.fn();
+      render(
+        <Harness
+          mode="uncontrolled"
+          initialOpen
+          content={
+            <Dialog.Close data-testid="delete" disabled action={closeAction}>
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      fireEvent.click(screen.getByTestId("delete"));
+      await user.click(screen.getByTestId("delete"));
+      expect(closeAction).not.toHaveBeenCalled();
+      expect(screen.getByTestId("delete")).toHaveAttribute("data-disabled", "");
+    });
+  });
+
+  describe("library-owned closes", () => {
+    renderBoth("Close part", (mode) => {
+      it("with action: openChangeAction(false) runs after it; the Close is pending until the close commits", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={
+              <Dialog.Close data-testid="delete" value="deleted" action={closeAction}>
+                Delete
+              </Dialog.Close>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        const closing = deferred();
+        action.mockImplementation(() => closing.promise);
+        const close = spyClose();
+        await user.click(screen.getByTestId("delete"));
+        expect(closeAction).toHaveBeenCalledTimes(1);
+        expect(action).toHaveBeenCalledTimes(1); // the open only
+        expectPending(screen.getByTestId("delete"));
+        expectNotPending(trigger());
+        await act(async () => work.resolve());
+        // The action resolved: the Root dispatched, the dialog is still open.
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(action.mock.calls[1]![1]).toMatchObject({
+          reason: "activate",
+          returnValue: "deleted",
+        });
+        expect(action.mock.calls[1]![1].event!.type).toBe("click");
+        expect(popup().open).toBe(true);
+        expect(close).not.toHaveBeenCalled();
+        expectPending(trigger());
+        // React entangles the Root's transition with the Close's async action.
+        expectPending(screen.getByTestId("delete"));
+        await act(async () => closing.resolve());
+        expect(close).toHaveBeenCalledWith("deleted");
+        expect(popup().open).toBe(false);
+        expectNotPending(trigger());
+      });
+
+      it("a Close part's close is not a close request: `cancel` neither fires nor blocks it", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        const onCancel = vi.fn((event: { preventDefault(): void }) => event.preventDefault());
+        render(<Harness mode={mode} action={action} popup={{ onCancel }} />);
+        await openThroughTrigger(user);
+        await user.click(screen.getByTestId("close"));
+        await flushTasks(2);
+        // The veto point of a part's close is openChangeAction, not `cancel` (design 7).
+        expect(onCancel).not.toHaveBeenCalled();
+        expect(popup().open).toBe(false);
+        // A later dismissal being labelled as one is a suite row ("close intents").
+      });
+    });
+
+    it("a vetoed close's returnValue does not leak into a later controlled close", async () => {
+      const user = setupUser();
+      let setOpen!: (open: boolean) => void;
+      render(
+        <Harness
+          mode="controlled"
+          refuseClose
+          outside={(set) => {
+            setOpen = set;
+            return null;
+          }}
+        />,
+      );
+      await openThroughTrigger(user);
+      await user.click(screen.getByTestId("close")); // value "x", vetoed
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      const close = spyClose();
+      await act(async () => setOpen(false));
+      expect(close).toHaveBeenCalledWith("");
+      expect(popup().returnValue).toBe("");
+    });
+
+    // review L4 (memo/reviewer/dialog-46.md).
+    it("a re-open between the library's close() and its close event is not superseded", async () => {
+      const action = vi.fn<ActionFn>();
+      let setOpen!: (open: boolean) => void;
+      render(
+        <Harness
+          mode="controlled"
+          action={action}
+          modal={false}
+          outside={(set) => {
+            setOpen = set;
+            return null;
+          }}
+        />,
+      );
+      await act(async () => trigger().click());
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      const close = spyClose();
+      act(() => setOpen(false));
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(popup().open).toBe(false);
+      // The Trigger, in the task gap before the `close` event.
+      act(() => trigger().click());
+      await flushTasks(2);
+      await flushTasks(2);
+      expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+        [true, "activate"],
+        [true, "activate"],
+      ]);
+      expect(popup().open).toBe(true);
+      expect(committedText()).toBe("true");
+    });
+
+    it("walkthrough 11.16: a controlled close while a Close action runs closes once", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      const work = deferred();
+      let setOpen!: (open: boolean) => void;
+      render(
+        <Harness
+          mode="controlled"
+          action={action}
+          content={
+            <>
+              <span data-testid="content">content</span>
+              <Dialog.Close data-testid="delete" value="v" action={() => work.promise}>
+                Delete
+              </Dialog.Close>
+            </>
+          }
+          outside={(set) => {
+            setOpen = set;
+            return null;
+          }}
+        />,
+      );
+      await openThroughTrigger(user);
+      const close = spyClose();
+      await user.click(screen.getByTestId("delete"));
+      await act(async () => setOpen(false));
+      await act(async () => work.resolve());
+      await flushTasks(2);
+      expect(action.mock.calls.filter(([next]) => !next)).toHaveLength(1);
+      expect(action.mock.calls[1]![1]).toMatchObject({ reason: "activate", returnValue: "v" });
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(close).toHaveBeenCalledWith("v");
+      expect(popup().open).toBe(false);
+      expect(committedText()).toBe("false");
+    });
+
+    // review P2 (memo/reviewer/dialog-46.md).
+    // Uncontrolled: a controlled parent that adopts every resolution in arrival order ends
+    // with the slower, superseded `false` (conventions 2.5).
+    describe("re-open during a pending part close", () => {
+      it("non-modal: the Trigger re-opens while openChangeAction(false) runs; the dialog stays open", async () => {
+        const user = setupUser();
+        const action = vi.fn<ActionFn>();
+        render(<Harness mode="uncontrolled" action={action} modal={false} />);
+        await openThroughTrigger(user);
+        const closing = deferred();
+        action.mockImplementation((next) => (next ? undefined : closing.promise));
+        const close = spyClose();
+        await user.click(screen.getByTestId("close"));
+        expect(trigger()).not.toHaveAttribute("data-open");
+        await user.click(trigger());
+        await act(async () => closing.resolve());
+        await flushTasks(2);
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+        expect(close).not.toHaveBeenCalled();
+        expect(popup().open).toBe(true);
+        expect(trigger()).toHaveAttribute("data-open", "");
+        expect(content()).toBeInTheDocument();
+        expectNotPending(trigger());
+      });
+    });
+
+    it("a render={<a href />} Close closes through the click handler in library mode", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(
+        <Harness
+          mode="uncontrolled"
+          action={action}
+          content={
+            <Dialog.Close data-testid="link-close" value="link" render={<a href="#close" />}>
+              Close
+            </Dialog.Close>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      await user.click(screen.getByTestId("link-close"));
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      expect(popup().returnValue).toBe("link");
+      expect(action.mock.calls[1]![1].returnValue).toBe("link");
+    });
+
+    it("JS-free: a Close action closes with close(value) directly when it resolves", async () => {
+      const user = setupUser();
+      const work = deferred();
+      render(
+        <Harness
+          mode="static"
+          content={
+            <Dialog.Close data-testid="delete" value="deleted" action={() => work.promise}>
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      await user.click(trigger());
+      const close = spyClose();
+      await user.click(screen.getByTestId("delete"));
+      expect(popup().open).toBe(true);
+      await act(async () => work.resolve());
+      expect(close).toHaveBeenCalledWith("deleted");
+      expect(popup().open).toBe(false);
+    });
+  });
+
+  describe("a controlled parent that vetoes the Close part's close (walkthrough 11.14)", () => {
+    /**
+     * A controlled parent following 11.14: it vetoes a Close part's close (reason
+     * "activate") and adopts everything else, a dismissal included.
+     */
+    function VetoCloseParent({
+      action,
+      modal,
+      content,
+    }: {
+      action: ActionFn;
+      modal?: boolean;
+      content?: ReactNode;
+    }) {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <Dialog.Root
+            open={open}
+            modal={modal}
+            openChangeAction={async (next, details) => {
+              await action(next, details);
+              if (!next && details.reason === "activate") return; // veto
+              startTransition(() => setOpen(next));
+            }}
+          >
+            <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
+            <Dialog.Popup data-testid="popup" aria-label="Edit">
+              <span data-testid="content">content</span>
+              {content ?? (
+                <Dialog.Close data-testid="close" value="x">
+                  Cancel
+                </Dialog.Close>
+              )}
+            </Dialog.Popup>
+          </Dialog.Root>
+          <output data-testid="committed">{String(open)}</output>
+        </>
+      );
+    }
+
+    // review M1 (memo/reviewer/dialog-46.md).
+    it("an Escape during the pending close, then the veto: the dismissal is notified, not undone", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      const showModal = spyShowModal();
+      render(<VetoCloseParent action={action} />);
+      await openThroughTrigger(user);
+      expect(showModal).toHaveBeenCalledTimes(1);
+      const closing = deferred();
+      action.mockImplementation((next) => (next ? undefined : closing.promise));
+      await user.click(screen.getByTestId("close"));
+      expect(popup().open).toBe(true);
+      // Escape while openChangeAction(false) runs: the platform closes at once.
+      await act(async () => popup().requestClose());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      // Nothing more yet: the user's intent is already "close" (11.13).
+      expect(action).toHaveBeenCalledTimes(2);
+      action.mockImplementation(() => undefined);
+      await act(async () => closing.resolve());
+      await flushTasks(2);
+      // The parent vetoed the Close; the dismissal stands and is notified now.
+      expect(action.mock.calls.map(([next, d]) => [next, d.reason, d.returnValue])).toEqual([
+        [true, "activate", undefined],
+        [false, "activate", "x"],
+        [false, "dismiss", ""],
+      ]);
+      expect(action.mock.calls[2]![1].event!.type).toBe("close");
+      expect(showModal).toHaveBeenCalledTimes(1); // never re-opened
+      expect(popup().open).toBe(false);
+      expect(committedText()).toBe("false");
+      expect(content()).toBeNull();
+      expectNotPending(trigger());
+      expect(trigger()).not.toHaveAttribute("data-open");
+    });
+
+    // review M1 (memo/reviewer/dialog-46.md).
+    it("an Escape during the pending close, then a re-open through the Trigger: superseded", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<VetoCloseParent action={action} />);
+      await openThroughTrigger(user);
+      const closing = deferred();
+      action.mockImplementation((next) => (next ? undefined : closing.promise));
+      await user.click(screen.getByTestId("close"));
+      await act(async () => popup().requestClose());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      await user.click(trigger());
+      await act(async () => closing.resolve());
+      await flushTasks(2);
+      expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+        [true, "activate"],
+        [false, "activate"],
+        [true, "activate"],
+      ]);
+      expect(popup().open).toBe(true);
+      expect(committedText()).toBe("true");
+    });
+
+    it("with a Close action: the action runs, the close is vetoed, no blink", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      const showModal = spyShowModal();
+      const work = deferred();
+      const closeAction = vi.fn(() => work.promise);
+      render(
+        <VetoCloseParent
+          action={action}
+          content={
+            <Dialog.Close data-testid="delete" value="deleted" action={closeAction}>
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      showModal.mockClear();
+      const close = spyClose();
+      await user.click(screen.getByTestId("delete"));
+      expectPending(screen.getByTestId("delete"));
+      await act(async () => work.resolve());
+      await flushTasks(2);
+      expect(closeAction).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls.map(([next, d]) => [next, d.reason, d.returnValue])).toEqual([
+        [true, "activate", undefined],
+        [false, "activate", "deleted"],
+      ]);
+      expect(close).not.toHaveBeenCalled();
+      expect(showModal).not.toHaveBeenCalled();
+      expect(popup().open).toBe(true);
+      expect(content()).toBeInTheDocument();
+      expect(trigger()).toHaveAttribute("data-open", "");
+      expectNotPending(screen.getByTestId("delete"));
+      expectNotPending(trigger());
+      // A later close is not affected by the vetoed one's value.
+      action.mockImplementation(() => undefined);
+      await act(async () => popup().requestClose());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      expect(popup().returnValue).toBe("");
+    });
+  });
+
+  describe("foreign close commands", () => {
+    renderBoth("foreign close command", (mode) => {
+      it.each(["request-close", "close"])(
+        "%s is cancelled and closes through the Root with the invoker's value",
+        async (command) => {
+          const user = setupUser();
+          const action = vi.fn<ActionFn>();
+          render(<Harness mode={mode} action={action} />);
+          await openThroughTrigger(user);
+          const d = deferred();
+          action.mockImplementation(() => d.promise);
+          const close = spyClose();
+          const source = document.createElement("button");
+          source.value = "foreign";
+          document.body.append(source);
+          let event!: Event;
+          await act(async () => {
+            event = dispatchCommand(popup(), command, source);
+          });
+          expect(event.defaultPrevented).toBe(true);
+          expect(popup().open).toBe(true);
+          const [next, details] = action.mock.calls[1]!;
+          expect(next).toBe(false);
+          expect(details).toMatchObject({ reason: "activate", returnValue: "foreign" });
+          expect(details.event).toBe(event);
+          await act(async () => d.resolve());
+          expect(close).toHaveBeenCalledWith("foreign");
+          expect(popup().open).toBe(false);
+        },
+      );
+    });
+
+    it("a foreign close command without a source closes with ''", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" action={action} />);
+      await openThroughTrigger(user);
+      await act(async () => {
+        dispatchCommand(popup(), "request-close", null);
+      });
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      expect(action.mock.calls[1]![1].returnValue).toBe("");
+    });
+
+    it("JS-free: a foreign request-close invoker closes natively", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          mode="static"
+          content={
+            <button type="button" data-testid="foreign" command="request-close" value="native">
+              Foreign
+            </button>
+          }
+        />,
+      );
+      screen.getByTestId("foreign").setAttribute("commandfor", popup().id);
+      await user.click(trigger());
+      await user.click(screen.getByTestId("foreign"));
+      expect(popup().open).toBe(false);
+      expect(popup().returnValue).toBe("native");
+    });
+  });
+
+  describe("held content (design 4.4)", () => {
+    /** Records what the DOM looks like when the library calls `close()` in the close commit. */
+    function atClose<T>(read: () => T): { readonly value: () => T | undefined } {
+      let value: T | undefined;
+      const original = HTMLDialogElement.prototype.close;
+      vi.spyOn(HTMLDialogElement.prototype, "close").mockImplementation(function (
+        this: HTMLDialogElement,
+        returnValue?: string,
+      ) {
+        value = read();
+        original.call(this, returnValue);
+      });
+      return { value: () => value };
+    }
+
+    it("without transition a controlled close keeps the children through the close commit", async () => {
+      let setOpen!: (open: boolean) => void;
+      const mounts = vi.fn();
+      function Content() {
+        useEffect(() => mounts(), []);
+        return <span data-testid="content" />;
+      }
+      render(
+        <Harness
+          mode="controlled"
+          initialOpen
+          content={<Content />}
+          outside={(set) => {
+            setOpen = set;
+            return null;
+          }}
+        />,
+      );
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      const seen = atClose(() => [committedText(), content() !== null] as const);
+      await act(async () => setOpen(false));
+      expect(seen.value()).toEqual(["false", true]);
+      await flushTasks(2);
+      // Released after the `close` event found no exit animation; never re-mounted.
+      expect(content()).toBeNull();
+      expect(mounts).toHaveBeenCalledTimes(1);
+    });
+
+    it("without transition a Close part's close keeps the children through the close commit", async () => {
+      const user = setupUser();
+      render(<Harness mode="uncontrolled" />);
+      await openThroughTrigger(user);
+      const seen = atClose(() => [committedText(), content() !== null] as const);
+      await user.click(screen.getByTestId("close"));
+      await flushTasks(2);
+      expect(seen.value()).toEqual(["false", true]);
+      expect(content()).toBeNull();
+    });
+
+    it("with transition the children are gone in the close commit", async () => {
+      const user = setupUser();
+      render(<Harness mode="uncontrolled" popup={{ transition: "none" }} />);
+      await openThroughTrigger(user);
+      const seen = atClose(() => [committedText(), content() !== null] as const);
+      await user.click(screen.getByTestId("close"));
+      await flushTasks(2);
+      expect(seen.value()).toEqual(["false", false]);
+      expect(popup().open).toBe(false);
+    });
+
+    it("keepMounted: the Activity stays visible through the close commit, hidden after", async () => {
+      const user = setupUser();
+      render(<Harness mode="uncontrolled" popup={{ keepMounted: true }} />);
+      await openThroughTrigger(user);
+      const seen = atClose(() => content()!.style.display);
+      await user.click(screen.getByTestId("close"));
+      await flushTasks(2);
+      expect(seen.value()).not.toBe("none");
+      expect(content()!.style.display).toBe("none");
+    });
+
+    it("a dismissal held for an exit animation is released by a normal update, not a view transition", async () => {
+      const calls = vi.fn<() => never>(() => {
+        throw new Error("startViewTransition stub");
+      });
+      Object.defineProperty(document, "startViewTransition", {
+        configurable: true,
+        value: calls,
+      });
+      try {
+        const user = setupUser();
+        render(<Harness mode="uncontrolled" popup={{ transition: "pop" }} />);
+        await openThroughTrigger(user);
+        const fade = deferred();
+        const animation = {
+          effect: { getComputedTiming: () => ({ endTime: 150 }) },
+          finished: fade.promise,
+        } as unknown as Animation;
+        // The exit starts with the close: an animation already running at `beforetoggle` is
+        // the baseline, not the exit (#64).
+        vi.spyOn(popup(), "getAnimations").mockImplementation(() =>
+          popup().open ? [] : [animation],
+        );
+        calls.mockClear();
+        await act(async () => popup().requestClose());
+        await flushTasks(2);
+        // The notification commit (one document view transition); the content is held.
+        expect(calls).toHaveBeenCalledTimes(1);
+        expect(content()).toBeInTheDocument();
+        await act(async () => fade.resolve());
+        await flushTasks(2);
+        expect(content()).toBeNull();
+        expect(calls).toHaveBeenCalledTimes(1);
+      } finally {
+        Reflect.deleteProperty(document, "startViewTransition");
+      }
+    });
+
+    it("an animation already running before the close does not hold the content", async () => {
+      const user = setupUser();
+      render(<Harness mode="uncontrolled" />);
+      await openThroughTrigger(user);
+      const running = {
+        effect: { getComputedTiming: () => ({ endTime: 10_000 }) },
+        finished: new Promise<never>(() => {}),
+      } as unknown as Animation;
+      // The same object before and after the close: a progress bar, not the exit.
+      vi.spyOn(popup(), "getAnimations").mockReturnValue([running]);
+      await act(async () => popup().requestClose());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      expect(content()).toBeNull();
+    });
+  });
+
+  describe.each([
+    [false, "none", false],
+    [false, "none", true],
+    [false, undefined, false],
+    [true, "none", false],
+  ] as const)(
+    "focus return: modal=%s transition=%s keepMounted=%s",
+    (modal, transition, keepMounted) => {
+      it("a Close activated with Enter returns focus to the Trigger (design 6.2 rule 2)", async () => {
+        const user = setupUser();
+        render(<Harness mode="uncontrolled" modal={modal} popup={{ transition, keepMounted }} />);
+        await openThroughTrigger(user);
+        screen.getByTestId("close").focus();
+        await user.keyboard("{Enter}");
+        await flushTasks(2);
+        expect(popup().open).toBe(false);
+        expect(trigger()).toHaveFocus();
+      });
+    },
+  );
+});

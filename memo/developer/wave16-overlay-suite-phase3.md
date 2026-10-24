@@ -147,3 +147,57 @@ Mutations (run on menu.test.tsx):
    (uncontrolled) and the RadioGroup overlap row fail.
 4. use-overlay-root.ts: a stale intent never cleared: S: close intents > an intent is dropped ...
    fails. Before this commit no Menu row caught it.
+
+### Commit 4: dialog.test.tsx split, history-named sections regrouped (187 -> 187 jsdom tests; browser 38 -> 38 per engine)
+
+Files: dialog.test.tsx (101: suite, ARIA, JS-free mode, keyboard, function props, render element,
+post-await, light dismiss, focus, nested confirm, warnings, smoke), dialog-close.test.tsx (41: Close
+part, library-owned closes, the 11.14 veto parent, foreign close commands, held content, focus
+return), dialog-form.test.tsx (24: Form part, closeOnSettle, `method="dialog"` submits),
+dialog-disabled.test.tsx (21). Harness in `src/__tests__/dialog-harness.tsx` (commit 1). 110 full
+names are unchanged (only the file moved). Review ids moved from titles into a comment above the
+row (`// review M1 (memo/reviewer/dialog-46.md).`). Renamed (Dialog > ...):
+
+| Old | New |
+| --- | --- |
+| Close part > open-generation guard (review M2) (both) ... | Close part > open-generation guard (both) same row title |
+| async action (both) a Close part's close is not a close request: ... | library-owned closes > Close part (both) same row title |
+| library-owned part-initiated closes (#46) > Close part (both) with action: openChangeAction(false) runs after the action; the Close stays pending until the close commits | library-owned closes > Close part (both) with action: openChangeAction(false) runs after it; the Close is pending until the close commits |
+| library-owned part-initiated closes (#46) > a vetoed close's returnValue ...; JS-free: a Close action closes ...; a render={<a href />} Close ... | library-owned closes > same titles |
+| ... > review of #46 > L4: a re-open between the library's close() and its close event is not superseded | library-owned closes > a re-open between ... (same, no "L4: ") |
+| ... > review of #46 > walkthrough 11.16: ... | library-owned closes > same title |
+| ... > review of #46 > re-open during a pending part close (P2) > non-modal: ... | library-owned closes > re-open during a pending part close > same title |
+| ... > review of #46 > M1: an Escape during a pending part close that is then vetoed is notified, not undone | a controlled parent that vetoes the Close part's close (walkthrough 11.14) > an Escape during the pending close, then the veto: the dismissal is notified, not undone |
+| ... > review of #46 > M1: the dismissal is superseded by a re-open through the Trigger | a controlled parent that vetoes ... > an Escape during the pending close, then a re-open through the Trigger: superseded |
+| ... > review of #46 > a Close action plus a controlled veto: the action runs, the close is vetoed, no blink | a controlled parent that vetoes ... > with a Close action: the action runs, the close is vetoed, no blink |
+| library-owned part-initiated closes (#46) > foreign close command (both) ...; a foreign close command without a source ...; JS-free: a foreign request-close invoker ... | foreign close commands > same titles |
+| library-owned part-initiated closes (#46) > held content (design 4.4) > ... (#64) and 5 others | held content (design 4.4) > same titles ("(#64)" dropped) |
+| library-owned part-initiated closes (#46) > focus return: ... (4 rows) | focus return: ... (same) |
+| async action (both) close: a method='dialog' submit is 'activate' with the submitter's value | method='dialog' submits > method='dialog' submit (both) is 'activate' with the submitter's value |
+| library-owned part-initiated closes (#46) > method='dialog' submit (both) ... (2 rows); a plain <form method='dialog'> ...; stopPropagation() in onSubmit ...; Form action settle close (both) ... | method='dialog' submits > same titles |
+| ... > review of #46 > M3: stopPropagation() from a document listener that runs first (React root on the document) opts out | method='dialog' submits > a document listener that runs first and stops propagation opts out (React root on the document) |
+| ... > review of #46 > L1: a method='dialog' submit inside a shadow root goes through the Root | method='dialog' submits > a method='dialog' submit inside a shadow root goes through the Root |
+| ... > review of #46 > nested dialogs and the shared submit listener > (2 rows) | method='dialog' submits > nested dialogs and the shared submit listener > same |
+| review fixes > re-open while a close notification is pending (L2) (both) Escape during a Form save, then the Trigger: pending meanwhile, opens after the save, no extra close | method='dialog' submits > re-open while a dismissal's notification waits for a Form save (both) Escape, then the Trigger: pending until the save settles, then open; no extra close |
+| review fixes > Dialog.Form closeOnSettle (M3) > (2 rows) | Form part > closeOnSettle > same titles |
+| review fixes > Dialog.Form keeps `method` with a string action; owns it otherwise (L4) | Form part > keeps `method` with a string action; owns it otherwise |
+| review fixes > Root state.pending is true during the re-open window (L2) | function props > Root state.pending is true while a re-open waits for a dismissal's notification |
+| review fixes > non-modal: Escape is left to an open popover inside the dialog (M2) | keyboard > same without "(M2)" |
+| review fixes > nested confirm (H1) > the recommended pattern ... | nested confirm dialog > same title |
+| review fixes > nested confirm (H1) > characterisation: an action that awaits input arriving through a transition holds every transition | nested confirm dialog > characterisation: awaiting input that arrives through a transition holds every transition |
+| review fixes > disabled is owned: a render element cannot re-enable Trigger or Close (L1) | disabled on link and component renders (design/components/button.md 17.3) > same without "(L1)" |
+| disabled on link and component renders (#83, design/components/button.md 17.3) > 17 rows | disabled on link and component renders (design/components/button.md 17.3) > same titles, except "... (review M1)" x2 and "... (fold W8)" x3 lose the suffix |
+| light dismiss (baseline) > modal / non-modal: a drag from inside ... does not close (M1) | same without "(M1)" |
+
+Browser (dialog.browser.test.tsx, per engine): "review rows (browser)" dissolved: `... drag from
+inside ... (M1)` -> light dismiss (browser) > same without "(M1)"; `non-modal: Escape inside a
+popover closes the popover only (M2)` -> library mode (browser) > same without "(M2)"; `nested
+confirm: the inner dialog opens at once; the outer closes after the confirm (H1)` -> nested confirm
+(browser) > the inner dialog opens at once; the outer closes after the confirm. "ViewTransition
+(browser, #46)" -> "ViewTransition (browser)" (13 rows, same titles; one shortened: "transition="pop"
+plus a CSS exit and the recipe: an Escape runs one view transition, no new image of the dialog" ->
+"transition="pop", a CSS exit and the recipe: an Escape runs one view transition, no new dialog
+image").
+
+Not renamed: "re-entry (#81, design/components/button.md 16.4)" and its D1-D6 ids (design test-plan
+ids, not review ids).
