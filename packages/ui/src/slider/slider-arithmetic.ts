@@ -215,3 +215,16 @@ export function sliderGeometry(
   });
   return geometry;
 }
+
+/** A Slider value as an array, one entry per thumb. */
+export function toArray(value: number | readonly number[]): readonly number[] {
+  return typeof value === "number" ? [value] : value;
+}
+
+/** The shape of a Slider value (fixed at mount, design 3.1). */
+export function shapeOf(
+  value: number | readonly number[] | undefined,
+): "number" | "array" | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === "number" ? "number" : "array";
+}

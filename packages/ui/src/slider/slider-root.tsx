@@ -1,6 +1,6 @@
 "use client";
 import { addTransitionType, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
@@ -17,7 +17,6 @@ import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
-import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
@@ -26,18 +25,20 @@ import type { DataAttributes } from "../internal/use-render.js";
 import {
   clampToNeighbours,
   equalValues,
-  isMaxReachable,
-  isOnGrid,
   nearestThumb,
   platformDefault,
   pointerValue,
   resolveTie,
   sanitize,
+  shapeOf,
   sliderGeometry,
   tiedRange,
+  toArray,
 } from "./slider-arithmetic.js";
 import { SliderContext } from "./slider-context.js";
 import type { SliderContextValue, SliderFieldWiring } from "./slider-context.js";
+import { useSliderDevWarnings } from "./use-slider-dev-warnings.js";
+import { useThumbRegistry } from "./use-thumb-registry.js";
 
 /** One number (one thumb) or one number per thumb, in ascending order. */
 export type SliderValue = number | readonly number[];
@@ -168,15 +169,6 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const STEP_TYPES = transitionTypes("slider", "change");
 const COMMIT_TYPES = transitionTypes("slider", "commit");
-
-function toArray(value: SliderValue): readonly number[] {
-  return typeof value === "number" ? [value] : value;
-}
-
-function shapeOf(value: SliderValue | undefined): "number" | "array" | undefined {
-  if (value === undefined) return undefined;
-  return typeof value === "number" ? "number" : "array";
-}
 
 function replaceAt(values: readonly number[], index: number, value: number): readonly number[] {
   return values.map((v, i) => (i === index ? value : v));
@@ -434,58 +426,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   // --- Thumb registry ------------------------------------------------------------------------
 
-  const [registry] = useState(() => new Map<number, HTMLInputElement>());
-  const warnedDuplicate = useRef(false);
-  const warnedForm = useRef(false);
-  const registerThumb = useCallback(
-    (index: number, input: HTMLInputElement) => {
-      const existing = registry.get(index);
-      if (isDev && existing !== undefined && existing !== input && !warnedDuplicate.current) {
-        warnedDuplicate.current = true;
-        console.error(
-          `Slider.Thumb: two Thumbs have \`index={${index}}\`. Each value needs exactly one ` +
-            `Thumb; give every Thumb a distinct index.`,
-        );
-      }
-      if (isDev && !warnedForm.current) {
-        for (const other of registry.values()) {
-          if (other !== input && other.form !== input.form) {
-            warnedForm.current = true;
-            console.error(
-              "Slider.Thumb: the thumbs of one Slider belong to different forms (a Thumb's " +
-                "`form` prop). A form reset is followed through the first thumb's form only; " +
-                "keep every thumb in one form.",
-            );
-            break;
-          }
-        }
-      }
-      registry.set(index, input);
-      return () => {
-        if (registry.get(index) === input) registry.delete(index);
-      };
-    },
-    [registry],
-  );
-
-  /** The first registered input: the form-associated element the reset subscription follows. */
-  const formElement = useMemo<RefObject<FormAssociatedElement | null>>(
-    () => ({
-      get current() {
-        let first: HTMLInputElement | null = null;
-        let firstIndex = Number.POSITIVE_INFINITY;
-        for (const [index, input] of registry) {
-          if (index < firstIndex) {
-            firstIndex = index;
-            first = input;
-          }
-        }
-        return first;
-      },
-      set current(_ignored) {},
-    }),
-    [registry],
-  );
+  const { registry, registerThumb, formElement } = useThumbRegistry();
 
   // --- Labels --------------------------------------------------------------------------------
 
@@ -735,54 +676,23 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   // --- Development warnings ------------------------------------------------------------------
 
-  useDevWarning(
-    !stepValid,
-    isDev && `Slider.Root: \`step\` must be a positive number (got ${String(stepProp)}); using 1.`,
-  );
-  useDevWarning(
-    stepValid && !isMaxReachable(min, max, step),
-    isDev &&
-      `Slider.Root: \`max\` (${max}) is not on the step grid from \`min\` (${min}) with \`step\` ` +
-        `${step}: it is unreachable, as on a native range. The last reachable value is the last ` +
-        `step below \`max\`.`,
-  );
-  const given = value ?? defaultValue;
-  const givenValues = given === undefined ? [] : toArray(given);
-  useDevWarning(
-    givenValues.some((v) => !isOnGrid(v, min, max, step)),
-    isDev &&
-      `Slider.Root: the ${value !== undefined ? "`value`" : "`defaultValue`"} ` +
-        `(${givenValues.join(", ")}) is off the step grid or outside \`min\` / \`max\`. It is ` +
-        `rendered as given and the browser sanitises it; the first user step snaps it.`,
-  );
-  useDevWarning(
-    givenValues.some((v, i) => i > 0 && v < (givenValues[i - 1] as number)),
-    isDev &&
-      `Slider.Root: the values (${givenValues.join(", ")}) must be in ascending order; the thumbs ` +
-        `would be rendered crossed.`,
-  );
-  const currentShape = shapeOf(given);
-  useDevWarning(
-    currentShape !== undefined && currentShape !== shape,
-    isDev &&
-      `Slider.Root: the value changed shape between a number and an array after mount. The shape ` +
-        `is fixed at mount; remount the Slider (a \`key\`) to change the number of thumbs.`,
-  );
-  // Inside a Field, `Field.Label` names the group (design 9.4.2).
-  const unnamedGroup =
-    shown.length > 1 &&
-    !inField &&
-    rest["aria-label"] === undefined &&
-    rest["aria-labelledby"] === undefined;
-  const warnedGroupName = useRef(false);
-  useEffect(() => {
-    if (!isDev || warnedGroupName.current || !unnamedGroup || labelCountRef.current > 0) return;
-    warnedGroupName.current = true;
-    console.error(
-      "Slider.Root: a slider with several thumbs is a `group` and needs a name: render a " +
-        "Slider.Label, or pass `aria-label` / `aria-labelledby` to the Root.",
-    );
-  }, [unnamedGroup, labelCountRef]);
+  useSliderDevWarnings({
+    stepProp,
+    stepValid,
+    min,
+    max,
+    step,
+    value,
+    defaultValue,
+    shape,
+    // Inside a Field, `Field.Label` names the group (design 9.4.2).
+    unnamedGroup:
+      shown.length > 1 &&
+      !inField &&
+      rest["aria-label"] === undefined &&
+      rest["aria-labelledby"] === undefined,
+    labelCountRef,
+  });
 
   // --- Render --------------------------------------------------------------------------------
 
