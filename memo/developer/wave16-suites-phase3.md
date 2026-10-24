@@ -25,3 +25,87 @@ Pre-hydration assertions on the server HTML moved into `mutate` unchanged.
 Not touched: dialog.test.tsx and popover.test.tsx (another developer owns them in parallel); their
 two `hydrate()` copies can switch to `hydrateFromServer(ui, { mutate, flush: null })` later.
 Titles: identical (2923 = 2923).
+
+## 2. `sequencedDeferreds` (T2 helper)
+
+`sequencedDeferreds(n)`: an array of `n` deferreds with `next()` (the n-th call gets `[n]`, throws
+past the end) and a `calls` counter (button.test.tsx asserted `calls`). Replaced the
+`[deferred(), …]; let calls = 0; ds[calls++]!.promise` idiom at 30 sites in 7 files.
+Titles identical (2923).
+
+## 3. Value-action suite (T2)
+
+`__tests__/value-action-suite.tsx`: `describeValueAction(driver)` and
+`describeValueTransitionTypes(driver)`, plus the exported `ValueHarness` (the "update on success"
+harness, used by component rows that still need it) and `definedProps`. Drivers live in
+`__tests__/drivers/<component>.tsx` because two test files use each one (the component file and its
+`*-transition-types.test.tsx`; a test file cannot import another).
+
+Driver contract: `values[0..3]` (initial, then the value gesture i dispatches), `gesture(user, i)`,
+`expectShown(v)` (the optimistic DOM, as strong as each old row's DOM checks), `expectCommitted(v)`
+(DOM that follows the committed value only: Tabs panel, `<details open>`), `pendingOn(i)` /
+`pendingOff(i)`, `queryControl()` (gone once the boundary caught), `detailsFields(i)` (the
+serialisable details; the suite asserts `Object.keys` and JSON against it), `eventType`, `props`
+(names in the warnings), `commit` (how the parent commits; ToggleGroup patches), `readShown` /
+`shown` (Profiler snapshots), `transitionTypes` (per gesture).
+
+Transition types (T19): every value component gets a `*-transition-types.test.tsx` with
+`vi.mock("react")` through `__tests__/transition-type-spy.ts` (`withTransitionTypeSpy`). The mock
+stays in small files of its own, not in the big component files, so that T14 (no isolation) only
+has to fence those files. So the suite asserts the types, but from a second entry point.
+
+Rows of the suite (each in both modes unless noted): sync action; async action (optimistic +
+pending, data-returning action, non-thenable return, unmount while pending); rejection (boundary,
+sync throw, caught inside); overlapping (uncontrolled: both resolve orders, pending until all
+settle); superseded rejection (after / while newer, first error kept + reportError, after unmount);
+suspending content (harness suspender reading the committed value); post-await rule (controlled,
+Profiler snapshots of every commit; and without startTransition); controlled veto; transition prop
+(markup equal for a class and a type map; dispatch with each); details (virtual event; Server
+Function shape); dev warnings (both props, uncontrolled -> controlled, none in normal use).
+
+### Toggle (commit 3a)
+
+Removed title (toggle.test.tsx, `Toggle …`) -> suite row (`Toggle: value action conformance …`):
+- sync action (both) calls pressedChangeAction(next, { event }) and flips (row 6) -> sync action
+  (both) dispatches (next, details) with the event and commits each gesture
+- async action (both) shows optimistic state and data-pending until the action resolves (row 8) ->
+  async action (both) shows the optimistic value and data-pending until the action resolves
+  (`data-pressed` is in the driver's `expectShown`)
+- async action (both) awaits an action that resolves with data (non-void return, row 8) -> same
+  title without the row number; ignores a non-thenable return value (sync data, row 8) -> same;
+  settles quietly when unmounted while pending (smoke test) -> same
+- rejection (both) reaches the Error Boundary, reverts optimistic state, leaves committed state
+  (row 9) -> rejection (both) reaches the Error Boundary and leaves the committed value (button
+  gone = `queryControl()` null); treats a synchronous throw like a rejection (edge case) -> same;
+  caught inside the action counts as success (row 10) -> caught inside the action counts as
+  success; only a controlled parent reverts
+- overlapping actions (uncontrolled) latest dispatch wins when resolved %s (row 11) -> the latest
+  dispatch wins when resolved %s; stays pending until every in-flight action settles (row 12) ->
+  same
+- superseded rejection (both) rows 12a / 12b / reportError / after unmount -> same four suite rows
+  (12a/12b assert the committed value of the newer dispatch, `false` here as before)
+- suspending content (both) row 13 -> suspending content (both)
+- post-await rule (row 17) aria-pressed and data-pending converge in one commit with
+  startTransition -> post-await rule (controlled parent) the shown value and data-pending converge
+  … (snapshots now from a Profiler around the control instead of a layout effect inside
+  `children`; same per-commit reading. The old row asserted exactly one commit before the click;
+  the suite asserts every pre-click commit shows the initial value, not pending)
+- post-await rule (row 17) still ends in the right state without startTransition -> same
+- controlled edge cases: snaps back when the parent never adopts the value (veto) -> controlled
+  veto: snaps back …
+- transition prop (row 18) renders the same markup with and without `transition` -> same (the map
+  now lists every fsui-toggle type); still dispatches with a transition set -> still dispatches
+  with a class / a type map as `transition` (two rows)
+- details (row 21) both rows -> details: same two titles (keys now compared exactly, `[]`)
+- dev warnings (row 19) three rows -> dev warnings: the same three (the first render of the
+  uncontrolled->controlled row is still `<Toggle>` with neither prop; `implicitDefault`)
+Kept in toggle.test.tsx: disabled never dispatches (row 7, now on `ValueHarness`), roles, keyboard,
+function props, render prop, rebase while pending, refs.
+New: toggle-transition-types.test.tsx (3 rows; Toggle had no type assertion before).
+jsdom titles: 2923 -> 2927 (-35 +35 suite, +1 transition dispatch split, +3 types).
+
+Mutations (toggle.tsx, reverted):
+1. `data-pending` never set: 23 rows fail (16 suite rows).
+2. press/release types swapped: the 3 transition-type rows fail.
+3. A "sticky" aria-pressed that never reverts after a click: suite rows "caught inside
+   (controlled)" and "controlled veto" fail.

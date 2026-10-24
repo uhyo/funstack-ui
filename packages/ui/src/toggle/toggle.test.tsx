@@ -1,94 +1,30 @@
+// Toggle tests (design/components/toggle.md section 11). The action-prop rows (sync and async
+// actions, rejection, overlap, superseded rejection, suspending content, the post-await rule, the
+// controlled veto, `transition`, details, dev warnings) come from the shared value-action suite
+// (__tests__/value-action-suite.tsx, driver __tests__/drivers/toggle.tsx); the transition types
+// are in toggle-transition-types.test.tsx. This file keeps the Toggle-specific rows.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Suspense, startTransition, useLayoutEffect, useRef, useState } from "react";
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import { useState } from "react";
+import type { ComponentPropsWithRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
-  createSuspender,
   deferred,
-  sequencedDeferreds,
-  ErrorCatcher,
   expectNotPending,
   expectPending,
   renderBoth,
   setupUser,
-  silenceErrors,
 } from "../__tests__/helpers.js";
-import type { ControlMode } from "../__tests__/helpers.js";
+import { toggleDriver } from "../__tests__/drivers/toggle.js";
+import { describeValueAction, ValueHarness } from "../__tests__/value-action-suite.js";
 import { Toggle } from "./toggle.js";
-import type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./toggle.js";
+import type { ToggleState, TogglePressedChangeDetails } from "./toggle.js";
 
 type ActionFn = (next: boolean, details: TogglePressedChangeDetails) => unknown;
 
-interface HarnessProps extends Omit<
-  ToggleProps,
-  "pressed" | "defaultPressed" | "pressedChangeAction"
-> {
-  mode: ControlMode;
-  initial?: boolean;
-  /** The consumer's work; awaited by the harness's change action. */
-  action?: ActionFn;
-  /** Catch errors thrown by `action` (turns a rejection into success for the library). */
-  catchErrors?: boolean;
-  /** Wrap only the Toggle in an `ErrorCatcher` that reports to this callback. */
-  boundary?: (error: unknown) => void;
-  /** Render the committed value through a suspender, everything inside one Suspense boundary. */
-  suspender?: ReturnType<typeof createSuspender>;
-}
-
-/**
- * Test harness for controlled/uncontrolled parity. The controlled variant follows the
- * "update on success" pattern from the design (section 2.4); the uncontrolled variant mirrors the
- * committed value in a sibling so both modes expose it the same way.
- */
-function Harness({
-  mode,
-  initial = false,
-  action,
-  catchErrors = false,
-  boundary,
-  suspender,
-  children = "Favorite",
-  ...rest
-}: HarnessProps) {
-  const [committed, setCommitted] = useState(initial);
-  const [error, setError] = useState<unknown>(null);
-
-  const pressedChangeAction = async (next: boolean, details: TogglePressedChangeDetails) => {
-    try {
-      await action?.(next, details);
-    } catch (e) {
-      if (!catchErrors) throw e;
-      startTransition(() => setError(e));
-      return;
-    }
-    startTransition(() => setCommitted(next));
-  };
-
-  const modeProps = mode === "controlled" ? { pressed: committed } : { defaultPressed: initial };
-  let toggle: ReactNode = (
-    <Toggle {...modeProps} pressedChangeAction={pressedChangeAction} {...rest}>
-      {children}
-    </Toggle>
-  );
-  if (boundary) toggle = <ErrorCatcher onError={boundary}>{toggle}</ErrorCatcher>;
-
-  const content = (
-    <>
-      {toggle}
-      <output data-testid="committed">{String(committed)}</output>
-      {error !== null && <output data-testid="error">{String(error)}</output>}
-      {suspender && <suspender.Suspender value={String(committed)} />}
-    </>
-  );
-  return suspender ? (
-    <Suspense fallback={<span data-testid="fallback">loading</span>}>{content}</Suspense>
-  ) : (
-    content
-  );
-}
-
 const button = () => screen.getByRole("button");
 const committed = () => screen.getByTestId("committed");
+
+describeValueAction(toggleDriver);
 
 describe("Toggle", () => {
   describe("roles and ARIA", () => {
@@ -196,32 +132,17 @@ describe("Toggle", () => {
   });
 
   renderBoth("sync action", (mode) => {
-    it("calls pressedChangeAction(next, { event }) and flips (row 6)", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(button());
-      expect(action).toHaveBeenCalledTimes(1);
-      const [next, details] = action.mock.calls[0]!;
-      expect(next).toBe(true);
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(details.event?.type).toBe("click");
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expectNotPending(button());
-      expect(committed()).toHaveTextContent("true");
-
-      await user.click(button());
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]?.[0]).toBe(false);
-      expect(button()).toHaveAttribute("aria-pressed", "false");
-      expect(committed()).toHaveTextContent("false");
-    });
-
     it("disabled never dispatches, even through ref.click() (row 7)", async () => {
       const action = vi.fn<ActionFn>();
       const ref = { current: null as HTMLButtonElement | null };
-      render(<Harness mode={mode} action={action} disabled ref={ref} />);
+      render(
+        <ValueHarness
+          driver={toggleDriver}
+          mode={mode}
+          action={action}
+          extra={{ disabled: true, ref }}
+        />,
+      );
       const user = setupUser();
 
       await user.click(button());
@@ -234,323 +155,6 @@ describe("Toggle", () => {
       expect(action).not.toHaveBeenCalled();
       expect(button()).toHaveAttribute("aria-pressed", "false");
       expect(committed()).toHaveTextContent("false");
-    });
-  });
-
-  renderBoth("async action", (mode) => {
-    it("shows optimistic state and data-pending until the action resolves (row 8)", async () => {
-      const d = deferred();
-      const action = vi.fn<ActionFn>(() => d.promise);
-      render(<Harness mode={mode} action={action} />);
-      const user = setupUser();
-
-      await user.click(button());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expect(button()).toHaveAttribute("data-pressed", "");
-      expectPending(button());
-      expect(committed()).toHaveTextContent("false");
-
-      await act(async () => {
-        d.resolve();
-      });
-      expectNotPending(button());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expect(committed()).toHaveTextContent("true");
-    });
-
-    it("awaits an action that resolves with data (non-void return, row 8)", async () => {
-      const d = deferred<{ ok: boolean }>();
-      const save = (_next: boolean): Promise<{ ok: boolean }> => d.promise;
-      // Type-level: `(next) => save(next)` returns `Promise<{ ok }>`, which `Action` must accept.
-      render(<Harness mode={mode} action={(next) => save(next)} />);
-      const user = setupUser();
-
-      await user.click(button());
-      expectPending(button());
-      await act(async () => {
-        d.resolve({ ok: true });
-      });
-      expectNotPending(button());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expect(committed()).toHaveTextContent("true");
-    });
-
-    it("ignores a non-thenable return value (sync data, row 8)", async () => {
-      render(<Harness mode={mode} action={() => 42} />);
-      const user = setupUser();
-      await user.click(button());
-      expectNotPending(button());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expect(committed()).toHaveTextContent("true");
-    });
-
-    it("settles quietly when unmounted while pending (smoke test)", async () => {
-      const consoleError = silenceErrors();
-      const d = deferred();
-      const { unmount } = render(<Harness mode={mode} action={() => d.promise} />);
-      const user = setupUser();
-
-      await user.click(button());
-      expectPending(button());
-      unmount();
-      await act(async () => {
-        d.resolve();
-      });
-      expect(consoleError).not.toHaveBeenCalled();
-    });
-  });
-
-  renderBoth("rejection", (mode) => {
-    it("reaches the Error Boundary, reverts optimistic state, leaves committed state (row 9)", async () => {
-      silenceErrors();
-      const d = deferred();
-      const onError = vi.fn();
-      render(<Harness mode={mode} action={() => d.promise} boundary={onError} />);
-      const user = setupUser();
-
-      await user.click(button());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expectPending(button());
-
-      const err = new Error("save failed");
-      await act(async () => {
-        d.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
-      expect(committed()).toHaveTextContent("false");
-    });
-
-    it("treats a synchronous throw like a rejection (edge case)", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const err = new Error("sync boom");
-      render(
-        <Harness
-          mode={mode}
-          action={() => {
-            throw err;
-          }}
-          boundary={onError}
-        />,
-      );
-      const user = setupUser();
-
-      await user.click(button());
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-      expect(committed()).toHaveTextContent("false");
-    });
-
-    it("caught inside the action counts as success (row 10)", async () => {
-      const d = deferred();
-      render(<Harness mode={mode} action={() => d.promise} catchErrors />);
-      const user = setupUser();
-
-      await user.click(button());
-      expectPending(button());
-      await act(async () => {
-        d.reject(new Error("vetoed"));
-      });
-
-      expectNotPending(button());
-      expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
-      // The harness never adopted the value in either mode...
-      expect(committed()).toHaveTextContent("false");
-      // ...but only a controlled parent can veto: uncontrolled commits `true`.
-      expect(button()).toHaveAttribute("aria-pressed", mode === "controlled" ? "false" : "true");
-    });
-  });
-
-  describe("overlapping actions (uncontrolled)", () => {
-    it.each([
-      ["second then first", [1, 0]],
-      ["first then second", [0, 1]],
-    ] as const)("latest dispatch wins when resolved %s (row 11)", async (_label, order) => {
-      const deferreds = sequencedDeferreds(2);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode="uncontrolled" action={action} />);
-      const user = setupUser();
-
-      await user.click(button());
-      await user.click(button());
-      expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
-      expect(button()).toHaveAttribute("aria-pressed", "false");
-      expectPending(button());
-
-      for (const i of order) {
-        await act(async () => {
-          deferreds[i]!.resolve();
-        });
-      }
-      expect(button()).toHaveAttribute("aria-pressed", "false");
-      expectNotPending(button());
-    });
-
-    it("stays pending until every in-flight action settles (row 12)", async () => {
-      const deferreds = sequencedDeferreds(2);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode="uncontrolled" action={action} />);
-      const user = setupUser();
-
-      await user.click(button());
-      await user.click(button());
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expectPending(button());
-      expect(button()).toHaveAttribute("aria-pressed", "false");
-
-      await act(async () => {
-        deferreds[0]!.resolve();
-      });
-      expectNotPending(button());
-    });
-  });
-
-  renderBoth("superseded rejection", (mode) => {
-    function renderTwoClicks(onError: (error: unknown) => void, count = 2) {
-      const deferreds = sequencedDeferreds(count);
-      const action = vi.fn<ActionFn>(() => deferreds.next());
-      render(<Harness mode={mode} action={action} boundary={onError} />);
-      return { deferreds, action };
-    }
-
-    it("reaches the boundary when the older action rejects after the newer resolved (row 12a)", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds, action } = renderTwoClicks(onError);
-      const user = setupUser();
-
-      await user.click(button());
-      await user.click(button());
-      expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
-
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).not.toHaveBeenCalled();
-      expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "false");
-
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-      expect(committed()).toHaveTextContent("false");
-    });
-
-    it("reaches the boundary when the older action rejects while the newer is pending (row 12b)", async () => {
-      silenceErrors();
-      const onError = vi.fn();
-      const { deferreds } = renderTwoClicks(onError);
-      const user = setupUser();
-
-      await user.click(button());
-      await user.click(button());
-      expectPending(button());
-
-      const err = new Error("older save failed");
-      await act(async () => {
-        deferreds[0]!.reject(err);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(err);
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-
-      // The newer action's outcome is unaffected and nothing is thrown a second time.
-      await act(async () => {
-        deferreds[1]!.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-      expect(committed()).toHaveTextContent("false");
-    });
-
-    it("keeps the first superseded error and reports later ones through reportError", async () => {
-      silenceErrors();
-      const reportError = vi.fn();
-      vi.stubGlobal("reportError", reportError);
-      const onError = vi.fn();
-      const { deferreds } = renderTwoClicks(onError, 3);
-      const user = setupUser();
-
-      await user.click(button());
-      await user.click(button());
-      await user.click(button());
-
-      const first = new Error("first");
-      const second = new Error("second");
-      await act(async () => {
-        deferreds[0]!.reject(first);
-        deferreds[1]!.reject(second);
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(first);
-      expect(reportError).toHaveBeenCalledTimes(1);
-      expect(reportError).toHaveBeenCalledWith(second);
-
-      await act(async () => {
-        deferreds[2]!.resolve();
-      });
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(reportError).toHaveBeenCalledTimes(1);
-      vi.unstubAllGlobals();
-    });
-
-    it("ignores a superseded rejection after unmount (smoke test)", async () => {
-      const consoleError = silenceErrors();
-      const reportError = vi.fn();
-      vi.stubGlobal("reportError", reportError);
-      const onError = vi.fn();
-      const deferreds = sequencedDeferreds(2);
-      const { unmount } = render(
-        <Harness mode={mode} action={() => deferreds.next()} boundary={onError} />,
-      );
-      const user = setupUser();
-
-      await user.click(button());
-      await user.click(button());
-      unmount();
-      await act(async () => {
-        deferreds[0]!.reject(new Error("too late"));
-        deferreds[1]!.resolve();
-      });
-      expect(onError).not.toHaveBeenCalled();
-      expect(reportError).not.toHaveBeenCalled();
-      expect(consoleError).not.toHaveBeenCalled();
-      vi.unstubAllGlobals();
-    });
-  });
-
-  renderBoth("suspending content", (mode) => {
-    it("keeps old content, no fallback, pending while the new content loads (row 13)", async () => {
-      const suspender = createSuspender();
-      suspender.resolve("false");
-      render(<Harness mode={mode} suspender={suspender} />);
-      const user = setupUser();
-      expect(screen.getByTestId("suspender")).toHaveTextContent("false");
-
-      await user.click(button());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expectPending(button());
-      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
-      expect(screen.getByTestId("suspender")).toHaveTextContent("false");
-      expect(committed()).toHaveTextContent("false");
-
-      await act(async () => {
-        suspender.resolve("true");
-      });
-      expect(screen.getByTestId("suspender")).toHaveTextContent("true");
-      expect(committed()).toHaveTextContent("true");
-      expectNotPending(button());
-      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
     });
   });
 
@@ -884,101 +488,7 @@ describe("Toggle", () => {
     });
   });
 
-  describe("post-await rule (row 17)", () => {
-    function Parent({
-      promise,
-      wrap,
-      children = "Favorite",
-    }: { promise: Promise<void>; wrap: boolean } & Pick<ToggleProps, "children">) {
-      const [pressed, setPressed] = useState(false);
-      return (
-        <Toggle
-          pressed={pressed}
-          pressedChangeAction={async (next) => {
-            await promise;
-            if (wrap) startTransition(() => setPressed(next));
-            else setPressed(next);
-          }}
-        >
-          {children}
-        </Toggle>
-      );
-    }
-
-    it("aria-pressed and data-pending converge in one commit with startTransition", async () => {
-      const d = deferred();
-      // A layout effect inside `children` runs after every commit of the Toggle, so it sees each
-      // intermediate commit (a MutationObserver would coalesce commits made in the same task).
-      const snapshots: { pressed: string | null; pending: boolean }[] = [];
-      function Recorder() {
-        const ref = useRef<HTMLSpanElement>(null);
-        useLayoutEffect(() => {
-          // Own ref rather than the Toggle's: a child's layout effect runs before the parent's
-          // ref is attached within the same commit.
-          const el = ref.current!.closest("button")!;
-          snapshots.push({
-            pressed: el.getAttribute("aria-pressed"),
-            pending: el.hasAttribute("data-pending"),
-          });
-        });
-        return <span ref={ref}>Favorite</span>;
-      }
-      render(
-        <Parent promise={d.promise} wrap>
-          {() => <Recorder />}
-        </Parent>,
-      );
-      const user = setupUser();
-      expect(snapshots).toEqual([{ pressed: "false", pending: false }]);
-
-      await user.click(button());
-      expect(snapshots.at(-1)).toEqual({ pressed: "true", pending: true });
-      const afterClick = snapshots.length;
-      await act(async () => {
-        d.resolve();
-      });
-
-      expect(snapshots.length).toBeGreaterThan(afterClick);
-      expect(snapshots.at(-1)).toEqual({ pressed: "true", pending: false });
-      // No commit after the click ever showed the old value again.
-      expect(snapshots.slice(1).every((s) => s.pressed === "true")).toBe(true);
-    });
-
-    it("still ends in the right state without startTransition (documented limitation)", async () => {
-      const d = deferred();
-      render(<Parent promise={d.promise} wrap={false} />);
-      const user = setupUser();
-
-      await user.click(button());
-      await act(async () => {
-        d.resolve();
-      });
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expectNotPending(button());
-    });
-  });
-
   describe("controlled edge cases", () => {
-    it("snaps back when the parent never adopts the value (veto)", async () => {
-      const d = deferred();
-      render(
-        <Toggle pressed={false} pressedChangeAction={() => d.promise}>
-          Favorite
-        </Toggle>,
-      );
-      const user = setupUser();
-
-      await user.click(button());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-      expectPending(button());
-      await act(async () => {
-        d.resolve();
-      });
-      expect(button()).toHaveAttribute("aria-pressed", "false");
-      expect(button()).not.toHaveAttribute("data-pressed");
-      expectNotPending(button());
-    });
-
     it("rebases the optimistic value when `pressed` changes externally while pending", async () => {
       const d = deferred();
       function Parent() {
@@ -1008,115 +518,6 @@ describe("Toggle", () => {
       });
       expect(toggle).toHaveAttribute("aria-pressed", "true");
       expectNotPending(toggle);
-    });
-  });
-
-  describe("transition prop (row 18)", () => {
-    it("renders the same markup with and without `transition`", () => {
-      const plain = render(<Toggle defaultPressed>Favorite</Toggle>).container.innerHTML;
-      const str = render(
-        <Toggle defaultPressed transition="fsui-fade">
-          Favorite
-        </Toggle>,
-      ).container.innerHTML;
-      const map = render(
-        <Toggle
-          defaultPressed
-          transition={{
-            "fsui-toggle-press": "pop",
-            "fsui-toggle-release": "fade",
-            default: "none",
-          }}
-        >
-          Favorite
-        </Toggle>,
-      ).container.innerHTML;
-      expect(str).toBe(plain);
-      expect(map).toBe(plain);
-    });
-
-    it("still dispatches with a transition set", async () => {
-      const action = vi.fn<ActionFn>();
-      render(
-        <Toggle transition="fsui-fade" pressedChangeAction={action}>
-          Favorite
-        </Toggle>,
-      );
-      const user = setupUser();
-      await user.click(button());
-      expect(action).toHaveBeenCalledWith(true, expect.anything());
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-    });
-  });
-
-  describe("details (row 21)", () => {
-    it("exposes `event` as a virtual, non-own property", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Toggle pressedChangeAction={action}>Favorite</Toggle>);
-      const user = setupUser();
-
-      await user.click(button());
-      const details = action.mock.calls[0]![1];
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(details.event?.type).toBe("click");
-      expect("event" in details).toBe(true);
-      expect(Object.keys(details)).not.toContain("event");
-      expect({ ...details }).not.toHaveProperty("event");
-      expect(JSON.stringify(details)).toBe(JSON.stringify({}));
-      expect(Object.isExtensible(details)).toBe(true);
-    });
-
-    it("can be passed straight to a Server-Function-shaped action", async () => {
-      // A Server Function is just an async function to the library; it receives `(next, details)`
-      // and the serialiser only ever sees the real fields.
-      const serverFn = vi.fn(async (_next: boolean, _details: TogglePressedChangeDetails) => {});
-      render(<Toggle pressedChangeAction={serverFn}>Favorite</Toggle>);
-      const user = setupUser();
-
-      await user.click(button());
-      expect(serverFn).toHaveBeenCalledTimes(1);
-      const [next, details] = serverFn.mock.calls[0]!;
-      expect(next).toBe(true);
-      expect(details.event).toBeInstanceOf(window.Event);
-      expect(JSON.parse(JSON.stringify([next, details]))).toEqual([true, {}]);
-      expect(button()).toHaveAttribute("aria-pressed", "true");
-    });
-  });
-
-  describe("dev warnings (row 19)", () => {
-    it("warns once when pressed and defaultPressed are both set", () => {
-      const consoleError = silenceErrors();
-      const { rerender } = render(
-        <Toggle pressed defaultPressed>
-          Favorite
-        </Toggle>,
-      );
-      rerender(
-        <Toggle pressed defaultPressed>
-          Favorite
-        </Toggle>,
-      );
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(/both `pressed` and `defaultPressed`/);
-    });
-
-    it("warns once when switching from uncontrolled to controlled", () => {
-      const consoleError = silenceErrors();
-      const { rerender } = render(<Toggle>Favorite</Toggle>);
-      expect(consoleError).not.toHaveBeenCalled();
-      rerender(<Toggle pressed>Favorite</Toggle>);
-      rerender(<Toggle pressed={false}>Favorite</Toggle>);
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError.mock.calls[0]?.[0]).toMatch(/uncontrolled to controlled/);
-    });
-
-    it("does not warn in normal use", async () => {
-      const consoleError = silenceErrors();
-      const { rerender } = render(<Toggle defaultPressed>Favorite</Toggle>);
-      const user = setupUser();
-      await user.click(button());
-      rerender(<Toggle defaultPressed={false}>Favorite</Toggle>);
-      expect(consoleError).not.toHaveBeenCalled();
     });
   });
 
