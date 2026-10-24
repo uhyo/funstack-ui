@@ -17,6 +17,20 @@ function decodeEntities(value: string): string {
     .replaceAll("&amp;", "&");
 }
 
+/** The percent-decoded fragment, or undefined when it has a malformed escape (a broken link). */
+function decodeFragment(fragment: string): string | undefined {
+  try {
+    return decodeURIComponent(fragment);
+  } catch {
+    return undefined;
+  }
+}
+
+function hasId(ids: Set<string>, fragment: string): boolean {
+  const id = decodeFragment(fragment);
+  return id !== undefined && ids.has(id);
+}
+
 function pagePathOf(file: string): string {
   const withoutExt = file
     .replace(/\.html$/, "")
@@ -42,13 +56,15 @@ export async function checkInternalLinks(outDir: string): Promise<string[]> {
       const href = decodeEntities(match[1]!);
       if (!href.startsWith("#") && !(href.startsWith("/") && !href.startsWith("//"))) continue;
       const hashIndex = href.indexOf("#");
-      const targetPath = hashIndex === -1 ? href : href.slice(0, hashIndex) || pagePath;
+      const beforeHash = hashIndex === -1 ? href : href.slice(0, hashIndex);
+      // A query string does not select a different page.
+      const targetPath = beforeHash.split("?")[0] || pagePath;
       const fragment = hashIndex === -1 ? "" : href.slice(hashIndex + 1);
       const target = pages.get(targetPath);
       if (target === undefined) {
         if (fragment === "" && fileSet.has(targetPath)) continue;
         errors.push(`${pagePath}: link to missing page ${href}`);
-      } else if (fragment !== "" && !target.ids.has(decodeURIComponent(fragment))) {
+      } else if (fragment !== "" && !hasId(target.ids, fragment)) {
         errors.push(`${pagePath}: link to missing anchor ${href}`);
       }
     }
