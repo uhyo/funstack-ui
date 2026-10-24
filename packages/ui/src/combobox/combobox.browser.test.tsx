@@ -1128,7 +1128,8 @@ describe("Trigger close (#112, browser)", () => {
 // pointer to the Popup; the release then lands on the Popup, whose topmost clicked popover is the
 // listbox itself. These rows check what the capture must not break: the caret, the double click,
 // nesting, touch and the drag-selection (whose Firefox cost the design documents). The plain
-// press is #117's row above. Outside React's act environment, as #117's rows.
+// press is #117's row ("a real press while open", below). Outside React's act environment, as
+// #117's rows.
 describe("Input press (#123, browser)", () => {
   let restoreAct: (() => void) | undefined;
 
@@ -1262,14 +1263,14 @@ describe("Input press (#123, browser)", () => {
   // without it, as the Menu and NumberField touch rows. The touch compat `mousedown` / `click`
   // come after `pointerup`, so only a capture at `pointerdown` keeps the listbox (design 5.4).
   //
-  // Chromium inside a frame (#123 finding, memo/developer/issue-123.md): the capture keeps a
-  // touch tap from light-dismissing in a top-level document, but in a same-origin iframe
-  // Chromium still hides the listbox at the tap's `click` (mouse presses are fine there; Firefox
-  // keeps it open in both; probed in plain DOM with Playwright's touchscreen too). vitest's
-  // runner is such a frame, so the frame branch is what runs here; it asserts the documented
-  // close, and fails the day Chromium changes.
+  // Chromium inside a frame (#124, memo/developer/issue-123.md): the capture keeps a touch tap
+  // from light-dismissing in a top-level document, but in a same-origin iframe Chromium still
+  // hides the listbox at the tap's `click` (mouse presses are fine there; Firefox keeps it open
+  // in both; probed in plain DOM with Playwright's touchscreen too). vitest's runner is such a
+  // frame, so the frame branch is what runs here; it asserts the documented close, and fails the
+  // day Chromium changes.
   it.runIf(browserName === "chromium")(
-    "a touch tap on the input (CDP): the listbox stays (Chromium in a frame: dismissed, #123), focus and text kept",
+    "a touch tap on the input (CDP): the listbox stays (Chromium in a frame: dismissed, #124), focus and text kept",
     async () => {
       const openAction = vi.fn<OpenAction>();
       const valueAction = vi.fn<ValueAction>();
@@ -1508,15 +1509,12 @@ describe("a real press while open (#117, browser)", () => {
     ]);
   });
 
-  // #123 (current behaviour, pinned): design 5.1 and the research's probe table say a press on
-  // the input does not light-dismiss, because the popup was shown with `{ source: input }`. Real
-  // presses say otherwise in Chromium and Firefox: HTML's "topmost clicked popover" exempts only
-  // an invoker button's `commandfor` / `popovertarget`, not the `source`, so the press closes the
-  // listbox at `pointerup` with `(false, "dismiss")` from the `toggle`. The research probed with a
-  // synthesised click (no `pointerdown` / `pointerup`, so no light dismiss). This row asserts
-  // today's outcome so every other part of it stays guarded; it fails, and must be rewritten to
-  // the decided behaviour, when #123 is fixed.
-  it("the input (the popup's source), #123 today: light-dismissed at the release; focus, text and value untouched", async () => {
+  // #123: `source` is no light-dismiss exemption (HTML's "topmost clicked popover" reads only an
+  // invoker button's `commandfor` / `popovertarget`), so the Input captures the pointer to the
+  // Popup at `pointerdown` while the listbox is shown; the release lands on the Popup and nothing
+  // hides (design 5.4). The caret, double click, drag, nesting and touch rows are in
+  // "Input press (#123, browser)".
+  it("the input: nothing closes or dispatches; the input keeps focus and its text", async () => {
     const valueAction = vi.fn<ValueAction>();
     const openAction = vi.fn<OpenAction>();
     render(<Harness root={{ valueChangeAction: valueAction, openChangeAction: openAction }} />);
@@ -1524,16 +1522,13 @@ describe("a real press while open (#117, browser)", () => {
     const calls = openAction.mock.calls.length;
     const atPress = await press(input());
     expect(atPress).toEqual({ open: true, focus: input() });
-    await expect.poll(() => isOpen()).toBe(false);
+    await quietPeriod(80, "a press on the input must neither close nor dispatch");
+    expect(isOpen()).toBe(true);
     expect(document.activeElement).toBe(input());
     expect(input().value).toBe("j");
-    await quietPeriod(80, "the listbox must not re-open");
-    expect(isOpen()).toBe(false);
-    expect(input()).toHaveAttribute("aria-expanded", "false");
+    expect(input()).toHaveAttribute("aria-expanded", "true");
     expect(valueAction).not.toHaveBeenCalled();
-    expect(
-      openAction.mock.calls.slice(calls).map(([n, d]) => [n, d.reason, d.event?.type]),
-    ).toEqual([[false, "dismiss", "toggle"]]);
+    expect(openAction).toHaveBeenCalledTimes(calls);
   });
 
   for (const [where, target, at] of [

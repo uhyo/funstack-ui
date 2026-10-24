@@ -40,7 +40,9 @@ option listed, caret points from canvas `measureText` with the input's computed 
 - touch tap (CDP, Chromium only, as the Menu / NumberField touch rows): see the finding below.
 Mutation: with the Input's handler removed, all 9 (chromium + firefox) fail.
 
-The #117 row ("the input (the popup's source)") is flipped after #117 lands (see below).
+The #117 row is flipped (after rebasing onto #117): "the input: nothing closes or dispatches; the
+input keeps focus and its text" (shown at the press and 80 ms after the release, focus and text
+kept, `aria-expanded="true"`, no dispatch).
 
 ## Finding: Chromium, touch, inside an iframe
 
@@ -58,8 +60,8 @@ Event order in the iframe is identical to top-level: `pointerdown:input`, `point
 `mousedown` / `mouseup` / `click:input`, then `toggle`. Without capture both close; a tap inside
 the popup or on a `commandfor` invoker stays open in the iframe. So Chromium's click-time
 comparison (`LightDismissFromClick`) does not see the captured `pointerup` target for a touch
-gesture in a subframe. Looks like a Chromium bug (a human task to report; candidate for a GitHub
-issue in this repo). vitest's runner is an iframe, so the touch row branches on
+gesture in a subframe. Looks like a Chromium bug; recorded as #124 (human task to report
+upstream). vitest's runner is an iframe, so the touch row branches on
 `window === window.top` and asserts the close with `(false, "dismiss", "toggle")` in a frame.
 Probe script was in the session scratchpad (touch-probe2.mjs); the matrix above is the result.
 
