@@ -233,15 +233,6 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
     [isLibrary, intended, send],
   );
 
-  // Same guard as `requestClose`; a separate name because the callers mean different things.
-  const notifyClosed = useCallback(
-    (event: Event | undefined, reason: ChangeReason): void => {
-      if (!isLibrary || !intended()) return;
-      send(false, event, reason);
-    },
-    [isLibrary, intended, send],
-  );
-
   const ids = useMemo(
     () => ({ popup: id, title: `${id}-title`, description: `${id}-description` }),
     [id],
@@ -261,7 +252,9 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
       nextOpenGeneration,
       requestOpen,
       requestClose,
-      notifyClosed,
+      // The same function as `requestClose`; a separate name because the callers mean different
+      // things (a part asks to close; the platform already closed).
+      notifyClosed: requestClose,
       latestInFlight,
       triggerRef,
       popupRef,
@@ -280,7 +273,6 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
       nextOpenGeneration,
       requestOpen,
       requestClose,
-      notifyClosed,
       latestInFlight,
       recordCloseIntent,
       takeCloseIntent,
