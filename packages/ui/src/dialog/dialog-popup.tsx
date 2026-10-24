@@ -190,7 +190,7 @@ export function DialogPopup({
 }: DialogPopupProps) {
   const ctx = useDialogContext("Dialog.Popup");
   const isLibrary = ctx.mode === "library";
-  const { modal, ids, dialogRef, triggerRef } = ctx;
+  const { modal, ids, popupRef, triggerRef } = ctx;
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
   // Set by the synchronous `beforetoggle` of a close, cleared by the `close` event a task later:
   // the dialog is closed but its notification is not dispatched yet, so the apply effect must
@@ -228,7 +228,7 @@ export function DialogPopup({
 
   // Whether the content unmounted while holding focus since the dialog was last shown: a close
   // with `transition` removes the focused Close part before `close()` runs (design 6.2 rule 2).
-  const contentProbe = useContentFocusProbe(dialogRef);
+  const contentProbe = useContentFocusProbe(popupRef);
   const { wrapContent } = contentProbe;
 
   // Toast's Viewport moves its region into the topmost open modal (design/components/toast.md 4.3).
@@ -258,14 +258,14 @@ export function DialogPopup({
   const libraryRef = useCallback(
     (element: HTMLDialogElement) => {
       checkElement?.(element);
-      dialogRef.current = element;
+      popupRef.current = element;
       setDialog(element);
       return () => {
-        if (dialogRef.current === element) dialogRef.current = null;
+        if (popupRef.current === element) popupRef.current = null;
         setDialog(null);
       };
     },
-    [checkElement, dialogRef],
+    [checkElement, popupRef],
   );
 
   // --- Opening -----------------------------------------------------------------------------
@@ -301,7 +301,7 @@ export function DialogPopup({
   // Mount reconciliation (design 2.4): a click before hydration opened the dialog natively.
   // Runs before the apply effect; the dispatch makes the apply effect wait for it.
   const reconcileOnMount = useEffectEvent(() => {
-    const element = dialogRef.current;
+    const element = popupRef.current;
     if (element === null || !element.open) return;
     ctx.requestOpen(undefined, "platform");
   });
@@ -333,7 +333,7 @@ export function DialogPopup({
   // do not rely on an unrelated render to re-apply state.
   useLayoutEffect(() => {
     if (!isLibrary) return;
-    const element = dialogRef.current;
+    const element = popupRef.current;
     if (element === null || !element.isConnected) return;
     if (!ctx.pending && ctx.latestInFlight() === null) {
       const dismissed = dismissedWhilePending.current;
@@ -393,7 +393,7 @@ export function DialogPopup({
   // --- Native listeners (conventions 7.4) ---------------------------------------------------
 
   const onCommand = useEffectEvent((event: Event) => {
-    if (event.target !== dialogRef.current || event.defaultPrevented) return;
+    if (event.target !== popupRef.current || event.defaultPrevented) return;
     const command = String((event as Event & { command?: string }).command ?? "").toLowerCase();
     if (command === "show-modal") {
       // A foreign invoker (design 2.2): opening goes through the library in library mode.
@@ -417,7 +417,7 @@ export function DialogPopup({
   // On the dialog's root node (the document, or a shadow root: `submit` is not composed), bubble
   // phase: after React's root listener, so a consumer's `onSubmit` has run (design 8.1).
   const onSubmit = useEffectEvent((event: Event) => {
-    const element = dialogRef.current;
+    const element = popupRef.current;
     const form = event.target;
     if (element === null || !(form instanceof HTMLFormElement)) return;
     if (form.closest("dialog") !== element) return;
@@ -441,7 +441,7 @@ export function DialogPopup({
   });
 
   const onClose = useEffectEvent((event: Event) => {
-    const element = dialogRef.current;
+    const element = popupRef.current;
     if (element === null || event.target !== element) return;
     awaitingClose.current = false;
 
@@ -491,7 +491,7 @@ export function DialogPopup({
   });
 
   const onBeforeToggle = useEffectEvent((event: Event) => {
-    const element = dialogRef.current;
+    const element = popupRef.current;
     if (element === null || event.target !== element) return;
     const newState = (event as ToggleEvent).newState;
     awaitingClose.current = newState === "closed";
@@ -645,7 +645,7 @@ export function DialogPopup({
     );
 
   const libraryProps: ComponentPropsWithRef<"dialog"> & DataAttributes = {
-    id: ids.dialog,
+    id: ids.popup,
     // Never rendered: removing `open` by hand hides a modal dialog without `close` and leaves
     // `:modal` true (research). Owned so a `render` element cannot add it.
     open: undefined,

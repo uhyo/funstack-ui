@@ -89,7 +89,7 @@ export function DialogForm({
   ...rest
 }: DialogFormProps) {
   const ctx = useDialogContext("Dialog.Form");
-  const { dialogRef, recordCloseIntent, requestClose } = ctx;
+  const { popupRef, recordCloseIntent, requestClose } = ctx;
   const isLibrary = ctx.mode === "library";
   const [pending, setPending] = useState(false);
   const submission = useRef<{ event: Event; returnValue: string } | null>(null);
@@ -125,7 +125,7 @@ export function DialogForm({
   // `clean`: no field error in the settle's result (always `true` without a `Form.Root`).
   const onSettled = useCallback(
     (clean: boolean) => {
-      const dialog = dialogRef.current;
+      const dialog = popupRef.current;
       const submitted = submission.current;
       submission.current = null;
       if (!closeOnSettle || closedSinceSubmit.current) return;
@@ -143,7 +143,7 @@ export function DialogForm({
       recordCloseIntent({ reason: "activate", event: submitted?.event });
       dialog.close(returnValue);
     },
-    [closeOnSettle, dialogRef, isLibrary, recordCloseIntent, requestClose],
+    [closeOnSettle, popupRef, isLibrary, recordCloseIntent, requestClose],
   );
 
   const state: DialogFormState = { pending };

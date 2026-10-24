@@ -69,13 +69,13 @@ export function DialogClose({
   ...rest
 }: DialogCloseProps) {
   const ctx = useDialogContext("Dialog.Close");
-  const { dialogRef, recordCloseIntent } = ctx;
+  const { popupRef, recordCloseIntent } = ctx;
   const isLibrary = ctx.mode === "library";
   return useOverlayClose({
     part: "Dialog.Close",
     noun: "dialog",
     isLibrary,
-    popupId: ctx.ids.dialog,
+    popupId: ctx.ids.popup,
     command: "request-close",
     openGeneration: ctx.openGeneration,
     action,
@@ -89,7 +89,7 @@ export function DialogClose({
         return;
       }
       // JS-free mode with `action`: a browser-owned close; there is no Root state to go through.
-      const dialog = dialogRef.current;
+      const dialog = popupRef.current;
       if (dialog === null || !dialog.open) return;
       recordCloseIntent({ reason: "activate", event });
       dialog.close(returnValue);

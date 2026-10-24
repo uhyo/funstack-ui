@@ -33,10 +33,12 @@ export interface PopoverLikeDetails extends ActionDetails {
 }
 
 /**
- * The Root's state and machinery, shared by Popover and Menu (design 14). The component puts it
- * in its own context; `usePopoverTrigger` and `usePopoverPopup` take it as their first argument.
+ * The Root's state and machinery, shared by Popover, Menu, Combobox (design 14) and Dialog. The
+ * component puts it in its own context; `usePopoverTrigger` and `usePopoverPopup` take it as their
+ * first argument. `Popup` is the popup element's type; `CloseArgs` are the extra arguments of a
+ * close (Dialog's `returnValue`), passed on to the `details` builder.
  */
-export interface PopoverRootValue {
+export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends unknown[]> {
   readonly mode: PopoverMode;
   /** `useId`-based ids: the popup, its Title and its Description. */
   readonly ids: { readonly popup: string; readonly title: string; readonly description: string };
@@ -70,24 +72,34 @@ export interface PopoverRootValue {
    * activation. `openChangeAction(false)` is awaited and the popup hides in the commit. A no-op
    * when `false` is already intended.
    */
-  readonly requestClose: (event: Event | undefined, reason: ChangeReason) => void;
+  readonly requestClose: (
+    event: Event | undefined,
+    reason: ChangeReason,
+    ...args: CloseArgs
+  ) => void;
   /**
    * The browser hid the popup (a dismissal or a foreign invoker): dispatch the `false`
    * notification unless `false` is already intended (the library's own echo, or a dismissal
    * during a pending part-initiated close).
    */
-  readonly notifyClosed: (event: Event | undefined, reason: ChangeReason) => void;
+  readonly notifyClosed: (
+    event: Event | undefined,
+    reason: ChangeReason,
+    ...args: CloseArgs
+  ) => void;
   /** From `useControllableAction`: the latest in-flight intent, or `null`. */
   readonly latestInFlight: () => { readonly next: boolean } | null;
   /** The registered Trigger: `showPopover({ source })` and the focus-return fallback. */
   readonly triggerRef: RefObject<HTMLElement | null>;
-  /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()`. */
-  readonly popupRef: RefObject<HTMLElement | null>;
+  /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()` / `close()`. */
+  readonly popupRef: RefObject<Popup | null>;
   /** Record what causes the next close. Cleared after a task if the popover did not close. */
   readonly recordCloseIntent: (intent: PopoverCloseIntent | undefined) => void;
   /** Read and clear the recorded intent (the Popup's `toggle` listener). */
   readonly takeCloseIntent: () => PopoverCloseIntent | undefined;
 }
+
+export type PopoverRootValue = OverlayRootValue<HTMLElement, []>;
 
 export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
   /** Transition types and messages: `"popover"` gives `fsui-popover`, `fsui-popover-open`, … */
@@ -98,11 +110,6 @@ export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
   readonly defaultOpen: boolean | undefined;
   readonly openChangeAction: ChangeAction<boolean, Details> | undefined;
   /**
-   * Builds the `details` of a dispatch. Default: `createActionDetails(event, { reason })`. A
-   * component with more fields (Menu) passes its own.
-   */
-  readonly details?: (event: Event | undefined, reason: ChangeReason) => Details;
-  /**
    * `"library"` forces library mode whatever the props (Menu, which has no JS-free mode). Default:
    * detected from `open` / `defaultOpen` / `openChangeAction` on the first render.
    */
@@ -112,31 +119,82 @@ export interface UsePopoverRootOptions<Details extends PopoverLikeDetails> {
    * read the open cause).
    */
   readonly onDispatch?: (next: boolean, details: Details) => void;
+  /**
+   * Builds the `details` of a dispatch. Default: `createActionDetails(event, { reason })`, which
+   * fits only a details type with no other fields.
+   */
+  readonly details?: (event: Event | undefined, reason: ChangeReason) => Details;
 }
 
-/** How long a recorded close intent survives when the popover did not close (design 2.3). */
-function clearLater(
+export interface UseOverlayRootOptions<
+  Details extends ActionDetails,
+  Popup extends HTMLElement,
+  CloseArgs extends unknown[],
+> extends Omit<
+  UsePopoverRootOptions<PopoverLikeDetails>,
+  "openChangeAction" | "onDispatch" | "details"
+> {
+  readonly openChangeAction: ChangeAction<boolean, Details> | undefined;
+  readonly onDispatch?: (next: boolean, details: Details) => void;
+  /** Builds the `details` of a dispatch; an open passes no `args`. */
+  readonly details: (
+    event: Event | undefined,
+    reason: ChangeReason,
+    ...args: CloseArgs | []
+  ) => Details;
+  /** Whether the popup is shown, for a stale close intent. Default: `:popover-open`. */
+  readonly isShown?: (popup: Popup) => boolean;
+}
+
+/** How long a recorded close intent survives when the popup did not close (design 2.3). */
+function clearLater<Popup extends HTMLElement>(
   intentRef: { current: PopoverCloseIntent | undefined },
   intent: PopoverCloseIntent,
-  popupRef: { current: HTMLElement | null },
+  popupRef: { current: Popup | null },
+  isShown: (popup: Popup) => boolean,
 ): void {
   setTimeout(() => {
-    // Closed: its `toggle` event (queued as a task) consumes the intent. Still open: the close
-    // was cancelled or invalid, so the intent is stale.
-    if (intentRef.current === intent && isPopoverOpen(popupRef.current)) {
+    // Closed: its `toggle` / `close` event (queued as a task) consumes the intent. Still open: the
+    // close was cancelled or invalid, so the intent is stale.
+    const popup = popupRef.current;
+    if (intentRef.current === intent && popup !== null && isShown(popup)) {
       intentRef.current = undefined;
     }
   }, 0);
 }
 
+const popoverDetails = (event: Event | undefined, reason: ChangeReason): PopoverLikeDetails =>
+  createActionDetails(event, { reason });
+
 /**
- * The Root of a popover-like component without its public props (design 14.1): mode detection
- * (once, from the first render), `useControllableAction<boolean>`, ids, refs, close intents and
- * the intent-aware `requestOpen` / `requestClose` / `notifyClosed`.
+ * The Root of a popover-like component without its public props (design 14.1), with the
+ * default `details` (`{ reason }`).
  */
 export function usePopoverRoot<Details extends PopoverLikeDetails>(
-  options: UsePopoverRootOptions<Details>,
+  options: UsePopoverRootOptions<Details> &
+    (PopoverLikeDetails extends Details
+      ? unknown
+      : Required<Pick<UsePopoverRootOptions<Details>, "details">>),
+): PopoverRootValue;
+export function usePopoverRoot(
+  options: UsePopoverRootOptions<PopoverLikeDetails>,
 ): PopoverRootValue {
+  return useOverlayRoot<PopoverLikeDetails, HTMLElement, []>({
+    ...options,
+    details: options.details ?? popoverDetails,
+  });
+}
+
+/**
+ * The Root of an overlay without its public props: mode detection (once, from the first
+ * render), `useControllableAction<boolean>`, ids, refs, close intents, the open generation and
+ * the intent-aware `requestOpen` / `requestClose` / `notifyClosed`.
+ */
+export function useOverlayRoot<
+  Details extends ActionDetails,
+  Popup extends HTMLElement,
+  CloseArgs extends unknown[],
+>(options: UseOverlayRootOptions<Details, Popup, CloseArgs>): OverlayRootValue<Popup, CloseArgs> {
   const { component, part, open, defaultOpen, openChangeAction, details, onDispatch } = options;
 
   // Mode is decided once, from the first render's props (design 2).
@@ -170,7 +228,7 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
 
   const id = useId();
   const triggerRef = useRef<HTMLElement | null>(null);
-  const popupRef = useRef<HTMLElement | null>(null);
+  const popupRef = useRef<Popup | null>(null);
   const closeIntent = useRef<PopoverCloseIntent | undefined>(undefined);
 
   // The optimistic value of the last commit, for callers that run after an `await` (a Close
@@ -178,16 +236,24 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   // An insertion effect runs in the mutation phase, before any layout effect of the same commit
   // (a child's included), so `intended()` is current there too.
   const committedOptimistic = useLatest(optimistic);
+  // `details`, `onDispatch` and `isShown` are usually inline functions: read the committed render's
+  // through a ref so that the functions below, and with them the returned value, stay stable.
+  const callbacks = useLatest({ details, onDispatch, isShown: options.isShown });
   const generation = useRef(0);
   const openGeneration = useCallback(() => generation.current, []);
   const nextOpenGeneration = useCallback(() => {
     generation.current++;
   }, []);
 
-  const recordCloseIntent = useCallback((intent: PopoverCloseIntent | undefined) => {
-    closeIntent.current = intent;
-    if (intent !== undefined) clearLater(closeIntent, intent, popupRef);
-  }, []);
+  const recordCloseIntent = useCallback(
+    (intent: PopoverCloseIntent | undefined) => {
+      closeIntent.current = intent;
+      if (intent !== undefined) {
+        clearLater(closeIntent, intent, popupRef, callbacks.current.isShown ?? isPopoverOpen);
+      }
+    },
+    [callbacks],
+  );
   const takeCloseIntent = useCallback(() => {
     const intent = closeIntent.current;
     closeIntent.current = undefined;
@@ -202,17 +268,10 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
     [latestInFlight, committedOptimistic],
   );
 
-  // `details` and `onDispatch` are usually inline functions: read the committed render's through a
-  // ref so that the functions below, and with them the returned value, stay stable.
-  const callbacks = useLatest({ details, onDispatch });
-
   const send = useCallback(
-    (next: boolean, event: Event | undefined, reason: ChangeReason): void => {
+    (next: boolean, event: Event | undefined, reason: ChangeReason, args: CloseArgs | []): void => {
       const { details, onDispatch } = callbacks.current;
-      const built =
-        details !== undefined
-          ? details(event, reason)
-          : (createActionDetails(event, { reason }) as unknown as Details);
+      const built = details(event, reason, ...args);
       if (next) nextOpenGeneration();
       onDispatch?.(next, built);
       dispatch(next, built);
@@ -223,15 +282,15 @@ export function usePopoverRoot<Details extends PopoverLikeDetails>(
   const requestOpen = useCallback(
     (event: Event | undefined, reason: ChangeReason): void => {
       if (!isLibrary || intended()) return;
-      send(true, event, reason);
+      send(true, event, reason, []);
     },
     [isLibrary, intended, send],
   );
 
   const requestClose = useCallback(
-    (event: Event | undefined, reason: ChangeReason): void => {
+    (event: Event | undefined, reason: ChangeReason, ...args: CloseArgs): void => {
       if (!isLibrary || !intended()) return;
-      send(false, event, reason);
+      send(false, event, reason, args);
     },
     [isLibrary, intended, send],
   );

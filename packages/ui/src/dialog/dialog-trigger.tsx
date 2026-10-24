@@ -61,7 +61,7 @@ export function DialogTrigger({
 }: DialogTriggerProps) {
   const ctx = useDialogContext("Dialog.Trigger");
   const isLibrary = ctx.mode === "library";
-  const { modal, ids, triggerRef, dialogRef } = ctx;
+  const { modal, ids, triggerRef, popupRef } = ctx;
 
   const state: DialogTriggerState = {
     open: ctx.optimistic,
@@ -96,12 +96,12 @@ export function DialogTrigger({
   // A Trigger without a Popup opens nothing (design 14, dev warnings).
   useEffect(() => {
     if (!isDev) return;
-    if (document.getElementById(ids.dialog) === null) {
+    if (document.getElementById(ids.popup) === null) {
       console.error(
         "Dialog.Trigger: no Dialog.Popup is rendered for this Dialog.Root; the trigger opens nothing.",
       );
     }
-  }, [ids.dialog]);
+  }, [ids.popup]);
 
   // Library mode (both modal and non-modal) and non-modal JS-free mode need a click handler;
   // modal JS-free mode is the browser's command.
@@ -123,7 +123,7 @@ export function DialogTrigger({
       event.preventDefault();
       return;
     }
-    const dialog = dialogRef.current;
+    const dialog = popupRef.current;
     if (dialog !== null && !dialog.open && dialog.isConnected) dialog.show();
   };
 
@@ -133,7 +133,7 @@ export function DialogTrigger({
     // Owned: a render element must not re-enable a disabled Trigger (in JS-free mode the
     // browser would run its command).
     ...disabledProps.props,
-    commandfor: invoker ? ids.dialog : undefined,
+    commandfor: invoker ? ids.popup : undefined,
     command: invoker ? "show-modal" : undefined,
     // Only owned when installed, so a render element keeps its own `onClick` in modal JS-free
     // mode (Accordion's rule).
