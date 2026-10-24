@@ -4,8 +4,6 @@ import { useFormOwnerEvent } from "./use-form-owner-event.js";
 import type { FormAssociatedElement } from "./use-form-owner-event.js";
 import { useLatest } from "./use-latest.js";
 
-export type { FormAssociatedElement } from "./use-form-owner-event.js";
-
 /**
  * Stable `reset` subscription on the form owner of `ref.current` (conventions 3.8).
  *
