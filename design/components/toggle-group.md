@@ -350,6 +350,8 @@ and everything else on `<div>` pass through.
 ```ts
 // packages/ui/src/toggle-group/toggle-group-item.tsx
 export interface ToggleGroupItemState {
+  /** The Item's `value` prop (#113 API2: every item-like state carries its value). */
+  readonly value: string;
   /** Optimistic pressed state. */
   readonly pressed: boolean;
   /** The group's action is in flight and this Item's optimistic state differs from its committed one. */

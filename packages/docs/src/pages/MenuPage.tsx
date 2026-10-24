@@ -447,7 +447,7 @@ export function MenuPage() {
       />
       <PartFacts
         state={
-          "`MenuRadioItemState` is `{ checked, pending, disabled }`; `pending` is true on the item being selected."
+          "`MenuRadioItemState` is `{ value, checked, pending, disabled }`; `value` is the item's own `value` prop; `pending` is true on the item being selected."
         }
         owned={
           'those of `Menu.Item`, plus `role` (`"menuitemradio"`), `aria-checked`, `data-checked`, and `value` (not rendered: a menu item is not a form control).'

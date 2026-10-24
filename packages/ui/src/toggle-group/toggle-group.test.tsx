@@ -439,6 +439,7 @@ describe("ToggleGroup", () => {
         orientation: "horizontal",
       });
       expect(itemChildren).toHaveBeenLastCalledWith({
+        value: "a",
         pressed: false,
         pending: false,
         disabled: false,

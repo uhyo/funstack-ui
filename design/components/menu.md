@@ -501,7 +501,7 @@ export interface MenuRadioGroupProps extends Omit<ComponentPropsWithRef<"div">, 
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuRadioGroupState>;
 }
 
-export interface MenuRadioItemState { readonly checked: boolean; readonly pending: boolean; readonly disabled: boolean; }
+export interface MenuRadioItemState { readonly value: string; readonly checked: boolean; readonly pending: boolean; readonly disabled: boolean; }
 
 export interface MenuRadioItemProps extends Omit<MenuCheckboxItemProps, "checked" | "defaultChecked" | "checkedChangeAction" | "className" | "style" | "children" | "render"> {
   value: string;

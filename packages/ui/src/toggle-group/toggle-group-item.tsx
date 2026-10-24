@@ -15,6 +15,8 @@ import { useToggleGroupContext } from "./toggle-group-context.js";
 import type { ToggleGroupOrientation } from "./toggle-group-context.js";
 
 export interface ToggleGroupItemState {
+  /** The Item's `value` prop. */
+  readonly value: string;
   /** Optimistic pressed state. */
   readonly pressed: boolean;
   /** The group's action is in flight and this Item's optimistic state differs from its committed one. */
@@ -83,6 +85,7 @@ export function ToggleGroupItem({
   );
 
   const state: ToggleGroupItemState = {
+    value,
     pressed,
     pending,
     disabled,

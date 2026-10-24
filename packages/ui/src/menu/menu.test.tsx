@@ -1410,6 +1410,33 @@ describe("Menu.RadioGroup", () => {
       );
     }
 
+    it("RadioItem state carries the item's value (#113 API2)", () => {
+      const className = vi.fn((s: MenuRadioItemState) => `radio-${s.value}`);
+      render(
+        <Harness
+          popup={{ keepMounted: true }}
+          content={
+            <Menu.RadioGroup defaultValue="date">
+              <Menu.RadioItem data-testid="name" value="name" className={className}>
+                Name
+              </Menu.RadioItem>
+              <Menu.RadioItem data-testid="date" value="date" className={className}>
+                Date
+              </Menu.RadioItem>
+            </Menu.RadioGroup>
+          }
+        />,
+      );
+      expect(item("name")).toHaveClass("radio-name");
+      expect(item("date")).toHaveClass("radio-date");
+      expect(className).toHaveBeenCalledWith({
+        value: "date",
+        checked: true,
+        pending: false,
+        disabled: false,
+      });
+    });
+
     it("pending on the group and the chosen item; previous item unchecked at once", async () => {
       const user = setupUser();
       const work = deferred();

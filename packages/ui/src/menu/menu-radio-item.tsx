@@ -9,6 +9,8 @@ import { closeStackLater, MenuRadioGroupContext, useMenuContext } from "./menu-c
 import { useMenuItem } from "./use-menu-item.js";
 
 export interface MenuRadioItemState {
+  /** The item's `value` prop. */
+  readonly value: string;
   /** This item is the group's optimistic value (`aria-checked`). */
   readonly checked: boolean;
   /** The group's change to this item is in flight. */
@@ -77,7 +79,7 @@ export function MenuRadioItem({
     },
   });
 
-  const state: MenuRadioItemState = { checked, pending, disabled };
+  const state: MenuRadioItemState = { value, checked, pending, disabled };
 
   return useRender<ComponentPropsWithRef<"button">, MenuRadioItemState>({
     defaultElement: "button",

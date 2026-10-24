@@ -197,7 +197,9 @@ export function ToggleGroupPage() {
         ]}
       />
       <PartFacts
-        state={"`ToggleGroupItemState` is `{ pressed, pending, disabled, orientation }`."}
+        state={
+          "`ToggleGroupItemState` is `{ value, pressed, pending, disabled, orientation }`; `value` is the Item's own `value` prop."
+        }
         owned={
           '`aria-pressed`, `disabled`, `aria-disabled` (link or component `render`), `onClick`, `tabIndex` (the roving focus writes it), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, and `focusgroupstart` while the Root renders `focusgroup`. `type` defaults to `"button"`; a `render` element\'s own wins.'
         }
