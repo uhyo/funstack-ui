@@ -9,7 +9,8 @@ import { FormStatusWatcher } from "../internal/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
-import { hasAnyError, sortByDocumentOrder } from "../internal/validity.js";
+import { sortByDocumentOrder } from "../internal/dom-order.js";
+import { hasAnyError } from "../internal/validity.js";
 import type { FormErrors } from "../internal/validity.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 

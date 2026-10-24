@@ -21,6 +21,16 @@ import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
 import { ToggleGroupContext } from "./toggle-group-context.js";
 import type { ToggleGroupContextValue, ToggleGroupOrientation } from "./toggle-group-context.js";
+import { compareDocumentOrder } from "../internal/dom-order.js";
+import {
+  applyPatch,
+  EMPTY_SET,
+  arraysEqual,
+  firstDuplicate,
+  sortByOrder,
+  toSet,
+} from "../internal/value-set.js";
+import type { SetPatch, ValueSet } from "../internal/value-set.js";
 
 export type { ToggleGroupOrientation } from "./toggle-group-context.js";
 
@@ -119,7 +129,6 @@ export interface ToggleGroupExclusiveProps extends ToggleGroupRootBaseProps {
 export type ToggleGroupRootProps = ToggleGroupMultipleProps | ToggleGroupExclusiveProps;
 
 type GroupValue = string[] | string | null;
-type ValueSet = ReadonlySet<string>;
 
 /** Both variants as one shape, for the implementation. */
 interface InternalProps extends ToggleGroupRootBaseProps {
@@ -128,44 +137,6 @@ interface InternalProps extends ToggleGroupRootBaseProps {
   defaultValue?: GroupValue;
   deselectable?: boolean;
   valueChangeAction?: ChangeAction<GroupValue, ToggleGroupValueChangeDetails>;
-}
-
-const EMPTY: ValueSet = new Set();
-
-function toSet(value: GroupValue): ValueSet {
-  if (value === null) return EMPTY;
-  return typeof value === "string" ? new Set([value]) : new Set(value);
-}
-
-interface Patch {
-  readonly added: readonly string[];
-  readonly removed: readonly string[];
-}
-
-/** The optimistic reducer (design 5.2): apply a patch, so stacked dispatches re-base. */
-function reduce(set: ValueSet, patch: Patch): ValueSet {
-  const next = new Set(set);
-  for (const v of patch.removed) next.delete(v);
-  for (const v of patch.added) next.add(v);
-  return next;
-}
-
-/** `values` sorted by `order`; values not in `order` keep their iteration order, last. */
-function sortByOrder(values: Iterable<string>, order: readonly string[]): string[] {
-  const wanted = new Set(values);
-  const sorted: string[] = [];
-  for (const v of order) if (wanted.delete(v)) sorted.push(v);
-  for (const v of wanted) sorted.push(v);
-  return sorted;
-}
-
-function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
-
-function byDocumentOrder(a: Node, b: Node): number {
-  if (a === b) return 0;
-  return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
 }
 
 /** Standalone entry (design 6.2): the first pressed item, else the first item (radio-like). */
@@ -262,7 +233,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
     };
   }, []);
   const sortedItems = (): [HTMLElement, string][] =>
-    [...registry.current].sort(([a], [b]) => byDocumentOrder(a, b));
+    [...registry.current].sort(([a], [b]) => compareDocumentOrder(a, b));
   /** Sorts by the Items' current document order. Reads the DOM: handlers and effects only. */
   const sortByDocument = (values: Iterable<string>): string[] =>
     sortByOrder(
@@ -276,7 +247,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
   >({
     controlled: controlledSet,
     defaultValue: defaultSet,
-    initialValue: EMPTY,
+    initialValue: EMPTY_SET,
     action:
       valueChangeAction &&
       ((next, details) =>
@@ -286,7 +257,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
       ...(details.added.length > 0 ? ["fsui-toggle-group-press"] : []),
       ...(details.removed.length > 0 ? ["fsui-toggle-group-release"] : []),
     ],
-    reducer: (prev, _next, details) => reduce(prev, details),
+    reducer: (prev, _next, details) => applyPatch(prev, details),
     warn: { component: "ToggleGroup.Root", prop: "value" },
   });
 
@@ -295,7 +266,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
   const toggle = useCallback(
     (itemValue: string, event: Event) => {
       const { optimistic, exclusive, deselectable } = latest.current;
-      let patch: Patch;
+      let patch: SetPatch;
       if (optimistic.has(itemValue)) {
         // Exclusive and not deselectable: pressing the pressed Item is a no-op (design 5.2).
         if (exclusive && !deselectable) return;
@@ -303,7 +274,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
       } else {
         patch = { added: [itemValue], removed: exclusive ? [...optimistic] : [] };
       }
-      dispatch(reduce(optimistic, patch), createActionDetails(event, patch));
+      dispatch(applyPatch(optimistic, patch), createActionDetails(event, patch));
     },
     [dispatch, latest],
   );
@@ -325,7 +296,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
     if (valueChanged || startChanged) setLayout({ order, disabled: disabledValues });
 
     if (!isDev || warnedDuplicate.current) return;
-    const duplicate = order.find((v, i) => order.indexOf(v) !== i);
+    const duplicate = firstDuplicate(order);
     if (duplicate !== undefined) {
       warnedDuplicate.current = true;
       console.error(

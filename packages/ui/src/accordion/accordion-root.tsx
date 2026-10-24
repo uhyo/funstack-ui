@@ -23,6 +23,9 @@ import type {
   AccordionMode,
   AccordionRootContextValue,
 } from "./accordion-context.js";
+import { compareDocumentOrder } from "../internal/dom-order.js";
+import { EMPTY_SET, setsEqual, toSet } from "../internal/value-set.js";
+import type { ValueSet } from "../internal/value-set.js";
 
 export interface AccordionRootState {
   /** An action dispatched through this Accordion is in flight (library mode only). */
@@ -110,14 +113,7 @@ export interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
 export type AccordionRootProps = AccordionRootMultipleProps | AccordionRootExclusiveProps;
 
 type AccordionValue = string[] | string | null;
-type OpenSet = ReadonlySet<string>;
-
-const EMPTY: OpenSet = new Set();
-
-function toSet(value: AccordionValue): OpenSet {
-  if (value === null) return EMPTY;
-  return typeof value === "string" ? new Set([value]) : new Set(value);
-}
+type OpenSet = ValueSet;
 
 /**
  * Converts the open set back to the public value. Multiple mode lists the items in registration
@@ -143,17 +139,6 @@ function reduce(set: OpenSet, item: string, open: boolean, exclusive: boolean): 
   }
   if (exclusive) return new Set([item]);
   return set.has(item) ? set : new Set(set).add(item);
-}
-
-function setsEqual(a: OpenSet, b: OpenSet): boolean {
-  if (a.size !== b.size) return false;
-  for (const v of a) if (!b.has(v)) return false;
-  return true;
-}
-
-function byDocumentOrder<T extends Node>(a: T, b: T): number {
-  if (a === b) return 0;
-  return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
 }
 
 const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
@@ -244,7 +229,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   >({
     controlled: controlledSet,
     defaultValue: defaultValue === undefined ? undefined : toSet(defaultValue),
-    initialValue: EMPTY,
+    initialValue: EMPTY_SET,
     action:
       action && ((next, details) => action(fromSet(next, exclusive, registeredValues()), details)),
     transitionTypes: (_next, _prev, details) =>
@@ -356,7 +341,7 @@ export function AccordionRoot(props: AccordionRootProps) {
     if (!NAV_KEYS.has(event.key)) return;
     const target = event.target;
     if (!(target instanceof HTMLElement) || !triggers.current.has(target)) return;
-    const sorted = [...triggers.current].sort(byDocumentOrder);
+    const sorted = [...triggers.current].sort(compareDocumentOrder);
     const next = nextTrigger(sorted, target, event.key);
     if (next === undefined) return;
     event.preventDefault();
@@ -369,8 +354,8 @@ export function AccordionRoot(props: AccordionRootProps) {
   const name = !isLibrary && exclusive ? id : undefined;
   const rootPending = isLibrary && pending;
   const state: AccordionRootState = { pending: rootPending, disabled };
-  const contextCommitted = isLibrary ? committed : EMPTY;
-  const contextOptimistic = isLibrary ? optimistic : EMPTY;
+  const contextCommitted = isLibrary ? committed : EMPTY_SET;
+  const contextOptimistic = isLibrary ? optimistic : EMPTY_SET;
 
   // Memoised (design 12, #48): the dispatchers are stable, so this changes only with the open
   // sets, pending and the props below.

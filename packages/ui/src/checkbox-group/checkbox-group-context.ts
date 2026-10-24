@@ -1,11 +1,9 @@
 "use client";
 import { createContext, use } from "react";
+import type { SetPatch } from "../internal/value-set.js";
 
 /** A change to the group's set of checked values (design/components/checkbox-group.md 5.2). */
-export interface CheckboxGroupPatch {
-  readonly added: readonly string[];
-  readonly removed: readonly string[];
-}
+export type CheckboxGroupPatch = SetPatch;
 
 export interface CheckboxGroupContextValue {
   /** The `name` shared by every Item of the group (prop or `useId()`). */

@@ -26,7 +26,6 @@ import { useFormOwnerEvent } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import {
-  arraysEqual,
   focusTargetOf,
   normaliseErrorValue,
   snapshotValidity,
@@ -36,6 +35,7 @@ import {
   validityEquals,
 } from "../internal/validity.js";
 import type { FieldErrorValue, FieldValidity, ValidatableElement } from "../internal/validity.js";
+import { arraysEqual } from "../internal/value-set.js";
 
 export type { FieldState } from "../internal/field-context.js";
 export type { FieldValidity } from "../internal/validity.js";
