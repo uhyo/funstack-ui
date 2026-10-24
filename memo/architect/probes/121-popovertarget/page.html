@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"><title>121 probe</title>
+<style>
+  body { margin: 0; }
+  .row { display: flex; gap: 8px; padding: 8px; }
+  button { height: 28px; }
+  [popover] { margin: 0; inset: auto; position-area: bottom; position-try-fallbacks: flip-block; width: 140px; height: 40px; box-sizing: border-box; }
+  #outer-cf, #outer-pt { position-area: right; height: 120px; }
+  #inner-cf, #inner-pt, #desc-cf, #desc-pt { position-area: right; }
+</style></head><body>
+<div style="height: 100px">filler</div>
+<div class="row">
+  <button id="cf-btn" commandfor="cf-pop" command="toggle-popover">cf</button>
+  <button id="pt-btn" popovertarget="pt-pop">pt</button>
+  <button id="ptshow-btn" popovertarget="ptshow-pop" popovertargetaction="show">ptshow</button>
+  <button id="none-btn">none</button>
+  <button id="dis-btn" popovertarget="dis-pop" disabled>dis</button>
+  <button id="outer-cf-btn" commandfor="outer-cf" command="toggle-popover">outer cf</button>
+  <button id="outer-pt-btn" popovertarget="outer-pt">outer pt</button>
+</div>
+<div style="height: 100px">filler</div>
+<div id="cf-pop" popover>cf popup</div>
+<div id="pt-pop" popover>pt popup <button id="pt-hide" popovertarget="pt-pop" popovertargetaction="hide">hide</button></div>
+<div id="ptshow-pop" popover>ptshow popup</div>
+<div id="none-pop" popover>none popup</div>
+<div id="dis-pop" popover>dis popup</div>
+<div id="outer-cf" popover>outer cf
+  <button id="inner-cf-btn" commandfor="inner-cf" command="toggle-popover">inner (sibling)</button>
+  <button id="desc-cf-btn" commandfor="desc-cf" command="toggle-popover">inner (descendant)</button>
+  <div id="desc-cf" popover>descendant cf</div>
+</div>
+<div id="inner-cf" popover>inner cf (sibling of outer)</div>
+<div id="outer-pt" popover>outer pt
+  <button id="inner-pt-btn" popovertarget="inner-pt">inner (sibling)</button>
+  <button id="desc-pt-btn" popovertarget="desc-pt">inner (descendant)</button>
+  <div id="desc-pt" popover>descendant pt</div>
+</div>
+<div id="inner-pt" popover>inner pt (sibling of outer)</div>
+<script>
+  window.log = [];
+  for (const id of ["cf-pop", "pt-pop", "ptshow-pop", "none-pop", "outer-cf", "outer-pt", "inner-cf", "inner-pt", "desc-cf", "desc-pt"]) {
+    const el = document.getElementById(id);
+    el.addEventListener("beforetoggle", (e) => window.log.push(`${id}:beforetoggle:${e.oldState}->${e.newState}:source=${e.source ? e.source.id : e.source === null ? "null" : typeof e.source}`));
+    el.addEventListener("command", (e) => window.log.push(`${id}:command:${e.command}:source=${e.source && e.source.id}`));
+  }
+  window.open = (id) => document.getElementById(id).matches(":popover-open");
+  window.rect = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { top: Math.round(r.top), left: Math.round(r.left), bottom: Math.round(r.bottom), right: Math.round(r.right) }; };
+  window.cancelClicks = new Set();
+  document.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && window.cancelClicks.has(b.id)) e.preventDefault(); });
+</script>
+</body></html>

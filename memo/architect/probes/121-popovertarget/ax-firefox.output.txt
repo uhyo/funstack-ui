@@ -1,0 +1,37 @@
+firefox 157.0
+closed {
+ "pt-plain": "pushbutton [collapsed,expandable]",
+ "pt-show": "pushbutton [collapsed,expandable]",
+ "pt-hide-out": "pushbutton [collapsed,expandable]",
+ "pt-dis": "pushbutton []",
+ "pt-mi": "menuitem [collapsed,expandable]",
+ "pt-aria-false": "pushbutton [collapsed,expandable]",
+ "cf-dis": "pushbutton []",
+ "pt-noanchor": "pushbutton []",
+ "pt-nonpopover": "pushbutton []"
+}
+open {
+ "pt-plain": "pushbutton [expanded,expandable]",
+ "pt-show": "pushbutton [expanded,expandable]",
+ "pt-hide-out": "pushbutton [expanded,expandable]",
+ "pt-dis": "pushbutton []",
+ "pt-mi": "menuitem [expanded,expandable]",
+ "pt-aria-false": "pushbutton [expanded,expandable]",
+ "cf-dis": "pushbutton []",
+ "pt-noanchor": "pushbutton []",
+ "pt-nonpopover": "pushbutton []",
+ "close-cf": "pushbutton []",
+ "close-pt": "pushbutton []",
+ "close-ptt": "pushbutton []"
+}
+closed-again {
+ "pt-plain": "pushbutton [collapsed,expandable]",
+ "pt-show": "pushbutton [collapsed,expandable]",
+ "pt-hide-out": "pushbutton [collapsed,expandable]",
+ "pt-dis": "pushbutton []",
+ "pt-mi": "menuitem [collapsed,expandable]",
+ "pt-aria-false": "pushbutton [collapsed,expandable]",
+ "cf-dis": "pushbutton []",
+ "pt-noanchor": "pushbutton []",
+ "pt-nonpopover": "pushbutton []"
+}

@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><title>121 ax probe</title></head><body>
+<p>filler</p>
+<button id="pt-plain" popovertarget="pop-pt-plain">pt plain</button>
+<button id="pt-show" popovertarget="pop-pt-show" popovertargetaction="show">pt show</button>
+<button id="pt-hide-out" popovertarget="pop-pt-hide-out" popovertargetaction="hide">pt hide outside</button>
+<button id="pt-dis" popovertarget="pop-pt-dis" disabled>pt disabled</button>
+<button id="pt-mi" role="menuitem" popovertarget="pop-pt-mi" aria-haspopup="menu">pt menuitem</button>
+<button id="pt-aria-false" popovertarget="pop-pt-aria-false" aria-expanded="false">pt aria false</button>
+<button id="cf-dis" commandfor="pop-cf-dis" command="toggle-popover" disabled>cf disabled</button>
+<button id="pt-noanchor" popovertarget="pop-missing">pt target missing</button>
+<button id="pt-nonpopover" popovertarget="plain-div">pt target not a popover</button>
+<div id="plain-div">plain</div>
+<p>filler</p>
+<div id="pop-pt-plain" popover="manual">plain</div>
+<div id="pop-pt-show" popover="manual">show</div>
+<div id="pop-pt-hide-out" popover="manual">hide outside</div>
+<div id="pop-pt-dis" popover="manual">dis</div>
+<div id="pop-pt-mi" popover="manual">mi</div>
+<div id="pop-pt-aria-false" popover="manual">aria false</div>
+<div id="pop-cf-dis" popover="manual">cf dis</div>
+<div id="pop-close-cf" popover="manual">close cf <button id="close-cf" commandfor="pop-close-cf" command="hide-popover">close (commandfor)</button></div>
+<div id="pop-close-pt" popover="manual">close pt <button id="close-pt" popovertarget="pop-close-pt" popovertargetaction="hide">close (popovertarget hide)</button></div>
+<div id="pop-close-ptt" popover="manual">close ptt <button id="close-ptt" popovertarget="pop-close-ptt">close (popovertarget toggle)</button></div>
+<script>
+  window.__ready = true;
+  window.showAll = () => { for (const el of document.querySelectorAll("[popover]")) el.showPopover(); return true; };
+  window.hideAll = () => { for (const el of document.querySelectorAll("[popover]")) el.hidePopover(); return true; };
+</script>
+</body></html>
