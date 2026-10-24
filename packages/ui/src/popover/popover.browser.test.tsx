@@ -21,6 +21,7 @@ import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
+import { axProperty, getAXNodes } from "../__tests__/ax-tree.js";
 import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import {
@@ -206,6 +207,40 @@ describe("JS-free mode (browser)", () => {
 });
 
 describe("library mode (browser)", () => {
+  // The attribute and, on Chromium, the computed AX state agree in every pending phase: Chromium
+  // and WebKit compute an invoker's state from the popover, Firefox reads the attribute (#118).
+  // CDP is Chromium-only; Firefox and WebKit run the DOM assertions.
+  it("aria-expanded is the shown popup during a deferred open and a deferred Trigger close (#118)", async () => {
+    let work = deferred();
+    const action = vi.fn<ActionFn>(() => work.promise);
+    render(<Library action={action} />);
+    const expectExpanded = async (expanded: boolean) => {
+      expect(trigger()).toHaveAttribute("aria-expanded", String(expanded));
+      if (browserName !== "chromium") return;
+      const node = (await getAXNodes()).find(
+        (n) => n.role?.value === "button" && n.name?.value === "Filters",
+      );
+      expect(node).toBeDefined();
+      expect(axProperty(node, "expanded")).toBe(expanded);
+    };
+    await user.click(trigger());
+    expect(isOpen()).toBe(false);
+    expect(trigger()).toHaveAttribute("data-open", "");
+    await expectExpanded(false);
+    await act(async () => work.resolve());
+    expect(isOpen()).toBe(true);
+    await expectExpanded(true);
+    work = deferred();
+    await user.click(trigger());
+    expect(isOpen()).toBe(true);
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    expect(trigger()).not.toHaveAttribute("data-open");
+    await expectExpanded(true);
+    await act(async () => work.resolve());
+    await expect.poll(() => isOpen()).toBe(false);
+    await expectExpanded(false);
+  });
+
   it("the Trigger's click goes through the library; the popup is anchored below it", async () => {
     let release!: () => void;
     const action = vi.fn<ActionFn>(
@@ -223,9 +258,12 @@ describe("library mode (browser)", () => {
     // The command was cancelled: the popup is still hidden while the action runs.
     expect(isOpen()).toBe(false);
     expect(trigger()).toHaveAttribute("data-pending", "");
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    // Optimistically open (`data-open`), not shown: `aria-expanded` is the shown state (#118).
+    expect(trigger()).toHaveAttribute("data-open", "");
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
     await act(async () => release());
     expect(isOpen()).toBe(true);
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
     expect(trigger()).not.toHaveAttribute("data-pending");
     // `showPopover({ source: trigger })`: the implicit anchor; `position-area: bottom`.
     const t = trigger().getBoundingClientRect();

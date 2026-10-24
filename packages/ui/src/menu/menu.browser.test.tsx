@@ -833,11 +833,14 @@ describe("Trigger click while open (browser, #110)", () => {
     return { work, action };
   }
 
-  /** Pending close through the click: menu shown, item focused, optimistic feedback on the Trigger. */
+  /**
+   * Pending close through the click: menu shown, item focused, optimistic feedback on the Trigger;
+   * `aria-expanded` stays on the shown menu (#118).
+   */
   function expectPendingClose(action: ReturnType<typeof setup>["action"], calls: number) {
     expect(document.activeElement).toBe(item("rename"));
     expect(isOpen()).toBe(true);
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
     expect(trigger()).not.toHaveAttribute("data-open");
     expect(trigger()).toHaveAttribute("data-pending", "");
     expect(action).toHaveBeenCalledTimes(calls);

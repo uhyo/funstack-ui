@@ -73,6 +73,8 @@ export interface PopoverTriggerHook {
  * browser runs the command and the Popup keeps `aria-expanded` current on the element. In library
  * mode the click is cancelled (so the command does not run) and toggles against what the user
  * already intends: an open through `requestOpen`, a library-owned close through `requestClose`.
+ * There `aria-expanded` renders the committed (shown) state; `data-open` and `state.open` are
+ * optimistic (#118).
  *
  * Menu adds `aria-haspopup="menu"` and its own key handling on top.
  */
@@ -184,9 +186,11 @@ export function usePopoverTrigger<State>(
     // and the attributes would claim otherwise (#115).
     commandfor: invoker ? ids.popup : undefined,
     command: invoker ? "toggle-popover" : undefined,
-    // Library mode: optimistic. JS-free mode: "false" in React; the Popup's `toggle` listener
-    // writes the DOM value, and React never rewrites an unchanged prop.
-    "aria-expanded": isLibrary ? state.open : false,
+    // Library mode: committed, the shown popup (`data-open` is the optimistic one; Chromium and
+    // WebKit compute an invoker's state from the popover, so this is the one value every engine
+    // agrees on, #118). JS-free mode: "false" in React; the Popup's `toggle` listener writes the
+    // DOM value, and React never rewrites an unchanged prop.
+    "aria-expanded": isLibrary ? ctx.committed : false,
     ...merged,
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),

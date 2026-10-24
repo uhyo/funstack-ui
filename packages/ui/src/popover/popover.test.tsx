@@ -272,6 +272,61 @@ describe("Popover", () => {
       expect(closed).not.toContain("secret content");
     });
 
+    it("library mode: aria-expanded is the shown popup, data-open the intent (#118)", async () => {
+      const html = renderToString(
+        <Popover.Root defaultOpen>
+          <Popover.Trigger>Open</Popover.Trigger>
+          <Popover.Popup aria-label="x">content</Popover.Popup>
+        </Popover.Root>,
+      );
+      expect(html).toMatch(/<button[^>]*aria-expanded="true"/);
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" initialOpen action={action} />);
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      // A deferred part close: optimistically closed, still shown.
+      const closing = deferred();
+      action.mockImplementation(() => closing.promise);
+      await user.click(screen.getByTestId("close"));
+      expect(isOpen()).toBe(true);
+      expect(trigger()).not.toHaveAttribute("data-open");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      await act(async () => closing.resolve());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      // A deferred open: optimistically open, not shown yet.
+      const opening = deferred();
+      action.mockImplementation(() => opening.promise);
+      await user.click(trigger());
+      expect(isOpen()).toBe(false);
+      expect(trigger()).toHaveAttribute("data-open", "");
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      await act(async () => opening.resolve());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("library mode: a refused controlled close keeps aria-expanded true throughout (#118)", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="controlled" action={action} refuseClose />);
+      await openThroughTrigger(user);
+      const closing = deferred();
+      action.mockImplementation(() => closing.promise);
+      await user.click(trigger());
+      expect(trigger()).not.toHaveAttribute("data-open");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      await act(async () => closing.resolve());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(trigger()).toHaveAttribute("data-open", "");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    });
+
     it("never lets a render element override the owned keys", () => {
       render(
         <Harness

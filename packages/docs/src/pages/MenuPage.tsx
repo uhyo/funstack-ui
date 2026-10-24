@@ -139,9 +139,9 @@ export function MenuPage() {
           If the menu was dismissed and opened again while an action ran, that action's close is
           dropped: it belonged to the previous opening. The re-open itself does not show until that
           action settles: React holds transitions started while an async action is pending, so
-          meanwhile the Trigger shows <code>aria-expanded="true"</code> and{" "}
-          <code>data-pending</code> without a menu. A slow Server Function behind an item makes this
-          visible (Popover's <code>Close</code> behaves the same).
+          meanwhile the Trigger shows <code>data-open</code> and <code>data-pending</code> without a
+          menu (<code>aria-expanded</code> stays <code>"false"</code>). A slow Server Function
+          behind an item makes this visible (Popover's <code>Close</code> behaves the same).
         </li>
         <li>
           Keyboard activation goes through the item's <code>click()</code>, so{" "}
@@ -511,10 +511,11 @@ export function MenuPage() {
       <Table
         head={["Hook", "On", "Meaning"]}
         rows={[
+          ["`data-open`", "Trigger, SubmenuTrigger", "Optimistic open state of the Root."],
           [
-            "`aria-expanded`, `data-open`",
+            "`aria-expanded`",
             "Trigger, SubmenuTrigger",
-            "Optimistic open state of the Root.",
+            "Whether the menu is shown (the Root's committed open state).",
           ],
           [
             "`data-open`",
@@ -678,7 +679,7 @@ export function MenuPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The Trigger's `aria-expanded` and `data-open`, and CheckboxItem and RadioItem `data-checked`, are optimistic. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
+          "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the Trigger's `aria-expanded` follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
         }
       />
 

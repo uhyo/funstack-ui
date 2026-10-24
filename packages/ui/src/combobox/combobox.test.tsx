@@ -2164,7 +2164,11 @@ describe("Combobox", () => {
       await flushTasks(2);
       expect(isOpen()).toBe(true);
       expectPending(trigger());
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      // Optimistically closed, but the listbox is still shown: `aria-expanded` is the shown state
+      // on the Trigger and the input alike (#118).
+      expect(trigger()).not.toHaveAttribute("data-open");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      expect(input()).toHaveAttribute("aria-expanded", "true");
       await act(async () => close.resolve());
       await flushTasks(2);
       expect(isOpen()).toBe(true);
@@ -2442,12 +2446,17 @@ describe("Combobox", () => {
       await flushTasks(2);
       expectPending(input());
       expectPending(trigger());
-      expect(input()).toHaveAttribute("aria-expanded", "true");
+      // Optimistically open, nothing shown yet (#118).
+      expect(input()).toHaveAttribute("data-open", "");
+      expect(input()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
       expect(shows).toHaveLength(0);
       await act(async () => results.resolve("all"));
       await flushTasks(2);
       expect(shows).toHaveLength(1);
       expect(isOpen()).toBe(true);
+      expect(input()).toHaveAttribute("aria-expanded", "true");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
       expectNotPending(input());
     });
   });

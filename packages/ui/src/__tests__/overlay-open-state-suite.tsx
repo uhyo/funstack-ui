@@ -389,7 +389,8 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         const d = deferred();
         render(<Harness mode={mode} action={() => d.promise} />);
         await user.click(trigger());
-        expectExpanded(true);
+        // `aria-expanded` is the shown popup (committed); `data-open` the optimistic intent (#118).
+        expectExpanded(false);
         expect(trigger()).toHaveAttribute("data-open", "");
         expectPending(trigger());
         expect(open).not.toHaveBeenCalled();
@@ -428,7 +429,8 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(content()).toBeInTheDocument();
         expectPending(trigger());
         expect(trigger()).not.toHaveAttribute("data-open");
-        expectExpanded(false);
+        // Still shown, so still expanded until the close commits (#118).
+        expectExpanded(true);
         if (config.partCloseReturnsFocus) expect(trigger()).not.toHaveFocus();
         await flushTasks(2);
         expect(isOpen()).toBe(true);
@@ -666,6 +668,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         action.mockImplementation(() => d.promise);
         await partClose(user);
         expect(trigger()).not.toHaveAttribute("data-open");
+        expectExpanded(true);
         await act(async () => d.resolve());
         await flushTasks(2);
         expect(close).not.toHaveBeenCalled();
@@ -846,11 +849,13 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(open).not.toHaveBeenCalled();
         expect(isOpen()).toBe(false);
         expectPending(trigger());
+        expectExpanded(false);
         expect(screen.queryByTestId("fallback")).toBeNull();
         await act(async () => suspender.resolve("details", "Order details"));
         expect(open).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
         expect(screen.getByTestId("suspender")).toHaveTextContent("Order details");
+        expectExpanded(true);
         expectNotPending(trigger());
       });
 

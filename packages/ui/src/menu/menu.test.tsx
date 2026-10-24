@@ -1694,13 +1694,16 @@ describe("Menu.Root", () => {
     await user.click(trigger());
     await flushTasks(2);
     expectPending(trigger());
-    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    // Optimistically open, but nothing is shown yet: `aria-expanded` is the shown state (#118).
+    expect(trigger()).toHaveAttribute("data-open", "");
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
     expect(calls).toHaveLength(0);
     expect(screen.queryByTestId("fallback")).toBeNull();
     await act(async () => resolve("recent"));
     await flushTasks(2);
     expect(calls).toHaveLength(1);
     expect(calls[0]!.autofocus).toBe(item("first"));
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
     expectNotPending(trigger());
   });
 
@@ -2262,10 +2265,12 @@ describe("submenus", () => {
       expect(item("rename")).toHaveFocus();
       const hide = spyHide();
       await user.click(trigger());
-      // The click is the only close: shown, item focused, optimistic feedback on the Trigger.
+      // The click is the only close: shown, item focused, optimistic feedback on the Trigger;
+      // `aria-expanded` stays on the shown menu (#118).
       expect(isOpen()).toBe(true);
       expect(item("rename")).toHaveFocus();
-      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      expect(trigger()).not.toHaveAttribute("data-open");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
       expect(trigger()).toHaveAttribute("data-pending", "");
       expect(hide).not.toHaveBeenCalled();
       expect(action).toHaveBeenCalledTimes(2);
@@ -2282,6 +2287,7 @@ describe("submenus", () => {
       await flushTasks(2);
       expect(isOpen()).toBe(false);
       expect(hide).toHaveBeenCalledTimes(1);
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
       expect(trigger()).not.toHaveAttribute("data-pending");
       expect(action).toHaveBeenCalledTimes(2);
     });

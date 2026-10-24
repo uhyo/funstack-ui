@@ -128,7 +128,8 @@ export function ComboboxPage() {
         holds every transition. Typing is unaffected (urgent), and so are the results: a deferred
         render is not held by a pending action (verified in Chromium and Firefox). Opening the
         listbox while a save is pending is a transition, so it waits for the save: the input shows{" "}
-        <code>aria-expanded="true"</code> and <code>data-pending</code> meanwhile.
+        <code>data-open</code> and <code>data-pending</code> meanwhile, and{" "}
+        <code>aria-expanded</code> turns <code>"true"</code> when the listbox is shown.
       </p>
 
       <h4>Accepting an option</h4>
@@ -497,7 +498,11 @@ export function ComboboxPage() {
       <Table
         head={["Attribute", "On", "Meaning"]}
         rows={[
-          ["`data-open`", "Input, Trigger", "Optimistic open state (`aria-expanded`)."],
+          [
+            "`data-open`",
+            "Input, Trigger",
+            "Optimistic open state (`aria-expanded` follows the shown listbox instead).",
+          ],
           [
             "`data-pending`",
             "Input",

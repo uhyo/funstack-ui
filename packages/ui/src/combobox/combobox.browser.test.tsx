@@ -960,8 +960,11 @@ describe("Trigger close (#112, browser)", () => {
     expect(isOpen()).toBe(true);
     expect(document.activeElement).toBe(input());
     expect(trigger()).toHaveAttribute("data-pending", "");
-    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    // Optimistically closed, still shown: `aria-expanded` is the shown state (#118).
+    expect(trigger()).not.toHaveAttribute("data-open");
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
     await expect.poll(() => isOpen(), { timeout: 2000 }).toBe(false);
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
     expect(document.activeElement).toBe(input());
     expect(openAction).toHaveBeenCalledTimes(1);
     const [next, details] = openAction.mock.calls[0]!;

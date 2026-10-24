@@ -185,7 +185,10 @@ export function PendingOptimisticPage() {
         immediate feedback as sighted users. Where HTML gives the state to a native element that
         cannot carry the ARIA attribute, assistive technology hears the committed state and the
         optimistic data attribute is visual only; the component page says so when that applies (for
-        example <a href="/components/accordion">Accordion</a>).
+        example <a href="/components/accordion">Accordion</a>). The same holds for a trigger's{" "}
+        <code>aria-expanded</code> on a popup (Popover, Menu, Combobox): browsers report it from the
+        popup itself, so it follows the shown popup, and <code>data-open</code> is the optimistic
+        one.
       </p>
     </DocPage>
   );

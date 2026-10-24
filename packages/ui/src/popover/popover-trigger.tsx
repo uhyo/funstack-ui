@@ -34,7 +34,8 @@ export interface PopoverTriggerProps extends Omit<
  * JS-free mode the browser runs the command and the Popup keeps `aria-expanded` current. In
  * library mode the click is cancelled (so the command does not run) and dispatched through the
  * Root's transition: an open, or a library-owned close while open. The button shows optimistic
- * `data-open` / `aria-expanded` and `data-pending` until the change has landed.
+ * `data-open` and `data-pending` until the change has landed; `aria-expanded` follows the shown
+ * popup (committed state, #118).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`
  * (library mode, link or component `render`), `commandfor`, `command`, `aria-expanded`,

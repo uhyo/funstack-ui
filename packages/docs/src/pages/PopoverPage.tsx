@@ -114,7 +114,7 @@ export function PopoverPage() {
           [
             "Trigger `aria-expanded`",
             "kept current on the element from the popup's `toggle` event",
-            "rendered from optimistic state",
+            "rendered from committed state: the shown popup",
           ],
           ["Trigger `data-open`, `data-pending`", "not emitted", "emitted"],
           [
@@ -373,7 +373,11 @@ export function PopoverPage() {
             "Popup",
             "While shown: where the browser placed the popup (`top` / `bottom` / `left` / `right`, after any flip; read from the computed `position-area`). Otherwise the requested placement. Absent with `side={null}`.",
           ],
-          ["`aria-expanded`", "Trigger", "Open state, both modes (optimistic in library mode)."],
+          [
+            "`aria-expanded`",
+            "Trigger",
+            "Whether the popup is shown, both modes (committed, not optimistic, in library mode).",
+          ],
           ["`data-open`", "Trigger", "Optimistic open state (library mode only)."],
           [
             "`data-pending`",
@@ -540,7 +544,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`aria-expanded`, `data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight; its `aria-expanded` follows the shown popup, because Chromium and WebKit report an invoker's expanded state from the popover itself and only the shown state is true in every engine. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
         }
       >
         <h4>Walkthrough (library mode)</h4>
@@ -550,8 +554,9 @@ html:active-view-transition .popover { transition: none; }
         <ol>
           <li>
             Click ⋯: the click is cancelled (so the native command does not run), the Trigger gets{" "}
-            <code>aria-expanded="true"</code>, <code>data-open</code> and <code>data-pending</code>,
-            and <code>openChangeAction(true, {'{ reason: "activate" }'})</code> runs.
+            <code>data-open</code> and <code>data-pending</code> (<code>aria-expanded</code> stays{" "}
+            <code>"false"</code> until the popup is shown), and{" "}
+            <code>openChangeAction(true, {'{ reason: "activate" }'})</code> runs.
           </li>
           <li>
             The commit that sets committed <code>open</code> renders the Popup's children;{" "}
