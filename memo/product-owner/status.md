@@ -291,3 +291,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
   #104 P2 overlay structural | #105 P2 controls structural (C1 last) — start after #101+#102 merge
   #106 P3 shared test suites (after P2) | #107 P4 jsdom --no-isolate
 - P1 running: 3 developers in agent worktrees, branches wave16/test-infra, wave16/source-cleanup, wave16/docs-example. Branch CI before master; PO merges after reviewer pass. Release alpha.12 at wave end (Breaking: C14).
+- #103 MERGED 005e5c9 (docs −657, example −329 net; D3 sidebar bug fixed; server-only guard). Closed. #101/#102 still running.
