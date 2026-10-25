@@ -111,7 +111,7 @@ export function SwitchPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "Pseudo-class", "Meaning"]}
+        head={["Hook", "Pseudo-class", "Meaning"]}
         rows={[
           [
             "`data-checked`",

@@ -130,7 +130,7 @@ export function ButtonPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "Meaning"]}
+        head={["Hook", "Meaning"]}
         rows={[
           [
             "`data-pending`",

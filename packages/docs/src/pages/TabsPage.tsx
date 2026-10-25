@@ -238,7 +238,7 @@ export function TabsPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "On", "Meaning"]}
+        head={["Hook", "On", "Meaning"]}
         rows={[
           [
             "`data-pending`",

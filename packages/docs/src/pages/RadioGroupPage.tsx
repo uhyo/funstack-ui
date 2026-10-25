@@ -194,7 +194,7 @@ export function RadioGroupPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "On", "Pseudo-class", "Meaning"]}
+        head={["Hook", "On", "Pseudo-class", "Meaning"]}
         rows={[
           ["`data-pending`", "Root", "–", "`valueChangeAction` is in flight."],
           [

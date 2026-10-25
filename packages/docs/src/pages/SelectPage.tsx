@@ -269,7 +269,7 @@ export function SelectPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "On", "Pseudo-class", "Meaning"]}
+        head={["Hook", "On", "Pseudo-class", "Meaning"]}
         rows={[
           ["`data-pending`", "Root, Trigger", "–", "`valueChangeAction` is in flight."],
           ["`data-pending`", "Option", "–", "The option the in-flight dispatch is selecting."],

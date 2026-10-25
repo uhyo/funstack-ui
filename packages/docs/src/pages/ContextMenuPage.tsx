@@ -72,7 +72,7 @@ export function ContextMenuPage() {
           <code>li</code> or <code>canvas</code> through <code>render</code> keeps its own), no{" "}
           <code>aria-haspopup</code> (not allowed on generic elements) and no{" "}
           <code>aria-expanded</code>. ARIA has no way to say "this has a context menu".{" "}
-          <code>tabIndex</code> is yours (rule 2).
+          <code>tabIndex</code> is yours (<a href="#accessibility-rules">rule 2</a>).
         </li>
         <li>
           <strong>Render the Popup next to the region</strong>, so the reading order is natural. In
@@ -382,9 +382,10 @@ export function ContextMenuPage() {
         right-click opens the same menu at the pointer. It is one menu: while it is open from a
         right-click the button is exposed as expanded (the browser's state for its{" "}
         <code>popovertarget</code>) and shows <code>data-open</code>, and a click on it closes the
-        menu. That is the recommended way to satisfy rule 1, and it gives keyboard users a focusable
-        target inside the region. Use one Root per target (a row, a card); several ContextTriggers
-        in one Root are allowed but all show <code>data-open</code> together.
+        menu. That is the recommended way to satisfy <a href="#accessibility-rules">rule 1</a>, and
+        it gives keyboard users a focusable target inside the region. Use one Root per target (a
+        row, a card); several ContextTriggers in one Root are allowed but all show{" "}
+        <code>data-open</code> together.
       </p>
 
       <h3 id="props">Props</h3>
@@ -432,43 +433,47 @@ export function ContextMenuPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Where", "What", "Meaning"]}
+        head={["Hook", "On", "Meaning"]}
         rows={[
           [
-            "`Menu.Popup`",
             "`data-context`, `state.context`",
+            "`Menu.Popup`",
             "The current open came from a ContextTrigger and is placed at a point (committed). `data-side` / `data-align` are absent then, and `state.side` is `null`.",
           ],
           [
-            "`Menu.Popup`",
             "`--menu-point-x`, `--menu-point-y`",
+            "`Menu.Popup`",
             "The point, inline, in viewport pixels (also with `side={null}`).",
           ],
           [
-            "`Menu.Popup`",
             "`--menu-point-gap`",
+            "`Menu.Popup`",
             "The vertical gap between the point and the menu: `0px` for a mouse or keyboard open, `16px` for a touch or pen open, which is placed above the point. Inline; your `style` wins (also with `side={null}`).",
           ],
           [
-            "`Menu.Popup`",
             "`side`, `align`",
+            "`Menu.Popup`",
             "Apply to opens from a `Menu.Trigger`; ignored for a context open. `side={null}` opts out of the inline placement on both paths.",
           ],
           [
-            "`Menu.Popup`",
             "`onContextMenu` (owned)",
+            "`Menu.Popup`",
             "Prevents the browser's menu over the custom one.",
           ],
           [
-            "`Menu.Root`",
             "`state.context`",
+            "`Menu.Root`",
             "The current open (optimistic) came from a ContextTrigger.",
           ],
         ]}
       />
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
-      <Callout kind="warning" title="Three rules for an accessible context menu">
+      <Callout
+        kind="warning"
+        title="Three rules for an accessible context menu"
+        id="accessibility-rules"
+      >
         <ol>
           <li>
             <strong>A context menu is a shortcut, never the only path to an action.</strong> iOS
@@ -554,8 +559,9 @@ export function ContextMenuPage() {
       <ul>
         <li>
           <strong>iOS Safari</strong> never fires <code>contextmenu</code> for touch; the library's
-          long-press opens the menu there. VoiceOver on iOS cannot open it (rule 1). On iPadOS with
-          a trackpad, Safari shows its own menu over the custom one (WebKit bug 260722).
+          long-press opens the menu there. VoiceOver on iOS cannot open it (
+          <a href="#accessibility-rules">rule 1</a>). On iPadOS with a trackpad, Safari shows its
+          own menu over the custom one (WebKit bug 260722).
         </li>
         <li>
           <strong>Firefox</strong>: Shift+right-click forces the browser's menu and fires no event,

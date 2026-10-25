@@ -94,7 +94,7 @@ export function TogglePage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "Meaning"]}
+        head={["Hook", "Meaning"]}
         rows={[
           ["`data-pressed`", "Optimistically pressed."],
           ["`aria-pressed`", '`"true"` or `"false"`, optimistic.'],

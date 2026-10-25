@@ -187,7 +187,7 @@ export function MeterPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Name", "On", "Meaning"]}
+        head={["Hook", "On", "Meaning"]}
         rows={[
           ["`data-region`", "every part", "`optimum`, `suboptimum` or `even-less-good`."],
           ["`--meter-value`", "Root (inherited)", "The percentage."],

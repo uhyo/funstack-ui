@@ -129,7 +129,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "On", "Meaning"]}
+        head={["Hook", "On", "Meaning"]}
         rows={[
           ["`data-orientation`", "Root", "The toolbar's orientation."],
           ["`data-orientation`", "Separator", "The separator's own (perpendicular) orientation."],

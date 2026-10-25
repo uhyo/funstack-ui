@@ -4,14 +4,17 @@ import type { ReactNode } from "react";
 export function Callout({
   kind = "note",
   title,
+  id,
   children,
 }: {
   kind?: "note" | "warning";
   title?: string;
+  /** A link target, for a callout that other text refers to. */
+  id?: string;
   children: ReactNode;
 }) {
   return (
-    <aside className={`callout ${kind}`}>
+    <aside id={id} className={`callout ${kind}`}>
       {title && <p className="callout-title">{title}</p>}
       {children}
     </aside>
