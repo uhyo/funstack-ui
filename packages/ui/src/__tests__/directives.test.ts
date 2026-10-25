@@ -224,6 +224,7 @@ const directiveFreeFiles = [
   "toast/toast.mjs",
   "internal/modal-registry.mjs",
   "internal/focus-visible.mjs",
+  "internal/invokers.mjs",
   "slider/index.mjs",
   // Pure arithmetic (design 15).
   "slider/slider-arithmetic.mjs",

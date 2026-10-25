@@ -8,7 +8,7 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { listenInvokerPresses } from "../internal/invoker-press.js";
+import { listenInvokerPresses } from "../internal/invokers.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";

@@ -11,7 +11,7 @@ import type {
 } from "react";
 import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
-import { listenInvokerPresses } from "../internal/invoker-press.js";
+import { listenInvokerPresses } from "../internal/invokers.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";

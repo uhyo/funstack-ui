@@ -1,7 +1,7 @@
 // The foreign invoker press guard (conventions 3.5, #126) on plain DOM. The jsdom invoker shim
 // reflects the IDL it reads; the component rows are in menu.test.tsx and combobox.test.tsx.
 import { afterEach, describe, expect, it } from "vitest";
-import { isPopoverInvoker, listenInvokerPresses } from "./invoker-press.js";
+import { isPopoverInvoker, listenInvokerPresses } from "./invokers.js";
 
 function setup() {
   const popup = document.createElement("div");

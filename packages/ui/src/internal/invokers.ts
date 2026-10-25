@@ -1,10 +1,33 @@
-// No directive: DOM listeners only (conventions 7.1).
+// No directive: DOM reads and listeners only (conventions 7.1). The platform's invoker
+// relationship between a button and a popover, as the overlays read it.
 
 /** An invoker button's IDL; absent where the engine lacks the Popover API or Invoker Commands. */
 interface InvokerButton {
   readonly popoverTargetElement?: Element | null;
   readonly commandForElement?: Element | null;
   readonly command?: string;
+}
+
+/**
+ * The `source` of a `ToggleEvent` (Chromium 140, Firefox 145, Safari 26.5), a `CommandEvent` or
+ * an `InterestEvent`: the invoker that caused it, `null` without one. Not in TypeScript's DOM lib
+ * for all three.
+ */
+export function eventSource(event: Event): Element | null {
+  return (event as Event & { readonly source?: Element | null }).source ?? null;
+}
+
+/**
+ * Whether the `ToggleEvent.source` of a close is a `popovertarget` invoker of `popup`. A
+ * `commandfor` or `interestfor` invoker sets `source` too (Chromium's lost-interest hide, a
+ * dismissal), and so names no `popovertarget` here.
+ */
+export function closedByPopoverTarget(event: ToggleEvent, popup: HTMLElement): boolean {
+  const source = eventSource(event);
+  return (
+    (source instanceof HTMLButtonElement || source instanceof HTMLInputElement) &&
+    source.popoverTargetElement === popup
+  );
 }
 
 /** The `<input>` types HTML counts as buttons: the ones `popovertarget` applies to. */

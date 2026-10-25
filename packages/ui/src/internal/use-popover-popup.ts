@@ -2,6 +2,7 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
+import { closedByPopoverTarget, eventSource } from "./invokers.js";
 import { supportsFocusVisibleOption } from "./focus-visible.js";
 import type { QuietFocusTarget } from "./focus-visible.js";
 import {
@@ -79,20 +80,6 @@ const isDev = process.env.NODE_ENV !== "production";
 function needsName(element: Element): boolean {
   const role = element.getAttribute("role");
   return role === "dialog" || role === "alertdialog" || role === "menu";
-}
-
-/**
- * Whether the `ToggleEvent.source` of a close (Chromium 140, Firefox 145, Safari 26.5; not in
- * TypeScript's DOM lib) is a `popovertarget` invoker of `popup`. A `commandfor` or `interestfor`
- * invoker sets `source` too (Chromium's lost-interest hide, a dismissal), and so names no
- * `popovertarget` here.
- */
-function closedByPopoverTarget(event: ToggleEvent, popup: HTMLElement): boolean {
-  const source = (event as ToggleEvent & { readonly source?: Element | null }).source;
-  return (
-    (source instanceof HTMLButtonElement || source instanceof HTMLInputElement) &&
-    source.popoverTargetElement === popup
-  );
 }
 
 /** Whether `element` sits inside a popover that is not shown (an outer popup that closed). */
@@ -284,8 +271,8 @@ export function usePopoverPopup(
         event.preventDefault();
         // Chromium dispatches `interest` and then the interest show in one step, so a show whose
         // `source` is the remembered interest invoker is that button's interest open (#127).
-        const source = (toggle as ToggleEvent & { readonly source?: Element | null }).source;
-        interestOpen.current = source != null && source === interestInvoker.current;
+        const source = eventSource(toggle);
+        interestOpen.current = source !== null && source === interestInvoker.current;
         ctx.requestOpen(event, "activate");
       } else if (!reshowing.current) {
         // A Close action that resolves after this open must not close it (design 3.4). A re-show
@@ -360,14 +347,10 @@ export function usePopoverPopup(
     }
   };
 
-  /** The `source` of an `interest` / `loseinterest` event (`InterestEvent`, not in the DOM lib). */
-  const interestSource = (event: Event): Element | null =>
-    (event as Event & { readonly source?: Element | null }).source ?? null;
-
   const onInterest = (event: Event): void => {
     const element = popupRef.current;
     if (!isLibrary || element === null || event.target !== element) return;
-    interestInvoker.current = interestSource(event);
+    interestInvoker.current = eventSource(event);
   };
 
   /**
@@ -384,7 +367,7 @@ export function usePopoverPopup(
   const onLoseInterest = (event: Event): void => {
     const element = popupRef.current;
     if (!isLibrary || element === null || event.target !== element) return;
-    const source = interestSource(event);
+    const source = eventSource(event);
     if (source === null || source !== interestInvoker.current) return;
     interestInvoker.current = null;
     if (!interestOpen.current) return;

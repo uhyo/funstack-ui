@@ -17,6 +17,7 @@ import {
   useInitialFocusTarget,
   useJsFreePropWarnings,
 } from "../internal/overlay-popup.js";
+import { eventSource } from "../internal/invokers.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -352,8 +353,7 @@ export function DialogPopup({
         // `show-modal`: same markup as Dialog.Close, same behaviour. `source` is the invoker
         // (`""` where an engine gives none).
         event.preventDefault();
-        const source = (event as Event & { source?: unknown }).source;
-        ctx.requestClose(event, "activate", valueOf(source));
+        ctx.requestClose(event, "activate", valueOf(eventSource(event)));
       } else if (element.open) {
         // The `command` event fires whatever the dialog's state (HTML): a close at a closed
         // dialog leaves no intent for a later close.
