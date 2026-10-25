@@ -13,6 +13,8 @@
  *
  * A blocked stylesheet degrades: the point menu opens at the point but never flips, and on the
  * native tooltip path each tooltip waits its own `delay` (no skip-delay).
+ *
+ * @see https://ui.funstack.work/concepts/content-security-policy
  */
 export const STYLE_SHA256 = {
   "@funstack/ui/menu-point": "Wm5aBRstuZ3S9kDs0IbldhidU/prqpIW69jEAS0N9mc=",

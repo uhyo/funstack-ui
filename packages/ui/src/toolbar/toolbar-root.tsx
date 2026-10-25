@@ -8,12 +8,23 @@ import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
 
+/** The arrow-key axis of a Toolbar. */
 export type ToolbarOrientation = Orientation;
 
+/**
+ * State of `Toolbar.Root`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ToolbarRootState {
+  /** The `orientation` prop. */
   readonly orientation: ToolbarOrientation;
 }
 
+/**
+ * Props of `Toolbar.Root`.
+ *
+ * @see https://ui.funstack.work/components/toolbar
+ */
 export interface ToolbarRootProps extends Omit<
   ComponentPropsWithRef<"div">,
   | "role"
@@ -26,19 +37,33 @@ export interface ToolbarRootProps extends Omit<
   | "style"
   | "children"
 > {
-  /** Axis of the arrow keys; also `aria-orientation`. Default `"horizontal"`. */
+  /**
+   * Axis of the arrow keys; also `aria-orientation`.
+   *
+   * @defaultValue `"horizontal"`
+   */
   orientation?: ToolbarOrientation;
-  /** Whether arrows wrap from the last item to the first. Default `true`. */
+  /**
+   * Whether arrows wrap from the last item to the first.
+   *
+   * @defaultValue `true`
+   */
   loop?: boolean;
   /**
    * Render `focusgroup="toolbar …"` and, where the browser implements it, let the browser handle
    * arrow keys, Home and End and the single Tab stop. Chromium 150+ only; elsewhere the JS path
-   * stays active. Default `false`.
+   * stays active.
+   *
+   * @defaultValue `false`
    */
   experimental_focusgroup?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToolbarRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToolbarRootState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ToolbarRootState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ToolbarRootState>;
 }
 
@@ -59,6 +84,8 @@ function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
  *
  * Owned keys (conventions 1.2): `role`, `aria-orientation`, `data-orientation`, `onKeyDown`,
  * `onFocus`, `onBlur`, `onPointerDown`, and `focusgroup` while the flag is on.
+ *
+ * @see https://ui.funstack.work/components/toolbar
  */
 export function ToolbarRoot({
   orientation = "horizontal",

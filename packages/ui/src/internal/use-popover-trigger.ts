@@ -48,6 +48,7 @@ export interface PopoverTriggerHookState {
   readonly open: boolean;
   /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
   readonly pending: boolean;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 

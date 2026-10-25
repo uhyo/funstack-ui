@@ -8,6 +8,8 @@ import { ToolbarSeparator } from "./toolbar-separator.js";
  * arrow keys over its focusable descendants, and `Separator` (hr). Any focusable element is an
  * item: no wrapper parts. A command button is `Button` from `@funstack/ui/button`, which stays
  * focusable when disabled inside a Toolbar (design/components/button.md 7.3).
+ *
+ * @see https://ui.funstack.work/components/toolbar
  */
 export const Toolbar = {
   Root: ToolbarRoot,

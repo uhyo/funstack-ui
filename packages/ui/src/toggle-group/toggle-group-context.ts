@@ -2,6 +2,7 @@
 import { createContext, use } from "react";
 import type { Orientation } from "../internal/types.js";
 
+/** The arrow-key axis of a ToggleGroup. */
 export type ToggleGroupOrientation = Orientation;
 
 export interface ToggleGroupContextValue {

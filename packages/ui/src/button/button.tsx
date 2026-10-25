@@ -22,6 +22,9 @@ const isDev = process.env.NODE_ENV !== "production";
 /** Details passed to `Button`'s `action`. Serialisable; `event` is virtual (conventions 2.2). */
 export interface ButtonActionDetails extends ActionDetails {}
 
+/**
+ * State of `Button`, passed to the function forms of `className`, `style`, `children` and `render`.
+ */
 export interface ButtonState {
   /**
    * This Button's own `action` is in flight, or a submission it started through its own
@@ -32,6 +35,11 @@ export interface ButtonState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Button`.
+ *
+ * @see https://ui.funstack.work/components/button
+ */
 export interface ButtonProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "aria-disabled" | "className" | "style" | "children" | "type" | "formAction"
@@ -52,10 +60,11 @@ export interface ButtonProps extends Omit<
    */
   formAction?: ComponentPropsWithRef<"button">["formAction"];
   /**
-   * Default `"button"`, or `"submit"` when `formAction` is given. Owned on a `<button>` and on a
-   * component `render` element (set it here, not on the element; a component should spread it);
-   * omitted for a host element of another tag (`<a>`). `action` together with
-   * `"submit"` / `"reset"` warns in development: one click would do two things.
+   * Owned on a `<button>` and on a component `render` element (set it here, not on the element; a
+   * component should spread it); omitted for a host element of another tag (`<a>`). `action`
+   * together with `"submit"` / `"reset"` warns in development: one click would do two things.
+   *
+   * @defaultValue `"button"`, or `"submit"` when `formAction` is given
    */
   type?: "button" | "submit" | "reset";
   /**
@@ -63,13 +72,16 @@ export interface ButtonProps extends Omit<
    * Never dispatches. With `focusableWhenDisabled`, inside a `Toolbar.Root`, or when the
    * rendered element is not a host `<button>` (`render={<a href />}`, a component), renders
    * `aria-disabled="true"` instead.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
   /**
    * Keep a disabled Button focusable: `aria-disabled="true"` instead of native `disabled`, so
-   * keyboard and screen-reader users still find it and a Tooltip on it still opens. Default
-   * `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar) and for a `render` element that
-   * is not a host `<button>`.
+   * keyboard and screen-reader users still find it and a Tooltip on it still opens.
+   *
+   * @defaultValue `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar) and for a `render`
+   * element that is not a host `<button>`
    */
   focusableWhenDisabled?: boolean;
   /**
@@ -80,9 +92,13 @@ export interface ButtonProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ButtonState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ButtonState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ButtonState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, ButtonState>;
 }
 
@@ -95,6 +111,8 @@ export interface ButtonProps extends Omit<
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`,
  * `data-pending`, `data-disabled`, `onClick`.
+ *
+ * @see https://ui.funstack.work/components/button
  */
 export function Button({
   action,
