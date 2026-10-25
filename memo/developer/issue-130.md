@@ -43,8 +43,11 @@ memo/reviewer/wave18-audit-tests.md. Phase 2 (T3, T4, T5, T7) and T2 (dev-131) a
   scratchpad `base-*-names.txt`, `t9-*-names.txt`.
 - jsdom shuffled: seeds 1, 2, 3 (T1 first version), 11, 12, 13 (final): all green.
 - Mutations (all reverted):
-  - T1: without the jsdom body clear, use-popover-hooks.test fails one row (leftover from
-    another file). A probe browser file (not committed: row 1 opens a raw modal dialog, holds the
+  - T1: without the jsdom body clear, the first ordering failed one use-popover-hooks.test row
+    (a leftover from another file); with the final ordering the full jsdom run stays green
+    without it, so a jsdom probe file (row 1 leaves an open raw popover and server HTML in the
+    body, row 2 asserts an empty body and nothing open) shows it: row 2 fails without the clear.
+    A probe browser file (not committed: row 1 opens a raw modal dialog, holds the
     mouse, leaves the act environment twice; row 2 asserts all three reset) fails row 2 without
     the browser close, without `runCleanups`, or without `releaseHeld`. Without the close, the
     real browser suite still passes (unmount removes React's popups; the close is for raw DOM).
