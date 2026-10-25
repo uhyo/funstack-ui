@@ -615,52 +615,52 @@ describe("Select (browser)", () => {
     expect(action).toHaveBeenCalledTimes(1);
     expect(vt.calls()).toBe(0);
   });
-});
 
-// #117: a real press on what design 8 lists while the picker is open (`Enter`, `Space`, click
-// (open) commit; everything else closes without committing). There is no open state to dispatch,
-// so the rows assert the value contract: no dispatch, the value and content unchanged, the picker
-// closed. Only where the in-page picker exists (`supportsBaseSelect`): Firefox's native popup is
-// not in the page and a headless click does not open it (the header). The option pick is the
-// "a pick through the picker" row above.
-describe.runIf(supportsBaseSelect)("a real press while the picker is open", () => {
-  afterEach(async () => {
-    await mouse.releaseHeld();
-  });
-
-  async function pressOn(target: Element) {
-    const r = target.getBoundingClientRect();
-    const x = Math.round(r.left + r.width / 2);
-    const y = Math.round(r.top + r.height / 2);
-    await act(async () => {
-      await mouse.down(x, y);
-      await sleep(20);
-      await mouse.up(x, y);
+  // #117: a real press on what design 8 lists while the picker is open (`Enter`, `Space`, click
+  // (open) commit; everything else closes without committing). There is no open state to dispatch,
+  // so the rows assert the value contract: no dispatch, the value and content unchanged, the picker
+  // closed. Only where the in-page picker exists (`supportsBaseSelect`): Firefox's native popup is
+  // not in the page and a headless click does not open it (the header). The option pick is the
+  // "a pick through the picker" row above.
+  describe.runIf(supportsBaseSelect)("a real press while the picker is open", () => {
+    afterEach(async () => {
+      await mouse.releaseHeld();
     });
-    await flushFor();
-  }
 
-  it.each([
-    ["the select itself", () => sel()],
-    ["a button outside", () => screen.getByTestId("outside")],
-  ])("%s: the picker closes without committing; nothing is dispatched", async (_, target) => {
-    const action = vi.fn<ActionFn>();
-    render(
-      <div style={{ padding: 20 }}>
-        <button type="button" data-testid="outside" style={{ display: "block" }}>
-          Outside
-        </button>
-        <Fruits action={action} />
-      </div>,
-    );
-    await pressOn(sel());
-    await expect.poll(() => isOpen()).toBe(true);
-    await pressOn(target());
-    await expect.poll(() => isOpen()).toBe(false);
-    await flushFor(50);
-    expect(isOpen()).toBe(false);
-    expect(action).not.toHaveBeenCalled();
-    expect(sel().value).toBe("a");
-    expect(content().textContent).toBe("Apple");
+    async function pressOn(target: Element) {
+      const r = target.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2);
+      const y = Math.round(r.top + r.height / 2);
+      await act(async () => {
+        await mouse.down(x, y);
+        await sleep(20);
+        await mouse.up(x, y);
+      });
+      await flushFor();
+    }
+
+    it.each([
+      ["the select itself", () => sel()],
+      ["a button outside", () => screen.getByTestId("outside")],
+    ])("%s: the picker closes without committing; nothing is dispatched", async (_, target) => {
+      const action = vi.fn<ActionFn>();
+      render(
+        <div style={{ padding: 20 }}>
+          <button type="button" data-testid="outside" style={{ display: "block" }}>
+            Outside
+          </button>
+          <Fruits action={action} />
+        </div>,
+      );
+      await pressOn(sel());
+      await expect.poll(() => isOpen()).toBe(true);
+      await pressOn(target());
+      await expect.poll(() => isOpen()).toBe(false);
+      await flushFor(50);
+      expect(isOpen()).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+      expect(sel().value).toBe("a");
+      expect(content().textContent).toBe("Apple");
+    });
   });
 });
