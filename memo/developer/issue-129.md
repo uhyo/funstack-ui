@@ -64,3 +64,16 @@ test:jsdom 3364/3364, test:browser Chromium + Firefox 1006 passed / 36 skipped.
 - Q3 `fix(ui)`: Combobox.Trigger's ref writes `popovertarget` only while `invoker`
   (`disabledButton`), `invoker` in the deps; `aria-expanded` for non-invokers. jsdom rows and an
   all-engine browser row; both fail against the old trigger. ComboboxPage Trigger notes updated.
+
+## Review fixes (memo/reviewer/issue-129-review.md)
+
+- F1: S3 regression. A callback-ref re-run (inline consumer `ref`) detached the whileShown
+  listeners and nothing reinstalled them. The attach now installs through
+  `useLatest(options.whileShown)` when the popup is shown. Side effect: a popup already shown at
+  its first attach (pre-hydration open) now gets the listeners too (before: only at the next
+  open). Rows: use-popover-hooks (balance of installs/stops, since the open's own re-renders
+  re-run an inline ref too) and menu.test.tsx (inline ref, rerender, invoker guard + right-click
+  outside); both fail without the fix. popover.md 14.2 sentence updated.
+- F2: no observable row (the open cause is read in the apply layout effect, after the click
+  handler); a comment at the call states the contract instead.
+- F4: re-wrapped Combobox namespace / Label / Trigger and Popover.Close `action` JSDoc.
