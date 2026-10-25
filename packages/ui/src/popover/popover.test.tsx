@@ -31,7 +31,6 @@ import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
 import {
   deferred,
-  ErrorCatcher,
   expectNotPending,
   expectPending,
   renderBoth,
@@ -39,7 +38,6 @@ import {
   flushTasks,
   hydrateFromServer,
   silenceErrors,
-  recordClicks,
 } from "../__tests__/helpers.js";
 import { PopoverContext } from "./popover-context.js";
 import { Popover } from "./index.js";
@@ -61,6 +59,7 @@ import {
   describeOverlayOpenState,
   popoverLikeDriver,
 } from "../__tests__/overlay-open-state-suite.js";
+import { describeOverlayClosePart } from "../__tests__/overlay-close-part-suite.js";
 import type { OverlayHarnessMode } from "../__tests__/overlay-open-state-suite.js";
 
 type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
@@ -139,6 +138,20 @@ describeOverlayOpenState<PopoverOpenChangeDetails>({
     ),
     useIntents: () => use(PopoverContext)!,
     open: (element) => element.showPopover(),
+  },
+});
+
+describeOverlayClosePart<PopoverOpenChangeDetails>({
+  name: "Popover",
+  Harness,
+  isOpen,
+  Close: (props) => <Popover.Close {...props} />,
+  spyClose: spyHide,
+  closeArgs: [],
+  dismiss: () => popup().hidePopover(),
+  // The Trigger's native `popovertarget` toggle.
+  openStatic: async () => {
+    await setupUser().click(trigger());
   },
 });
 
@@ -1455,243 +1468,6 @@ describe("Popover", () => {
       expect(details.event!.defaultPrevented).toBe(true);
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-    });
-
-    renderBoth("with action", (mode) => {
-      it("data-pending while it runs, then the close is dispatched", async () => {
-        const user = setupUser();
-        const action = vi.fn<ActionFn>();
-        const work = deferred();
-        const closeAction = vi.fn(() => work.promise);
-        render(<Harness mode={mode} action={action} close={{ action: closeAction }} />);
-        await openThroughTrigger(user);
-        const close = screen.getByTestId("close");
-        await user.click(close);
-        expect(closeAction).toHaveBeenCalledTimes(1);
-        expect(closeAction.mock.calls[0]).toEqual([expect.anything()]);
-        expectPending(close);
-        expect(isOpen()).toBe(true);
-        expect(action).toHaveBeenCalledTimes(1);
-        await act(async () => work.resolve());
-        await flushTasks(2);
-        expectNotPending(close);
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls[1]![0]).toBe(false);
-        expect(action.mock.calls[1]![1].reason).toBe("activate");
-        expect(isOpen()).toBe(false);
-      });
-
-      it("dismissed and re-opened while the action runs: the stale close is dropped", async () => {
-        const user = setupUser();
-        const action = vi.fn<ActionFn>();
-        const work = deferred();
-        render(<Harness mode={mode} action={action} close={{ action: () => work.promise }} />);
-        await openThroughTrigger(user);
-        await user.click(screen.getByTestId("close"));
-        expectPending(screen.getByTestId("close"));
-        // A dismissal, then the user opens the popover again.
-        await act(async () => popup().hidePopover());
-        await flushTasks(2);
-        expect(isOpen()).toBe(false);
-        // The re-open is entangled with the Close's pending async transition (React batches
-        // them), so it commits together with the action's end.
-        await user.click(trigger());
-        await act(async () => work.resolve());
-        await flushTasks(2);
-        expect(isOpen()).toBe(true);
-        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
-      });
-
-      it("a rejection reaches the boundary inside the popup; the popup stays open", async () => {
-        const user = setupUser();
-        silenceErrors();
-        const action = vi.fn<ActionFn>();
-        const caught = vi.fn();
-        render(
-          <Harness
-            mode={mode}
-            action={action}
-            content={
-              <ErrorCatcher onError={caught}>
-                <Popover.Close
-                  data-testid="close"
-                  action={async () => {
-                    throw new Error("archive failed");
-                  }}
-                >
-                  Archive
-                </Popover.Close>
-              </ErrorCatcher>
-            }
-          />,
-        );
-        await openThroughTrigger(user);
-        await user.click(screen.getByTestId("close"));
-        await flushTasks(2);
-        expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "archive failed" }));
-        expect(action).toHaveBeenCalledTimes(1);
-        expect(isOpen()).toBe(true);
-      });
-
-      // P3
-      it("a rejection reaches the boundary; after a reset the Close runs again", async () => {
-        const user = setupUser();
-        silenceErrors();
-        const action = vi.fn<ActionFn>();
-        const caught = vi.fn();
-        const runs = [deferred(), deferred()];
-        let call = 0;
-        function Resettable() {
-          const [key, setKey] = useState(0);
-          return (
-            <>
-              <button type="button" data-testid="reset" onClick={() => setKey((k) => k + 1)} />
-              <ErrorCatcher key={key} onError={caught}>
-                <Popover.Close data-testid="close" action={() => runs[call++]!.promise}>
-                  Archive
-                </Popover.Close>
-              </ErrorCatcher>
-            </>
-          );
-        }
-        render(<Harness mode={mode} action={action} content={<Resettable />} />);
-        await openThroughTrigger(user);
-        await user.click(screen.getByTestId("close"));
-        await act(async () => runs[0]!.reject(new Error("first failed")));
-        await flushTasks(2);
-        expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
-        expect(isOpen()).toBe(true);
-        expect(action).toHaveBeenCalledTimes(1);
-        fireEvent.click(screen.getByTestId("reset"));
-        await user.click(screen.getByTestId("close"));
-        expect(call).toBe(2);
-        await act(async () => runs[1]!.resolve());
-        await flushTasks(2);
-        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
-        expect(isOpen()).toBe(false);
-      });
-
-      // P1
-      it("a second click, Enter and Space while pending are ignored and cancelled", async () => {
-        const user = setupUser();
-        const action = vi.fn<ActionFn>();
-        const work = deferred();
-        const closeAction = vi.fn(() => work.promise);
-        render(<Harness mode={mode} action={action} close={{ action: closeAction }} />);
-        await openThroughTrigger(user);
-        const close = screen.getByTestId("close");
-        expect(close).not.toHaveAttribute("aria-disabled");
-        const clicks = recordClicks();
-        await user.click(close);
-        await user.click(close);
-        close.focus();
-        await user.keyboard("{Enter}");
-        await user.keyboard(" ");
-        expect(closeAction).toHaveBeenCalledTimes(1);
-        expect(clicks).toEqual([true, true, true, true]);
-        expect(close).toHaveAttribute("aria-disabled", "true");
-        expectPending(close);
-        expect(close).not.toHaveAttribute("data-disabled");
-        expect(close).not.toBeDisabled();
-        expect(document.activeElement).toBe(close);
-        await act(async () => work.resolve());
-        await flushTasks(2);
-        expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
-          [true, "activate"],
-          [false, "activate"],
-        ]);
-        expect(isOpen()).toBe(false);
-        expect(close).not.toHaveAttribute("aria-disabled");
-        expectNotPending(close);
-      });
-
-      // P2
-      it("two clicks in one task call the action once", async () => {
-        const user = setupUser();
-        const action = vi.fn<ActionFn>();
-        const work = deferred();
-        const closeAction = vi.fn(() => work.promise);
-        render(<Harness mode={mode} action={action} close={{ action: closeAction }} />);
-        await openThroughTrigger(user);
-        act(() => {
-          fireEvent.click(screen.getByTestId("close"));
-          fireEvent.click(screen.getByTestId("close"));
-        });
-        expect(closeAction).toHaveBeenCalledTimes(1);
-        await act(async () => work.resolve());
-        await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(isOpen()).toBe(false);
-      });
-    });
-
-    // P1
-    it("JS-free mode with action, a second click while pending is ignored; one hidePopover()", async () => {
-      const user = setupUser();
-      const work = deferred();
-      const closeAction = vi.fn(() => work.promise);
-      render(<Harness mode="static" close={{ action: closeAction }} />);
-      await user.click(trigger());
-      const hidePopover = spyHide();
-      const close = screen.getByTestId("close");
-      const clicks = recordClicks();
-      await user.click(close);
-      await user.click(close);
-      close.focus();
-      await user.keyboard("{Enter}");
-      expect(closeAction).toHaveBeenCalledTimes(1);
-      expect(clicks).toEqual([true, true, true]);
-      expect(close).toHaveAttribute("aria-disabled", "true");
-      expectPending(close);
-      await act(async () => work.resolve());
-      expect(hidePopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(false);
-      expect(close).not.toHaveAttribute("aria-disabled");
-    });
-
-    // P4
-    it("a render element's aria-disabled is removed while the Close is idle (owned)", () => {
-      render(
-        <Harness
-          mode="static"
-          close={{ action: () => {}, render: <button type="button" aria-disabled="true" /> }}
-        />,
-      );
-      expect(screen.getByTestId("close")).not.toHaveAttribute("aria-disabled");
-    });
-
-    it("JS-free mode with action: hidePopover() after the action resolves", async () => {
-      const user = setupUser();
-      const work = deferred();
-      render(<Harness mode="static" close={{ action: () => work.promise }} />);
-      await user.click(trigger());
-      const hidePopover = spyHide();
-      await user.click(screen.getByTestId("close"));
-      expect(isOpen()).toBe(true);
-      expectPending(screen.getByTestId("close"));
-      await act(async () => work.resolve());
-      expect(hidePopover).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(false);
-    });
-
-    it("a disabled Close never runs its action or closes", async () => {
-      const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      const closeAction = vi.fn();
-      render(
-        <Harness
-          mode="uncontrolled"
-          action={action}
-          close={{ action: closeAction, disabled: true }}
-        />,
-      );
-      await openThroughTrigger(user);
-      fireEvent.click(screen.getByTestId("close"));
-      await flushTasks(2);
-      expect(closeAction).not.toHaveBeenCalled();
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(isOpen()).toBe(true);
-      expect(screen.getByTestId("close")).toHaveAttribute("data-disabled", "");
     });
 
     it("disabled is owned: a render element cannot re-enable Trigger or Close", () => {
