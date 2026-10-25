@@ -92,3 +92,34 @@ memo/reviewer/wave18-audit-tests.md. Phase 2 (T3, T4, T5, T7) and T2 (dev-131) a
 - Gates after the rebase: typecheck, lint, format:check, build, root test:jsdom (3384), two
   shuffled jsdom runs, Chromium 518 + 6 skipped (25.8 s), Firefox 494 + 30 skipped (131.7 s).
 - CLAUDE.md: one sentence on vitest.browser.setup.ts (lead's permission).
+
+## Phase 2 (branch refactor/130-phase2 from d21d3ed)
+Scope: T5, T4, T3, T7, review finding 1 (number-field titles) and 3 (teardown guard rows), #133
+review gaps 1 and 2.
+- Finding 1: number-field.test.tsx :639 / :1393 ids moved to comments.
+- Finding 3: environment.browser.test.tsx "per-test teardown (setup files)" (2 ordered rows,
+  `{ shuffle: false }`) and a new jsdom file src/__tests__/setup-teardown.test.tsx. Mutants: no
+  browser close, no runCleanups, no vitest.browser.setup.ts, no onCleanup in leaveActEnvironment,
+  no jsdom body clear: each fails the second row. The setup's `cleanup()` removed is equivalent
+  (Testing Library's own afterEach unmounts).
+- T5: `partCloses: [PartClose, ...]`; rows named "[part]" only where there are two (Menu: an item,
+  the Trigger). Menu's local #110 block deleted. Menu.Trigger mousedown-prevent mutant: caught by 0
+  rows before, 3 after.
+- T4: suite "held content (design 4.4)" reads the DOM at the closing `beforetoggle` (synchronous
+  in both shims, inside close()/hidePopover()). vi.spyOn in vitest 5 has no
+  getMockImplementation for the original, hence the event. Dialog keeps its two stubbed-animation
+  rows.
+- T3: src/__tests__/overlay-close-part-suite.tsx (`describeOverlayClosePart`). Dialog gains the
+  controlled variants (+6). Popover's two JS-free with-action rows merged into one suite row.
+- T7: src/__tests__/foreign-invoker-press-browser-suite.tsx; both components outside act now.
+  jsdom keeps one wiring row each + Combobox's submit-in-form and unmount rows.
+- Gap 1: Popover "lost interest after an open by %s does nothing" (jsdom, both modes, script
+  showPopover / foreign show-popover invoker) and Chromium "an open by %s stays through interest
+  and lost interest". noteOpen-always-true mutant: 4 jsdom + 2 Chromium rows fail (survived before).
+- Gap 2: Combobox "focus moving into the Popup's content" (relatedTarget path; deferred path with
+  the move's own focusout silenced so only the null-relatedTarget focusout reaches the library).
+  Each fails only under its own mutant.
+- Counts: jsdom 3384 -> 3416 (dialog-close 43->45, dialog 108->114, menu 196->213, popover
+  240->245, setup-teardown +2; combobox 161 unchanged: +2 gap rows, -2 classifier rows).
+  Browser 524 -> 528 (environment +2, popover +2 Chromium-only). Every removed name is a moved or
+  renamed row (list in the scratchpad p2/).
