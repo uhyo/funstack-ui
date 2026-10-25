@@ -12,6 +12,36 @@ import type { PopoverRootValue } from "./use-overlay-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * Owned and never written on an overlay Trigger (Popover, Menu, Combobox): the default
+ * `popovertarget` action, which a render element must not change, and an Invoker Command, which
+ * would take precedence over `popovertarget` and act on another element.
+ */
+export const RESERVED_INVOKER_KEYS = {
+  popoverTargetAction: undefined,
+  commandfor: undefined,
+  command: undefined,
+} as const;
+
+/**
+ * The library-mode dev warning for a Trigger rendered as another element than a `<button>`: only
+ * an invoker button is spared by the popover's light dismiss, so a press while the popup is open
+ * hides it before the click. `popover` and `popup` are the nouns the text uses for it.
+ */
+export function nonInvokerMessage(
+  part: string,
+  tag: string,
+  popover: string,
+  popup: string,
+): string {
+  return (
+    `${part}: rendered a <${tag}>. Only a <button> is the ${popover}'s invoker: a press on ` +
+    `this element while the ${popup} is open closes it through light dismiss before the ` +
+    "click, so the close is not awaited, openChangeAction(false) cannot veto it and " +
+    "there is no exit transition. Render a <button>."
+  );
+}
+
 /** The state of an overlay Trigger (Popover.Trigger, Menu.Trigger and its siblings). */
 export interface PopoverTriggerHookState {
   /** Optimistic open state. A Popover in JS-free mode (the browser owns it) reports `false`. */
@@ -107,10 +137,7 @@ export function usePopoverTrigger<State>(
           );
         }
         return isLibrary
-          ? `${part}: rendered a <${tag}>. Only a <button> is the popover's invoker: a press on ` +
-              "this element while the popup is open closes it through light dismiss before the " +
-              "click, so the close is not awaited, openChangeAction(false) cannot veto it and " +
-              "there is no exit transition. Render a <button>."
+          ? nonInvokerMessage(part, tag, "popover", "popup")
           : `${part}: rendered a <${tag}> in JS-free mode. Only a <button> is a ` +
               "`popovertarget` invoker; this trigger will not open the popover. Render a " +
               "<button>, or put the component in library mode (`defaultOpen={false}`).";
@@ -180,12 +207,7 @@ export function usePopoverTrigger<State>(
     // Only on a button (or a component, assumed to render one): another element is no invoker,
     // and the attribute would claim otherwise (#115).
     popoverTarget: invoker ? ids.popup : undefined,
-    // Never written: the default `toggle` (a render element must not change the action).
-    popoverTargetAction: undefined,
-    // Reserved: an Invoker Command on the same button would take precedence over
-    // `popovertarget` and act on another element (#121 review F1).
-    commandfor: undefined,
-    command: undefined,
+    ...RESERVED_INVOKER_KEYS,
     // No `aria-expanded` on an invoker: every engine exposes the popover's shown state from
     // `popovertarget`, and ARIA in HTML forbids the attribute there (#121). Otherwise nothing else
     // exposes the state: library mode renders shown (the popup is in the top layer; `data-open`

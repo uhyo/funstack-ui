@@ -9,6 +9,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { nonInvokerMessage, RESERVED_INVOKER_KEYS } from "../internal/use-popover-trigger.js";
 import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
@@ -80,7 +81,8 @@ export function ComboboxTrigger({
   render,
   ...rest
 }: ComboboxTriggerProps) {
-  const ctx = useComboboxContext("Combobox.Trigger");
+  const part = "Combobox.Trigger";
+  const ctx = useComboboxContext(part);
   const { popover } = ctx;
   const disabled = ownDisabled || ctx.disabled;
   // Development check (design 9): an icon-only Trigger needs a name from the consumer.
@@ -93,11 +95,7 @@ export function ComboboxTrigger({
       ((element) =>
         element.tagName === "BUTTON"
           ? null
-          : `Combobox.Trigger: rendered a <${element.tagName.toLowerCase()}>. Only a <button> ` +
-            "is the listbox's invoker: a press on this element while the listbox is open closes " +
-            "it through light dismiss before the click, so the close is not awaited, " +
-            "openChangeAction(false) cannot veto it and there is no exit transition. Render a " +
-            "<button>."),
+          : nonInvokerMessage(part, element.tagName.toLowerCase(), "listbox", "listbox")),
   );
   const popupId = popover.ids.popup;
   // After hydration a `<button>` becomes the popup's invoker (design 3.3, #112): the platform's
@@ -132,11 +130,9 @@ export function ComboboxTrigger({
     "aria-expanded": rendersButton(render) ? undefined : popover.shown,
     "aria-controls": ctx.ids.list,
     // Owned: the ref writes `popovertarget` after hydration; a render element sets none of
-    // these (an Invoker Command would take precedence over `popovertarget`, #121 review F1).
+    // these.
     popoverTarget: undefined,
-    popoverTargetAction: undefined,
-    commandfor: undefined,
-    command: undefined,
+    ...RESERVED_INVOKER_KEYS,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
     },
