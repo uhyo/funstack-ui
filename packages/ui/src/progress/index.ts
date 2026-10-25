@@ -13,6 +13,8 @@ import { ProgressValue } from "./progress-value.js";
  * (the fill, sized by your CSS from `--progress-value`), `Label` and `Value`. Output-only: no
  * actions and no pending state; a `value` of `null` (the default) is indeterminate. Write a value
  * that reports on a pending action with a plain `setState`, never inside `startTransition`.
+ *
+ * @see https://ui.funstack.work/components/progress
  */
 export const Progress = {
   Root: ProgressRoot,
