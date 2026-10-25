@@ -28,6 +28,7 @@ export const conceptNavItems: NavItem[] = [
 export const guideNavItems: NavItem[] = [
   { path: "/concepts/experimental", label: "Experimental features" },
   { path: "/concepts/content-security-policy", label: "Content Security Policy" },
+  { path: "/concepts/ai-agents", label: "Using with AI agents" },
 ];
 
 // Grouped by kind, so a reader looking for "a form control" or "an overlay" scans a few names.
@@ -62,6 +63,7 @@ export const docsNavSections: NavSection[] = [
   {
     label: "Introduction",
     items: [
+      { path: "/why", label: "Why FUNSTACK UI" },
       { path: "/", label: "Overview" },
       { path: "/getting-started", label: "Getting started" },
     ],

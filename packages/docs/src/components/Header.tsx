@@ -7,6 +7,7 @@ import { DocsNav } from "./DocsNav.js";
 
 const navItems = [
   { path: "/", match: "/", label: "Home" },
+  { path: "/why", match: "/why", label: "Why" },
   { path: "/getting-started", match: "/getting-started", label: "Getting started" },
   { path: "/concepts/action-props", match: "/concepts", label: "Concepts" },
   { path: "/components/button", match: "/components", label: "Components" },
