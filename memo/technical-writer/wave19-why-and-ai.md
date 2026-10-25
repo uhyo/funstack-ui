@@ -8,8 +8,8 @@ Branch `docs/136-why`.
   comparison table by approach (no library names) / for, not for / next.
 - Home: hero buttons Why + Get started (dropped "Learn the concepts"; the principle cards now link
   to concept pages). "What it is" paragraph folded into "Try it". Browser support moved under Install.
-- `/guides/ai-agents`: new `/guides/` prefix. The two older guides still live under `/concepts/`;
-  moving them would break links, left as is.
+- AI agents guide at `/concepts/ai-agents`, with the other two guides (PO decision: no `/guides/`
+  path for a single page). The comparison table names no library (PO confirmed).
 - llms.txt/.md URLs are written as code on absolute https URLs, so checkLinks does not need
   dev-134's outputs to exist on this branch.
 - `.principles` CSS renamed to `.card-list` (shared by home and Why).

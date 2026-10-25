@@ -168,7 +168,7 @@ const [isPending, startTransition] = useTransition();
           <a href="/concepts/action-props">Action props</a>: the idea everything else builds on.
         </li>
         <li>
-          <a href="/guides/ai-agents">Using with AI agents</a>: give your coding agent the full
+          <a href="/concepts/ai-agents">Using with AI agents</a>: give your coding agent the full
           docs.
         </li>
       </ul>

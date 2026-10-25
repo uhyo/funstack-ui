@@ -55,7 +55,7 @@ export const routes = [
               page("/concepts/browser-owned-state", "BrowserOwnedStatePage"),
               page("/concepts/experimental", "ExperimentalPage"),
               page("/concepts/content-security-policy", "ContentSecurityPolicyPage"),
-              page("/guides/ai-agents", "AiAgentsPage"),
+              page("/concepts/ai-agents", "AiAgentsPage"),
               page("/components/button", "ButtonPage"),
               page("/components/toggle", "TogglePage"),
               page("/components/tabs", "TabsPage"),

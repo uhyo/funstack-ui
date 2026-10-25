@@ -28,7 +28,7 @@ export const conceptNavItems: NavItem[] = [
 export const guideNavItems: NavItem[] = [
   { path: "/concepts/experimental", label: "Experimental features" },
   { path: "/concepts/content-security-policy", label: "Content Security Policy" },
-  { path: "/guides/ai-agents", label: "Using with AI agents" },
+  { path: "/concepts/ai-agents", label: "Using with AI agents" },
 ];
 
 // Grouped by kind, so a reader looking for "a form control" or "an overlay" scans a few names.
