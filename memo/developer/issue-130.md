@@ -70,3 +70,11 @@ memo/reviewer/wave18-audit-tests.md. Phase 2 (T3, T4, T5, T7) and T2 (dev-131) a
   also has vitest.browser.setup.ts (not edited: outside this task's files).
 - Merging with dev-129's overlay test rows: the browser-file wrap re-indents whole files; resolve
   with `-Xignore-space-change` or re-run the wrap after.
+
+## CI
+- `gh workflow run ci.yml --ref refactor/130-tests`: run 40154862154 green (ci, chromium,
+  firefox, webkit); the WebKit job re-run twice (attempts 2 and 3), green each time.
+- CI "Duration" (worker startup is 86-95 % of it): chromium 41.1 s (master 39.9-42.9 s over the
+  last 8 runs), firefox 123.5 s (master 108-126 s), webkit 47.8 / 47.3 / 51.6 s (master
+  39.0-47.0 s). No gain visible on CI; WebKit sits at the top of master's range, not explained
+  by these changes (the tests share is ~13 %), worth a look if it persists after merge.
