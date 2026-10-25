@@ -1535,7 +1535,11 @@ kept next to `transition` must be **cut while a view transition runs**
 (`html:active-view-transition .dialog { transition: none; }`), otherwise Chromium keeps the
 fading element rendered and the close's view transition captures it as a live
 `::view-transition-new` next to the old image (a double image); the rule is untyped on purpose,
-because a controlled close carries no types (#46; Dialog 10.3, Popover 10.2).
+because a controlled close carries no types (#46; Dialog 10.3, Popover 10.2). It applies to
+**every** top-layer part that hides in a layout effect with `transition` set, Menu and Combobox
+included (confirmed in Chromium for both, #132; Menu 9, Combobox 11.4), and to a nested popup the
+browser closes together with its parent, so the selector goes on the class every such popup
+carries rather than on a variant for the ones that set `transition`.
 
 ```tsx
 // inside Tabs.Panel (mount strategy per `keepMounted`, section 3.7: not rendered, <Activity>,

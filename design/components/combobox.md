@@ -398,7 +398,7 @@ export interface ComboboxInputState {
 export interface ComboboxInputProps
   extends Omit<
     ComponentPropsWithRef<"input">,
-    | "value" | "defaultValue" | "onChange" | "onInput" | "onKeyDown" | "onBlur" | "onClick"
+    | "value" | "defaultValue" | "onChange" | "onInput" | "onKeyDown" | "onFocus" | "onBlur" | "onClick"
     | "onPointerDown"
     | "role" | "aria-autocomplete" | "aria-expanded" | "aria-controls" | "aria-activedescendant"
     | "autoComplete" | "disabled" | "className" | "style" | "children"
@@ -417,10 +417,13 @@ suggestion list would sit over the listbox), `aria-autocomplete` (`"list"`), `ar
 (optimistic open), `aria-controls` (the List id, token-merged), `aria-activedescendant`,
 `disabled`, the handlers listed in the `Omit` (`onPointerDown` since #123: a primary-button
 press while the listbox is shown captures the pointer to the Popup, so the release is not a light
-dismiss, 5.4), `data-open`, `data-pending`, `data-selected`
+dismiss, 5.4; `onFocus` since #132: it starts the #111 press watch that `onBlur` relies on, so the
+pair is owned together, conventions 1.5), `data-open`, `data-pending`, `data-selected`
 (optimistic `value !== null`), `data-stale`, `data-disabled`. `name` passes through (a second,
 visible field for the raw text; the selection's `name` is the Root's). `placeholder`,
-`aria-describedby`, `inputMode`, `onFocus`, `onCompositionStart` and the rest pass through.
+`aria-describedby`, `inputMode`, `onCompositionStart`, the capture-phase handlers
+(`onFocusCapture`, `onBlurCapture`) and the rest pass through; a consumer who needs to react to
+focus (select the text on focus, say) uses `onFocusCapture` or the function form of `render`.
 
 ### 3.3 `Combobox.Trigger`, `Combobox.Clear`
 
@@ -1222,6 +1225,8 @@ progressive enhancement, not a JS-free mode, as Menu (conventions 7.3).
 .listbox { opacity: 0; translate: 0 -4px; transition: opacity 120ms, translate 120ms, display 120ms allow-discrete, overlay 120ms allow-discrete; }
 .listbox:popover-open { opacity: 1; translate: 0 0; }
 @starting-style { .listbox:popover-open { opacity: 0; translate: 0 -4px; } }
+/* With `transition` on the Popup: keep the exit for dismissals, cut it while a view transition runs (11.4). */
+html:active-view-transition .listbox { transition: none; }
 @media (prefers-reduced-motion: reduce) { .listbox { transition: none; } }
 ```
 
@@ -1247,6 +1252,17 @@ press used to hide the popup before the close commit, so there was no exit to ca
 - Types: every value dispatch adds `fsui-combobox` and `fsui-combobox-select`; the open and
   close dispatches add `fsui-combobox-open` / `fsui-combobox-close`. The accept-then-close path
   contributes `fsui-combobox-select` and `fsui-combobox-close` to the one commit that ends it.
+- **The CSS exit of 11.3 must be cut while a view transition runs** (Popover 10.2, Dialog 10.3,
+  conventions 5.1; #132). The library-driven closes (an accepted option, the Trigger, a controlled
+  close) hide the listbox with `hidePopover()` in the layout effect of a transition commit, the
+  same path as Popover's; with the `display` / `overlay` transition on the popup Chromium keeps the
+  closing box rendered through its fade, so the close's view transition captures it as a live
+  `::view-transition-new(…)` next to the `old` image (a double image). Probed for this component
+  in Chromium (accepted option, the docs' exit CSS): without the rule the box is still displayed
+  at `ready` with a `new` image; with `html:active-view-transition .listbox { transition: none; }`
+  it is `display: none` with the `old` image only. Firefox animates no popover exit and shows the
+  `old` image either way. The selector is untyped on purpose (a controlled close carries no
+  types); the cost is that an unrelated page view transition also cuts a dismissal's fade.
 
 ---
 
@@ -1305,7 +1321,7 @@ Element.prototype` (all three stable engines; asserted true, branch kept for Pla
 | Trigger close (#112) | Real mouse (`mouse.down` / `mouse.up`) on the Trigger of an open listbox with `openChangeAction` resolving after 300 ms: at `pointerup` + 20 ms the popup still matches `:popover-open`, `document.activeElement` is the input, the Trigger has `data-pending`, no `data-open` and no `aria-expanded` (#121; the Chromium branch asserts the Trigger's AX `expanded=true` through `getAXNodes()` at the same sample); after the action: hidden, exactly one dispatch `(false, { reason: "activate" })` whose `event` is the `click`. Controlled `open={true}` parent that refuses (async and sync action): `:popover-open` sampled every frame from the press to + 400 ms is never false. With `transition`: `startViewTransition` called once for the Trigger close with a `::view-transition-old` of the popup. A click while closed opens with the popup's inline-start edge on the input's and width `>= input width` (the command never ran; the anchor is still the input). | none: all three engines run the same DOM assertions; the AX assertion is Chromium only. WebKit is checked by its CI job (`FUNSTACK_BROWSERS=webkit`); its `handlePopoverLightDismiss` checks `popoverTargetElement()` (`Document.cpp`, main, #121 evaluation) |
 | Input press (#123) | The #117 row, now passing: a real press (`mouse.down` / 20 ms / `mouse.up`) on the input of an open listbox: at the press and 80 ms after the release the popup matches `:popover-open`, `document.activeElement` is the input, the text is unchanged, nothing dispatched; the `click` landed on the Popup (`openOnClick` neither re-opens nor dispatches). Caret: a press after the third character leaves `selectionStart === selectionEnd === 3`. Nested inside an open `Popover.Popup`: both stay open. Touch (a `hasTouch` context, `touchscreen.tap`, or CDP `Input.dispatchTouchEvent`): stays open at top level; under vitest's runner the page is a frame, where Chromium closes it (#124): the row asserts the close in Chromium with the issue named, so it fails the day Chromium changes. It runs in Chromium only: the harness creates no `hasTouch` context, and CDP touch input is Chromium's (as the Menu and NumberField touch rows); Firefox's touch outcome comes from the plain-DOM probe (open, top level and frame). Drag-to-select from the second to the eighth character while open: `[2, 8]` where the engine's selection drag ignores pointer capture; Firefox: `[2, 2]`, asserted as the documented cost, never skipped. | Touch row: `browserName === "chromium"` (CDP), branching on `window === window.top` (the frame is #124's trigger; vitest's runner is always a frame) with #124 named. Drag row: `browserName === "firefox"` with the finding named (conventions 13.3: no feature check fits a drag). WebKit's expectation is `[2, 8]`; if its CI job alone disagrees, record it in the amendment and branch |
 | Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration, one `"platform"` text dispatch, no `valueChangeAction`, nothing opened; the server HTML's Trigger has no `popovertarget`, a real click on it before `hydrateRoot` opens nothing, after hydration it carries `popovertarget` (#112, #121). | The "keyboard did not reach the iframe" fallback is allowed for WebKit only (the engine not probed locally, review L4); Chromium and Firefox must reach it |
-| ViewTransition | With `transition={{ …, default: "none" }}`: open calls `startViewTransition` once, accept-close once with a `::view-transition-old` of the popup present, a deferred results change zero times; with `transition="pop"` a results change calls it once (documents the cost); without `transition` zero calls. | none |
+| ViewTransition | With `transition={{ …, default: "none" }}`: open calls `startViewTransition` once, accept-close once with a `::view-transition-old` of the popup present, a deferred results change zero times; with `transition="pop"` a results change calls it once (documents the cost); without `transition` zero calls. **CSS exit recipe (#132, as the shared overlay suite's "a CSS exit (recipe=%s)" rows):** the type map plus a `display` / `overlay` exit on the popup, an accepted option: at `ready` the popup is still displayed with a live `::view-transition-new` of it only in Chromium without the recipe (`html:active-view-transition .fade { transition: none; }`); with it, `display: none` and the `old` image only; one view transition, the content not re-mounted. | Recipe row: `browserName === "chromium"` for the displayed-and-`new`-image branch (Firefox: `old` only; WebKit: `display: none` by `ready`, pseudo names unreliable, assert `display` only, as Dialog 13.3). |
 | IME | Composition (`compositionstart` … `compositionend` through Playwright's `insertText` / keyboard IME where available): the text updates per composition update, the listbox opens, Enter during composition does not accept. | Chromium (Playwright IME support); others assert the non-composition path |
 
 ---
@@ -1396,7 +1412,8 @@ packages/ui/src/internal/
   from `popup.matches(":popover-open")`, reading options from the registry in DOM order
   (`compareDocumentPosition`), skipping `aria-disabled`; Home / End / ArrowLeft / ArrowRight →
   `setActive(null)` without `preventDefault`; Enter while closed with `allowCustomValue` →
-  `flushSync` around the commit. `onBlur` (React's `focusout`): nothing while `disabled`; if
+  `flushSync` around the commit. `onFocus` → start the #111 press watch (an owned key since
+  #132, as the `onBlur` it serves). `onBlur` (React's `focusout`): nothing while `disabled`; if
   `relatedTarget` is outside the input and the popup → `popup.hidePopover()` with a recorded
   `"dismiss"` intent, then the revert / custom commit (`leave()`); if `relatedTarget === null` →
   `setTimeout(0)` (while a pointer is pressed, one task after the last release instead; see 5.4,
@@ -2227,3 +2244,43 @@ plain button, not while closed; the #125 foreign row keeps `foreign.click()`. Br
 dragged-off press leaves the listbox shown, input focused, nothing dispatched. Mutation check: with
 the listener removed, the Chromium and Firefox rows fail (`"dismiss"`, text reverted, re-open on
 Firefox), the WebKit row passes.
+
+## Amendment: `Combobox.Input` owns `onFocus`; the CSS exit recipe applies here (#132, 2026-10-25)
+
+Status: architect decision on two wave 18 audit findings (`memo/reviewer/wave18-audit-source.md`
+S10, `memo/technical-writer/wave18-docs-audit.md` D3). Edited in place: 3.2 (props type and owned
+keys), 11.3, 11.4, 12.2, 14. Notes: `memo/architect/issue-132.md`.
+
+**S10: `onFocus` is omitted from `ComboboxInputProps` and listed as owned.** #111 made the Input
+install a prop-form `onFocus` (it starts the press watch that decides whether a `focusout` with
+no `relatedTarget` is a leave) without updating 3.2, which still said `onFocus` passes through.
+Today a consumer's `onFocus` is chained before the library's (conventions 1.2 merge order), so
+nothing breaks at runtime; the type is the inconsistency: `onBlur` refused, `onFocus` accepted.
+Conventions 1.5 is a blanket rule, "the library's own prop-form event handlers are omitted from
+the type", and every other part follows it (`Tabs.Tab` installs and omits `onFocus`; `Menu.Popup`,
+`Tabs.List`, `Toast.Viewport`, `ToggleGroup.Root`, `Toolbar.Root` omit it). The alternative, keep
+accepting it and document it as "owned, chained", would create a third category of handler
+("installed by the library but passed through") that 1.5 would have to define and every part
+would then have to classify its handlers against; a passive handler today can grow a
+`preventDefault()` tomorrow. Not worth it for one key. A types-only breaking change, allowed in
+alpha; the runtime is unchanged. What a consumer who reacts to focus does instead: `onFocusCapture`
+(a DOM event prop the part does not use, 1.5) or the function form of `render`.
+
+Implementation (developer): `combobox-input.tsx`: `"onFocus"` in the `Omit`; the doc comment's
+owned-key list gains `onFocus`. `combobox.test.tsx`: a `// @ts-expect-error -- owned key` line
+for `onFocus` next to the existing one. Docs (`ComboboxPage.tsx`, the Input's `PartFacts`): add
+`onFocus` to the owned list; the note gains "`onFocusCapture` passes through".
+
+**D3: the "cut the CSS exit while a view transition runs" rule applies to Combobox** (and Menu;
+see the Menu amendment of the same date). Confirmed two ways: by construction, since
+`Combobox.Popup` wraps the popover element in the boundary and `usePopoverPopup` runs
+`hidePopover()` in the layout effect of the close commit exactly as `Popover.Popup` does; and by
+a Chromium and Firefox probe of the docs' CSS shape (11.4). The docs and the playground must add
+the rule: `html:active-view-transition .demo-combobox-popup { transition: none; }`
+(`packages/docs/src/examples/combobox.css`) and `html:active-view-transition .cb-popup {
+transition: none; }` (`packages/example/src/combobox-demo.css`), with ComboboxPage's Styling
+section carrying the one-line CSS and the Chromium double-image reason, or a link to the general
+statement if the technical writer moves it to the Transitions page (recommended: the rule is
+general, conventions 5.1, and four pages now repeat it). A permanent browser row (12.2) is
+recommended so the Combobox gets what the shared overlay suite already gives Popover, Dialog and
+Menu.
