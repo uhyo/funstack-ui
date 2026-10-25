@@ -354,3 +354,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Reviews -> fixes -> merged by PO (devs went idle after green CI without reporting; check `gh run list` rather than waiting).
 - RELEASED 0.1.0-alpha.14 (notes: scratchpad notes-alpha14.md).
 - Human tasks open: #114, #119, #122, #124, older upstream issues. No open dev issues.
+
+## Wave 18: tidy-up pass (user: "A new tidy-up pass sounds great")
+- Running 3 read-only audits: audit18-src (reviewer, source; overlay accretion from wave 17) → memo/reviewer/wave18-audit-source.md; audit18-tests (reviewer) → memo/reviewer/wave18-audit-tests.md; audit18-docs (technical-writer, docs + example) → memo/technical-writer/wave18-docs-audit.md.
+- Then: pick findings by value/risk → issues → developers in worktrees → review per change → release.
