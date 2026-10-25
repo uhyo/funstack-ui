@@ -1427,6 +1427,72 @@ describe("Combobox", () => {
       expect(openAction.mock.calls.at(-1)![1].event?.type).toBe("focusout");
     });
 
+    // Focusable content inside the Popup is not outside (design 5.4; #133 review, gap 2): focus
+    // moving there, reported on the input's focusout or found by the deferred check, keeps the
+    // listbox, the typed text and every dispatch.
+    describe("focus moving into the Popup's content", () => {
+      async function setup() {
+        const openAction = vi.fn<OpenAction>();
+        const valueAction = vi.fn<ValueAction>();
+        const user = setupUser();
+        render(
+          <Harness
+            root={{ openChangeAction: openAction, valueChangeAction: valueAction }}
+            afterList={
+              <button type="button" data-testid="inside">
+                Add a country
+              </button>
+            }
+          />,
+        );
+        // Unmatched text (`allowCustomValue` off): leaving would revert it.
+        await typeText(user, "Jamaicax");
+        expect(isOpen()).toBe(true);
+        openAction.mockClear();
+        return { openAction, valueAction, inside: screen.getByTestId("inside") };
+      }
+
+      async function expectStayed({
+        openAction,
+        valueAction,
+        inside,
+      }: Awaited<ReturnType<typeof setup>>) {
+        await flushTasks(3);
+        expect(inside).toHaveFocus();
+        expect(isOpen()).toBe(true);
+        expect(input().value).toBe("Jamaicax");
+        expect(openAction).not.toHaveBeenCalled();
+        expect(valueAction).not.toHaveBeenCalled();
+      }
+
+      it("the input's focusout names the element inside the Popup: nothing closes", async () => {
+        const rows = await setup();
+        const seen: (EventTarget | null)[] = [];
+        input().addEventListener("focusout", (event) => seen.push(event.relatedTarget));
+        act(() => rows.inside.focus());
+        expect(seen).toEqual([rows.inside]);
+        await expectStayed(rows);
+      });
+
+      it("a focusout with no related target, focus inside the Popup by the deferred check: nothing closes", async () => {
+        const rows = await setup();
+        // Focus moves without the input's own focusout reaching the library; the focusout that
+        // does carries no related target (a press: focus to <body> first), so the check is the
+        // deferred one.
+        const silence = (event: Event) => event.stopImmediatePropagation();
+        window.addEventListener("focusout", silence, true);
+        window.addEventListener("blur", silence, true);
+        try {
+          act(() => rows.inside.focus());
+        } finally {
+          window.removeEventListener("focusout", silence, true);
+          window.removeEventListener("blur", silence, true);
+        }
+        fireEvent.focusOut(input(), { relatedTarget: null });
+        await expectStayed(rows);
+      });
+    });
+
     it("closes nothing when focus leaves to nowhere (window blur)", async () => {
       const user = setupUser();
       render(<Harness />);
