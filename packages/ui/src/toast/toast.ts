@@ -33,9 +33,9 @@ export interface ToastOptions {
    * @defaultValue generated
    */
   readonly id?: string | undefined;
-  /** Rendered by `Toast.Title`; named by `aria-labelledby` on the Root. */
+  /** Rendered by `Toast.Title`, which names the Root (`aria-labelledby`). */
   readonly title?: ReactNode;
-  /** Rendered by `Toast.Description`; named by `aria-describedby` on the Root. */
+  /** Rendered by `Toast.Description`, which describes the Root (`aria-describedby`). */
   readonly description?: ReactNode;
   /** Free-form, rendered as `data-type` on the Root (`"success"`, `"error"`, ...). */
   readonly type?: string | undefined;

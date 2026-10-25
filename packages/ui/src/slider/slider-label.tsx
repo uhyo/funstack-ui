@@ -9,7 +9,12 @@ import type { SliderRootState, SliderValue } from "./slider-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-/** `T` defaults to `SliderValue`; pass it to narrow the state (`<Slider.Label<number>>`). */
+/**
+ * Props of `Slider.Label`. `T` defaults to `SliderValue`; pass it to narrow the state
+ * (`<Slider.Label<number>>`).
+ *
+ * @see https://ui.funstack.work/components/slider
+ */
 export interface SliderLabelProps<T extends SliderValue = SliderValue> extends Omit<
   ComponentPropsWithRef<"label">,
   "htmlFor" | "id" | "className" | "style" | "children"
