@@ -636,7 +636,8 @@ describe("NumberField", () => {
       expect(onCommit).not.toHaveBeenCalled();
     });
 
-    describe("disabled on component renders (#83, design/components/button.md 17.3)", () => {
+    // #83
+    describe("disabled on component renders (design/components/button.md 17.3)", () => {
       const cases = [
         ["the prop", { disabled: true }, {}],
         ["readOnly", {}, { readOnly: true }],
@@ -1390,7 +1391,8 @@ describe("NumberField", () => {
       }
     });
 
-    it("without ariaNotify, steps announce nothing and insert no live region (#113 A1)", () => {
+    // #113 A1
+    it("without ariaNotify, steps announce nothing and insert no live region", () => {
       vi.useFakeTimers();
       render(<Fixture mode="uncontrolled" />);
       expect(() => key("ArrowUp")).not.toThrow();
