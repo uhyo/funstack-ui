@@ -19,11 +19,15 @@ export type { MeterRegion } from "./meter-region.js";
 export interface MeterState {
   /** Clamped to `[min, max]`. */
   readonly value: number;
+  /** The `min` prop. */
   readonly min: number;
+  /** The `max` prop. */
   readonly max: number;
   /** After HTML's defaults and clamping. */
   readonly low: number;
+  /** After HTML's defaults and clamping. */
   readonly high: number;
+  /** After HTML's defaults and clamping. */
   readonly optimum: number;
   /** A number 0–100. */
   readonly percentage: number;
@@ -31,9 +35,18 @@ export interface MeterState {
   readonly formattedValue: string;
   /** What `aria-valuetext` carries: `getAriaValueText`'s result, else `formattedValue`. */
   readonly valueText: string | null;
+  /**
+   * Which region of the range the value is in, as the platform computes it; rendered as
+   * `data-region` on every part.
+   */
   readonly region: MeterRegion;
 }
 
+/**
+ * Props of `Meter.Root`.
+ *
+ * @see https://ui.funstack.work/components/meter
+ */
 export interface MeterRootProps extends Omit<
   ComponentPropsWithRef<"div">,
   | "role"
@@ -49,25 +62,48 @@ export interface MeterRootProps extends Omit<
 > {
   /** Required: a meter always has a value. Clamped to `[min, max]`. */
   value: number;
-  /** @default 0 */
+  /**
+   * Lower bound of the range.
+   *
+   * @defaultValue `0`
+   */
   min?: number;
-  /** @default 100 */
+  /**
+   * Upper bound of the range.
+   *
+   * @defaultValue `100`
+   */
   max?: number;
-  /** Upper bound of the "low" part of the range. Default `min`. */
+  /**
+   * Upper bound of the "low" part of the range.
+   *
+   * @defaultValue `min`
+   */
   low?: number;
-  /** Lower bound of the "high" part of the range. Default `max`. */
+  /**
+   * Lower bound of the "high" part of the range.
+   *
+   * @defaultValue `max`
+   */
   high?: number;
-  /** The best value. Default the midpoint. Decides which part of the range is `optimum`. */
+  /**
+   * The best value. Decides which part of the range is `optimum`.
+   *
+   * @defaultValue the midpoint, `(min + max) / 2`
+   */
   optimum?: number;
   /**
-   * `Intl.NumberFormat` options for `aria-valuetext` and `Meter.Value`. Default
-   * `{ style: "percent" }`. A `percent` style formats the fraction of the range; any other style
-   * formats the value. Serialisable: a Server Component may pass it.
+   * `Intl.NumberFormat` options for `aria-valuetext` and `Meter.Value`. A `percent` style formats
+   * the fraction of the range; any other style formats the value. Serialisable: a Server
+   * Component may pass it.
+   *
+   * @defaultValue `{ style: "percent" }`
    */
   format?: Intl.NumberFormatOptions;
   /**
-   * BCP 47 tag for `Intl.NumberFormat`; default: the runtime's locale. Pass it when a client
-   * tree is server-rendered.
+   * BCP 47 tag for `Intl.NumberFormat`. Pass it when a client tree is server-rendered.
+   *
+   * @defaultValue the runtime's locale
    */
   locale?: string;
   /**
@@ -76,9 +112,13 @@ export interface MeterRootProps extends Omit<
    * `aria-valuetext`.
    */
   getAriaValueText?: (value: number, state: MeterState) => string | null | undefined;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MeterState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MeterState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, MeterState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, MeterState>;
 }
 
@@ -88,6 +128,8 @@ export interface MeterRootProps extends Omit<
  * percentages) in `style`, where the consumer's entries win. Owned keys: `role`,
  * `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, `aria-valuetext`, `aria-labelledby`
  * (token-merged: the consumer's tokens, then `Meter.Label`'s id, always), `data-region`.
+ *
+ * @see https://ui.funstack.work/components/meter
  */
 export function MeterRoot({
   value,

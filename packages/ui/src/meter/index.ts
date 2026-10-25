@@ -12,6 +12,8 @@ import { MeterValue } from "./meter-value.js";
  * render it and it runs on the server), `Track`, `Indicator` (sized by your CSS from
  * `--meter-value`), `Label` and `Value`. `low` / `high` / `optimum` decide the region
  * (`data-region`: `optimum`, `suboptimum`, `even-less-good`) with the platform's rules.
+ *
+ * @see https://ui.funstack.work/components/meter
  */
 export const Meter = {
   Root: MeterRoot,

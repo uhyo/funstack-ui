@@ -1,6 +1,11 @@
 // No "use client": pure functions (design/components/progress.md 2.4).
 import { clamp } from "../internal/range-value.js";
 
+/**
+ * The gauge region of a Meter's value (`MeterState.region`, `data-region`), with the platform's
+ * `<meter>` rules: `"optimum"` (the region `optimum` is in), `"suboptimum"` (next to it),
+ * `"even-less-good"` (the far end; never when `optimum` is between `low` and `high`).
+ */
 export type MeterRegion = "optimum" | "suboptimum" | "even-less-good";
 
 export interface MeterBounds {
