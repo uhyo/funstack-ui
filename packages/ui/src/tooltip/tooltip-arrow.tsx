@@ -7,19 +7,33 @@ import type { DataAttributes } from "../internal/use-render.js";
 import { TooltipPopupContext } from "./tooltip-context.js";
 import type { TooltipAlign, TooltipSide } from "./tooltip-context.js";
 
+/**
+ * State of `Tooltip.Arrow`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TooltipArrowState {
   /** The Popup's side: resolved while shown (after any flip), requested otherwise. */
   readonly side: TooltipSide | null;
+  /** The Popup's alignment: resolved while shown, requested otherwise. */
   readonly align: TooltipAlign;
 }
 
+/**
+ * Props of `Tooltip.Arrow`.
+ *
+ * @see https://ui.funstack.work/components/tooltip
+ */
 export interface TooltipArrowProps extends Omit<
   ComponentPropsWithRef<"span">,
   "aria-hidden" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TooltipArrowState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TooltipArrowState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, TooltipArrowState>;
+  /** Replace the default `<span>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"span">, TooltipArrowState>;
 }
 
@@ -31,6 +45,8 @@ export interface TooltipArrowProps extends Omit<
  *
  * Owned keys (conventions 1.2): `aria-hidden`, and `data-side` / `data-align` unless the Popup's
  * `side` is `null`.
+ *
+ * @see https://ui.funstack.work/components/tooltip
  */
 export function TooltipArrow({ className, style, children, render, ...rest }: TooltipArrowProps) {
   const placement = use(TooltipPopupContext);

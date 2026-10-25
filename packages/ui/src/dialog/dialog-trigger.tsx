@@ -9,6 +9,10 @@ import { disabledButton, rendersButton, useRender } from "../internal/use-render
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 
+/**
+ * State of `Dialog.Trigger`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface DialogTriggerState {
   /** Optimistic open state (library mode); `false` in JS-free mode. */
   readonly open: boolean;
@@ -18,9 +22,15 @@ export interface DialogTriggerState {
    * flight, or a re-open requested while a close notification is still settling.
    */
   readonly pending: boolean;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Dialog.Trigger`.
+ *
+ * @see https://ui.funstack.work/components/dialog
+ */
 export interface DialogTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "className" | "style" | "children"
@@ -29,9 +39,13 @@ export interface DialogTriggerProps extends Omit<
    * Never dispatches. Native `disabled` on a `<button>` (no longer an invoker); with a link or
    * component `render` where the Trigger handles the click (library mode, or a non-modal
    * dialog), `aria-disabled="true"` instead: the element stays focusable.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, DialogTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, DialogTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, DialogTriggerState>;
@@ -52,6 +66,8 @@ const isDev = process.env.NODE_ENV !== "production";
  * link or component `render` with the click handler installed), `commandfor`, `command`,
  * `onClick`, `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`,
  * `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/dialog
  */
 export function DialogTrigger({
   disabled = false,

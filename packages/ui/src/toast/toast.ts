@@ -20,24 +20,43 @@ export interface ToastActionOptions {
   readonly action: Action<[details: ToastActionDetails]>;
 }
 
+/**
+ * What `toast(options)` shows: the content and behaviour of one toast. `toast.update(id, options)`
+ * takes a partial of it.
+ *
+ * @see https://ui.funstack.work/components/toast
+ */
 export interface ToastOptions {
-  /** Explicit id: an existing one updates that toast. Default: generated. */
+  /**
+   * Explicit id: an existing one updates that toast.
+   *
+   * @defaultValue generated
+   */
   readonly id?: string | undefined;
+  /** Rendered by `Toast.Title`; named by `aria-labelledby` on the Root. */
   readonly title?: ReactNode;
+  /** Rendered by `Toast.Description`; named by `aria-describedby` on the Root. */
   readonly description?: ReactNode;
   /** Free-form, rendered as `data-type` on the Root (`"success"`, `"error"`, ...). */
   readonly type?: string | undefined;
   /**
    * Announcement priority and role: `"high"` announces with `ariaNotify` priority `"high"` and
-   * renders the Root as an `alertdialog`. Default `"normal"`.
+   * renders the Root as an `alertdialog`.
+   *
+   * @defaultValue `"normal"`
    */
   readonly priority?: ToastPriority | undefined;
   /**
-   * Milliseconds before the toast closes with `reason: "timeout"`; `null` never. Default: the
-   * Viewport's `duration`, or `null` (persistent) when the toast has an `action`. A timed action
+   * Milliseconds before the toast closes with `reason: "timeout"`; `null` never. A timed action
    * toast must keep its action reachable elsewhere too (WCAG 2.2.1).
+   *
+   * @defaultValue the Viewport's `duration`, or `null` (persistent) when the toast has an `action`
    */
   readonly duration?: number | null | undefined;
+  /**
+   * A button the toast offers (Undo, Retry), rendered and run by `Toast.Action`. A toast with an
+   * action is persistent unless `duration` is set.
+   */
   readonly action?: ToastActionOptions | undefined;
   /**
    * Called once when the toast leaves, with the reason: `"activate"` (the Action part settled),
@@ -47,8 +66,9 @@ export interface ToastOptions {
    */
   readonly closeAction?: Action<[details: ToastCloseDetails]> | undefined;
   /**
-   * The text `document.ariaNotify()` speaks for this toast; `null` announces nothing. Default:
-   * the Viewport's `announce`, else the text of the toast's Title and Description.
+   * The text `document.ariaNotify()` speaks for this toast; `null` announces nothing.
+   *
+   * @defaultValue the Viewport's `announce`, else the text of the toast's Title and Description
    */
   readonly announce?: ((toast: ToastItem) => string | null) | undefined;
   /** Anything the Viewport's children want to render. */
@@ -75,11 +95,18 @@ export interface ToastActionDetails extends ActionDetails {
 
 /** Details passed to a toast's `closeAction`. */
 export interface ToastCloseDetails extends ActionDetails {
+  /** The id of the toast that closed. */
   readonly id: string;
   /** `"activate"`, `"dismiss"` or `"timeout"`. */
   readonly reason: ChangeReason;
 }
 
+/**
+ * The second argument of `toast.promise(promise, options)`: the toast to show while `promise` is
+ * pending and the ones that replace it when it settles.
+ *
+ * @see https://ui.funstack.work/components/toast
+ */
 export interface ToastPromiseOptions<T> {
   /** Shown at once, with `data-pending`; no timer until the promise settles. */
   readonly pending: ToastOptions;
@@ -95,6 +122,11 @@ export interface ToastPromiseOptions<T> {
    * returned promise rejects with what it threw.
    */
   readonly error?: ToastOptions | ((reason: unknown) => ToastOptions) | undefined;
+  /**
+   * Explicit id of the toast; an existing one is updated.
+   *
+   * @defaultValue generated
+   */
   readonly id?: string | undefined;
 }
 
@@ -102,6 +134,10 @@ export interface ToastPromiseOptions<T> {
 export interface ToastManager {
   /** Adds a toast (or updates the one with `options.id`) and returns its id. */
   (options: ToastOptions): string;
+  /**
+   * The same as calling the manager: adds a toast (or updates the one with `options.id`) and
+   * returns its id.
+   */
   readonly add: (options: ToastOptions) => string;
   /**
    * Shows `options.pending` at once and swaps to `success` / `error` when `promise` settles.
@@ -222,6 +258,8 @@ function resolveOptions<V>(
 /**
  * Creates an isolated queue: `<Toast.Viewport manager={m}>` renders it. For a second React root,
  * a micro-frontend, or a test that wants a clean queue. `toast` is the default manager.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export function createToastManager(): ToastManager {
   let listener: ToastListener | null = null;
@@ -354,5 +392,7 @@ export function createToastManager(): ToastManager {
  * The default toast manager: `toast({ title: "Saved" })` from anywhere on the client (action
  * bodies, stores, effects). `<Toast.Viewport>` without `manager` renders it. On the server every
  * call is a no-op.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export const toast: ToastManager = createToastManager();

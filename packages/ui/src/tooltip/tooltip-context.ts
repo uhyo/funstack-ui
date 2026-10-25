@@ -7,6 +7,10 @@ import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
  * shown, the state carries the resolved physical side.
  */
 export type TooltipSide = AnchorSide;
+/**
+ * Alignment of the Popup along its side: inline-relative on a top / bottom side, the top / bottom
+ * edges on the others.
+ */
 export type TooltipAlign = AnchorAlign;
 
 /** Which accessibility relation the tooltip provides for its trigger (design section 5.1). */

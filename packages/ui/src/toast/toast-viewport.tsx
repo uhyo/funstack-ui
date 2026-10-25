@@ -40,6 +40,10 @@ import { useModalPortalHost } from "./use-modal-portal-host.js";
 import { applyCommands, makeEntry, partition, plainText, withFlags } from "./toast-queue.js";
 import type { Entry } from "./toast-queue.js";
 
+/**
+ * State of `Toast.Viewport`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ToastViewportState {
   /** Rendered toasts, chronological (oldest first), exiting ones included. */
   readonly toasts: readonly ToastItem[];
@@ -49,6 +53,11 @@ export interface ToastViewportState {
   readonly paused: boolean;
 }
 
+/**
+ * Props of `Toast.Viewport`.
+ *
+ * @see https://ui.funstack.work/components/toast
+ */
 export interface ToastViewportProps extends Omit<
   ComponentPropsWithRef<"section">,
   | "popover"
@@ -61,26 +70,44 @@ export interface ToastViewportProps extends Omit<
   | "onBlur"
   | "onKeyDown"
 > {
-  /** The queue to render. Default: the module-level `toast`. */
+  /**
+   * The queue to render (from `createToastManager()`).
+   *
+   * @defaultValue the module-level `toast`
+   */
   manager?: ToastManager;
-  /** Toasts rendered at once; further ones wait in order (never dropped). Default `3`. */
+  /**
+   * Toasts rendered at once; further ones wait in order (never dropped).
+   *
+   * @defaultValue `3`
+   */
   limit?: number;
-  /** Default `duration` of a toast in milliseconds; `null` for persistent. Default `5000`. */
+  /**
+   * Default `duration` of a toast in milliseconds; `null` for persistent.
+   *
+   * @defaultValue `5000`
+   */
   duration?: number | null;
   /**
    * Keys that focus the newest toast: `event.code` values and modifier names (`"altKey"`,
    * `"ctrlKey"`, `"metaKey"`, `"shiftKey"`), all of which must match, with no other modifier
-   * held. Default `["F8"]`; `null` installs no listener.
+   * held. `null` installs no listener.
+   *
+   * @defaultValue `["F8"]`
    */
   hotkey?: readonly string[] | null;
   /**
    * The text `document.ariaNotify()` speaks for a toast (localisation); `null` announces nothing.
-   * A toast's own `announce` wins. Default: the text of its Title and Description.
+   * A toast's own `announce` wins.
+   *
+   * @defaultValue the text of the toast's Title and Description
    */
   announce?: (toast: ToastItem) => string | null;
   /** Usually a function of the state mapping `state.toasts` to `Toast.Root`s. */
   children?: StateValue<ReactNode, ToastViewportState>;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToastViewportState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToastViewportState>;
   /** Must render an element that can carry `popover` (a `<section>` by default). */
   render?: RenderProp<ComponentPropsWithRef<"section">, ToastViewportState>;
@@ -113,6 +140,8 @@ function anyPause(sources: PauseSources): boolean {
  *
  * Owned keys (conventions 1.2): `popover`, `aria-label` (the consumer's own `aria-label` wins
  * verbatim), `data-paused`, `data-empty`, and the pointer / focus handlers.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export function ToastViewport({
   manager = defaultManager,

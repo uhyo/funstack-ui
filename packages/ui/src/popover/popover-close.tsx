@@ -6,12 +6,22 @@ import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/
 import { useOverlayClose } from "../internal/use-overlay-close.js";
 import { usePopoverContext } from "./popover-context.js";
 
+/**
+ * State of `Popover.Close`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface PopoverCloseState {
   /** The `action` is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Popover.Close`.
+ *
+ * @see https://ui.funstack.work/components/popover
+ */
 export interface PopoverCloseProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "className" | "style" | "children"
@@ -29,11 +39,17 @@ export interface PopoverCloseProps extends Omit<
    * Never closes. Native `disabled` on a `<button>`; owned, so a `render` element cannot
    * re-enable it. With a link or component `render` whose click this part handles (library mode,
    * or with `action`), `aria-disabled="true"` instead: the element stays focusable.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, PopoverCloseState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, PopoverCloseState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, PopoverCloseState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, PopoverCloseState>;
 }
 
@@ -50,6 +66,8 @@ export interface PopoverCloseProps extends Omit<
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
  * `command`, `onClick` (library mode, or with `action`), `aria-disabled`, `data-pending`,
  * `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/popover
  */
 export function PopoverClose({
   action,

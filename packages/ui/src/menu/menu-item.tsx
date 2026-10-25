@@ -11,12 +11,22 @@ import { useMenuItem } from "./use-menu-item.js";
 /** Details passed to `Menu.Item`'s `action`. */
 export interface MenuItemDetails extends ActionDetails {}
 
+/**
+ * State of `Menu.Item`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface MenuItemState {
   /** This item's `action` is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Menu.Item`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuItemProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "onKeyDown" | "onPointerMove" | "disabled" | "className" | "style" | "children"
@@ -28,18 +38,28 @@ export interface MenuItemProps extends Omit<
    * Boundary above the item. Without `action`, activation only closes.
    */
   action?: Action<[details: MenuItemDetails]>;
-  /** Close the whole menu once `action` settles. Default `true`. */
+  /**
+   * Close the whole menu once `action` settles.
+   *
+   * @defaultValue `true`
+   */
   closeOnActivate?: boolean;
   /**
    * Renders `aria-disabled` and `data-disabled`: the item stays focusable and never activates.
    * It is an ordinary item for navigation; only the open focus skips items with `disabled`.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
   /** Text typeahead matches when the item's text content is not representative (an icon). */
   label?: string;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuItemState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuItemState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, MenuItemState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, MenuItemState>;
 }
 
@@ -53,6 +73,8 @@ export interface MenuItemProps extends Omit<
  * Owned keys (conventions 1.2): `type` (on a `<button>`), `role`, `tabIndex`, `disabled`
  * (always absent), `aria-disabled`, `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`,
  * `data-disabled`, `data-typeahead`.
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuItem({
   action,

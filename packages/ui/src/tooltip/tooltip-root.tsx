@@ -9,26 +9,46 @@ import { useTooltipInteraction } from "./use-tooltip-interaction.js";
 
 export type { TooltipProvides } from "./tooltip-context.js";
 
+/** State of `Tooltip.Root`, passed to the function forms of `children`. */
 export interface TooltipRootState {
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Tooltip.Root`.
+ *
+ * @see https://ui.funstack.work/components/tooltip
+ */
 export interface TooltipRootProps {
   /**
    * Milliseconds from hover or keyboard focus to open. Default 250 (Chromium's
    * `interest-delay-start`). The same delay applies to hover and focus.
+   *
+   * @defaultValue `250`
    */
   delay?: number;
-  /** Milliseconds from de-hover or blur to close. Default 150 (Chromium's `interest-delay-end`). */
+  /**
+   * Milliseconds from de-hover or blur to close.
+   *
+   * @defaultValue `150` (Chromium's `interest-delay-end`)
+   */
   closeDelay?: number;
-  /** When true the tooltip never opens. The ARIA relation stays in place. */
+  /**
+   * When true the tooltip never opens. The ARIA relation stays in place.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
   /**
    * Which accessibility relation the tooltip provides for the trigger.
    * `"description"` (default): `aria-describedby`, for triggers that have their own name.
    * `"name"`: `aria-labelledby`, for icon-only triggers; do not also set `aria-label`.
+   *
+   * @defaultValue `"description"`
    */
   provides?: TooltipProvides;
+  /** The Trigger and the Popup. May be a function of the part's state. */
   children?: StateValue<ReactNode, TooltipRootState>;
 }
 
@@ -45,6 +65,8 @@ const FOCUSABLE =
  * Render `Tooltip.Popup` immediately after `Tooltip.Trigger` in DOM order: the HTML spec
  * recommends that reading order for popovers, and some screen readers attach an adjacent tooltip
  * to the wrong control otherwise. This is documented, not enforced.
+ *
+ * @see https://ui.funstack.work/components/tooltip
  */
 export function TooltipRoot({
   delay = 250,

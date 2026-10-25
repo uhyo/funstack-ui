@@ -37,8 +37,16 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type MenuSide = AnchorSide;
+/**
+ * Alignment of the Popup along its side: inline-relative on a top / bottom side, the top / bottom
+ * edges on the others.
+ */
 export type MenuAlign = AnchorAlign;
 
+/**
+ * State of `Menu.Popup`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface MenuPopupState {
   /** Committed open state. Read `:popover-open` for the DOM truth. */
   readonly open: boolean;
@@ -59,6 +67,11 @@ export interface MenuPopupState {
   readonly context: boolean;
 }
 
+/**
+ * Props of `Menu.Popup`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuPopupProps extends Omit<
   ComponentPropsWithRef<"div">,
   | "id"
@@ -80,32 +93,39 @@ export interface MenuPopupProps extends Omit<
 > {
   /**
    * Placement against the Trigger through inline `position-area`, with `position-try-fallbacks`
-   * flipping it when it does not fit. Default `"bottom"` for a top-level menu, `"inline-end"` for
-   * a submenu (the right of the item in LTR, its left in RTL; its fallback is `flip-inline`
-   * only). `"left"` / `"right"` stay physical. `null` emits no inline positioning (and no
-   * `data-side` / `data-align`): the stylesheet owns placement. Ignored for an open from a
+   * flipping it when it does not fit. A submenu's `"inline-end"` is the right of the item in LTR,
+   * its left in RTL; its fallback is `flip-inline` only. `"left"` / `"right"` stay physical.
+   * `null` emits no inline positioning (and no `data-side` / `data-align`): the stylesheet owns
+   * placement. Ignored for an open from a
    * `Menu.ContextTrigger`, which is placed at the pointer; there `null` also opts out of the
    * inline point placement and the library's `@position-try` rules, leaving only
    * `--menu-point-x` / `--menu-point-y`.
+   *
+   * @defaultValue `"bottom"` for a top-level menu, `"inline-end"` for a submenu
    */
   side?: MenuSide | null;
   /**
-   * Alignment along the side. Default `"start"` (both levels): inline-relative on a top / bottom
-   * side (mirrored under `direction: rtl`), the top edges on the others. Ignored when `side` is
-   * `null`.
+   * Alignment along the side: inline-relative on a top / bottom side (mirrored under
+   * `direction: rtl`), the top edges on the others. Ignored when `side` is `null`.
+   *
+   * @defaultValue `"start"` (both levels)
    */
   align?: MenuAlign;
   /**
    * `false` (default): the items are not rendered while the menu is closed; mounting them is part
    * of the opening transition, so items that suspend hold the open (and the Trigger pending)
    * until they are ready. `true`: they stay mounted inside `<Activity mode="hidden">`.
+   *
+   * @defaultValue `false`
    */
   keepMounted?: boolean;
   /**
    * Experimental (Chromium 150+). Renders `focusgroup="menu wrap|nowrap"` and, where the engine
    * implements `focusGroup`, lets the browser handle ArrowUp / ArrowDown / Home / End: items then
    * render no `tabindex` and the library's arrow-key handling steps aside. Typeahead, activation,
-   * submenu keys and Tab stay in JS. No effect in other engines. Default `false`.
+   * submenu keys and Tab stay in JS. No effect in other engines.
+   *
+   * @defaultValue `false`
    */
   experimental_focusgroup?: boolean;
   /**
@@ -115,8 +135,11 @@ export interface MenuPopupProps extends Omit<
    * outside, Tab) animate with CSS only. Without it the part renders no `<ViewTransition>`.
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuPopupState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuPopupState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, MenuPopupState>;
   /** Should render a `<div>`; a `<dialog>` would run the dialog focusing steps. */
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuPopupState>;
@@ -147,6 +170,8 @@ const FOCUSABLE_SELECTOR =
  * `side` is `null`, `top` and `left` (`right` for an RTL popup) at the point with the library's
  * `@position-try` fallbacks, whose rules it renders as a hoisted `<style>`. A top-level menu
  * closes at once on a right- or middle-click outside it.
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuPopup({
   side: sideProp,

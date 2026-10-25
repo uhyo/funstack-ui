@@ -23,8 +23,16 @@ import { useMenuItem } from "./use-menu-item.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Menu.SubmenuTrigger`: the same shape as `MenuTriggerState` (`open` is the submenu's).
+ */
 export type MenuSubmenuTriggerState = MenuTriggerState;
 
+/**
+ * Props of `Menu.SubmenuTrigger`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuSubmenuTriggerProps extends Omit<
   MenuItemProps,
   | "action"
@@ -42,10 +50,13 @@ export interface MenuSubmenuTriggerProps extends Omit<
   | "children"
   | "render"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuSubmenuTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuSubmenuTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, MenuSubmenuTriggerState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, MenuSubmenuTriggerState>;
 }
 
@@ -62,6 +73,8 @@ export interface MenuSubmenuTriggerProps extends Omit<
  * never written) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`,
  * `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`,
  * `onPointerLeave`).
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuSubmenuTrigger({
   disabled = false,

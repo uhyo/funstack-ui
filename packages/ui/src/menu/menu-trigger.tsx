@@ -19,8 +19,17 @@ import { edgeItem, focusItem, hasModifier, isRtl } from "./menu-dom.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Menu.Trigger`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export type MenuTriggerState = PopoverTriggerHookState;
 
+/**
+ * Props of `Menu.Trigger`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   | "onClick"
@@ -39,9 +48,13 @@ export interface MenuTriggerProps extends Omit<
   /**
    * The menu cannot be opened from this button. Native `disabled` on a `<button>`; with a link or
    * component `render`, `aria-disabled="true"` instead (the element stays focusable).
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, MenuTriggerState>;
@@ -92,6 +105,8 @@ function isPointerClick(event: Event): boolean {
  * (link or component `render`), `popoverTarget`, `aria-haspopup`, `aria-expanded`, `onClick`,
  * `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`; `commandfor`,
  * `command` and `popoverTargetAction` (never written; omitted from the props type).
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuTrigger({
   disabled = false,

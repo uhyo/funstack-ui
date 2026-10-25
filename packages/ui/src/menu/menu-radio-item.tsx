@@ -8,6 +8,10 @@ import type { MenuCheckboxItemProps } from "./menu-checkbox-item.js";
 import { closeStackLater, MenuRadioGroupContext, useMenuContext } from "./menu-context.js";
 import { useMenuItem } from "./use-menu-item.js";
 
+/**
+ * State of `Menu.RadioItem`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface MenuRadioItemState {
   /** The item's `value` prop. */
   readonly value: string;
@@ -15,9 +19,15 @@ export interface MenuRadioItemState {
   readonly checked: boolean;
   /** The group's change to this item is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Menu.RadioItem`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuRadioItemProps extends Omit<
   MenuCheckboxItemProps,
   | "checked"
@@ -30,9 +40,13 @@ export interface MenuRadioItemProps extends Omit<
 > {
   /** The value the group's `valueChangeAction` receives when this item is chosen. */
   value: string;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuRadioItemState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuRadioItemState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, MenuRadioItemState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, MenuRadioItemState>;
 }
 
@@ -43,6 +57,8 @@ export interface MenuRadioItemProps extends Omit<
  *
  * Owned keys (conventions 1.2): those of `Menu.Item`, plus `aria-checked`, `data-checked`, and
  * `value` (not rendered: a menu item is not a form control).
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuRadioItem({
   value,

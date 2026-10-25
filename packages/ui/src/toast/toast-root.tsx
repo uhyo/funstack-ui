@@ -12,30 +12,48 @@ import type { ToastItem, ToastPriority } from "./toast.js";
 import { ToastRootContext, useToastRootContext, useToastViewportContext } from "./toast-context.js";
 import type { ToastRootContextValue } from "./toast-context.js";
 
+/**
+ * State of `Toast.Root`, `Toast.Title`, `Toast.Description`, passed to the function forms of
+ * `className`, `style`, `children` and `render`.
+ */
 export interface ToastRootState {
+  /** The toast this Root renders (the Root's `toast` prop). */
   readonly toast: ToastItem;
   /** `toast.pending`: its promise is unsettled or its Action runs. */
   readonly pending: boolean;
   /** `toast.ending`: closed, kept for its exit animation. */
   readonly ending: boolean;
+  /** `toast.type`, rendered as `data-type`. */
   readonly type: string | undefined;
+  /** `toast.priority`, resolved (`"normal"` when absent). */
   readonly priority: ToastPriority;
 }
 
+/**
+ * Props of `Toast.Root`.
+ *
+ * @see https://ui.funstack.work/components/toast
+ */
 export interface ToastRootProps extends Omit<
   ComponentPropsWithRef<"div">,
   "role" | "className" | "style" | "children" | "onKeyDown"
 > {
   /** The toast to render: an item of the Viewport's `state.toasts`. */
   toast: ToastItem;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ToastRootState>;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToastRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToastRootState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ToastRootState>;
   /**
    * Rendered by the Root's own Suspense guard while `children` suspend, in place of the
    * invisible default. The toast's timer and announcement wait for the reveal either way.
    * Parts inside it (a visually hidden `<Toast.Title>` giving the toast a name) gate nothing.
+   *
+   * @defaultValue `null`
    */
   fallback?: ReactNode;
 }
@@ -63,6 +81,8 @@ function SuspenseGuard({ children }: { children: ReactNode }) {
  *
  * Owned keys (conventions 1.2): `role`, `tabIndex`, `aria-labelledby`, `aria-describedby`,
  * `inert`, `data-type`, `data-pending`, `data-ending`, `onKeyDown`.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export function ToastRoot({
   toast: item,

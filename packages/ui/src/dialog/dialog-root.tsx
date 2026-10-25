@@ -25,14 +25,21 @@ export interface DialogOpenChangeDetails extends ActionDetails {
   readonly returnValue: string | undefined;
 }
 
+/** State of `Dialog.Root`, passed to the function forms of `children`. */
 export interface DialogRootState {
   /** Optimistic open state (`false` in JS-free mode). Content rendered from it must not suspend. */
   readonly open: boolean;
   /** An `openChangeAction` dispatched through this Dialog is in flight (library mode only). */
   readonly pending: boolean;
+  /** The `modal` prop. */
   readonly modal: boolean;
 }
 
+/**
+ * Props of `Dialog.Root`.
+ *
+ * @see https://ui.funstack.work/components/dialog
+ */
 export interface DialogRootProps {
   /**
    * Controlled open state. `undefined` means uncontrolled (and, with `defaultOpen` and
@@ -61,8 +68,13 @@ export interface DialogRootProps {
    * `startTransition` (React limitation).
    */
   openChangeAction?: ChangeAction<boolean, DialogOpenChangeDetails>;
-  /** `showModal()` (top layer, backdrop, inert page, Escape) or `show()`. Default `true`. */
+  /**
+   * `showModal()` (top layer, backdrop, inert page, Escape) or `show()`.
+   *
+   * @defaultValue `true`
+   */
   modal?: boolean;
+  /** The parts. The function form receives the optimistic state and must not suspend. */
   children?: StateValue<ReactNode, DialogRootState>;
 }
 
@@ -85,6 +97,8 @@ const isDialogOpen = (dialog: HTMLDialogElement): boolean => dialog.open;
  * close a part asks for (Close, Form, a foreign close command: `openChangeAction(false)` is
  * awaited, `close(returnValue)` runs when it has committed). Dismissals (Escape, a click
  * outside) are the browser's and `openChangeAction(false)` is a notification.
+ *
+ * @see https://ui.funstack.work/components/dialog
  */
 export function DialogRoot({
   open,

@@ -6,14 +6,26 @@ import { useRender } from "../internal/use-render.js";
 import { useToastRootContext } from "./toast-context.js";
 import type { ToastRootState } from "./toast-root.js";
 
+/**
+ * Props of `Toast.Title`.
+ *
+ * @see https://ui.funstack.work/components/toast
+ */
 export interface ToastTitleProps extends Omit<
   ComponentPropsWithRef<"div">,
   "id" | "className" | "style" | "children"
 > {
-  /** Default: the toast's `title`. */
+  /**
+   * The title shown, or a function of the part's state.
+   *
+   * @defaultValue the toast's `title`
+   */
   children?: StateValue<ReactNode, ToastRootState>;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToastRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToastRootState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ToastRootState>;
 }
 
@@ -23,6 +35,8 @@ export interface ToastTitleProps extends Omit<
  * announcement.
  *
  * Owned key (conventions 1.2): `id`.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export function ToastTitle({ children, className, style, render, ...rest }: ToastTitleProps) {
   const root = useToastRootContext("Toast.Title");
