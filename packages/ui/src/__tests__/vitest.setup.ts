@@ -14,10 +14,7 @@ import { capturedPointers } from "./pointer-capture-shim.js";
 
 const isJsdom = typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom");
 
-/**
- * Closes every open `<dialog>` and hides every open popover: a modal dialog left open makes the
- * next test's page inert, and in jsdom the shims would still count a popover as shown.
- */
+/** Closes every open `<dialog>` and hides every open popover still in the document. */
 function closeOpenTopLayer(): void {
   if (typeof document === "undefined") return;
   for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
@@ -28,13 +25,17 @@ function closeOpenTopLayer(): void {
 
 // Restore every `vi.spyOn` first, so the teardown runs on the real methods (no file needs its own
 // `afterEach(vi.restoreAllMocks)`; a file hook that must reach a real method still restores
-// itself, since file hooks run before this one). Then close what the test left in the top layer,
-// unmount, and in jsdom empty the body: an element a test appended itself, or the server HTML of
-// a hydration row, would otherwise reach the next test (and, files sharing the window, the next
-// file). Then run the cleanups the test registered (`onCleanup`, `addStyle`,
-// `leaveActEnvironment`) and settle whatever it left pending (a failed assertion before its
-// `resolve()`): an unsettled async action would entangle every later test's transitions with it.
-// Browser files also run vitest.browser.setup.ts, whose hook runs before this one.
+// itself, since file hooks run before this one). Then unmount, and clear what the unmount left:
+// in jsdom the body (an element a test appended itself, or the server HTML of a hydration row,
+// would otherwise reach the next test and, files sharing the window, the next file; the shims,
+// like the platform, close a removed popover or dialog without events), in a browser the top
+// layer (a modal dialog a test opened outside React makes the next test's page inert). Closing
+// only after the unmount fires no hide into a component or a test's listener: its queued
+// `toggle` would run during the next test. Then run the cleanups the test registered
+// (`onCleanup`, `addStyle`, `leaveActEnvironment`) and settle whatever it left pending (a failed
+// assertion before its `resolve()`): an unsettled async action would entangle every later test's
+// transitions with it. Browser files also run vitest.browser.setup.ts, whose hook runs before
+// this one.
 //
 // The `jsdom` project shares one module graph and one window between the files of a worker
 // (`isolate: false`, #107), so the rest puts back what a file could leave for the next: stubbed
@@ -48,9 +49,9 @@ function closeOpenTopLayer(): void {
 // (React's own once-only warnings cannot be reset: see `takeSelectedContentWarning`.)
 afterEach(async () => {
   vi.restoreAllMocks();
-  closeOpenTopLayer();
   cleanup();
   if (isJsdom) document.body.innerHTML = "";
+  else closeOpenTopLayer();
   runCleanups();
   await settleOpenDeferreds();
   vi.unstubAllGlobals();
