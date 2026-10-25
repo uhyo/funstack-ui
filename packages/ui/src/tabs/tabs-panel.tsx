@@ -10,13 +10,24 @@ import { useTabsContext } from "./tabs-context.js";
 import type { TabsContextValue, TabsOrientation } from "./tabs-context.js";
 import { panelId, tabId } from "./tabs-ids.js";
 
+/**
+ * State of `Tabs.Panel`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TabsPanelState {
+  /** The Panel's `value` prop. */
   readonly value: string;
   /** Committed: true only once the action has resolved and the render has committed. */
   readonly selected: boolean;
+  /** The Root's `orientation`. */
   readonly orientation: TabsOrientation;
 }
 
+/**
+ * Props of `Tabs.Panel`.
+ *
+ * @see https://ui.funstack.work/components/tabs
+ */
 export interface TabsPanelProps extends Omit<
   ComponentPropsWithRef<"div">,
   "id" | "hidden" | "className" | "style" | "children"
@@ -31,6 +42,8 @@ export interface TabsPanelProps extends Omit<
    * - `"until-found"`: rendered with `hidden="until-found"`: DOM, state and effects stay live,
    *   the content is in server-rendered HTML, and find-in-page or a text fragment selects the
    *   tab (`details.reason === "platform"`).
+   *
+   * @defaultValue `false`
    */
   keepMounted?: boolean | "until-found";
   /**
@@ -41,9 +54,13 @@ export interface TabsPanelProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TabsPanelState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TabsPanelState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, TabsPanelState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, TabsPanelState>;
 }
 
@@ -53,6 +70,8 @@ export interface TabsPanelProps extends Omit<
  *
  * Owned keys (conventions 1.2): `role`, `id`, `aria-labelledby` (token-merged), `data-selected`,
  * `hidden`.
+ *
+ * @see https://ui.funstack.work/components/tabs
  */
 export function TabsPanel(props: TabsPanelProps) {
   const ctx = useTabsContext("Tabs.Panel");

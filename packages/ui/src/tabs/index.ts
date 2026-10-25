@@ -12,6 +12,8 @@ import { TabsTab } from "./tabs-tab.js";
  * optional `Indicator` (span), plus one `Panel` (tabpanel) per tab. Tabs and the Indicator render
  * the optimistic selection; Panels render the committed one, so a suspending panel keeps the
  * current panel on screen while the Root and the selected Tab show `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/tabs
  */
 export const Tabs = {
   Root: TabsRoot,

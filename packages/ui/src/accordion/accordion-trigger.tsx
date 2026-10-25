@@ -21,6 +21,11 @@ const isDev = process.env.NODE_ENV !== "production";
 /** The trigger is the item's control; it renders the item's state object. */
 export type AccordionTriggerState = AccordionItemState;
 
+/**
+ * Props of `Accordion.Trigger`.
+ *
+ * @see https://ui.funstack.work/components/accordion
+ */
 export interface AccordionTriggerProps extends Omit<
   ComponentPropsWithRef<"summary">,
   "onClick" | "className" | "style" | "children"
@@ -35,7 +40,9 @@ export interface AccordionTriggerProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, AccordionTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, AccordionTriggerState>;
   /** Rendered from optimistic state; must not suspend. A heading inside is recommended. */
   children?: StateValue<ReactNode, AccordionTriggerState>;
@@ -68,6 +75,8 @@ function nestedInteractive(target: EventTarget | null, summary: HTMLElement): El
  * library mode the click is intercepted and dispatched through the Root's transition; the
  * element shows optimistic `data-open` and `data-pending`. The platform forbids `aria-expanded`
  * on a summary, so assistive technology hears the committed state (from `<details open>`).
+ *
+ * @see https://ui.funstack.work/components/accordion
  */
 export function AccordionTrigger({
   transition,

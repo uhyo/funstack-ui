@@ -10,6 +10,8 @@ import { AccordionTrigger } from "./accordion-trigger.js";
  * Accordion built on `<details>`/`<summary>`: `Root` (div) > `Item` (details) > `Trigger`
  * (summary, first child) + `Panel` (div). JS-free when the Root has no value props; a transition
  * state owner with optimistic `data-open` and `data-pending` otherwise.
+ *
+ * @see https://ui.funstack.work/components/accordion
  */
 export const Accordion = {
   Root: AccordionRoot,

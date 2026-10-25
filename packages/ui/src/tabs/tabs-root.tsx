@@ -33,22 +33,37 @@ export interface TabsValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
+/**
+ * State of `Tabs.Root`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TabsRootState {
   /** Optimistic selected value, or `null`. Content rendered from it must not suspend. */
   readonly value: string | null;
   /** An action dispatched through this Tabs is in flight. */
   readonly pending: boolean;
+  /** The `orientation` prop. */
   readonly orientation: TabsOrientation;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Tabs.Root`.
+ *
+ * @see https://ui.funstack.work/components/tabs
+ */
 export interface TabsRootProps extends Omit<
   ComponentPropsWithRef<"div">,
   "className" | "style" | "children" | "defaultValue"
 > {
   /** Controlled selected value. `null` selects nothing; `undefined` means uncontrolled. */
   value?: string | null;
-  /** Initial value in uncontrolled mode. Defaults to `null` (no panel shown). */
+  /**
+   * Initial value in uncontrolled mode.
+   *
+   * @defaultValue `null` (no panel shown)
+   */
   defaultValue?: string | null;
   /**
    * Runs inside the Root's transition whenever the user selects a tab. May be sync or async;
@@ -59,20 +74,37 @@ export interface TabsRootProps extends Omit<
    * Transition update; wrap it in `startTransition` (React limitation).
    */
   valueChangeAction?: ChangeAction<string, TabsValueChangeDetails>;
-  /** Layout and arrow-key axis. Default `"horizontal"`. */
+  /**
+   * Layout and arrow-key axis.
+   *
+   * @defaultValue `"horizontal"`
+   */
   orientation?: TabsOrientation;
   /**
    * `"automatic"`: selection follows focus. `"manual"`: Enter, Space or click selects.
-   * Default `"automatic"`.
+   *
+   * @defaultValue `"automatic"`
    */
   activationMode?: TabsActivationMode;
-  /** Whether arrow keys wrap from the last tab to the first. Default `true`. */
+  /**
+   * Whether arrow keys wrap from the last tab to the first.
+   *
+   * @defaultValue `true`
+   */
   loop?: boolean;
-  /** Disables every Tab (focusable, never dispatches). */
+  /**
+   * Disables every Tab (focusable, never dispatches).
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TabsRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TabsRootState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, TabsRootState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, TabsRootState>;
 }
 
@@ -90,6 +122,8 @@ function findById(node: Node | null, id: string): Element | null {
  * `data-pending` while a selection is in flight (including a suspending panel's wait).
  *
  * Owned keys (conventions 1.2): `data-pending`, `data-orientation`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/tabs
  */
 export function TabsRoot({
   value,
