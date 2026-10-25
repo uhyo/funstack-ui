@@ -250,22 +250,23 @@ export function SelectPage() {
       <PartFacts state={"`SelectRootState`."} owned={"`label`."} />
 
       <h4>
-        <code>Select.GroupLabel</code>, <code>Select.Separator</code>
+        <code>Select.GroupLabel</code>
       </h4>
       <PropsTable
         rows={[
-          ...functionProps(
-            "SelectRootState",
-            "GroupLabel: the rich label. Separator takes no children.",
-          ),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: SelectRootState) => ReactNode)",
-            description: "Replace the default <legend> (GroupLabel) or <hr> (Separator).",
-          },
+          ...functionProps("SelectRootState", "The rich label."),
+          renderProp("legend", "SelectRootState"),
         ]}
       />
       <PartFacts state={"`SelectRootState`."} owned={"none."} />
+
+      <h4>
+        <code>Select.Separator</code>
+      </h4>
+      <PropsTable
+        rows={[...stylingProps("SelectRootState"), renderProp("hr", "SelectRootState")]}
+      />
+      <PartFacts state={"`SelectRootState`."} owned={"none."} note={"Takes no children."} />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
