@@ -39,16 +39,14 @@ export interface UsePopoverTriggerOptions<State> {
   readonly handlers?: PopoverTriggerHandlers;
   /**
    * What a click does in library mode, after the command has been cancelled and `disabled`
-   * checked. Default: toggle against `intended()` (`requestOpen` / `requestClose`). Menu's
-   * SubmenuTrigger opens, or moves focus into an already open submenu, and never closes.
+   * checked, replacing the default toggle against `intended()` (`requestOpen` / `requestClose`).
+   * Menu's SubmenuTrigger opens, or moves focus into an already open submenu, and never closes;
+   * so with `activate` the library-mode non-button warning says a press while open dismisses the
+   * popup instead of moving focus into it.
    */
   readonly activate?: (event: MouseEvent<HTMLElement>) => void;
-  /**
-   * The click never closes (Menu's SubmenuTrigger): only picks the library-mode non-button
-   * warning's text, since there a press while open dismisses the popup instead of moving focus
-   * into it. (Not `activate !== undefined`: Menu.Trigger has an `activate` that closes.)
-   */
-  readonly opensOnly?: boolean;
+  /** Runs right before the default toggle's `requestOpen` (Menu.Trigger: the open cause). */
+  readonly beforeOpen?: (event: MouseEvent<HTMLElement>) => void;
   /**
    * How `disabled` is rendered. `"native"` (default): the `disabled` attribute, so the button is
    * no invoker at all; in library mode a link or component `render` still gets the `"aria"`
@@ -83,15 +81,7 @@ export function usePopoverTrigger<State>(
   ctx: PopoverRootValue,
   options: UsePopoverTriggerOptions<State>,
 ): PopoverTriggerHook {
-  const {
-    part,
-    disabled,
-    render,
-    handlers,
-    activate,
-    opensOnly = false,
-    disabledAs = "native",
-  } = options;
+  const { part, disabled, render, handlers, activate, beforeOpen, disabledAs = "native" } = options;
   const isLibrary = ctx.mode === "library";
   const { ids, triggerRef, popupRef } = ctx;
 
@@ -109,7 +99,7 @@ export function usePopoverTrigger<State>(
         const tag = element.tagName.toLowerCase();
         // Library mode: the click handler works, but only an invoker button is spared by the
         // popover's light dismiss, so a press while open hides the popup before the click (#115).
-        if (isLibrary && opensOnly) {
+        if (isLibrary && activate !== undefined) {
           return (
             `${part}: rendered a <${tag}>. Only a <button> is the popover's invoker: a press on ` +
             "this element while its popup is open dismisses the popup through light dismiss " +
@@ -150,8 +140,12 @@ export function usePopoverTrigger<State>(
       return;
     }
     const native = event.nativeEvent;
-    if (ctx.intended()) ctx.requestClose(native, "activate");
-    else ctx.requestOpen(native, "activate");
+    if (ctx.intended()) {
+      ctx.requestClose(native, "activate");
+    } else {
+      beforeOpen?.(event);
+      ctx.requestOpen(native, "activate");
+    }
   };
 
   // The component's handlers first, then the Trigger's (design/components/menu.md 14). The click

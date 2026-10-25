@@ -140,15 +140,7 @@ export function MenuTrigger({
         if (event.button === 0 && menu.popover.intended()) event.preventDefault();
       },
     },
-    activate: (event) => {
-      const native = event.nativeEvent;
-      if (menu.popover.intended()) {
-        menu.popover.requestClose(native, "activate");
-      } else {
-        menu.setOpenCause("first", isPointerClick(native));
-        menu.popover.requestOpen(native, "activate");
-      }
-    },
+    beforeOpen: (event) => menu.setOpenCause("first", isPointerClick(event.nativeEvent)),
   });
 
   return useRender<ComponentPropsWithRef<"button">, MenuTriggerState>({

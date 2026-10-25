@@ -154,7 +154,6 @@ export function MenuSubmenuTrigger({
     },
     // A click opens (or moves focus into the open submenu); it never closes.
     activate: (event) => open(event.nativeEvent),
-    opensOnly: true,
   });
   const ref = useMergedRefs(triggerRef, hoverRef);
 
