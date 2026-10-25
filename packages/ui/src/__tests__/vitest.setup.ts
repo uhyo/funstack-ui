@@ -6,6 +6,7 @@ import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 import { resetWarnOnce } from "../internal/dev-warn.js";
 import { resetFocusVisibleOption } from "../internal/focus-visible.js";
+import { resetInvalidBatch } from "../internal/focus-first-invalid.js";
 import { resetToastServerWarning } from "../toast/toast.js";
 import { runCleanups } from "./cleanups.js";
 import { settleOpenDeferreds } from "./helpers.js";
@@ -21,10 +22,12 @@ import { capturedPointers } from "./pointer-capture-shim.js";
 // The `jsdom` project shares one module graph and one window between the files of a worker
 // (`isolate: false`, #107), so the rest puts back what a file could leave for the next: stubbed
 // globals and env, pointer captures, the library's once-only dev warnings and its once-only
-// detection of `focus({ focusVisible })` (a file may patch `focus()` to read it). Fake timers
-// stay with the files that install them (each restores them in its own `afterEach`): touching
-// vitest's timer controller here, even `vi.isFakeTimers()`, made Firefox's browser run deliver a
-// popover's queued `toggle` after a later `setTimeout(0)` (environment.browser.test.tsx).
+// detection of `focus({ focusVisible })` (a file may patch `focus()` to read it). The Field
+// first-invalid batch is forgotten after every test: its clearing timer may not have run before
+// the next test submits. Fake timers stay with the files that install them (each restores them
+// in its own `afterEach`): touching vitest's timer controller here, even `vi.isFakeTimers()`,
+// made Firefox's browser run deliver a popover's queued `toggle` after a later `setTimeout(0)`
+// (environment.browser.test.tsx).
 // (React's own once-only warnings cannot be reset: see `takeSelectedContentWarning`.)
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -37,4 +40,5 @@ afterEach(async () => {
   resetWarnOnce();
   resetToastServerWarning();
   resetFocusVisibleOption();
+  resetInvalidBatch();
 });

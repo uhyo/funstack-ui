@@ -63,6 +63,15 @@ export function collectInvalid(target: HTMLElement | null, message: string, sour
   queueMicrotask(() => focusFirst(current));
 }
 
+/**
+ * Tests only: forget the submission attempt in progress. Its timer is a task away, and the next
+ * test can start before it runs (no task in between); its attempt would then join this one and
+ * compare focus with an element of the previous test.
+ */
+export function resetInvalidBatch(): void {
+  batch = null;
+}
+
 function focusFirst(current: Batch): void {
   const { targets, activeBefore } = current;
   const connected = targets.filter((t) => t.isConnected);
