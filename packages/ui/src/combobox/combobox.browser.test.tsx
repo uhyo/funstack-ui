@@ -45,8 +45,10 @@ import type {
   ComboboxTriggerProps,
   ComboboxValueChangeDetails,
 } from "./index.js";
+import { addExitStyle } from "../__tests__/overlay-browser-suite.js";
 import {
   addStyle,
+  animationsFinished,
   closeOpenTopLayer,
   flushFor,
   onCleanup,
@@ -847,11 +849,24 @@ describe("ViewTransition (browser)", () => {
   });
 
   /** No wrapper element: the Popup's boundary is the top of what a transition inserts. */
-  function Plain({ transition, search }: { transition?: ViewTransitionClass; search?: Search }) {
+  function Plain({
+    transition,
+    search,
+    className,
+  }: {
+    transition?: ViewTransitionClass;
+    search?: Search;
+    className?: string;
+  }) {
     return (
       <Combobox.Root>
         <Combobox.Input data-testid="input" />
-        <Combobox.Popup data-testid="popup" transition={transition} style={popupStyle}>
+        <Combobox.Popup
+          data-testid="popup"
+          transition={transition}
+          className={className}
+          style={popupStyle}
+        >
           <Combobox.List data-testid="list" aria-label="Country">
             {({ query }) => (search ? <search.Results query={query} /> : <Options query={query} />)}
           </Combobox.List>
@@ -910,6 +925,71 @@ describe("ViewTransition (browser)", () => {
     await expect.poll(() => optionTexts()).toEqual(["Japan", "Jamaica"]);
     await expect.poll(() => calls.length).toBe(2);
     await transitions[1]!.finished;
+  });
+
+  /** The `::view-transition-*` pseudo-elements animating now, by name (read at `ready`). */
+  function pseudoNames(): string[] {
+    return [
+      ...new Set(
+        document
+          .getAnimations()
+          .map((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? "")
+          .filter((name) => name.startsWith("::view-transition-")),
+      ),
+    ].sort();
+  }
+
+  /** The popup's images of `kind`: any `::view-transition-<kind>` other than the root's. */
+  const popupImages = (kind: "old" | "new") =>
+    pseudoNames().filter(
+      (name) =>
+        name.startsWith(`::view-transition-${kind}(`) && name !== `::view-transition-${kind}(root)`,
+    );
+
+  // Design 12.2, as the shared overlay suite's "a CSS exit (recipe=%s)" rows (#132): Chromium
+  // keeps a closed popup rendered through its CSS fade, so the accept-close's new snapshot
+  // captures it as a live `::view-transition-new` next to the old image (a double image); the
+  // docs' recipe cuts the fade while a view transition runs. Firefox closes at once: the old
+  // image only either way. WebKit: `display: none` by `ready`, pseudo names unreliable. If the
+  // recipe=false row starts failing, an engine changed; re-check the docs' recipe.
+  describe.each([false, true])("a CSS exit (recipe=%s)", (recipe) => {
+    it("an accepted option has the old image, a live new image only where the box still fades (Chromium, recipe=false); the options are not re-mounted", async () => {
+      addExitStyle("fade", "200ms", { openPseudo: ":popover-open", recipe });
+      render(<Plain transition={TYPE_MAP} className="fade" />);
+      input().focus();
+      await press("j");
+      await expect.poll(() => calls.length).toBe(1);
+      await transitions[0]!.finished;
+      await animationsFinished(popup()); // the enter fade
+      let mounts = 0;
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            if (node instanceof Element && node.matches('[role="option"], :has([role="option"])')) {
+              mounts++;
+            }
+          }
+        }
+      });
+      observer.observe(popup(), { childList: true, subtree: true });
+      option("jm").click();
+      await expect.poll(() => calls.length).toBe(2);
+      expect(calls[1]!.openAtStart).toBe(true);
+      await transitions[1]!.ready;
+      const fading = getComputedStyle(popup()).display !== "none";
+      const seen = JSON.stringify({ names: pseudoNames(), fading });
+      expect(fading, seen).toBe(!recipe && browserName === "chromium");
+      if (browserName !== "webkit") {
+        expect(popupImages("old").length, seen).toBeGreaterThan(0);
+        expect(popupImages("new").length > 0, seen).toBe(fading);
+      }
+      await transitions[1]!.finished;
+      expect(isOpen()).toBe(false);
+      await quietPeriod(100, "the release of the hold must not start a view transition");
+      expect(calls).toHaveLength(2);
+      observer.disconnect();
+      expect(mounts).toBe(0);
+    });
   });
 
   it("without transition: no view transition for an open, a results change or an accept", async () => {
