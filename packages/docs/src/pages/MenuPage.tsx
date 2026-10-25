@@ -734,6 +734,12 @@ export function MenuPage() {
         Keep them short: the page takes no pointer events during a view transition.
       </p>
       <CodeBlock>{`<Menu.Popup transition={{ "fsui-menu-open": "menu-in", "fsui-menu-close": "menu-out", default: "none" }}>`}</CodeBlock>
+      <p>
+        With both, turn the CSS exit off while a view transition runs, on the whole popup class so
+        that submenus closing with their parent are covered (
+        <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>):
+      </p>
+      <CodeBlock language="css">{`html:active-view-transition .menu { transition: none; }`}</CodeBlock>
 
       <h3 id="browser-notes">Browser notes</h3>
       <ul>

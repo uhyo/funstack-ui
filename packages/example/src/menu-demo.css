@@ -117,6 +117,10 @@
 ::view-transition-old(.menu-out) {
   animation: 120ms ease-in both menu-out;
 }
+/* No CSS exit while a view transition runs (Chromium double image); submenus included. */
+html:active-view-transition .menu {
+  transition: none;
+}
 @keyframes menu-in {
   from {
     opacity: 0;

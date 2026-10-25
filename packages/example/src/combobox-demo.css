@@ -153,6 +153,11 @@
   }
 }
 
+/* No CSS exit while a view transition runs (Chromium double image). */
+html:active-view-transition .cb-popup {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cb-popup {
     transition: none;

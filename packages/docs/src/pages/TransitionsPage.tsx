@@ -164,6 +164,40 @@ export function TransitionsPage() {
         </p>
       </ConceptExample>
 
+      <h4 id="css-exit">A popup with a CSS exit and a view transition</h4>
+      <p>
+        A popup in the top layer can close two ways. A close the library performs (a part's close, a
+        controlled <code>open={"{false}"}</code>) happens in a commit, so the popup's{" "}
+        <code>transition</code> prop can animate it with a view transition in every engine. A{" "}
+        <a href="/concepts/browser-owned-state#dismissal">dismissal</a> happens in the browser
+        before React hears about it, so only a CSS exit (<code>@starting-style</code>,{" "}
+        <code>transition-behavior: allow-discrete</code>) can animate it. Keep both, and turn the
+        CSS exit off while a view transition runs:
+      </p>
+      <CodeBlock language="css">{`html:active-view-transition .my-popup { transition: none; }`}</CodeBlock>
+      <p>
+        Without that rule, a popup the library hides keeps rendering through its CSS fade, and
+        Chromium captures it in the close's new snapshot as well as the old one: a double image. The
+        selector has no transition type on purpose, because a controlled close carries none. The
+        cost is that an unrelated view transition of the page also cuts a CSS fade in progress. Put
+        the rule on the whole popup class, so that nested popups that close with their parent are
+        covered too.
+      </p>
+      <ConceptExample component="Dialog" href="/components/dialog">
+        <p>
+          A Dialog with a CSS fade for Escape and a click outside, and a view transition for its
+          Close parts:
+        </p>
+        <CodeBlock>{`<Dialog.Popup className="dialog" transition={{ "fsui-dialog-open": "pop", "fsui-dialog-close": "pop", default: "none" }}>`}</CodeBlock>
+        <CodeBlock language="css">{`.dialog { opacity: 0; transition: opacity 150ms, display 150ms allow-discrete, overlay 150ms allow-discrete; }
+.dialog:open { opacity: 1; }
+@starting-style { .dialog:open { opacity: 0; } }
+::view-transition-new(.pop) { animation: 180ms ease-out both pop-in; }
+::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }
+/* Keep the CSS exit for dismissals, but not while a view transition runs. */
+html:active-view-transition .dialog { transition: none; }`}</CodeBlock>
+      </ConceptExample>
+
       <h3>Rules the library follows for you</h3>
       <ul>
         <li>

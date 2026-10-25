@@ -122,6 +122,12 @@
     translate: 0 -4px;
   }
 }
+/* Keep the CSS exit for dismissals, but not while a view transition runs (Chromium would
+   capture a fading menu twice). The whole class: submenus close with their parent. */
+html:active-view-transition .demo-menu {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .demo-menu {
     transition: none;

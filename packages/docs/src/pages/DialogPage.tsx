@@ -583,13 +583,12 @@ html:active-view-transition .dialog { transition: none; }
             carries none.
           </li>
           <li>
-            Dismissals (Escape, a click outside) happen in the browser before React hears about
-            them, so they animate with the CSS exit only: keep it. Cut it while a view transition
-            runs (<code>html:active-view-transition .dialog {"{ transition: none; }"}</code>):
-            otherwise a dialog closed by the library stays rendered through its fade, and Chromium
-            captures it in the close's new snapshot as well, a double image. The untyped selector is
-            deliberate: a controlled close carries no transition types. The cost: an unrelated view
-            transition of the page also cuts a fade in progress.
+            Dismissals (Escape, a click outside) animate with the CSS exit only: keep it, and cut it
+            while a view transition runs, as above (
+            <a href="/concepts/transitions#css-exit">
+              A popup with a CSS exit and a view transition
+            </a>
+            ).
           </li>
           <li>
             The <code>::backdrop</code> is not captured on its own: it is part of the page snapshot
