@@ -6,7 +6,7 @@ import { inline, Table } from "../components/Tables.js";
 const chores = [
   {
     title: "No pending flags",
-    body: "Every component sets `data-pending` while your action runs, until its result is on screen. Style it in CSS.",
+    body: "Every component with an action sets `data-pending` while the action runs, until its result is on screen. Style it in CSS.",
     href: "/concepts/pending-and-optimistic",
   },
   {
@@ -16,7 +16,7 @@ const chores = [
   },
   {
     title: "No races between fast clicks",
-    body: "The latest click wins. A slow response to an older click never overwrites a newer choice.",
+    body: "The display always shows the latest click. Uncontrolled state commits only the latest one, so a slow response to an older click never overwrites a newer choice.",
     href: "/concepts/action-props#overlapping-actions",
   },
   {
@@ -26,7 +26,7 @@ const chores = [
   },
   {
     title: "No JavaScript copies of the browser",
-    body: "Popups use the Popover API, `<dialog>` and CSS Anchor Positioning; form controls are native inputs. The browser handles the top layer, Escape, click outside and focus return.",
+    body: "Popups use the Popover API, `<dialog>` and CSS Anchor Positioning; form controls are native inputs. The browser handles the top layer and Escape, and popovers close on a click outside natively.",
     href: "/concepts/browser-owned-state",
   },
   {
@@ -86,8 +86,8 @@ const [isPending, startTransition] = useTransition();
   Favorite
 </Toggle>`}</CodeBlock>
       <p className="why-claim">
-        Same optimistic flip, same <code>data-pending</code>, plus rollback on failure and
-        latest-click-wins. Try it on the <a href="/">home page</a>.
+        Same optimistic flip and <code>data-pending</code>, plus latest-click-wins and transition
+        types for animation. Try it on the <a href="/">home page</a>.
       </p>
 
       <h3 id="compared">Compared with other headless libraries</h3>
@@ -116,7 +116,7 @@ const [isPending, startTransition] = useTransition();
           ],
           [
             "**Animation**",
-            "CSS, plus your own code for exit animations.",
+            "CSS, with exit-animation states built in. No `<ViewTransition>` integration.",
             "CSS, plus `<ViewTransition>` through the parts' `transition` prop ([Transitions](/concepts/transitions)).",
           ],
           [

@@ -22,3 +22,11 @@ Branch `docs/136-why`.
 
 ## Open
 - Bundled docs layout under dist/docs (asked dev-134); SKILL.md only names index.md.
+
+## Review fixes (memo/reviewer/issue-136-review.md)
+- Latest-click-wins is an uncontrolled-state guarantee only; controlled parents order their own
+  post-await setState (useActionState or a guard). Stated on /why and in SKILL.md.
+- The hand-written useOptimistic version already rolls back and reaches Error Boundaries: never
+  claim rollback as a difference.
+- Native light dismiss is the popovers'; Dialog's click outside is opt-in JS (`lightDismiss`).
+- Task actions (Button, Menu.Item, Dialog/Popover.Close, Toast.Action) take `(details)` only.

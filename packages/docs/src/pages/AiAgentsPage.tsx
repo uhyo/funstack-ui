@@ -36,6 +36,10 @@ yarn dlx -p @funstack/ui@alpha funstack-ui-skill-installer`}</CodeBlock>
         instead:
       </p>
       <CodeBlock language="bash">{`SKILL_INSTALL_PATH=./.claude/skills npx -p @funstack/ui@alpha funstack-ui-skill-installer`}</CodeBlock>
+      <p>
+        In an interactive terminal the variable is ignored and the prompt appears; add{" "}
+        <code>&lt; /dev/null</code> to the command to use the variable there.
+      </p>
       <p>The skill is short, so the agent can load it whole. It contains:</p>
       <ul>
         <li>
