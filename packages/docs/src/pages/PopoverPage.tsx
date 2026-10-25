@@ -12,17 +12,17 @@ export function PopoverPage() {
   return (
     <DocPage
       title="Popover"
-      description="A non-modal popover on the Popover API and Invoker Commands: JS-free when you need no state; a transition-driven open, library-owned closes with a ViewTransition exit in every engine, and Suspense-ready content when you do."
+      description="A non-modal popover on the Popover API: JS-free when you need no state; a transition-driven open, library-owned closes with a ViewTransition exit in every engine, and Suspense-ready content when you do."
     >
       <p className="page-intro">
-        Built on <code>popover="auto"</code>, a <code>&lt;dialog&gt;</code> element and Invoker
-        Commands. The platform supplies the top layer, light dismiss, Escape, one-at-a-time stacking
-        with nesting, placement next to the trigger, a declarative trigger that works before
-        hydration, and focus return. The library adds the asynchronous half: opening a popover whose
-        content loads is a transition, so the trigger shows <code>data-pending</code> and the
-        popover opens once its content is ready; and the closes the user asks a part for run through
-        the library too, so <code>&lt;ViewTransition&gt;</code> can animate the exit, in Firefox as
-        well.
+        Built on <code>popover="auto"</code>, a <code>&lt;dialog&gt;</code> element, a{" "}
+        <code>popovertarget</code> Trigger and an Invoker Command Close. The platform supplies the
+        top layer, light dismiss, Escape, one-at-a-time stacking with nesting, placement next to the
+        trigger, a declarative trigger that works before hydration, and focus return. The library
+        adds the asynchronous half: opening a popover whose content loads is a transition, so the
+        trigger shows <code>data-pending</code> and the popover opens once its content is ready; and
+        the closes the user asks a part for run through the library too, so{" "}
+        <code>&lt;ViewTransition&gt;</code> can animate the exit, in Firefox as well.
       </p>
 
       <Example file="PopoverShare.tsx" css="popover.css">
@@ -53,11 +53,10 @@ export function PopoverPage() {
           <strong>Root renders no DOM.</strong> Trigger and Popup are linked by id through{" "}
           <code>popovertarget</code>. Render the Popup <strong>right after the Trigger</strong>{" "}
           where the layout allows: Safari 27.0 does not put a far-away popover next in the Tab order
-          after its trigger. A <code>&lt;button commandfor command&gt;</code> or{" "}
-          <code>&lt;button popovertarget&gt;</code> of your own that targets the popover is a{" "}
-          <em>foreign invoker</em>; in library mode an open through it is routed through the
-          library, while a foreign close (<code>hide-popover</code>, or a <code>popovertarget</code>{" "}
-          click while open) happens natively and is reported as <code>"activate"</code>.
+          after its trigger. A <code>&lt;button popovertarget&gt;</code> or{" "}
+          <code>&lt;button commandfor command&gt;</code> of your own that targets the popover is a{" "}
+          <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a> (see{" "}
+          <a href="#other-openers">Other ways to open and close</a>).
         </li>
         <li>
           <strong>
@@ -114,11 +113,6 @@ export function PopoverPage() {
             "rendered from committed `open`; unmounted while closed unless `keepMounted`",
           ],
           [
-            "Trigger's exposed expanded state",
-            "the browser's, from `popovertarget` (no `aria-expanded` on a `<button>`)",
-            "the same; a link or other non-button element (or a disabled component `render`) renders `aria-expanded` from whether the popup is shown",
-          ],
-          [
             "Trigger `data-open`",
             "kept current on the element from the popup's `toggle` event",
             "optimistic, rendered",
@@ -144,6 +138,40 @@ export function PopoverPage() {
         <a href="/concepts/browser-owned-state#parts-vs-dismissals">Parts vs dismissals</a>). The
         mode is decided on the first render; switching later is not supported (development warning).
       </p>
+
+      <h4 id="other-openers">Other ways to open and close</h4>
+      <ul>
+        <li>
+          <strong>
+            <a href="/concepts/browser-owned-state#foreign-invoker">Foreign invokers</a> and
+            scripts:
+          </strong>{" "}
+          in library mode any open that the library did not start (a{" "}
+          <code>&lt;button commandfor command="show-popover"&gt;</code>, a{" "}
+          <code>&lt;button popovertarget&gt;</code>, a script <code>showPopover()</code>) is
+          cancelled at <code>beforetoggle</code> and dispatched with that <code>ToggleEvent</code>.
+          A foreign close happens natively and is reported as <code>"activate"</code>: a{" "}
+          <code>hide-popover</code> or <code>toggle-popover</code> command with its{" "}
+          <code>CommandEvent</code>, a <code>&lt;button popovertarget&gt;</code> with the{" "}
+          <code>beforetoggle</code> <code>ToggleEvent</code>, whose <code>source</code> is the
+          button. Escape, a click outside and a script <code>hidePopover()</code> stay{" "}
+          <code>"dismiss"</code>.
+        </li>
+        <li>
+          <strong>Hover card (Chromium):</strong> a <code>&lt;button interestfor&gt;</code> naming
+          the Popup (your own button, or the Trigger with <code>interestfor</code> added) opens it
+          on interest (hover or keyboard focus) through the library, and in library mode the Popup
+          hides again on lost interest: <code>openChangeAction(false)</code> is a{" "}
+          <code>"dismiss"</code> notification whose <code>details.event</code> is the{" "}
+          <code>loseinterest</code> event (its <code>source</code> is the button). Lost interest
+          while the open is still pending cancels it, so the card never appears under a pointer that
+          has left. A Trigger-click open stays open on lost interest, as in the platform. As with
+          the platform's own lost-interest hide, focus is not returned to the Trigger. Firefox and
+          Safari ignore <code>interestfor</code>, so give the button a click path (make it the
+          Trigger) when the card must open everywhere. For a name or description (
+          <code>role="tooltip"</code> content), use <a href="/components/tooltip">Tooltip</a>.
+        </li>
+      </ul>
 
       <h3 id="props">Props</h3>
       <h4>
@@ -202,9 +230,11 @@ export function PopoverPage() {
         <code>Popover.Trigger</code>
       </h4>
       <p>
-        One per Root: only one Trigger is the popover's anchor and focus-return target, and a press
-        on another while open counts as outside it. A second <code>Popover.Trigger</code> in the
-        same Root is not supported (development warns); use a Root per trigger.
+        A <code>&lt;button popovertarget&gt;</code>: see{" "}
+        <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a> for what that
+        gives it, and for a Trigger rendered as another element. One per Root: it is the popover's
+        anchor and focus-return target, and a press on a second Trigger while open counts as
+        outside.
       </p>
       <PropsTable
         rows={[
@@ -227,10 +257,10 @@ export function PopoverPage() {
           "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open, a part's close or a dismissal notification."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-expanded` (rendered only without `popoverTarget`), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are owned too (never written: an Invoker Command would take precedence over `popovertarget`) and omitted from the props type."
+          "`type` (only on a `<button>`), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`."
         }
         note={
-          "A click on a `<button>` Trigger while open is a part's close; a second click during a pending open cancels it (the latest intent wins). A `<button>` Trigger renders no `aria-expanded`: the browser exposes the popup's state on a `popovertarget` invoker ([#121](https://github.com/uhyo/funstack-ui/issues/121)). A Trigger rendered as another element (library mode) is no invoker, so it renders `aria-expanded` from whether the popup is shown, and a press on it while open light-dismisses the popup before the click: the close is reported as `\"activate\"` but not awaited, a controlled parent cannot veto it and there is no exit transition ([#115](https://github.com/uhyo/funstack-ui/issues/115)); a development warning says so. `aria-haspopup` and `aria-controls` pass through."
+          'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode only) is light-dismissed before its click; that close is reported as `"activate"`. `aria-haspopup` and `aria-controls` pass through.'
         }
       />
 
@@ -340,7 +370,7 @@ export function PopoverPage() {
       <PartFacts
         state={"`PopoverCloseState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a host element other than a `<button>`), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a link or other non-button host element), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
           'In library mode the click is always intercepted, so every Close goes through the Root. A second click while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending` (the action and the hide); never natively disabled, so it keeps focus. To hide at once and finish the work in the background, do not return the promise: `action={() => { void apply(); }}`. If the user dismisses the popover and opens it again while the action runs, the action\'s close is dropped: it belonged to the earlier open. Popovers have no return value.'
@@ -383,7 +413,7 @@ export function PopoverPage() {
           ],
           [
             "`aria-expanded`",
-            "Trigger (a link or other non-button element, or a disabled component `render`, only)",
+            "Trigger, only when it is no [invoker](/concepts/browser-owned-state#popup-triggers): a link or other non-button element, or a disabled component `render`",
             "Whether the popup is shown (library mode). A `<button>` Trigger has none: the browser exposes the state.",
           ],
           [
@@ -405,62 +435,6 @@ export function PopoverPage() {
           ["`data-disabled`", "Trigger, Close", "The `disabled` prop (both modes)."],
         ]}
       />
-      <p>
-        The Trigger's styling hook is <code>data-open</code> in both modes (optimistic in library
-        mode, written from the popup's <code>toggle</code> event in JS-free mode); a{" "}
-        <code>&lt;button&gt;</code> Trigger has no <code>aria-expanded</code> to select on. On a
-        page that never hydrates, style the Trigger from the popup that follows it:
-      </p>
-      <CodeBlock language="css">{`.trigger[data-open] { color: var(--accent); }
-/* Without JavaScript: the Popup right after the Trigger. */
-.trigger:has(+ :popover-open) { color: var(--accent); }`}</CodeBlock>
-      <p>
-        The Popup emits no <code>data-open</code>: <code>:popover-open</code> is exact. Enter and
-        exit animate in CSS, in both modes:
-      </p>
-      <CodeBlock language="css">{`.popover {
-  margin: 0;
-  inset: auto; /* the popover UA stylesheet sets inset: 0 */
-  opacity: 0;
-  translate: 0 -4px;
-  transition: opacity 120ms, translate 120ms, display 120ms allow-discrete, overlay 120ms allow-discrete;
-}
-.popover:popover-open { opacity: 1; translate: 0 0; }
-@starting-style { .popover:popover-open { opacity: 0; translate: 0 -4px; } }
-/* The gap, static on the requested edge (side="bottom"): a flip swaps the popup's margins, so
-   it moves to the other edge by itself. */
-.popover { margin-block-start: 6px; }
-/* A class that serves any side: both sides of the axis, keyed on data-side, the closed logical
-   values included so the first layout has the gap. A one-sided margin keyed on the resolved
-   data-side is the wrong form: after a flip it lands on the far edge. */
-.popover-any[data-side="top"], .popover-any[data-side="bottom"] { margin-block: 6px; }
-.popover-any[data-side="left"], .popover-any[data-side="right"],
-.popover-any[data-side="inline-start"], .popover-any[data-side="inline-end"] { margin-inline: 6px; }
-@media (prefers-reduced-motion: reduce) { .popover { transition: none; } }`}</CodeBlock>
-      <p>
-        <code>data-side</code> is where the popup <strong>is</strong>, read from the computed{" "}
-        <code>position-area</code> while it is shown; the{" "}
-        <a href="/components/tooltip#data-attributes">Tooltip page</a> explains the mechanism, its
-        render cost and the margin and animation caveats, which apply here as they are. Popover has
-        no Arrow part; an arrow drawn with a pseudo-element on <code>[data-side]</code> follows a
-        flip (see the <a href="/components/tooltip#arrow">Tooltip arrow</a>).
-      </p>
-      <h4>Right-to-left</h4>
-      <p>
-        <code>side="inline-start"</code> / <code>"inline-end"</code> and <code>align</code> on a top
-        or bottom side use the <code>self-*</code> keywords, which follow the popup's inherited
-        direction: an RTL page and an RTL container both mirror them, with no JavaScript. Firefox
-        misplaces a popover inside a direction island (
-        <a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>; see{" "}
-        <a href="/components/tooltip#browser-notes">Tooltip</a>).
-      </p>
-      <p>
-        The exit animates in Chromium and Safari; Firefox hides a popover instantly. The library
-        keeps the content mounted until the exit animation ends, so a fading popover is never empty.
-        On iOS, <code>position-try-fallbacks</code> together with <code>@starting-style</code> can
-        hang (WebKit bug 317926).
-      </p>
-
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
         head={["Key", "Behaviour", "Who"]}
@@ -502,10 +476,8 @@ export function PopoverPage() {
           <strong>ARIA.</strong> The Popup has <code>role="dialog"</code> and{" "}
           <code>aria-modal="false"</code> explicitly (WebKit implements no minimum role for
           popovers; Chromium would expose a <code>&lt;dialog popover&gt;</code> as modal). The
-          Trigger is a <code>popovertarget</code> invoker, which every engine exposes as expanded or
-          collapsed from the popover itself, so a <code>&lt;button&gt;</code> Trigger renders no{" "}
-          <code>aria-expanded</code> (ARIA in HTML forbids it there); a link or other non-button
-          element (or a disabled component <code>render</code>) renders it. No{" "}
+          browser exposes the Trigger's expanded state (
+          <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a>). No{" "}
           <code>aria-haspopup</code> (the APG disclosure shape); add{" "}
           <code>aria-haspopup="dialog"</code> or <code>aria-controls</code> yourself if you want
           them.
@@ -569,7 +541,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown state of the popup it targets, so after Escape or a click outside it is collapsed at once, even while the dismissal notification runs (a link or other non-button element (or a disabled component `render`) renders that shown state as `aria-expanded`). The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. The expanded state assistive technology hears follows the shown popup, so after Escape or a click outside it is collapsed at once, even while the dismissal notification runs. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
         }
       >
         <h4>Walkthrough (library mode)</h4>
@@ -656,35 +628,51 @@ html:active-view-transition .popover { transition: none; }
             content mounts into the open popover. If the action rejects or a controlled parent
             refuses, the popover closes again.
           </li>
-          <li>
-            <strong>Foreign invokers and scripts:</strong> in library mode any open that the library
-            did not start (a <code>&lt;button commandfor command="show-popover"&gt;</code>, a{" "}
-            <code>&lt;button popovertarget&gt;</code>, a script <code>showPopover()</code>) is
-            cancelled at <code>beforetoggle</code> and dispatched with that <code>ToggleEvent</code>
-            . A foreign close happens natively and is reported as <code>"activate"</code>: a{" "}
-            <code>hide-popover</code> or <code>toggle-popover</code> command with its{" "}
-            <code>CommandEvent</code>, a <code>&lt;button popovertarget&gt;</code> with the{" "}
-            <code>beforetoggle</code> <code>ToggleEvent</code>, whose <code>source</code> is the
-            button. Escape, a click outside and a script <code>hidePopover()</code> stay{" "}
-            <code>"dismiss"</code>.
-          </li>
-          <li>
-            <strong>Hover card (Chromium):</strong> a <code>&lt;button interestfor&gt;</code> naming
-            the Popup (your own button, or the Trigger with <code>interestfor</code> added) opens it
-            on interest (hover or keyboard focus) through the library, and in library mode the Popup
-            hides again on lost interest: <code>openChangeAction(false)</code> is a{" "}
-            <code>"dismiss"</code> notification whose <code>details.event</code> is the{" "}
-            <code>loseinterest</code> event (its <code>source</code> is the button). Lost interest
-            while the open is still pending cancels it, so the card never appears under a pointer
-            that has left. A Trigger-click open stays open on lost interest, as in the platform. As
-            with the platform's own lost-interest hide, focus is not returned to the Trigger.
-            Firefox and Safari ignore <code>interestfor</code>, so give the button a click path
-            (make it the Trigger) when the card must open everywhere. For a name or description (
-            <code>role="tooltip"</code> content), use <a href="/components/tooltip">Tooltip</a>.
-          </li>
         </ul>
       </BehaviourSection>
 
+      <h3 id="styling">Styling</h3>
+      <p>
+        The Trigger's styling hook is <code>data-open</code> in both modes (optimistic in library
+        mode, written from the popup's <code>toggle</code> event in JS-free mode); a{" "}
+        <code>&lt;button&gt;</code> Trigger has no <code>aria-expanded</code> to select on (
+        <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a>). On a page
+        that never hydrates, style the Trigger from the popup that follows it:
+      </p>
+      <CodeBlock language="css">{`.trigger[data-open] { color: var(--accent); }
+/* Without JavaScript: the Popup right after the Trigger. */
+.trigger:has(+ :popover-open) { color: var(--accent); }`}</CodeBlock>
+      <p>
+        The Popup emits no <code>data-open</code>: <code>:popover-open</code> is exact. Enter and
+        exit animate in CSS, in both modes:
+      </p>
+      <CodeBlock language="css">{`.popover {
+  margin: 0;
+  inset: auto; /* the popover UA stylesheet sets inset: 0 */
+  opacity: 0;
+  translate: 0 -4px;
+  transition: opacity 120ms, translate 120ms, display 120ms allow-discrete, overlay 120ms allow-discrete;
+}
+.popover:popover-open { opacity: 1; translate: 0 0; }
+@starting-style { .popover:popover-open { opacity: 0; translate: 0 -4px; } }
+/* The gap, static on the requested edge (side="bottom"): a flip swaps the popup's margins, so
+   it moves to the other edge by itself. */
+.popover { margin-block-start: 6px; }
+/* A class that serves any side: both sides of the axis, keyed on data-side, the closed logical
+   values included so the first layout has the gap. A one-sided margin keyed on the resolved
+   data-side is the wrong form: after a flip it lands on the far edge. */
+.popover-any[data-side="top"], .popover-any[data-side="bottom"] { margin-block: 6px; }
+.popover-any[data-side="left"], .popover-any[data-side="right"],
+.popover-any[data-side="inline-start"], .popover-any[data-side="inline-end"] { margin-inline: 6px; }
+@media (prefers-reduced-motion: reduce) { .popover { transition: none; } }`}</CodeBlock>
+      <p>
+        <code>data-side</code> is where the popup <strong>is</strong>, read from the computed{" "}
+        <code>position-area</code> while it is shown; the{" "}
+        <a href="/components/tooltip#data-attributes">Tooltip page</a> explains the mechanism, its
+        render cost and the margin and animation caveats, which apply here as they are. Popover has
+        no Arrow part; an arrow drawn with a pseudo-element on <code>[data-side]</code> follows a
+        flip (see the <a href="/components/tooltip#arrow">Tooltip arrow</a>).
+      </p>
       <h3 id="recipes">Recipes</h3>
       <h4>Submit, then close (controlled)</h4>
       <CodeBlock>{`const [open, setOpen] = useState(false);
@@ -732,6 +720,27 @@ html:active-view-transition .popover { transition: none; }
         <code>position-try-fallbacks</code> can hang (WebKit bug 302008): give the inner Popup{" "}
         <code>side={"{null}"}</code> and place it in CSS if you hit it.
       </p>
+
+      <h3 id="browser-notes">Browser notes</h3>
+      <ul>
+        <li>
+          <strong>Right-to-left:</strong> <code>side="inline-start"</code> /{" "}
+          <code>"inline-end"</code> and <code>align</code> on a top or bottom side use the{" "}
+          <code>self-*</code> keywords, which follow the popup's inherited direction: an RTL page
+          and an RTL container both mirror them, with no JavaScript. Firefox misplaces a popover
+          inside a direction island (<a href="https://github.com/uhyo/funstack-ui/issues/89">#89</a>
+          ; see <a href="/components/tooltip#browser-notes">Tooltip</a>).
+        </li>
+        <li>
+          The CSS exit animates in Chromium and Safari; Firefox hides a popover instantly. The
+          library keeps the content mounted until the exit animation ends, so a fading popover is
+          never empty.
+        </li>
+        <li>
+          On iOS, <code>position-try-fallbacks</code> together with <code>@starting-style</code> can
+          hang (WebKit bug 317926).
+        </li>
+      </ul>
     </DocPage>
   );
 }

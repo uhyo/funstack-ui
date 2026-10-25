@@ -56,7 +56,8 @@ export function DialogPage() {
           <code>commandfor</code> links them by id. A Popup without a Trigger is fine (controlled{" "}
           <code>open</code>); a Trigger without a Popup is a development warning. A{" "}
           <code>&lt;button commandfor command&gt;</code> of your own that targets the dialog is a{" "}
-          <em>foreign invoker</em>; in library mode it goes through the library too.
+          <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a>; in library
+          mode it goes through the library too.
         </li>
         <li>
           <strong>
@@ -173,7 +174,7 @@ export function DialogPage() {
             type: "boolean",
             default: "true",
             description:
-              "`showModal()` (top layer, backdrop, inert page, Escape) or `show()`. A non-modal dialog has no command to open it, so its Trigger always uses a click handler: it is never JS-free.",
+              "`showModal()` (top layer, backdrop, inert page, Escape) or `show()`. A non-modal dialog has no command to open it, so its Trigger always uses a click handler: in JS-free mode too, it needs JavaScript to open.",
           },
           {
             name: "children",
@@ -219,7 +220,7 @@ export function DialogPage() {
           "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, a part's close waiting for `openChangeAction(false)`, a close notification in flight, or a re-open requested while a close notification is still settling."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a host element other than a `<button>`), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
         }
       />
 
@@ -263,7 +264,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Close on a click outside the dialog (the `::backdrop` for a modal). JS `pointerdown` and `click` listeners: both the press and the click must land outside, so a drag that starts inside (selecting text) never closes. With `experimental_closedBy`, native `closedby="any"`, which behaves the same. A click on the Trigger of an open non-modal dialog counts as outside, as native `closedby="any"` treats it: the dialog ends closed and the click does not re-open it, in both modes.',
+              'Close on a click outside the dialog (the `::backdrop` for a modal). JS `pointerdown` and `click` listeners: both the press and the click must land outside, so a drag that starts inside (selecting text) never closes. With `experimental_closedBy`, native `closedby="any"`, which behaves the same. A click on the Trigger of an open non-modal dialog counts as outside, as native `closedby="any"` treats it: the dialog ends closed and the click does not re-open it, in JS-free and library mode.',
           },
           {
             name: "experimental_closedBy",
@@ -337,7 +338,7 @@ export function DialogPage() {
       <PartFacts
         state={"`DialogCloseState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a host element other than a `<button>`), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
           'A second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'

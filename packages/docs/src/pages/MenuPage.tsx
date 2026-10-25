@@ -215,9 +215,10 @@ export function MenuPage() {
                 parent menu closing). Runs in the Root's transition; may be a Server Function.{" "}
                 <code>details.reason</code>: <code>"activate"</code>, <code>"dismiss"</code> or{" "}
                 <code>"platform"</code> (found open on hydration; <code>event</code> is{" "}
-                <code>undefined</code>). A <code>popovertarget</code> or <code>commandfor</code>{" "}
-                button of your own for the popup closes it as <code>"activate"</code> (a
-                notification); pressing it never moves focus out of the menu.
+                <code>undefined</code>). A{" "}
+                <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a> closes
+                it as <code>"activate"</code>, a notification; pressing one does not move focus out
+                of the menu.
               </>
             ),
           },
@@ -260,9 +261,11 @@ export function MenuPage() {
         <code>Menu.Trigger</code>
       </h4>
       <p>
-        One per Root: only one Trigger is the menu's anchor and focus-return target, and a press on
-        another while open counts as outside it. A second <code>Menu.Trigger</code> in the same Root
-        is not supported (development warns); use a Root per trigger.
+        A <code>&lt;button popovertarget&gt;</code>: see{" "}
+        <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a> for what that
+        gives it, and for a Trigger rendered as another element. One per Root: it is the menu's
+        anchor and focus-return target, and a press on a second Trigger while open counts as
+        outside.
       </p>
       <PropsTable
         rows={[
@@ -280,10 +283,10 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction` (never written), `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `onClick`, `onKeyDown`, `onMouseDown` (a primary-button press while the menu is open keeps focus on the current item), `data-open`, `data-pending`, `data-disabled`. `commandfor` and `command` are owned too (never written: an Invoker Command would take precedence over `popovertarget`) and omitted from the props type."
+          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`."
         }
         note={
-          "Use it in a top-level Root only. A `<button>` Trigger renders no `aria-expanded`: the browser exposes the shown menu's state on a `popovertarget` invoker ([#121](https://github.com/uhyo/funstack-ui/issues/121)); a link or other non-button element (or a disabled component `render`) renders it."
+          "Use it in a top-level Root only. A primary-button press on it while the menu is open keeps focus on the current item; the click then closes the menu."
         }
       />
 
@@ -503,10 +506,10 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `popoverTarget` (not on a host element other than a `<button>`), `popoverTargetAction`, `aria-haspopup`, `aria-expanded` (rendered only without `popoverTarget`), `data-open`, `data-pending`; `commandfor` and `command`, never written) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
         }
         note={
-          "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. Use it in a submenu Root only."
+          'Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. A disabled SubmenuTrigger stays focusable (`aria-disabled`), so it is no invoker while disabled and renders `aria-expanded="false"`. Use it in a submenu Root only.'
         }
       />
 
@@ -517,7 +520,7 @@ export function MenuPage() {
           ["`data-open`", "Trigger, SubmenuTrigger", "Optimistic open state of the Root."],
           [
             "`aria-expanded`",
-            "Trigger, SubmenuTrigger (a link or other non-button element, or a disabled component `render`, only)",
+            "Trigger, SubmenuTrigger, only when it is no [invoker](/concepts/browser-owned-state#popup-triggers): a link or other non-button element, a disabled component `render`, or a disabled SubmenuTrigger",
             "Whether the menu is shown (mirrored from its `toggle` event, not optimistic). A `<button>` has none: the browser exposes the state.",
           ],
           [
@@ -626,7 +629,8 @@ export function MenuPage() {
           focus on the current item, so the arrow keys keep working. So does a press on a{" "}
           <code>&lt;button&gt;</code> Trigger while the menu is open: the click then closes it like
           an item's activation, on every browser (a Trigger rendered as another element is
-          light-dismissed first, <a href="https://github.com/uhyo/funstack-ui/issues/115">#115</a>).
+          light-dismissed first: see{" "}
+          <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a>).
         </li>
         <li>
           <strong>Hover intent</strong> for submenus: the submenu opens <code>delay</code> ms (100)
@@ -638,11 +642,11 @@ export function MenuPage() {
           menu must not linger once focus has moved on. It is notified as <code>"dismiss"</code>.
         </li>
         <li>
-          <strong>ARIA:</strong> the Trigger has <code>aria-haspopup="menu"</code> and is a{" "}
-          <code>popovertarget</code> invoker, which every engine exposes as expanded or collapsed
-          from the menu itself, so it renders no <code>aria-expanded</code> (the SubmenuTrigger
-          alike); the Popup <code>role="menu"</code> and <code>aria-labelledby</code> pointing at
-          its trigger; items their roles and <code>aria-checked</code> / <code>aria-disabled</code>.
+          <strong>ARIA:</strong> the Trigger and SubmenuTrigger have{" "}
+          <code>aria-haspopup="menu"</code>; as invokers, the browser exposes their expanded state (
+          <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a>); the Popup{" "}
+          <code>role="menu"</code> and <code>aria-labelledby</code> pointing at its trigger; items
+          their roles and <code>aria-checked</code> / <code>aria-disabled</code>.
         </li>
       </ul>
 

@@ -79,10 +79,11 @@ export function ComboboxPage() {
         <li>
           The listbox is always anchored to the input and opened by the library. The server HTML
           gives the Trigger no <code>popovertarget</code>; after hydration a{" "}
-          <code>{"<button>"}</code> Trigger names the listbox as its invoker (with every click
+          <code>{"<button>"}</code> Trigger becomes the listbox's{" "}
+          <a href="/concepts/browser-owned-state#popup-triggers">invoker</a> (with every click
           cancelled), so pressing it while the listbox is open is not a light dismiss, and the
-          browser exposes the listbox's state on it (it renders no <code>aria-expanded</code>; the
-          Input does). Before hydration the input is a plain text field; text typed then is kept and
+          browser exposes the listbox's state on it. The Input renders <code>aria-expanded</code>{" "}
+          itself. Before hydration the input is a plain text field; text typed then is kept and
           adopted at mount, and nothing opens until the next keystroke.
         </li>
       </ul>
@@ -223,7 +224,7 @@ export function ComboboxPage() {
             name: "openChangeAction",
             type: "ChangeAction<boolean, ComboboxOpenChangeDetails>",
             description:
-              'Awaited for opens and for the closes the library performs (an accepted option, the Trigger); a notification for dismissals (Escape, a click outside, focus leaving). A `popovertarget` or `commandfor` button of your own for the popup closes it as `"activate"` (a notification); pressing it never moves focus out of the input, so the text is left as typed.',
+              'Awaited for opens and for the closes the library performs (an accepted option, the Trigger); a notification for dismissals (Escape, a click outside, focus leaving). A [foreign invoker](/concepts/browser-owned-state#foreign-invoker) closes it as `"activate"`, a notification; pressing one does not move focus out of the input, so the text is left as typed.',
           },
           {
             name: "allowCustomValue",
@@ -339,10 +340,10 @@ export function ComboboxPage() {
       <PartFacts
         state={"`ComboboxInputState` is `{ value, inputValue, open, pending, stale, disabled }`."}
         owned={
-          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
         }
         note={
-          "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
+          "`placeholder`, `name` (a second field with the raw text), `aria-describedby` and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
         }
       />
 
@@ -370,10 +371,10 @@ export function ComboboxPage() {
           "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, inputValue, disabled }`."
         }
         owned={
-          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (rendered only by a non-invoker: a non-button `render`, or an `aria-disabled` one), `aria-controls`, `popoverTarget` and `popoverTargetAction` (`popovertarget` is written after hydration on a `<button>` while enabled, or natively disabled; not while `aria-disabled`, which renders `aria-expanded` instead), `data-open`, `data-pending`; `commandfor` and `command` (never written) are owned too and omitted from its props type."
+          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (only on a non-button `render`), `aria-controls`, `popovertarget` (written after hydration, only on a `<button>`), `data-open`, `data-pending`. Owned and never written (the Trigger): `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`."
         }
         note={
-          "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). Any other element is light-dismissed at the press and warns in development. Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
+          "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). A Trigger rendered as another element is light-dismissed before its click and warns in development ([Triggers of a popup](/concepts/browser-owned-state#popup-triggers)). Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
         }
       />
 
@@ -500,12 +501,12 @@ export function ComboboxPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Attribute", "On", "Meaning"]}
+        head={["Hook", "On", "Meaning"]}
         rows={[
           [
             "`data-open`",
             "Input, Trigger",
-            "Optimistic open state (the Input's `aria-expanded` follows the shown listbox instead; a `<button>` Trigger has no `aria-expanded`, the browser exposes its state).",
+            "Optimistic open state. The Input's `aria-expanded` follows the shown listbox instead; a `<button>` Trigger has no `aria-expanded` (the browser exposes its state).",
           ],
           [
             "`data-pending`",

@@ -37,10 +37,16 @@ export function BrowserOwnedStatePage() {
               "Closing something without one of its parts: Escape, the Android back gesture, an assistive-technology dismiss, a click outside, or another top-layer element opening (the Popover API calls the last two light dismiss).",
           },
           {
-            id: "invoker-command",
-            term: "Invoker command",
+            id: "invoker",
+            term: "Invoker",
             definition:
-              "A button's `commandfor` and `command` attributes (Invoker Commands), or its `popovertarget` attribute (the Popover API's invoker, used by the overlay Triggers), which make the browser itself open or close a dialog or popover on click, without JavaScript.",
+              "A `<button>` that names a popover or dialog by id, so that the browser itself opens or closes it on click, without JavaScript: through `popovertarget` (the Popover API) or through `commandfor` and `command` (Invoker Commands). See [Triggers of a popup](#popup-triggers).",
+          },
+          {
+            id: "foreign-invoker",
+            term: "Foreign invoker",
+            definition:
+              "An invoker of your own that targets a component's popup or dialog, but is not one of the component's parts.",
           },
           {
             id: "platform-path",
@@ -76,7 +82,7 @@ export function BrowserOwnedStatePage() {
           [
             "Who changes it",
             "the library, inside its transition",
-            "the browser (hover, light dismiss, Escape, find-in-page, a summary click, an invoker command)",
+            "the browser (hover, light dismiss, Escape, find-in-page, a summary click, an [invoker](#invoker))",
           ],
           [
             "Optimistic state",
@@ -96,11 +102,10 @@ export function BrowserOwnedStatePage() {
         The library never mirrors browser-owned state into React state. It reads the DOM when it
         needs to, and it does not duplicate a pseudo-class with a data attribute. State that nobody
         persists or awaits (whether a hint is showing) is left to the browser entirely, with no prop
-        and no action. One read is mirrored: whether an overlay's popup is shown, for the{" "}
-        <code>aria-expanded</code> of the Combobox input and of a trigger rendered as something
-        other than a <code>&lt;button&gt;</code> (a <code>&lt;button&gt;</code> trigger names the
-        popup with <code>popovertarget</code>, and the browser exposes its state). Each component
-        page says what it leaves to the browser in its <strong>Browser-owned state</strong> section.
+        and no action. One read is mirrored: whether a popup is shown, where no native element
+        exposes it to assistive technology (see <a href="#popup-triggers">Triggers of a popup</a>).
+        Each component page says what it leaves to the browser in its{" "}
+        <strong>Browser-owned state</strong> section.
       </p>
       <ConceptExample component="Tooltip" href="/components/tooltip">
         <p>
@@ -177,6 +182,70 @@ export function BrowserOwnedStatePage() {
           <code>reason: "dismiss"</code>; a controlled parent that keeps <code>open</code> gets the
           dialog re-opened once the action settles.
         </p>
+      </ConceptExample>
+
+      <h3 id="popup-triggers">Triggers of a popup</h3>
+      <p>
+        A component whose popup is a popover has a <strong>Trigger</strong>: the part that opens and
+        closes it. A Trigger rendered as a <code>&lt;button&gt;</code> names the popup with{" "}
+        <code>popovertarget</code>, which makes it the popup's <a href="#invoker">invoker</a>. That
+        relationship gives it three things from the browser:
+      </p>
+      <ul>
+        <li>It can open the popup before hydration and with JavaScript off.</li>
+        <li>
+          A press on it is not a click outside: light dismiss spares the invoker of an open popover,
+          so the Trigger's click can close the popup as <a href="#parts-close">a part's close</a>,
+          awaited and animated.
+        </li>
+        <li>
+          The browser exposes the popover's expanded or collapsed state on it. The Trigger therefore
+          renders no <code>aria-expanded</code>;{" "}
+          <a href="https://w3c.github.io/html-aria/">ARIA in HTML</a> forbids the attribute on an
+          element with <code>popovertarget</code>.
+        </li>
+      </ul>
+      <p>A component may give up one of these on purpose; its page says so.</p>
+      <p>
+        Only a <code>&lt;button&gt;</code> can be an invoker. A Trigger rendered as a link or
+        another element works through the library's click handler instead, and has none of the
+        above: it renders <code>aria-expanded</code> itself, from whether the popup is shown; and a
+        press on it while the popup is open counts as a click outside, so light dismiss closes the
+        popup before the click arrives. That close is not awaited, a controlled parent cannot refuse
+        it, and there is no exit transition. A development warning says so. A disabled Trigger that
+        stays focusable (it renders <code>aria-disabled</code>) is no invoker either, so that
+        nothing native can open the popup.
+      </p>
+      <p>
+        <strong>Two kinds of open state on a Trigger.</strong> What assistive technology hears is
+        whether the popup is shown. In library mode, <code>data-open</code> is the{" "}
+        <a href="/concepts/pending-and-optimistic#optimistic">optimistic</a> state: it flips at the
+        click, while an open that waits for an action or for content is still pending. Style click
+        feedback with <code>[data-open]</code> and <code>[data-pending]</code>, never with{" "}
+        <code>[aria-expanded]</code>, which a <code>&lt;button&gt;</code> Trigger does not have.
+      </p>
+      <p>
+        <strong>One Trigger per Root.</strong> The library anchors the popup to its Trigger or
+        returns focus to it, so a Root has one. A second Trigger in the same Root is not supported
+        (development warning); use a Root per trigger.
+      </p>
+      <p>
+        <strong>Foreign invokers.</strong> A <a href="#foreign-invoker">foreign invoker</a> still
+        works in library mode. An open through it is routed through the library like the Trigger's,
+        so the action runs and the content loads first. A close through it is reported with{" "}
+        <code>reason: "activate"</code>, because the user asked for it; each component page says
+        whether that close is awaited or a notification. A component that keeps focus in its popup
+        does not lose it when you press a foreign invoker: the invoker's own close is the only one.
+      </p>
+      <ConceptExample component="Popover" href="/components/popover">
+        <p>
+          A <code>Popover.Trigger</code> renders <code>&lt;button popovertarget&gt;</code> with no{" "}
+          <code>aria-expanded</code>. Its styling hook is <code>data-open</code>; on a page that
+          never hydrates, select on the popup that follows it:
+        </p>
+        <CodeBlock language="css">{`.trigger[data-open] { color: var(--accent); }
+/* Without JavaScript: the Popup right after the Trigger. */
+.trigger:has(+ :popover-open) { color: var(--accent); }`}</CodeBlock>
       </ConceptExample>
 
       <h3 id="native-inputs">Native inputs: the DOM is the optimistic state</h3>
