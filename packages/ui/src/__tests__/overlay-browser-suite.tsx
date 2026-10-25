@@ -295,8 +295,8 @@ export function setUpViewTransitionRows(isOpen: (popup: Element) => boolean): Vi
     }));
     leaveActEnvironment();
     addStyle(`
-      ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
-      ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
+      ::view-transition-old(.pop) { animation: 60ms ease-in both vt-pop-out; }
+      ::view-transition-new(.pop) { animation: 60ms ease-out both vt-pop-in; }
       @keyframes vt-pop-out { to { opacity: 0; } }
       @keyframes vt-pop-in { from { opacity: 0; } }
     `);
@@ -397,7 +397,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
       it.each(closes)(
         "%s ignores a finite animation that was already running inside",
         async (_, close) => {
-          addExitStyle("fade", "300ms", { openPseudo });
+          addExitStyle("fade", "100ms", { openPseudo });
           let bar: Animation | undefined;
           render(
             <Harness
