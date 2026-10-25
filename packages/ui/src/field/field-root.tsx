@@ -49,15 +49,28 @@ const isDev = process.env.NODE_ENV !== "production";
  */
 export type FieldValidate = (value: string, formData: FormData) => FieldErrorValue;
 
+/**
+ * Props of `Field.Root`.
+ *
+ * @see https://ui.funstack.work/components/field
+ */
 export interface FieldRootProps extends Omit<
   ComponentPropsWithRef<"div">,
   "className" | "style" | "children"
 > {
   /** Form field name: the control's default `name`, the key in `Form.Root errors`, and the entry `validate` reads. */
   name?: string;
-  /** Disables the control (native `disabled`) and marks every part `data-disabled`. */
+  /**
+   * Disables the control (native `disabled`) and marks every part `data-disabled`.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
-  /** Makes the control `required` (native) and marks every part `data-required`. */
+  /**
+   * Makes the control `required` (native) and marks every part `data-required`.
+   *
+   * @defaultValue `false`
+   */
   required?: boolean;
   /**
    * A custom constraint, written into the control with `setCustomValidity`. Sync. Receives the
@@ -73,9 +86,13 @@ export interface FieldRootProps extends Omit<
    * `validate` is rendered from a client component.
    */
   validate?: FieldValidate;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, FieldState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, FieldState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, FieldState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, FieldState>;
 }
 
@@ -117,6 +134,8 @@ function entryStrings(entries: readonly FormDataEntryValue[]): string[] {
  * Field has no action of its own.
  *
  * Owned keys (conventions 1.2): `data-invalid`, `data-disabled`, `data-required`, `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/field
  */
 export function FieldRoot({
   name,

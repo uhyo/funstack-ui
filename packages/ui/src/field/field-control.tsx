@@ -10,17 +10,36 @@ import { useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * Props of `Field.Control`.
+ *
+ * @see https://ui.funstack.work/components/field
+ */
 export interface FieldControlProps extends Omit<
   ComponentPropsWithRef<"input">,
   "id" | "aria-invalid" | "className" | "style" | "children"
 > {
-  /** Native `name`; defaults to the Field's `name`. */
+  /**
+   * Native `name`.
+   *
+   * @defaultValue the Field's `name`
+   */
   name?: string;
-  /** Native `disabled`; the Field's `disabled` also disables the control. Owned. */
+  /**
+   * Native `disabled`; the Field's `disabled` also disables the control. Owned.
+   *
+   * @defaultValue the Field's `disabled`
+   */
   disabled?: boolean;
-  /** Native `required`; the Field's `required` also requires the control. Owned. */
+  /**
+   * Native `required`; the Field's `required` also requires the control. Owned.
+   *
+   * @defaultValue the Field's `required`
+   */
   required?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, FieldState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, FieldState>;
   /** Must render an `<input>`, `<textarea>` or `<select>`: `render={<textarea rows={3} />}`. */
   render?: RenderProp<ComponentPropsWithRef<"input">, FieldState>;
@@ -38,6 +57,8 @@ const CONTROL_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
  * Owned keys (conventions 1.2): `id`, `name`, `disabled`, `required`, `aria-invalid`,
  * `aria-describedby` (token-merged), `data-invalid`, `data-disabled`, `data-required`,
  * `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/field
  */
 export function FieldControl({
   name,

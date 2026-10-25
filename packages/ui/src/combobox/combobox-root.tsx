@@ -73,6 +73,7 @@ export interface ComboboxOpenChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
+/** State of `Combobox.Root`, passed to the function forms of `announce` and `children`. */
 export interface ComboboxRootState {
   /** Optimistic selection. Content rendered from it must not suspend. */
   readonly value: string | null;
@@ -88,13 +89,23 @@ export interface ComboboxRootState {
   readonly open: boolean;
   /** A `valueChangeAction` or `openChangeAction` dispatched through this Combobox is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Combobox.Root`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxRootProps {
   /** Controlled selection. `null`: nothing selected. `undefined`: uncontrolled. */
   value?: string | null;
-  /** Initial selection in uncontrolled mode. Default `null`. */
+  /**
+   * Initial selection in uncontrolled mode.
+   *
+   * @defaultValue `null`
+   */
   defaultValue?: string | null;
   /**
    * Runs inside the Root's transition when the user accepts an option, commits free text
@@ -108,8 +119,10 @@ export interface ComboboxRootProps {
   /** Controlled input text. `undefined`: uncontrolled. */
   inputValue?: string;
   /**
-   * Initial input text. Default `""`. Pass the selected value's label when `defaultValue` is
+   * Initial input text. Pass the selected value's label when `defaultValue` is
    * set: the library never derives the text from the value.
+   *
+   * @defaultValue `""`
    */
   defaultInputValue?: string;
   /**
@@ -124,7 +137,11 @@ export interface ComboboxRootProps {
 
   /** Controlled open state. `undefined`: uncontrolled. */
   open?: boolean;
-  /** Initial open state when uncontrolled. Opens after hydration. */
+  /**
+   * Initial open state when uncontrolled. Opens after hydration.
+   *
+   * @defaultValue `false`
+   */
   defaultOpen?: boolean;
   /**
    * Awaited for opens and for the close after an accepted option (or the Trigger); a
@@ -135,24 +152,37 @@ export interface ComboboxRootProps {
   /**
    * Free text is a value: Enter with no active option, or focus leaving with text that is not
    * the selected option's label, dispatches the text with `details.custom: true` (empty text
-   * dispatches `null`). Default `false`: unmatched text reverts to the selection's label when
-   * focus leaves.
+   * dispatches `null`). When `false`, unmatched text reverts to the selection's label when focus
+   * leaves.
+   *
+   * @defaultValue `false`
    */
   allowCustomValue?: boolean;
   /**
    * Make the first enabled option active when the results for an open or an edit settle (APG
-   * "automatic selection"). Stale results are never highlighted. Default `false`.
+   * "automatic selection"). Stale results are never highlighted.
+   *
+   * @defaultValue `false`
    */
   autoHighlight?: boolean;
-  /** Open the listbox on a pointer click in the input (not on focus). Default `false`. */
+  /**
+   * Open the listbox on a pointer click in the input (not on focus).
+   *
+   * @defaultValue `false`
+   */
   openOnClick?: boolean;
-  /** Wrap from the last option to the first and back with the arrow keys. Default `false`. */
+  /**
+   * Wrap from the last option to the first and back with the arrow keys.
+   *
+   * @defaultValue `false`
+   */
   loop?: boolean;
   /**
    * The message `ariaNotify()` announces on the List when the results settle, from the number
-   * of mounted options. Default (English): `"No results"`, `"1 result"`, `"N results"`. Override
-   * for localisation or a richer message; return `null` to announce nothing. Ignored where
-   * `ariaNotify` is missing.
+   * of mounted options. Override for localisation or a richer message; return `null` to announce
+   * nothing. Ignored where `ariaNotify` is missing.
+   *
+   * @defaultValue English: `"No results"`, `"1 result"`, `"N results"`
    */
   announce?: (count: number, state: ComboboxRootState) => string | null;
 
@@ -160,8 +190,13 @@ export interface ComboboxRootProps {
   name?: string;
   /** The `form` attribute of the hidden input. */
   form?: string;
-  /** Disables the Input, Trigger and Clear; nothing dispatches for user interaction. */
+  /**
+   * Disables the Input, Trigger and Clear; nothing dispatches for user interaction.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** The parts, or a function of the Root's state. */
   children?: StateValue<ReactNode, ComboboxRootState>;
 }
 
@@ -211,6 +246,8 @@ interface TextRecord {
  * urgent virtual focus (`aria-activedescendant`); the listbox is a `popover="auto"` opened by the
  * library with the input as `source`. Renders no DOM, except one `<input type="hidden">` when
  * `name` is given.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxRoot(props: ComboboxRootProps) {
   const {

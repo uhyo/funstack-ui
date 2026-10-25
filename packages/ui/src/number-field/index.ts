@@ -15,6 +15,8 @@ import { NumberFieldRoot } from "./number-field-root.js";
  * (committed on blur or Enter) or steps with the keys and buttons. Two actions:
  * `valueChangeAction` on every step (a transition; keep it cheap) and `valueCommitAction` once
  * per gesture (the save; uncontrolled state is committed when it resolves).
+ *
+ * @see https://ui.funstack.work/components/number-field
  */
 export const NumberField = {
   Root: NumberFieldRoot,

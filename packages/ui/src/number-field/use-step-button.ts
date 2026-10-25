@@ -152,6 +152,10 @@ export function useStepButton(
   return { onPointerDown, onClick, onContextMenu };
 }
 
+/**
+ * State of `NumberField.Increment`, `NumberField.Decrement`, passed to the function forms of
+ * `className`, `style`, `children` and `render`.
+ */
 export interface NumberFieldButtonState {
   /** The Root is pending and the latest step or commit came from this button. */
   readonly pending: boolean;
@@ -159,6 +163,11 @@ export interface NumberFieldButtonState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `NumberField.Increment` (`NumberField.Decrement` takes the same props).
+ *
+ * @see https://ui.funstack.work/components/number-field
+ */
 export interface NumberFieldIncrementProps extends Omit<
   ComponentPropsWithRef<"button">,
   | "type"
@@ -175,14 +184,25 @@ export interface NumberFieldIncrementProps extends Omit<
   /**
    * Never steps. Native `disabled` on a `<button>` (also at the bound and under `readOnly`); with
    * a link or component `render`, `aria-disabled="true"` instead.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, NumberFieldButtonState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, NumberFieldButtonState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, NumberFieldButtonState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, NumberFieldButtonState>;
 }
 
+/**
+ * Props of `NumberField.Decrement`: the same as `NumberFieldIncrementProps`.
+ *
+ * @see https://ui.funstack.work/components/number-field
+ */
 export type NumberFieldDecrementProps = NumberFieldIncrementProps;
 
 const LABELS: Record<StepDirection, string> = { increment: "Increase", decrement: "Decrease" };

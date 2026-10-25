@@ -13,6 +13,8 @@ import { CheckboxGroupRoot } from "./checkbox-group-root.js";
  * value is a set of strings; the keyboard is entirely native. Each box's DOM `checked` is
  * optimistic; the Root and the boxes whose state is changing carry `data-pending` while
  * `valueChangeAction` is in flight.
+ *
+ * @see https://ui.funstack.work/components/checkbox-group
  */
 export const CheckboxGroup = {
   Root: CheckboxGroupRoot,

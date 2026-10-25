@@ -21,7 +21,12 @@ import type { SliderOrientation } from "./slider-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Slider.Thumb`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface SliderThumbState {
+  /** The Thumb's `index` prop: which entry of the value it edits. */
   readonly index: number;
   /** The value this thumb shows. */
   readonly value: number;
@@ -29,10 +34,17 @@ export interface SliderThumbState {
   readonly pending: boolean;
   /** A pointer is captured on this thumb. */
   readonly dragging: boolean;
+  /** The Root's `orientation`. */
   readonly orientation: SliderOrientation;
+  /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Slider.Thumb`.
+ *
+ * @see https://ui.funstack.work/components/slider
+ */
 export interface SliderThumbProps extends Omit<
   ComponentPropsWithRef<"span">,
   | "onPointerDown"
@@ -49,11 +61,23 @@ export interface SliderThumbProps extends Omit<
   | "style"
   | "children"
 > {
-  /** Which value this thumb edits. Default `0`. */
+  /**
+   * Which value this thumb edits.
+   *
+   * @defaultValue `0`
+   */
   index?: number;
-  /** Form field name of this thumb's input; overrides the Root's `name`. */
+  /**
+   * Form field name of this thumb's input; overrides the Root's `name`.
+   *
+   * @defaultValue the Root's `name`
+   */
   name?: string;
-  /** The `form` attribute of this thumb's input; overrides the Root's. */
+  /**
+   * The `form` attribute of this thumb's input; overrides the Root's.
+   *
+   * @defaultValue the Root's `form`
+   */
   form?: string;
   /**
    * Forwarded to the input (the element with role `slider`), not the styled element. Required
@@ -68,10 +92,13 @@ export interface SliderThumbProps extends Omit<
   inputRef?: Ref<HTMLInputElement>;
   /** Forwarded to the input. */
   autoFocus?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SliderThumbState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SliderThumbState>;
   /** Rendered inside the styled element, next to the input (an icon, a value bubble). */
   children?: StateValue<ReactNode, SliderThumbState>;
+  /** Replace the default `<span>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"span">, SliderThumbState>;
 }
 
@@ -103,6 +130,8 @@ const VERTICAL_INPUT_STYLE: CSSProperties = {
  * `data-dragging`, `data-pending`, `data-disabled`, and `--slider-value` / `touch-action` in
  * `style` (the consumer's entries win). `aria-label`, `aria-labelledby`, `aria-describedby`,
  * `name`, `form` and `autoFocus` go to the input; every other input attribute is the library's.
+ *
+ * @see https://ui.funstack.work/components/slider
  */
 export function SliderThumb({
   index = 0,

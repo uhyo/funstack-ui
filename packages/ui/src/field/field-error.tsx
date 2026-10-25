@@ -6,18 +6,28 @@ import type { FieldState } from "../internal/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
 
+/**
+ * Props of `Field.Error`.
+ *
+ * @see https://ui.funstack.work/components/field
+ */
 export interface FieldErrorProps extends Omit<
   ComponentPropsWithRef<"div">,
   "id" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, FieldState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, FieldState>;
   /**
-   * Rendered only while `state.invalid`. Default: `state.messages` joined by a space. A function
-   * gets the state: `({ validity, messages }) => validity.valueMissing ? "Enter your email" : messages.join(" ")`.
+   * Rendered only while `state.invalid`. A function gets the state:
+   * `({ validity, messages }) => validity.valueMissing ? "Enter your email" : messages.join(" ")`.
    * Must not suspend (urgent render, design 2.4).
+   *
+   * @defaultValue `state.messages` joined by a space
    */
   children?: StateValue<ReactNode, FieldState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, FieldState>;
 }
 
@@ -33,6 +43,8 @@ function defaultChildren(state: FieldState): ReactNode {
  *
  * Owned keys (conventions 1.2): `id`, `data-invalid`, `data-disabled`, `data-required`,
  * `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/field
  */
 export function FieldError({
   className,

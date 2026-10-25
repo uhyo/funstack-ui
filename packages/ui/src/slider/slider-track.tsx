@@ -12,20 +12,35 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderOrientation } from "./slider-root.js";
 
+/**
+ * State of `Slider.Track`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface SliderTrackState {
+  /** The Root's `orientation`. */
   readonly orientation: SliderOrientation;
   /** A pointer is captured on a thumb. */
   readonly dragging: boolean;
+  /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Slider.Track`.
+ *
+ * @see https://ui.funstack.work/components/slider
+ */
 export interface SliderTrackProps extends Omit<
   ComponentPropsWithRef<"div">,
   "onPointerDown" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SliderTrackState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SliderTrackState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, SliderTrackState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, SliderTrackState>;
 }
 
@@ -35,6 +50,8 @@ export interface SliderTrackProps extends Omit<
  * mirrors a horizontal slider). Owned keys: `onPointerDown`, `data-orientation`,
  * `data-disabled`, and `touch-action` in `style` (`pan-y` horizontal, `pan-x` vertical; the
  * consumer's entry wins).
+ *
+ * @see https://ui.funstack.work/components/slider
  */
 export function SliderTrack({ className, style, children, render, ...rest }: SliderTrackProps) {
   const ctx = useSliderContext("Slider.Track");

@@ -12,6 +12,8 @@ export type { NumberFieldDecrementProps } from "./use-step-button.js";
  *
  * Owned keys: `type`, `tabIndex`, `aria-controls`, `disabled`, `aria-disabled` (link or component
  * `render`), `onPointerDown`, `onClick`, `onContextMenu`, `data-pending`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/number-field
  */
 export function NumberFieldDecrement(props: NumberFieldDecrementProps) {
   return useStepButtonElement("decrement", "NumberField.Decrement", props);

@@ -36,6 +36,11 @@ export interface SelectValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
+/**
+ * State of `Select.Root`, `Select.Trigger`, `Select.Value`, `Select.Group`, `Select.GroupLabel`,
+ * `Select.Separator`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface SelectRootState {
   /** Optimistic value. Content rendered from it must not suspend. */
   readonly value: string;
@@ -45,6 +50,11 @@ export interface SelectRootState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Select.Root`.
+ *
+ * @see https://ui.funstack.work/components/select
+ */
 export interface SelectRootProps extends Omit<
   ComponentPropsWithRef<"select">,
   | "value"
@@ -65,6 +75,8 @@ export interface SelectRootProps extends Omit<
    * whose value is `""`, else the first enabled option) is adopted at mount, without a dispatch,
    * and is what a form reset returns to. Until a pick (or a platform change) sets the value,
    * options that mount later without the adopted one (a Suspense fallback) adopt again.
+   *
+   * @defaultValue the browser's choice
    */
   defaultValue?: string;
   /**
@@ -78,10 +90,19 @@ export interface SelectRootProps extends Omit<
    * limitation). Controlled mode is the way to veto a change.
    */
   valueChangeAction?: ChangeAction<string, SelectValueChangeDetails>;
-  /** Native `disabled`. Never set by the library while pending. */
+  /**
+   * Native `disabled`. Never set by the library while pending.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SelectRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SelectRootState>;
+  /**
+   * The options and the Trigger. The function form receives the optimistic value; must not suspend.
+   */
   children?: StateValue<ReactNode, SelectRootState>;
   /** Replace the rendered element. Must keep a `<select>`. */
   render?: RenderProp<ComponentPropsWithRef<"select">, SelectRootState>;
@@ -96,6 +117,8 @@ export interface SelectRootProps extends Omit<
  * Owned keys (conventions 1.2): `value`, `disabled`, `data-pending`, `data-disabled`, `onChange`;
  * inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby`
  * (token-merged) and `data-invalid`, and `disabled` / `name` / `required` default from the Field.
+ *
+ * @see https://ui.funstack.work/components/select
  */
 export function SelectRoot({
   value,

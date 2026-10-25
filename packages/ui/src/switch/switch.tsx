@@ -12,6 +12,7 @@ import type {
 import { useCheckableInput } from "../internal/use-checkable-input.js";
 import { useRender } from "../internal/use-render.js";
 
+/** State of `Switch`, passed to the function forms of `className`, `style` and `render`. */
 export interface SwitchState {
   /** Optimistic checked state: what the user sees, including an in-flight change. */
   readonly checked: boolean;
@@ -32,6 +33,11 @@ export interface SwitchCheckedChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
+/**
+ * Props of `Switch`.
+ *
+ * @see https://ui.funstack.work/components/switch
+ */
 export interface SwitchProps extends Omit<
   ComponentPropsWithRef<"input">,
   | "type"
@@ -47,8 +53,10 @@ export interface SwitchProps extends Omit<
   /** Controlled checked state. `undefined` means uncontrolled. */
   checked?: boolean;
   /**
-   * Initial checked state in uncontrolled mode (default `false`). Also the value a form reset
+   * Initial checked state in uncontrolled mode. Also the value a form reset
    * returns to: the latest prop value is mirrored into the input's `defaultChecked`.
+   *
+   * @defaultValue `false`
    */
   defaultChecked?: boolean;
   /**
@@ -61,9 +69,17 @@ export interface SwitchProps extends Omit<
    * unsupported here; use controlled mode to veto a change.
    */
   checkedChangeAction?: ChangeAction<boolean, SwitchCheckedChangeDetails>;
-  /** Renders a natively disabled input; never dispatches. Default `false`. */
+  /**
+   * Renders a natively disabled input; never dispatches.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
-  /** Submitted as the input's value when checked. Default `"on"` (platform). */
+  /**
+   * Submitted as the input's value when checked.
+   *
+   * @defaultValue `"on"` (platform)
+   */
   value?: string;
   /**
    * Forwarded as `default` to the Switch's `<ViewTransition>`. Default: no boundary. Animates the
@@ -74,7 +90,9 @@ export interface SwitchProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SwitchState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SwitchState>;
   /**
    * Replace the rendered element (element form) or take over rendering (function form). Must keep
@@ -95,6 +113,8 @@ export interface SwitchProps extends Omit<
  * default from the Field. Event handlers are merged rather than owned: a `render` element's own
  * `onChange` (or `onClick`) runs first, then the library's; an `onClick` that calls
  * `preventDefault()` cancels the change (nothing is dispatched).
+ *
+ * @see https://ui.funstack.work/components/switch
  */
 export function Switch({
   checked,

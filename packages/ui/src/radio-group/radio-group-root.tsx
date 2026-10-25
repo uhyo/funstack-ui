@@ -32,6 +32,10 @@ export interface RadioGroupValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
+/**
+ * State of `RadioGroup.Root`, `RadioGroup.Label`, passed to the function forms of `className`,
+ * `style`, `children` and `render`.
+ */
 export interface RadioGroupRootState {
   /** Optimistic checked value, or `null`. Content rendered from it must not suspend. */
   readonly value: string | null;
@@ -41,6 +45,11 @@ export interface RadioGroupRootState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `RadioGroup.Root`.
+ *
+ * @see https://ui.funstack.work/components/radio-group
+ */
 export interface RadioGroupRootProps extends Omit<
   ComponentPropsWithRef<"fieldset">,
   | "className"
@@ -64,8 +73,10 @@ export interface RadioGroupRootProps extends Omit<
    */
   value?: string | null;
   /**
-   * Initial value in uncontrolled mode. Defaults to `null` (nothing checked). Also the value a
+   * Initial value in uncontrolled mode. Also the value a
    * form reset returns to: the latest prop value is mirrored into the radios' `defaultChecked`.
+   *
+   * @defaultValue `null` (nothing checked)
    */
   defaultValue?: string | null;
   /**
@@ -81,9 +92,11 @@ export interface RadioGroupRootProps extends Omit<
    */
   valueChangeAction?: ChangeAction<string | null, RadioGroupValueChangeDetails>;
   /**
-   * The `name` shared by every radio in the group (form data key). Defaults to a `useId()` value;
-   * pass a real name when the group is inside a `<form>` you submit. Must be unique within the
-   * form: react-dom throws if a non-React radio shares it.
+   * The `name` shared by every radio in the group (form data key). Pass a real name when the group
+   * is inside a `<form>` you submit. Must be unique within the form: react-dom throws if a
+   * non-React radio shares it.
+   *
+   * @defaultValue a `useId()` value
    */
   name?: string;
   /** The `form` attribute, applied to the fieldset and to every radio. */
@@ -92,12 +105,21 @@ export interface RadioGroupRootProps extends Omit<
    * Marks every radio `required`, which makes the group required (one checked radio satisfies it),
    * and renders `aria-required="true"` on the fieldset so the radiogroup itself is exposed as
    * required.
+   *
+   * @defaultValue `false`
    */
   required?: boolean;
-  /** Renders `<fieldset disabled>`: every radio is disabled, unfocusable and skipped by arrows. */
+  /**
+   * Renders `<fieldset disabled>`: every radio is disabled, unfocusable and skipped by arrows.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, RadioGroupRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, RadioGroupRootState>;
+  /** The Label and Items. The function form receives the optimistic value; must not suspend. */
   children?: StateValue<ReactNode, RadioGroupRootState>;
   /** Replace the rendered element. Must keep a `<fieldset>`. */
   render?: RenderProp<ComponentPropsWithRef<"fieldset">, RadioGroupRootState>;
@@ -135,6 +157,8 @@ function readGroup(
  * interacts) is not supported by React: clicking a hydrated radio while same-`name` siblings are
  * still dehydrated makes react-dom throw "Mixing React and non-React radio inputs with the same
  * `name` is not supported". Development warns when Items hydrate after their Root.
+ *
+ * @see https://ui.funstack.work/components/radio-group
  */
 export function RadioGroupRoot({
   value,

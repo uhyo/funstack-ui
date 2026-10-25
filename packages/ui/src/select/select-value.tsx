@@ -10,11 +10,18 @@ import type { SelectRootState } from "./select-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * Props of `Select.Value`.
+ *
+ * @see https://ui.funstack.work/components/select
+ */
 export interface SelectValueProps extends Omit<
   ComponentPropsWithRef<"selectedcontent">,
   "children" | "dangerouslySetInnerHTML" | "className" | "style"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SelectRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SelectRootState>;
   /** Replace the rendered element. Must keep a `<selectedcontent>`. */
   render?: RenderProp<ComponentPropsWithRef<"selectedcontent">, SelectRootState>;
@@ -59,6 +66,8 @@ function refresh(select: HTMLSelectElement): void {
  * `HTMLSelectedContentElement` is undefined (Firefox today, jsdom): nothing is cloned there.
  *
  * Owned keys: `dangerouslySetInnerHTML`, `suppressHydrationWarning`, `children`.
+ *
+ * @see https://ui.funstack.work/components/select
  */
 export function SelectValue({ className, style, render, ...rest }: SelectValueProps) {
   const ctx = useSelectContext("Select.Value");

@@ -11,6 +11,8 @@ import { RadioGroupRoot } from "./radio-group-root.js";
  * (`input[type=radio]`) per option. The keyboard is entirely native. Each Item's DOM `checked` is
  * the optimistic value; the Root and the checked Item carry `data-pending` while
  * `valueChangeAction` is in flight.
+ *
+ * @see https://ui.funstack.work/components/radio-group
  */
 export const RadioGroup = {
   Root: RadioGroupRoot,

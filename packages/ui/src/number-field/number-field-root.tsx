@@ -67,18 +67,30 @@ export interface NumberFieldState {
   readonly text: string;
   /** A step or commit dispatched through this NumberField is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
+  /** The `readOnly` prop. */
   readonly readOnly: boolean;
+  /** The `required` prop, or the enclosing Field's. */
   readonly required: boolean;
 }
 
+/**
+ * Props of `NumberField.Root`.
+ *
+ * @see https://ui.funstack.work/components/number-field
+ */
 export interface NumberFieldRootProps extends Omit<
   ComponentPropsWithRef<"div">,
   "defaultValue" | "role" | "className" | "style" | "children"
 > {
   /** Controlled value; `null` is empty, `undefined` uncontrolled. */
   value?: number | null;
-  /** Initial value in uncontrolled mode, and its form-reset target (latest). Default `null` (empty). */
+  /**
+   * Initial value in uncontrolled mode, and its form-reset target (latest).
+   *
+   * @defaultValue `null` (empty)
+   */
   defaultValue?: number | null;
   /**
    * Runs inside the Root's step transition on every step: the parse of typed text at commit,
@@ -98,9 +110,17 @@ export interface NumberFieldRootProps extends Omit<
   min?: number;
   /** Native `max` on the hidden input (a constraint) and the upper bound of stepping. */
   max?: number;
-  /** Native `step` and the stepping grid from `min` (else `0`). Default `1`, or `0.01` when `format.style` is `"percent"`. */
+  /**
+   * Native `step` and the stepping grid from `min` (else `0`).
+   *
+   * @defaultValue `1`, or `0.01` when `format.style` is `"percent"`
+   */
   step?: number;
-  /** PageUp / PageDown and Shift+Arrow. Default `10 × step`. */
+  /**
+   * The step of PageUp / PageDown and Shift+Arrow.
+   *
+   * @defaultValue `10 × step`
+   */
   largeStep?: number;
   /**
    * `Intl.NumberFormatOptions` for the text: `style` `"decimal"` (default), `"percent"`,
@@ -109,32 +129,58 @@ export interface NumberFieldRootProps extends Omit<
    */
   format?: Intl.NumberFormatOptions;
   /**
-   * BCP 47 tag(s). Default: the runtime's locale (`Intl.NumberFormat().resolvedOptions().locale`).
-   * Pass the page's `lang`; a dev warning fires when `document.documentElement.lang` disagrees
-   * and this prop is absent.
+   * BCP 47 tag(s). Pass the page's `lang`; a dev warning fires when
+   * `document.documentElement.lang` disagrees and this prop is absent.
+   *
+   * @defaultValue the runtime's locale (`Intl.NumberFormat().resolvedOptions().locale`)
    */
   locale?: string | readonly string[];
-  /** Step with the mouse wheel while the input is focused. Default `false`. */
+  /**
+   * Step with the mouse wheel while the input is focused.
+   *
+   * @defaultValue `false`
+   */
   stepOnWheel?: boolean;
-  /** Native `name` on the hidden input; defaults to the Field's `name` inside a `Field.Root`. */
+  /**
+   * Native `name` on the hidden input.
+   *
+   * @defaultValue the Field's `name` inside a `Field.Root`
+   */
   name?: string;
   /** Native `form` on the hidden input. */
   form?: string;
-  /** Disables both inputs and the buttons; inherited by every part. */
+  /**
+   * Disables both inputs and the buttons; inherited by every part.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
-  /** Native `readonly` on both inputs; no stepping (buttons disabled, keys and wheel inert). */
+  /**
+   * Native `readonly` on both inputs; no stepping (buttons disabled, keys and wheel inert).
+   *
+   * @defaultValue `false`
+   */
   readOnly?: boolean;
-  /** Native `required` on the hidden input (empty is `valueMissing`); or the Field's. */
+  /**
+   * Native `required` on the hidden input (empty is `valueMissing`); or the Field's.
+   *
+   * @defaultValue `false`
+   */
   required?: boolean;
   /**
-   * What is announced (`ariaNotify()`) after a key press, a wheel event, a
-   * click activation and a hold's release. Default: `(_, state) => state.text`. Return `null` to
-   * announce nothing.
+   * What is announced (`ariaNotify()`) after a key press, a wheel event, a click activation and a
+   * hold's release. Return `null` to announce nothing.
+   *
+   * @defaultValue `(_, state) => state.text`
    */
   announce?: (value: number | null, state: NumberFieldState) => string | null;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, NumberFieldState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, NumberFieldState>;
+  /** The parts. The function form receives the state. */
   children?: StateValue<ReactNode, NumberFieldState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, NumberFieldState>;
 }
 
@@ -191,6 +237,8 @@ function readVisible(
  * Owned keys (conventions 1.2): `role="group"`, `aria-labelledby` (token-merged: the consumer's,
  * then `NumberField.Label`'s id while one is mounted, then a Field's label id), `data-pending`,
  * `data-disabled`, `data-invalid` (inside a Field).
+ *
+ * @see https://ui.funstack.work/components/number-field
  */
 export function NumberFieldRoot(props: NumberFieldRootProps) {
   const {

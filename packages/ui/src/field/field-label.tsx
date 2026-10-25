@@ -8,12 +8,20 @@ import { useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * Props of `Field.Label`.
+ *
+ * @see https://ui.funstack.work/components/field
+ */
 export interface FieldLabelProps extends Omit<
   ComponentPropsWithRef<"label">,
   "htmlFor" | "id" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, FieldState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, FieldState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, FieldState>;
   /** Must render a `<label>`. */
   render?: RenderProp<ComponentPropsWithRef<"label">, FieldState>;
@@ -26,6 +34,8 @@ export interface FieldLabelProps extends Omit<
  *
  * Owned keys (conventions 1.2): `id`, `htmlFor`, `data-invalid`, `data-disabled`,
  * `data-required`, `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/field
  */
 export function FieldLabel({ className, style, children, render, ...rest }: FieldLabelProps) {
   const ctx = useFieldContext("Field.Label");

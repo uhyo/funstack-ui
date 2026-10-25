@@ -16,7 +16,12 @@ import { ComboboxListContext, optionId, useComboboxContext } from "./combobox-co
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Combobox.Option`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ComboboxOptionState {
+  /** The Option's `value` prop. */
   readonly value: string;
   /** Optimistic: this option's value is the (optimistic) selection. */
   readonly selected: boolean;
@@ -24,9 +29,15 @@ export interface ComboboxOptionState {
   readonly active: boolean;
   /** The selection is pending and this option is its optimistic target. */
   readonly pending: boolean;
+  /** The Option's `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Combobox.Option`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxOptionProps extends Omit<
   ComponentPropsWithRef<"div">,
   | "id"
@@ -44,16 +55,25 @@ export interface ComboboxOptionProps extends Omit<
   /** The selection this option stands for. Unique within the Combobox; also its id fragment. */
   value: string;
   /**
-   * The text written into the input when this option is accepted. Default: the element's
-   * trimmed `textContent` at that moment. Not used for matching: the library filters nothing.
+   * The text written into the input when this option is accepted. Not used for matching: the
+   * library filters nothing.
+   *
+   * @defaultValue the element's trimmed `textContent` at that moment
    */
   label?: string;
-  /** `aria-disabled`: shown, skipped by the arrow keys, never accepted. */
+  /**
+   * `aria-disabled`: shown, skipped by the arrow keys, never accepted.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxOptionState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxOptionState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, ComboboxOptionState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxOptionState>;
 }
 
@@ -68,6 +88,8 @@ const preventDefault = (event: { preventDefault(): void }) => event.preventDefau
  * Owned keys (conventions 1.2): `id` (derived from `value`), `role`, `aria-selected`,
  * `aria-disabled`, `onClick`, `onPointerDown`, `onMouseDown`, `onPointerMove`, `data-selected`,
  * `data-active`, `data-pending`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxOption({
   value,

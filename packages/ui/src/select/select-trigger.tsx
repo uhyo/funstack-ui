@@ -7,11 +7,18 @@ import { useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
+/**
+ * Props of `Select.Trigger`.
+ *
+ * @see https://ui.funstack.work/components/select
+ */
 export interface SelectTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   "type" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SelectRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SelectRootState>;
   /**
    * Non-interactive content only (HTML content model of a select's button), usually
@@ -38,6 +45,8 @@ function firstChildOfSelect(el: HTMLButtonElement): string | null {
  * `children`.
  *
  * Owned keys: `type` (always `"button"`), `data-pending`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/select
  */
 export function SelectTrigger({ className, style, children, render, ...rest }: SelectTriggerProps) {
   const ctx = useSelectContext("Select.Trigger");

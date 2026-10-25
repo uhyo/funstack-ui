@@ -21,6 +21,11 @@ import { useNumberFieldContext } from "./number-field-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * Props of `NumberField.Input`.
+ *
+ * @see https://ui.funstack.work/components/number-field
+ */
 export interface NumberFieldInputProps extends Omit<
   ComponentPropsWithRef<"input">,
   | "value"
@@ -45,7 +50,9 @@ export interface NumberFieldInputProps extends Omit<
 > {
   /** The hidden native `<input type="number">` rendered after the visible input. */
   hiddenInputRef?: Ref<HTMLInputElement>;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, NumberFieldState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, NumberFieldState>;
   /** Must render an `<input>` of type `text`, `search` or `tel`; the hidden input is rendered after it regardless. */
   render?: RenderProp<ComponentPropsWithRef<"input">, NumberFieldState>;
@@ -77,6 +84,8 @@ const TEXT_TYPES = ["text", "search", "tel"];
  * `onKeyDown`, `onBlur`, `aria-invalid` and `aria-describedby` (Field, token-merged),
  * `data-pending`, `data-disabled`, `data-invalid`. Defaults the consumer's own prop replaces:
  * `inputMode`, `autoComplete="off"`, `autoCorrect="off"`, `spellCheck={false}`.
+ *
+ * @see https://ui.funstack.work/components/number-field
  */
 export function NumberFieldInput({
   hiddenInputRef,

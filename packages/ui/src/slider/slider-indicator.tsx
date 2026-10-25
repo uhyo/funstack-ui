@@ -6,15 +6,25 @@ import { useRender } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderTrackState } from "./slider-track.js";
 
+/** State of `Slider.Indicator`: the same shape as `SliderTrackState`. */
 export type SliderIndicatorState = SliderTrackState;
 
+/**
+ * Props of `Slider.Indicator`.
+ *
+ * @see https://ui.funstack.work/components/slider
+ */
 export interface SliderIndicatorProps extends Omit<
   ComponentPropsWithRef<"span">,
   "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SliderIndicatorState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SliderIndicatorState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, SliderIndicatorState>;
+  /** Replace the default `<span>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"span">, SliderIndicatorState>;
 }
 
@@ -22,6 +32,8 @@ export interface SliderIndicatorProps extends Omit<
  * The fill between the first and last thumb (from `min` to the value for one thumb). Renders no
  * inline position: the consumer's CSS places it from the Root's inherited `--slider-start` /
  * `--slider-end`. Owned keys: `data-orientation`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/slider
  */
 export function SliderIndicator({
   className,
