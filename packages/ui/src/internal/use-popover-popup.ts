@@ -2,6 +2,8 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
+import { supportsFocusVisibleOption } from "./focus-visible.js";
+import type { QuietFocusTarget } from "./focus-visible.js";
 import {
   commandOf,
   renderOverlayContent,
@@ -46,17 +48,6 @@ export interface UsePopoverPopupOptions {
   readonly source?: () => HTMLElement | null;
 }
 
-/**
- * An initial focus target opened by a pointer: where the engine reads `focus({ focusVisible })`,
- * the library focuses it with `focusVisible: false` right after `showPopover()` instead of
- * writing `autofocus` (WebKit shows the ring for an `autofocus` target after a click).
- * Elsewhere it is an ordinary target.
- */
-export interface QuietFocusTarget {
-  readonly element: HTMLElement;
-  readonly focusVisible: false;
-}
-
 export interface PopoverPopupHook {
   /** Callback ref for the popup element; pass as `useRender`'s `ref`. */
   readonly setElement: (element: HTMLElement) => () => void;
@@ -88,36 +79,6 @@ const isDev = process.env.NODE_ENV !== "production";
 function needsName(element: Element): boolean {
   const role = element.getAttribute("role");
   return role === "dialog" || role === "alertdialog" || role === "menu";
-}
-
-let focusVisibleOption: boolean | undefined;
-
-/**
- * The engine reads the `focusVisible` member of `focus()`'s options (Chromium 145, Firefox 104,
- * Safari 18.4). Detected once through a getter: the bindings convert the dictionary before the
- * method runs, so a detached element is enough and nothing is focused.
- */
-function supportsFocusVisibleOption(doc: Document): boolean {
-  if (focusVisibleOption === undefined) {
-    let read = false;
-    try {
-      doc.createElement("div").focus({
-        get focusVisible() {
-          read = true;
-          return false;
-        },
-      } as FocusOptions);
-    } catch {
-      read = false;
-    }
-    focusVisibleOption = read;
-  }
-  return focusVisibleOption;
-}
-
-/** Tests only: forget the detection, so the next pointer open detects the option again. */
-export function resetFocusVisibleOption(): void {
-  focusVisibleOption = undefined;
 }
 
 /**
@@ -202,41 +163,45 @@ export function usePopoverPopup(
 
   // --- Opening ------------------------------------------------------------------------------
 
-  const resolveFocusTarget = (element: HTMLElement): HTMLElement | QuietFocusTarget | null => {
+  // The initial focus target inside the popup, and whether it is focused without the focus ring.
+  const resolveFocusTarget = (
+    element: HTMLElement,
+  ): { readonly target: HTMLElement; readonly quiet: boolean } | null => {
     if (options.resolveInitialFocus !== undefined) {
       const resolved = options.resolveInitialFocus(element);
       if (resolved === null) return null;
       const target = resolved instanceof HTMLElement ? resolved : resolved.element;
-      return element.contains(target) ? resolved : null;
+      if (!element.contains(target)) return null;
+      // A pointer open asks for no focus ring: `focus({ focusVisible: false })` after the show,
+      // where the engine reads that option (QuietFocusTarget).
+      const quiet =
+        !(resolved instanceof HTMLElement) && supportsFocusVisibleOption(element.ownerDocument);
+      return { target, quiet };
     }
-    return initialFocusTarget(element, initialFocus);
+    const target = initialFocusTarget(element, initialFocus);
+    return target === null ? null : { target, quiet: false };
   };
 
   const showPopup = (element: HTMLElement): void => {
-    const resolved = resolveFocusTarget(element);
-    const target =
-      resolved === null || resolved instanceof HTMLElement ? resolved : resolved.element;
-    // A pointer open asks for no focus ring: `focus({ focusVisible: false })` after the show,
-    // where the engine reads that option (QuietFocusTarget).
-    const quiet =
-      target !== null &&
-      !(resolved instanceof HTMLElement) &&
-      supportsFocusVisibleOption(element.ownerDocument);
+    const focus = resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps
     // for a <dialog>, in every engine); React drops `autoFocus` on client-rendered content.
     // Never `.focus()` (6.1) except for the quiet target above.
-    const added = target !== null && !quiet && !target.hasAttribute("autofocus");
-    if (added) target.setAttribute("autofocus", "");
+    const autofocused =
+      focus !== null && !focus.quiet && !focus.target.hasAttribute("autofocus")
+        ? focus.target
+        : null;
+    autofocused?.setAttribute("autofocus", "");
     opening.current = true;
     try {
       const source = options.source !== undefined ? options.source() : triggerRef.current;
       element.showPopover(source != null && source.isConnected ? { source } : undefined);
     } finally {
       opening.current = false;
-      if (added) target.removeAttribute("autofocus");
+      autofocused?.removeAttribute("autofocus");
     }
-    if (quiet && isPopoverOpen(element) && element.contains(target)) {
-      target.focus({ focusVisible: false } as FocusOptions);
+    if (focus?.quiet === true && isPopoverOpen(element) && element.contains(focus.target)) {
+      focus.target.focus({ focusVisible: false } as FocusOptions);
     }
   };
 
