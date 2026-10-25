@@ -41,12 +41,19 @@ Most of the edit was a codemod (TS compiler API over `src`, with the docs pages'
 the source of defaults) followed by hand edits; discriminated unions (ToggleGroup and Accordion
 `exclusive`) needed hand fixes, as the codemod put the default on both variants.
 
-## Docs vs code findings (not fixed: behaviour/API unchanged)
+## Docs vs code findings
 
-- The root entry `@funstack/ui` does not export `MenuContextTriggerProps` /
-  `MenuContextTriggerState`; `@funstack/ui/menu` does.
-- The docs props table of `Select.Separator` lists `children` (it uses `functionProps`), but
-  `SelectSeparatorProps` omits `children` and the part renders none.
+Fixed on the branch at the PO's request:
+
+- The root entry `@funstack/ui` did not export `MenuContextTriggerProps` /
+  `MenuContextTriggerState` (`@funstack/ui/menu` did). Now exported; `MenuContextTriggerProps`
+  is also registered in `src/__tests__/action-naming.test.ts`, which lists every root Props type.
+- The docs shared one props table between `Select.GroupLabel` and `Select.Separator`, so the
+  Separator appeared to take `children` (the row's note did say "Separator takes no children").
+  Split into two tables; the Separator's has no `children` row.
+
+Left as they are (PO decision):
+
 - Native attributes with a library default (NumberField.Input `inputMode` / `autoComplete` /
   `autoCorrect` / `spellCheck`, NumberField step buttons' `aria-label`, Toast.Viewport
   `aria-label`, Progress.Value `aria-hidden`) have a default in the docs tables but no
