@@ -52,3 +52,15 @@ issue), S8 (dev-131), S10 (#132).
 
 typecheck, lint (one pre-existing warning, menu-submenu-trigger.tsx:136), format:check, build,
 test:jsdom 3364/3364, test:browser Chromium + Firefox 1006 passed / 36 skipped.
+
+## #132 additions (same branch)
+
+- S10 `refactor(ui)!`: `onFocus` in ComboboxInputProps' Omit and owned list; `@ts-expect-error`
+  row plus an `onFocusCapture` passes-through line; ComboboxPage owned list updated.
+- D3 `test(ui)`: Combobox "a CSS exit (recipe=%s)" browser rows (accepted option, type map),
+  mirroring the shared overlay suite; `addExitStyle` imported from overlay-browser-suite.tsx,
+  pseudo-name helpers and the option mount count local (the suite's `countMounts` is not
+  exported). Docs / playground CSS for the recipe (combobox.md amendment) is not done here.
+- Q3 `fix(ui)`: Combobox.Trigger's ref writes `popovertarget` only while `invoker`
+  (`disabledButton`), `invoker` in the deps; `aria-expanded` for non-invokers. jsdom rows and an
+  all-engine browser row; both fail against the old trigger. ComboboxPage Trigger notes updated.
