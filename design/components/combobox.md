@@ -1404,7 +1404,9 @@ packages/ui/src/internal/
 - **Revalidation effect** (6.5): a layout effect after every commit reading the registry;
   `typed()` and the caret keys call `setActive(null)` directly.
 - **Announcement effect**: a passive effect keyed on `[stale, count, query]` that reads the
-  option count and the loading count **from the refs** (6.4, review H1).
+  option count and the loading count **from the refs** (6.4, review H1); speaks through
+  `internal/announce.ts`'s `announce(list, message)` and composes the consumer's `announce` prop
+  only where `canAnnounce(list)` (#129; the Root's own `ariaNotify` call before).
 - **Form reset** (`useComboboxForm`, `use-combobox-form.ts`): `useFormReset(hiddenInputRef or
   inputRef, onReset, onResetEvent)`;
   `onResetEvent` (synchronous, before the reset algorithm) writes the text mirror into the
@@ -1426,8 +1428,9 @@ packages/ui/src/internal/
   input and the popup. `onClick` → `openOnClick`. `onPointerDown` → while
   `popup.matches(":popover-open")` and `button === 0`, `capturePointer(popup, pointerId)` (#123;
   the helper moves from `menu/menu-dom.ts` to `internal/pointer-capture.ts`). **Foreign invokers**
-  (#126): `Combobox.Popup` passes an `onToggle` to `usePopoverPopup` that starts
-  `listenInvokerPresses(popup)` (`internal/invoker-press.ts`, shared with Menu: a document capture
+  (#126): `Combobox.Popup` passes a `whileShown` installer to `usePopoverPopup` (#129; an
+  `onToggle` before) that starts
+  `listenInvokerPresses(popup)` (`internal/invokers.ts`, `invoker-press.ts` before #129, shared with Menu: a document capture
   `mousedown` listener preventing the primary button's default on a `<button>` outside the popup
   whose `popoverTargetElement` / `commandForElement` with a `*-popover` command is the popup) when
   shown and stops it when closed. Composition: ignore
@@ -2238,7 +2241,9 @@ duty (the text revert / custom commit) would have to run or not run on a guess.
 
 Implementation (developer): `combobox-popup.tsx` passes an `onToggle` to `usePopoverPopup` that
 starts `listenInvokerPresses(popup)` (`internal/invoker-press.ts`, shared with Menu) when
-`newState === "open"` and the popup is `:popover-open`, and stops it on `"closed"` and unmount;
+`newState === "open"` and the popup is `:popover-open`, and stops it on `"closed"` and unmount
+(since #129: a `whileShown` installer, the hook owning the same lifecycle, and the module is
+`internal/invokers.ts`);
 `combobox-root.tsx` and `combobox-input.tsx` are unchanged. The docs page's `openChangeAction`
 row gains one sentence as Menu's.
 

@@ -2042,10 +2042,13 @@ packages/ui/src/
     content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
     use-exit-animation.ts   # held content while an exit animates (popover.md 4.4)
     popover-open.ts         # isPopoverOpen(element); directive-free
+    invokers.ts             # eventSource, closedByPopoverTarget, isPopoverInvoker, listenInvokerPresses (popover.md 14.2, menu.md #126); directive-free; `invoker-press.ts` before #129
+    focus-visible.ts        # QuietFocusTarget, supportsFocusVisibleOption, resetFocusVisibleOption (popover.md 6.1); directive-free (#129)
+    announce.ts             # announce(target, message, priority?), canAnnounce(target) (section 8, number-field.md 8.3); directive-free (#129)
     anchor-position.ts      # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free
     use-resolved-placement.ts  # useResolvedPlacement, useAnchoredPlacement (13.2)
     shipped-styles.ts       # FSUI_PRECEDENCE (section 12); directive-free
-    use-hydrated-mount.ts, use-register-count.ts, use-delayed-pair.ts, use-until-found.ts, use-modal-registration.ts, modal-registry.ts, announce.ts, decimal.ts, range-value.ts, csp-context.ts, tooltip-warm.ts, form-status-watcher.tsx
+    use-hydrated-mount.ts, use-register-count.ts, use-delayed-pair.ts, use-until-found.ts, use-modal-registration.ts, modal-registry.ts, decimal.ts, range-value.ts, csp-context.ts, tooltip-warm.ts, form-status-watcher.tsx
   __tests__/
     vitest.setup.ts
     helpers.tsx             # section 10

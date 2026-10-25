@@ -823,8 +823,8 @@ as Dialog's: the library writes `autofocus` on the resolved element right before
 and removes it after; it never calls `.focus()` on open, with **one exception**: a
 `resolveInitialFocus` resolver (Menu) may return a `QuietFocusTarget`
 (`{ element, focusVisible: false }`) for a pointer-initiated open, and where the engine reads
-the `focusVisible` option (a getter probe on a detached element; Chromium 145, Firefox 104,
-Safari 18.4) the hook skips the `autofocus` write and calls `element.focus({ focusVisible:
+the `focusVisible` option (a getter probe on a detached element, `internal/focus-visible.ts`;
+Chromium 145, Firefox 104, Safari 18.4) the hook skips the `autofocus` write and calls `element.focus({ focusVisible:
 false })` right after `showPopover()` instead, so a mouse open does not paint a focus ring on the
 item (Menu 6.1, review H1). Elsewhere the `autofocus` path runs as before. `initialFocus` itself
 never takes this path.
@@ -1497,12 +1497,18 @@ the popup is still open a task later; Dialog passes `dialog.open`), and:
 ### 14.2 `usePopoverPopup(ctx, options)` (shared)
 
 Everything in the Popup except rendering. `options`: `{ part, initialFocus?, resolveInitialFocus?,
-keepMounted?, transition, onBeforeToggle?, onToggle?, source? }` (the optional hooks are for Menu:
+keepMounted?, transition, whileShown?, source? }` (the optional hooks are for Menu and Combobox:
 `resolveInitialFocus(popup)` replaces `initialFocus` with a function called right before each
 library open, no `cause` argument since the open cause is Menu's own ref; it returns an element,
 `null`, or a `QuietFocusTarget` `{ element, focusVisible: false }` that is focused with
 `focus({ focusVisible: false })` after `showPopover()` where the option is implemented (6.1);
-`onToggle` closes the stack on Tab-out). Returns `{ setElement (callback ref), visible,
+`whileShown(popup)` installs listeners that live while the popup is shown and returns their
+cleanup: called at the `toggle` that finds the popup shown, cleaned up at the closing `toggle` and
+when the element detaches (Menu: the outside listeners and the foreign-invoker press guard;
+Combobox: the guard; #129, replacing the `onToggle` / `onBeforeToggle` callbacks). The
+`focusVisible` probe behind `QuietFocusTarget` lives in `internal/focus-visible.ts` (#129); event
+sources and invoker relationships (`eventSource`, `closedByPopoverTarget`, `isPopoverInvoker`,
+`listenInvokerPresses`) in `internal/invokers.ts`). Returns `{ setElement (callback ref), visible,
 renderContent, reshow }`; nothing with a ref inside the returned object (React Compiler's ref inference would flag every member once one
 is passed as `ref`; consumers destructure). Effects and listeners:
 
@@ -1569,7 +1575,7 @@ is passed as `ref`; consumers destructure). Effects and listeners:
    Trigger mounts while one is registered. Shared by `usePopoverTrigger` (Popover, Menu,
    submenus), `Dialog.Trigger` and `Combobox.Input`.
 
-### 14.3 `usePopoverTrigger(ctx, { part, disabled, render, handlers?, activate?, disabledAs? })` (shared)
+### 14.3 `usePopoverTrigger(ctx, { part, disabled, render, handlers?, activate?, beforeOpen?, disabledAs? })` (shared)
 
 Returns `{ state, libraryProps, ref }`: `type` via `rendersButton`, `popoverTarget` (the Popup's
 id, on a `<button>` or component render only; the typed camelCase prop, #121), `disabled` (owned, through `disabledButton(render, disabled, { handlesClick:
@@ -1579,7 +1585,12 @@ or for a JS-free activation, else `aria-disabled` with `popoverTarget` withheld)
 `dispatch(!intended())` through `requestOpen` / `requestClose`), `data-open`, `data-pending`,
 `data-disabled`; the callback ref writes `triggerRef` and warns for a non-button in JS-free mode.
 Menu adds `aria-haspopup="menu"` and its own `onKeyDown` (ArrowDown / ArrowUp open with the
-first / last item focused) on top.
+first / last item focused) on top. `activate` replaces the default toggle (SubmenuTrigger: open
+or move focus in, never close); `beforeOpen` runs right before the default toggle's `requestOpen`
+(Menu.Trigger records the open cause there and keeps the default toggle, #129). The module also
+exports `RESERVED_INVOKER_KEYS` (`popoverTargetAction`, `commandfor`, `command` as owned
+`undefined`) and `nonInvokerMessage(part, tag, popover, popup)`, the library-mode non-button
+warning, which `Combobox.Trigger` reuses (#129).
 
 ### 14.4 Rendering (Popup)
 
@@ -1829,8 +1840,9 @@ a `render={<a href="#" />}` Trigger with an async `openChangeAction`, real mouse
 degraded shape, next to #110's `<button>` row that asserts the awaited one.
 
 Review follow-ups (#115 review, PO decisions, 2026-10-24): F3, the shared hook's library-mode
-warning has a SubmenuTrigger text (option `opensOnly`; not `activate !== undefined`, which
-Menu.Trigger also passes): a press on a non-button SubmenuTrigger while its submenu is open
+warning has a SubmenuTrigger text (keyed on `activate !== undefined`: since #129 Menu.Trigger
+passes `beforeOpen` and keeps the default toggle, so only SubmenuTrigger passes `activate`; the
+interim `opensOnly` option is gone): a press on a non-button SubmenuTrigger while its submenu is open
 dismisses the submenu instead of moving focus into it (menu.md element constraints). F4, the
 overlay Triggers and Close parts render `commandfor` / `command` only on a `<button>` or a
 component render (`invoker && rendersButton(render)` at each call site; `disabledButton().invoker`

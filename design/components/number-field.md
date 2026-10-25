@@ -1006,9 +1006,10 @@ fallbacks), and in `document.body` it was inert under a modal dialog, so it was 
 Known gap (BCD): ChromeOS exposes `ariaNotify` but never speaks it; the feature-detected
 fallback would not have run there either.
 
-`null` from `announce` announces nothing. Combobox keeps its own `ariaNotify` call and
-`focus-first-invalid.ts` its own `announce` in v1; moving them onto `announce.ts` would only
-remove the duplicated `ariaNotify` call (the optional follow-up in issue #77), not a design change.
+`null` from `announce` announces nothing. Combobox kept its own `ariaNotify` call and
+`focus-first-invalid.ts` its own `announce` at first; #129 moved them (and Toast) onto
+`announce.ts`, now directive-free with one `announce(target: Element | Document, message,
+priority?)` plus `canAnnounce(target)` (the optional follow-up of issue #77; not a design change).
 
 ### 8.4 The two built-in strings
 
@@ -1157,8 +1158,8 @@ step transition) can key a type map on them. A rollback carries no types.
 - **Wheel commit coalescing** (4.4).
 - **Validity that follows the draft** (6.2, the open question at the end).
 - **The browser rows of #77** (touch hold, IME, the CDP console check, the rejected-commit
-  `startViewTransition` case) and the optional migration of Combobox and
-  `focus-first-invalid.ts` onto `internal/announce.ts`.
+  `startViewTransition` case); the migration of Combobox and `focus-first-invalid.ts` onto
+  `internal/announce.ts` is done (#129).
 - **Formatting the draft while typing** (live grouping): a formatter under the caret is what
   the draft design avoids.
 
@@ -1253,7 +1254,7 @@ packages/ui/src/number-field/
 packages/ui/src/internal/
   decimal.ts                      # no directive: decimalsOf / gridDecimals / roundTo, shared with Slider
   use-superseded-rejection.ts     # conventions 2.4: called once in the Root, passed as `captureSuperseded` to both hooks
-  announce.ts                     # "use client": announce(element, message): ariaNotify only (the fallback live region was dropped, #113 A1)
+  announce.ts                     # directive-free (#129): announce(target, message, priority?) and canAnnounce(target): ariaNotify only (the fallback live region was dropped, #113 A1); shared with Combobox, focus-first-invalid and Toast
   field-context.ts                # FieldControlRegistration gains `validityElement?: () => ValidatableElement | null`
   use-field-control.ts            # the option, passed through to registerControl
   ../field/field-root.tsx         # reads validity / writes the slot on the validity element, `:user-invalid` on the element, mirrors after the slot write
@@ -1341,7 +1342,7 @@ deviation the reviewer accepted; none is corrected here.
 | N4 | **The fallback region was written in the task it was inserted** and a repeated text was not a change. It is cleared, written 100 ms later and cleared after a second. Superseded by #113 A1: the fallback region was dropped. | 8.3, 14.1, 15 |
 | N5 | `onCompositionStart` / `onCompositionEnd` pass through `NumberField.Input` (the library installs neither); the details JSDoc and the docs say `event` is `undefined` on hold repeats and at a bound-ended hold. | 1, 2.4, 3.2, 14.1 |
 | Deviations 1 to 11 | Accepted by the reviewer and folded: (1) End → the largest grid point `≤ max`; (2) an empty value skips the against-direction rule; (3) the hydration re-sync writes `visible.value` directly; (4) no hidden-input registry, refs through context with `onItemMounted`; (5) the parser's affix-level leniencies and bidi stripping; (6) `event` undefined on hold ticks; (7) Ctrl / Meta combinations not handled; (8) `deltaY === 0` ignored; (9) a consumer `aria-labelledby` omits the default `aria-label`; (10) a commit while `disabled` / `readOnly` clears the draft; (11) the percent test row needs `maximumFractionDigits: 1` for `0.5 → 0.005`. | 4.1, 4.2, 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 6.1, 8.4, 14.1 |
-| Reports | **Firefox's bubble and `:user-invalid` persist while the user types a fix** (validity follows the committed value): recorded as a known difference in 6.2 with an open question below, no change now. **Implicit submission needs a submit button** (the hidden number input is a second field): correct platform behaviour, documented in 4.1 and on the docs page. **The Field layout shift under a click** is a property of every Field control; the Field docs page notes it, the rows tab out first. **Combobox and `focus-first-invalid.ts` keep their own announcements**; migrating them onto `announce.ts` is the optional part of #77. | 4.1, 6.2, 8.3, 14.2 |
+| Reports | **Firefox's bubble and `:user-invalid` persist while the user types a fix** (validity follows the committed value): recorded as a known difference in 6.2 with an open question below, no change now. **Implicit submission needs a submit button** (the hidden number input is a second field): correct platform behaviour, documented in 4.1 and on the docs page. **The Field layout shift under a click** is a property of every Field control; the Field docs page notes it, the rows tab out first. **Combobox and `focus-first-invalid.ts` keep their own announcements**; migrating them onto `announce.ts` is the optional part of #77 (done at #129). | 4.1, 6.2, 8.3, 14.2 |
 
 ## Open question (resolved)
 

@@ -1221,8 +1221,10 @@ packages/ui/src/internal/
   keyboard or programmatic move reaches the Trigger through `focusout` (#110). A `mousedown` on a
   foreign invoker of the root popup (`popoverTargetElement === popup`, or
   `commandForElement === popup` with a `*-popover` command) is prevented the same way by a
-  document capture listener the root Popup starts in `onToggle` next to `listenOutside` and stops
-  on close (`internal/invoker-press.ts`, shared with Combobox, #126).
+  document capture listener the root Popup installs through `usePopoverPopup`'s `whileShown`
+  next to `listenOutside`, cleaned up at the closing `toggle` and on detach
+  (`internal/invokers.ts`, shared with Combobox, #126; `invoker-press.ts` and the `onToggle`
+  callback before #129).
 - **Hover intent.** In `SubmenuTrigger`: `pointerenter` (not `touch`) → `timers.open(delay, () =>
   requestOpen(event, "activate"))`; `pointerleave` → `timers.close(closeDelay, maybeClose)`;
   the submenu Popup's `pointerenter` → `timers.cancelClose()`, `pointerleave` → `timers.close`;
@@ -1548,13 +1550,15 @@ from a Tab at `focusout` time (true on both engines) but does not fix the drag-o
 documenting it. The pattern is one the library classifies on purpose (#125, whose Menu browser row
 had to prevent the button's `mousedown` by hand), and a flicker plus a re-open is a bug.
 
-Implementation (developer): `src/internal/invoker-press.ts` (directive-free):
+Implementation (developer): `src/internal/invoker-press.ts` (directive-free; renamed
+`src/internal/invokers.ts` at #129, where `eventSource` and `closedByPopoverTarget` joined it):
 `isPopoverInvoker(target: EventTarget | null, popup: HTMLElement): boolean` (closest `<button>`,
 outside the popup, `popoverTargetElement === popup` or `commandForElement === popup` with
 `/-popover$/.test(command)`; absent IDL means the engine has no such invoker, so `false`) and
 `listenInvokerPresses(popup): () => void` (the capture `mousedown` listener on
 `popup.ownerDocument`, cleanup returned). `menu-popup.tsx`: in the existing `onToggle`, start it
-with `listenOutside` and stop it with `stopOutside()` (root only). `Menu.Popup`'s doc comment and
+with `listenOutside` and stop it with `stopOutside()` (root only; since #129 both are installed
+by the `whileShown` function `usePopoverPopup` calls while the popup is shown). `Menu.Popup`'s doc comment and
 the docs page's `openChangeAction` row gain one sentence: a consumer's own `popovertarget` /
 `commandfor` button for the popup closes it as `"activate"` and never moves focus out of the menu.
 
