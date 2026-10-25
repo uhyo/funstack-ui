@@ -29,6 +29,17 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          <strong>Breaking (types):</strong> <code>Combobox.Input</code> owns <code>onFocus</code>,
+          which is no longer in its props type; use <code>onFocusCapture</code> to react to focus (
+          <a href={issue(132)}>#132</a>).
+        </li>
+        <li>
+          A <code>Combobox.Trigger</code> that is disabled but stays focusable (a component{" "}
+          <code>render</code> with <code>aria-disabled</code>) is no invoker, like the other overlay
+          Triggers: it renders <code>aria-expanded</code> and no <code>popovertarget</code>, and
+          pressing it while the listbox is shown light-dismisses it (<a href={issue(132)}>#132</a>).
+        </li>
+        <li>
           A Popover opened by an <code>interestfor</code> button that is not its Trigger (Chromium)
           hides when interest is lost, reported as <code>"dismiss"</code> (
           <a href={issue(127)}>#127</a>).
