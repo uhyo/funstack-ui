@@ -124,6 +124,7 @@ type PublicProps = {
   FormRootProps: UI.FormRootProps;
   FormSubmitProps: UI.FormSubmitProps;
   MenuCheckboxItemProps: UI.MenuCheckboxItemProps;
+  MenuContextTriggerProps: UI.MenuContextTriggerProps;
   MenuGroupLabelProps: UI.MenuGroupLabelProps;
   MenuGroupProps: UI.MenuGroupProps;
   MenuItemProps: UI.MenuItemProps;
@@ -237,6 +238,7 @@ const listedKeys = {
   FormRootProps: true,
   FormSubmitProps: true,
   MenuCheckboxItemProps: true,
+  MenuContextTriggerProps: true,
   MenuGroupLabelProps: true,
   MenuGroupProps: true,
   MenuItemProps: true,

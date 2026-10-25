@@ -159,6 +159,8 @@ export type {
   MenuSeparatorState,
   MenuSubmenuTriggerProps,
   MenuSubmenuTriggerState,
+  MenuContextTriggerProps,
+  MenuContextTriggerState,
 } from "./menu/index.js";
 
 export { RadioGroup } from "./radio-group/index.js";
