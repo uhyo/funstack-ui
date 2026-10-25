@@ -26,11 +26,7 @@ import { Suspense, use } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
-import {
-  anchorPositionHonoursParentDirection,
-  browserName,
-  supportsAriaNotify,
-} from "../__tests__/engine.js";
+import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
 import { axProperty, expectInvokerExpanded, getAXNodes } from "../__tests__/ax-tree.js";
 import { deferred, PlainButton } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
@@ -58,6 +54,7 @@ import {
   sleep,
 } from "../__tests__/browser-helpers.js";
 import { centre, mouse, toPagePoint } from "../__tests__/browser-commands.js";
+import { expectInlineEdges } from "../__tests__/placement-browser.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -180,16 +177,7 @@ describe("Combobox (browser)", () => {
       const i = input().getBoundingClientRect();
       const p = popup().getBoundingClientRect();
       expect(Math.abs(p.top - i.bottom)).toBeLessThanOrEqual(1);
-      if (anchorPositionHonoursParentDirection) {
-        expect(Math.abs(p.right - i.right)).toBeLessThanOrEqual(1);
-      } else {
-        // Firefox (Mozilla 2019601, #89): the popup's parent box has a direction different from
-        // the root's, so the inline alignment inside the cell is mirrored; no workaround ships
-        // (conventions 13.3). The listbox meets neither input edge. When this fails, the bug is
-        // fixed: delete this branch.
-        expect(Math.abs(p.right - i.right)).toBeGreaterThan(1);
-        expect(Math.abs(p.left - i.left)).toBeGreaterThan(1);
-      }
+      expectInlineEdges(popup(), input(), ["right", "right"]);
       // No resolved-placement observer on the listbox (design 7.2).
       expect(popup()).not.toHaveAttribute("data-side");
     });

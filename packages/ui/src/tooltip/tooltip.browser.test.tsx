@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { centre, mouse } from "../__tests__/browser-commands.js";
 import {
-  anchorPositionHonoursParentDirection,
   pressFocusesButtons,
   supportsInterestFor,
   supportsPopoverHint,
@@ -18,9 +17,11 @@ import {
 } from "../__tests__/engine.js";
 import {
   actPoll,
+  expectInlineEdges,
   frames,
   near,
   placedSide,
+  scrollContainerTo,
   withPageDirection,
 } from "../__tests__/placement-browser.js";
 import { Tooltip } from "./index.js";
@@ -623,17 +624,7 @@ describe("Tooltip (browser)", () => {
       );
       const scroller = screen.getByTestId("scroller");
       const placedOn = () => placedSide(popup(), trigger());
-      /** Scrolls the container and lets the engine lay out the frame after the `scroll` event. */
-      const scrollTo = async (top: number) => {
-        const scrolled = new Promise((resolve) =>
-          scroller.addEventListener("scroll", resolve, { once: true }),
-        );
-        await act(async () => {
-          scroller.scrollTop = top;
-          await scrolled;
-        });
-        await frames();
-      };
+      const scrollTo = (top: number) => scrollContainerTo(scroller, top);
 
       await show();
       await frames();
@@ -727,34 +718,17 @@ describe("Tooltip (browser)", () => {
       await show();
       // The side is read from the keywords and the popup's direction, so it is right everywhere.
       await actPoll(side, "left");
-      let t = trigger().getBoundingClientRect();
-      let p = popup().getBoundingClientRect();
-      if (anchorPositionHonoursParentDirection) {
-        expect(near(p.right, t.left)).toBe(true);
-      } else {
-        // Firefox (Mozilla 2019601, #89): the popup's parent box has a direction different from
-        // the root's, so the inline alignment inside the cell is mirrored; no workaround ships
-        // (conventions 13.3). The popup meets neither trigger edge. When this fails, the bug is
-        // fixed: delete this branch.
-        expect(near(p.right, t.left)).toBe(false);
-        expect(near(p.left, t.right)).toBe(false);
-      }
+      expectInlineEdges(popup(), trigger(), ["right", "left"]);
       unmount();
 
       render(<Placed dir="rtl" popup={{ side: "bottom", align: "start" }} />);
       await show();
       await frames();
       expect(side()).toBe("bottom");
-      t = trigger().getBoundingClientRect();
-      p = popup().getBoundingClientRect();
+      const t = trigger().getBoundingClientRect();
+      const p = popup().getBoundingClientRect();
       expect(near(p.top, t.bottom)).toBe(true);
-      if (anchorPositionHonoursParentDirection) {
-        expect(near(p.right, t.right)).toBe(true);
-      } else {
-        // Mozilla 2019601, as above.
-        expect(near(p.right, t.right)).toBe(false);
-        expect(near(p.left, t.left)).toBe(false);
-      }
+      expectInlineEdges(popup(), trigger(), ["right", "right"]);
     });
   });
   // wave 11, #21

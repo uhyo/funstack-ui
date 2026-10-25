@@ -36,6 +36,7 @@ import {
 } from "../__tests__/engine.js";
 import {
   actPoll,
+  expectInlineEdges,
   frames,
   near,
   placedSide,
@@ -747,16 +748,9 @@ describe("Menu (browser)", () => {
     async function expectRtlMenus(mirrored: boolean): Promise<void> {
       await openWithKeyboard();
       const t = trigger().getBoundingClientRect();
-      let p = popup().getBoundingClientRect();
+      const p = popup().getBoundingClientRect();
       expect(near(p.top, t.bottom)).toBe(true);
-      if (mirrored) {
-        expect(near(p.right, t.right)).toBe(true);
-      } else {
-        // Firefox (Mozilla 2019601, #89): the inline alignment is mirrored inside a direction
-        // island; no workaround ships (conventions 13.3). Delete this branch once it fails.
-        expect(near(p.right, t.right)).toBe(false);
-        expect(near(p.left, t.left)).toBe(false);
-      }
+      expectInlineEdges(popup(), trigger(), ["right", "right"], mirrored);
       expect(popup()).toHaveAttribute("data-align", "start");
       await user.keyboard("{ArrowDown}{ArrowLeft}");
       await flushFor();
@@ -774,15 +768,8 @@ describe("Menu (browser)", () => {
       }
       const m = item("move").getBoundingClientRect();
       const s = sub().getBoundingClientRect();
-      p = popup().getBoundingClientRect();
       expect(near(s.top, m.top)).toBe(true);
-      if (mirrored) {
-        expect(near(s.right, m.left)).toBe(true);
-      } else {
-        // Mozilla 2019601, as above: the submenu meets neither edge of its item.
-        expect(near(s.right, m.left)).toBe(false);
-        expect(near(s.left, m.right)).toBe(false);
-      }
+      expectInlineEdges(sub(), item("move"), ["right", "left"], mirrored);
       // ArrowRight closes it in RTL; the attribute is the requested side again.
       await user.keyboard("{ArrowRight}");
       await expect.poll(() => isOpen(sub())).toBe(false);

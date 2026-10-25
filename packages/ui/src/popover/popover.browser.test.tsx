@@ -25,7 +25,6 @@ import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
 import { centre, mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import {
-  anchorPositionHonoursParentDirection,
   browserName,
   pressFocusesButtons,
   supportsInterestFor,
@@ -33,9 +32,11 @@ import {
 } from "../__tests__/engine.js";
 import {
   actPoll,
+  expectInlineEdges,
   frames,
   near,
   placedSide,
+  scrollContainerTo,
   withPageDirection,
 } from "../__tests__/placement-browser.js";
 import { deferred, silenceErrors } from "../__tests__/helpers.js";
@@ -1066,21 +1067,8 @@ describe("Popover (browser)", () => {
         </div>,
       );
       const scroller = screen.getByTestId("scroller");
-      const placedOn = () => {
-        const t = trigger().getBoundingClientRect();
-        const p = popup().getBoundingClientRect();
-        return p.top >= t.bottom - 1 ? "bottom" : p.bottom <= t.top + 1 ? "top" : "overlapping";
-      };
-      const scrollTo = async (top: number) => {
-        const scrolled = new Promise((resolve) =>
-          scroller.addEventListener("scroll", resolve, { once: true }),
-        );
-        await act(async () => {
-          scroller.scrollTop = top;
-          await scrolled;
-        });
-        await frames();
-      };
+      const placedOn = () => placedSide(popup(), trigger());
+      const scrollTo = (top: number) => scrollContainerTo(scroller, top);
       // The Trigger 100 px into the scroller (300 px tall, at the viewport's bottom): room below.
       await scrollTo(400);
       await openPlaced();
@@ -1147,19 +1135,10 @@ describe("Popover (browser)", () => {
       await openPlaced();
       await frames();
       expect(popup()).toHaveAttribute("data-align", "start");
-      let t = trigger().getBoundingClientRect();
-      let p = popup().getBoundingClientRect();
+      const t = trigger().getBoundingClientRect();
+      const p = popup().getBoundingClientRect();
       expect(near(p.top, t.bottom)).toBe(true);
-      if (anchorPositionHonoursParentDirection) {
-        expect(near(p.right, t.right)).toBe(true);
-      } else {
-        // Firefox (Mozilla 2019601, #89): the popup's parent box has a direction different from
-        // the root's, so the inline alignment inside the cell is mirrored; no workaround ships
-        // (conventions 13.3). Its inline edges meet neither Trigger edge. When this fails, the bug
-        // is fixed: delete this branch.
-        expect(near(p.right, t.right)).toBe(false);
-        expect(near(p.left, t.left)).toBe(false);
-      }
+      expectInlineEdges(popup(), trigger(), ["right", "right"]);
       await closePlaced();
       unmount();
 
@@ -1167,15 +1146,7 @@ describe("Popover (browser)", () => {
       await openPlaced();
       // The side comes from the keywords and the popup's direction: right in every engine.
       await actPoll(side, "left");
-      t = trigger().getBoundingClientRect();
-      p = popup().getBoundingClientRect();
-      if (anchorPositionHonoursParentDirection) {
-        expect(near(p.right, t.left)).toBe(true);
-      } else {
-        // Mozilla 2019601, as above.
-        expect(near(p.right, t.left)).toBe(false);
-        expect(near(p.left, t.right)).toBe(false);
-      }
+      expectInlineEdges(popup(), trigger(), ["right", "left"]);
       await closePlaced();
     });
   });
