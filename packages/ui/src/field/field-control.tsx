@@ -26,15 +26,17 @@ export interface FieldControlProps extends Omit<
    */
   name?: string;
   /**
-   * Native `disabled`; the Field's `disabled` also disables the control. Owned.
+   * Native `disabled`. Owned. Also `true` when the Field is disabled: an explicit `false` does not
+   * override the Field.
    *
-   * @defaultValue the Field's `disabled`
+   * @defaultValue `false`
    */
   disabled?: boolean;
   /**
-   * Native `required`; the Field's `required` also requires the control. Owned.
+   * Native `required`. Owned. Also `true` when the Field is required: an explicit `false` does not
+   * override the Field.
    *
-   * @defaultValue the Field's `required`
+   * @defaultValue `false`
    */
   required?: boolean;
   /** Class name, or a function of the part's state that returns one. */
