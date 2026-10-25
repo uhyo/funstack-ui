@@ -2,29 +2,36 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Callout } from "../components/Callout.js";
 import { Example } from "../components/Example.js";
 import { PageHead } from "../components/PageHead.js";
+import { inline } from "../components/Tables.js";
 import { componentNavItems } from "../navigation.js";
 import { ToggleFavorite } from "../examples/ToggleFavorite.js";
 
-const principles = [
+// The six principles of docs/vision.md, linked to the page that explains each where there is one.
+const principles: { title: string; body: string; href?: string }[] = [
   {
     title: "Suspense-native",
-    body: "Content that suspends is the normal case. Panels keep the old content on screen while the new content loads; no fallback flashes.",
+    body: "Content that suspends is the normal case. The old content stays on screen while the new content loads.",
+    href: "/concepts/suspense",
   },
   {
     title: "Transition by default",
-    body: "Every state change the library makes is a React transition. You do not opt in; urgent updates would be the opt-out.",
+    body: "Every state change the library makes is a React transition. You do not opt in.",
+    href: "/concepts/transitions",
   },
   {
     title: "Action props, not event handlers",
-    body: "Interactive props are actions (pressedChangeAction, valueChangeAction). They may be async; the component awaits them and shows pending state.",
+    body: "Pass an async function (`pressedChangeAction`, `valueChangeAction`); the component shows the new value at once and `data-pending` until it is done.",
+    href: "/concepts/action-props",
   },
   {
     title: "<ViewTransition> built in",
-    body: "Every part whose content is driven by library state takes a transition prop. Pass it and the part renders a <ViewTransition>, so the change animates.",
+    body: "Give a part a `transition` prop and its changes animate with React's `<ViewTransition>`.",
+    href: "/concepts/transitions#transition-prop",
   },
   {
     title: "Greedy about the platform",
-    body: "Popover API, CSS Anchor Positioning, <dialog> with Invoker Commands, native form controls, <details name>, hidden=until-found, ::details-content, interestfor. Where HTML can do the job, it does.",
+    body: "Popover API, `<dialog>`, CSS Anchor Positioning, `<details>`, native form controls. Where HTML can do the job, it does.",
+    href: "/concepts/browser-owned-state",
   },
   {
     title: "Accessibility is not optional",
@@ -44,62 +51,61 @@ export function HomePage() {
         </p>
         <img src="/FUNSTACK_UI_Hero_small.png" alt="FUNSTACK UI" className="hero-image" />
         <div className="hero-buttons">
-          <a href="/getting-started" className="button primary">
-            Get started
+          <a href="/why" className="button primary">
+            Why FUNSTACK UI
           </a>
-          <a href="/concepts/action-props" className="button secondary">
-            Learn the concepts
+          <a href="/getting-started" className="button secondary">
+            Get started
           </a>
         </div>
       </section>
 
       <Callout kind="warning" title="Experimental">
         <p>
-          FUNSTACK UI is experimental. APIs change without notice; releases are published on npm
-          under the <code>alpha</code> dist-tag. Feedback and issues are welcome on{" "}
-          <a href="https://github.com/uhyo/funstack-ui/issues">GitHub</a>.
+          APIs change without notice. Releases are on npm under the <code>alpha</code> dist-tag.
+          Feedback is welcome on <a href="https://github.com/uhyo/funstack-ui/issues">GitHub</a>.
         </p>
       </Callout>
 
-      <h2>What it is</h2>
+      <h2>Try it</h2>
       <p>
-        React 19 gave us transitions, actions, <code>useOptimistic</code>, Suspense for data and{" "}
-        <code>&lt;ViewTransition&gt;</code>. Component libraries still mostly hand you{" "}
-        <code>onClick</code> and <code>onChange</code> and leave the rest to you. FUNSTACK UI starts
-        from the other end: the component owns the transition, shows the optimistic state right
-        away, exposes the pending state as a data attribute, and keeps suspending content on screen
-        until it is ready.
-      </p>
-      <p>
-        Click the button below. The star flips at once, the button shows a spinner while the fake
-        save runs, and clicking again while it is pending simply wins.
+        The star flips at once, the button shows a spinner while the fake save runs, and a second
+        click while it is pending wins. The code is one <code>Toggle</code> with an async action.
       </p>
       <Example file="ToggleFavorite.tsx" css="toggle.css">
         <ToggleFavorite />
       </Example>
       <p>
-        The components are headless: they render accessible HTML with data attributes and no styles.
-        You bring the CSS.
+        The components are headless: accessible HTML with data attributes, no styles. You bring the
+        CSS. <a href="/why">Why FUNSTACK UI</a> shows what this saves you.
       </p>
 
       <h2>Principles</h2>
-      <ul className="principles">
+      <ul className="card-list">
         {principles.map((p) => (
           <li key={p.title}>
-            <h3>{p.title}</h3>
-            <p>{p.body}</p>
+            <h3>{p.href === undefined ? p.title : <a href={p.href}>{p.title}</a>}</h3>
+            <p>{inline(p.body)}</p>
           </li>
         ))}
       </ul>
 
-      <h2>Browser support</h2>
+      <h2>Install</h2>
+      <CodeBlock language="bash">{`npm install @funstack/ui@alpha`}</CodeBlock>
       <p>
-        <strong>
-          The latest stable version of each major engine (Blink, WebKit, Gecko). No fallbacks.
-        </strong>{" "}
-        Being modern is the point. Platform features that have not shipped in all three engines are
-        still used, but only behind <code>experimental_*</code> props that you opt into per call
-        site. See <a href="/concepts/experimental">Experimental features</a>.
+        React 19.3 or later. Supported browsers:{" "}
+        <strong>the latest stable Blink, WebKit and Gecko. No fallbacks.</strong> Platform features
+        not yet in all three are opt-in <a href="/concepts/experimental">experimental props</a>.
+      </p>
+      <p>
+        Components:{" "}
+        {componentNavItems.map((item, i) => (
+          <span key={item.path}>
+            {i > 0 && (i === componentNavItems.length - 1 ? " and " : ", ")}
+            <a href={item.path}>{item.label}</a>
+          </span>
+        ))}
+        . More are coming; see the <a href="/roadmap">roadmap</a>.
       </p>
 
       <h2>The FUNSTACK family</h2>
@@ -116,19 +122,6 @@ export function HomePage() {
           static site framework. This site is built with it.
         </li>
       </ul>
-
-      <h2>Components</h2>
-      <p>
-        The component pages so far:{" "}
-        {componentNavItems.map((item, i) => (
-          <span key={item.path}>
-            {i > 0 && (i === componentNavItems.length - 1 ? " and " : ", ")}
-            <a href={item.path}>{item.label}</a>
-          </span>
-        ))}
-        . A larger set follows; see the <a href="/roadmap">roadmap</a>.
-      </p>
-      <CodeBlock language="bash">{`npm install @funstack/ui@alpha`}</CodeBlock>
     </div>
   );
 }
