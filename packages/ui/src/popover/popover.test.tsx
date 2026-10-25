@@ -690,6 +690,19 @@ describe("Popover", () => {
       expect(details.event!.type).toBe("command");
     });
 
+    it("a foreign command name is matched case-insensitively (as the platform's)", async () => {
+      const action = vi.fn<ActionFn>();
+      const user = setupUser();
+      render(<Harness mode={mode} action={action} />);
+      await openThroughTrigger(user);
+      await act(async () => {
+        dispatchCommand(popup(), "Hide-Popover", screen.getByTestId("elsewhere"));
+        popup().hidePopover();
+      });
+      await flushTasks(2);
+      expect(action.mock.calls[1]![1].reason).toBe("activate");
+    });
+
     // #125
     it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent", async () => {
       const user = setupUser();
@@ -2324,35 +2337,6 @@ describe("Popover", () => {
       await user.click(trigger());
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-    });
-  });
-
-  describe("invoker shim", () => {
-    it("dispatchCommand drives a foreign command event", async () => {
-      const action = vi.fn<ActionFn>();
-      const user = setupUser();
-      render(<Harness mode="uncontrolled" action={action} />);
-      await openThroughTrigger(user);
-      await act(async () => {
-        const event = dispatchCommand(popup(), "hide-popover", screen.getByTestId("elsewhere"));
-        expect(event.defaultPrevented).toBe(false);
-        popup().hidePopover();
-      });
-      await flushTasks(2);
-      expect(action.mock.calls[1]![1].reason).toBe("activate");
-    });
-
-    it("the command name is matched case-insensitively (as the platform's)", async () => {
-      const action = vi.fn<ActionFn>();
-      const user = setupUser();
-      render(<Harness mode="uncontrolled" action={action} />);
-      await openThroughTrigger(user);
-      await act(async () => {
-        dispatchCommand(popup(), "Hide-Popover", screen.getByTestId("elsewhere"));
-        popup().hidePopover();
-      });
-      await flushTasks(2);
-      expect(action.mock.calls[1]![1].reason).toBe("activate");
     });
   });
 });
