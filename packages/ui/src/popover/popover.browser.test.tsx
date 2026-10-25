@@ -22,7 +22,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
-import { mouse } from "../__tests__/browser-commands.js";
+import { centre, mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import {
   anchorPositionHonoursParentDirection,
@@ -704,16 +704,6 @@ describe("Popover (browser)", () => {
     // #117: real presses with real timing while both are open (design 7: a press inside the outer
     // popup is outside the inner one; the inner Trigger is the inner popup's invoker).
     describe("a real press while both are open", () => {
-      async function pressOn(target: Element) {
-        const box = target.getBoundingClientRect();
-        const x = Math.round(box.left + box.width / 2);
-        const y = Math.round(box.top + box.height / 2);
-        await mouse.down(x, y);
-        await sleep(20);
-        await mouse.up(x, y);
-        await sleep(20);
-      }
-
       it("the inner Trigger: the inner popup's close is awaited ('activate'); the outer stays", async () => {
         const work = deferred();
         const action = vi.fn<ActionFn>();
@@ -723,7 +713,7 @@ describe("Popover (browser)", () => {
         const outerCalls = action.mock.calls.length;
         const innerCalls = innerAction.mock.calls.length;
         leaveActEnvironment();
-        await pressOn(screen.getByTestId("inner-trigger"));
+        await mouse.pressOn(screen.getByTestId("inner-trigger"));
         expect(isOpen(inner())).toBe(true);
         const innerTrigger = screen.getByTestId("inner-trigger");
         expect(innerTrigger).toHaveAttribute("data-pending", "");
@@ -752,7 +742,7 @@ describe("Popover (browser)", () => {
         const outerCalls = action.mock.calls.length;
         const innerCalls = innerAction.mock.calls.length;
         leaveActEnvironment();
-        await pressOn(screen.getByRole("heading", { name: "Filters" }));
+        await mouse.pressOn(screen.getByRole("heading", { name: "Filters" }));
         await expect.poll(() => isOpen(inner())).toBe(false);
         await expect.poll(() => innerAction.mock.calls.length).toBe(innerCalls + 1);
         const [next, details] = innerAction.mock.calls.at(-1)!;
@@ -1228,9 +1218,7 @@ describe("Popover (browser)", () => {
       const clicks: boolean[] = [];
       // Whether the popup was still shown when the click arrived.
       trigger().addEventListener("click", () => clicks.push(isOpen()));
-      const rect = trigger().getBoundingClientRect();
-      const x = Math.round(rect.left + rect.width / 2);
-      const y = Math.round(rect.top + rect.height / 2);
+      const { x, y } = centre(trigger());
       await act(async () => {
         await mouse.down(x, y);
       });
@@ -1286,14 +1274,12 @@ describe("Popover (browser)", () => {
         await settle(() => expect(isOpen()).toBe(true));
         const calls = action.mock.calls.length;
         leaveActEnvironment();
-        const box = foreign.getBoundingClientRect();
-        const x = Math.round(box.left + box.width / 2);
-        const y = Math.round(box.top + box.height / 2);
-        await mouse.down(x, y);
-        await sleep(20);
-        expect(isOpen()).toBe(true);
-        expect(action).toHaveBeenCalledTimes(calls);
-        await mouse.up(x, y);
+        await mouse.pressOn(foreign, {
+          atPress: () => {
+            expect(isOpen()).toBe(true);
+            expect(action).toHaveBeenCalledTimes(calls);
+          },
+        });
         await expect.poll(() => isOpen()).toBe(false);
         await expect.poll(() => action.mock.calls.length).toBe(calls + 1);
         const [next, details] = action.mock.calls.at(-1)!;
@@ -1331,15 +1317,12 @@ describe("Popover (browser)", () => {
       const before = document.activeElement;
       const calls = action.mock.calls.length;
       leaveActEnvironment();
-      const r = close.getBoundingClientRect();
-      const x = Math.round(r.left + r.width / 2);
-      const y = Math.round(r.top + r.height / 2);
-      await mouse.down(x, y);
-      await sleep(20);
-      expect(isOpen()).toBe(true);
-      expect(document.activeElement).toBe(focusesButtons ? close : before);
-      await mouse.up(x, y);
-      await sleep(20);
+      await mouse.pressOn(close, {
+        atPress: () => {
+          expect(isOpen()).toBe(true);
+          expect(document.activeElement).toBe(focusesButtons ? close : before);
+        },
+      });
       expect(close).toHaveAttribute("data-pending", "");
       await quietPeriod(50, "the popup must stay shown while the Close's action runs");
       expect(isOpen()).toBe(true);

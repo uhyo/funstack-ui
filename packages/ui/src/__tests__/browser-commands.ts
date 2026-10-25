@@ -1,5 +1,6 @@
 // Custom browser commands registered in vitest.config.ts (browser tests only).
 import { commands } from "vitest/browser";
+import { sleep } from "./browser-helpers.js";
 
 declare module "vitest/browser" {
   interface BrowserCommands {
@@ -35,6 +36,51 @@ export function toPagePoint(x: number, y: number): { x: number; y: number } {
 }
 
 type Button = "left" | "right" | "middle";
+
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * The client point of `element` at `at` (relative to its top-left corner), by default its centre,
+ * rounded to whole pixels: where the real-mouse rows press.
+ */
+export function centre(element: Element, at?: Point): Point {
+  const r = element.getBoundingClientRect();
+  return {
+    x: Math.round(r.left + (at?.x ?? r.width / 2)),
+    y: Math.round(r.top + (at?.y ?? r.height / 2)),
+  };
+}
+
+/** Options of `mouse.pressOn`. */
+interface PressOptions<T> {
+  /** Where to press, relative to the target's top-left corner; its centre by default. */
+  readonly at?: Point;
+  /** Park the pointer on the point first (and wait 20 ms), so hover rules run before the press. */
+  readonly moveFirst?: boolean;
+  /** Runs while the button is down (20 ms after the press); `pressOn` returns its result. */
+  readonly atPress?: () => T;
+}
+
+/**
+ * A real press and release on `target` with real timing: down, 20 ms, `atPress`, up, 20 ms. A row
+ * failing in `atPress` leaves the button down for vitest.browser.setup.ts to release.
+ */
+async function pressOn<T = void>(target: Element, options: PressOptions<T> = {}): Promise<T> {
+  const { x, y } = centre(target, options.at);
+  if (options.moveFirst) {
+    await mouse.move(x, y);
+    await sleep(20);
+  }
+  await mouse.down(x, y);
+  await sleep(20);
+  const atPress = options.atPress?.() as T;
+  await mouse.up(x, y);
+  await sleep(20);
+  return atPress;
+}
 
 /**
  * Resolves once `type` reached this window (capture phase) and the rest of that input task ran
@@ -99,6 +145,7 @@ export const mouse = {
     await commands.mouse("click", p.x, p.y, button);
     await handled;
   },
+  pressOn,
   /** Two presses and releases, the second with `detail === 2`; resolves after the `dblclick`. */
   dblclick: async (x: number, y: number, button: Button = "left") => {
     const p = toPagePoint(x, y);

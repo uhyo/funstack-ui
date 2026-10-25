@@ -30,7 +30,7 @@ import { Popover } from "../popover/index.js";
 import { Select } from "./index.js";
 import type { SelectValueChangeDetails } from "./index.js";
 import { mouse } from "../__tests__/browser-commands.js";
-import { flushFor, sleep, spyViewTransitions } from "../__tests__/browser-helpers.js";
+import { flushFor, spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: string, details: SelectValueChangeDetails) => unknown;
 
@@ -617,17 +617,7 @@ describe("Select (browser)", () => {
   // not in the page and a headless click does not open it (the header). The option pick is the
   // "a pick through the picker" row above.
   describe.runIf(supportsBaseSelect)("a real press while the picker is open", () => {
-    async function pressOn(target: Element) {
-      const r = target.getBoundingClientRect();
-      const x = Math.round(r.left + r.width / 2);
-      const y = Math.round(r.top + r.height / 2);
-      await act(async () => {
-        await mouse.down(x, y);
-        await sleep(20);
-        await mouse.up(x, y);
-      });
-      await flushFor();
-    }
+    const pressOn = (target: Element) => act(() => mouse.pressOn(target));
 
     it.each([
       ["the select itself", () => sel()],

@@ -57,7 +57,7 @@ import {
   quietPeriod,
   sleep,
 } from "../__tests__/browser-helpers.js";
-import { mouse, toPagePoint } from "../__tests__/browser-commands.js";
+import { centre, mouse, toPagePoint } from "../__tests__/browser-commands.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -1011,14 +1011,9 @@ describe("Combobox (browser)", () => {
 
     const trigger = () => screen.getByTestId("trigger");
 
-    function center(element: Element) {
-      const r = element.getBoundingClientRect();
-      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-    }
-
     /** A real press and release on the Trigger. */
     async function pressTrigger() {
-      const { x, y } = center(trigger());
+      const { x, y } = centre(trigger());
       await mouse.down(x, y);
       await mouse.up(x, y);
     }
@@ -1313,8 +1308,8 @@ describe("Combobox (browser)", () => {
         document.removeEventListener("click", recordClick, true);
         document.removeEventListener("gotpointercapture", recordCapture, true);
       });
-      const r = input().getBoundingClientRect();
-      await mouse.click(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+      const { x, y } = centre(input());
+      await mouse.click(x, y);
       await expect.poll(() => isOpen()).toBe(true);
       expect(captures).toEqual([]);
       expect(clicks).toEqual([input()]);
@@ -1372,12 +1367,7 @@ describe("Combobox (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       expect(isOpen(outer)).toBe(true);
       leaveActEnvironment();
-      const r = input().getBoundingClientRect();
-      const x = Math.round(r.left + r.width / 2);
-      const y = Math.round(r.top + r.height / 2);
-      await mouse.down(x, y);
-      await sleep(20);
-      await mouse.up(x, y);
+      await mouse.pressOn(input());
       await quietPeriod(80, "a press on the input must close neither popover");
       expect(isOpen()).toBe(true);
       expect(isOpen(outer)).toBe(true);
@@ -1526,17 +1516,11 @@ describe("Combobox (browser)", () => {
     }
 
     /** A real press and release at `at` (relative to the element's top-left) or its centre. */
-    async function press(target: Element, at?: { x: number; y: number }) {
-      const r = target.getBoundingClientRect();
-      const x = Math.round(r.left + (at?.x ?? r.width / 2));
-      const y = Math.round(r.top + (at?.y ?? r.height / 2));
-      await mouse.down(x, y);
-      await sleep(20);
-      const atPress = { open: isOpen(), focus: document.activeElement };
-      await mouse.up(x, y);
-      await sleep(20);
-      return atPress;
-    }
+    const press = (target: Element, at?: { x: number; y: number }) =>
+      mouse.pressOn(target, {
+        at,
+        atPress: () => ({ open: isOpen(), focus: document.activeElement }),
+      });
 
     it("an option: shown and focused through the value action, then the library-owned close ('activate')", async () => {
       const save = deferred();
@@ -1729,11 +1713,6 @@ describe("Combobox (browser)", () => {
       return { valueAction, openAction };
     }
 
-    function centre(target: Element) {
-      const r = target.getBoundingClientRect();
-      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-    }
-
     for (const [kind, attributes, eventType] of [
       ["popovertarget", { popovertarget: "{popup}" }, "beforetoggle"],
       [
@@ -1744,14 +1723,10 @@ describe("Combobox (browser)", () => {
     ] as const) {
       it(`${kind}: the input keeps focus and its text, one (false, activate), no re-open`, async () => {
         const { valueAction, openAction } = await setup(attributes);
-        const { x, y } = centre(foreign());
-        await mouse.down(x, y);
-        await sleep(20);
-        expect({ open: isOpen(), focus: document.activeElement }).toEqual({
-          open: true,
-          focus: input(),
+        const atPress = await mouse.pressOn(foreign(), {
+          atPress: () => ({ open: isOpen(), focus: document.activeElement }),
         });
-        await mouse.up(x, y);
+        expect(atPress).toEqual({ open: true, focus: input() });
         await expect.poll(() => isOpen()).toBe(false);
         await expect.poll(() => openAction.mock.calls.length).toBe(1);
         const [next, details] = openAction.mock.calls[0]!;

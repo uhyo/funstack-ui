@@ -8,7 +8,7 @@ import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import { mouse } from "../__tests__/browser-commands.js";
+import { centre, mouse } from "../__tests__/browser-commands.js";
 import {
   anchorPositionHonoursParentDirection,
   pressFocusesButtons,
@@ -399,11 +399,6 @@ describe("Tooltip (browser)", () => {
       leaveActEnvironment();
     });
 
-    function centre(element: Element) {
-      const r = element.getBoundingClientRect();
-      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-    }
-
     it.each([
       ["the trigger", () => trigger()],
       ["the popup", () => popup()],
@@ -418,10 +413,7 @@ describe("Tooltip (browser)", () => {
         await mouse.move(x, y);
         await sleep(20);
         expect(isOpen()).toBe(true);
-        await mouse.down(x, y);
-        await sleep(20);
-        expect(isOpen()).toBe(false);
-        await mouse.up(x, y);
+        await mouse.pressOn(target(), { atPress: () => expect(isOpen()).toBe(false) });
         await quietPeriod(150, "the tooltip must not re-open while the pointer stays put");
         expect(isOpen()).toBe(false);
         if (target() === trigger() && focusesButtons) expect(trigger()).toHaveFocus();
@@ -441,11 +433,7 @@ describe("Tooltip (browser)", () => {
         );
         await userEvent.hover(trigger());
         await expect.poll(isOpen, { timeout: 3000 }).toBe(true);
-        const { x, y } = centre(trigger());
-        await mouse.down(x, y);
-        await sleep(20);
-        expect(isOpen()).toBe(true);
-        await mouse.up(x, y);
+        await mouse.pressOn(trigger(), { atPress: () => expect(isOpen()).toBe(true) });
         await quietPeriod(
           150,
           "an invoker press is no light dismiss; the library attaches nothing",
@@ -472,13 +460,10 @@ describe("Tooltip (browser)", () => {
         );
         await userEvent.hover(trigger());
         await expect.poll(isOpen, { timeout: 3000 }).toBe(true);
-        const { x, y } = centre(target());
-        await mouse.move(x, y);
-        await sleep(20);
-        await mouse.down(x, y);
-        await sleep(20);
-        expect(isOpen()).toBe(true);
-        await mouse.up(x, y);
+        await mouse.pressOn(target(), {
+          moveFirst: true,
+          atPress: () => expect(isOpen()).toBe(true),
+        });
         if (staysOpen) {
           await quietPeriod(150, "a press inside the hint must not dismiss it");
           expect(isOpen()).toBe(true);

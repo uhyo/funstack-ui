@@ -455,24 +455,21 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
                 ? target
                 : before;
           const calls = action.mock.calls.length;
-          const box = target.getBoundingClientRect();
-          const x = Math.round(box.left + (press.at?.x ?? box.width / 2));
-          const y = Math.round(box.top + (press.at?.y ?? box.height / 2));
 
-          await mouse.down(x, y);
-          await sleep(20);
-          expect(document.activeElement).toBe(focusAtPress);
-          if (press.outcome === "dismissed" && press.hiddenAtPressIfFocused && pressFocused) {
-            expect(isOpen()).toBe(false);
-          } else {
-            // Nothing closes at the press: light dismiss waits for the release, a part for its
-            // click.
-            expect(isOpen()).toBe(true);
-            expect(action).toHaveBeenCalledTimes(calls);
-          }
-
-          await mouse.up(x, y);
-          await sleep(20);
+          await mouse.pressOn(target, {
+            at: press.at,
+            atPress: () => {
+              expect(document.activeElement).toBe(focusAtPress);
+              if (press.outcome === "dismissed" && press.hiddenAtPressIfFocused && pressFocused) {
+                expect(isOpen()).toBe(false);
+              } else {
+                // Nothing closes at the press: light dismiss waits for the release, a part for its
+                // click.
+                expect(isOpen()).toBe(true);
+                expect(action).toHaveBeenCalledTimes(calls);
+              }
+            },
+          });
           const last = () => action.mock.calls.at(-1)!;
 
           if (press.outcome === "stays-open") {

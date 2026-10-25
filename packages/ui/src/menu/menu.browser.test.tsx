@@ -25,7 +25,7 @@ import { userEvent } from "vitest/browser";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
-import { mouse } from "../__tests__/browser-commands.js";
+import { centre, mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import { deferred } from "../__tests__/helpers.js";
 import {
@@ -511,18 +511,6 @@ describe("Menu (browser)", () => {
     // row of 1). The pointer is parked on the target first, so the hover rules (focus follows the
     // pointer, 6.2) have run before the press.
     describe("a real press while a submenu is open", () => {
-      async function pressOn(target: Element) {
-        const box = target.getBoundingClientRect();
-        const x = Math.round(box.left + box.width / 2);
-        const y = Math.round(box.top + box.height / 2);
-        await mouse.move(x, y);
-        await sleep(20);
-        await mouse.down(x, y);
-        await sleep(20);
-        await mouse.up(x, y);
-        await sleep(20);
-      }
-
       it("the SubmenuTrigger: the submenu stays open and its first item takes focus; nothing closes", async () => {
         const action = vi.fn<OpenAction>();
         const subAction = vi.fn<OpenAction>();
@@ -535,7 +523,7 @@ describe("Menu (browser)", () => {
         const calls = [action.mock.calls.length, subAction.mock.calls.length];
         leaveActEnvironment();
         // The submenu's invoker: no light dismiss; its click opens, or focuses into an open submenu.
-        await pressOn(item("move"));
+        await mouse.pressOn(item("move"), { moveFirst: true });
         await expect.poll(() => document.activeElement).toBe(item("inbox"));
         await quietPeriod(80, "neither menu may close");
         expect(isOpen(sub())).toBe(true);
@@ -557,7 +545,7 @@ describe("Menu (browser)", () => {
         const subElement = sub();
         const calls = action.mock.calls.length;
         leaveActEnvironment();
-        await pressOn(item("delete"));
+        await mouse.pressOn(item("delete"), { moveFirst: true });
         // Light dismiss of the nested popover (a press in the parent menu), or the hover close:
         // either way a dismissal. The root stays shown through its pending close.
         await expect.poll(() => isOpen(subElement)).toBe(false);
@@ -596,7 +584,7 @@ describe("Menu (browser)", () => {
         const subCalls = subAction.mock.calls.length;
         leaveActEnvironment();
         // Not the item the keyboard open focused: the pointer moves focus to it (6.2).
-        await pressOn(item("later"));
+        await mouse.pressOn(item("later"), { moveFirst: true });
         expect(document.activeElement).toBe(item("later"));
         expect(isOpen(subElement)).toBe(true);
         expect(isOpen()).toBe(true);
@@ -903,13 +891,9 @@ describe("Menu (browser)", () => {
       const restore = leaveActEnvironment();
       try {
         for (const id of ["dense", "date", "keep"]) {
-          const r = item(id).getBoundingClientRect();
-          const x = Math.round(r.left + r.width / 2);
-          const y = Math.round(r.top + r.height / 2);
-          await mouse.down(x, y);
-          await sleep(20);
-          expect(document.activeElement).toBe(item(id));
-          await mouse.up(x, y);
+          await mouse.pressOn(item(id), {
+            atPress: () => expect(document.activeElement).toBe(item(id)),
+          });
           await quietPeriod(60, "the menu must stay open");
           expect(isOpen()).toBe(true);
           expect(document.activeElement).toBe(item(id));
@@ -1093,9 +1077,7 @@ describe("Menu (browser)", () => {
       const { work, action } = setup();
       await openWithKeyboard();
       const calls = action.mock.calls.length;
-      const box = trigger().getBoundingClientRect();
-      const x = Math.round(box.left + box.width / 2);
-      const y = Math.round(box.top + box.height / 2);
+      const { x, y } = centre(trigger());
       await act(async () => {
         await mouse.down(x, y);
       });
@@ -1129,10 +1111,7 @@ describe("Menu (browser)", () => {
       popup().addEventListener("beforetoggle", (event) => {
         if ((event as ToggleEvent).newState === "closed") hides.push("hide");
       });
-      const { x, y } = (() => {
-        const box = trigger().getBoundingClientRect();
-        return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
-      })();
+      const { x, y } = centre(trigger());
       await act(async () => {
         await mouse.down(x, y);
       });
@@ -1200,11 +1179,6 @@ describe("Menu (browser)", () => {
         item("foreign").setAttribute(name, value.replace("{popup}", popup().id));
       }
       return action;
-    }
-
-    function centre(target: Element) {
-      const r = target.getBoundingClientRect();
-      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
     }
 
     /** Opens with the keyboard (the first item focused) and returns the dispatches so far. */

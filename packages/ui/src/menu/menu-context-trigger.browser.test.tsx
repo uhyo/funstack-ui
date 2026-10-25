@@ -23,7 +23,7 @@ import { act, render, screen } from "@testing-library/react";
 import { cdp } from "vitest/browser";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mouse, toPagePoint, wheel } from "../__tests__/browser-commands.js";
+import { centre, mouse, toPagePoint, wheel } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsFocusVisibleOption } from "../__tests__/engine.js";
 import { withPageDirection } from "../__tests__/placement-browser.js";
@@ -892,12 +892,6 @@ describe("Menu.ContextTrigger (browser)", () => {
     expect(Math.abs(r.top - y)).toBeLessThanOrEqual(1);
   }
   // --- Wave 11 (#88): press-drag-release, touch offset, scrolling --------------------------------
-
-  /** Where an item of the open menu is: its centre. */
-  function centre(element: Element) {
-    const r = element.getBoundingClientRect();
-    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-  }
 
   /**
    * The time between the start of the gesture's 500 ms and the next `pointerup`, from the events'

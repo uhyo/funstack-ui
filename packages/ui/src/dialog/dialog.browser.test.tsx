@@ -39,7 +39,6 @@ import {
   leaveActEnvironment,
   quietPeriod,
   settle,
-  sleep,
 } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: boolean, details: DialogOpenChangeDetails) => unknown;
@@ -891,12 +890,7 @@ describe("Dialog (browser)", () => {
       await flushFor();
       const restore = leaveActEnvironment();
       try {
-        const box = trigger().getBoundingClientRect();
-        const x = Math.round(box.left + box.width / 2);
-        const y = Math.round(box.top + box.height / 2);
-        await mouse.down(x, y);
-        await sleep(20);
-        await mouse.up(x, y);
+        await mouse.pressOn(trigger());
         await quietPeriod(80, "the dialog must stay open and nothing may be dispatched");
       } finally {
         await mouse.releaseHeld();
@@ -976,17 +970,11 @@ describe("Dialog (browser)", () => {
   // cancelled, the same awaited dispatch as the Close part); a non-modal dialog without
   // `lightDismiss` ignores an outside press (7); its Close part is awaited like the modal one.
   describe("a real press while open: foreign invokers and non-modal", () => {
-    async function pressOn(target: Element) {
-      const r = target.getBoundingClientRect();
-      const x = Math.round(r.left + r.width / 2);
-      const y = Math.round(r.top + r.height / 2);
-      await mouse.down(x, y);
-      await sleep(20);
-      const atPress = { open: popup().open, focus: document.activeElement };
-      await mouse.up(x, y);
-      await sleep(20);
-      return atPress;
-    }
+    /** A real press on `target`; returns whether the dialog was open, and the focus, at the press. */
+    const pressOn = (target: Element) =>
+      mouse.pressOn(target, {
+        atPress: () => ({ open: popup().open, focus: document.activeElement }),
+      });
 
     /** The pending window of an awaited close, then the close once `work` settles. */
     async function expectAwaitedClose(
