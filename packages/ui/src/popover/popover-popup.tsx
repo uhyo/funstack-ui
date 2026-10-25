@@ -19,8 +19,16 @@ import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type PopoverSide = AnchorSide;
+/**
+ * Alignment of the Popup along its side: inline-relative on a top / bottom side, the top / bottom
+ * edges on the others.
+ */
 export type PopoverAlign = AnchorAlign;
 
+/**
+ * State of `Popover.Popup`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface PopoverPopupState {
   /**
    * Committed open state (library mode); `false` in JS-free mode. Read `:popover-open` for the
@@ -36,6 +44,11 @@ export interface PopoverPopupState {
   readonly align: PopoverAlign;
 }
 
+/**
+ * Props of `Popover.Popup`.
+ *
+ * @see https://ui.funstack.work/components/popover
+ */
 export interface PopoverPopupProps extends Omit<
   ComponentPropsWithRef<"dialog">,
   | "id"
@@ -50,15 +63,19 @@ export interface PopoverPopupProps extends Omit<
 > {
   /**
    * Placement relative to the Trigger through inline `position-area`, with
-   * `position-try-fallbacks` flipping it when it does not fit. Default `"bottom"`.
+   * `position-try-fallbacks` flipping it when it does not fit.
    * `"inline-start"` / `"inline-end"` follow the popup's direction. `null` emits no inline
    * positioning (and no `data-side` / `data-align`), so a stylesheet owns placement.
+   *
+   * @defaultValue `"bottom"`
    */
   side?: PopoverSide | null;
   /**
-   * Alignment along the side. Default `"center"`. On a top / bottom side `start` / `end` are
+   * Alignment along the side. On a top / bottom side `start` / `end` are
    * inline-relative (mirrored under `direction: rtl`); on the other sides the top / bottom
    * edges. Ignored when `side` is `null`.
+   *
+   * @defaultValue `"center"`
    */
   align?: PopoverAlign;
   /**
@@ -70,16 +87,20 @@ export interface PopoverPopupProps extends Omit<
    *   stopped, pre-rendered at low priority. Not in the server HTML.
    *
    * Ignored in JS-free mode (always mounted).
+   *
+   * @defaultValue `false`
    */
   keepMounted?: boolean;
   /**
    * Element to focus when the popover opens: a ref, or a selector resolved inside the popup.
    * The library writes `autofocus` on it right before `showPopover()` and the platform focuses
-   * it. Default: the platform's choice for a `<dialog>` (first focusable descendant; the popup
-   * itself if none); for `render={<div />}` focus stays on the Trigger.
+   * it.
    *
    * In JS-free mode the browser opens the popover itself, so the attribute is written after
    * hydration and kept while mounted; before hydration only `autoFocus` in the markup works.
+   *
+   * @defaultValue the platform's choice for a `<dialog>` (first focusable descendant; the popup
+   * itself if none); for `render={<div />}` focus stays on the Trigger
    */
   initialFocus?: RefObject<HTMLElement | null> | string;
   /**
@@ -95,8 +116,11 @@ export interface PopoverPopupProps extends Omit<
    * A plain open starts none: the children mount under the already-mounted popover element.
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, PopoverPopupState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, PopoverPopupState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, PopoverPopupState>;
   /** A `<dialog>` (default) or a `<div>` (focus stays on the Trigger). */
   render?: RenderProp<ComponentPropsWithRef<"dialog">, PopoverPopupState>;
@@ -119,6 +143,8 @@ export interface PopoverPopupProps extends Omit<
  * Owned keys (conventions 1.2): `id`, `popover`, `open`, `aria-modal`, `aria-labelledby` and
  * `aria-describedby` (token-merged), and `data-side` / `data-align` unless `side` is `null`.
  * `role` is a default (`"dialog"`) the consumer may override.
+ *
+ * @see https://ui.funstack.work/components/popover
  */
 export function PopoverPopup({
   side: sideProp = "bottom",

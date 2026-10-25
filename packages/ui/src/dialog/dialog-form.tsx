@@ -11,11 +11,20 @@ import { useDialogContext } from "./dialog-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Dialog.Form`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface DialogFormState {
   /** `useFormStatus().pending` of this form, exposed for `className` / `children` functions. */
   readonly pending: boolean;
 }
 
+/**
+ * Props of `Dialog.Form`.
+ *
+ * @see https://ui.funstack.work/components/dialog
+ */
 export interface DialogFormProps extends Omit<
   ComponentPropsWithRef<"form">,
   "method" | "action" | "className" | "style" | "children"
@@ -37,7 +46,7 @@ export interface DialogFormProps extends Omit<
    * throwing and, when this form is rendered as a `Form.Root`
    * (`render={<Form.Root errors={state.errors} />}`), with no field error: a settle whose
    * `errors` has a non-empty entry (hidden stale ones included, the `autoReset` rule) keeps
-   * the dialog open and the Form focuses the first errored field. Default `true`.
+   * the dialog open and the Form focuses the first errored field.
    *
    * Without a `Form.Root` the library never sees a result, so any settle that does not throw
    * counts, including a `useActionState` result that reports errors: render the form as a
@@ -49,6 +58,8 @@ export interface DialogFormProps extends Omit<
    *
    * The dialog is not closed either when it was closed (Escape, a Close part) while the action
    * ran, also if the user re-opened it meanwhile.
+   *
+   * @defaultValue `true`
    */
   closeOnSettle?: boolean;
   /**
@@ -56,9 +67,13 @@ export interface DialogFormProps extends Omit<
    * `"dialog"` without `action`, React's own with a function `action`.
    */
   method?: ComponentPropsWithRef<"form">["method"];
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, DialogFormState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, DialogFormState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, DialogFormState>;
+  /** Replace the default `<form>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"form">, DialogFormState>;
 }
 
@@ -77,6 +92,8 @@ export interface DialogFormProps extends Omit<
  * `useFormStatus()` themselves.
  *
  * Owned keys (conventions 1.2): `method` (except with a string `action`), `action`.
+ *
+ * @see https://ui.funstack.work/components/dialog
  */
 export function DialogForm({
   action,

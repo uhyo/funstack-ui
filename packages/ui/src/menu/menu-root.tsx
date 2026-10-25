@@ -36,6 +36,7 @@ export interface MenuOpenChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
+/** State of `Menu.Root`, passed to the function forms of `children`. */
 export interface MenuRootState {
   /** Optimistic open state. Content rendered from it must not suspend. */
   readonly open: boolean;
@@ -50,6 +51,11 @@ export interface MenuRootState {
   readonly context: boolean;
 }
 
+/**
+ * Props of `Menu.Root`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuRootProps {
   /** Controlled open state. `undefined` means uncontrolled. */
   open?: boolean;
@@ -63,15 +69,26 @@ export interface MenuRootProps {
    * `startTransition` (React limitation).
    */
   openChangeAction?: ChangeAction<boolean, MenuOpenChangeDetails>;
-  /** Arrow keys wrap from the last item to the first and back. Default `true`. */
+  /**
+   * Arrow keys wrap from the last item to the first and back.
+   *
+   * @defaultValue `true`
+   */
   loop?: boolean;
-  /** Submenu only: milliseconds from hovering the SubmenuTrigger to the open. Default 100. */
+  /**
+   * Submenu only: milliseconds from hovering the SubmenuTrigger to the open.
+   *
+   * @defaultValue `100`
+   */
   delay?: number;
   /**
    * Submenu only: milliseconds from the pointer leaving the SubmenuTrigger and the submenu to the
-   * close. Default 150.
+   * close.
+   *
+   * @defaultValue `150`
    */
   closeDelay?: number;
+  /** The parts. The function form receives the optimistic state and must not suspend. */
   children?: StateValue<ReactNode, MenuRootState>;
 }
 
@@ -86,6 +103,8 @@ const DEFAULT_FOCUS: MenuOpenFocus = { cause: "first", pointer: false };
  * part asks for are transitions (pending Trigger, items render from committed state,
  * `showPopover()` / `hidePopover()` once the change has committed); dismissals are the
  * browser's and `openChangeAction(false)` is a notification.
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuRoot({
   open,

@@ -12,7 +12,12 @@ import type { TooltipAlign, TooltipPopupContextValue, TooltipSide } from "./tool
 
 export type { TooltipAlign, TooltipSide } from "./tooltip-context.js";
 
+/**
+ * State of `Tooltip.Popup`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TooltipPopupState {
+  /** The Root's `disabled`. */
   readonly disabled: boolean;
   /**
    * While shown: the physical side the browser placed the popup on (`"top"` / `"bottom"` /
@@ -24,37 +29,51 @@ export interface TooltipPopupState {
   readonly align: TooltipAlign;
 }
 
+/**
+ * Props of `Tooltip.Popup`.
+ *
+ * @see https://ui.funstack.work/components/tooltip
+ */
 export interface TooltipPopupProps extends Omit<
   ComponentPropsWithRef<"div">,
   "id" | "popover" | "role" | "className" | "style" | "children"
 > {
   /**
    * Placement relative to the trigger through inline `position-area`, with
-   * `position-try-fallbacks` flipping it when it does not fit. Default `"top"`. `"inline-start"` /
+   * `position-try-fallbacks` flipping it when it does not fit. `"inline-start"` /
    * `"inline-end"` follow the popup's direction. `null` emits no inline positioning (and no
    * `data-side` / `data-align`), so a stylesheet owns placement.
+   *
+   * @defaultValue `"top"`
    */
   side?: TooltipSide | null;
   /**
-   * Alignment along the side. Default `"center"`. On a top / bottom side `start` / `end` are
+   * Alignment along the side. On a top / bottom side `start` / `end` are
    * inline-relative (mirrored under `direction: rtl`); on the other sides they are the top /
    * bottom edges. Ignored when `side` is `null`.
+   *
+   * @defaultValue `"center"`
    */
   align?: TooltipAlign;
   /**
    * Experimental (Chrome 151+, Firefox 153+; Safari 27.0 treats it as `"manual"`). Renders
    * `popover="hint"` instead of `popover="manual"`: native light dismiss, and the tooltip can
    * open over an `auto` popover (a menu) without closing it. The JS Escape / pointerdown handling
-   * stays in place for engines that do not know `hint`. Default `false`.
+   * stays in place for engines that do not know `hint`.
+   *
+   * @defaultValue `false`
    */
   experimental_hint?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TooltipPopupState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TooltipPopupState>;
   /**
    * Rendered at mount (hidden by the popover's `display: none`), not at open time. Tooltip
    * content should be static; if it must suspend, put the `<Suspense>` boundary inside the Popup.
    */
   children?: StateValue<ReactNode, TooltipPopupState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, TooltipPopupState>;
 }
 
@@ -75,6 +94,8 @@ export interface TooltipPopupProps extends Omit<
  *
  * Owned keys (conventions 1.2): `id`, `popover`, `role`, `data-disabled`, and `data-side` /
  * `data-align` unless `side` is `null`.
+ *
+ * @see https://ui.funstack.work/components/tooltip
  */
 export function TooltipPopup({
   side: sideProp = "top",

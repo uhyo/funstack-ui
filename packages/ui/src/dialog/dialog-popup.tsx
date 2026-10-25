@@ -29,12 +29,22 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 
+/**
+ * State of `Dialog.Popup`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface DialogPopupState {
   /** Committed open state (library mode); `false` in JS-free mode. Read `:open` for the DOM truth. */
   readonly open: boolean;
+  /** The Root's `modal`. */
   readonly modal: boolean;
 }
 
+/**
+ * Props of `Dialog.Popup`.
+ *
+ * @see https://ui.funstack.work/components/dialog
+ */
 export interface DialogPopupProps extends Omit<
   ComponentPropsWithRef<"dialog">,
   "id" | "open" | "closedby" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"
@@ -48,31 +58,37 @@ export interface DialogPopupProps extends Omit<
    *   stopped, pre-rendered at low priority. Not in the server HTML.
    *
    * Ignored in JS-free mode (always mounted).
+   *
+   * @defaultValue `false`
    */
   keepMounted?: boolean;
   /**
    * Element to focus when the dialog opens: a ref, or a selector resolved inside the dialog.
    * The library writes `autofocus` on it right before `showModal()` / `show()` and the platform
-   * focuses it. Default: the platform's choice (first focusable descendant; the dialog itself if
-   * none). Use `tabIndex={-1}` on a heading or wrapper for long or destructive dialogs (APG).
+   * focuses it. Use `tabIndex={-1}` on a heading or wrapper for long or destructive dialogs (APG).
    *
    * In JS-free mode the browser opens the dialog itself, so the attribute is written after
    * hydration and kept while mounted; before hydration only `autoFocus` in the markup works.
+   *
+   * @defaultValue the platform's choice (first focusable descendant; the dialog itself if none)
    */
   initialFocus?: RefObject<HTMLElement | null> | string;
   /**
-   * Close on a click outside the dialog (on the backdrop for modal dialogs). Default `false`.
+   * Close on a click outside the dialog (on the backdrop for modal dialogs).
    * Baseline: JS `pointerdown` + `click` listeners, which close only when both the press and the
    * click land outside (a drag that starts inside, such as selecting text, never closes); with
    * `experimental_closedBy`, native `closedby="any"`, which behaves the same. A click on the
    * Trigger of an open non-modal dialog counts as outside, as it does natively.
+   *
+   * @defaultValue `false`
    */
   lightDismiss?: boolean;
   /**
    * Experimental (Chrome 134+, Firefox 141+; Safari 27.0 ignores it). Renders `closedby`
    * (`"any"` when `lightDismiss`, else `"closerequest"`) and skips the JS dismiss listeners where
    * `HTMLDialogElement.prototype.closedBy` exists. Elsewhere the JS baseline stays active.
-   * Default `false`.
+   *
+   * @defaultValue `false`
    */
   experimental_closedBy?: boolean;
   /**
@@ -87,8 +103,11 @@ export interface DialogPopupProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, DialogPopupState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, DialogPopupState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, DialogPopupState>;
   /** Must render a `<dialog>`. */
   render?: RenderProp<ComponentPropsWithRef<"dialog">, DialogPopupState>;
@@ -174,6 +193,8 @@ function valueOf(element: unknown): string {
  *
  * Owned keys (conventions 1.2): `id`, `open`, `closedby`, `aria-labelledby` and
  * `aria-describedby` (token-merged), `data-modal`, `suppressHydrationWarning`.
+ *
+ * @see https://ui.funstack.work/components/dialog
  */
 export function DialogPopup({
   keepMounted,

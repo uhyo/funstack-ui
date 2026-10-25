@@ -18,6 +18,7 @@ export interface PopoverOpenChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
+/** State of `Popover.Root`, passed to the function forms of `children`. */
 export interface PopoverRootState {
   /** Optimistic open state (`false` in JS-free mode). Content rendered from it must not suspend. */
   readonly open: boolean;
@@ -25,6 +26,11 @@ export interface PopoverRootState {
   readonly pending: boolean;
 }
 
+/**
+ * Props of `Popover.Root`.
+ *
+ * @see https://ui.funstack.work/components/popover
+ */
 export interface PopoverRootProps {
   /**
    * Controlled open state. `undefined` means uncontrolled (and, with `defaultOpen` and
@@ -49,6 +55,7 @@ export interface PopoverRootProps {
    * `startTransition` (React limitation).
    */
   openChangeAction?: ChangeAction<boolean, PopoverOpenChangeDetails>;
+  /** The parts. The function form receives the optimistic state and must not suspend. */
   children?: StateValue<ReactNode, PopoverRootState>;
 }
 
@@ -62,6 +69,8 @@ export interface PopoverRootProps {
  * transitions (the Trigger shows `data-pending`, content renders from committed state,
  * `showPopover()` / `hidePopover()` run when the change has committed); dismissals are the
  * browser's and `openChangeAction(false)` is a notification.
+ *
+ * @see https://ui.funstack.work/components/popover
  */
 export function PopoverRoot({ open, defaultOpen, openChangeAction, children }: PopoverRootProps) {
   const context = useOverlayRoot<PopoverOpenChangeDetails>({

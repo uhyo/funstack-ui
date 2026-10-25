@@ -6,8 +6,17 @@ import type { PopoverTriggerHookState } from "../internal/use-popover-trigger.js
 import { useRender } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
 
+/**
+ * State of `Popover.Trigger`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export type PopoverTriggerState = PopoverTriggerHookState;
 
+/**
+ * Props of `Popover.Trigger`.
+ *
+ * @see https://ui.funstack.work/components/popover
+ */
 export interface PopoverTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   | "onClick"
@@ -24,9 +33,13 @@ export interface PopoverTriggerProps extends Omit<
    * Never dispatches. Native `disabled` on a `<button>` (no longer an invoker); in library mode
    * with a link or component `render`, `aria-disabled="true"` instead: the element stays
    * focusable.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, PopoverTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, PopoverTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, PopoverTriggerState>;
@@ -50,6 +63,8 @@ export interface PopoverTriggerProps extends Omit<
  * (library mode), `data-open`, `data-pending`, `data-disabled`; `commandfor`, `command` and
  * `popoverTargetAction` (never written; omitted from the props type). `aria-haspopup` and
  * `aria-controls` pass through.
+ *
+ * @see https://ui.funstack.work/components/popover
  */
 export function PopoverTrigger({
   disabled = false,

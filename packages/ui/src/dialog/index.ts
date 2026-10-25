@@ -17,6 +17,8 @@ import { DialogTrigger } from "./dialog-trigger.js";
  * part asks for (Close, Form, a foreign close command: `openChangeAction(false)` awaited, then
  * `close(returnValue)`); dismissals (Escape, a click outside) are the browser's, notified
  * through `openChangeAction(false)`.
+ *
+ * @see https://ui.funstack.work/components/dialog
  */
 export const Dialog = {
   Root: DialogRoot,

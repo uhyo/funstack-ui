@@ -11,21 +11,35 @@ import { closeStackLater, useMenuContext } from "./menu-context.js";
 import type { MenuItemProps } from "./menu-item.js";
 import { useMenuItem } from "./use-menu-item.js";
 
+/**
+ * State of `Menu.CheckboxItem`, passed to the function forms of `className`, `style`, `children`
+ * and `render`.
+ */
 export interface MenuCheckboxItemState {
   /** Optimistic checked state (`aria-checked`). */
   readonly checked: boolean;
   /** `checkedChangeAction` is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Menu.CheckboxItem`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuCheckboxItemProps extends Omit<
   MenuItemProps,
   "action" | "closeOnActivate" | "className" | "style" | "children" | "render"
 > {
   /** Controlled checked state. `undefined` means uncontrolled. */
   checked?: boolean;
-  /** Initial checked state when uncontrolled. Default `false`. */
+  /**
+   * Initial checked state when uncontrolled.
+   *
+   * @defaultValue `false`
+   */
   defaultChecked?: boolean;
   /**
    * Awaited inside the item's transition; `aria-checked` flips at once and rolls back on
@@ -33,11 +47,19 @@ export interface MenuCheckboxItemProps extends Omit<
    * Function.
    */
   checkedChangeAction?: ChangeAction<boolean>;
-  /** Close the whole menu once the change settles. Default `false`: the menu stays open. */
+  /**
+   * Close the whole menu once the change settles. When `false` the menu stays open.
+   *
+   * @defaultValue `false`
+   */
   closeOnActivate?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuCheckboxItemState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuCheckboxItemState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, MenuCheckboxItemState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, MenuCheckboxItemState>;
 }
 
@@ -47,6 +69,8 @@ export interface MenuCheckboxItemProps extends Omit<
  * `data-checked` and `data-pending`; the menu stays open unless `closeOnActivate`.
  *
  * Owned keys (conventions 1.2): those of `Menu.Item`, plus `aria-checked` and `data-checked`.
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuCheckboxItem({
   checked,

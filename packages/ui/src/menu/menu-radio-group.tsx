@@ -10,6 +10,10 @@ import { useRender } from "../internal/use-render.js";
 import { MenuGroupContext, MenuRadioGroupContext } from "./menu-context.js";
 import type { MenuRadioGroupContextValue } from "./menu-context.js";
 
+/**
+ * State of `Menu.RadioGroup`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface MenuRadioGroupState {
   /** Optimistic value; `null` when no item is selected. */
   readonly value: string | null;
@@ -17,13 +21,22 @@ export interface MenuRadioGroupState {
   readonly pending: boolean;
 }
 
+/**
+ * Props of `Menu.RadioGroup`.
+ *
+ * @see https://ui.funstack.work/components/menu
+ */
 export interface MenuRadioGroupProps extends Omit<
   ComponentPropsWithRef<"div">,
   "role" | "defaultValue" | "className" | "style" | "children"
 > {
   /** Controlled value; `null` selects nothing, `undefined` means uncontrolled. */
   value?: string | null;
-  /** Initial value when uncontrolled. Default `null`. */
+  /**
+   * Initial value when uncontrolled.
+   *
+   * @defaultValue `null`
+   */
   defaultValue?: string | null;
   /**
    * Receives the chosen item's `value`, awaited inside the group's transition; the items'
@@ -31,9 +44,13 @@ export interface MenuRadioGroupProps extends Omit<
    * dispatches nothing. May be a Server Function.
    */
   valueChangeAction?: ChangeAction<string>;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuRadioGroupState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuRadioGroupState>;
+  /** The RadioItems and a GroupLabel. May be a function of the part's state. */
   children?: StateValue<ReactNode, MenuRadioGroupState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuRadioGroupState>;
 }
 
@@ -42,6 +59,8 @@ export interface MenuRadioGroupProps extends Omit<
  * a `Menu.GroupLabel` inside it). Emits `data-pending` while `valueChangeAction` runs.
  *
  * Owned keys (conventions 1.2): `role`, `aria-labelledby` (token-merged), `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export function MenuRadioGroup({
   value,

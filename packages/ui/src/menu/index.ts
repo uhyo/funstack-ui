@@ -20,6 +20,8 @@ import { MenuTrigger } from "./menu-trigger.js";
  * transition with `data-pending` on the item, and the whole menu closes when it settles.
  * `ContextTrigger` is a region whose right-click (or Shift+F10, or a touch long-press) opens the
  * same `Popup` at the pointer; a Root may hold a `Trigger` and a `ContextTrigger`.
+ *
+ * @see https://ui.funstack.work/components/menu
  */
 export const Menu = {
   Root: MenuRoot,

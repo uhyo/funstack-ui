@@ -10,6 +10,8 @@ import { ToastViewport } from "./toast-viewport.js";
  * once, even while the action it reports on is pending); its output is `Toast.Viewport`
  * (`section[popover=manual]`, rendered once) mapping `state.toasts` to `Toast.Root`
  * (`div[role=dialog]`) > `Title`, `Description`, `Action` (an action prop, e.g. Undo), `Close`.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export const Toast = {
   Viewport: ToastViewport,

@@ -12,6 +12,8 @@ import { TooltipTrigger } from "./tooltip-trigger.js";
  * top layer and is placed with CSS Anchor Positioning, `Arrow` (decorative `span`) echoes the
  * Popup's resolved side. Open state is browser-owned: no `open` prop, no action, style with
  * `:popover-open`. Render the Popup immediately after the Trigger.
+ *
+ * @see https://ui.funstack.work/components/tooltip
  */
 export const Tooltip = {
   Root: TooltipRoot,

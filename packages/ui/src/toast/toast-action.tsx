@@ -10,12 +10,22 @@ import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastActionDetails, ToastItem } from "./toast.js";
 import { useToastRootContext } from "./toast-context.js";
 
+/**
+ * State of `Toast.Action`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ToastActionState {
   /** This part's action is in flight. */
   readonly pending: boolean;
+  /** The toast this Action belongs to. */
   readonly toast: ToastItem;
 }
 
+/**
+ * Props of `Toast.Action`.
+ *
+ * @see https://ui.funstack.work/components/toast
+ */
 export interface ToastActionProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "className" | "style" | "children"
@@ -25,15 +35,28 @@ export interface ToastActionProps extends Omit<
    * timer paused. When it resolves the toast closes with `reason: "activate"` (unless
    * `closeOnSettle` is `false`); a rejection keeps the toast and reaches the nearest Error
    * Boundary above the Viewport. A caught error counts as success and closes the toast: rethrow
-   * after `toast.update`, or use `closeOnSettle={false}`. Default: the toast's `action.action`.
+   * after `toast.update`, or use `closeOnSettle={false}`.
+   *
+   * @defaultValue the toast's `action.action`
    */
   action?: Action<[details: ToastActionDetails]>;
-  /** Close the toast when the action resolves. Default `true`. */
+  /**
+   * Close the toast when the action resolves.
+   *
+   * @defaultValue `true`
+   */
   closeOnSettle?: boolean;
-  /** Default: the toast's `action.label`. */
+  /**
+   * The button's content, or a function of the part's state.
+   *
+   * @defaultValue the toast's `action.label`
+   */
   children?: StateValue<ReactNode, ToastActionState>;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToastActionState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToastActionState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, ToastActionState>;
 }
 
@@ -44,6 +67,8 @@ export interface ToastActionProps extends Omit<
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `onClick`, `aria-disabled`,
  * `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export function ToastAction({
   action,

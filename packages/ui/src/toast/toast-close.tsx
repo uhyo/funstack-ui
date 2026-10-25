@@ -9,17 +9,31 @@ import { useToastRootContext } from "./toast-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Toast.Close`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ToastCloseState {
+  /** The toast this Close belongs to. */
   readonly toast: ToastItem;
 }
 
+/**
+ * Props of `Toast.Close`.
+ *
+ * @see https://ui.funstack.work/components/toast
+ */
 export interface ToastCloseProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "className" | "style" | "children"
 > {
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ToastCloseState>;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToastCloseState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToastCloseState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, ToastCloseState>;
 }
 
@@ -28,6 +42,8 @@ export interface ToastCloseProps extends Omit<
  * or text). No Invoker Command: `hide-popover` would hide the whole region.
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `onClick`.
+ *
+ * @see https://ui.funstack.work/components/toast
  */
 export function ToastClose({ children, className, style, render, ...rest }: ToastCloseProps) {
   const root = useToastRootContext("Toast.Close");

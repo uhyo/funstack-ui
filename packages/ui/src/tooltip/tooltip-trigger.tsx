@@ -15,10 +15,20 @@ import { rendersButton, resolveStateValue, useRender } from "../internal/use-ren
 import type { DataAttributes } from "../internal/use-render.js";
 import { useTooltipContext } from "./tooltip-context.js";
 
+/**
+ * State of `Tooltip.Trigger`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TooltipTriggerState {
+  /** The Root's `disabled`. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Tooltip.Trigger`.
+ *
+ * @see https://ui.funstack.work/components/tooltip
+ */
 export interface TooltipTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   "className" | "style" | "children"
@@ -34,12 +44,17 @@ export interface TooltipTriggerProps extends Omit<
    * `<style href="@funstack/ui/tooltip-warm">` (nonce from `<CSPProvider>`), rendered beside the
    * element so a `render` element with its own children keeps it. When that stylesheet is
    * missing (a CSP blocks it), the tooltip opens after its `delay` and only skip-delay is lost.
-   * Default `false`.
+   *
+   * @defaultValue `false`
    */
   experimental_interestFor?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TooltipTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TooltipTriggerState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, TooltipTriggerState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, TooltipTriggerState>;
 }
 
@@ -56,6 +71,8 @@ export interface TooltipTriggerProps extends Omit<
  * `data-disabled`; and `interestfor` and `data-fsui-tooltip-trigger` when
  * `experimental_interestFor` is on. `type="button"` is a default the consumer may override (the
  * part installs no click handler), unlike the overlay Triggers, which own it.
+ *
+ * @see https://ui.funstack.work/components/tooltip
  */
 export function TooltipTrigger({
   experimental_interestFor = false,

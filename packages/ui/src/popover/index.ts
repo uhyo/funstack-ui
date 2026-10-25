@@ -16,6 +16,8 @@ import { PopoverTrigger } from "./popover-trigger.js";
  * `defaultOpen` / `openChangeAction`; otherwise opening and the closes a part asks for are
  * transitions (pending Trigger, content from committed state), and dismissals are notified
  * through `openChangeAction(false)`.
+ *
+ * @see https://ui.funstack.work/components/popover
  */
 export const Popover = {
   Root: PopoverRoot,

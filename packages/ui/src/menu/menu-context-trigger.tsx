@@ -31,8 +31,14 @@ import {
 } from "./menu-gestures.js";
 import type { MenuTriggerState } from "./menu-trigger.js";
 
+/** State of `Menu.ContextTrigger`: the same shape as `MenuTriggerState`. */
 export type MenuContextTriggerState = MenuTriggerState;
 
+/**
+ * Props of `Menu.ContextTrigger`.
+ *
+ * @see https://ui.funstack.work/components/context-menu
+ */
 export interface MenuContextTriggerProps extends Omit<
   ComponentPropsWithRef<"div">,
   | "onContextMenu"
@@ -44,19 +50,33 @@ export interface MenuContextTriggerProps extends Omit<
   | "style"
   | "children"
 > {
-  /** The region does nothing; a `contextmenu` bubbles on to an outer region. `data-disabled`. */
+  /**
+   * The region does nothing; a `contextmenu` bubbles on to an outer region. `data-disabled`.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
   /**
    * What a `contextmenu` (or long-press) on an editable target inside the region opens: the
    * browser's own menu (`"native"`, default: copy and paste keep working) or this menu.
    * Editable: a text-taking `<input>`, a `<textarea>`, an element with `isContentEditable`.
+   *
+   * @defaultValue `"native"`
    */
   editableTargets?: "native" | "menu";
-  /** Milliseconds a touch or pen pointer must stay down (within 10 px) to open. Default 500. */
+  /**
+   * Milliseconds a touch or pen pointer must stay down (within 10 px) to open.
+   *
+   * @defaultValue `500`
+   */
   longPressDelay?: number;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuContextTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuContextTriggerState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, MenuContextTriggerState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuContextTriggerState>;
 }
 
@@ -83,6 +103,8 @@ interface LongPress {
  * Owned keys (conventions 1.2): `onContextMenu`, `onPointerDown`, `onPointerMove`,
  * `onPointerUp`, `onPointerCancel`, `data-open`, `data-pending`, `data-disabled`, and the style
  * key `WebkitTouchCallout` (`"none"`; the consumer's `style` wins).
+ *
+ * @see https://ui.funstack.work/components/context-menu
  */
 export function MenuContextTrigger({
   disabled = false,
