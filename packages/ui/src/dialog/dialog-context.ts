@@ -9,9 +9,10 @@ import type { OverlayRootValue } from "../internal/use-overlay-root.js";
  * close through Invoker Commands; in "library" mode opening and the closes a part asks for are
  * library-owned, dismissals browser-owned and notified (design section 2).
  */
-export interface DialogContextValue extends OverlayRootValue<
-  HTMLDialogElement,
-  [returnValue: string]
+export interface DialogContextValue extends Omit<
+  OverlayRootValue<HTMLDialogElement, [returnValue: string]>,
+  // The popover `shown` mirror: Dialog does not maintain it.
+  "shown" | "setShown"
 > {
   readonly modal: boolean;
   /**
