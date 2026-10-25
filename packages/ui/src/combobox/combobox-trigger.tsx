@@ -62,14 +62,16 @@ export interface ComboboxTriggerProps extends Omit<
  * does not take focus from the input, and a click focuses the input. After hydration a `<button>`
  * also names the Popup as its invoker (`popovertarget`, written through the ref, never
  * server-rendered), so a press while the listbox is open is not a light dismiss and the click's
- * close is the only one (design 3.3), and the browser exposes the listbox's state on
- * it: a `<button>` renders no `aria-expanded`, another element renders it from the shown listbox.
- * Every click is cancelled, so the toggle never runs: the listbox stays anchored to the input
- * (design 1).
+ * close is the only one (design 3.3), and the browser exposes the listbox's state on it: an
+ * invoker renders no `aria-expanded`. A Trigger that is disabled and still focusable
+ * (`aria-disabled` on a component `render`) is no invoker, like any other overlay Trigger: a press
+ * on it while the listbox is shown is a light dismiss. A non-invoker renders `aria-expanded` from
+ * the shown listbox. Every click is cancelled, so the toggle never runs: the listbox stays
+ * anchored to the input (design 1).
  *
  * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or
- * component `render`), `aria-expanded`, `aria-controls` (token-merged), `popovertarget`,
- * `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`;
+ * component `render`), `aria-expanded`, `aria-controls` (token-merged), `popovertarget` (while an
+ * invoker), `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`;
  * `popoverTarget`, `popoverTargetAction`, `commandfor` and `command` (never written as props;
  * omitted from the props type).
  */
@@ -98,20 +100,23 @@ export function ComboboxTrigger({
           : nonInvokerMessage(part, element.tagName.toLowerCase(), "listbox", "listbox")),
   );
   const popupId = popover.ids.popup;
+  // Not an invoker while disabled and focusable (`aria-disabled`), as the other overlay Triggers.
+  const { props: disabledProps, invoker } = disabledButton(render, disabled);
   // After hydration a `<button>` becomes the popup's invoker (design 3.3): the platform's
   // light dismiss exempts a press on an invoker of the open popover. Written here, not rendered,
-  // so the server HTML has no `popovertarget` and a click before hydration opens nothing.
+  // so the server HTML has no `popovertarget` and a click before hydration opens nothing. A flip
+  // of `invoker` re-runs the ref, which adds or removes the attribute.
   const ref = useCallback(
     (element: HTMLElement) => {
       checkName?.(element);
       checkElement?.(element);
-      if (element.tagName !== "BUTTON") return () => {};
+      if (element.tagName !== "BUTTON" || !invoker) return () => {};
       element.setAttribute("popovertarget", popupId);
       return () => {
         element.removeAttribute("popovertarget");
       };
     },
-    [checkName, checkElement, popupId],
+    [checkName, checkElement, popupId, invoker],
   );
 
   const state: ComboboxTriggerState = {
@@ -123,11 +128,10 @@ export function ComboboxTrigger({
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     tabIndex: -1,
-    ...disabledButton(render, disabled).props,
-    // A `<button>` is the invoker after hydration and the browser exposes the listbox's state on
-    // it. Another element: shown (the listbox is in the top layer); `data-open` is the
-    // optimistic one.
-    "aria-expanded": rendersButton(render) ? undefined : popover.shown,
+    ...disabledProps,
+    // An invoker `<button>`: the browser exposes the listbox's state on it after hydration.
+    // Otherwise: shown (the listbox is in the top layer); `data-open` is the optimistic one.
+    "aria-expanded": invoker && rendersButton(render) ? undefined : popover.shown,
     "aria-controls": ctx.ids.list,
     // Owned: the ref writes `popovertarget` after hydration; a render element sets none of these.
     popoverTarget: undefined,

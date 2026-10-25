@@ -32,7 +32,7 @@ import {
   supportsAriaNotify,
 } from "../__tests__/engine.js";
 import { axProperty, expectInvokerExpanded, getAXNodes } from "../__tests__/ax-tree.js";
-import { deferred } from "../__tests__/helpers.js";
+import { deferred, PlainButton } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Field } from "../field/index.js";
 import { Popover } from "../popover/index.js";
@@ -1148,6 +1148,31 @@ describe("Trigger close (#112, browser)", () => {
       [false, "activate", "click"],
     ]);
     expect(location.hash).toBe("");
+  });
+
+  it("a disabled component render pressed while shown: light-dismissed, one (false, dismiss), focus stays in the input (#132)", async () => {
+    const openAction = vi.fn<OpenAction>();
+    render(
+      <Harness
+        root={{ openChangeAction: openAction }}
+        trigger={{ disabled: true, render: <PlainButton /> }}
+      />,
+    );
+    expect(trigger()).toHaveAttribute("aria-disabled", "true");
+    // No invoker while disabled and focusable: nothing exempts a press on it from light dismiss.
+    expect(trigger()).not.toHaveAttribute("popovertarget");
+    input().focus();
+    await userEvent.keyboard("j");
+    await expect.poll(() => isOpen()).toBe(true);
+    await expect.poll(() => trigger().getAttribute("aria-expanded")).toBe("true");
+    openAction.mockClear();
+    await pressTrigger();
+    await expect.poll(() => isOpen()).toBe(false);
+    await quietPeriod(100, "the listbox must not re-open");
+    expect(isOpen()).toBe(false);
+    expect(document.activeElement).toBe(input());
+    expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "dismiss"]]);
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
   });
 
   it("a click while closed opens once, anchored to the input, at least as wide (no command ran)", async () => {

@@ -2129,6 +2129,58 @@ describe("Combobox", () => {
       expect(error).toHaveBeenCalled();
     });
 
+    it("a disabled component render is no invoker: aria-disabled, no popovertarget, aria-expanded from shown (#132)", async () => {
+      const openAction = vi.fn<OpenAction>();
+      const user = setupUser();
+      const { rerender } = render(
+        <Harness
+          root={{ openChangeAction: openAction }}
+          trigger={{ disabled: true, render: <PlainButton /> }}
+        />,
+      );
+      expect(trigger().tagName).toBe("BUTTON");
+      expect(trigger()).toHaveAttribute("aria-disabled", "true");
+      expect(trigger()).not.toHaveAttribute("disabled");
+      expect(trigger()).not.toHaveAttribute("popovertarget");
+      expect(trigger()).toHaveAttribute("aria-expanded", "false");
+      // A cancelled click that opens nothing.
+      expect(fireEvent.click(trigger())).toBe(false);
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(openAction).not.toHaveBeenCalled();
+      // Shown through typing: the Trigger exposes it itself.
+      await typeText(user, "j");
+      expect(isOpen()).toBe(true);
+      await flushTasks(2);
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+      // Enabled: an invoker again, the browser exposes the state.
+      rerender(
+        <Harness
+          root={{ openChangeAction: openAction }}
+          trigger={{ disabled: false, render: <PlainButton /> }}
+        />,
+      );
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
+      expect(trigger()).not.toHaveAttribute("aria-disabled");
+      // And back.
+      rerender(
+        <Harness
+          root={{ openChangeAction: openAction }}
+          trigger={{ disabled: true, render: <PlainButton /> }}
+        />,
+      );
+      expect(trigger()).not.toHaveAttribute("popovertarget");
+      expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("a natively disabled host button keeps popovertarget (an invoker; the browser's own disabled check applies)", () => {
+      render(<Harness trigger={{ disabled: true }} />);
+      expect(trigger()).toBeDisabled();
+      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
+      expect(trigger()).not.toHaveAttribute("aria-expanded");
+    });
+
     it("popoverTarget, popoverTargetAction, commandfor and command are owned keys", () => {
       // @ts-expect-error -- owned key, omitted from ComboboxTriggerProps
       const popoverTarget: ComboboxTriggerProps = { popoverTarget: "elsewhere" };
