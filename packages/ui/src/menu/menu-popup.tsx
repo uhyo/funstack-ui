@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { use, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -183,15 +183,6 @@ export function MenuPopup({
   const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
   const { onKeyDown, typingAhead } = useMenuKeyboard(menu, nativeFocusgroup);
 
-  // The outside right- / middle-click listeners and the foreign invoker press guard (#126) of a
-  // top-level menu, while it is shown.
-  const outside = useRef<(() => void) | null>(null);
-  const stopOutside = useCallback(() => {
-    outside.current?.();
-    outside.current = null;
-  }, []);
-  useEffect(() => stopOutside, [stopOutside]);
-
   const { setElement, visible, renderContent, reshow } = usePopoverPopup(popover, {
     part: "Menu.Popup",
     // Design 6.1: the first (or last) enabled item by open cause, nothing for a hover open, the
@@ -207,22 +198,18 @@ export function MenuPopup({
     transition,
     // A point open nests through the region that opened it (context-menu.md 3.1).
     source: () => (point !== null ? point.source : popover.triggerRef.current),
-    onToggle: (event) => {
-      if (submenu) return;
-      const element = popover.popupRef.current;
-      if (event.newState === "open" && element !== null && isPopoverOpen(element)) {
-        if (outside.current === null) {
+    // The outside right- / middle-click listeners and the foreign invoker press guard of a
+    // top-level menu.
+    whileShown: submenu
+      ? undefined
+      : (element) => {
           const stopListening = listenOutside(element, menu, () => latestPlacement.current);
           const stopPresses = listenInvokerPresses(element);
-          outside.current = () => {
+          return () => {
             stopListening();
             stopPresses();
           };
-        }
-      } else if (event.newState === "closed") {
-        stopOutside();
-      }
-    },
+        },
   });
 
   // A move (context-menu.md 4.3): the popup is shown and the placement changed since it was

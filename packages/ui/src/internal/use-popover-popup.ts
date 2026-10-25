@@ -31,10 +31,13 @@ export interface UsePopoverPopupOptions {
   readonly keepMounted?: boolean | undefined;
   /** The consumer's `transition`; decides how a library-driven close keeps its content (4.4). */
   readonly transition: ViewTransitionClass | undefined;
-  /** Runs after the library's own `beforetoggle` handling (Menu: focus bookkeeping). */
-  readonly onBeforeToggle?: (event: ToggleEvent) => void;
-  /** Runs after the library's own `toggle` handling (Menu: the outside right-click listeners). */
-  readonly onToggle?: (event: ToggleEvent) => void;
+  /**
+   * Installs listeners that live while the popup is shown (Menu: the outside right-click
+   * listeners; Menu and Combobox: the foreign invoker press guard) and returns their cleanup.
+   * Called at the `toggle` that finds the popup shown; the cleanup runs at the `toggle` of the
+   * close and when the element detaches.
+   */
+  readonly whileShown?: ((popup: HTMLElement) => () => void) | undefined;
   /**
    * The `source` of each library `showPopover({ source })`, read right before the call. Default:
    * the registered Trigger. Menu passes the ContextTrigger region for a point open
@@ -150,8 +153,7 @@ export function usePopoverPopup(
   ctx: PopoverRootValue,
   options: UsePopoverPopupOptions,
 ): PopoverPopupHook {
-  const { part, initialFocus, transition, onBeforeToggle: onBeforeToggleOption } = options;
-  const onToggleOption = options.onToggle;
+  const { part, initialFocus, transition } = options;
   const isLibrary = ctx.mode === "library";
   const { popupRef, triggerRef, setShown } = ctx;
 
@@ -173,6 +175,12 @@ export function usePopoverPopup(
   const interestOpen = useRef(false);
   const interestHideTask = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const interestHide = useRef(false);
+  // The cleanup of `whileShown` while the popup is shown.
+  const stopWhileShown = useRef<(() => void) | null>(null);
+  const stopListeningWhileShown = (): void => {
+    stopWhileShown.current?.();
+    stopWhileShown.current = null;
+  };
 
   // `held`: children stay mounted while the hide animates (design 4.4).
   const exit = useCloseHold(ctx.committed, isLibrary, transition);
@@ -336,7 +344,6 @@ export function usePopoverPopup(
         (active !== null && element.contains(active)) || contentProbe.hadFocus();
       contentProbe.forget();
     }
-    onBeforeToggleOption?.(toggle);
   };
 
   const onToggle = (event: Event): void => {
@@ -368,7 +375,12 @@ export function usePopoverPopup(
         ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
       }
     }
-    onToggleOption?.(event as ToggleEvent);
+    const { newState } = event as ToggleEvent;
+    if (newState === "open" && isPopoverOpen(element)) {
+      stopWhileShown.current ??= options.whileShown?.(element) ?? null;
+    } else if (newState === "closed") {
+      stopListeningWhileShown();
+    }
   };
 
   const onCommand = (event: Event): void => {
@@ -482,6 +494,7 @@ export function usePopoverPopup(
         interestHide.current = false;
         interestInvoker.current = null;
         interestOpen.current = false;
+        stopListeningWhileShown();
         if (isLibrary) setShown(false);
         autofocused?.removeAttribute("autofocus");
         if (popupRef.current === element) popupRef.current = null;

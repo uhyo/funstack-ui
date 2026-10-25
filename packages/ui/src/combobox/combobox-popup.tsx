@@ -1,5 +1,4 @@
 "use client";
-import { useCallback, useEffect, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -10,7 +9,6 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import { listenInvokerPresses } from "../internal/invoker-press.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
@@ -91,29 +89,15 @@ export function ComboboxPopup({
   const ctx = useComboboxContext("Combobox.Popup");
   const { popover } = ctx;
 
-  // While shown, a press on a foreign invoker of the popup keeps focus in the input (design 5.4,
-  // #126).
-  const invokerPresses = useRef<(() => void) | null>(null);
-  const stopInvokerPresses = useCallback(() => {
-    invokerPresses.current?.();
-    invokerPresses.current = null;
-  }, []);
-  useEffect(() => stopInvokerPresses, [stopInvokerPresses]);
-
   const { setElement, renderContent } = usePopoverPopup(popover, {
     part: "Combobox.Popup",
     // Focus stays in the input: nothing inside the popup is ever focused.
     resolveInitialFocus: () => null,
     keepMounted,
     transition,
-    onToggle: (event) => {
-      const element = popover.popupRef.current;
-      if (event.newState === "open" && element !== null && isPopoverOpen(element)) {
-        invokerPresses.current ??= listenInvokerPresses(element);
-      } else if (event.newState === "closed") {
-        stopInvokerPresses();
-      }
-    },
+    // While shown, a press on a foreign invoker of the popup keeps focus in the input (design
+    // 5.4).
+    whileShown: listenInvokerPresses,
   });
 
   const devRef = useElementCheck(

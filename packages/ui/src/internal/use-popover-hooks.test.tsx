@@ -1,7 +1,7 @@
 // The extension points of the shared popover hooks that Menu (#39, design/components/menu.md 14)
 // uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, a
-// `<div popover>` popup (no dialog focusing steps), and `renderContent` with a Menu-style
-// `requestClose`. Popover's own behaviour is covered by src/popover/popover.test.tsx.
+// `<div popover>` popup (no dialog focusing steps), `renderContent` with a Menu-style
+// `requestClose`, and `whileShown` (Menu and Combobox). Popover's own behaviour is covered by src/popover/popover.test.tsx.
 import { render, screen } from "@testing-library/react";
 import type { ComponentPropsWithRef, Ref, ViewTransitionClass } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -16,11 +16,13 @@ function Mini({
   onDispatch,
   resolve,
   transition,
+  whileShown,
   link = false,
 }: {
   onDispatch?: (next: boolean, details: OverlayDetails) => void;
   resolve?: (popup: HTMLElement) => HTMLElement | null;
   transition?: ViewTransitionClass;
+  whileShown?: (popup: HTMLElement) => () => void;
   /** Render the Trigger as a link (no invoker) instead of a `<button>`. */
   link?: boolean;
 }) {
@@ -47,6 +49,7 @@ function Mini({
     resolveInitialFocus: resolve,
     keepMounted: undefined,
     transition,
+    whileShown,
   });
   return (
     <>
@@ -159,6 +162,34 @@ describe("shared popover hooks: Menu's extension points", () => {
     await user.click(screen.getByTestId("trigger"));
     await flushTasks();
     expect(screen.getByTestId("trigger")).toHaveFocus();
+  });
+
+  it("whileShown installs at the open's toggle and cleans up at the close's toggle", async () => {
+    const user = setupUser();
+    const stop = vi.fn();
+    const whileShown = vi.fn((_popup: HTMLElement) => stop);
+    render(<Mini whileShown={whileShown} />);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(whileShown).toHaveBeenCalledTimes(1);
+    expect(whileShown).toHaveBeenCalledWith(screen.getByTestId("popup"));
+    expect(stop).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(whileShown).toHaveBeenCalledTimes(1);
+  });
+
+  it("whileShown cleans up when the popup unmounts while shown", async () => {
+    const user = setupUser();
+    const stop = vi.fn();
+    const { unmount } = render(<Mini whileShown={() => stop} />);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
+    expect(stop).not.toHaveBeenCalled();
+    unmount();
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 
   it("useOverlayRoot returns the same value across re-renders with unchanged state (#48)", async () => {
