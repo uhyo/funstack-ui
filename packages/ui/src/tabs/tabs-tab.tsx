@@ -17,23 +17,39 @@ import { TabsListContext, useTabsContext } from "./tabs-context.js";
 import type { TabsOrientation } from "./tabs-context.js";
 import { anchorName, panelId, tabId } from "./tabs-ids.js";
 
+/**
+ * State of `Tabs.Tab`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TabsTabState {
+  /** The Tab's `value` prop. */
   readonly value: string;
   /** Optimistic: true as soon as the user selects this tab, before the action settles. */
   readonly selected: boolean;
   /** The Root is pending and this tab is the optimistic target. */
   readonly pending: boolean;
+  /** Disabled by its own prop or by the Root. */
   readonly disabled: boolean;
+  /** The Root's `orientation`. */
   readonly orientation: TabsOrientation;
 }
 
+/**
+ * Props of `Tabs.Tab`.
+ *
+ * @see https://ui.funstack.work/components/tabs
+ */
 export interface TabsTabProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "onKeyDown" | "onFocus" | "id" | "value" | "className" | "style" | "children"
 > {
   /** The value this tab selects. Must be unique within the Root. */
   value: string;
-  /** Focusable but inert: `aria-disabled="true"`, never dispatches. */
+  /**
+   * Focusable but inert: `aria-disabled="true"`, never dispatches.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
   /**
    * Forwarded to the Tab's `<ViewTransition default>`. Default: no boundary. Fires only on the commit
@@ -45,10 +61,13 @@ export interface TabsTabProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TabsTabState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TabsTabState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, TabsTabState>;
+  /** Replace the default `<button>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"button">, TabsTabState>;
 }
 
@@ -75,6 +94,8 @@ function movedWithinList(event: FocusEvent<HTMLElement>): boolean {
  * Owned keys (conventions 1.2): `role`, `id`, `aria-selected`, `aria-controls` (token-merged),
  * `aria-disabled`, `tabIndex`, `focusgroupstart` (with `experimental_focusgroup`), `data-selected`, `data-pending`, `data-disabled`,
  * `data-orientation`, `onClick`, `onKeyDown`, `onFocus`.
+ *
+ * @see https://ui.funstack.work/components/tabs
  */
 export function TabsTab({
   value,

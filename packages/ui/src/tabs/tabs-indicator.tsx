@@ -7,20 +7,35 @@ import { useTabsContext } from "./tabs-context.js";
 import type { TabsOrientation } from "./tabs-context.js";
 import { anchorName } from "./tabs-ids.js";
 
+/**
+ * State of `Tabs.Indicator`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TabsIndicatorState {
   /** Optimistic selected value, or `null` (the indicator is then `hidden`). */
   readonly value: string | null;
+  /** The Root is pending. */
   readonly pending: boolean;
+  /** The Root's `orientation`. */
   readonly orientation: TabsOrientation;
 }
 
+/**
+ * Props of `Tabs.Indicator`.
+ *
+ * @see https://ui.funstack.work/components/tabs
+ */
 export interface TabsIndicatorProps extends Omit<
   ComponentPropsWithRef<"span">,
   "hidden" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TabsIndicatorState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TabsIndicatorState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, TabsIndicatorState>;
+  /** Replace the default `<span>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"span">, TabsIndicatorState>;
 }
 
@@ -33,6 +48,8 @@ export interface TabsIndicatorProps extends Omit<
  * commits, which never start a view transition (design 10.1).
  *
  * Owned keys (conventions 1.2): `aria-hidden`, `hidden`, `data-selected`, `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/tabs
  */
 export function TabsIndicator({ className, style, children, render, ...rest }: TabsIndicatorProps) {
   const ctx = useTabsContext("Tabs.Indicator");

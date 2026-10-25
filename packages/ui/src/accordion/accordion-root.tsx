@@ -32,6 +32,10 @@ import type { AccordionMode, AccordionRootContextValue } from "./accordion-conte
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Accordion.Root`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface AccordionRootState {
   /** An action dispatched through this Accordion is in flight (library mode only). */
   readonly pending: boolean;
@@ -59,22 +63,42 @@ interface AccordionRootBaseProps extends Omit<
   // `defaultValue` is also a native HTMLAttributes member; the Accordion's own definition wins.
   "onKeyDown" | "defaultValue" | "className" | "style" | "children"
 > {
-  /** Disables every item: triggers render `aria-disabled` and never dispatch. Default `false`. */
+  /**
+   * Disables every item: triggers render `aria-disabled` and never dispatch.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
   /**
    * Renders `interpolate-size: allow-keywords` on the root so `::details-content` can transition
    * `height` to `auto`. Chromium-only polish today; use the `grid-template-rows` form for a
    * cross-engine animation. Merged with `style`; the consumer's declaration wins.
+   *
+   * @defaultValue `false`
    */
   experimental_interpolateSize?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, AccordionRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, AccordionRootState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, AccordionRootState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, AccordionRootState>;
 }
 
+/**
+ * Props of `Accordion.Root` in multiple mode (the default): any number of items open, `value` is
+ * a `string[]`.
+ *
+ * @see https://ui.funstack.work/components/accordion
+ */
 export interface AccordionRootMultipleProps extends AccordionRootBaseProps {
-  /** Any number of items may be open. */
+  /**
+   * Any number of items may be open.
+   *
+   * @defaultValue `false`
+   */
   exclusive?: false;
   /** Controlled open items. `undefined` means uncontrolled; `[]` means none open. */
   value?: string[];
@@ -94,6 +118,12 @@ export interface AccordionRootMultipleProps extends AccordionRootBaseProps {
   valueChangeAction?: ChangeAction<string[], AccordionValueChangeDetails>;
 }
 
+/**
+ * Props of `Accordion.Root` in exclusive mode (`exclusive`): at most one item open, `value` is
+ * `string | null`.
+ *
+ * @see https://ui.funstack.work/components/accordion
+ */
 export interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
   /**
    * At most one item open. JS-free mode: renders the same `name` on every `<details>` (the
@@ -115,6 +145,8 @@ export interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
  * the browser owns each `<details open>`, nothing runs on toggle, and `exclusive` renders `name`.
  * With any of them it runs in **library mode**: the summary click is intercepted, `open` is driven
  * by committed state inside a transition, and triggers show optimistic `data-open`.
+ *
+ * @see https://ui.funstack.work/components/accordion
  */
 export type AccordionRootProps = AccordionRootMultipleProps | AccordionRootExclusiveProps;
 
@@ -182,6 +214,8 @@ function nextTrigger(
 /**
  * The accordion container: a `div` that owns the open state, the transition, the context the
  * other parts read, and ArrowUp/ArrowDown/Home/End navigation between triggers.
+ *
+ * @see https://ui.funstack.work/components/accordion
  */
 export function AccordionRoot(props: AccordionRootProps) {
   const {

@@ -18,7 +18,12 @@ import type { AccordionItemContextValue } from "./accordion-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Accordion.Item`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface AccordionItemState {
+  /** The Item's `value` prop. */
   readonly value: string;
   /** Optimistic open state. `undefined` in JS-free mode (browser-owned, unknown to React). */
   readonly open: boolean | undefined;
@@ -28,6 +33,11 @@ export interface AccordionItemState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Accordion.Item`.
+ *
+ * @see https://ui.funstack.work/components/accordion
+ */
 export interface AccordionItemProps extends Omit<
   ComponentPropsWithRef<"details">,
   "open" | "name" | "onToggle" | "className" | "style" | "children"
@@ -37,11 +47,15 @@ export interface AccordionItemProps extends Omit<
   /**
    * JS-free mode only: renders the initial `open` attribute; the browser owns it from then on.
    * Ignored (dev warning) in library mode, where the Root's `defaultValue` / `value` decide.
+   *
+   * @defaultValue `false`
    */
   defaultOpen?: boolean;
   /**
    * Disables this item: the Trigger renders `aria-disabled` and never toggles. Enforced by a
    * click handler, so in JS-free mode it does not hold before hydration or with JS off.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
   /**
@@ -54,8 +68,11 @@ export interface AccordionItemProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, AccordionItemState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, AccordionItemState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, AccordionItemState>;
   /** Must render a `<details>` element. */
   render?: RenderProp<ComponentPropsWithRef<"details">, AccordionItemState>;
@@ -65,6 +82,8 @@ export interface AccordionItemProps extends Omit<
  * One accordion entry: the `<details>` element. In library mode its `open` attribute follows
  * committed state and `data-open` / `data-pending` follow optimistic state; in JS-free mode (or
  * outside any Root, as a standalone disclosure) the browser owns `open`.
+ *
+ * @see https://ui.funstack.work/components/accordion
  */
 export function AccordionItem({
   value,

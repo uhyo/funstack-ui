@@ -2,7 +2,12 @@
 import { createContext, use } from "react";
 import type { ChangeReason, Orientation } from "../internal/types.js";
 
+/** The layout and arrow-key axis of a Tabs. */
 export type TabsOrientation = Orientation;
+/**
+ * `"automatic"`: selection follows focus. `"manual"`: arrow keys only move focus; Enter, Space or a
+ * click selects.
+ */
 export type TabsActivationMode = "automatic" | "manual";
 
 export interface TabsContextValue {

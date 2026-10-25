@@ -18,11 +18,22 @@ import type { TabsListContextValue, TabsOrientation } from "./tabs-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Tabs.List`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface TabsListState {
+  /** The Root's `orientation`. */
   readonly orientation: TabsOrientation;
+  /** The Root's `disabled`. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Tabs.List`.
+ *
+ * @see https://ui.funstack.work/components/tabs
+ */
 export interface TabsListProps extends Omit<
   ComponentPropsWithRef<"div">,
   "onKeyDown" | "onFocus" | "className" | "style" | "children"
@@ -30,12 +41,17 @@ export interface TabsListProps extends Omit<
   /**
    * Render `focusgroup="tablist …"` and, where the browser implements it, let the browser handle
    * arrow keys, Home and End. Chromium 150+ only; elsewhere the JS path stays active.
-   * Default `false`.
+   *
+   * @defaultValue `false`
    */
   experimental_focusgroup?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TabsListState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, TabsListState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, TabsListState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, TabsListState>;
 }
 
@@ -53,6 +69,8 @@ function tabsOf(list: Element): HTMLElement[] {
  * Owned keys (a `render` element cannot override them, conventions 1.2): `role`,
  * `aria-orientation`, `data-orientation`, `data-disabled`, `tabIndex`, `onKeyDown`, `onFocus`,
  * and `focusgroup` when `experimental_focusgroup` is on.
+ *
+ * @see https://ui.funstack.work/components/tabs
  */
 export function TabsList({
   experimental_focusgroup = false,

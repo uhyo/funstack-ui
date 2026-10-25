@@ -10,13 +10,24 @@ import { AccordionItemContext } from "./accordion-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Accordion.Panel`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface AccordionPanelState {
+  /** The enclosing Item's `value`. */
   readonly value: string;
   /** Committed open state. `undefined` in JS-free mode. */
   readonly open: boolean | undefined;
+  /** The enclosing Item is disabled (by its own prop or by the Root). */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Accordion.Panel`.
+ *
+ * @see https://ui.funstack.work/components/accordion
+ */
 export interface AccordionPanelProps extends Omit<
   ComponentPropsWithRef<"div">,
   "className" | "style" | "children"
@@ -30,7 +41,9 @@ export interface AccordionPanelProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, AccordionPanelState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, AccordionPanelState>;
   /**
    * Always mounted (closed `<details>` content stays in the DOM, indexable and searchable). The
@@ -38,12 +51,15 @@ export interface AccordionPanelProps extends Omit<
    * suspending content keeps the item closed until it is ready.
    */
   children?: StateValue<ReactNode, AccordionPanelState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, AccordionPanelState>;
 }
 
 /**
  * The item's content region: a `div` inside the `<details>`, after the Trigger. Its visibility
  * is the parent's `open` attribute (`details:open > .panel`); it renders committed state.
+ *
+ * @see https://ui.funstack.work/components/accordion
  */
 export function AccordionPanel({
   transition,
