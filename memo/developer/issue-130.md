@@ -78,3 +78,17 @@ memo/reviewer/wave18-audit-tests.md. Phase 2 (T3, T4, T5, T7) and T2 (dev-131) a
   last 8 runs), firefox 123.5 s (master 108-126 s), webkit 47.8 / 47.3 / 51.6 s (master
   39.0-47.0 s). No gain visible on CI; WebKit sits at the top of master's range, not explained
   by these changes (the tests share is ~13 %), worth a look if it persists after merge.
+
+## Rebase onto master (c65763f: #128, #129, #131)
+- Conflicts: use-popover-hooks.test (T9 title next to #129's rows), combobox.browser (wrap redone
+  with the wrap script on master's file; T1 import list keeps #129's `animationsFinished`).
+  vitest.setup.ts merged cleanly and keeps #129's `resetInvalidBatch()`.
+- New titles with ids (#129, #131): 3 renamed (combobox x2 "#132", commit-action-suite "#81 H2").
+  No new per-file teardown, `restoreAct` or press copies in the rows #129 added.
+  slider.browser's `centre` is unrounded (geometry maths, not a press point): left alone.
+- Names: master 3384 jsdom / 524 browser (518 + 6 Chromium); branch the same counts. Leaf titles
+  per file compared after stripping ids: browser identical; jsdom differs only by the intended
+  renames (ids inside mixed parentheses, "moved from" note) and T11 (2 rows out, 1 row x 2 modes in).
+- Gates after the rebase: typecheck, lint, format:check, build, root test:jsdom (3384), two
+  shuffled jsdom runs, Chromium 518 + 6 skipped (25.8 s), Firefox 494 + 30 skipped (131.7 s).
+- CLAUDE.md: one sentence on vitest.browser.setup.ts (lead's permission).
