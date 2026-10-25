@@ -358,3 +358,5 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 ## Wave 18: tidy-up pass (user: "A new tidy-up pass sounds great")
 - Running 3 read-only audits: audit18-src (reviewer, source; overlay accretion from wave 17) → memo/reviewer/wave18-audit-source.md; audit18-tests (reviewer) → memo/reviewer/wave18-audit-tests.md; audit18-docs (technical-writer, docs + example) → memo/technical-writer/wave18-docs-audit.md.
 - Then: pick findings by value/risk → issues → developers in worktrees → review per change → release.
+- Audits done (S1-S15, T1-T13, D1-D16). Issues: #128 docs (audit18-docs writer, branch docs/128-wave18), #129 source (dev-129, refactor/129-source), #130 tests phase 1 (dev-130, refactor/130-tests; phase 2 T3/T4/T5/T7 after), #131 T2 commit-action suite + S8 useValueSet (dev-131, refactor/131-controls), #132 design S10 + D3 (arch-132). Later: S6/S7 file splits after #129. Merge order planned: #128, #131, #129, #130 (each rebases; review each).
+- Note: 8 jsdom failures in directives.test.ts when dist/ is stale (filter test:jsdom skips build) — not a defect.
