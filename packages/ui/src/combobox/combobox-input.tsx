@@ -42,6 +42,7 @@ export interface ComboboxInputProps extends Omit<
   | "onChange"
   | "onInput"
   | "onKeyDown"
+  | "onFocus"
   | "onBlur"
   | "onClick"
   | "onPointerDown"
@@ -71,11 +72,12 @@ export interface ComboboxInputProps extends Omit<
  *
  * Owned keys (conventions 1.2): `id`, `type`, `role`, `value`, `autoComplete`,
  * `aria-autocomplete`, `aria-expanded`, `aria-controls` (token-merged), `aria-activedescendant`,
- * `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `onPointerDown` (a primary-button
- * press while the listbox is shown captures the pointer to the Popup, so it is no light dismiss),
- * `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`; inside a
- * `Field.Root` (whose control id it takes) also `required` (own or the Field's),
- * `aria-describedby` (token-merged), `aria-invalid` and `data-invalid`.
+ * `disabled`, `onChange`, `onKeyDown`, `onFocus` and `onBlur` (focus arriving starts the press
+ * watch that decides a focus loss), `onClick`, `onPointerDown` (a primary-button press while the
+ * listbox is shown captures the pointer to the Popup, so it is no light dismiss), `data-open`,
+ * `data-pending`, `data-selected`, `data-stale`, `data-disabled`; inside a `Field.Root` (whose
+ * control id it takes) also `required` (own or the Field's), `aria-describedby` (token-merged),
+ * `aria-invalid` and `data-invalid`. `onFocusCapture` passes through.
  */
 export function ComboboxInput({ className, style, render, ...rest }: ComboboxInputProps) {
   const ctx = useComboboxContext("Combobox.Input");

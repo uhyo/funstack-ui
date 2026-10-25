@@ -339,10 +339,10 @@ export function ComboboxPage() {
       <PartFacts
         state={"`ComboboxInputState` is `{ value, inputValue, open, pending, stale, disabled }`."}
         owned={
-          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
         }
         note={
-          "`placeholder`, `name` (a second field with the raw text), `aria-describedby` and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
+          "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
         }
       />
 

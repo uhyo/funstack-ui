@@ -2534,6 +2534,14 @@ describe("Combobox", () => {
       const props: ComboboxInputProps = { onPointerDown: () => {} };
       expect(props).toBeDefined();
     });
+
+    it("onFocus is an owned key; onFocusCapture passes through", () => {
+      // @ts-expect-error -- owned key, omitted from ComboboxInputProps
+      const props: ComboboxInputProps = { onFocus: () => {} };
+      const capture: ComboboxInputProps = { onFocusCapture: () => {} };
+      expect(props).toBeDefined();
+      expect(capture).toBeDefined();
+    });
   });
 
   describe("platform: mount reconciliation", () => {
