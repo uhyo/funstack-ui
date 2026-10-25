@@ -7,6 +7,11 @@ import { SelectContext, useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
+/**
+ * Props of `Select.Group`.
+ *
+ * @see https://ui.funstack.work/components/select
+ */
 export interface SelectGroupProps extends Omit<
   ComponentPropsWithRef<"optgroup">,
   "label" | "className" | "style" | "children"
@@ -16,10 +21,17 @@ export interface SelectGroupProps extends Omit<
    * technology. Required. Keep it equal to the text of a `Select.GroupLabel`, if any.
    */
   label: string;
-  /** Native `disabled`: every option in the group is disabled. */
+  /**
+   * Native `disabled`: every option in the group is disabled.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SelectRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SelectRootState>;
+  /** The GroupLabel and the group's Options. May be a function of the part's state. */
   children?: StateValue<ReactNode, SelectRootState>;
   /** Replace the rendered element. Must keep an `<optgroup>`. */
   render?: RenderProp<ComponentPropsWithRef<"optgroup">, SelectRootState>;
@@ -28,6 +40,8 @@ export interface SelectGroupProps extends Omit<
 /**
  * An `<optgroup>` of options. Its state is the Root's state. Owned key: `label`. Its `disabled`
  * reaches the Options' `state.disabled` / `data-disabled` through context, as `:disabled` does.
+ *
+ * @see https://ui.funstack.work/components/select
  */
 export function SelectGroup({
   label,

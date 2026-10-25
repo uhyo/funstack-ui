@@ -17,6 +17,8 @@ import { SelectValue } from "./select-value.js";
  * the styled picker with `appearance: base-select` in your CSS. The selected option is the
  * optimistic value; the Root, the Trigger and the picked Option carry `data-pending` while
  * `valueChangeAction` is in flight.
+ *
+ * @see https://ui.funstack.work/components/select
  */
 export const Select = {
   Root: SelectRoot,

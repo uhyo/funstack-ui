@@ -15,13 +15,24 @@ import { useComboboxContext } from "./combobox-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Combobox.Clear`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ComboboxClearState {
   /** Optimistic selection. */
   readonly value: string | null;
+  /** The text in the input (urgent). */
   readonly inputValue: string;
+  /** Disabled by its own prop or by the Root. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Combobox.Clear`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxClearProps extends Omit<
   ComponentPropsWithRef<"button">,
   | "onClick"
@@ -36,10 +47,15 @@ export interface ComboboxClearProps extends Omit<
   /**
    * Disables this button; the Root's `disabled` does too. Native `disabled` on a `<button>`; with
    * a link or component `render`, `aria-disabled="true"` instead.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxClearState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxClearState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ComboboxClearState>;
   /** Should render a `<button>`. */
   render?: RenderProp<ComponentPropsWithRef<"button">, ComboboxClearState>;
@@ -54,6 +70,8 @@ export interface ComboboxClearProps extends Omit<
  *
  * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or component
  * `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxClear({
   disabled: ownDisabled = false,

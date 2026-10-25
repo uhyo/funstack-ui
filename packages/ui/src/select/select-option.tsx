@@ -9,7 +9,12 @@ import { useRender } from "../internal/use-render.js";
 import { useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 
+/**
+ * State of `Select.Option`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface SelectOptionState {
+  /** The Option's `value` prop. */
   readonly value: string;
   /** Optimistic: true as soon as the user picks this option, before the action settles. */
   readonly selected: boolean;
@@ -19,15 +24,26 @@ export interface SelectOptionState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Select.Option`.
+ *
+ * @see https://ui.funstack.work/components/select
+ */
 export interface SelectOptionProps extends Omit<
   ComponentPropsWithRef<"option">,
   "value" | "selected" | "className" | "style" | "children"
 > {
   /** The option's value. Required: React cannot infer a value from rich children. */
   value: string;
-  /** Native `disabled`: not pickable, skipped by keyboard navigation. */
+  /**
+   * Native `disabled`: not pickable, skipped by keyboard navigation.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SelectOptionState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SelectOptionState>;
   /**
    * The option's content. Keep it readable as plain text: engines without customizable select
@@ -46,6 +62,8 @@ export interface SelectOptionProps extends Omit<
  *
  * Owned keys: `value`, `selected` (never rendered), `disabled`, `data-selected`, `data-pending`,
  * `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/select
  */
 export function SelectOption({
   value,

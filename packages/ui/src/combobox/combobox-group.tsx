@@ -15,26 +15,39 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /** `Combobox.Group`, `Combobox.GroupLabel` and `Combobox.Status` have no state of their own. */
 export type ComboboxGroupState = Record<string, never>;
+/** State of `Combobox.GroupLabel`: empty (the part has no state of its own). */
 export type ComboboxGroupLabelState = Record<string, never>;
+/** State of `Combobox.Status`: empty (the part has no state of its own). */
 export type ComboboxStatusState = Record<string, never>;
 /** `Combobox.Empty` renders from the List's state. */
 export type ComboboxEmptyState = ComboboxListState;
 
 const EMPTY: Record<string, never> = {};
 
+/**
+ * Props of `Combobox.Group`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxGroupProps extends Omit<
   ComponentPropsWithRef<"div">,
   "role" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxGroupState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxGroupState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ComboboxGroupState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxGroupState>;
 }
 
 /**
  * A labelled set of options: `<div role="group" aria-labelledby>` named by the
  * `Combobox.GroupLabel` inside it. Owned keys: `role`, `aria-labelledby` (token-merged).
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxGroup({ className, style, children, render, ...rest }: ComboboxGroupProps) {
   useComboboxContext("Combobox.Group");
@@ -54,17 +67,30 @@ export function ComboboxGroup({ className, style, children, render, ...rest }: C
 
 ComboboxGroup.displayName = "ComboboxGroup";
 
+/**
+ * Props of `Combobox.GroupLabel`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxGroupLabelProps extends Omit<
   ComponentPropsWithRef<"div">,
   "id" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxGroupLabelState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxGroupLabelState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ComboboxGroupLabelState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxGroupLabelState>;
 }
 
-/** The name of the enclosing `Combobox.Group`: a `<div>` with the referenced id. Owned key: `id`. */
+/**
+ * The name of the enclosing `Combobox.Group`: a `<div>` with the referenced id. Owned key: `id`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export function ComboboxGroupLabel({
   className,
   style,
@@ -91,13 +117,22 @@ export function ComboboxGroupLabel({
 
 ComboboxGroupLabel.displayName = "ComboboxGroupLabel";
 
+/**
+ * Props of `Combobox.Empty`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxEmptyProps extends Omit<
   ComponentPropsWithRef<"div">,
   "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxEmptyState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxEmptyState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ComboboxEmptyState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxEmptyState>;
 }
 
@@ -106,6 +141,8 @@ export interface ComboboxEmptyProps extends Omit<
  * options, the results are not stale and none are loading** (no `Combobox.Status` mounted inside
  * the List, i.e. no Suspense fallback showing); nothing otherwise (design 6.3). Place it in the
  * Popup, outside the List (a listbox holds only options). Owns no keys.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxEmpty({ className, style, children, render, ...rest }: ComboboxEmptyProps) {
   const ctx = useComboboxContext("Combobox.Empty");
@@ -124,13 +161,22 @@ export function ComboboxEmpty({ className, style, children, render, ...rest }: C
 
 ComboboxEmpty.displayName = "ComboboxEmpty";
 
+/**
+ * Props of `Combobox.Status`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxStatusProps extends Omit<
   ComponentPropsWithRef<"div">,
   "role" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxStatusState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxStatusState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ComboboxStatusState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxStatusState>;
 }
 
@@ -142,6 +188,8 @@ export interface ComboboxStatusProps extends Omit<
  * nothing is announced while it is mounted. Rendered in the Popup outside the List it is a plain
  * hint, `<div role="status">`. No live-region work of its own either way (the result count is
  * announced with `ariaNotify`). Owned key: `role`.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxStatus({
   className,

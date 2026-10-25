@@ -18,11 +18,20 @@ const isDev = process.env.NODE_ENV !== "production";
 
 export type { FieldErrorValue, FormErrors } from "../internal/validity.js";
 
+/**
+ * State of `Form.Root`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface FormRootState {
   /** A submission is in flight: the Form's own transition, or the form's status (`useFormStatus`), including the Suspense wait of the result. */
   readonly pending: boolean;
 }
 
+/**
+ * Props of `Form.Root`.
+ *
+ * @see https://ui.funstack.work/components/field
+ */
 export interface FormRootProps extends Omit<
   ComponentPropsWithRef<"form">,
   "onSubmit" | "method" | "action" | "className" | "style" | "children"
@@ -44,14 +53,19 @@ export interface FormRootProps extends Omit<
   errors?: FormErrors;
   /**
    * Reset the form (`form.reset()`) when a submission the Form ran settles with no non-empty
-   * entry in `errors`. Default `true`. A submission that reports errors never resets, so the
+   * entry in `errors`. A submission that reports errors never resets, so the
    * user's input, `:user-invalid` and custom validity stay. `false`: never reset.
+   *
+   * @defaultValue `true`
    */
   autoReset?: boolean;
   /** Only with a string `action`. Owned otherwise (React's own with a function action). */
   method?: ComponentPropsWithRef<"form">["method"];
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, FormRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, FormRootState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, FormRootState>;
   /** Must render a `<form>`. */
   render?: RenderProp<ComponentPropsWithRef<"form">, FormRootState>;
@@ -75,6 +89,8 @@ interface Submission {
  *
  * Owned keys (conventions 1.2): `action`, `method` (except with a string `action`), `onSubmit`,
  * `data-pending`.
+ *
+ * @see https://ui.funstack.work/components/field
  */
 export function FormRoot({
   action,

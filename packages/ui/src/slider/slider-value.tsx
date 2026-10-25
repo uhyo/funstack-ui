@@ -17,6 +17,11 @@ export interface SliderValueState<T extends SliderValue = SliderValue> extends S
   readonly index: number | null;
 }
 
+/**
+ * Props of `Slider.Value`.
+ *
+ * @see https://ui.funstack.work/components/slider
+ */
 export interface SliderValueProps<T extends SliderValue = SliderValue> extends Omit<
   ComponentPropsWithRef<"span">,
   "className" | "style" | "children"
@@ -26,9 +31,13 @@ export interface SliderValueProps<T extends SliderValue = SliderValue> extends O
    * slider needs `children` (dev warning otherwise, renders nothing).
    */
   index?: number;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SliderValueState<T>>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SliderValueState<T>>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, SliderValueState<T>>;
+  /** Replace the default `<span>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"span">, SliderValueState<T>>;
 }
 
@@ -36,6 +45,8 @@ export interface SliderValueProps<T extends SliderValue = SliderValue> extends O
  * Displays the shown value: `children(state)`, or the thumb at `index`, or the single value as
  * text. A plain `span`, not `<output>`: a `status` live region updating on every step would
  * chatter (the slider itself exposes its value). No owned keys.
+ *
+ * @see https://ui.funstack.work/components/slider
  */
 export function SliderValuePart<T extends SliderValue = SliderValue>({
   index,

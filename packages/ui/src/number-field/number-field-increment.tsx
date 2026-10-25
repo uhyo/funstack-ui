@@ -16,6 +16,8 @@ export type {
  *
  * Owned keys: `type`, `tabIndex`, `aria-controls`, `disabled`, `aria-disabled` (link or component
  * `render`), `onPointerDown`, `onClick`, `onContextMenu`, `data-pending`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/number-field
  */
 export function NumberFieldIncrement(props: NumberFieldIncrementProps) {
   return useStepButtonElement("increment", "NumberField.Increment", props);

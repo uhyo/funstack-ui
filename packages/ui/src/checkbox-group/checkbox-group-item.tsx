@@ -9,7 +9,11 @@ import { useRender } from "../internal/use-render.js";
 import { useCheckboxGroupContext } from "./checkbox-group-context.js";
 import { syncPresences } from "../internal/sync-presence.js";
 
+/**
+ * State of `CheckboxGroup.Item`, passed to the function forms of `className`, `style` and `render`.
+ */
 export interface CheckboxGroupItemState {
+  /** The Item's `value` prop. */
   readonly value: string;
   /** Optimistic: true as soon as the user checks this box, before the action settles. */
   readonly checked: boolean;
@@ -19,6 +23,11 @@ export interface CheckboxGroupItemState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `CheckboxGroup.Item`.
+ *
+ * @see https://ui.funstack.work/components/checkbox-group
+ */
 export interface CheckboxGroupItemProps extends Omit<
   ComponentPropsWithRef<"input">,
   | "type"
@@ -41,6 +50,8 @@ export interface CheckboxGroupItemProps extends Omit<
    * Native `disabled`: unfocusable, never dispatches, barred from constraint validation. A
    * `Parent` leaves a disabled Item's value alone and derives its state without it; a checked
    * disabled Item does not satisfy the group's `required`.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
   /**
@@ -53,7 +64,9 @@ export interface CheckboxGroupItemProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CheckboxGroupItemState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, CheckboxGroupItemState>;
   /** Replace the rendered element. Must keep an `<input>`; the library sets `type="checkbox"`. */
   render?: RenderProp<ComponentPropsWithRef<"input">, CheckboxGroupItemState>;
@@ -71,6 +84,8 @@ export interface CheckboxGroupItemProps extends Omit<
  * `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-invalid` (the Field's).
  * `onChange` is merged: a `render` element's own handler runs
  * first, then the library's. `role` passes through.
+ *
+ * @see https://ui.funstack.work/components/checkbox-group
  */
 export function CheckboxGroupItem({
   value,

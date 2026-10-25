@@ -21,6 +21,7 @@ import { optionId, useComboboxContext } from "./combobox-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/** State of `Combobox.Input`, passed to the function forms of `className`, `style` and `render`. */
 export interface ComboboxInputState {
   /** Optimistic selection. */
   readonly value: string | null;
@@ -32,9 +33,15 @@ export interface ComboboxInputState {
   readonly pending: boolean;
   /** The results shown are for an older text. */
   readonly stale: boolean;
+  /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Combobox.Input`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxInputProps extends Omit<
   ComponentPropsWithRef<"input">,
   | "value"
@@ -59,7 +66,9 @@ export interface ComboboxInputProps extends Omit<
 > {
   /** Native `required`: empty text is `valueMissing`. */
   required?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxInputState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxInputState>;
   /** Must render an `<input>` of type `text` or `search`. */
   render?: RenderProp<ComponentPropsWithRef<"input">, ComboboxInputState>;
@@ -78,6 +87,8 @@ export interface ComboboxInputProps extends Omit<
  * `data-pending`, `data-selected`, `data-stale`, `data-disabled`; inside a `Field.Root` (whose
  * control id it takes) also `required` (own or the Field's), `aria-describedby` (token-merged),
  * `aria-invalid` and `data-invalid`. `onFocusCapture` passes through.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxInput({ className, style, render, ...rest }: ComboboxInputProps) {
   const ctx = useComboboxContext("Combobox.Input");

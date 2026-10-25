@@ -42,6 +42,10 @@ export interface CheckboxGroupValueChangeDetails extends ActionDetails {
   readonly removed: readonly string[];
 }
 
+/**
+ * State of `CheckboxGroup.Root`, `CheckboxGroup.Label`, passed to the function forms of
+ * `className`, `style`, `children` and `render`.
+ */
 export interface CheckboxGroupRootState {
   /**
    * Optimistic checked values, in document order of the Items as of the Root's last render
@@ -57,6 +61,11 @@ export interface CheckboxGroupRootState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `CheckboxGroup.Root`.
+ *
+ * @see https://ui.funstack.work/components/checkbox-group
+ */
 export interface CheckboxGroupRootProps extends Omit<
   ComponentPropsWithRef<"fieldset">,
   | "className"
@@ -78,8 +87,10 @@ export interface CheckboxGroupRootProps extends Omit<
    */
   value?: string[];
   /**
-   * Initial values in uncontrolled mode. Defaults to `[]`. Also the values a form reset returns
+   * Initial values in uncontrolled mode. Also the values a form reset returns
    * to: the latest prop value is mirrored into the boxes' `defaultChecked`.
+   *
+   * @defaultValue `[]`
    */
   defaultValue?: string[];
   /**
@@ -97,8 +108,10 @@ export interface CheckboxGroupRootProps extends Omit<
    */
   valueChangeAction?: ChangeAction<string[], CheckboxGroupValueChangeDetails>;
   /**
-   * The `name` shared by every Item (form data key: `formData.getAll(name)`). Defaults to a
-   * `useId()` value; pass a real name when the group is inside a `<form>` you submit.
+   * The `name` shared by every Item (form data key: `formData.getAll(name)`). Pass a real name
+   * when the group is inside a `<form>` you submit.
+   *
+   * @defaultValue a `useId()` value
    */
   name?: string;
   /** The `form` attribute, applied to the fieldset and to every Item. */
@@ -109,12 +122,24 @@ export interface CheckboxGroupRootProps extends Omit<
    * Items (neither is submitted) do not satisfy it. Until the Items have mounted (server HTML,
    * before hydration) any checked value satisfies it. Not exposed on the fieldset (ARIA does not
    * allow `aria-required` on role `group`): say it in the `Label` or through `aria-describedby`.
+   *
+   * @defaultValue `false`
    */
   required?: boolean;
-  /** Renders `<fieldset disabled>`: every Item and Parent is disabled and unfocusable. */
+  /**
+   * Renders `<fieldset disabled>`: every Item and Parent is disabled and unfocusable.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CheckboxGroupRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, CheckboxGroupRootState>;
+  /**
+   * The Label, Parents and Items. The function form receives the optimistic value; must not
+   * suspend.
+   */
   children?: StateValue<ReactNode, CheckboxGroupRootState>;
   /** Replace the rendered element. Must keep a `<fieldset>`. */
   render?: RenderProp<ComponentPropsWithRef<"fieldset">, CheckboxGroupRootState>;
@@ -167,6 +192,8 @@ function readItems(fieldset: HTMLFieldSetElement | null, name: string): HTMLInpu
  *
  * Unlike RadioGroup, Items may hydrate after their Root (a Suspense boundary between them): a
  * click before an Item hydrated is reconciled when it does.
+ *
+ * @see https://ui.funstack.work/components/checkbox-group
  */
 export function CheckboxGroupRoot({
   value,

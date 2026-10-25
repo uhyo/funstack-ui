@@ -12,7 +12,12 @@ import { enabledValues, useCheckboxGroupContext } from "./checkbox-group-context
 import type { CheckboxGroupPatch } from "./checkbox-group-context.js";
 import { syncPresences } from "../internal/sync-presence.js";
 
+/**
+ * State of `CheckboxGroup.Parent`, passed to the function forms of `className`, `style` and
+ * `render`.
+ */
 export interface CheckboxGroupParentState {
+  /** The Parent's `values` prop: the Items it checks and unchecks. */
   readonly values: readonly string[];
   /** Every value in `values` is optimistically checked (`false` when `values` is empty). */
   readonly checked: boolean;
@@ -27,6 +32,11 @@ export interface CheckboxGroupParentState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `CheckboxGroup.Parent`.
+ *
+ * @see https://ui.funstack.work/components/checkbox-group
+ */
 export interface CheckboxGroupParentProps extends Omit<
   ComponentPropsWithRef<"input">,
   | "type"
@@ -56,7 +66,11 @@ export interface CheckboxGroupParentProps extends Omit<
    * disabled Items too; it settles when the Items hydrate.
    */
   values: string[];
-  /** Native `disabled`: unfocusable, never dispatches. */
+  /**
+   * Native `disabled`: unfocusable, never dispatches.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
   /**
    * Forwarded to the Parent's `<ViewTransition default>`. Default: no boundary. Fires only on the
@@ -68,7 +82,9 @@ export interface CheckboxGroupParentProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CheckboxGroupParentState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, CheckboxGroupParentState>;
   /** Replace the rendered element. Must keep an `<input>`; the library sets `type="checkbox"`. */
   render?: RenderProp<ComponentPropsWithRef<"input">, CheckboxGroupParentState>;
@@ -95,6 +111,8 @@ function derive(values: readonly string[], set: ReadonlySet<string>) {
  * `defaultChecked`, `indeterminate` (stripped; the property is set), `required` (removed), `form`
  * (removed), `autoComplete` (`"off"`), `disabled`, `aria-checked` (removed), `data-checked`, `data-indeterminate`,
  * `data-pending`, `data-disabled`. `onChange` is merged.
+ *
+ * @see https://ui.funstack.work/components/checkbox-group
  */
 export function CheckboxGroupParent({
   values,

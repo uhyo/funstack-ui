@@ -6,12 +6,20 @@ import { useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
+/**
+ * Props of `Select.GroupLabel`.
+ *
+ * @see https://ui.funstack.work/components/select
+ */
 export interface SelectGroupLabelProps extends Omit<
   ComponentPropsWithRef<"legend">,
   "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SelectRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SelectRootState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, SelectRootState>;
   /** Replace the rendered element. Must keep a `<legend>`. */
   render?: RenderProp<ComponentPropsWithRef<"legend">, SelectRootState>;
@@ -27,6 +35,8 @@ function firstChildOfGroup(el: HTMLLegendElement): string | null {
  * The rich label of a `Select.Group`: a `<legend>`, rendered by engines with customizable select.
  * Optional; must be the **first child** of its Group. Keep its text equal to the Group's `label`,
  * which native pickers and assistive technology use. Owns no keys.
+ *
+ * @see https://ui.funstack.work/components/select
  */
 export function SelectGroupLabel({
   className,

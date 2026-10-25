@@ -8,7 +8,11 @@ import { useNativeChecked } from "../internal/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 import { useRadioGroupContext } from "./radio-group-context.js";
 
+/**
+ * State of `RadioGroup.Item`, passed to the function forms of `className`, `style` and `render`.
+ */
 export interface RadioGroupItemState {
+  /** The Item's `value` prop. */
   readonly value: string;
   /** Optimistic: true as soon as the user checks this radio, before the action settles. */
   readonly checked: boolean;
@@ -18,6 +22,11 @@ export interface RadioGroupItemState {
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `RadioGroup.Item`.
+ *
+ * @see https://ui.funstack.work/components/radio-group
+ */
 export interface RadioGroupItemProps extends Omit<
   ComponentPropsWithRef<"input">,
   | "type"
@@ -35,7 +44,11 @@ export interface RadioGroupItemProps extends Omit<
 > {
   /** The value this radio checks. Must be unique within the Root. Submitted as the form value. */
   value: string;
-  /** Native `disabled`: unfocusable, skipped by arrow keys, never dispatches. */
+  /**
+   * Native `disabled`: unfocusable, skipped by arrow keys, never dispatches.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
   /**
    * Forwarded to the Item's `<ViewTransition default>`. Default: no boundary. Fires only on the commit
@@ -47,7 +60,9 @@ export interface RadioGroupItemProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, RadioGroupItemState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, RadioGroupItemState>;
   /** Replace the rendered element. Must keep an `<input>`; the library sets `type="radio"`. */
   render?: RenderProp<ComponentPropsWithRef<"input">, RadioGroupItemState>;
@@ -67,6 +82,8 @@ export interface RadioGroupItemProps extends Omit<
  * `checked`. An Item added on the client while the Root's `value` equals its value gets
  * `defaultChecked` too, so two radios may carry it and a reset does not necessarily return to
  * the group's mount-time value (see `RadioGroup.Root` `value`).
+ *
+ * @see https://ui.funstack.work/components/radio-group
  */
 export function RadioGroupItem({
   value,

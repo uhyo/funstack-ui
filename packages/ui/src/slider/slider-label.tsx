@@ -14,8 +14,11 @@ export interface SliderLabelProps<T extends SliderValue = SliderValue> extends O
   ComponentPropsWithRef<"label">,
   "htmlFor" | "id" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SliderRootState<T>>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SliderRootState<T>>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, SliderRootState<T>>;
   /** Must stay a `<label>` when the slider has one thumb (the `for` association). */
   render?: RenderProp<ComponentPropsWithRef<"label">, SliderRootState<T>>;
@@ -25,6 +28,8 @@ export interface SliderLabelProps<T extends SliderValue = SliderValue> extends O
  * The visible name of the slider: `<label for>` naming the only thumb's input, or, with several
  * thumbs, the element whose `id` the Root's `aria-labelledby` (`role="group"`) points at, emitted
  * only while a Label is mounted. Owned keys: `id`, `htmlFor`.
+ *
+ * @see https://ui.funstack.work/components/slider
  */
 export function SliderLabel<T extends SliderValue = SliderValue>({
   className,

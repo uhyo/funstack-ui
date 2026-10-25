@@ -15,6 +15,10 @@ import {
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Combobox.List`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ComboboxListState {
   /** The deferred text the results are for: render the Options for it. */
   readonly query: string;
@@ -24,17 +28,25 @@ export interface ComboboxListState {
   readonly empty: boolean;
 }
 
+/**
+ * Props of `Combobox.List`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxListProps extends Omit<
   ComponentPropsWithRef<"div">,
   "id" | "role" | "aria-busy" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxListState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxListState>;
   /**
    * Usually a function of `{ query }` rendering the Options for it, under your own `<Suspense>`
    * for an async search. The previous results stay visible while the next ones load.
    */
   children?: StateValue<ReactNode, ComboboxListState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxListState>;
 }
 
@@ -47,6 +59,8 @@ export interface ComboboxListProps extends Omit<
  *
  * Owned keys (conventions 1.2): `id`, `role`, `aria-labelledby` (token-merged), `aria-busy`,
  * `data-stale`, `data-empty`.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxList({ className, style, children, render, ...rest }: ComboboxListProps) {
   const ctx = useComboboxContext("Combobox.List");

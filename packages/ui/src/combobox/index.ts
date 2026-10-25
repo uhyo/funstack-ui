@@ -23,6 +23,8 @@ import { ComboboxTrigger } from "./combobox-trigger.js";
  * `GroupLabel`; `Empty` and `Status` in the Popup. Typing is urgent (the `onInputValueChange`
  * handler, the library's urgent lane); the results render from the deferred `query`; accepting an
  * option is a transition with `data-pending` on it, and the listbox closes when it settles.
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export const Combobox = {
   Root: ComboboxRoot,

@@ -10,12 +10,20 @@ import type { NumberFieldState } from "./number-field-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * Props of `NumberField.Label`.
+ *
+ * @see https://ui.funstack.work/components/number-field
+ */
 export interface NumberFieldLabelProps extends Omit<
   ComponentPropsWithRef<"label">,
   "htmlFor" | "id" | "className" | "style" | "children"
 > {
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, NumberFieldState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, NumberFieldState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, NumberFieldState>;
   /** Must render a `<label>`. */
   render?: RenderProp<ComponentPropsWithRef<"label">, NumberFieldState>;
@@ -26,6 +34,8 @@ export interface NumberFieldLabelProps extends Omit<
  * Root group (`aria-labelledby`, emitted only while a Label is mounted).
  *
  * Owned keys: `id`, `htmlFor`, `data-pending`, `data-disabled`.
+ *
+ * @see https://ui.funstack.work/components/number-field
  */
 export function NumberFieldLabel({
   className,

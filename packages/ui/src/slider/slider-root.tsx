@@ -44,6 +44,7 @@ import { useThumbRegistry } from "./use-thumb-registry.js";
 /** One number (one thumb) or one number per thumb, in ascending order. */
 export type SliderValue = number | readonly number[];
 
+/** The arrow-key axis and layout of a Slider. */
 export type SliderOrientation = Orientation;
 
 /** Details passed as the second argument of `Slider.Root`'s `valueChangeAction` (each step). */
@@ -75,6 +76,10 @@ export interface SliderValueCommitDetails extends ActionDetails {
   readonly thumb: number | null;
 }
 
+/**
+ * State of `Slider.Root` and `Slider.Label`, passed to the function forms of `className`,
+ * `style`, `children` and `render`.
+ */
 export interface SliderRootState<T extends SliderValue = number> {
   /**
    * The value the thumbs show: the value a gesture has reached while a pointer is captured or a
@@ -88,13 +93,24 @@ export interface SliderRootState<T extends SliderValue = number> {
   readonly pending: boolean;
   /** A pointer is captured on a thumb. */
   readonly dragging: boolean;
+  /** The `orientation` prop. */
   readonly orientation: SliderOrientation;
+  /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
+  /** The `min` prop. */
   readonly min: number;
+  /** The `max` prop. */
   readonly max: number;
+  /** The `step` prop. */
   readonly step: number;
 }
 
+/**
+ * Props of `Slider.Root`. `T` is `number` (one thumb) or `readonly number[]` (one entry per
+ * thumb), inferred from `value` / `defaultValue`.
+ *
+ * @see https://ui.funstack.work/components/slider
+ */
 export interface SliderRootProps<T extends SliderValue = number> extends Omit<
   ComponentPropsWithRef<"div">,
   | "defaultValue"
@@ -112,8 +128,9 @@ export interface SliderRootProps<T extends SliderValue = number> extends Omit<
   /** Controlled value: one number, or one per thumb in ascending order. `undefined`: uncontrolled. */
   value?: T;
   /**
-   * Initial value in uncontrolled mode; also the form-reset target (latest value). Default: the
-   * platform's midpoint, `min + (max - min) / 2`, snapped to `step`.
+   * Initial value in uncontrolled mode; also the form-reset target (latest value).
+   *
+   * @defaultValue the platform's midpoint, `min + (max - min) / 2`, snapped to `step`
    */
   defaultValue?: T;
   /**
@@ -133,18 +150,36 @@ export interface SliderRootProps<T extends SliderValue = number> extends Omit<
    * resolves and reverts to the previous value if it rejects. May be a Server Function.
    */
   valueCommitAction?: ChangeAction<T, SliderValueCommitDetails>;
-  /** Default `0`. */
+  /**
+   * Lower bound of the range.
+   *
+   * @defaultValue `0`
+   */
   min?: number;
   /**
-   * Default `100`. A `max` that is not on the step grid from `min` is unreachable, as on a
-   * native range (dev warning).
+   * Upper bound of the range. A `max` that is not on the step grid from `min` is unreachable, as
+   * on a native range (dev warning).
+   *
+   * @defaultValue `100`
    */
   max?: number;
-  /** Default `1`. Must be positive. Values snap to `min + n × step`. */
+  /**
+   * Must be positive. Values snap to `min + n × step`.
+   *
+   * @defaultValue `1`
+   */
   step?: number;
-  /** Minimum number of steps between two adjacent thumbs. Default `0` (thumbs may share a value). */
+  /**
+   * Minimum number of steps between two adjacent thumbs.
+   *
+   * @defaultValue `0` (thumbs may share a value)
+   */
   minStepsBetweenThumbs?: number;
-  /** Default `"horizontal"`. Vertical sliders have `min` at the bottom. */
+  /**
+   * Layout and arrow-key axis. Vertical sliders have `min` at the bottom.
+   *
+   * @defaultValue `"horizontal"`
+   */
   orientation?: SliderOrientation;
   /**
    * `aria-valuetext` for a thumb, from the value it shows. Set it when the number alone is not
@@ -158,11 +193,20 @@ export interface SliderRootProps<T extends SliderValue = number> extends Omit<
   name?: string;
   /** The `form` attribute for every thumb's input (a Thumb's own `form` wins). */
   form?: string;
-  /** Disables every input (native `disabled`; not submitted) and the pointer. Never set while pending. */
+  /**
+   * Disables every input (native `disabled`; not submitted) and the pointer. Never set while
+   * pending. Inside a `Field.Root`, the Field's `disabled` also applies.
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SliderRootState<T>>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SliderRootState<T>>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, SliderRootState<T>>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, SliderRootState<T>>;
 }
 
@@ -823,6 +867,8 @@ SliderRootImpl.displayName = "SliderRoot";
  * `Slider.Root`. Overloaded so that the value's shape is inferred from `value` / `defaultValue`
  * as `number` or `readonly number[]` (an array literal would otherwise infer a mutable
  * `number[]`), and every action and state function receives that shape (design 3.1).
+ *
+ * @see https://ui.funstack.work/components/slider
  */
 export const SliderRoot = SliderRootImpl as {
   (props: SliderRootProps<number>): ReactNode;

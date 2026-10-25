@@ -18,14 +18,24 @@ import { useComboboxContext } from "./combobox-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Combobox.Trigger`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ComboboxTriggerState {
   /** Optimistic open state. */
   readonly open: boolean;
   /** The open (or close) transition is in flight. */
   readonly pending: boolean;
+  /** Disabled by its own prop or by the Root. */
   readonly disabled: boolean;
 }
 
+/**
+ * Props of `Combobox.Trigger`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   | "onClick"
@@ -46,9 +56,13 @@ export interface ComboboxTriggerProps extends Omit<
   /**
    * Disables this button; the Root's `disabled` does too. Native `disabled` on a `<button>`; with
    * a link or component `render`, `aria-disabled="true"` instead.
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxTriggerState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, ComboboxTriggerState>;
@@ -74,6 +88,8 @@ export interface ComboboxTriggerProps extends Omit<
  * invoker), `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`,
  * `data-disabled`; `popoverTarget`, `popoverTargetAction`, `commandfor` and `command` (never
  * written as props; omitted from the props type).
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxTrigger({
   disabled: ownDisabled = false,

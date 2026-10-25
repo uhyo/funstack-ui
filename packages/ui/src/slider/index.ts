@@ -15,6 +15,8 @@ import { SliderValuePart } from "./slider-value.js";
  * `Value`. Two actions: `valueChangeAction` on every step (a transition; keep it cheap) and
  * `valueCommitAction` once per gesture (the save; uncontrolled state is committed when it
  * resolves and rolls back when it rejects).
+ *
+ * @see https://ui.funstack.work/components/slider
  */
 export const Slider = {
   Root: SliderRoot,

@@ -20,6 +20,10 @@ import { ComboboxPopupContext, useComboboxContext } from "./combobox-context.js"
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * State of `Combobox.Popup`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ComboboxPopupState {
   /** Committed open state. Read `:popover-open` for the DOM truth. */
   readonly open: boolean;
@@ -29,6 +33,11 @@ export interface ComboboxPopupState {
   readonly query: string;
 }
 
+/**
+ * Props of `Combobox.Popup`.
+ *
+ * @see https://ui.funstack.work/components/combobox
+ */
 export interface ComboboxPopupProps extends Omit<
   ComponentPropsWithRef<"div">,
   | "id"
@@ -44,6 +53,8 @@ export interface ComboboxPopupProps extends Omit<
   /**
    * `false` (default): the children are not rendered while the listbox is closed. `true`: they
    * stay mounted inside `<Activity mode="hidden">`.
+   *
+   * @defaultValue `false`
    */
   keepMounted?: boolean;
   /**
@@ -54,8 +65,11 @@ export interface ComboboxPopupProps extends Omit<
    * `default: "none"` unless every result change should cross-fade. Static.
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxPopupState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxPopupState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ComboboxPopupState>;
   /** Must render a `<div>`: a `<dialog>` would pull focus out of the input. */
   render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxPopupState>;
@@ -76,6 +90,8 @@ const preventDefault = (event: { preventDefault(): void }) => event.preventDefau
  * Owned keys (conventions 1.2): `id`, `popover`, `onPointerDown`, `onMouseDown`, `data-stale`.
  * Inline `position-area`, `position-try-fallbacks` and `min-width` sit under the consumer's
  * `style` (`style={{ positionTryFallbacks: "none" }}` removes the flip).
+ *
+ * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxPopup({
   keepMounted,
