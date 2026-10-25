@@ -6,6 +6,7 @@ import { userEvent } from "@testing-library/user-event";
 import { act, configure, getConfig, render } from "@testing-library/react";
 import type { RenderResult } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
+import { onCleanup } from "./cleanups.js";
 
 /** A promise whose settlement the test controls. */
 export interface Deferred<T> {
@@ -263,6 +264,19 @@ export function flushTasks(rounds = 1): Promise<void> {
  */
 export function silenceErrors(): MockInstance<typeof console.error> {
   return vi.spyOn(console, "error").mockImplementation(() => {});
+}
+
+/**
+ * Records `defaultPrevented` of every click once it has bubbled past React's root listener (a
+ * document listener runs after it), including the clicks user-event synthesises for Enter and
+ * Space. The listener is removed after the test (`onCleanup`).
+ */
+export function recordClicks(): boolean[] {
+  const seen: boolean[] = [];
+  const listener = (event: Event) => seen.push(event.defaultPrevented);
+  document.addEventListener("click", listener);
+  onCleanup(() => document.removeEventListener("click", listener));
+  return seen;
 }
 
 export interface HydrateFromServerOptions {

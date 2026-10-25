@@ -32,6 +32,7 @@ import {
   flushTasks,
   hydrateFromServer,
   silenceErrors,
+  recordClicks,
 } from "../__tests__/helpers.js";
 import { Menu } from "./index.js";
 import type {
@@ -48,7 +49,7 @@ import type {
   MenuTriggerProps,
   MenuTriggerState,
 } from "./index.js";
-import { recordClicks, spyHide, spyShow, watchShow } from "../__tests__/overlay-helpers.js";
+import { spyHide, spyShow, watchShow } from "../__tests__/overlay-helpers.js";
 import { describeOverlayDisabledRenders } from "../__tests__/overlay-disabled-render-suite.js";
 import {
   createOverlayHarness,
@@ -951,18 +952,14 @@ describe("Menu.Item actions", () => {
       const archive = item("archive");
       expect(archive).not.toHaveAttribute("aria-disabled");
       const clicks = recordClicks();
-      try {
-        await user.click(archive);
-        archive.focus();
-        await user.keyboard("{Enter}");
-        await user.keyboard(" ");
-        await user.click(archive);
-      } finally {
-        clicks.stop();
-      }
+      await user.click(archive);
+      archive.focus();
+      await user.keyboard("{Enter}");
+      await user.keyboard(" ");
+      await user.click(archive);
       expect(action).toHaveBeenCalledTimes(1);
       // The first click was not cancelled; Enter and Space reach the item through its click.
-      expect(clicks.seen).toEqual([false, true, true, true]);
+      expect(clicks).toEqual([false, true, true, true]);
       expect(archive).toHaveAttribute("aria-disabled", "true");
       expectPending(archive);
       expect(archive).not.toHaveAttribute("data-disabled");

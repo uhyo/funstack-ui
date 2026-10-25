@@ -39,6 +39,7 @@ import {
   flushTasks,
   hydrateFromServer,
   silenceErrors,
+  recordClicks,
 } from "../__tests__/helpers.js";
 import { PopoverContext } from "./popover-context.js";
 import { Popover } from "./index.js";
@@ -52,7 +53,7 @@ import type {
   PopoverTriggerProps,
   PopoverTriggerState,
 } from "./index.js";
-import { recordClicks, spyHide, spyShow } from "../__tests__/overlay-helpers.js";
+import { spyHide, spyShow } from "../__tests__/overlay-helpers.js";
 import { describeOverlayDisabledRenders } from "../__tests__/overlay-disabled-render-suite.js";
 import type { DisabledPartProps } from "../__tests__/overlay-disabled-render-suite.js";
 import {
@@ -1586,17 +1587,13 @@ describe("Popover", () => {
         const close = screen.getByTestId("close");
         expect(close).not.toHaveAttribute("aria-disabled");
         const clicks = recordClicks();
-        try {
-          await user.click(close);
-          await user.click(close);
-          close.focus();
-          await user.keyboard("{Enter}");
-          await user.keyboard(" ");
-        } finally {
-          clicks.stop();
-        }
+        await user.click(close);
+        await user.click(close);
+        close.focus();
+        await user.keyboard("{Enter}");
+        await user.keyboard(" ");
         expect(closeAction).toHaveBeenCalledTimes(1);
-        expect(clicks.seen).toEqual([true, true, true, true]);
+        expect(clicks).toEqual([true, true, true, true]);
         expect(close).toHaveAttribute("aria-disabled", "true");
         expectPending(close);
         expect(close).not.toHaveAttribute("data-disabled");
@@ -1643,16 +1640,12 @@ describe("Popover", () => {
       const hidePopover = spyHide();
       const close = screen.getByTestId("close");
       const clicks = recordClicks();
-      try {
-        await user.click(close);
-        await user.click(close);
-        close.focus();
-        await user.keyboard("{Enter}");
-      } finally {
-        clicks.stop();
-      }
+      await user.click(close);
+      await user.click(close);
+      close.focus();
+      await user.keyboard("{Enter}");
       expect(closeAction).toHaveBeenCalledTimes(1);
-      expect(clicks.seen).toEqual([true, true, true]);
+      expect(clicks).toEqual([true, true, true]);
       expect(close).toHaveAttribute("aria-disabled", "true");
       expectPending(close);
       await act(async () => work.resolve());

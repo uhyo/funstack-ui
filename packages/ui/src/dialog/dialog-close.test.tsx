@@ -15,9 +15,9 @@ import {
   setupUser,
   flushTasks,
   silenceErrors,
+  recordClicks,
 } from "../__tests__/helpers.js";
 import { Dialog } from "./index.js";
-import { recordClicks } from "../__tests__/overlay-helpers.js";
 import {
   committedText,
   content,
@@ -172,18 +172,14 @@ describe("Dialog", () => {
         const button = screen.getByTestId("delete");
         expect(button).not.toHaveAttribute("aria-disabled");
         const clicks = recordClicks();
-        try {
-          await user.click(button);
-          await user.click(button);
-          button.focus();
-          await user.keyboard("{Enter}");
-          await user.keyboard(" ");
-        } finally {
-          clicks.stop();
-        }
+        await user.click(button);
+        await user.click(button);
+        button.focus();
+        await user.keyboard("{Enter}");
+        await user.keyboard(" ");
         expect(closeAction).toHaveBeenCalledTimes(1);
         // Library mode cancels every Close click (the command); the ignored ones are no exception.
-        expect(clicks.seen).toEqual([true, true, true, true]);
+        expect(clicks).toEqual([true, true, true, true]);
         expect(button).toHaveAttribute("aria-disabled", "true");
         expectPending(button);
         expect(button).not.toHaveAttribute("data-disabled");
@@ -223,16 +219,12 @@ describe("Dialog", () => {
         const close = spyClose();
         const button = screen.getByTestId("delete");
         const clicks = recordClicks();
-        try {
-          await user.click(button);
-          await user.click(button);
-          button.focus();
-          await user.keyboard("{Enter}");
-        } finally {
-          clicks.stop();
-        }
+        await user.click(button);
+        await user.click(button);
+        button.focus();
+        await user.keyboard("{Enter}");
         expect(closeAction).toHaveBeenCalledTimes(1);
-        expect(clicks.seen).toEqual([true, true, true]);
+        expect(clicks).toEqual([true, true, true]);
         expect(button).toHaveAttribute("aria-disabled", "true");
         expectPending(button);
         expect(popup().open).toBe(true);

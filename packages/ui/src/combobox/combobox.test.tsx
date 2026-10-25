@@ -50,7 +50,7 @@ import type {
   ComboboxTriggerState,
   ComboboxValueChangeDetails,
 } from "./index.js";
-import { spyHide } from "../__tests__/overlay-helpers.js";
+import { spyHide, watchShow } from "../__tests__/overlay-helpers.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -196,19 +196,6 @@ const clearButton = () => screen.getByTestId("clear");
 const isOpen = () => popup().matches(":popover-open");
 const optionTexts = () => screen.queryAllByRole("option").map((o) => o.textContent);
 const hidden = () => document.querySelector<HTMLInputElement>('input[type="hidden"]');
-
-function watchShow() {
-  const calls: { popup: HTMLElement; source: unknown; children: number }[] = [];
-  const original = HTMLElement.prototype.showPopover;
-  vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
-    this: HTMLElement,
-    options?: ShowPopoverOptions,
-  ) {
-    calls.push({ popup: this, source: options?.source, children: this.childElementCount });
-    return original.call(this, options);
-  });
-  return calls;
-}
 
 /** Types into the (focused) input and runs the open. */
 async function typeText(user: ReturnType<typeof setupUser>, text: string) {
@@ -662,7 +649,7 @@ describe("Combobox", () => {
 
   describe("open", () => {
     it("opens on typing: openChangeAction(true, activate) and showPopover({ source: input })", async () => {
-      const shows = watchShow();
+      const { calls: shows } = watchShow();
       const openAction = vi.fn<OpenAction>();
       const user = setupUser();
       render(<Harness root={{ openChangeAction: openAction }} />);
@@ -2844,7 +2831,7 @@ describe("Combobox", () => {
     });
 
     it("results suspending outside the List hold the open with the input and Trigger pending", async () => {
-      const shows = watchShow();
+      const { calls: shows } = watchShow();
       const results = createSearch();
       const user = setupUser();
       function Slow() {

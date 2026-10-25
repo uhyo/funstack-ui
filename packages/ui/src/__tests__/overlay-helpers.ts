@@ -19,11 +19,13 @@ interface ShowCall {
   /** The element carrying `autofocus` at the call (the library writes it right before, 6.1). */
   readonly autofocus: Element | null;
   readonly source: unknown;
+  /** The popup's child element count at the call (whether the content committed before the show). */
+  readonly children: number;
 }
 
 /**
  * Records, for every `showPopover()` call, the popup, the element carrying `autofocus` at that
- * moment (the keyboard path) and the `source`; the call goes through.
+ * moment (the keyboard path), the `source` and the popup's child count; the call goes through.
  */
 export function watchShow(): { calls: readonly ShowCall[] } {
   const calls: ShowCall[] = [];
@@ -33,19 +35,13 @@ export function watchShow(): { calls: readonly ShowCall[] } {
     options?: ShowPopoverOptions,
   ) {
     const autofocus = this.hasAttribute("autofocus") ? this : this.querySelector("[autofocus]");
-    calls.push({ popup: this, autofocus, source: options?.source });
+    calls.push({
+      popup: this,
+      autofocus,
+      source: options?.source,
+      children: this.childElementCount,
+    });
     return original.call(this, options);
   });
   return { calls };
-}
-
-/**
- * `defaultPrevented` of every click once it bubbled past React's root listener; `stop()` removes
- * the listener.
- */
-export function recordClicks(): { seen: boolean[]; stop: () => void } {
-  const seen: boolean[] = [];
-  const listener = (event: Event) => seen.push(event.defaultPrevented);
-  document.addEventListener("click", listener);
-  return { seen, stop: () => document.removeEventListener("click", listener) };
 }

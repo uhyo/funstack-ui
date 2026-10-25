@@ -11,7 +11,7 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -22,6 +22,7 @@ import {
   setupUser,
   silenceErrors,
   PlainButton,
+  recordClicks,
 } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Form } from "../form/index.js";
@@ -41,24 +42,6 @@ function click(el: Element): MouseEvent {
   });
   return event;
 }
-
-/**
- * Records `defaultPrevented` of every click once it has bubbled past React's root listener (a
- * document listener runs after it), including the clicks user-event synthesises for Enter and
- * Space.
- */
-function recordClicks(): boolean[] {
-  const seen: boolean[] = [];
-  const listener = (event: Event) => seen.push(event.defaultPrevented);
-  document.addEventListener("click", listener);
-  cleanups.push(() => document.removeEventListener("click", listener));
-  return seen;
-}
-
-const cleanups: (() => void)[] = [];
-afterEach(() => {
-  for (const cleanup of cleanups.splice(0)) cleanup();
-});
 
 describe("Button", () => {
   describe("roles and ARIA (row 1)", () => {
