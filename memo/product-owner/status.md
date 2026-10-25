@@ -363,3 +363,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #132 decided (arch): Combobox.Input omits onFocus (types-only break), CSS exit recipe applies to Menu/Combobox, disabled focusable Combobox.Trigger is no invoker (small behaviour fix).
 - MERGED: #131 (useValueSet, commit-action suite), #129 (source tidy-up + #132 library; review F1 whileShown reinstall-at-attach regression caught & fixed; resetInvalidBatch test flake fix), #128 (docs consolidation, Transitions #css-exit, roadmap).
 - Running: #130 tests phase 1 (dev-130), #133 S6/S7 splits (dev-131). Then #130 phase 2, then release alpha.15 (notes: Breaking types Combobox.Input onFocus; Fix disabled aria Combobox.Trigger no invoker; whileShown listeners installed for a pre-hydration-open popup). Check Roadmap lists wave 18 changes before release.
+- MERGED #133 (S6/S7 splits), #130 phase 1+2 (titles, shared teardown, helpers, T3/T4/T5/T7 suites, #133 gap rows, teardown guard rows). Roadmap updated for #132.
+- RELEASED 0.1.0-alpha.15 (Publish + Deploy Docs green). WAVE 18 DONE. No open dev issues; human-task issues unchanged (#114, #119, #122, #124, older upstream).
+- Lessons: developers sometimes go idle without seeing late messages — resend once; reviewer caught a real refactor regression (whileShown reattach) → keep reviewing pure refactors.
