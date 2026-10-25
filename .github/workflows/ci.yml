@@ -43,6 +43,10 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      # The skill, its installer and the bundled Markdown docs are in the npm tarball.
+      - name: Check package contents
+        run: pnpm --filter @funstack/ui pack:check
+
   # The vitest browser project, one job per engine (docs/vision.md: latest stable Blink, Gecko
   # and WebKit), so the jsdom job above stays fast and a failure names its engine.
   browser:

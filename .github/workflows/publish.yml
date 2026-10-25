@@ -28,8 +28,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The docs build (which builds @funstack/ui first) writes the Markdown edition that the
+      # package's prepack step copies into dist/docs.
       - name: Build
-        run: pnpm turbo run build --filter=@funstack/ui
+        run: pnpm turbo run build --filter=docs
+
+      - name: Check package contents
+        run: pnpm --filter @funstack/ui pack:check
 
       - name: Determine npm tag
         id: npm-tag

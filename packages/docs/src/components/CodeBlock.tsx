@@ -15,8 +15,9 @@ export async function CodeBlock({ children, language = "tsx", title }: CodeBlock
     theme: "github-dark",
   });
 
+  // data-language tells the Markdown edition (src/markdown) the code fence's language.
   return (
-    <div className="code-block">
+    <div className="code-block" data-language={language}>
       {title && <div className="code-block-title">{title}</div>}
       <div className="code-block-wrapper" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
