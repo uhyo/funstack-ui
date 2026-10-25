@@ -170,6 +170,8 @@ export function usePopoverTrigger<State>(
     if (ctx.intended()) {
       ctx.requestClose(native, "activate");
     } else {
+      // First: what it records (Menu's open cause) must be in place before anything can show the
+      // popup. Today the show waits for the apply effect, so the order is not observable.
       beforeOpen?.(event);
       ctx.requestOpen(native, "activate");
     }

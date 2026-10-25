@@ -21,8 +21,8 @@ export interface PopoverCloseProps extends Omit<
    * popover: in library mode through the Root (`openChangeAction(false)` awaited, view
    * transition if set), in JS-free mode with `hidePopover()`. A rejection reaches the nearest
    * Error Boundary above the Close part and leaves the popover open. If the popover was
-   * dismissed and opened again while the action ran, the close is dropped. Without `action` in JS-free
-   * mode the button is a native `command="hide-popover"` invoker.
+   * dismissed and opened again while the action ran, the close is dropped. Without `action` in
+   * JS-free mode the button is a native `command="hide-popover"` invoker.
    */
   action?: Action<[details: ActionDetails]>;
   /**

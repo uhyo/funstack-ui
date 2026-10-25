@@ -21,7 +21,8 @@ export interface ComboboxLabelProps extends Omit<
 
 /**
  * The visible name of the combobox: `<label for={input}>`, whose id also names the listbox
- * (`aria-labelledby` on `Combobox.List`, emitted only while a Label is mounted). Owned keys: `id`, `htmlFor`.
+ * (`aria-labelledby` on `Combobox.List`, emitted only while a Label is mounted). Owned keys:
+ * `id`, `htmlFor`.
  */
 export function ComboboxLabel({ className, style, children, render, ...rest }: ComboboxLabelProps) {
   const ctx = useComboboxContext("Combobox.Label");

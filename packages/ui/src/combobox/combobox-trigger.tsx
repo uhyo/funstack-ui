@@ -71,9 +71,9 @@ export interface ComboboxTriggerProps extends Omit<
  *
  * Owned keys: `type` (on a `<button>`), `tabIndex`, `disabled`, `aria-disabled` (link or
  * component `render`), `aria-expanded`, `aria-controls` (token-merged), `popovertarget` (while an
- * invoker), `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`;
- * `popoverTarget`, `popoverTargetAction`, `commandfor` and `command` (never written as props;
- * omitted from the props type).
+ * invoker), `onClick`, `onPointerDown`, `onMouseDown`, `data-open`, `data-pending`,
+ * `data-disabled`; `popoverTarget`, `popoverTargetAction`, `commandfor` and `command` (never
+ * written as props; omitted from the props type).
  */
 export function ComboboxTrigger({
   disabled: ownDisabled = false,

@@ -21,8 +21,8 @@ import { ComboboxTrigger } from "./combobox-trigger.js";
  * or one hidden input with `name`) > `Label`, `Input` (`input[role=combobox]`), `Trigger`,
  * `Clear`, `Popup` (`div[popover=auto]`) > `List` (`div[role=listbox]`) > `Option`, `Group` >
  * `GroupLabel`; `Empty` and `Status` in the Popup. Typing is urgent (the `onInputValueChange`
- * handler, the library's urgent lane); the results render from the deferred `query`; accepting an option
- * is a transition with `data-pending` on it, and the listbox closes when it settles.
+ * handler, the library's urgent lane); the results render from the deferred `query`; accepting an
+ * option is a transition with `data-pending` on it, and the listbox closes when it settles.
  */
 export const Combobox = {
   Root: ComboboxRoot,
