@@ -45,7 +45,7 @@ describeOverlayClosePart<DialogOpenChangeDetails>({
 
 describe("Dialog", () => {
   describe("Close part", () => {
-    // #81, D3. The rows with `action` are in the shared Close part suite.
+    // #81. The rows with `action` are in the shared Close part suite.
     describe("re-entry (design/components/button.md 16.4)", () => {
       it("without action, a second click while the Root's close is pending changes nothing", async () => {
         const user = setupUser();
@@ -348,28 +348,6 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
       expect(popup().returnValue).toBe("link");
       expect(action.mock.calls[1]![1].returnValue).toBe("link");
-    });
-
-    it("JS-free: a Close action closes with close(value) directly when it resolves", async () => {
-      const user = setupUser();
-      const work = deferred();
-      render(
-        <Harness
-          mode="static"
-          content={
-            <Dialog.Close data-testid="delete" value="deleted" action={() => work.promise}>
-              Delete
-            </Dialog.Close>
-          }
-        />,
-      );
-      await user.click(trigger());
-      const close = spyClose();
-      await user.click(screen.getByTestId("delete"));
-      expect(popup().open).toBe(true);
-      await act(async () => work.resolve());
-      expect(close).toHaveBeenCalledWith("deleted");
-      expect(popup().open).toBe(false);
     });
   });
 

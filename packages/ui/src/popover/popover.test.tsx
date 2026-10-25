@@ -948,7 +948,7 @@ describe("Popover", () => {
     });
 
     // The library hides on lost interest only after the interest invoker's own open; an open it
-    // routed for anyone else (#133 review, gap 1) stays.
+    // routed for anyone else stays (design/components/popover.md 2.3, amendment #127).
     it.each([
       [
         "a script's showPopover()",

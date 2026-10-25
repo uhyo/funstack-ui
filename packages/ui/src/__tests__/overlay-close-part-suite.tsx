@@ -21,7 +21,11 @@ import {
   setupUser,
   silenceErrors,
 } from "./helpers.js";
-import type { OpenChangeFn, OverlaySuiteHarnessProps } from "./overlay-open-state-suite.js";
+import type {
+  OpenChangeFn,
+  OverlayDetailsLike,
+  OverlaySuiteHarnessProps,
+} from "./overlay-open-state-suite.js";
 
 /** The props the suite renders the Close part with. */
 export interface ClosePartProps {
@@ -32,7 +36,7 @@ export interface ClosePartProps {
   readonly children?: ReactNode;
 }
 
-export interface OverlayClosePartConfig<D extends { readonly reason: string }> {
+export interface OverlayClosePartConfig<D extends OverlayDetailsLike> {
   /** The describe block's name (`"Dialog"`). */
   readonly name: string;
   readonly Harness: ComponentType<OverlaySuiteHarnessProps<D>>;
@@ -57,7 +61,7 @@ export interface OverlayClosePartConfig<D extends { readonly reason: string }> {
 
 type User = ReturnType<typeof setupUser>;
 
-export function describeOverlayClosePart<D extends { readonly reason: string }>(
+export function describeOverlayClosePart<D extends OverlayDetailsLike>(
   config: OverlayClosePartConfig<D>,
 ): void {
   const { Harness, isOpen, Close, spyClose } = config;
@@ -79,7 +83,7 @@ export function describeOverlayClosePart<D extends { readonly reason: string }>(
     </Close>
   );
 
-  describe(`${config.name} Close part with action (shared suite)`, () => {
+  describe(`${config.name} Close part with action (shared overlay suite)`, () => {
     renderBoth("library mode", (mode) => {
       it("the click is cancelled, data-pending while it runs, then the library closes", async () => {
         const user = setupUser();
@@ -114,7 +118,7 @@ export function describeOverlayClosePart<D extends { readonly reason: string }>(
         const [next, notify] = action.mock.calls[1]!;
         expect(next).toBe(false);
         expect(notify.reason).toBe("activate");
-        expect((notify as unknown as { event?: Event }).event!.type).toBe("click");
+        expect(notify.event!.type).toBe("click");
         if (config.value !== undefined) expect(returnValueOf(notify)).toBe(config.value);
       });
 

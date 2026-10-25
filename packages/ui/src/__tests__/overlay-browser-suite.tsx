@@ -333,7 +333,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
   const content = () => screen.queryByTestId("content");
   const isOpen = () => config.isOpen(popup());
 
-  describe(`${config.name} (shared overlay browser suite)`, () => {
+  describe(`${config.name} (shared overlay suite)`, () => {
     it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
       const action = vi.fn<Action>();
       render(<Harness action={action} />);

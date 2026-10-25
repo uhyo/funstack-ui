@@ -1427,7 +1427,7 @@ describe("Combobox", () => {
       expect(openAction.mock.calls.at(-1)![1].event?.type).toBe("focusout");
     });
 
-    // Focusable content inside the Popup is not outside (design 5.4; #133 review, gap 2): focus
+    // Focusable content inside the Popup is not outside (design 5.4): focus
     // moving there, reported on the input's focusout or found by the deferred check, keeps the
     // listbox, the typed text and every dispatch.
     describe("focus moving into the Popup's content", () => {

@@ -102,7 +102,7 @@ export function describeOverlayDisabledRenders<D, P extends object>(
     if (config.popoverTarget) expect(trigger()).toHaveAttribute("aria-expanded", String(shown));
   };
 
-  describe(`${config.name} disabled on link and component renders (shared suite, design/components/button.md 17.3)`, () => {
+  describe(`${config.name} disabled on link and component renders (shared overlay suite, design/components/button.md 17.3)`, () => {
     describe.each(renders)("Trigger, %s render", (_, element) => {
       it.each(variants)(
         "library mode%s: aria-disabled, the click is cancelled; click, Enter and ArrowDown do not open",

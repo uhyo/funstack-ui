@@ -1405,7 +1405,7 @@ describe("Popover (browser)", () => {
     );
 
     // Only the interest button's own open is hidden on lost interest; an open the library routed
-    // for anyone else stays (#133 review, gap 1). The platform hides only what its interest show
+    // for anyone else stays (design/components/popover.md 2.3, amendment #127). The platform hides only what its interest show
     // opened, so it leaves this popup alone too.
     it.runIf(supportsInterestFor).each([
       [

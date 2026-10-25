@@ -42,7 +42,7 @@ import { spyHide, spyShow } from "./overlay-helpers.js";
 export type OverlayHarnessMode = ControlMode | "static";
 
 /** What every overlay's `openChangeAction` details have (Dialog's add `returnValue`). */
-interface OverlayDetailsLike {
+export interface OverlayDetailsLike {
   readonly reason: string;
   readonly event: Event | undefined;
 }
@@ -291,6 +291,8 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
   /** The row-name suffix of a part close, where the component has more than one. */
   const partName = (part: PartClose) => (partCloses.length > 1 ? ` [${part.name}]` : "");
   const hasReturnValue = config.detailsKeys.includes("returnValue");
+  /** The transition type of the component's open (`fsui-popover-open`). */
+  const openType = `fsui-${config.name.toLowerCase()}-open`;
   type Action = OpenChangeFn<D>;
 
   const trigger = () => screen.getByTestId("trigger");
@@ -1187,12 +1189,13 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(content()).toBeInTheDocument();
       });
 
+      // Keyed by the type the component's open carries (conventions 5.3: `fsui-<component>-open`).
       it("renders with a `transition` type map", async () => {
         const user = setupUser();
         render(
           <Harness
             mode="uncontrolled"
-            popup={{ transition: { "fsui-open": "pop-in", default: "none" } }}
+            popup={{ transition: { [openType]: "pop-in", default: "none" } }}
           />,
         );
         await openThroughTrigger(user);

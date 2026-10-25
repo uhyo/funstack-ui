@@ -55,7 +55,7 @@ export function describeForeignInvokerPressInBrowser(config: ForeignInvokerPress
     return openAction;
   }
 
-  describe(`${config.name}: a press on a foreign invoker while shown (shared suite)`, () => {
+  describe(`${config.name} a press on a foreign invoker while shown (shared overlay suite)`, () => {
     for (const [kind, attributes, eventType] of [
       ["popovertarget", { popovertarget: "{popup}" }, "beforetoggle"],
       [
