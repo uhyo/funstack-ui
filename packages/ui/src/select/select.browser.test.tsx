@@ -30,12 +30,7 @@ import { Popover } from "../popover/index.js";
 import { Select } from "./index.js";
 import type { SelectValueChangeDetails } from "./index.js";
 import { mouse } from "../__tests__/browser-commands.js";
-import {
-  closeOpenTopLayer,
-  flushFor,
-  sleep,
-  spyViewTransitions,
-} from "../__tests__/browser-helpers.js";
+import { flushFor, sleep, spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 type ActionFn = (next: string, details: SelectValueChangeDetails) => unknown;
 
@@ -67,7 +62,6 @@ afterEach(async () => {
   for (const s of document.querySelectorAll("select")) {
     if (s.matches(":open")) s.blur();
   }
-  closeOpenTopLayer();
 });
 
 function Fruits({
@@ -623,10 +617,6 @@ describe("Select (browser)", () => {
   // not in the page and a headless click does not open it (the header). The option pick is the
   // "a pick through the picker" row above.
   describe.runIf(supportsBaseSelect)("a real press while the picker is open", () => {
-    afterEach(async () => {
-      await mouse.releaseHeld();
-    });
-
     async function pressOn(target: Element) {
       const r = target.getBoundingClientRect();
       const x = Math.round(r.left + r.width / 2);

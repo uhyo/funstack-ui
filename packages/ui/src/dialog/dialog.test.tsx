@@ -29,7 +29,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { startTransition, use, useRef, useState } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { dispatchCommand, isModal } from "../__tests__/dialog-shim.js";
 import {
   deferred,
@@ -61,12 +61,6 @@ import {
 } from "../__tests__/dialog-harness.js";
 import type { ActionFn } from "../__tests__/dialog-harness.js";
 import { describeOverlayOpenState } from "../__tests__/overlay-open-state-suite.js";
-
-afterEach(() => {
-  // Restored here as well as in the setup file: the DOM is cleared below with real methods.
-  vi.restoreAllMocks();
-  document.body.innerHTML = "";
-});
 
 describeOverlayOpenState<DialogOpenChangeDetails>({
   name: "Dialog",

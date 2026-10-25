@@ -4,7 +4,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { startTransition, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/dialog-shim.js";
 import {
   deferred,
@@ -29,12 +29,6 @@ import {
   trigger,
 } from "../__tests__/dialog-harness.js";
 import type { ActionFn } from "../__tests__/dialog-harness.js";
-
-afterEach(() => {
-  // Restored here as well as in the setup file: the DOM is cleared below with real methods.
-  vi.restoreAllMocks();
-  document.body.innerHTML = "";
-});
 
 describe("Dialog", () => {
   describe("Close part", () => {

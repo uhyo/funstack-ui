@@ -23,7 +23,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { userEvent } from "vitest/browser";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
 import { mouse } from "../__tests__/browser-commands.js";
 import { user } from "../__tests__/browser-user.js";
@@ -52,10 +52,8 @@ import { Menu } from "./index.js";
 import type { MenuOpenChangeDetails, MenuPopupProps, MenuRootProps } from "./index.js";
 import {
   addStyle,
-  closeOpenTopLayer,
   flushFor,
   onCleanup,
-  runCleanups,
   sleep,
   leaveActEnvironment,
   quietPeriod,
@@ -69,11 +67,6 @@ const popup = () => screen.getByTestId("popup");
 const sub = () => screen.getByTestId("subpopup");
 const item = (id: string) => screen.getByTestId(id);
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
-
-afterEach(async () => {
-  closeOpenTopLayer();
-  runCleanups();
-});
 
 const popupStyle = {
   margin: 0,
@@ -518,14 +511,6 @@ describe("Menu (browser)", () => {
     // row of 1). The pointer is parked on the target first, so the hover rules (focus follows the
     // pointer, 6.2) have run before the press.
     describe("a real press while a submenu is open", () => {
-      let restoreAct: (() => void) | undefined;
-
-      afterEach(async () => {
-        await mouse.releaseHeld();
-        restoreAct?.();
-        restoreAct = undefined;
-      });
-
       async function pressOn(target: Element) {
         const box = target.getBoundingClientRect();
         const x = Math.round(box.left + box.width / 2);
@@ -548,7 +533,7 @@ describe("Menu (browser)", () => {
         );
         await openSub();
         const calls = [action.mock.calls.length, subAction.mock.calls.length];
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         // The submenu's invoker: no light dismiss; its click opens, or focuses into an open submenu.
         await pressOn(item("move"));
         await expect.poll(() => document.activeElement).toBe(item("inbox"));
@@ -571,7 +556,7 @@ describe("Menu (browser)", () => {
         await openSub();
         const subElement = sub();
         const calls = action.mock.calls.length;
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         await pressOn(item("delete"));
         // Light dismiss of the nested popover (a press in the parent menu), or the hover close:
         // either way a dismissal. The root stays shown through its pending close.
@@ -609,7 +594,7 @@ describe("Menu (browser)", () => {
         const subElement = sub();
         const calls = action.mock.calls.length;
         const subCalls = subAction.mock.calls.length;
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         // Not the item the keyboard open focused: the pointer moves focus to it (6.2).
         await pressOn(item("later"));
         expect(document.activeElement).toBe(item("later"));
@@ -639,7 +624,7 @@ describe("Menu (browser)", () => {
     it("hover intent: opens after ~100 ms without moving focus, closes ~150 ms after leaving", async () => {
       // The hover timers update the Roots outside any `act` scope: like the ViewTransition rows,
       // this row runs outside React's act environment and drives the raw `userEvent` (review L4).
-      onCleanup(leaveActEnvironment());
+      leaveActEnvironment();
       const times: Record<string, number> = {};
       render(
         <Basic>
@@ -1063,11 +1048,6 @@ describe("Menu (browser)", () => {
   // (design/components/menu.md 2.2, "A press on the Trigger is not a focus-out"). One outcome on
   // every engine.
   describe("Trigger click while open", () => {
-    afterEach(async () => {
-      // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
-      await mouse.releaseHeld();
-    });
-
     function setup() {
       const work = deferred();
       const action = vi.fn<OpenAction>((next) => (next ? undefined : work.promise));
@@ -1200,10 +1180,6 @@ describe("Menu (browser)", () => {
   // which focuses a clicked button) hid the menu at the press as "dismiss", and the click's toggle
   // re-showed it on Firefox. One outcome on every engine.
   describe("a press on a foreign invoker while open", () => {
-    afterEach(async () => {
-      await mouse.releaseHeld();
-    });
-
     /**
      * The foreign button is the next tab stop after the menu (the popover follows its Trigger), on
      * the Trigger's line, clear of the menu below it.

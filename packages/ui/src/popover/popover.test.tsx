@@ -20,7 +20,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { startTransition, use, useRef, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   dispatchInterest,
   dispatchLoseInterest,
@@ -115,16 +115,6 @@ async function openThroughTrigger(user: ReturnType<typeof setupUser>) {
   await flushTasks(2);
   expect(isOpen()).toBe(true);
 }
-
-afterEach(() => {
-  // Restored here as well as in the setup file (which runs after this hook): the loop below
-  // must reach the real `hidePopover`, not a test's spy.
-  vi.restoreAllMocks();
-  for (const element of document.querySelectorAll("[popover]")) {
-    if (element.matches(":popover-open")) (element as HTMLElement).hidePopover();
-  }
-  document.body.innerHTML = "";
-});
 
 describeOverlayOpenState<PopoverOpenChangeDetails>({
   ...popoverLikeDriver(),

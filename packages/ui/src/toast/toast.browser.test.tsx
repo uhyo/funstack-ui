@@ -16,21 +16,14 @@
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { supportsAriaNotify } from "../__tests__/engine.js";
 import { Dialog } from "../dialog/index.js";
 import { Menu } from "../menu/index.js";
 import { createToastManager, Toast } from "./index.js";
 import type { ToastItem, ToastManager, ToastViewportState } from "./index.js";
-import {
-  addStyle,
-  closeOpenTopLayer,
-  flushFor,
-  runCleanups,
-  sleep,
-  settle,
-} from "../__tests__/browser-helpers.js";
+import { addStyle, flushFor, sleep, settle } from "../__tests__/browser-helpers.js";
 
 async function call<T>(fn: () => T): Promise<T> {
   let result!: T;
@@ -64,12 +57,6 @@ let manager: ToastManager;
 
 beforeEach(() => {
   manager = createToastManager();
-});
-
-afterEach(async () => {
-  closeOpenTopLayer();
-  runCleanups();
-  await sleep(0);
 });
 
 function renderToast(t: ToastItem) {

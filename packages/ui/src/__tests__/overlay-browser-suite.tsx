@@ -284,7 +284,6 @@ export interface ViewTransitionRows {
  * off, and the `.pop` keyframes. `isOpen` reads the popup (`data-testid="popup"`).
  */
 export function setUpViewTransitionRows(isOpen: (popup: Element) => boolean): ViewTransitionRows {
-  let restoreAct: () => void;
   let calls: { openAtStart: boolean }[] = [];
   let transitions: ViewTransition[] = [];
 
@@ -294,7 +293,7 @@ export function setUpViewTransitionRows(isOpen: (popup: Element) => boolean): Vi
       const element = document.querySelector("[data-testid=popup]");
       calls.push({ openAtStart: element ? isOpen(element) : false });
     }));
-    restoreAct = leaveActEnvironment();
+    leaveActEnvironment();
     addStyle(`
       ::view-transition-old(.pop) { animation: 200ms ease-in both vt-pop-out; }
       ::view-transition-new(.pop) { animation: 200ms ease-out both vt-pop-in; }
@@ -304,7 +303,6 @@ export function setUpViewTransitionRows(isOpen: (popup: Element) => boolean): Vi
   });
 
   afterEach(async () => {
-    restoreAct();
     await Promise.allSettled(transitions.map((transition) => transition.finished));
   });
 
@@ -435,15 +433,6 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
     // engine's focus, light dismiss and `toggle` tasks interleave with React's work as they do on
     // a page; the close action is held open so the pending window can be inspected.
     describe("a real press while open", () => {
-      let restoreAct: (() => void) | undefined;
-
-      afterEach(async () => {
-        // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
-        await mouse.releaseHeld();
-        restoreAct?.();
-        restoreAct = undefined;
-      });
-
       it.each(config.pressesWhileOpen.map((press) => [press.name, press] as const))(
         "a real press on %s",
         async (_, press) => {
@@ -454,7 +443,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           render(<Rendered action={action} />);
           await config.open();
           await flushFor();
-          restoreAct = leaveActEnvironment();
+          leaveActEnvironment();
 
           const target = press.target();
           const before = document.activeElement;

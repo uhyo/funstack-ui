@@ -3,7 +3,7 @@
 // dialog.test.tsx for what jsdom cannot test.
 import { act, render, screen } from "@testing-library/react";
 import { useActionState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   deferred,
   ErrorCatcher,
@@ -23,12 +23,6 @@ import {
   trigger,
 } from "../__tests__/dialog-harness.js";
 import type { ActionFn } from "../__tests__/dialog-harness.js";
-
-afterEach(() => {
-  // Restored here as well as in the setup file: the DOM is cleared below with real methods.
-  vi.restoreAllMocks();
-  document.body.innerHTML = "";
-});
 
 describe("Dialog", () => {
   describe("Form part", () => {

@@ -68,9 +68,9 @@ export function quietPeriod(ms: number, _whatMustNotHappen: string): Promise<voi
   return sleep(ms);
 }
 
-export { onCleanup, runCleanups } from "./cleanups.js";
+export { onCleanup } from "./cleanups.js";
 
-/** Appends a `<style>` to <head>, removed at the next `runCleanups()`; returns the remover. */
+/** Appends a `<style>` to <head>, removed after the test (`onCleanup`); returns the remover. */
 export function addStyle(css: string): () => void {
   const style = document.createElement("style");
   style.textContent = css;
@@ -80,26 +80,27 @@ export function addStyle(css: string): () => void {
   return remove;
 }
 
-/**
- * Closes every open `<dialog>` and hides every open popover, so that the next test starts with an
- * interactive page (a modal dialog left open makes the rest of the document inert).
- */
-export function closeOpenTopLayer(): void {
-  for (const dialog of document.querySelectorAll("dialog")) if (dialog.open) dialog.close();
-  for (const element of document.querySelectorAll<HTMLElement>("[popover]")) {
-    if (element.matches(":popover-open")) element.hidePopover();
-  }
-}
-
 type ActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
+
+/** The act environment before the current test's first `leaveActEnvironment()`, if it left. */
+let actEnvironmentBeforeTest: { readonly value: boolean | undefined } | undefined;
 
 /**
  * Switches React's act environment off (for rows whose updates land outside any `act` scope:
  * a view transition commits in its callback, a hover timer fires on its own) and returns the
- * function that restores the previous value.
+ * function that restores the previous value, for a row that re-enters it mid-test. The value the
+ * test started with is restored after the test in any case (`onCleanup`), so a caller needs no
+ * `afterEach` of its own.
  */
 export function leaveActEnvironment(): () => void {
   const previous = (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT;
+  if (actEnvironmentBeforeTest === undefined) {
+    actEnvironmentBeforeTest = { value: previous };
+    onCleanup(() => {
+      (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = actEnvironmentBeforeTest!.value;
+      actEnvironmentBeforeTest = undefined;
+    });
+  }
   (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = false;
   return () => {
     (globalThis as ActGlobal).IS_REACT_ACT_ENVIRONMENT = previous;

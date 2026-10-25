@@ -19,7 +19,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
 import { mouse } from "../__tests__/browser-commands.js";
@@ -52,10 +52,8 @@ import type {
 import { Popover } from "./index.js";
 import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
 import {
-  closeOpenTopLayer,
   flushFor,
   leaveActEnvironment,
-  runCleanups,
   quietPeriod,
   settle,
   sleep,
@@ -66,12 +64,6 @@ type ActionFn = (next: boolean, details: PopoverOpenChangeDetails) => unknown;
 const trigger = () => screen.getByTestId("trigger");
 const popup = () => screen.getByTestId("popup");
 const isOpen = (element: Element = popup()) => element.matches(":popover-open");
-
-afterEach(async () => {
-  // Close anything left open so the next test starts with an interactive page.
-  closeOpenTopLayer();
-  runCleanups();
-});
 
 /** Box styles that make positions predictable (the popover and dialog UA styles reset). */
 const box = (width: number, height: number) => ({
@@ -712,14 +704,6 @@ describe("Popover (browser)", () => {
     // #117: real presses with real timing while both are open (design 7: a press inside the outer
     // popup is outside the inner one; the inner Trigger is the inner popup's invoker).
     describe("a real press while both are open", () => {
-      let restoreAct: (() => void) | undefined;
-
-      afterEach(async () => {
-        await mouse.releaseHeld();
-        restoreAct?.();
-        restoreAct = undefined;
-      });
-
       async function pressOn(target: Element) {
         const box = target.getBoundingClientRect();
         const x = Math.round(box.left + box.width / 2);
@@ -738,7 +722,7 @@ describe("Popover (browser)", () => {
         await openBoth();
         const outerCalls = action.mock.calls.length;
         const innerCalls = innerAction.mock.calls.length;
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         await pressOn(screen.getByTestId("inner-trigger"));
         expect(isOpen(inner())).toBe(true);
         const innerTrigger = screen.getByTestId("inner-trigger");
@@ -767,7 +751,7 @@ describe("Popover (browser)", () => {
         await openBoth();
         const outerCalls = action.mock.calls.length;
         const innerCalls = innerAction.mock.calls.length;
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         await pressOn(screen.getByRole("heading", { name: "Filters" }));
         await expect.poll(() => isOpen(inner())).toBe(false);
         await expect.poll(() => innerAction.mock.calls.length).toBe(innerCalls + 1);
@@ -1212,11 +1196,6 @@ describe("Popover (browser)", () => {
   // pending), no veto, no exit transition. The degraded shape is the same on every engine; the
   // `<button>` Trigger's awaited close is Menu's #110 rows and "a Trigger click while open" above.
   describe("non-button Trigger click while open", () => {
-    afterEach(async () => {
-      // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
-      await mouse.releaseHeld();
-    });
-
     it("a link Trigger's press while open hides the popup before the click's (false, 'activate')", async () => {
       silenceErrors();
       const work = deferred();
@@ -1284,14 +1263,6 @@ describe("Popover (browser)", () => {
   // notifies with the `CommandEvent`). The invoker is exempt from light dismiss, so the command is
   // the single source of the close. Real press, real timing.
   describe("a real press on a foreign invoker while open", () => {
-    let restoreAct: (() => void) | undefined;
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct?.();
-      restoreAct = undefined;
-    });
-
     it.each(["hide-popover", "toggle-popover"])(
       "command=%s hides it at the click with one (false, 'activate') carrying the CommandEvent",
       async (command) => {
@@ -1314,7 +1285,7 @@ describe("Popover (browser)", () => {
         await user.click(trigger());
         await settle(() => expect(isOpen()).toBe(true));
         const calls = action.mock.calls.length;
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         const box = foreign.getBoundingClientRect();
         const x = Math.round(box.left + box.width / 2);
         const y = Math.round(box.top + box.height / 2);
@@ -1343,14 +1314,6 @@ describe("Popover (browser)", () => {
   // #117: Popover.Close with `action` (design 2.3 row 2): the press runs the Close's own action in
   // its transition (`data-pending` on the Close) with the popup shown; the close dispatch follows it.
   describe("a real press on a Close with action", () => {
-    let restoreAct: (() => void) | undefined;
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct?.();
-      restoreAct = undefined;
-    });
-
     it("the action runs with the popup shown; then one (false, 'activate') and focus back on the Trigger", async () => {
       const focusesButtons = await pressFocusesButtons();
       const save = deferred();
@@ -1367,7 +1330,7 @@ describe("Popover (browser)", () => {
       const close = screen.getByTestId("save");
       const before = document.activeElement;
       const calls = action.mock.calls.length;
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       const r = close.getBoundingClientRect();
       const x = Math.round(r.left + r.width / 2);
       const y = Math.round(r.top + r.height / 2);

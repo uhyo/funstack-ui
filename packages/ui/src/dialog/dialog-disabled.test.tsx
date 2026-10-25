@@ -4,18 +4,12 @@
 // Trigger, enabled commands, `data-disabled` in JS-free mode, owned `disabled`) are here.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { setupUser, PlainButton, flushTasks } from "../__tests__/helpers.js";
 import { Dialog } from "./index.js";
 import { Harness, popup, spyClose, spyShowModal, trigger } from "../__tests__/dialog-harness.js";
 import { describeOverlayDisabledRenders } from "../__tests__/overlay-disabled-render-suite.js";
 import type { DialogOpenChangeDetails } from "./index.js";
-
-afterEach(() => {
-  // Restored here as well as in the setup file: the DOM is cleared below with real methods.
-  vi.restoreAllMocks();
-  document.body.innerHTML = "";
-});
 
 describeOverlayDisabledRenders<DialogOpenChangeDetails, { modal?: boolean; content?: ReactNode }>({
   name: "Dialog",

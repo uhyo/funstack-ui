@@ -49,10 +49,8 @@ import { addExitStyle } from "../__tests__/overlay-browser-suite.js";
 import {
   addStyle,
   animationsFinished,
-  closeOpenTopLayer,
   flushFor,
   onCleanup,
-  runCleanups,
   settle,
   leaveActEnvironment,
   spyViewTransitions,
@@ -138,11 +136,6 @@ async function typeInto(text: string) {
   await user.keyboard(text);
   await flushFor();
 }
-
-afterEach(async () => {
-  closeOpenTopLayer();
-  runCleanups();
-});
 
 describe("Combobox (browser)", () => {
   describe("placement and width", () => {
@@ -410,10 +403,6 @@ describe("Combobox (browser)", () => {
         await mouse.up(x, y);
       }
     }
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-    });
 
     for (const [where, label] of [
       ["Combobox.Label", () => screen.getByText("Country", { selector: "label" })],
@@ -824,7 +813,6 @@ describe("Combobox (browser)", () => {
   });
 
   describe("ViewTransition", () => {
-    let restoreAct: () => void;
     let calls: { openAtStart: boolean }[] = [];
     let transitions: ViewTransition[] = [];
 
@@ -834,7 +822,7 @@ describe("Combobox (browser)", () => {
         const element = document.querySelector("[data-testid=popup]");
         calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
       }));
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       addStyle(`
         ::view-transition-old(.pop) { animation: 150ms ease-in both cb-pop-out; }
         ::view-transition-new(.pop) { animation: 150ms ease-out both cb-pop-in; }
@@ -844,7 +832,6 @@ describe("Combobox (browser)", () => {
     });
 
     afterEach(async () => {
-      restoreAct();
       await Promise.allSettled(transitions.map((transition) => transition.finished));
     });
 
@@ -1018,15 +1005,8 @@ describe("Combobox (browser)", () => {
   // input (`mouse.down` / `mouse.up`), outside React's act environment so the timing is real. No
   // engine branch: WebKit is verified by its CI job.
   describe("Trigger close", () => {
-    let restoreAct: () => void;
-
     beforeEach(() => {
-      restoreAct = leaveActEnvironment();
-    });
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct();
+      leaveActEnvironment();
     });
 
     const trigger = () => screen.getByTestId("trigger");
@@ -1259,14 +1239,6 @@ describe("Combobox (browser)", () => {
   // press is #117's row ("a real press while open", below). Outside React's act environment, as
   // #117's rows.
   describe("Input press", () => {
-    let restoreAct: (() => void) | undefined;
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct?.();
-      restoreAct = undefined;
-    });
-
     // Ten characters with ordinary-width letters around the boundaries the rows press at (2, 3, 8).
     const TEXT = "Wide Words";
 
@@ -1276,7 +1248,7 @@ describe("Combobox (browser)", () => {
       await typeInto(TEXT);
       await settle(() => expect(isOpen()).toBe(true));
       expect(input().value).toBe(TEXT);
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
     }
 
     /** Client point of the caret boundary before `input().value[index]`, at mid-height. */
@@ -1329,7 +1301,7 @@ describe("Combobox (browser)", () => {
     it("closed: a click on the input reaches it (nothing captured) and openOnClick opens", async () => {
       const openAction = vi.fn<OpenAction>();
       render(<Harness root={{ openOnClick: true, openChangeAction: openAction }} />);
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       expect(isOpen()).toBe(false);
       const clicks: EventTarget[] = [];
       const captures: EventTarget[] = [];
@@ -1399,7 +1371,7 @@ describe("Combobox (browser)", () => {
       const outer = screen.getByTestId("popover");
       await settle(() => expect(isOpen()).toBe(true));
       expect(isOpen(outer)).toBe(true);
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       const r = input().getBoundingClientRect();
       const x = Math.round(r.left + r.width / 2);
       const y = Math.round(r.top + r.height / 2);
@@ -1433,7 +1405,7 @@ describe("Combobox (browser)", () => {
         await typeInto("j");
         await settle(() => expect(isOpen()).toBe(true));
         openAction.mockClear();
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         const downs: string[] = [];
         const captures: Element[] = [];
         const recordDown = (event: PointerEvent) => downs.push(event.pointerType);
@@ -1546,19 +1518,11 @@ describe("Combobox (browser)", () => {
   // React's act environment so the engine's focus, light dismiss and `toggle` tasks interleave with
   // React's work as on a page. The Trigger is #112's describe above and the labels #111's.
   describe("a real press while open", () => {
-    let restoreAct: (() => void) | undefined;
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct?.();
-      restoreAct = undefined;
-    });
-
     /** Opens by typing `text` (inside act), then leaves the act environment for the press. */
     async function openByTyping(text: string) {
       await typeInto(text);
       await settle(() => expect(isOpen()).toBe(true));
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
     }
 
     /** A real press and release at `at` (relative to the element's top-left) or its centre. */
@@ -1734,14 +1698,6 @@ describe("Combobox (browser)", () => {
   // Chromium and Firefox (and Playwright's Linux WebKit, which focuses a clicked button) hid it at
   // the press as `"dismiss"`, reverted the text, and the click's toggle re-showed it.
   describe("a press on a foreign invoker while shown", () => {
-    let restoreAct: (() => void) | undefined;
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct?.();
-      restoreAct = undefined;
-    });
-
     function ForeignHarness(props: HarnessProps) {
       return (
         <>
@@ -1769,7 +1725,7 @@ describe("Combobox (browser)", () => {
       await typeInto("Jamaicax");
       await settle(() => expect(isOpen()).toBe(true));
       openAction.mockClear();
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       return { valueAction, openAction };
     }
 

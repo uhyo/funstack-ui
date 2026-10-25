@@ -14,7 +14,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { Suspense, startTransition, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { mouse } from "../__tests__/browser-commands.js";
@@ -35,11 +35,9 @@ import { Dialog } from "./index.js";
 import type { DialogOpenChangeDetails, DialogPopupProps } from "./index.js";
 import {
   addStyle,
-  closeOpenTopLayer,
   flushFor,
   leaveActEnvironment,
   quietPeriod,
-  runCleanups,
   settle,
   sleep,
 } from "../__tests__/browser-helpers.js";
@@ -55,12 +53,6 @@ async function openWithTrigger(): Promise<void> {
   await user.click(trigger());
   await settle(() => expect(popup().open).toBe(true));
 }
-
-afterEach(async () => {
-  // Close anything left open so the next test starts with an interactive page.
-  closeOpenTopLayer();
-  runCleanups();
-});
 
 function Library({
   action,
@@ -984,14 +976,6 @@ describe("Dialog (browser)", () => {
   // cancelled, the same awaited dispatch as the Close part); a non-modal dialog without
   // `lightDismiss` ignores an outside press (7); its Close part is awaited like the modal one.
   describe("a real press while open: foreign invokers and non-modal", () => {
-    let restoreAct: (() => void) | undefined;
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct?.();
-      restoreAct = undefined;
-    });
-
     async function pressOn(target: Element) {
       const r = target.getBoundingClientRect();
       const x = Math.round(r.left + r.width / 2);
@@ -1052,7 +1036,7 @@ describe("Dialog (browser)", () => {
         foreign.setAttribute("command", command);
         const before = document.activeElement!;
         const calls = action.mock.calls.length;
-        restoreAct = leaveActEnvironment();
+        leaveActEnvironment();
         const focus = focusesButtons ? foreign : before;
         expect(await pressOn(foreign)).toEqual({ open: true, focus });
         expect(action.mock.calls.at(-1)![1].returnValue).toBe("foreign");
@@ -1083,7 +1067,7 @@ describe("Dialog (browser)", () => {
       render(<NonModal action={action} />);
       await openWithTrigger();
       await flushFor();
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       const outside = screen.getByTestId("outside");
       const before = document.activeElement;
       expect(await pressOn(outside)).toEqual({
@@ -1105,7 +1089,7 @@ describe("Dialog (browser)", () => {
       const close = screen.getByTestId("close");
       const before = document.activeElement!;
       const calls = action.mock.calls.length;
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       const focus = focusesButtons ? close : before;
       expect(await pressOn(close)).toEqual({ open: true, focus });
       await expectAwaitedClose(action, calls, work, focus, "click");

@@ -114,14 +114,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  // Restored here as well as in the setup file (which runs after this hook): the loop below
-  // must reach the real `hidePopover`, not a test's spy.
-  vi.restoreAllMocks();
   delete (document as unknown as { ariaNotify?: unknown }).ariaNotify;
-  for (const element of document.querySelectorAll("[popover]")) {
-    if (element.matches(":popover-open")) (element as HTMLElement).hidePopover();
-  }
-  document.body.innerHTML = "";
 });
 
 // --- Tests ---------------------------------------------------------------------------------------

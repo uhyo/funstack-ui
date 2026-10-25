@@ -173,7 +173,12 @@ export default defineConfig({
         test: {
           name: "browser",
           include: ["src/**/*.browser.test.{ts,tsx}"],
-          setupFiles: ["./src/__tests__/vitest.setup.ts"],
+          // Hooks run in stack order: vitest.browser.setup.ts's afterEach (release the mouse) runs
+          // before vitest.setup.ts's (close the top layer, unmount).
+          setupFiles: [
+            "./src/__tests__/vitest.setup.ts",
+            "./src/__tests__/vitest.browser.setup.ts",
+          ],
           globals: true,
           browser: {
             enabled: true,

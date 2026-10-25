@@ -37,10 +37,8 @@ import type {
 } from "./index.js";
 import {
   addStyle,
-  closeOpenTopLayer,
   flushFor,
   onCleanup,
-  runCleanups,
   sleep,
   leaveActEnvironment,
   spyViewTransitions,
@@ -72,12 +70,7 @@ beforeEach(() => {
     `);
 });
 
-afterEach(async () => {
-  // A row that failed between `mouse.down` and `mouse.up` must not leave the (in Firefox, shared,
-  // #62) button down for the next rows.
-  await mouse.releaseHeld();
-  closeOpenTopLayer();
-  runCleanups();
+afterEach(() => {
   window.scrollTo(0, 0);
 });
 
@@ -760,7 +753,6 @@ describe("Menu.ContextTrigger (browser)", () => {
   });
 
   describe("ViewTransition", () => {
-    let restoreAct: () => void;
     let calls: { openAtStart: boolean }[] = [];
     let transitions: ViewTransition[] = [];
 
@@ -770,7 +762,7 @@ describe("Menu.ContextTrigger (browser)", () => {
         const element = document.querySelector("[data-testid=popup]");
         calls.push({ openAtStart: element?.matches(":popover-open") ?? false });
       }));
-      restoreAct = leaveActEnvironment();
+      leaveActEnvironment();
       addStyle(`
         ::view-transition-old(.pop) { animation: 100ms ease-in both vt-cm-out; }
         ::view-transition-new(.pop) { animation: 100ms ease-out both vt-cm-in; }
@@ -780,7 +772,6 @@ describe("Menu.ContextTrigger (browser)", () => {
     });
 
     afterEach(async () => {
-      restoreAct();
       await Promise.allSettled(transitions.map((transition) => transition.finished));
     });
 

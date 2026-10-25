@@ -206,13 +206,6 @@ async function typeText(user: ReturnType<typeof setupUser>, text: string) {
 
 afterEach(() => {
   vi.useRealTimers();
-  // Restored here as well as in the setup file (which runs after this hook): the loop below
-  // must reach the real `hidePopover`, not a test's spy.
-  vi.restoreAllMocks();
-  for (const element of document.querySelectorAll("[popover]")) {
-    if (element.matches(":popover-open")) (element as HTMLElement).hidePopover();
-  }
-  document.body.innerHTML = "";
 });
 
 describe("Combobox", () => {

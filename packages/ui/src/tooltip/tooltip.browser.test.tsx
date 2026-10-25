@@ -395,16 +395,8 @@ describe("Tooltip (browser)", () => {
   // pointer leaves and re-enters"). The outside press is "a pointerdown outside" above. The native
   // path's "a click on the trigger does not close" (2.1) is Chromium-only (`supportsInterestFor`).
   describe("a real press while open", () => {
-    let restoreAct: (() => void) | undefined;
-
     beforeEach(() => {
-      restoreAct = leaveActEnvironment();
-    });
-
-    afterEach(async () => {
-      await mouse.releaseHeld();
-      restoreAct?.();
-      restoreAct = undefined;
+      leaveActEnvironment();
     });
 
     function centre(element: Element) {

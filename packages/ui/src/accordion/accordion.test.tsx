@@ -21,7 +21,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -1123,10 +1123,6 @@ describe("Accordion", () => {
         },
         flush: null,
       });
-
-    afterEach(() => {
-      document.body.innerHTML = "";
-    });
 
     renderBoth("library mode", (mode) => {
       it("reconciles every pre-opened item in ONE dispatch with reason 'platform' and no event", async () => {

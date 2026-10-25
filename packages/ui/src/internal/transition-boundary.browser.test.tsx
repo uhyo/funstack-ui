@@ -27,7 +27,6 @@ import { Dialog } from "../dialog/index.js";
 import { Tabs } from "../tabs/index.js";
 import { silenceErrors } from "../__tests__/helpers.js";
 import {
-  closeOpenTopLayer,
   leaveActEnvironment,
   spyViewTransitions,
   viewTransitionFinished,
@@ -35,16 +34,13 @@ import {
 import type { ViewTransitionSpy } from "../__tests__/browser-helpers.js";
 
 let vt: ViewTransitionSpy;
-let restoreAct: () => void;
 
 beforeEach(() => {
   vt = spyViewTransitions();
-  restoreAct = leaveActEnvironment();
+  leaveActEnvironment();
 });
 
 afterEach(async () => {
-  restoreAct();
-  closeOpenTopLayer();
   // Let a still-running view transition finish so it cannot hold the next test's commits.
   await viewTransitionFinished();
 });
