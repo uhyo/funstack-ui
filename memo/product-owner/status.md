@@ -371,3 +371,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - User: skill like other FUNSTACK libs + anything else for AI efficiency; plus a "Human Summary" page (humans glance, AIs read full docs).
 - Issues: #134 Markdown edition of docs (per-page .md, llms.txt, llms-full.txt; from rendered HTML) — dev-134 on feat/134-ai-docs, then #135 infra (skill installer bin `funstack-ui-skill-installer`, skill `funstack-ui-knowledge`, dist/docs bundled in npm). #136 Why page (/why) + home glanceability + SKILL.md content + "Using with AI agents" guide — writer-136 on docs/136-why. #137 JSDoc coverage of public API — dev-137 on docs/137-jsdoc.
 - Then: review each, merge, release alpha.16 (Features: agent skill + installer, bundled docs).
+- MERGED #137 (JSDoc 100%; reviewer's pull --rebase linearised it onto master — fine), #134+#135+#136 together (e2175bf; SKILL.md conflict resolved to writer's version).
+- RELEASED 0.1.0-alpha.16 (Publish + Deploy Docs green). Verified: `npx -p @funstack/ui@0.1.0-alpha.16 funstack-ui-skill-installer` installs the skill; https://ui.funstack.work/llms.txt live; .md served as text/markdown. WAVE 19 DONE.
+- Lesson: merge in a private worktree and push from there — agents share the main checkout and its master.
