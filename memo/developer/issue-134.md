@@ -104,7 +104,15 @@ getting-started.md:
     >
     > `@funstack/ui` is published as alpha releases under the `alpha` dist-tag; ...
 
-## Open
+## Follow-up (PO decisions, same day)
+
+- llms-full.txt drops titled CSS blocks (example stylesheets) via `stylesheetsAt`, with a line
+  linking the page's .md; untitled CSS snippets in prose stay. Saved only 713 -> 663 kB: the
+  bulk is the TSX demo sources, not the CSS (my "halve it" estimate was wrong).
+- CLAUDE.md updated (Markdown edition, docs tests, pack:check, publish building docs).
+- packages/ui/README.md: stale component list replaced by a link to the docs.
+
+## Open (initial report)
 
 - CLAUDE.md not updated (docs tests, Markdown edition, pack:check): left for the PO.
 - packages/ui/README.md still lists only 4 components ("Components: Toggle, Tabs, ...") - stale, not

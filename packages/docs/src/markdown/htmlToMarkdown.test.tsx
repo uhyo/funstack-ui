@@ -133,6 +133,28 @@ describe("pageToMarkdown", () => {
     expect(markdown.trimEnd().endsWith("`dialog.css`: the same file as above.")).toBe(true);
   });
 
+  test("with stylesheetsAt, replaces example stylesheets with a link to the page", async () => {
+    const markdown = pageToMarkdown(
+      await renderPage(
+        <>
+          <h2>Demo</h2>
+          <Example file="DialogConfirm.tsx" css="dialog.css">
+            <button type="button">Live demo DOM</button>
+          </Example>
+          <CodeBlock language="css">{".dialog:open { opacity: 1; }"}</CodeBlock>
+        </>,
+      ),
+      { stylesheetsAt: "https://ui.funstack.work/components/dialog.md" },
+    ).markdown;
+    expect(markdown).toContain('```tsx title="DialogConfirm.tsx"');
+    expect(markdown).not.toContain('```css title="dialog.css"');
+    expect(markdown).toContain(
+      "`dialog.css`: the example's stylesheet, in [the page's Markdown](https://ui.funstack.work/components/dialog.md).",
+    );
+    // An untitled CSS snippet in the prose stays.
+    expect(markdown).toContain("```css\n.dialog:open { opacity: 1; }\n```");
+  });
+
   test("converts props tables, part facts, reference tables and terms", async () => {
     const markdown = pageToMarkdown(
       await renderPage(

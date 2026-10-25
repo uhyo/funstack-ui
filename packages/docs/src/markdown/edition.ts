@@ -147,11 +147,13 @@ export async function writeMarkdownEdition(outDir: string, markdownDir: string):
     if (description === "") {
       throw new Error(`Markdown edition: ${sitePath} has no description`);
     }
+    const file = markdownFileOf(sitePath);
+    // llms-full.txt leaves the demo stylesheets out; the page's own .md has them.
     const absoluteMarkdown = pageToMarkdown(html, {
       resolveLink: linkResolver(sitePath, pagePaths, false),
       anchors,
+      stylesheetsAt: new URL(file, SITE_URL).href,
     }).markdown;
-    const file = markdownFileOf(sitePath);
     const label = labels.get(sitePath) ?? title;
     pages.set(sitePath, {
       path: sitePath,

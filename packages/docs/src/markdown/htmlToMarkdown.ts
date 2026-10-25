@@ -57,6 +57,11 @@ export interface PageToMarkdownOptions {
    * unless it is a heading's id that equals the slug Markdown renderers derive from its text.
    */
   anchors?: ReadonlySet<string>;
+  /**
+   * When set, an example's stylesheet (a titled CSS block) is left out and replaced by a line
+   * pointing to this URL, the page's own Markdown (for llms-full.txt).
+   */
+  stylesheetsAt?: string;
 }
 
 /** The element standing for an `<a id>` anchor until conversion (see {@link anchor}). */
@@ -211,30 +216,44 @@ const dl: Handle = (state, node) => {
   return result;
 };
 
+/** A one-line stand-in for a titled code block: "`title`: text". */
+function codeReference(meta: string, text: PhrasingContent[]): Paragraph {
+  const title = /title="([^"]*)"/.exec(meta)?.[1] ?? "";
+  return { type: "paragraph", children: [{ type: "inlineCode", value: title }, ...text] };
+}
+
 /**
  * Replaces a titled code block that repeats an earlier one on the page (examples that share a
- * stylesheet show it with each example) with a reference to it.
+ * stylesheet show it with each example) with a reference to it, and with `stylesheetsAt`, every
+ * example stylesheet with a link to the page's Markdown.
  */
-function dedupeCodeBlocks(node: Nodes, seen = new Set<string>()): void {
+function shortenCodeBlocks(
+  node: Nodes,
+  stylesheetsAt: string | undefined,
+  seen = new Set<string>(),
+): void {
   if (!("children" in node)) return;
   node.children = node.children.map((child) => {
     if (child.type !== "code" || child.meta === null || child.meta === undefined) return child;
+    if (stylesheetsAt !== undefined && child.lang === "css") {
+      return codeReference(child.meta, [
+        { type: "text", value: ": the example's stylesheet, in " },
+        {
+          type: "link",
+          url: stylesheetsAt,
+          children: [{ type: "text", value: "the page's Markdown" }],
+        },
+        { type: "text", value: "." },
+      ]);
+    }
     const key = `${child.meta}\n${child.value}`;
     if (!seen.has(key)) {
       seen.add(key);
       return child;
     }
-    const title = /title="([^"]*)"/.exec(child.meta)?.[1] ?? "";
-    const reference: Paragraph = {
-      type: "paragraph",
-      children: [
-        { type: "inlineCode", value: title },
-        { type: "text", value: ": the same file as above." },
-      ],
-    };
-    return reference;
+    return codeReference(child.meta, [{ type: "text", value: ": the same file as above." }]);
   }) as typeof node.children;
-  for (const child of node.children) dedupeCodeBlocks(child, seen);
+  for (const child of node.children) shortenCodeBlocks(child, stylesheetsAt, seen);
 }
 
 /**
@@ -290,7 +309,7 @@ export function pageToMarkdown(html: string, options: PageToMarkdownOptions = {}
       handlers: { aside, div, dl, [anchorTagName]: anchor },
     },
   );
-  dedupeCodeBlocks(mdast);
+  shortenCodeBlocks(mdast, options.stylesheetsAt);
   const markdown = toMarkdown(mdast, {
     // Unpadded table cells: column alignment costs a reader tokens and adds nothing.
     extensions: [gfmToMarkdown({ tablePipeAlign: false })],

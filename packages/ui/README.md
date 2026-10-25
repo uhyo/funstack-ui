@@ -32,7 +32,8 @@ import { Toggle } from "@funstack/ui/toggle";
 <Toggle pressedChangeAction={async (pressed) => await saveFavorite(pressed)}>Favorite</Toggle>;
 ```
 
-Components: `Toggle`, `Tabs`, `Accordion`, `Tooltip`.
+Every component is imported from its own subpath (`@funstack/ui/dialog`, `@funstack/ui/tabs`, …).
+See the [component list](https://ui.funstack.work/components/button) in the documentation.
 
 ## Using with AI agents
 
