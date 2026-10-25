@@ -98,12 +98,12 @@ export interface PopoverTriggerHook {
 /**
  * The Trigger of a popover-like component (design/components/popover.md 14.3):
  * `button[popoverTarget]`, with no `aria-expanded` on an invoker: every engine exposes the
- * popover's shown state from the invoker relationship (#121). In JS-free mode the browser toggles
+ * popover's shown state from the invoker relationship. In JS-free mode the browser toggles
  * the popover and the Popup keeps `data-open` current on the element. In library mode the click
  * is cancelled (so the activation does not run) and toggles against what the user already
  * intends: an open through `requestOpen`, a library-owned close through `requestClose`. There
  * `data-open` and `state.open` are optimistic; a non-button `render` (no invoker) renders
- * `aria-expanded` from whether the popup is shown (in the top layer, #118).
+ * `aria-expanded` from whether the popup is shown (in the top layer).
  *
  * Menu adds `aria-haspopup="menu"` and its own key handling on top.
  */
@@ -128,7 +128,7 @@ export function usePopoverTrigger<State>(
         if (element.tagName === "BUTTON") return null;
         const tag = element.tagName.toLowerCase();
         // Library mode: the click handler works, but only an invoker button is spared by the
-        // popover's light dismiss, so a press while open hides the popup before the click (#115).
+        // popover's light dismiss, so a press while open hides the popup before the click.
         if (isLibrary && activate !== undefined) {
           return (
             `${part}: rendered a <${tag}>. Only a <button> is the popover's invoker: a press on ` +
@@ -147,7 +147,7 @@ export function usePopoverTrigger<State>(
     (element: HTMLElement) => {
       checkElement?.(element);
       const unregister = registerTrigger(triggerRef, element, part);
-      // JS-free mode: the DOM owns `data-open` (design 9, #121). A Trigger that mounts after the
+      // JS-free mode: the DOM owns `data-open` (design 9). A Trigger that mounts after the
       // Popup (or is re-created) picks up the current state here.
       if (!isLibrary && popupRef.current !== null) {
         element.toggleAttribute("data-open", isPopoverOpen(popupRef.current));
@@ -205,13 +205,13 @@ export function usePopoverTrigger<State>(
     // would toggle the popover).
     ...disabledProps.props,
     // Only on a button (or a component, assumed to render one): another element is no invoker,
-    // and the attribute would claim otherwise (#115).
+    // and the attribute would claim otherwise.
     popoverTarget: invoker ? ids.popup : undefined,
     ...RESERVED_INVOKER_KEYS,
     // No `aria-expanded` on an invoker: every engine exposes the popover's shown state from
-    // `popovertarget`, and ARIA in HTML forbids the attribute there (#121). Otherwise nothing else
+    // `popovertarget`, and ARIA in HTML forbids the attribute there. Otherwise nothing else
     // exposes the state: library mode renders shown (the popup is in the top layer; `data-open`
-    // is the optimistic one, #118), JS-free mode cannot know it and renders "false".
+    // is the optimistic one), JS-free mode cannot know it and renders "false".
     "aria-expanded": invoker ? undefined : isLibrary ? ctx.shown : false,
     ...merged,
     "data-open": dataAttr(state.open),

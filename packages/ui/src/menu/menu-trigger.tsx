@@ -46,9 +46,9 @@ export interface MenuTriggerProps extends Omit<
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, MenuTriggerState>;
   /**
-   * Should render a `<button>` (the `popovertarget` path before hydration). Another element works through
-   * the click handler, but a press on it while the menu is open is a light dismiss rather than the
-   * awaited close.
+   * Should render a `<button>` (the `popovertarget` path before hydration). Another element works
+   * through the click handler, but a press on it while the menu is open is a light dismiss rather
+   * than the awaited close.
    */
   render?: RenderProp<ComponentPropsWithRef<"button">, MenuTriggerState>;
 }
@@ -82,10 +82,11 @@ function isPointerClick(event: Event): boolean {
 
 /**
  * The menu button: `<button type="button" popovertarget aria-haspopup="menu">`, with no
- * `aria-expanded` (the browser exposes the menu's state on its invoker, #121; a link or other
- * non-button element, or a disabled component `render`, renders it from the shown menu). A click (Enter, Space) toggles the menu through the
- * Root's transition; ArrowDown / ArrowUp open it with the first / last item focused (inside a
- * vertical `Toolbar.Root`: the inline-end arrow, with the first item focused).
+ * `aria-expanded` (the browser exposes the menu's state on its invoker; a link or other non-button
+ * element, or a disabled component `render`, renders it from the shown menu). A click (Enter,
+ * Space) toggles the menu through the Root's transition; ArrowDown / ArrowUp open it with the
+ * first / last item focused (inside a vertical `Toolbar.Root`: the inline-end arrow, with the
+ * first item focused).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
  * (link or component `render`), `popoverTarget`, `aria-haspopup`, `aria-expanded`, `onClick`,
@@ -136,7 +137,7 @@ export function MenuTrigger({
       onKeyDown,
       onMouseDown: (event: ReactMouseEvent<HTMLButtonElement>) => {
         // A press on the Trigger of an open menu must not move focus out of the popup: the Popup's
-        // focusout would hide the menu before the click's library-owned close (design 2.2, #110).
+        // focusout would hide the menu before the click's library-owned close (design 2.2).
         if (event.button === 0 && menu.popover.intended()) event.preventDefault();
       },
     },

@@ -484,7 +484,7 @@ export function DialogPopup({
     let pressedOutside = false;
 
     const isOutside = (target: EventTarget | null): boolean => {
-      // The Trigger counts as outside, as native `closedby="any"` treats it (#116).
+      // The Trigger counts as outside, as native `closedby="any"` treats it.
       return !(target instanceof Node) || !dialog.contains(target);
     };
     let outsideAttached = false;

@@ -724,7 +724,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   // A press blurs the input at `mousedown`, but its outcome is known only at the `click`, which
   // runs in the `pointerup` task: a `<label for>` (Combobox.Label, Field.Label) refocuses the
-  // input there (#111). While the input is focused (and until a leave deferred to a release has
+  // input there. While the input is focused (and until a leave deferred to a release has
   // been decided), the presses on its document are tracked; a leave check made while one is down
   // waits for the last release. A window blur forgets the presses (a release it swallowed would
   // otherwise hold the check back), and so does focus arriving in the input.
@@ -822,9 +822,9 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   // A press on the field while the listbox is shown: `source` is no light-dismiss exemption, so
   // the release goes to the Popup, whose topmost clicked popover is the listbox itself (design
-  // 5.4, #123). Judged on `:popover-open`, not the intent: a press during a pending close must
+  // 5.4). Judged on `:popover-open`, not the intent: a press during a pending close must
   // not dismiss either. Primary button only (a right click keeps the field's own context menu).
-  // The engine releases the capture after `pointerup`; the #111 press tracking above still sees
+  // The engine releases the capture after `pointerup`; the press tracking above still sees
   // the release on the document.
   const inputPointerDown = (event: PointerEvent): void => {
     if (disabled || event.button !== 0) return;

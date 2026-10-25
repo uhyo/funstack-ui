@@ -72,8 +72,8 @@ export interface ComboboxInputProps extends Omit<
  * Owned keys (conventions 1.2): `id`, `type`, `role`, `value`, `autoComplete`,
  * `aria-autocomplete`, `aria-expanded`, `aria-controls` (token-merged), `aria-activedescendant`,
  * `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `onPointerDown` (a primary-button
- * press while the listbox is shown captures the pointer to the Popup, so it is no light dismiss,
- * #123), `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`; inside a
+ * press while the listbox is shown captures the pointer to the Popup, so it is no light dismiss),
+ * `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`; inside a
  * `Field.Root` (whose control id it takes) also `required` (own or the Field's),
  * `aria-describedby` (token-merged), `aria-invalid` and `data-invalid`.
  */
@@ -108,7 +108,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
       inputRef.current = element as HTMLInputElement;
       // The popover's "trigger" is the input: `showPopover({ source: input })` anchors the
       // listbox to it and stacks a nested listbox under its popover (design 5.1). It does not
-      // exempt presses on the input from light dismiss; `onPointerDown` does that (#123).
+      // exempt presses on the input from light dismiss; `onPointerDown` does that.
       const unregister = registerTrigger(triggerRef, element, "Combobox.Input");
       return () => {
         if (inputRef.current === element) inputRef.current = null;
@@ -141,7 +141,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     value: ctx.inputValue,
     autoComplete: "off",
     "aria-autocomplete": "list",
-    // Shown (the listbox is in the top layer); `data-open` is the optimistic one (#118).
+    // Shown (the listbox is in the top layer); `data-open` is the optimistic one.
     "aria-expanded": popover.shown,
     "aria-controls": ids.list,
     "aria-activedescendant":

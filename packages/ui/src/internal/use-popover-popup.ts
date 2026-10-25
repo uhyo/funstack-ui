@@ -93,9 +93,9 @@ function insideHiddenPopover(element: Element): boolean {
 /**
  * Everything in a popover-like Popup except rendering (design/components/popover.md 14.2): mount
  * reconciliation, the apply effect, the native `beforetoggle` / `toggle` / `command` listeners
- * (and `interest` / `loseinterest`, #127), close intents, the focus-return fallback, the JS-free
+ * (and `interest` / `loseinterest`), close intents, the focus-return fallback, the JS-free
  * `data-open` sync, the deferred unmount while a hide animates, and `initialFocus`. Shared by
- * Popover and Menu.
+ * Popover, Menu and Combobox.
  */
 export function usePopoverPopup(
   ctx: PopoverRootValue,
@@ -116,9 +116,10 @@ export function usePopoverPopup(
   // Whether focus was inside the popup when its last close began (design 6.2 rule 1).
   const focusWasInside = useRef(false);
   const initialFocusTarget = useInitialFocusTarget(part, "popup");
-  // `interestfor` (library mode, amendment #127): the button that has interest in the popup
-  // (`InterestEvent.source`), whether the current open was that button's interest open, the
-  // task that hides the popup on its lost interest, and whether the hide in flight is that one.
+  // `interestfor` (library mode, popover.md lost-interest amendment): the button that has
+  // interest in the popup (`InterestEvent.source`), whether the current open was that button's
+  // interest open, the task that hides the popup on its lost interest, and whether the hide in
+  // flight is that one.
   const interestInvoker = useRef<Element | null>(null);
   const interestOpen = useRef(false);
   const interestHideTask = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -138,7 +139,7 @@ export function usePopoverPopup(
   const { wrapContent } = contentProbe;
 
   const syncOpen = (element: HTMLElement): void => {
-    // JS-free mode only (design 9, #121): read the DOM, not `newState`, so a stale task cannot
+    // JS-free mode only (design 9): read the DOM, not `newState`, so a stale task cannot
     // lie.
     triggerRef.current?.toggleAttribute("data-open", isPopoverOpen(element));
   };
@@ -270,7 +271,7 @@ export function usePopoverPopup(
       if (isLibrary && !opening.current) {
         event.preventDefault();
         // Chromium dispatches `interest` and then the interest show in one step, so a show whose
-        // `source` is the remembered interest invoker is that button's interest open (#127).
+        // `source` is the remembered interest invoker is that button's interest open.
         const source = eventSource(toggle);
         interestOpen.current = source !== null && source === interestInvoker.current;
         ctx.requestOpen(event, "activate");
@@ -281,7 +282,7 @@ export function usePopoverPopup(
       }
       contentProbe.forget();
     } else {
-      // A foreign `popovertarget` invoker closing the popup (design 2.3, #125): `source` is the
+      // A foreign `popovertarget` invoker closing the popup (design 2.3): `source` is the
       // button, and `null` for Escape, light dismiss and script. The library's own parts never
       // get here with a source (their clicks are cancelled; their closes are `hidePopover()`). A
       // button with `commandfor` as well runs its command, whose intent comes first and stays.
@@ -303,8 +304,8 @@ export function usePopoverPopup(
     awaitingClose.current = false;
     const lostInterest = interestHide.current;
     interestHide.current = false;
-    // JS-free mode writes the Trigger's `data-open` (#121); library mode mirrors into the Root,
-    // which non-button Triggers and the Combobox Input render as `aria-expanded` (#118).
+    // JS-free mode writes the Trigger's `data-open`; library mode mirrors into the Root, which
+    // non-button Triggers and the Combobox Input render as `aria-expanded`.
     if (isLibrary) setShown(isPopoverOpen(element));
     else syncOpen(element);
 
@@ -313,7 +314,7 @@ export function usePopoverPopup(
       // Focus return for what the platform leaves out (design 6.2): a nested popover restores
       // nothing, and an opener that is gone leaves focus inside the hidden popup. Not after a
       // lost-interest hide: the platform never focuses the invoker there, and focusing a Trigger
-      // with `interestfor` would give it interest again and re-open the popup (#127).
+      // with `interestfor` would give it interest again and re-open the popup.
       const wasInside = focusWasInside.current;
       focusWasInside.current = false;
       if (wasInside && !lostInterest) returnFocus(element);
@@ -354,15 +355,15 @@ export function usePopoverPopup(
   };
 
   /**
-   * Lost interest of an `interestfor` button naming the popup (Chromium; amendment #127). The
-   * platform hides only a popover its own interest show opened (`invokedVia == kInterest`), and
-   * the library cancels that show and re-shows with `showPopover({ source })`, so the platform
-   * never hides: the library does, as a dismissal. Chromium also fires `loseinterest` from
-   * inside every hide of the popup while the button has interest (Escape, script, the library's
-   * own close), before the state flips, and a `hidePopover()` called from there re-enters the
-   * hide and loses its `toggle`: the hide waits one task and runs only if the popup is still
-   * shown and still meant to be open, and returns no focus to the Trigger. A pending interest
-   * open is cancelled instead.
+   * Lost interest of an `interestfor` button naming the popup (Chromium; popover.md lost-interest
+   * amendment). The platform hides only a popover its own interest show opened
+   * (`invokedVia == kInterest`), and the library cancels that show and re-shows with
+   * `showPopover({ source })`, so the platform never hides: the library does, as a dismissal.
+   * Chromium also fires `loseinterest` from inside every hide of the popup while the button has
+   * interest (Escape, script, the library's own close), before the state flips, and a
+   * `hidePopover()` called from there re-enters the hide and loses its `toggle`: the hide waits
+   * one task and runs only if the popup is still shown and still meant to be open, and returns no
+   * focus to the Trigger. A pending interest open is cancelled instead.
    */
   const onLoseInterest = (event: Event): void => {
     const element = popupRef.current;
@@ -422,7 +423,7 @@ export function usePopoverPopup(
       ];
       for (const [type, listener] of listeners) element.addEventListener(type, listener);
       // A pre-hydration open is shown from the first commit; a popup removed while open fires no
-      // `toggle`, so the detach clears the mirror (#118).
+      // `toggle`, so the detach clears the mirror.
       if (isLibrary) setShown(isPopoverOpen(element));
 
       let autofocused: HTMLElement | null = null;
@@ -450,8 +451,8 @@ export function usePopoverPopup(
     [checkElement, popupRef, setShown, handlers, isLibrary, initialFocus],
   );
 
-  // Development check (design 9): `role="dialog"` needs a name once the popup is (or can be)
-  // shown.
+  // Development check (design 9): a `dialog`, `alertdialog` or `menu` role needs a name once the
+  // popup is (or can be) shown.
   useShownNameWarning(
     popupRef,
     !isLibrary || ctx.committed,

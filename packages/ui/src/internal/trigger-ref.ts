@@ -8,7 +8,7 @@ const warned = new WeakSet<RefObject<HTMLElement | null>>();
 /**
  * Registers `element` as the Root's one Trigger (`triggerRef`, last mounted wins) and returns
  * the ref cleanup. In development, a second Trigger mounting while another is registered
- * warns once per Root (#113 API3): only the registered one is the popup's `source` (anchor,
+ * warns once per Root (popover.md 14.2): only the registered one is the popup's `source` (anchor,
  * focus return) and, in JS-free mode, the one whose `data-open` is kept current.
  */
 export function registerTrigger(

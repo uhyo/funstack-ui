@@ -43,7 +43,7 @@ export interface PopoverCloseProps extends Omit<
  * and the close goes through the Root (`openChangeAction(false)` awaited, `hidePopover()` in the
  * commit). With `action` the action runs first in this part's own transition (`data-pending` on
  * the button, with `aria-disabled`; a second click meanwhile is ignored); a rejection leaves the
- * popover open. It keeps `commandfor` where the Trigger has `popovertarget` (#121): an invoker
+ * popover open. It keeps `commandfor` where the Trigger has `popovertarget`: an invoker
  * inside its own popover exposes no state either way, and the `command` event tells the Popup a
  * foreign hide's reason.
  *

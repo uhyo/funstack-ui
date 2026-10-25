@@ -133,7 +133,7 @@ const FOCUSABLE_SELECTOR =
  * `experimental_focusgroup` where supported), printable characters run typeahead, ArrowLeft
  * closes a submenu. The top-level popup closes the whole menu at once when focus leaves it (Tab);
  * a press on a button of the consumer's that names it (`popovertarget`, `commandfor`) moves no
- * focus, so that button's click closes the menu as `"activate"` (#126).
+ * focus, so that button's click closes the menu as `"activate"`.
  * Style it with `:popover-open`; it emits `data-side` / `data-align` but no `data-open`. While
  * shown, those are where the browser placed it (conventions 13.2), otherwise the requested
  * values.
@@ -246,7 +246,7 @@ export function MenuPopup({
             "focusing steps, which fight the menu's item focus."
           : null),
   );
-  const devRef = useCallback(
+  const pressRef = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);
       // A press inside a menu is never a long-press of a Menu.ContextTrigger around it.
@@ -257,7 +257,7 @@ export function MenuPopup({
     },
     [checkElement],
   );
-  const ref = useMergedRefs(setElement, devRef, placementRef);
+  const ref = useMergedRefs(setElement, pressRef, placementRef);
 
   const listContext = useMemo<MenuListContextValue>(
     () => ({ menu, nativeFocusgroup, typingAhead }),

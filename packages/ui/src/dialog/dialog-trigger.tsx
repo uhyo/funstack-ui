@@ -111,9 +111,9 @@ export function DialogTrigger({
   const invoker = modal && disabledProps.invoker && rendersButton(render);
   // Non-modal JS-free mode: whether the dialog was open when the press began. A press on the
   // Trigger of an open `lightDismiss` dialog is a dismissal (the JS listeners or native
-  // `closedby="any"` close it before the click), so that click must not `show()` it again
-  // (#116). Pointer clicks only (`detail > 0`): a keyboard click has no press, and a press that
-  // never became a click must not swallow a later one.
+  // `closedby="any"` close it before the click), so that click must not `show()` it again.
+  // Pointer clicks only (`detail > 0`): a keyboard click has no press, and a press that never
+  // became a click must not swallow a later one.
   const pressedOpen = useRef(false);
   const installPress = !isLibrary && !modal;
   const onPointerDown = () => {

@@ -62,13 +62,13 @@ export interface ComboboxContextValue {
   readonly typed: (text: string, event: Event) => void;
   /** Keyboard model of design section 8, run by the Input's `onKeyDown`. */
   readonly keyDown: (event: KeyboardEvent) => boolean;
-  /** Focus arrived in the Input: track presses until a leave is decided (#111). */
+  /** Focus arrived in the Input: track presses until a leave is decided. */
   readonly focusIn: (event: FocusEvent) => void;
   /** Focus left the Input (design 5.4): close at once, then revert or commit free text. */
   readonly focusOut: (event: FocusEvent) => void;
   /** A pointer click in the Input (`openOnClick`). */
   readonly inputClick: (event: MouseEvent) => void;
-  /** A press on the Input: captures the pointer to the shown Popup (design 5.4, #123). */
+  /** A press on the Input: captures the pointer to the shown Popup (design 5.4). */
   readonly inputPointerDown: (event: PointerEvent) => void;
 }
 

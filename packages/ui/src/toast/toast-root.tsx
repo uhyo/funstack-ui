@@ -239,7 +239,8 @@ export function ToastRoot({
       event.preventDefault();
       close("dismiss", event.nativeEvent);
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      // A text field, select or slider inside the toast keeps its arrows (#113 A3).
+      // A text field, select or slider inside the toast keeps its arrows (the roving rule,
+      // toggle-group.md 6.3).
       if (ownsArrows(event.target as Element)) return;
       event.preventDefault();
       viewport.focusSibling(id, event.key === "ArrowDown" ? 1 : -1);

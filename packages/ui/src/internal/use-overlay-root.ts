@@ -21,7 +21,7 @@ export type OverlayMode = "static" | "library";
 /**
  * What caused the next close, recorded just before it happens (design 2.3). The `toggle` event
  * names no cause beyond its invoker (`ToggleEvent.source`: a `popovertarget`, `commandfor` or
- * `interestfor` button, #125); without an intent a close is a `"dismiss"`.
+ * `interestfor` button); without an intent a close is a `"dismiss"`.
  */
 export interface OverlayCloseIntent {
   readonly reason: ChangeReason;
@@ -49,8 +49,8 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   readonly optimistic: boolean;
   /**
    * The popup is in the top layer, mirrored from its `toggle` (urgent, conventions 3.5): what
-   * `aria-expanded` renders on a non-button Trigger and the Combobox Input (#118; a `<button>`
-   * Trigger renders none, #121). Written by a popover Popup in library mode; Dialog does not
+   * `aria-expanded` renders on a non-button Trigger and the Combobox Input (a `<button>`
+   * Trigger renders none). Written by a popover Popup in library mode; Dialog does not
    * maintain it, and its context omits it.
    */
   readonly shown: boolean;
@@ -106,7 +106,7 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   /**
    * Record what causes the next close. Cleared after a task if the popover did not close.
    * `unlessRecorded`: keep an intent already recorded for this close (the `command` listener runs
-   * before the `beforetoggle` of the same click, #125).
+   * before the `beforetoggle` of the same click).
    */
   readonly recordCloseIntent: (
     intent: OverlayCloseIntent | undefined,

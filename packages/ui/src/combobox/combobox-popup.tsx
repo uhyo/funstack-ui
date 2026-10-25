@@ -69,7 +69,7 @@ const preventDefault = (event: { preventDefault(): void }) => event.preventDefau
  * Anchor Positioning, at least as wide as the input. Focus never enters it: a press anywhere in
  * it is `preventDefault()`ed so the input keeps focus (design 7.1), and so is a press on a button
  * of the consumer's that names the popup (`popovertarget`, `commandfor`) while it is shown: its
- * click closes the listbox as `"activate"` with the text untouched (#126). Holds the `List` and,
+ * click closes the listbox as `"activate"` with the text untouched. Holds the `List` and,
  * outside it, `Empty` and `Status`. Style it with `:popover-open`; it emits `data-stale` but no
  * `data-open`.
  *

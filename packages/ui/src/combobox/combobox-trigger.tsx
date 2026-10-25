@@ -62,7 +62,7 @@ export interface ComboboxTriggerProps extends Omit<
  * does not take focus from the input, and a click focuses the input. After hydration a `<button>`
  * also names the Popup as its invoker (`popovertarget`, written through the ref, never
  * server-rendered), so a press while the listbox is open is not a light dismiss and the click's
- * close is the only one (design 3.3, #112, #121), and the browser exposes the listbox's state on
+ * close is the only one (design 3.3), and the browser exposes the listbox's state on
  * it: a `<button>` renders no `aria-expanded`, another element renders it from the shown listbox.
  * Every click is cancelled, so the toggle never runs: the listbox stays anchored to the input
  * (design 1).
@@ -98,9 +98,9 @@ export function ComboboxTrigger({
           : nonInvokerMessage(part, element.tagName.toLowerCase(), "listbox", "listbox")),
   );
   const popupId = popover.ids.popup;
-  // After hydration a `<button>` becomes the popup's invoker (design 3.3, #112): the platform's
+  // After hydration a `<button>` becomes the popup's invoker (design 3.3): the platform's
   // light dismiss exempts a press on an invoker of the open popover. Written here, not rendered,
-  // so the server HTML has no `popovertarget` and a click before hydration opens nothing (#121).
+  // so the server HTML has no `popovertarget` and a click before hydration opens nothing.
   const ref = useCallback(
     (element: HTMLElement) => {
       checkName?.(element);
@@ -125,12 +125,11 @@ export function ComboboxTrigger({
     tabIndex: -1,
     ...disabledButton(render, disabled).props,
     // A `<button>` is the invoker after hydration and the browser exposes the listbox's state on
-    // it (#121). Another element: shown (the listbox is in the top layer); `data-open` is the
-    // optimistic one (#118).
+    // it. Another element: shown (the listbox is in the top layer); `data-open` is the
+    // optimistic one.
     "aria-expanded": rendersButton(render) ? undefined : popover.shown,
     "aria-controls": ctx.ids.list,
-    // Owned: the ref writes `popovertarget` after hydration; a render element sets none of
-    // these.
+    // Owned: the ref writes `popovertarget` after hydration; a render element sets none of these.
     popoverTarget: undefined,
     ...RESERVED_INVOKER_KEYS,
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {

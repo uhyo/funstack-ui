@@ -53,15 +53,15 @@ export interface MenuSubmenuTriggerProps extends Omit<
  * The item that opens a submenu: an item of the parent menu (`role="menuitem"`, roving
  * `tabindex`, typeahead) and the Trigger of the submenu's Root (`popovertarget`,
  * `aria-haspopup="menu"`; no `aria-expanded`: the browser exposes the submenu's state on its
- * invoker, #121). ArrowRight (ArrowLeft in
- * RTL), Enter, Space or a click open the submenu with its first item focused; hovering it opens
- * the submenu after the Root's `delay` and leaves focus where it is.
+ * invoker). ArrowRight (ArrowLeft in RTL), Enter, Space or a click open the submenu with its first
+ * item focused; hovering it opens the submenu after the Root's `delay` and leaves focus where it
+ * is.
  *
- * Owned keys (conventions 1.2): the Trigger's (`type`, `id`, `popoverTarget`,
- * `aria-haspopup`, `aria-expanded`, `data-open`, `data-pending`; `commandfor`, `command` and
- * `popoverTargetAction`, never written) and the item's (`role`,
- * `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`,
- * `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`).
+ * Owned keys (conventions 1.2): the Trigger's (`type`, `id`, `popoverTarget`, `aria-haspopup`,
+ * `aria-expanded`, `data-open`, `data-pending`; `commandfor`, `command` and `popoverTargetAction`,
+ * never written) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`,
+ * `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`,
+ * `onPointerLeave`).
  */
 export function MenuSubmenuTrigger({
   disabled = false,

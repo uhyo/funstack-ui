@@ -165,7 +165,7 @@ export function PopoverPopup({
     // Never rendered: `showPopover()` does not set it, and an `open` attribute would show the
     // <dialog> outside the top layer. Owned so a `render` element cannot add it.
     open: undefined,
-    // Chromium exposes a <dialog popover> as modal without it (research; issue #44).
+    // Chromium exposes a <dialog popover> as modal without it (design, Decisions 4).
     "aria-modal": "false",
     "aria-labelledby": ids.title,
     "aria-describedby": ids.description,
