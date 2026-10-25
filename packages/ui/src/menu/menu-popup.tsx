@@ -177,8 +177,7 @@ export function MenuPopup({
     align,
     fallbacks: submenu ? "flip-inline" : undefined,
   });
-  const { side } = placement;
-  const resolvedAlign = placement.align;
+  const { side, align: resolvedAlign, ref: placementRef } = placement;
 
   const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
   const { onKeyDown, typingAhead } = useMenuKeyboard(menu, nativeFocusgroup);
@@ -258,7 +257,6 @@ export function MenuPopup({
     },
     [checkElement],
   );
-  const placementRef = placement.ref;
   const ref = useMergedRefs(setElement, devRef, placementRef);
 
   const listContext = useMemo<MenuListContextValue>(
