@@ -366,3 +366,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - MERGED #133 (S6/S7 splits), #130 phase 1+2 (titles, shared teardown, helpers, T3/T4/T5/T7 suites, #133 gap rows, teardown guard rows). Roadmap updated for #132.
 - RELEASED 0.1.0-alpha.15 (Publish + Deploy Docs green). WAVE 18 DONE. No open dev issues; human-task issues unchanged (#114, #119, #122, #124, older upstream).
 - Lessons: developers sometimes go idle without seeing late messages — resend once; reviewer caught a real refactor regression (whileShown reattach) → keep reviewing pure refactors.
+
+## Wave 19: AI + human optimization (user request 2026-10-25)
+- User: skill like other FUNSTACK libs + anything else for AI efficiency; plus a "Human Summary" page (humans glance, AIs read full docs).
+- Issues: #134 Markdown edition of docs (per-page .md, llms.txt, llms-full.txt; from rendered HTML) — dev-134 on feat/134-ai-docs, then #135 infra (skill installer bin `funstack-ui-skill-installer`, skill `funstack-ui-knowledge`, dist/docs bundled in npm). #136 Why page (/why) + home glanceability + SKILL.md content + "Using with AI agents" guide — writer-136 on docs/136-why. #137 JSDoc coverage of public API — dev-137 on docs/137-jsdoc.
+- Then: review each, merge, release alpha.16 (Features: agent skill + installer, bundled docs).
