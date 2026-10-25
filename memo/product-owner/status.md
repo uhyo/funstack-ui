@@ -347,3 +347,10 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - RELEASED 0.1.0-alpha.13 (Publish + Deploy Docs green).
 - Next: #121 evaluation (popovertarget Triggers, no aria-expanded) — architect evaluation; ask user before any large redesign.
 - Human tasks open: #114 (+ macOS Ctrl+click Combobox), #119, #122, #124, older upstream issues.
+
+## 2026-10-25: wave 17 tail
+- #121 adopted (user: "Adopt now"): popovertarget Triggers, no aria-expanded on button Triggers, data-open styling; owned commandfor/command/popoverTarget/popoverTargetAction.
+- #125 foreign popovertarget close = "activate" (ToggleEvent.source + popoverTargetElement check). #126 foreign invoker press prevents mousedown while Menu/Combobox open (HTML invoker relationship: no disabled, no form-owned submit; input button/reset included; own Trigger during pending close = no flicker, PO decision). #127 lost interest hides an interest-opened library Popover by proxy one task later, no focus fallback; regained interest cancels (PO decision). Accepted: controlled refusal of a pending close keeps popup open after interest lost (review F6).
+- Reviews -> fixes -> merged by PO (devs went idle after green CI without reporting; check `gh run list` rather than waiting).
+- RELEASED 0.1.0-alpha.14 (notes: scratchpad notes-alpha14.md).
+- Human tasks open: #114, #119, #122, #124, older upstream issues. No open dev issues.
