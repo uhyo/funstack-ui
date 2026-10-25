@@ -64,10 +64,12 @@ Each line: import path, parts, main state props.
 
 ## Full documentation
 
-The full documentation (concepts, every component page with props tables, data attributes, keyboard behaviour and recipes) is bundled as Markdown in the installed package. Start from the index and open the page you need:
+The full documentation (concepts, every component page with props tables, data attributes, keyboard behaviour and recipes) is bundled as Markdown in the installed package, matching its version. Start from the index, which ends with a list of all pages:
 
 ```
 node_modules/@funstack/ui/dist/docs/index.md
 ```
 
-The same docs are online at https://ui.funstack.work (`/llms.txt` lists every page as Markdown).
+Every other page is at `node_modules/@funstack/ui/dist/docs/<route>.md`, for example `components/dialog.md` or `concepts/action-props.md`.
+
+If that file is missing (the package is not installed), use the online docs instead: https://ui.funstack.work/llms.txt lists every page, and each page is also available as Markdown at its URL plus `.md` (for example https://ui.funstack.work/components/dialog.md). The site documents the latest release.
