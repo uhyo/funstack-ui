@@ -40,7 +40,7 @@ export function BrowserOwnedStatePage() {
             id: "invoker",
             term: "Invoker",
             definition:
-              "A `<button>` that names a popover or dialog by id, so that the browser itself opens or closes it on click, without JavaScript: through `popovertarget` (the Popover API) or through `commandfor` and `command` (Invoker Commands). See [Triggers of a popup](#popup-triggers).",
+              'A button that names a popover or dialog by id, so that the browser itself opens or closes it on click, without JavaScript: through `popovertarget` (the Popover API) or through `commandfor` and `command` (Invoker Commands). A `<button>` or an `<input type="button">` / `<input type="reset">` can be one; a disabled button and a submit button inside a form are not. See [Triggers of a popup](#popup-triggers).',
           },
           {
             id: "foreign-invoker",
@@ -103,9 +103,9 @@ export function BrowserOwnedStatePage() {
         needs to, and it does not duplicate a pseudo-class with a data attribute. State that nobody
         persists or awaits (whether a hint is showing) is left to the browser entirely, with no prop
         and no action. One read is mirrored: whether a popup is shown, where no native element
-        exposes it to assistive technology (see <a href="#popup-triggers">Triggers of a popup</a>).
-        Each component page says what it leaves to the browser in its{" "}
-        <strong>Browser-owned state</strong> section.
+        exposes it to assistive technology: on a Trigger that is no invoker, and on the Combobox
+        input (see <a href="#popup-triggers">Triggers of a popup</a>). Each component page says what
+        it leaves to the browser in its <strong>Browser-owned state</strong> section.
       </p>
       <ConceptExample component="Tooltip" href="/components/tooltip">
         <p>
@@ -207,14 +207,14 @@ export function BrowserOwnedStatePage() {
       </ul>
       <p>A component may give up one of these on purpose; its page says so.</p>
       <p>
-        Only a <code>&lt;button&gt;</code> can be an invoker. A Trigger rendered as a link or
-        another element works through the library's click handler instead, and has none of the
-        above: it renders <code>aria-expanded</code> itself, from whether the popup is shown; and a
-        press on it while the popup is open counts as a click outside, so light dismiss closes the
-        popup before the click arrives. That close is not awaited, a controlled parent cannot refuse
-        it, and there is no exit transition. A development warning says so. A disabled Trigger that
-        stays focusable (it renders <code>aria-disabled</code>) is no invoker either, so that
-        nothing native can open the popup.
+        Only a <code>&lt;button&gt;</code> can be the Trigger's invoker. A Trigger rendered as a
+        link or another element works through the library's click handler instead, and has none of
+        the above: it renders <code>aria-expanded</code> itself, from whether the popup is shown;
+        and a press on it while the popup is open counts as a click outside, so light dismiss closes
+        the popup before the click arrives. That close is not awaited, a controlled parent cannot
+        refuse it, and there is no exit transition. A development warning says so. In Popover and
+        Menu, a disabled Trigger that stays focusable (it renders <code>aria-disabled</code>) is no
+        invoker either, so that nothing native can open the popup.
       </p>
       <p>
         <strong>Two kinds of open state on a Trigger.</strong> What assistive technology hears is
@@ -222,7 +222,9 @@ export function BrowserOwnedStatePage() {
         <a href="/concepts/pending-and-optimistic#optimistic">optimistic</a> state: it flips at the
         click, while an open that waits for an action or for content is still pending. Style click
         feedback with <code>[data-open]</code> and <code>[data-pending]</code>, never with{" "}
-        <code>[aria-expanded]</code>, which a <code>&lt;button&gt;</code> Trigger does not have.
+        <code>[aria-expanded]</code>, which a <code>&lt;button&gt;</code> Trigger does not have. An
+        element that controls a popup without being its invoker, such as the Combobox input, renders{" "}
+        <code>aria-expanded</code> from the shown popup too.
       </p>
       <p>
         <strong>One Trigger per Root.</strong> The library anchors the popup to its Trigger or
@@ -235,7 +237,8 @@ export function BrowserOwnedStatePage() {
         so the action runs and the content loads first. A close through it is reported with{" "}
         <code>reason: "activate"</code>, because the user asked for it; each component page says
         whether that close is awaited or a notification. A component that keeps focus in its popup
-        does not lose it when you press a foreign invoker: the invoker's own close is the only one.
+        or its input does not lose it when you press a foreign invoker: the invoker's own close is
+        the only one.
       </p>
       <ConceptExample component="Popover" href="/components/popover">
         <p>

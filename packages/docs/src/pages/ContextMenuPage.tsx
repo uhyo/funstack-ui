@@ -433,7 +433,7 @@ export function ContextMenuPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Hook or prop", "On", "Meaning"]}
         rows={[
           [
             "`data-context`, `state.context`",

@@ -186,8 +186,8 @@ export function PendingOptimisticPage() {
         cannot carry the ARIA attribute, assistive technology hears the committed state and the
         optimistic data attribute is visual only; the component page says so when that applies (for
         example <a href="/components/accordion">Accordion</a>). The same holds for the trigger of a
-        popup: assistive technology hears whether the popup is shown, and <code>data-open</code> is
-        the optimistic state (see{" "}
+        popup and for the Combobox input: assistive technology hears whether the popup is shown, and{" "}
+        <code>data-open</code> is the optimistic state (see{" "}
         <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a>).
       </p>
     </DocPage>

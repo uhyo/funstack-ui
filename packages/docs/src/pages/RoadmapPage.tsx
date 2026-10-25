@@ -52,9 +52,11 @@ export function RoadmapPage() {
           no <code>aria-expanded</code>: every browser exposes the popup's state on it. Move CSS
           from <code>[aria-expanded="true"]</code> to <code>[data-open]</code> (now also written in
           Popover's JS-free mode), or to <code>:has(+ :popover-open)</code> on a page that never
-          hydrates. <code>commandfor</code>, <code>command</code>, <code>popoverTarget</code> and{" "}
-          <code>popoverTargetAction</code> are owned by these Triggers (
-          <a href={issue(121)}>#121</a>).
+          hydrates. A Trigger rendered as a link or another element through <code>render</code>{" "}
+          keeps <code>aria-expanded</code>. Replace <code>[commandfor]</code> selectors on these
+          Triggers with <code>[data-open]</code> or a class of your own. <code>commandfor</code>,{" "}
+          <code>command</code>, <code>popoverTarget</code> and <code>popoverTargetAction</code> are
+          owned by these Triggers (<a href={issue(121)}>#121</a>).
         </li>
         <li>
           Clicking the Trigger of an open Menu or Combobox is a library-owned close on every engine:
@@ -82,6 +84,15 @@ export function RoadmapPage() {
           <a href={issue(113)}>#113</a>).
         </li>
         <li>
+          Combobox: a press on the input while the listbox is open no longer closes it (
+          <a href={issue(123)}>#123</a>); pressing a label while typing no longer discards or
+          commits the typed text (<a href={issue(111)}>#111</a>).
+        </li>
+        <li>
+          Toast: ArrowUp and ArrowDown inside a text field in a toast move the caret instead of
+          switching toasts (<a href={issue(113)}>#113</a>).
+        </li>
+        <li>
           <strong>Breaking:</strong> <code>MenuTriggerProps</code> no longer accepts{" "}
           <code>onMouseDown</code> (<a href={issue(110)}>#110</a>);{" "}
           <code>ComboboxTriggerProps</code> no longer accepts <code>commandfor</code> or{" "}
@@ -91,6 +102,11 @@ export function RoadmapPage() {
         <li>
           CheckboxGroup compares a controlled <code>value</code> by content, so an inline array with
           the same items does not re-render every Item (<a href={issue(108)}>#108</a>).
+        </li>
+        <li>
+          Slider and NumberField: when a newer action supersedes one that then rejects, the
+          rejection reaches the Error Boundary at once instead of waiting for the action on the
+          other channel (step or commit) to settle (<a href={issue(105)}>#105</a>).
         </li>
         <li>
           <strong>Breaking:</strong> <code>TabsValueChangeDetails.reason</code> and{" "}

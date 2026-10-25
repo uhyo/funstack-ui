@@ -283,7 +283,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`."
+          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
         }
         note={
           "Use it in a top-level Root only. A primary-button press on it while the menu is open keeps focus on the current item; the click then closes the menu."
@@ -506,10 +506,10 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`; these, `popoverTarget` and `aria-expanded` are not in the props type) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
         }
         note={
-          'Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. A disabled SubmenuTrigger stays focusable (`aria-disabled`), so it is no invoker while disabled and renders `aria-expanded="false"`. Use it in a submenu Root only.'
+          "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. A disabled SubmenuTrigger stays focusable (`aria-disabled`), so it is no invoker while disabled and renders `aria-expanded` from the shown submenu. Use it in a submenu Root only."
         }
       />
 

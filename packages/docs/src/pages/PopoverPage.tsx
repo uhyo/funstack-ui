@@ -257,7 +257,7 @@ export function PopoverPage() {
           "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open, a part's close or a dismissal notification."
         }
         owned={
-          "`type` (only on a `<button>`), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`."
+          "`type` (only on a `<button>`), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
         }
         note={
           'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode only) is light-dismissed before its click; that close is reported as `"activate"`. `aria-haspopup` and `aria-controls` pass through.'
