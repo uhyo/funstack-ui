@@ -35,7 +35,8 @@ Branch `refactor/131-controls` (worktree under the session scratchpad), not merg
 
 ### Mutations (each against the new and the old test files)
 
-All 26 mutants caught by the old files are caught by suite rows, usually by more rows. Survivors
+27 mutants (S1-S13, N1-N14). The 20 the old files caught are all caught by suite rows (or the
+new local row), usually by more rows than before. Survivors
 of the old files:
 - S2/N2 (dismiss revert for a superseded commit too): survived old and new; killed by adding a
   no-"dismiss" assertion to the two superseded-commit overlap rows.
