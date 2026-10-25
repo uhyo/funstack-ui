@@ -947,6 +947,43 @@ describe("Popover", () => {
       expect(action).toHaveBeenCalledTimes(1);
     });
 
+    // The library hides on lost interest only after the interest invoker's own open; an open it
+    // routed for anyone else (#133 review, gap 1) stays.
+    it.each([
+      [
+        "a script's showPopover()",
+        async () => {
+          await act(async () => popup().showPopover());
+        },
+      ],
+      [
+        "a foreign show-popover invoker",
+        async () => {
+          const opener = document.createElement("button");
+          opener.setAttribute("commandfor", popup().id);
+          opener.setAttribute("command", "show-popover");
+          document.body.append(opener);
+          await setupUser().click(opener);
+        },
+      ],
+    ])("lost interest after an open by %s does nothing", async (_, open) => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} />);
+      await open();
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(1);
+      const foreign = foreignButton();
+      // The popup is shown: the interest show is a no-op, as in Chromium.
+      await act(async () => gainInterest(popup(), foreign));
+      act(() => {
+        dispatchLoseInterest(popup(), foreign);
+      });
+      await flushTasks(3);
+      expect(isOpen()).toBe(true);
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
     it("lost interest with nothing pending or shown does nothing", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);

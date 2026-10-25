@@ -1404,6 +1404,64 @@ describe("Popover (browser)", () => {
       },
     );
 
+    // Only the interest button's own open is hidden on lost interest; an open the library routed
+    // for anyone else stays (#133 review, gap 1). The platform hides only what its interest show
+    // opened, so it leaves this popup alone too.
+    it.runIf(supportsInterestFor).each([
+      [
+        "a script's showPopover()",
+        async () => {
+          await act(async () => popup().showPopover());
+        },
+      ],
+      [
+        "a foreign show-popover invoker",
+        async () => {
+          const opener = screen.getByTestId("opener");
+          opener.setAttribute("commandfor", popup().id);
+          opener.setAttribute("command", "show-popover");
+          await user.click(opener);
+        },
+      ],
+    ])(
+      "an open by %s stays through interest and lost interest from an interestfor button",
+      async (_, open) => {
+        const action = vi.fn<ActionFn>();
+        render(
+          <Library
+            action={action}
+            before={
+              <>
+                <button type="button" data-testid="foreign" style={{ display: "block" }}>
+                  Foreign
+                </button>
+                <button type="button" data-testid="opener" style={{ display: "block" }}>
+                  Opener
+                </button>
+              </>
+            }
+          />,
+        );
+        const foreign = screen.getByTestId("foreign");
+        foreign.setAttribute("interestfor", popup().id);
+        foreign.style.setProperty("interest-delay", "0s");
+        const interest: string[] = [];
+        for (const type of ["interest", "loseinterest"]) {
+          popup().addEventListener(type, () => interest.push(type));
+        }
+        await open();
+        await settle(() => expect(isOpen()).toBe(true));
+        expect(action).toHaveBeenCalledTimes(1);
+        await user.hover(foreign);
+        await settle(() => expect(interest).toEqual(["interest"]));
+        await user.hover(screen.getByTestId("outside"));
+        await settle(() => expect(interest).toEqual(["interest", "loseinterest"]), 500);
+        await quietPeriod(100, "the lost interest must not hide a popup it did not open");
+        expect(isOpen()).toBe(true);
+        expect(action).toHaveBeenCalledTimes(1);
+      },
+    );
+
     it.runIf(supportsInterestFor)(
       "lost interest during a 600 ms open action cancels it: the popup never shows",
       async () => {
