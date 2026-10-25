@@ -2,7 +2,9 @@
 // CSS anchor positioning) are available to `*.browser.test.tsx` files. Component tests that need
 // a real browser follow this file's naming convention.
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { mouse } from "./browser-commands.js";
+import { addStyle, leaveActEnvironment } from "./browser-helpers.js";
 import {
   anchorPositionHonoursParentDirection,
   browserName,
@@ -129,5 +131,64 @@ describe("browser test environment", () => {
     const reChooses = await topLayerAnchorReChoosesOnScroll();
     if (browserName !== "webkit") expect(reChooses).toBe(browserName !== "chromium");
     console.info(`[${browserName}] top-layer anchor re-chooses on scroll: ${reChooses}`);
+  });
+});
+
+// The per-test teardown of vitest.setup.ts and vitest.browser.setup.ts: the first row leaves what
+// a failing row can leave behind, the second asserts that it starts clean. The rows depend on
+// their order, so the block is never shuffled.
+describe("per-test teardown (setup files)", { shuffle: false }, () => {
+  let dialog: HTMLDialogElement;
+  let popover: HTMLElement;
+  let leaving = false;
+  let mountedInFileHook = false;
+
+  afterEach(() => {
+    if (leaving) mountedInFileHook = screen.queryByTestId("mounted") !== null;
+    leaving = false;
+  });
+
+  it("leaves a raw modal dialog and popover, a style, the act environment off and a button down", async () => {
+    leaving = true;
+    render(<p data-testid="mounted">Mounted</p>);
+    dialog = document.createElement("dialog");
+    popover = document.createElement("div");
+    popover.popover = "manual";
+    document.body.append(dialog, popover);
+    dialog.showModal();
+    popover.showPopover();
+    addStyle(".teardown-probe { color: red; }");
+    leaveActEnvironment();
+    leaveActEnvironment();
+    await mouse.down(5, 5);
+    expect(dialog.open).toBe(true);
+  });
+
+  it("starts clean: unmounted after the file's hooks, top layer closed, style gone, act environment on, no button down", async () => {
+    try {
+      // File hooks run before the setup's unmount.
+      expect(mountedInFileHook).toBe(true);
+      expect(screen.queryByTestId("mounted")).toBeNull();
+      expect(dialog.open).toBe(false);
+      expect(popover.matches(":popover-open")).toBe(false);
+      const styles = [...document.head.querySelectorAll("style")];
+      expect(styles.some((style) => style.textContent?.includes("teardown-probe"))).toBe(false);
+      expect((globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT).toBe(
+        true,
+      );
+      let buttons = -1;
+      const read = (event: MouseEvent) => (buttons = event.buttons);
+      window.addEventListener("mousemove", read);
+      try {
+        await mouse.move(20, 20);
+        await expect.poll(() => buttons).not.toBe(-1);
+      } finally {
+        window.removeEventListener("mousemove", read);
+      }
+      expect(buttons).toBe(0);
+    } finally {
+      dialog.remove();
+      popover.remove();
+    }
   });
 });
