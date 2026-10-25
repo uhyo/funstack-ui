@@ -37,7 +37,7 @@ fixes**. No blocking items.
 1. `field/field-control.tsx:31,37` `disabled` / `required`: `@defaultValue the Field's
    \`disabled\`` suggests an explicit `false` overrides the Field. `resolveFieldDefaults` ORs
    them (`own.disabled || field.disabled`), so the default is `false` and the Field's value
-   always applies, as the prose says. Use `@defaultValue \`false\`` (as Slider / NumberField do).
+   always applies, as the prose says. Use `@defaultValue false` (as Slider / NumberField do).
    `name` (`own.name ?? field.name`) is correct.
 2. `toast/toast.ts` `ToastOptions.title` / `description`: "named by `aria-labelledby` on the
    Root" reads backwards: the title names the Root (`Toast.Title`'s id is in the Root's
@@ -63,6 +63,6 @@ addendum below for their status.
   `renderProp("hr")`, "Takes no children"); GroupLabel uses `renderProp("legend")`. Docs
   typecheck and format check pass.
 - Findings 1-3 above: fixed in 2bdfedf (comment-only diff, re-reviewed): Field.Control
-  `@defaultValue \`false\`` with the "explicit `false` does not override the Field" note; Toast
+  `@defaultValue false` with the "explicit `false` does not override the Field" note; Toast
   title/description wording; `SliderLabelProps` "Props of" + `@see`. Final verdict at 2bdfedf:
   **acceptable**, no open items.
