@@ -13,7 +13,7 @@ import type { ComponentPropsWithRef, CSSProperties, FocusEvent, ReactNode } from
 import { createPortal } from "react-dom";
 import { DialogContext } from "../dialog/dialog-context.js";
 import { createActionDetails } from "../internal/action-details.js";
-import type { AriaNotifyTarget } from "../internal/announce.js";
+import { announce as speak } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import type { ChangeReason, RenderProp, StateValue } from "../internal/types.js";
@@ -104,8 +104,6 @@ interface PauseSources {
 function anyPause(sources: PauseSources): boolean {
   return sources.hover || sources.focus || sources.hidden || sources.blurred;
 }
-
-type DocumentWithAriaNotify = Document & AriaNotifyTarget;
 
 /**
  * The toast region: a `<section popover="manual">` named "Notifications (F8)", shown in the top
@@ -332,10 +330,12 @@ export function ToastViewport({
     const batch = announceBatch.current;
     announceBatch.current = [];
     if (batch.length === 0) return;
-    const doc = (regionRef.current?.ownerDocument ?? document) as DocumentWithAriaNotify;
-    if (typeof doc.ariaNotify !== "function") return;
     const priority = batch.some((a) => a.priority === "high") ? "high" : "normal";
-    doc.ariaNotify(batch.map((a) => a.text).join(" "), { priority });
+    speak(
+      regionRef.current?.ownerDocument ?? document,
+      batch.map((a) => a.text).join(" "),
+      priority,
+    );
   };
 
   const queueAnnouncement = (id: string, text: string | null, priority: ToastPriority): void => {

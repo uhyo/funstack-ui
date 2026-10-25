@@ -1,5 +1,5 @@
 // Directive-free: the module-level first-invalid collector (design/components/field-form.md 2.5).
-import type { AriaNotifyTarget } from "./announce.js";
+import { announce } from "./announce.js";
 import { sortByDocumentOrder } from "./dom-order.js";
 
 interface Batch {
@@ -14,19 +14,6 @@ interface Batch {
   moved: boolean;
   /** The target already announced. */
   announced: HTMLElement | null;
-}
-
-type NotifyingElement = HTMLElement & AriaNotifyTarget;
-
-/**
- * Speaks `message` through `element.ariaNotify()` where the browser has it (design 5.3: the
- * error is read when focus moves to the control; when focus is already there nothing would be
- * read). Does nothing without `ariaNotify` or with an empty message.
- */
-export function announce(element: HTMLElement, message: string): void {
-  const notifying = element as NotifyingElement;
-  if (message === "" || typeof notifying.ariaNotify !== "function") return;
-  notifying.ariaNotify(message);
 }
 
 /** The submission attempt in progress: every target added during the current task. */

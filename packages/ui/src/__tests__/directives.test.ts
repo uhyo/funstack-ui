@@ -175,7 +175,7 @@ const clientFiles = [
   "internal/toolbar-context.mjs",
   "internal/use-roving-focus.mjs",
   // Every NumberField part and its context are client modules (design/components/number-field.md
-  // 10, 15), as is the announcer.
+  // 10, 15).
   "number-field/number-field-context.mjs",
   "number-field/number-field-root.mjs",
   "number-field/number-field-label.mjs",
@@ -183,7 +183,6 @@ const clientFiles = [
   "number-field/number-field-increment.mjs",
   "number-field/number-field-decrement.mjs",
   "number-field/use-step-button.mjs",
-  "internal/announce.mjs",
   // Button (design/components/button.md 11, row 20).
   "button/button.mjs",
   // The context menu region (design/components/context-menu.md 7, 13.1 "Directive").
@@ -231,6 +230,8 @@ const directiveFreeFiles = [
   "form/index.mjs",
   "internal/validity.mjs",
   "internal/focus-first-invalid.mjs",
+  // The announcer: `ariaNotify()` only (number-field.md 8.3).
+  "internal/announce.mjs",
   // Directive-free Roots that render their client context's provider, and the pure modules they
   // use (design/components/progress.md 8.1).
   "progress/index.mjs",

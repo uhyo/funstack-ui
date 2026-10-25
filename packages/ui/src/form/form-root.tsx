@@ -5,7 +5,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import { sortByDocumentOrder } from "../internal/dom-order.js";
 import { FormContext } from "../internal/field-context.js";
 import type { FormContextValue, FormFieldRegistration } from "../internal/field-context.js";
-import { announce } from "../internal/focus-first-invalid.js";
+import { announce } from "../internal/announce.js";
 import { FormStatusWatcher } from "../internal/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";

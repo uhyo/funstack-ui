@@ -14,7 +14,7 @@ import {
 import type { ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { createActionDetails } from "../internal/action-details.js";
-import type { AriaNotifyTarget } from "../internal/announce.js";
+import { announce, canAnnounce } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
@@ -514,11 +514,11 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     const key = `${count}\u0000${query}`;
     if (lastAnnounced.current === key) return;
     lastAnnounced.current = key;
-    const list = listRef.current as (HTMLElement & AriaNotifyTarget) | null;
-    if (list === null || typeof list.ariaNotify !== "function") return;
-    const announce = propsRef.current.announce ?? defaultComboboxAnnouncement;
-    const message = announce(count, state);
-    if (message !== null) list.ariaNotify(message);
+    const list = listRef.current;
+    if (list === null || !canAnnounce(list)) return;
+    const compose = propsRef.current.announce ?? defaultComboboxAnnouncement;
+    const message = compose(count, state);
+    if (message !== null) announce(list, message);
   });
 
   // --- Form: hidden input, reset, mount reconciliation (design 11.1, walkthroughs 10 and 11) ---
