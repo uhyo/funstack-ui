@@ -19,7 +19,8 @@ import type { ItemLayout } from "../internal/use-item-order.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
-import { applyPatch, EMPTY_SET, setsEqual, sortByOrder, toSet } from "../internal/value-set.js";
+import { useValueSet } from "../internal/use-value-set.js";
+import { applyPatch, EMPTY_SET, setsEqual, sortByOrder } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
 import { CheckboxGroupContext, enabledValues } from "./checkbox-group-context.js";
 import type { CheckboxGroupContextValue, CheckboxGroupPatch } from "./checkbox-group-context.js";
@@ -212,17 +213,8 @@ export function CheckboxGroupRoot({
   }, []);
   const disabledItems = useMemo(() => disabledOf(items), [items]);
 
-  // Keyed on the contents, so an inline `value={["a"]}` does not re-base every render.
-  const controlledKey = value === undefined ? undefined : JSON.stringify(value);
-  const controlledSet = useMemo(
-    () => (controlledKey === undefined ? undefined : toSet(JSON.parse(controlledKey) as string[])),
-    [controlledKey],
-  );
-  const defaultKey = defaultValue === undefined ? undefined : JSON.stringify(defaultValue);
-  const defaultSet = useMemo(
-    () => (defaultKey === undefined ? undefined : toSet(JSON.parse(defaultKey) as string[])),
-    [defaultKey],
-  );
+  const controlledSet = useValueSet(value);
+  const defaultSet = useValueSet(defaultValue);
 
   /** Sorts by the Items' current document order. Reads the DOM: handlers and effects only. */
   const sortByDocument = (values: Iterable<string>): string[] =>

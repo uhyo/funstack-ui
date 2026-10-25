@@ -284,6 +284,50 @@ describe("ToggleGroup", () => {
         expect(root()).toBeInTheDocument();
       });
     });
+
+    it("controlled: an inline array with the same contents does not re-render Items", async () => {
+      let rootRenders = 0;
+      let itemRenders = 0;
+      // Created once: the Items re-render only when the context they read changes.
+      const children = (
+        <ToggleGroup.Item
+          value="bold"
+          className={() => {
+            itemRenders++;
+            return undefined;
+          }}
+        >
+          bold
+        </ToggleGroup.Item>
+      );
+      function Parent() {
+        const [, setTick] = useState(0);
+        return (
+          <>
+            <PlainButton onClick={() => setTick((t) => t + 1)}>tick</PlainButton>
+            <ToggleGroup.Root
+              aria-label="Text style"
+              // A fresh inline array on every render.
+              value={["bold"]}
+              className={() => {
+                rootRenders++;
+                return undefined;
+              }}
+            >
+              {children}
+            </ToggleGroup.Root>
+          </>
+        );
+      }
+      render(<Parent />);
+      const user = setupUser();
+      const roots = rootRenders;
+      const renders = itemRenders;
+      await user.click(screen.getByRole("button", { name: "tick" }));
+      expect(rootRenders).toBe(roots + 1);
+      expect(itemRenders).toBe(renders);
+      expect(item("bold")).toHaveAttribute("aria-pressed", "true");
+    });
   });
 
   renderBoth("async action (row 3)", (mode) => {

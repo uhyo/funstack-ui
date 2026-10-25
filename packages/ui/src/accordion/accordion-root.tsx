@@ -24,6 +24,7 @@ import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { useValueSet } from "../internal/use-value-set.js";
 import { EMPTY_SET, setsEqual, toSet } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
 import { AccordionRootContext } from "./accordion-context.js";
@@ -214,16 +215,7 @@ export function AccordionRoot(props: AccordionRootProps) {
     | ChangeAction<AccordionValue, AccordionValueChangeDetails>
     | undefined;
 
-  // Keep the committed set's identity stable while the consumer's `value` has the same contents,
-  // so `useOptimistic` only re-bases, and the context only changes, when the controlled value
-  // really changed. Keyed on the contents, not the array: an inline `value={["a"]}` is a new
-  // array on every render. (Order-sensitive; a reordered array only costs one new set.)
-  const controlledKey = value === undefined ? undefined : JSON.stringify(value);
-  const controlledSet = useMemo(
-    () =>
-      controlledKey === undefined ? undefined : toSet(JSON.parse(controlledKey) as AccordionValue),
-    [controlledKey],
-  );
+  const controlledSet = useValueSet(value);
 
   const items = useRef(new Map<HTMLDetailsElement, string>());
   const triggers = useRef(new Set<HTMLElement>());

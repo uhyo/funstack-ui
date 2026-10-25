@@ -15,7 +15,8 @@ import { useLatest } from "../internal/use-latest.js";
 import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
-import { applyPatch, EMPTY_SET, arraysEqual, sortByOrder, toSet } from "../internal/value-set.js";
+import { useValueSet } from "../internal/use-value-set.js";
+import { applyPatch, EMPTY_SET, arraysEqual, sortByOrder } from "../internal/value-set.js";
 import type { SetPatch, ValueSet } from "../internal/value-set.js";
 import { ToggleGroupContext } from "./toggle-group-context.js";
 import type { ToggleGroupContextValue, ToggleGroupOrientation } from "./toggle-group-context.js";
@@ -199,18 +200,8 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
         "multiple mode is not supported; the group keeps the mode it mounted with.",
   );
 
-  // Committed set keyed on the contents, so an inline `value={["a"]}` does not re-base every render.
-  const controlledKey = value === undefined ? undefined : JSON.stringify(value);
-  const controlledSet = useMemo(
-    () =>
-      controlledKey === undefined ? undefined : toSet(JSON.parse(controlledKey) as GroupValue),
-    [controlledKey],
-  );
-  const defaultKey = defaultValue === undefined ? undefined : JSON.stringify(defaultValue);
-  const defaultSet = useMemo(
-    () => (defaultKey === undefined ? undefined : toSet(JSON.parse(defaultKey) as GroupValue)),
-    [defaultKey],
-  );
+  const controlledSet = useValueSet(value);
+  const defaultSet = useValueSet(defaultValue);
 
   // Item registration (design 16.2): element → value, written from the Items' callback refs.
   const registry = useRef(new Map<HTMLElement, string>());
