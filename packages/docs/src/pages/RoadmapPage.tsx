@@ -29,16 +29,73 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          A Popover opened by an <code>interestfor</code> button that is not its Trigger (Chromium)
+          hides when interest is lost, reported as <code>"dismiss"</code> (
+          <a href={issue(127)}>#127</a>).
+        </li>
+        <li>
+          Pressing a button of yours that targets an open Menu or Combobox (a{" "}
+          <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a>) no longer
+          moves focus out of it first; the button's own close is the only close (
+          <a href={issue(126)}>#126</a>).
+        </li>
+        <li>
+          A foreign <code>popovertarget</code> button that closes a Popover, Menu or Combobox is
+          reported as <code>"activate"</code> instead of <code>"dismiss"</code> (
+          <a href={issue(125)}>#125</a>).
+        </li>
+        <li>
           <strong>Breaking:</strong> <code>Popover.Trigger</code>, <code>Menu.Trigger</code>,{" "}
           <code>Menu.SubmenuTrigger</code> and <code>Combobox.Trigger</code> name their popup with{" "}
           <code>popovertarget</code> instead of <code>commandfor</code> +{" "}
           <code>command="toggle-popover"</code>, and a <code>&lt;button&gt;</code> Trigger renders
-          no <code>aria-expanded</code>: every browser exposes the popup's state on the invoker.
-          Move CSS from <code>[aria-expanded="true"]</code> to <code>[data-open]</code> (now also
-          written in Popover's JS-free mode), or to <code>:has(+ :popover-open)</code> on a page
-          that never hydrates; move <code>[commandfor]</code> selectors on these Triggers to{" "}
-          <code>[popovertarget]</code>. A link or other non-button element (or a disabled component{" "}
-          <code>render</code>) keeps <code>aria-expanded</code> (<a href={issue(121)}>#121</a>).
+          no <code>aria-expanded</code>: every browser exposes the popup's state on it. Move CSS
+          from <code>[aria-expanded="true"]</code> to <code>[data-open]</code> (now also written in
+          Popover's JS-free mode), or to <code>:has(+ :popover-open)</code> on a page that never
+          hydrates. <code>commandfor</code>, <code>command</code>, <code>popoverTarget</code> and{" "}
+          <code>popoverTargetAction</code> are owned by these Triggers (
+          <a href={issue(121)}>#121</a>).
+        </li>
+        <li>
+          Clicking the Trigger of an open Menu or Combobox is a library-owned close on every engine:
+          the popup stays shown with <code>data-pending</code> until{" "}
+          <code>openChangeAction(false)</code> settles, and the exit view transition runs (
+          <a href={issue(110)}>#110</a>, <a href={issue(112)}>#112</a>).
+        </li>
+        <li>
+          An overlay Trigger's <code>aria-expanded</code> and the Combobox input's report whether
+          the popup is actually shown; <code>data-open</code> stays optimistic. With{" "}
+          <code>defaultOpen</code> the server HTML has <code>aria-expanded="false"</code> until the
+          popup is shown after hydration (<a href={issue(118)}>#118</a>).
+        </li>
+        <li>
+          A Trigger click on an open non-modal <code>lightDismiss</code> Dialog dismisses it on
+          every engine (<a href={issue(116)}>#116</a>).
+        </li>
+        <li>
+          Popover and Menu Triggers rendered as something other than a <code>&lt;button&gt;</code>{" "}
+          are no longer invokers; a development warning explains that they close through light
+          dismiss (<a href={issue(115)}>#115</a>).
+        </li>
+        <li>
+          The fallback live region is removed: announcements use <code>ariaNotify</code> only (
+          <a href={issue(113)}>#113</a>).
+        </li>
+        <li>
+          <strong>Breaking:</strong> <code>MenuTriggerProps</code> no longer accepts{" "}
+          <code>onMouseDown</code> (<a href={issue(110)}>#110</a>);{" "}
+          <code>ComboboxTriggerProps</code> no longer accepts <code>commandfor</code> or{" "}
+          <code>command</code> (<a href={issue(112)}>#112</a>); <code>Combobox.Input</code> owns{" "}
+          <code>onPointerDown</code> (<a href={issue(123)}>#123</a>).
+        </li>
+        <li>
+          CheckboxGroup compares a controlled <code>value</code> by content, so an inline array with
+          the same items does not re-render every Item (<a href={issue(108)}>#108</a>).
+        </li>
+        <li>
+          <strong>Breaking:</strong> <code>TabsValueChangeDetails.reason</code> and{" "}
+          <code>AccordionValueChangeDetails.reason</code> are the shared <code>ChangeReason</code>{" "}
+          type (<a href={issue(102)}>#102</a>).
         </li>
         <li>
           <strong>Breaking:</strong> <code>Combobox.Root</code>'s{" "}
