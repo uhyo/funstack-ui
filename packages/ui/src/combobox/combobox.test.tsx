@@ -2110,7 +2110,8 @@ describe("Combobox", () => {
       expect(error).toHaveBeenCalled();
     });
 
-    it("a disabled component render is no invoker: aria-disabled, no popovertarget, aria-expanded from shown (#132)", async () => {
+    // #132
+    it("a disabled component render is no invoker: aria-disabled, no popovertarget, aria-expanded from shown", async () => {
       const openAction = vi.fn<OpenAction>();
       const user = setupUser();
       const { rerender } = render(

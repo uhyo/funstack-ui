@@ -240,7 +240,8 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
     });
 
     describe("steps run in transitions", () => {
-      it("a second step while the first step's action pends is called (no re-entry guard, #81 H2)", async () => {
+      // #81 H2
+      it("a second step while the first step's action pends is called (no re-entry guard)", async () => {
         const first = deferred();
         const second = deferred();
         const onChange = vi

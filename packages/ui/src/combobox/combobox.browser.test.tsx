@@ -1119,7 +1119,8 @@ describe("Combobox (browser)", () => {
       expect(location.hash).toBe("");
     });
 
-    it("a disabled component render pressed while shown: light-dismissed, one (false, dismiss), focus stays in the input (#132)", async () => {
+    // #132
+    it("a disabled component render pressed while shown: light-dismissed, one (false, dismiss), focus stays in the input", async () => {
       const openAction = vi.fn<OpenAction>();
       render(
         <Harness
