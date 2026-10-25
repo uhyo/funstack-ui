@@ -1,8 +1,6 @@
-/// <reference types="node" />
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { collectSitePaths } from "../entries.js";
-import { docsNavSections } from "../navigation.js";
+import type { List, Nodes } from "mdast";
+import { toMarkdown } from "mdast-util-to-markdown";
+import type { NavSection } from "../navigation.js";
 import { SITE_NAME, SITE_URL } from "../site.js";
 import { pageToMarkdown } from "./htmlToMarkdown.js";
 import { linkResolver, markdownFileOf } from "./paths.js";
@@ -12,8 +10,8 @@ import { linkResolver, markdownFileOf } from "./paths.js";
 //   The home page's `index.md` ends with an index of every page, so it is the entry point.
 // - `/llms.txt` (https://llmstxt.org) and `/llms-full.txt` (every page, in navigation order),
 //   with absolute URLs.
-// The same `.md` files are written to a separate directory too, from which `@funstack/ui` copies
-// them into its npm package as `dist/docs` (packages/ui/scripts/copy-docs.mjs).
+// write.ts writes it to disk, and the `.md` files to a separate directory too, from which
+// `@funstack/ui` copies them into its npm package as `dist/docs` (packages/ui/scripts/copy-docs.mjs).
 
 interface Page {
   /** The site path, e.g. `/components/dialog`. */
@@ -35,12 +33,15 @@ interface IndexSection {
   pages: Page[];
 }
 
-function htmlFileOf(sitePath: string): string {
-  return sitePath === "/" ? "index.html" : `${sitePath.slice(1)}.html`;
+export interface MarkdownEdition {
+  /** The `.md` files by path relative to the site root (`components/dialog.md`). */
+  files: Map<string, string>;
+  llmsTxt: string;
+  llmsFullTxt: string;
 }
 
 /** The fragment ids that links on the site point to, per target page. */
-function linkedIds(htmlByPath: Map<string, string>): Map<string, Set<string>> {
+function linkedIds(htmlByPath: ReadonlyMap<string, string>): Map<string, Set<string>> {
   const ids = new Map<string, Set<string>>();
   for (const [fromPath, html] of htmlByPath) {
     for (const [, href] of html.matchAll(/\shref="([^"]*#[^"]*)"/g)) {
@@ -60,10 +61,13 @@ function linkedIds(htmlByPath: Map<string, string>): Map<string, Set<string>> {
 }
 
 /** The pages grouped as in the sidebar; pages missing from it are listed last. */
-function indexSections(pages: Map<string, Page>): IndexSection[] {
+function indexSections(
+  pages: Map<string, Page>,
+  navSections: readonly NavSection[],
+): IndexSection[] {
   const listed = new Set<string>();
   const sections: IndexSection[] = [];
-  for (const section of docsNavSections) {
+  for (const section of navSections) {
     const sectionPages: Page[] = [];
     for (const item of section.items) {
       const page = pages.get(item.path);
@@ -78,15 +82,40 @@ function indexSections(pages: Map<string, Page>): IndexSection[] {
   return sections;
 }
 
+function serialize(node: Nodes): string {
+  return toMarkdown(node, { bullet: "-" }).trimEnd();
+}
+
+/** "- [label](link): description" per page, escaped (descriptions mention `<dialog>`). */
 function indexList(pages: Page[], link: (page: Page) => string): string {
-  return pages.map((page) => `- [${page.label}](${link(page)}): ${page.description}`).join("\n");
+  const list: List = {
+    type: "list",
+    spread: false,
+    children: pages.map((page) => ({
+      type: "listItem",
+      spread: false,
+      children: [
+        {
+          type: "paragraph",
+          children: [
+            { type: "link", url: link(page), children: [{ type: "text", value: page.label }] },
+            { type: "text", value: `: ${page.description}` },
+          ],
+        },
+      ],
+    })),
+  };
+  return serialize(list);
 }
 
 function llmsTxt(home: Page, sections: IndexSection[]): string {
   const url = (file: string) => new URL(file, SITE_URL).href;
   const parts = [
     `# ${SITE_NAME}`,
-    `> ${home.description}`,
+    serialize({
+      type: "blockquote",
+      children: [{ type: "paragraph", children: [{ type: "text", value: home.description }] }],
+    }),
     [
       "Install with `npm install @funstack/ui@alpha`; React 19.3 or later is a peer dependency.",
       'Each component is imported from its own subpath, for example `import { Dialog } from "@funstack/ui/dialog"`.',
@@ -113,19 +142,17 @@ function llmsFullTxt(sections: IndexSection[]): string {
 }
 
 /**
- * Generates the Markdown edition from the pre-rendered HTML in `outDir`, writing it into
- * `outDir` and, without llms.txt and llms-full.txt, into `markdownDir`. Throws when a page
- * yields no content.
+ * Generates the Markdown edition from the pre-rendered HTML of every page (by site path), with
+ * pages grouped as in `navSections`. Throws when a page yields no content or no description.
  */
-export async function writeMarkdownEdition(outDir: string, markdownDir: string): Promise<void> {
-  const pagePaths = new Set(collectSitePaths().filter((p) => p !== "/*"));
+export function generateMarkdownEdition(
+  htmlByPath: ReadonlyMap<string, string>,
+  navSections: readonly NavSection[],
+): MarkdownEdition {
+  const pagePaths = new Set(htmlByPath.keys());
   const labels = new Map(
-    docsNavSections.flatMap((section) => section.items).map((item) => [item.path, item.label]),
+    navSections.flatMap((section) => section.items).map((item) => [item.path, item.label]),
   );
-  const htmlByPath = new Map<string, string>();
-  for (const sitePath of pagePaths) {
-    htmlByPath.set(sitePath, await readFile(path.join(outDir, htmlFileOf(sitePath)), "utf8"));
-  }
   const anchorsByPath = linkedIds(htmlByPath);
   const pages = new Map<string, Page>();
   for (const [sitePath, html] of htmlByPath) {
@@ -166,7 +193,7 @@ export async function writeMarkdownEdition(outDir: string, markdownDir: string):
     });
   }
 
-  const sections = indexSections(pages);
+  const sections = indexSections(pages, navSections);
   const home = pages.get("/");
   if (home === undefined) throw new Error("Markdown edition: no home page");
   // The home page doubles as the entry point of the edition (the npm package's dist/docs/index.md).
@@ -175,14 +202,9 @@ export async function writeMarkdownEdition(outDir: string, markdownDir: string):
     .join("\n\n");
   home.markdown = `${home.markdown}\n## All pages\n\n${relativeIndex}\n`;
 
-  await rm(markdownDir, { recursive: true, force: true });
-  for (const page of pages.values()) {
-    for (const dir of [outDir, markdownDir]) {
-      const file = path.join(dir, page.file);
-      await mkdir(path.dirname(file), { recursive: true });
-      await writeFile(file, page.markdown);
-    }
-  }
-  await writeFile(path.join(outDir, "llms.txt"), llmsTxt(home, sections));
-  await writeFile(path.join(outDir, "llms-full.txt"), llmsFullTxt(sections));
+  return {
+    files: new Map([...pages.values()].map((page) => [page.file, page.markdown])),
+    llmsTxt: llmsTxt(home, sections),
+    llmsFullTxt: llmsFullTxt(sections),
+  };
 }

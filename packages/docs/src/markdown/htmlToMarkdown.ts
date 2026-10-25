@@ -265,7 +265,9 @@ export function pageToMarkdown(html: string, options: PageToMarkdownOptions = {}
   resolveStreamedBoundaries(tree);
   const main = select("main", tree);
   if (main === undefined) throw new Error("The page has no <main> element");
-  if (select('template[id^="B:"]', main) !== undefined) {
+  // A boundary or segment placeholder (`$RS` fills `P:` ones) left over, or a segment that was
+  // not moved in, would lose content silently.
+  if (select('template[id^="B:"], template[id^="P:"], div[hidden][id^="S:"]', tree) !== undefined) {
     throw new Error("The page has unresolved Suspense content");
   }
   removeAll(main, new Set(selectAll(strippedSelector, main)));

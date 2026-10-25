@@ -4,7 +4,7 @@ import path from "node:path";
 import type { BuildEntryFunction } from "@funstack/static/server";
 import { checkInternalLinks } from "./checkLinks.js";
 import { collectSitePaths } from "./entries.js";
-import { writeMarkdownEdition } from "./markdown/edition.js";
+import { writeMarkdownEdition } from "./markdown/write.js";
 import { SITE_URL } from "./site.js";
 
 function generateSitemap(): string {

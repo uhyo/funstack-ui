@@ -119,3 +119,13 @@ getting-started.md:
   touched.
 - SKILL.md points to node_modules/.../dist/docs/index.md; with `npx -p` and no local install that
   path does not exist; the writer may want the site URL (llms.txt) as fallback.
+
+## Review fixes (memo/reviewer/issue-134-review.md, findings 1-4 and 9)
+
+- Index lists and the llms.txt summary are built as mdast and serialized, so `<dialog>`, `fsui-*`
+  and `experimental_*` in descriptions are escaped.
+- edition.ts is now pure (`generateMarkdownEdition(htmlByPath, navSections)`), with
+  `edition.test.ts`; disk I/O moved to `write.ts` (build.ts imports it).
+- The converter throws on a leftover `template[id^=P:]` or `div[hidden][id^=S:]` too.
+- ToastPage `duration` default no longer has Markdown backticks inside a code cell.
+- README links the docs root for the component list.

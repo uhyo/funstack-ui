@@ -33,7 +33,7 @@ import { Toggle } from "@funstack/ui/toggle";
 ```
 
 Every component is imported from its own subpath (`@funstack/ui/dialog`, `@funstack/ui/tabs`, …).
-See the [component list](https://ui.funstack.work/components/button) in the documentation.
+The [documentation](https://ui.funstack.work/) lists every component.
 
 ## Using with AI agents
 

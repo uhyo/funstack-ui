@@ -277,6 +277,12 @@ describe("pageToMarkdown", () => {
     expect(() =>
       pageToMarkdown('<main><!--$?--><template id="B:0"></template><!--/$--></main>'),
     ).toThrow("unresolved Suspense content");
+    // A segment `$RS` would fill, or one no script moved in.
+    expect(() =>
+      pageToMarkdown(
+        '<main><h2>Page</h2><template id="P:1"></template></main><div hidden id="S:1"><p>Late.</p></div>',
+      ),
+    ).toThrow("unresolved Suspense content");
     expect(() => pageToMarkdown("<p>No main</p>")).toThrow("no <main>");
     expect(() => pageToMarkdown("<main><p>No heading</p></main>")).toThrow("no heading");
   });
