@@ -2928,7 +2928,7 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `Popover.Trigger`, `Menu.Trigger` and `Menu.SubmenuTrigger` render `popoverTarget={popupId}`
     (default action `toggle`) instead of `commandfor` + `command="toggle-popover"`;
     `Combobox.Trigger` writes `popovertarget` through its ref after hydration as it wrote the pair
-    (#112). On a `<button>` no `aria-expanded` is rendered: HTML-AAM maps a `popovertarget`
+    (#112), under the same invoker test as the other two (not while disabled and focusable, #132). On a `<button>` no `aria-expanded` is rendered: HTML-AAM maps a `popovertarget`
     invoker to its popover's state and Chromium, Firefox and WebKit all expose it (measured,
     `memo/architect/probes/121-popovertarget/`; `role="menuitem"` included), ARIA in HTML #514
     forbids the explicit attribute there, and Firefox ORs an explicit value in. Sub-decisions:

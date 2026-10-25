@@ -458,7 +458,12 @@ control, keeps its explicit `aria-expanded`; a non-button `render` renders `aria
 listbox and focuses the input. After hydration the Trigger writes `popovertarget` (the Popup's id)
 through its ref callback (`setAttribute("popovertarget", id)`, lowercase), onto a `<button>` only (HTML defines
 the invoker exemption below for buttons; a `render` that produces another element gets a dev
-warning and keeps a browser-shaped close), and **every click is cancelled** (`preventDefault()`),
+warning and keeps a browser-shaped close) **and only while it is an invoker under the shared rule**
+(#132: not while it is disabled and focusable, that is `aria-disabled` on a component `render`,
+`disabledButton(...).invoker` as `Popover.Trigger` and `Menu.Trigger`; a disabled Trigger is
+inert, so a press on it while the listbox is shown is a press on the page, a light dismiss, for
+both disabled flavours, and it renders `aria-expanded` from `popover.shown` like any
+non-invoker), and **every click is cancelled** (`preventDefault()`),
 so the activation never runs: the listbox is still opened by the library with `source: input` and
 keeps the input's anchor and width. The attribute is never in the server HTML (a
 pre-hydration activation would open an empty, button-anchored popup, 11.2); `popoverTarget` /
@@ -1294,7 +1299,7 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Empty and Status | `Empty` renders only with zero mounted options, not stale and not loading: hidden during the Suspense fallback (a `Status` inside the List) and while stale old results show; `data-empty` on the List likewise; the List is `aria-busy="true"` while loading and while stale; a Status in the Popup is `role=status` and does not count as loading. |
 | Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with the default message (`"No results"` / `"1 result"` / `"3 results"`) or the consumer's `announce(count)`; not while stale; **with a `Status` fallback inside the List: zero calls until the results resolve, then one** (review H1); not for an unchanged count; never when `announce` returns `null`. |
 | Clear | Writes `""`, dispatches `null` (`"activate"`, the `click`), no dispatch when already `null`, input keeps focus; while open, the light dismiss (shim) closes the listbox and it is not re-opened. |
-| Trigger | Toggles against `intended()`; every click is `defaultPrevented`; after mount a `<button>` Trigger carries `popovertarget` equal to the Popup's `id` and no `aria-expanded` (#121), `renderToString` output carries no `popovertarget`, a non-button `render` gets none, renders `aria-expanded` from `shown` and gets a dev warning; a controlled `open={true}` parent whose action leaves `open` alone keeps the listbox shown with one `(false, "activate")` dispatch (#112). |
+| Trigger | Toggles against `intended()`; every click is `defaultPrevented`; after mount a `<button>` Trigger carries `popovertarget` equal to the Popup's `id` and no `aria-expanded` (#121), `renderToString` output carries no `popovertarget`, a non-button `render` gets none, renders `aria-expanded` from `shown` and gets a dev warning; a `disabled` component `render` (`aria-disabled="true"`, #132) carries no `popovertarget` and renders `aria-expanded="false"`, the attribute appears when `disabled` flips to `false` in a re-render and goes when it flips back, and a native-`disabled` host button keeps it (it is an invoker; the browser's own disabled check makes it non-exempt); a controlled `open={true}` parent whose action leaves `open` alone keeps the listbox shown with one `(false, "activate")` dispatch (#112). |
 | Platform path (both) | Mount reconciliation: `renderToString`, set `input.value = "jap"` before `hydrateRoot` → one `onInputValueChange("jap", { reason: "platform", event: undefined })`, no open, StrictMode still one; no `valueChangeAction`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → one `valueChangeAction(resetTarget, "platform")` with the `reset` event and one text write; the reset target is the JS-computed one (uncontrolled: latest `defaultValue`; controlled: mount-time); the visible input's `defaultValue` attribute is the mirror at the time of the `reset` event (uncontrolled: latest `defaultInputValue`; controlled: mount-time); the hidden input carries no `defaultValue`. |
 | Suspending content (both) | Dependent content keyed on `value` suspends on accept: old content stays, Input `data-pending`, no fallback above; then new content. Results boundary outside the List: the open waits with `data-pending` on Input and Trigger, `showPopover` not called until resolve. |
 | Function props / `render` | Every part's documented state; `render={<input type="search" />}` keeps the role and handlers; a `render={<button />}` Input warns; Popup `render={<div className />}` merges. |
@@ -1432,7 +1437,9 @@ packages/ui/src/internal/
   `preventDefault()`, `data-stale`, inline `style` (consumer wins per property); content through
   `renderContent` as Popover 14.4.
 - **Trigger.** `onPointerDown` and `onMouseDown` → `preventDefault()` (focus stays in the
-  input); ref callback → when `element.tagName === "BUTTON"`, `setAttribute("popovertarget",
+  input); ref callback → when `element.tagName === "BUTTON"` and `invoker` (from
+  `disabledButton(render, disabled)`, a dependency of the `useCallback`, so React re-runs the
+  cleanup and the ref when it flips, #132), `setAttribute("popovertarget",
   ids.popup)` (#121; `commandfor` + `command` at #112), removed in the cleanup
   (otherwise a dev warning); `onClick` → `preventDefault()` first (the command never runs), then
   `disabled` check, toggle against `intended()`, focus the input. No `onPointerCancel`, no
@@ -1894,10 +1901,12 @@ write the spec's form so the exemption holds on a conformant engine; the click m
 cancelled so that the command never runs. A disabled button is never exempt (step 2 of the same
 algorithm; probed on Chromium and Firefox).
 
-Disabled flavours differ while open (review F7, recorded behaviour, no code change): a
+Disabled flavours differed while open (review F7, recorded behaviour then, no code change): a
 native-`disabled` Trigger is not exempt, so a press on it light-dismisses the open listbox
-(`"dismiss"`, as before #112); an `aria-disabled` `<button>` (component `render`) is exempt and
-its cancelled click returns early, so a press on it does nothing and the listbox stays open.
+(`"dismiss"`, as before #112); an `aria-disabled` `<button>` (component `render`) was exempt and
+its cancelled click returned early, so a press on it did nothing and the listbox stayed open.
+**Superseded by #132:** the ref writes `popovertarget` only while the Trigger is an invoker under
+the shared rule (not disabled-and-focusable), so both flavours light-dismiss.
 
 Chromium and WebKit expose an invoker relationship to accessibility: an implicit `aria-expanded`
 derived from the popover, which the explicit attribute does **not** override (#118,
@@ -2284,3 +2293,47 @@ statement if the technical writer moves it to the Transitions page (recommended:
 general, conventions 5.1, and four pages now repeat it). A permanent browser row (12.2) is
 recommended so the Combobox gets what the shared overlay suite already gives Popover, Dialog and
 Menu.
+
+## Amendment: a disabled, focusable Trigger is no invoker (#132, from the #128 review F1, 2026-10-25)
+
+Status: architect decision; a DOM-attribute change in one narrow case, no prop or type change.
+Edited in place: 3.3, the #112 amendment's F7 paragraph (superseded), 12.1's Trigger row, 14's
+Trigger bullet; conventions decision 41. Notes: `memo/architect/issue-132.md`.
+
+The gap (`memo/reviewer/issue-128-review.md` F1): `Popover.Trigger` and `Menu.Trigger` render
+`popoverTarget` only while `disabledButton(...).invoker` is true, so a Trigger that is disabled
+and still focusable (`aria-disabled="true"` on a link or component `render`, button.md 17) is no
+invoker (#83 M1, #115), and the docs state that as the rule for every overlay Trigger.
+`combobox-trigger.tsx`'s ref wrote `popovertarget` on any `<button>`, so a disabled component
+render of `Combobox.Trigger` stayed an invoker after hydration; the #112 amendment had recorded
+the consequence (F7: a press on it while the listbox is shown did nothing instead of
+light-dismissing) as behaviour, not as a decision.
+
+Decision: follow the shared rule. The ref writes `popovertarget` only when the element is a
+`<button>` **and** `disabledButton(render, disabled).invoker` is true; `aria-expanded` follows the
+same test (`invoker ? undefined : popover.shown`), as `use-popover-trigger.ts` does. Grounds:
+(1) one rule for every overlay Trigger (conventions decision 41 is written as one; the docs page
+on browser-owned state teaches it as one); (2) a disabled control is inert, and a press on an
+inert element while the listbox is shown is a press on the page, so light dismiss (`"dismiss"`)
+is the right outcome, which is what the native-`disabled` flavour already does (F7), so the two
+disabled flavours now agree inside Combobox as well; (3) the only thing the invoker relationship
+bought a disabled Trigger was the implicit expanded state, which the explicit `aria-expanded` from
+`popover.shown` provides equally (#118). The case is narrow (a component `render` with
+`disabled`), so the visible change is small; nothing changes for the default `<button>` (native
+`disabled`, invoker, non-exempt by the browser's own check) or for an enabled Trigger.
+
+Implementation (developer): `combobox-trigger.tsx`: compute `const { props: disabledProps,
+invoker: enabledInvoker } = disabledButton(render, disabled)` once; the ref's guard becomes
+`element.tagName !== "BUTTON" || !invoker` with `invoker` in the `useCallback` dependencies (React
+runs the cleanup and the new ref on a change, so a flip of `disabled` adds or removes the
+attribute); `"aria-expanded": invoker && rendersButton(render) ? undefined : popover.shown`;
+the doc comment names the rule. Tests (`combobox.test.tsx`, jsdom): the 12.1 Trigger row's new
+clauses: `disabled` with `render={<MyButton />}` has `aria-disabled="true"`, no `popovertarget`,
+`aria-expanded="false"` (and `"true"` once the listbox is shown through typing), a cancelled click
+that opens nothing; re-render with `disabled={false}`: `popovertarget` present and `aria-expanded`
+gone; the native-`disabled` host button keeps `popovertarget`. Optional browser row
+(`combobox.browser.test.tsx`): a real press on the disabled component-render Trigger of a shown
+listbox light-dismisses it (`(false, "dismiss")`, input keeps focus), on all three engines. Docs:
+`BrowserOwnedStatePage.tsx`'s "a disabled Trigger that stays focusable is no invoker either"
+becomes true as written; ComboboxPage's Trigger owned-keys note gains "(while enabled, or
+natively disabled; not while `aria-disabled`)" next to `popoverTarget`.

@@ -40,3 +40,18 @@ submenus close with the parent and would otherwise be captured live too.
 
 Files edited: design/components/combobox.md (3.2, 11.3, 11.4, 12.2, 14, amendment),
 design/components/menu.md (9, 13.2, amendment), design/conventions.md (5.1 one sentence).
+
+## Third question (from #128 review F1): disabled focusable Combobox.Trigger as invoker
+
+Facts: `use-popover-trigger.ts:178` renders `popoverTarget` only while
+`disabledButton(...).invoker` (false when focusable && disabled, i.e. `aria-disabled` on a
+link/component render); `combobox-trigger.tsx` ref writes `popovertarget` on any BUTTON. The
+#112 amendment's F7 paragraph had recorded the asymmetry (aria-disabled Trigger exempt from light
+dismiss, press does nothing) as behaviour, not a decision. Not covered by tests (Combobox is not
+in `describeOverlayDisabledRenders`).
+
+Decision: follow the shared rule (no invoker while disabled-and-focusable; `aria-expanded` from
+`popover.shown` then). Reasons: one rule for all overlay Triggers (decision 41, docs); an inert
+control's press while open should light-dismiss, as the native-disabled flavour already does;
+the implicit expanded state is replaced by the explicit attribute. Narrow case (component render
++ disabled). Edited combobox.md 3.3, F7 paragraph, 12.1, 14, new amendment; conventions 41.
