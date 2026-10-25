@@ -25,6 +25,7 @@ import { cdp, commands, userEvent } from "vitest/browser";
 import { Suspense, use } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
 import { axProperty, expectInvokerExpanded, getAXNodes } from "../__tests__/ax-tree.js";
@@ -55,6 +56,7 @@ import {
 } from "../__tests__/browser-helpers.js";
 import { centre, mouse, toPagePoint } from "../__tests__/browser-commands.js";
 import { expectInlineEdges } from "../__tests__/placement-browser.js";
+import { describeForeignInvokerPressInBrowser } from "../__tests__/foreign-invoker-press-browser-suite.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -1664,89 +1666,34 @@ describe("Combobox (browser)", () => {
     }
   });
 
-  // #126: a consumer's own invoker of the listbox (`popovertarget`, or `commandfor` with a popover
-  // command), pressed while it is shown. The Popup prevents the press's `mousedown`, so the input
-  // keeps focus, the focus-leaving close (5.4) never runs, and the click's native toggle closes the
-  // listbox as `"activate"` with the text untouched (design 5.4, conventions 3.5). Without the guard
-  // Chromium and Firefox (and Playwright's Linux WebKit, which focuses a clicked button) hid it at
-  // the press as `"dismiss"`, reverted the text, and the click's toggle re-showed it.
-  describe("a press on a foreign invoker while shown", () => {
-    function ForeignHarness(props: HarnessProps) {
-      return (
+  // #126: a consumer's own invoker of the listbox pressed while it is shown: the input keeps focus
+  // and its text (the focus-leaving close of 5.4 never runs; design 5.4, conventions 3.5).
+  let valueAction: Mock<ValueAction>;
+  describeForeignInvokerPressInBrowser({
+    name: "Combobox",
+    render: (openAction) => {
+      valueAction = vi.fn<ValueAction>();
+      render(
         <>
           {/* Before the Root: the listbox opens below the input and would cover a later button. */}
           <button type="button" data-testid="foreign" style={{ display: "block" }}>
             Foreign
           </button>
-          <Box {...props} />
-        </>
+          <Box root={{ valueChangeAction: valueAction, openChangeAction: openAction }} />
+        </>,
       );
-    }
-
-    const foreign = () => screen.getByTestId("foreign");
-
-    async function setup(attributes: Record<string, string>) {
-      const valueAction = vi.fn<ValueAction>();
-      const openAction = vi.fn<OpenAction>();
-      render(
-        <ForeignHarness root={{ valueChangeAction: valueAction, openChangeAction: openAction }} />,
-      );
-      for (const [name, value] of Object.entries(attributes)) {
-        foreign().setAttribute(name, value.replace("{popup}", popup().id));
-      }
-      // Unmatched text (`allowCustomValue` off): focus leaving would revert it.
+    },
+    popup,
+    // Unmatched text (`allowCustomValue` off): focus leaving would revert it.
+    open: async () => {
       await typeInto("Jamaicax");
       await settle(() => expect(isOpen()).toBe(true));
-      openAction.mockClear();
-      leaveActEnvironment();
-      return { valueAction, openAction };
-    }
-
-    for (const [kind, attributes, eventType] of [
-      ["popovertarget", { popovertarget: "{popup}" }, "beforetoggle"],
-      [
-        "commandfor + toggle-popover",
-        { commandfor: "{popup}", command: "toggle-popover" },
-        "command",
-      ],
-    ] as const) {
-      it(`${kind}: the input keeps focus and its text, one (false, activate), no re-open`, async () => {
-        const { valueAction, openAction } = await setup(attributes);
-        const atPress = await mouse.pressOn(foreign(), {
-          atPress: () => ({ open: isOpen(), focus: document.activeElement }),
-        });
-        expect(atPress).toEqual({ open: true, focus: input() });
-        await expect.poll(() => isOpen()).toBe(false);
-        await expect.poll(() => openAction.mock.calls.length).toBe(1);
-        const [next, details] = openAction.mock.calls[0]!;
-        expect(next).toBe(false);
-        expect(details.reason).toBe("activate");
-        expect(details.event!.type).toBe(eventType);
-        expect((details.event as Event & { source?: Element | null }).source).toBe(foreign());
-        expect(input().value).toBe("Jamaicax");
-        expect(document.activeElement).toBe(input());
-        await quietPeriod(100, "the click's toggle must not re-open the listbox");
-        expect(isOpen()).toBe(false);
-        expect(openAction).toHaveBeenCalledTimes(1);
-        expect(valueAction).not.toHaveBeenCalled();
-      });
-    }
-
-    it("a dragged-off press: the listbox stays shown, the input focused, nothing dispatched", async () => {
-      const { valueAction, openAction } = await setup({ popovertarget: "{popup}" });
-      const { x, y } = centre(foreign());
-      await mouse.down(x, y);
-      await sleep(20);
-      // Off the button, onto the empty page beside it (its own line: above the field).
-      const page = foreign().getBoundingClientRect();
-      await mouse.move(Math.round(page.right + 200), y);
-      await mouse.up(Math.round(page.right + 200), y);
-      await quietPeriod(100, "a dragged-off press must neither close nor dispatch");
-      expect(isOpen()).toBe(true);
-      expect(document.activeElement).toBe(input());
+    },
+    focusedWhileOpen: input,
+    focusAfterClose: input,
+    expectUntouched: () => {
       expect(input().value).toBe("Jamaicax");
-      expect(openAction).not.toHaveBeenCalled();
       expect(valueAction).not.toHaveBeenCalled();
-    });
+    },
   });
 });

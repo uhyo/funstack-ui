@@ -2340,6 +2340,7 @@ describe("Combobox", () => {
   describe("a press on a foreign invoker of the shown listbox", () => {
     // The Popup's document capture `mousedown` guard: the input keeps focus, so its focusout never
     // pre-empts the click's own toggle and the text is left alone (design 5.4, conventions 3.5).
+    // Which buttons are invokers is internal/invokers.test.ts; the real press is the browser suite.
     it("a popovertarget or commandfor button: prevented while shown, the input keeps focus", async () => {
       const user = setupUser();
       render(<Harness />);
@@ -2362,30 +2363,6 @@ describe("Combobox", () => {
       act(() => popup().hidePopover());
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
-    });
-
-    it("a plain button is an outside press", async () => {
-      const user = setupUser();
-      render(<Harness />);
-      await typeText(user, "j");
-      expect(isOpen()).toBe(true);
-      expect(fireEvent.mouseDown(screen.getByTestId("elsewhere"), { button: 0 })).toBe(true);
-    });
-
-    it("an <input type=button popovertarget> is guarded too", async () => {
-      const user = setupUser();
-      render(<Harness />);
-      await typeText(user, "j");
-      const foreign = document.createElement("input");
-      foreign.type = "button";
-      foreign.setAttribute("popovertarget", popup().id);
-      document.body.append(foreign);
-      onTestFinished(() => foreign.remove());
-      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
-      foreign.type = "reset";
-      expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
-      foreign.type = "text";
       expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
     });
 
