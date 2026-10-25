@@ -4,6 +4,11 @@ import type { ReactNode } from "react";
 import { CSPContext } from "../internal/csp-context.js";
 import type { CSPContextValue } from "../internal/csp-context.js";
 
+/**
+ * Props of `CSPProvider`.
+ *
+ * @see https://ui.funstack.work/concepts/content-security-policy
+ */
 export interface CSPProviderProps {
   /**
    * The per-response nonce of a nonce-based `style-src` policy. Pass the same value as React's
@@ -12,6 +17,7 @@ export interface CSPProviderProps {
    * the `nonce` when the option is absent or in its string form.
    */
   nonce?: string;
+  /** The tree whose library parts receive the nonce. */
   children?: ReactNode;
 }
 
@@ -21,6 +27,8 @@ export interface CSPProviderProps {
  * `experimental_interestFor`), which forward it as the element's `nonce` (design/conventions.md
  * 12). The library's only provider; its prop is serialisable, so a Server Component layout that
  * knows the nonce renders it once. Hash-based policies need no provider: use `STYLE_SHA256`.
+ *
+ * @see https://ui.funstack.work/concepts/content-security-policy
  */
 export function CSPProvider({ nonce, children }: CSPProviderProps) {
   const value = useMemo<CSPContextValue>(() => ({ nonce }), [nonce]);

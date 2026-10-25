@@ -7,6 +7,8 @@ import { ToggleGroupRoot } from "./toggle-group-root.js";
 /**
  * A set of toggle buttons sharing one value (design/components/toggle-group.md): several values
  * by default, at most one with `exclusive`.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
  */
 export const ToggleGroup = { Root: ToggleGroupRoot, Item: ToggleGroupItem } as const;
 

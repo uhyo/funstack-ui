@@ -33,6 +33,10 @@ export interface ToggleGroupValueChangeDetails extends ActionDetails {
   readonly removed: readonly string[];
 }
 
+/**
+ * State of `ToggleGroup.Root`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ToggleGroupRootState {
   /**
    * Optimistic pressed values in document order of the Items (exclusive mode: `[value]` or `[]`,
@@ -42,6 +46,7 @@ export interface ToggleGroupRootState {
   readonly value: readonly string[];
   /** An action dispatched through this group is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop. */
   readonly disabled: boolean;
   /** The effective orientation: the Toolbar's when inside one. */
   readonly orientation: ToggleGroupOrientation;
@@ -59,30 +64,65 @@ interface ToggleGroupRootBaseProps extends Omit<
   | "style"
   | "children"
 > {
-  /** Axis of the arrow keys and `data-orientation`. Default `"horizontal"`. Ignored inside a Toolbar (dev warning). */
+  /**
+   * Axis of the arrow keys and `data-orientation`. Ignored inside a Toolbar (dev warning).
+   *
+   * @defaultValue `"horizontal"`
+   */
   orientation?: ToggleGroupOrientation;
-  /** Whether arrows wrap from the last Item to the first. Default `true`. Ignored inside a Toolbar (dev warning). */
+  /**
+   * Whether arrows wrap from the last Item to the first. Ignored inside a Toolbar (dev warning).
+   *
+   * @defaultValue `true`
+   */
   loop?: boolean;
-  /** Disables every Item (native `disabled`). */
+  /**
+   * Disables every Item (native `disabled`).
+   *
+   * @defaultValue `false`
+   */
   disabled?: boolean;
   /**
    * Render `focusgroup="toolbar …"` and, where the browser implements it, let the browser move
    * focus between the Items. Chromium 150+ only; elsewhere the JS path stays active. Ignored
    * inside a Toolbar (a nested focusgroup would split the Toolbar's sequence; dev warning).
-   * Default `false`.
+   *
+   * @defaultValue `false`
    */
   experimental_focusgroup?: boolean;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToggleGroupRootState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToggleGroupRootState>;
+  /** Content, or a function of the part's state. */
   children?: StateValue<ReactNode, ToggleGroupRootState>;
+  /** Replace the default `<div>` (element form) or take over rendering (function form). */
   render?: RenderProp<ComponentPropsWithRef<"div">, ToggleGroupRootState>;
 }
 
+/**
+ * Props of `ToggleGroup.Root` in multiple mode (the default): any number of Items pressed, `value`
+ * is a `string[]`.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
+ */
 export interface ToggleGroupMultipleProps extends ToggleGroupRootBaseProps {
+  /**
+   * `true` switches to exclusive mode (at most one Item pressed; see `ToggleGroupExclusiveProps`).
+   *
+   * @defaultValue `false`
+   */
   exclusive?: false;
-  /** Controlled pressed values. `[]` presses nothing; `undefined` means uncontrolled. Order is not significant; duplicates ignored. */
+  /**
+   * Controlled pressed values. `[]` presses nothing; `undefined` means uncontrolled. Order is not
+   * significant; duplicates ignored.
+   */
   value?: string[];
-  /** Initial pressed values in uncontrolled mode. Default `[]`. */
+  /**
+   * Initial pressed values in uncontrolled mode.
+   *
+   * @defaultValue `[]`
+   */
   defaultValue?: string[];
   /**
    * Runs inside the Root's transition whenever the set of pressed Items changes. Sync or async (a
@@ -93,28 +133,47 @@ export interface ToggleGroupMultipleProps extends ToggleGroupRootBaseProps {
    * `added` / `removed` when controlled.
    */
   valueChangeAction?: ChangeAction<string[], ToggleGroupValueChangeDetails>;
-  /** Exclusive mode only: a type error here (TypeScript's union excess-property check would let it through otherwise). */
+  /**
+   * Exclusive mode only: a type error here (TypeScript's union excess-property check would let it
+   * through otherwise).
+   */
   deselectable?: never;
 }
 
+/**
+ * Props of `ToggleGroup.Root` in exclusive mode (`exclusive`): at most one Item pressed, `value` is
+ * `string | null`.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
+ */
 export interface ToggleGroupExclusiveProps extends ToggleGroupRootBaseProps {
   /** At most one Item is pressed; `value` is `string | null`. */
   exclusive: true;
   /** Controlled pressed value. `null` presses nothing; `undefined` means uncontrolled. */
   value?: string | null;
-  /** Initial pressed value in uncontrolled mode. Default `null`. */
+  /**
+   * Initial pressed value in uncontrolled mode.
+   *
+   * @defaultValue `null`
+   */
   defaultValue?: string | null;
   /**
-   * Whether pressing the pressed Item releases it (`next === null`). Default `true`. With
-   * `false` that press is a no-op and dispatches nothing; `value` stays `string | null` because
-   * the group may start with nothing pressed, but the action is then never called with `null`.
+   * Whether pressing the pressed Item releases it (`next === null`). With `false` that press is a
+   * no-op and dispatches nothing; `value` stays `string | null` because the group may start with
+   * nothing pressed, but the action is then never called with `null`.
+   *
+   * @defaultValue `true`
    */
   deselectable?: boolean;
   /** See {@link ToggleGroupMultipleProps.valueChangeAction}; `next` is the pressed value or `null`. */
   valueChangeAction?: ChangeAction<string | null, ToggleGroupValueChangeDetails>;
 }
 
-/** Props of `ToggleGroup.Root`, discriminated on `exclusive`. */
+/**
+ * Props of `ToggleGroup.Root`, discriminated on `exclusive`.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
+ */
 export type ToggleGroupRootProps = ToggleGroupMultipleProps | ToggleGroupExclusiveProps;
 
 type GroupValue = string[] | string | null;
@@ -148,6 +207,8 @@ const NO_LAYOUT: ToggleGroupLayout = { order: [], disabled: [] };
  * Owned keys (conventions 1.2): `role`, `data-orientation`, `data-pending`, `data-disabled`;
  * standalone also `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` and, with the flag,
  * `focusgroup`.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
  */
 export function ToggleGroupRoot(props: ToggleGroupRootProps) {
   const {

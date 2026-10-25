@@ -14,6 +14,10 @@ import { disabledButton, rendersButton, useRender } from "../internal/use-render
 import { useToggleGroupContext } from "./toggle-group-context.js";
 import type { ToggleGroupOrientation } from "./toggle-group-context.js";
 
+/**
+ * State of `ToggleGroup.Item`, passed to the function forms of `className`, `style`, `children` and
+ * `render`.
+ */
 export interface ToggleGroupItemState {
   /** The Item's `value` prop. */
   readonly value: string;
@@ -23,9 +27,15 @@ export interface ToggleGroupItemState {
   readonly pending: boolean;
   /** Own `disabled` or the Root's. */
   readonly disabled: boolean;
+  /** The Root's effective orientation (the Toolbar's inside one). */
   readonly orientation: ToggleGroupOrientation;
 }
 
+/**
+ * Props of `ToggleGroup.Item`.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
+ */
 export interface ToggleGroupItemProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "type" | "value" | "tabIndex" | "aria-pressed" | "className" | "style" | "children"
@@ -36,6 +46,8 @@ export interface ToggleGroupItemProps extends Omit<
    * Never dispatches. Native `disabled` on a `<button>` (skipped by the arrow keys); with a link
    * or component `render`, `aria-disabled="true"` instead: the element stays focusable and the
    * arrow keys reach it (the APG Toolbar behaviour).
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
   /**
@@ -47,7 +59,9 @@ export interface ToggleGroupItemProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToggleGroupItemState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToggleGroupItemState>;
   /** Rendered from optimistic state; must not suspend. */
   children?: StateValue<ReactNode, ToggleGroupItemState>;
@@ -63,6 +77,8 @@ export interface ToggleGroupItemProps extends Omit<
  * Owned keys (conventions 1.2): `aria-pressed`, `disabled`,
  * `aria-disabled` (link or component `render`), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, `onClick`, and
  * `focusgroupstart` while the Root renders `focusgroup`.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
  */
 export function ToggleGroupItem({
   value,

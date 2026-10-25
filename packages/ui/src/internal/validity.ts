@@ -12,16 +12,27 @@ export type FormErrors = Readonly<Record<string, FieldErrorValue>>;
  * `valid: true` on the server and before the first read).
  */
 export interface FieldValidity {
+  /** A required control has no value. */
   readonly valueMissing: boolean;
+  /** The value does not match the `type` (email, url). */
   readonly typeMismatch: boolean;
+  /** The value does not match `pattern`. */
   readonly patternMismatch: boolean;
+  /** The value is longer than `maxLength`. */
   readonly tooLong: boolean;
+  /** The value is shorter than `minLength`. */
   readonly tooShort: boolean;
+  /** The value is below `min`. */
   readonly rangeUnderflow: boolean;
+  /** The value is above `max`. */
   readonly rangeOverflow: boolean;
+  /** The value is not on the `step` grid. */
   readonly stepMismatch: boolean;
+  /** The browser cannot convert the input to a value. */
   readonly badInput: boolean;
+  /** A custom message is set (`validate` or a shown server error). */
   readonly customError: boolean;
+  /** No constraint is violated. */
   readonly valid: boolean;
 }
 

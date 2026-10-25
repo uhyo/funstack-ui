@@ -11,6 +11,9 @@ export type Orientation = "horizontal" | "vertical";
  */
 export type Action<Args extends readonly unknown[] = []> = (...args: Args) => unknown;
 
+/**
+ * The base of every `details` object an action receives (the second argument of a change action).
+ */
 export interface ActionDetails {
   /** The DOM event that caused the action, or `undefined` for programmatic changes. */
   readonly event: Event | undefined;

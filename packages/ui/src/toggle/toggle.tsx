@@ -14,6 +14,9 @@ import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../int
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
+/**
+ * State of `Toggle`, passed to the function forms of `className`, `style`, `children` and `render`.
+ */
 export interface ToggleState {
   /** Optimistic pressed state: what the user sees, including an in-flight change. */
   readonly pressed: boolean;
@@ -29,13 +32,22 @@ export interface TogglePressedChangeDetails extends ActionDetails {
   // breaking change (e.g. a `reason` if a ToggleGroup ever dispatches on an item's behalf).
 }
 
+/**
+ * Props of `Toggle`.
+ *
+ * @see https://ui.funstack.work/components/toggle
+ */
 export interface ToggleProps extends Omit<
   ComponentPropsWithRef<"button">,
   "onClick" | "type" | "aria-pressed" | "className" | "style" | "children"
 > {
   /** Controlled pressed state. `undefined` means uncontrolled. */
   pressed?: boolean;
-  /** Initial pressed state in uncontrolled mode. Default `false`. */
+  /**
+   * Initial pressed state in uncontrolled mode.
+   *
+   * @defaultValue `false`
+   */
   defaultPressed?: boolean;
   /**
    * Called with the next pressed state on every user-initiated change. Runs inside the Toggle's
@@ -47,7 +59,9 @@ export interface ToggleProps extends Omit<
   pressedChangeAction?: ChangeAction<boolean, TogglePressedChangeDetails>;
   /**
    * Never dispatches. Native `disabled` on a `<button>`; with a link or component `render`,
-   * `aria-disabled="true"` instead (the element stays focusable). Default `false`.
+   * `aria-disabled="true"` instead (the element stays focusable).
+   *
+   * @defaultValue `false`
    */
   disabled?: boolean;
   /**
@@ -60,7 +74,9 @@ export interface ToggleProps extends Omit<
    * page cross-fade that the next transition waits for).
    */
   transition?: ViewTransitionClass;
+  /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToggleState>;
+  /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ToggleState>;
   /** Rendered from optimistic state inside the button; must not suspend. */
   children?: StateValue<ReactNode, ToggleState>;
@@ -72,6 +88,8 @@ export interface ToggleProps extends Omit<
  * A two-state button (WAI-ARIA "Button" pattern, toggle variant). Renders
  * `<button type="button" aria-pressed>`; the pressed state flips optimistically and the element
  * carries `data-pending` while `pressedChangeAction` is in flight.
+ *
+ * @see https://ui.funstack.work/components/toggle
  */
 export function Toggle({
   pressed,
