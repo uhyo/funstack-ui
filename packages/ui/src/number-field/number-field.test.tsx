@@ -10,13 +10,31 @@
 // the visible input, a real wheel and page scroll, a real hold with focus staying put, the
 // accessibility tree, `startViewTransition` never called.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Component, StrictMode, Suspense, startTransition, useState } from "react";
+import { startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  createSuspender,
+  CommitFixture,
+  describeCommitAction,
+  eachCommitMode,
+} from "../__tests__/commit-action-suite.js";
+import type { CommitFixtureProps } from "../__tests__/commit-action-suite.js";
+import {
+  blur,
+  dec,
+  hidden,
+  inc,
+  input,
+  key,
+  numberFieldDriver,
+  Parts,
+  pointer,
+  press,
+  root,
+  typeText,
+} from "../__tests__/drivers/number-field.js";
+import {
   deferred,
-  ErrorCatcher,
   expectNotPending,
   expectPending,
   setupUser,
@@ -45,151 +63,26 @@ afterEach(() => {
 
 // --- Helpers -------------------------------------------------------------------------------------
 
-const root = () => screen.getByTestId("root");
-const input = () => screen.getByTestId("input") as HTMLInputElement;
-const hidden = () => input().nextElementSibling as HTMLInputElement;
-const inc = () => screen.getByTestId("inc");
-const dec = () => screen.getByTestId("dec");
+type FixtureProps = Omit<
+  CommitFixtureProps<
+    number | null,
+    NumberFieldValueChangeDetails,
+    NumberFieldValueChangeDetails,
+    NumberFieldRootProps
+  >,
+  "initial"
+> & { initial?: number | null };
 
-/** Types `text` into the visible input as the browser would (one `input` event). */
-function typeText(text: string): void {
-  act(() => {
-    fireEvent.change(input(), { target: { value: text } });
-  });
+/** The suite's three wrappers (uncontrolled, adopt, commit) around an en-US field at 1. */
+function Fixture({ initial = 1, ...props }: FixtureProps) {
+  return <CommitFixture driver={numberFieldDriver} initial={initial} {...props} />;
 }
 
-function blur(): void {
-  act(() => {
-    fireEvent.blur(input());
-  });
-}
-
-function key(k: string, init: KeyboardEventInit = {}, target: Element = input()): boolean {
-  let result = true;
-  act(() => {
-    result = fireEvent.keyDown(target, { key: k, bubbles: true, cancelable: true, ...init });
-  });
-  return result;
-}
-
-function pointer(
-  type: "pointerDown" | "pointerUp" | "pointerCancel",
-  element: Element,
-  init: { pointerId?: number; button?: number; isPrimary?: boolean } = {},
-): boolean {
-  let result = true;
-  act(() => {
-    result = fireEvent[type](element, {
-      pointerId: init.pointerId ?? 1,
-      button: init.button ?? 0,
-      isPrimary: init.isPrimary ?? true,
-      bubbles: true,
-      cancelable: true,
-    });
-  });
-  return result;
-}
-
-/** A press and a release on a button: one step, one commit. */
-function press(button: Element): void {
-  pointer("pointerDown", button);
-  pointer("pointerUp", button);
-}
-
-type Mode = "uncontrolled" | "adopt" | "commit";
-const modes: readonly Mode[] = ["uncontrolled", "adopt", "commit"];
-
-interface FixtureProps {
-  mode: Mode;
-  initial?: number | null;
-  onChange?: Fn;
-  onCommit?: Fn;
-  rootProps?: Partial<NumberFieldRootProps>;
-  below?: (value: number | null) => ReactNode;
-  boundary?: (error: unknown) => void;
-  retry?: boolean;
-}
-
-class RetryBoundary extends Component<{ children: ReactNode }, { error: unknown }> {
-  state = { error: null as unknown };
-  static getDerivedStateFromError(error: unknown) {
-    return { error };
-  }
-  render() {
-    if (this.state.error !== null) {
-      return (
-        <button type="button" onClick={() => this.setState({ error: null })}>
-          retry
-        </button>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-function Parts() {
-  return (
-    <>
-      <NumberField.Label data-testid="label">Quantity</NumberField.Label>
-      <NumberField.Decrement data-testid="dec">−</NumberField.Decrement>
-      <NumberField.Input data-testid="input" />
-      <NumberField.Increment data-testid="inc">+</NumberField.Increment>
-    </>
-  );
-}
-
-function Fixture({
-  mode,
-  initial = 1,
-  onChange,
-  onCommit,
-  rootProps,
-  below,
-  boundary,
-  retry,
-}: FixtureProps) {
-  const [value, setValue] = useState<number | null>(initial);
-  let props: NumberFieldRootProps;
-  if (mode === "uncontrolled") {
-    props = { defaultValue: initial, valueChangeAction: onChange, valueCommitAction: onCommit };
-  } else if (mode === "adopt") {
-    props = {
-      value,
-      valueChangeAction: (next, details) => {
-        setValue(next);
-        return onChange?.(next, details);
-      },
-      valueCommitAction: onCommit,
-    };
-  } else {
-    props = {
-      value,
-      valueChangeAction: onChange,
-      valueCommitAction: async (next, details) => {
-        await onCommit?.(next, details);
-        startTransition(() => setValue(next));
-      },
-    };
-  }
-  let field: ReactNode = (
-    <NumberField.Root data-testid="root" locale="en-US" {...props} {...rootProps}>
-      <Parts />
-    </NumberField.Root>
-  );
-  if (boundary) field = <ErrorCatcher onError={boundary}>{field}</ErrorCatcher>;
-  if (retry) field = <RetryBoundary>{field}</RetryBoundary>;
-  return (
-    <>
-      {field}
-      <output data-testid="parent">{String(value)}</output>
-      {below?.(value)}
-    </>
-  );
-}
-
-function eachMode(name: string, body: (mode: Mode) => void): void {
-  describe.each(modes)(`${name} (%s)`, (mode) => body(mode));
-}
+// The two-channel commit rows (async commit, rejection, rollback, no snap under suspending
+// content, overlap, superseded rejections, suspending content, mount reconciliation, form reset,
+// the post-await rule) come from __tests__/commit-action-suite.tsx with the driver
+// __tests__/drivers/number-field.tsx.
+describeCommitAction(numberFieldDriver);
 
 // --- Roles and ARIA ------------------------------------------------------------------------------
 
@@ -339,7 +232,7 @@ describe("NumberField", () => {
 
   // --- Typing (both) -------------------------------------------------------------------------------
 
-  eachMode("typing", (mode) => {
+  eachCommitMode("typing", (mode) => {
     it("keeps a draft per keystroke and commits on blur, once each, with the focusout", async () => {
       const onChange = vi.fn<Fn>();
       const onCommit = vi.fn<Fn>();
@@ -491,7 +384,7 @@ describe("NumberField", () => {
 
   // --- Keyboard (both) -----------------------------------------------------------------------------
 
-  eachMode("keyboard", (mode) => {
+  eachCommitMode("keyboard", (mode) => {
     it("each 4.2 row is a step + commit with the keydown and source keyboard", async () => {
       const onChange = vi.fn<Fn>();
       const onCommit = vi.fn<Fn>();
@@ -955,6 +848,25 @@ describe("NumberField", () => {
       expect(hidden().value).toBe("1");
     });
 
+    it("a reset clears a draft even when the value is already the target (no dispatch)", async () => {
+      const onCommit = vi.fn<Fn>();
+      render(
+        <form data-testid="form">
+          <Fixture mode="uncontrolled" onCommit={onCommit} rootProps={{ name: "quantity" }} />
+        </form>,
+      );
+      typeText("8");
+      await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+      await flushMicrotasks();
+      expect(input().value).toBe("1");
+      expect(hidden().value).toBe("1");
+      // The draft is gone, not only overwritten in the DOM: the blur has nothing to commit.
+      blur();
+      await flushMicrotasks();
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(input().value).toBe("1");
+    });
+
     it("the hidden input is autocomplete=off (no form-state restoration the text does not show)", () => {
       render(<Fixture mode="uncontrolled" />);
       expect(hidden()).toHaveAttribute("autocomplete", "off");
@@ -1010,63 +922,6 @@ describe("NumberField", () => {
   // --- Steps and commits ---------------------------------------------------------------------------
 
   describe("steps run in transitions", () => {
-    it("an async valueChangeAction is awaited in the step transition: data-pending until it settles", async () => {
-      const d = deferred();
-      function Probe() {
-        const [value, setValue] = useState<number | null>(1);
-        return (
-          <NumberField.Root
-            data-testid="root"
-            locale="en-US"
-            value={value}
-            valueChangeAction={async (next) => {
-              setValue(next);
-              await d.promise;
-            }}
-          >
-            <Parts />
-          </NumberField.Root>
-        );
-      }
-      render(<Probe />);
-      key("ArrowUp");
-      await flushMicrotasks();
-      expectPending(root());
-      expect(input().value).toBe("2");
-      await act(async () => d.resolve());
-      expectNotPending(root());
-      expect(input().value).toBe("2");
-    });
-
-    it("a second step while the first step's action pends is called (no re-entry guard, #81 H2)", async () => {
-      const first = deferred();
-      const second = deferred();
-      const onChange = vi
-        .fn<Fn>()
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => second.promise);
-      render(
-        <NumberField.Root
-          data-testid="root"
-          locale="en-US"
-          defaultValue={1}
-          valueChangeAction={onChange}
-        >
-          <Parts />
-        </NumberField.Root>,
-      );
-      key("ArrowUp");
-      await flushMicrotasks();
-      expectPending(root());
-      key("ArrowUp");
-      await flushMicrotasks();
-      // A step is not a re-entry: both steps ran.
-      expect(onChange.mock.calls.map(([next]) => next)).toEqual([2, 3]);
-      await act(async () => first.resolve());
-      await act(async () => second.resolve());
-      expectNotPending(root());
-    });
-
     it("without a valueChangeAction a step starts no transition; the text holds until the commit", async () => {
       vi.useFakeTimers();
       render(
@@ -1085,89 +940,6 @@ describe("NumberField", () => {
       });
       // A non-adopting controlled parent: back to `value`, once.
       expect(input().value).toBe("1");
-    });
-  });
-
-  eachMode("async commit", (mode) => {
-    it("holds the gesture value with data-pending until the save resolves", async () => {
-      const d = deferred();
-      render(<Fixture mode={mode} onCommit={() => d.promise} />);
-      press(inc());
-      await flushMicrotasks();
-      expectPending(root());
-      expectPending(input());
-      expectPending(inc());
-      expect(input().value).toBe("2");
-      expect(hidden().value).toBe("2");
-      if (mode !== "adopt") expect(screen.getByTestId("parent")).toHaveTextContent("1");
-      await act(async () => d.resolve());
-      expectNotPending(root());
-      expect(input().value).toBe("2");
-      if (mode !== "uncontrolled") expect(screen.getByTestId("parent")).toHaveTextContent("2");
-    });
-  });
-
-  eachMode("rejection", (mode) => {
-    it('reaches the boundary; uncontrolled reports the revert as a "dismiss" step', async () => {
-      silenceErrors();
-      const d = deferred();
-      const caught = vi.fn();
-      const onChange = vi.fn<Fn>();
-      render(
-        <Fixture mode={mode} onChange={onChange} onCommit={() => d.promise} boundary={caught} />,
-      );
-      typeText("5");
-      blur();
-      await flushMicrotasks();
-      expect(input().value).toBe("5");
-      onChange.mockClear();
-      await act(async () => d.reject(new Error("save failed")));
-      expect(caught).toHaveBeenCalledTimes(1);
-      expect((caught.mock.calls[0]![0] as Error).message).toBe("save failed");
-      expect(screen.queryByTestId("root")).toBeNull();
-      if (mode === "uncontrolled") {
-        expect(onChange).toHaveBeenCalledTimes(1);
-        const [next, details] = onChange.mock.calls[0]!;
-        expect(next).toBe(1);
-        expect(details.reason).toBe("dismiss");
-        expect(details.source).toBeNull();
-        expect(details.event).toBeUndefined();
-      } else {
-        expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(0);
-      }
-    });
-
-    it("after a retry the remounted field shows the value its parent holds", async () => {
-      silenceErrors();
-      const d = deferred();
-      render(<Fixture mode={mode} onCommit={() => d.promise} retry />);
-      press(inc());
-      await flushMicrotasks();
-      await act(async () => d.reject(new Error("x")));
-      fireEvent.click(screen.getByRole("button", { name: "retry" }));
-      await flushMicrotasks();
-      const expected = mode === "adopt" ? "2" : "1";
-      expect(input().value).toBe(expected);
-      expect(hidden().value).toBe(expected);
-    });
-
-    it("commits when the action catches its own error", async () => {
-      render(
-        <Fixture
-          mode={mode}
-          onCommit={async () => {
-            try {
-              throw new Error("handled");
-            } catch {
-              // handled inside
-            }
-          }}
-        />,
-      );
-      press(inc());
-      await flushMicrotasks();
-      expect(input().value).toBe("2");
-      expectNotPending(root());
     });
   });
 
@@ -1196,22 +968,6 @@ describe("NumberField", () => {
         </>
       );
     }
-
-    it("an update-on-success parent whose save fails: the text and hidden input return", async () => {
-      const d = deferred();
-      const onChange = vi.fn<Fn>();
-      render(<Parent d={d.promise} onChange={onChange} />);
-      typeText("5");
-      blur();
-      await flushMicrotasks();
-      expectPending(root());
-      expect(input().value).toBe("5");
-      await act(async () => d.reject(new Error("save failed")));
-      expectNotPending(root());
-      expect(input().value).toBe("1");
-      expect(hidden().value).toBe("1");
-      expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(0);
-    });
 
     it("a draft open at the rollback stays open and commits later", async () => {
       const d = deferred();
@@ -1246,185 +1002,6 @@ describe("NumberField", () => {
       });
       expect(input().value).toBe("3");
     });
-
-    it("an adopting parent whose content suspends: the text never shows the old value", async () => {
-      const { Suspender, resolve } = createSuspender();
-      resolve("1");
-      render(
-        <Fixture
-          mode="adopt"
-          below={(v) => (
-            <Suspense fallback={<span data-testid="fallback" />}>
-              <Suspender value={String(v)} />
-            </Suspense>
-          )}
-        />,
-      );
-      const seen: string[] = [];
-      const observer = new MutationObserver(() => seen.push(input().value));
-      observer.observe(root(), { attributes: true, subtree: true, characterData: true });
-      await act(async () => {
-        fireEvent.pointerDown(inc(), { pointerId: 1, button: 0, isPrimary: true });
-      });
-      await act(async () => {
-        fireEvent.pointerUp(inc(), { pointerId: 1 });
-      });
-      expect(input().value).toBe("2");
-      expectPending(root());
-      expect(screen.getByTestId("suspender")).toHaveTextContent("1");
-      expect(screen.queryByTestId("fallback")).toBeNull();
-      await act(async () => resolve("2"));
-      expect(screen.getByTestId("suspender")).toHaveTextContent("2");
-      expectNotPending(root());
-      expect(input().value).toBe("2");
-      observer.disconnect();
-      expect(seen.filter((v) => v === "1")).toHaveLength(0);
-    });
-  });
-
-  eachMode("overlap", (mode) => {
-    it("a key press, then typing + blur: data-pending stays, the latest wins", async () => {
-      const first = deferred();
-      const second = deferred();
-      const onCommit = vi
-        .fn<Fn>()
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => second.promise);
-      render(<Fixture mode={mode} onCommit={onCommit} />);
-      key("ArrowUp");
-      await flushMicrotasks();
-      typeText("9");
-      expect(input().value).toBe("9");
-      blur();
-      await flushMicrotasks();
-      expect(onCommit).toHaveBeenCalledTimes(2);
-      await act(async () => first.resolve());
-      expectPending(root());
-      expect(input().value).toBe("9");
-      await act(async () => second.resolve());
-      expectNotPending(root());
-      expect(input().value).toBe("9");
-      if (mode !== "uncontrolled") expect(screen.getByTestId("parent")).toHaveTextContent("9");
-    });
-
-    it("surfaces the superseded commit's rejection", async () => {
-      silenceErrors();
-      const first = deferred();
-      const second = deferred();
-      const caught = vi.fn();
-      const onCommit = vi
-        .fn<Fn>()
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => second.promise);
-      render(<Fixture mode={mode} onCommit={onCommit} boundary={caught} />);
-      key("ArrowUp");
-      await flushMicrotasks();
-      key("ArrowUp");
-      await flushMicrotasks();
-      await act(async () => first.reject(new Error("older")));
-      if (mode === "adopt") {
-        expect(caught).not.toHaveBeenCalled();
-        await act(async () => second.resolve());
-      } else {
-        expect(caught).toHaveBeenCalledTimes(1);
-        await act(async () => second.resolve());
-      }
-      expect(caught).toHaveBeenCalledTimes(1);
-      expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
-    });
-
-    it("the older rejects after the newer resolved", async () => {
-      silenceErrors();
-      const first = deferred();
-      const second = deferred();
-      const caught = vi.fn();
-      const onCommit = vi
-        .fn<Fn>()
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => second.promise);
-      render(<Fixture mode={mode} onCommit={onCommit} boundary={caught} />);
-      key("ArrowUp");
-      await flushMicrotasks();
-      key("ArrowUp");
-      await flushMicrotasks();
-      await act(async () => second.resolve());
-      await act(async () => first.reject(new Error("older")));
-      expect(caught).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("superseded rejection across channels", () => {
-    // Each channel (steps, commits) surfaces the rejection of a superseded run by throwing it from
-    // render. That must not wait for the other channel's pending action (#105).
-    function setup() {
-      silenceErrors();
-      const steps = [deferred(), deferred()];
-      const commits = [deferred(), deferred()];
-      const caught = vi.fn();
-      const onChange = vi
-        .fn<Fn>()
-        .mockImplementationOnce(() => steps[0]!.promise)
-        .mockImplementationOnce(() => steps[1]!.promise);
-      const onCommit = vi
-        .fn<Fn>()
-        .mockImplementationOnce(() => commits[0]!.promise)
-        .mockImplementationOnce(() => commits[1]!.promise);
-      render(
-        <Fixture mode="uncontrolled" onChange={onChange} onCommit={onCommit} boundary={caught} />,
-      );
-      return { steps, commits, caught, onChange, onCommit };
-    }
-
-    it("a superseded step's rejection reaches the boundary while commits are pending", async () => {
-      const { steps, caught, onChange, onCommit } = setup();
-      key("ArrowUp");
-      await flushMicrotasks();
-      key("ArrowUp");
-      await flushMicrotasks();
-      expect(onChange).toHaveBeenCalledTimes(2);
-      expect(onCommit).toHaveBeenCalledTimes(2);
-      await act(async () => steps[0]!.reject(new Error("older step")));
-      expect(caught).toHaveBeenCalledTimes(1);
-      expect((caught.mock.calls[0]![0] as Error).message).toBe("older step");
-    });
-
-    it("a superseded commit's rejection reaches the boundary while a step is pending", async () => {
-      const { commits, caught } = setup();
-      key("ArrowUp");
-      await flushMicrotasks();
-      key("ArrowUp");
-      await flushMicrotasks();
-      await act(async () => commits[0]!.reject(new Error("older commit")));
-      expect(caught).toHaveBeenCalledTimes(1);
-      expect((caught.mock.calls[0]![0] as Error).message).toBe("older commit");
-    });
-  });
-
-  describe("suspending content", () => {
-    it("an adopt-steps parent's content keyed on the value keeps the old content", async () => {
-      const { Suspender, resolve } = createSuspender();
-      resolve("1");
-      render(
-        <Fixture
-          mode="adopt"
-          below={(v) => (
-            <Suspense fallback={<span data-testid="fallback" />}>
-              <Suspender value={String(v)} />
-            </Suspense>
-          )}
-        />,
-      );
-      await act(async () => {
-        fireEvent.keyDown(input(), { key: "ArrowUp" });
-      });
-      expect(screen.getByTestId("suspender")).toHaveTextContent("1");
-      expect(screen.queryByTestId("fallback")).toBeNull();
-      expectPending(root());
-      expect(input().value).toBe("2");
-      await act(async () => resolve("2"));
-      expect(screen.getByTestId("suspender")).toHaveTextContent("2");
-      expectNotPending(root());
-    });
   });
 
   // --- Platform paths ------------------------------------------------------------------------------
@@ -1434,37 +1011,7 @@ describe("NumberField", () => {
 
   const visibleIn = (c: HTMLElement) => c.querySelector('input[type="text"]') as HTMLInputElement;
 
-  eachMode("mount reconciliation", (mode) => {
-    it("adopts text typed before hydration with one platform step + commit", async () => {
-      const onChange = vi.fn<Fn>();
-      const onCommit = vi.fn<Fn>();
-      await hydrate(<Fixture mode={mode} onChange={onChange} onCommit={onCommit} />, (c) => {
-        visibleIn(c).value = "3";
-      });
-      expect(onChange).toHaveBeenCalledTimes(1);
-      expect(onChange.mock.calls[0]![0]).toBe(3);
-      expect(onChange.mock.calls[0]![1].reason).toBe("platform");
-      expect(onChange.mock.calls[0]![1].source).toBeNull();
-      expect(onChange.mock.calls[0]![1].event).toBeUndefined();
-      expect(onCommit).toHaveBeenCalledTimes(1);
-      expect(onCommit.mock.calls[0]![0]).toBe(3);
-      expect(hidden().value).toBe("3");
-      expect(input().value).toBe("3");
-    });
-
-    it("dispatches once under StrictMode", async () => {
-      const onCommit = vi.fn<Fn>();
-      await hydrate(
-        <StrictMode>
-          <Fixture mode={mode} onCommit={onCommit} />
-        </StrictMode>,
-        (c) => {
-          visibleIn(c).value = "4";
-        },
-      );
-      expect(onCommit).toHaveBeenCalledTimes(1);
-    });
-
+  eachCommitMode("mount reconciliation", (mode) => {
     it("focused, unparsable text at hydration stays as the draft (never overwritten under the caret)", async () => {
       const onCommit = vi.fn<Fn>();
       await hydrate(<Fixture mode={mode} onCommit={onCommit} />, (c) => {
@@ -1503,125 +1050,6 @@ describe("NumberField", () => {
       });
       expect(onCommit).not.toHaveBeenCalled();
       expect(input().value).toBe("1,234.5");
-    });
-  });
-
-  eachMode("form reset", (mode) => {
-    function InForm(props: Omit<FixtureProps, "mode">) {
-      return (
-        <form data-testid="form">
-          <Fixture mode={mode} {...props} rootProps={{ name: "quantity", ...props.rootProps }} />
-          <button type="reset" data-testid="reset">
-            reset
-          </button>
-        </form>
-      );
-    }
-
-    it("form.reset(): the visible defaultValue is the formatted target; one step + commit", async () => {
-      const onChange = vi.fn<Fn>();
-      const onCommit = vi.fn<Fn>();
-      render(<InForm initial={1000} onChange={onChange} onCommit={onCommit} />);
-      key("ArrowUp");
-      await flushMicrotasks();
-      expect(input().value).toBe("1,001");
-      onChange.mockClear();
-      onCommit.mockClear();
-      const form = screen.getByTestId("form") as HTMLFormElement;
-      let visibleDefault = "";
-      form.addEventListener("reset", () => {
-        queueMicrotask(() => {
-          visibleDefault = input().defaultValue;
-        });
-      });
-      await act(async () => form.reset());
-      await flushMicrotasks();
-      expect(visibleDefault).toBe("1,000");
-      expect(onChange).toHaveBeenCalledTimes(1);
-      expect(onCommit).toHaveBeenCalledTimes(1);
-      expect(onCommit.mock.calls[0]![0]).toBe(1000);
-      expect(onCommit.mock.calls[0]![1].reason).toBe("platform");
-      expect(onCommit.mock.calls[0]![1].source).toBeNull();
-      expect(onCommit.mock.calls[0]![1].event?.type).toBe("reset");
-      expect(input().value).toBe("1,000");
-      expect(hidden().value).toBe("1000");
-    });
-
-    it("a reset button works, a cancelled reset dispatches nothing, a draft is cleared", async () => {
-      const onCommit = vi.fn<Fn>();
-      render(<InForm onCommit={onCommit} />);
-      key("ArrowUp");
-      await flushMicrotasks();
-      onCommit.mockClear();
-      const form = screen.getByTestId("form") as HTMLFormElement;
-      const cancel = (e: Event) => e.preventDefault();
-      form.addEventListener("reset", cancel);
-      await act(async () => fireEvent.click(screen.getByTestId("reset")));
-      await flushMicrotasks();
-      expect(onCommit).not.toHaveBeenCalled();
-      form.removeEventListener("reset", cancel);
-      typeText("8");
-      await act(async () => fireEvent.click(screen.getByTestId("reset")));
-      await flushMicrotasks();
-      expect(onCommit).toHaveBeenCalledTimes(1);
-      expect(input().value).toBe("1");
-    });
-
-    it("follows React's automatic reset after a successful form action", async () => {
-      const onCommit = vi.fn<Fn>();
-      const submitted = vi.fn();
-      render(
-        <form
-          data-testid="form"
-          action={async (data) => {
-            submitted(data.get("quantity"));
-          }}
-        >
-          <Fixture mode={mode} onCommit={onCommit} rootProps={{ name: "quantity" }} />
-          <button type="submit" data-testid="submit">
-            save
-          </button>
-        </form>,
-      );
-      key("ArrowUp");
-      await flushMicrotasks();
-      onCommit.mockClear();
-      await act(async () => fireEvent.click(screen.getByTestId("submit")));
-      await flushMicrotasks();
-      await flushMicrotasks();
-      expect(submitted).toHaveBeenCalledWith("2");
-      expect(onCommit).toHaveBeenCalledWith(1, expect.objectContaining({ reason: "platform" }));
-      expect(input().value).toBe("1");
-    });
-  });
-
-  describe("form reset, controlled specifics", () => {
-    it("a refusing controlled parent is re-synced", async () => {
-      function Refusing() {
-        const [value, setValue] = useState<number | null>(1);
-        return (
-          <form data-testid="form">
-            <NumberField.Root
-              data-testid="root"
-              locale="en-US"
-              value={value}
-              valueCommitAction={(next, details) => {
-                if (details.reason !== "platform") setValue(next);
-              }}
-            >
-              <Parts />
-            </NumberField.Root>
-          </form>
-        );
-      }
-      render(<Refusing />);
-      key("ArrowUp");
-      await flushMicrotasks();
-      expect(input().value).toBe("2");
-      await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
-      await flushMicrotasks();
-      expect(input().value).toBe("2");
-      expect(hidden().value).toBe("2");
     });
   });
 
@@ -2046,21 +1474,6 @@ describe("NumberField", () => {
       key("ArrowUp");
       await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledWith(2, expect.anything());
-    });
-  });
-
-  describe("post-await rule", () => {
-    it("a controlled parent updating after its own await inside startTransition", async () => {
-      const d = deferred();
-      render(<Fixture mode="commit" onCommit={() => d.promise} />);
-      press(inc());
-      await flushMicrotasks();
-      expect(screen.getByTestId("parent")).toHaveTextContent("1");
-      expect(input().value).toBe("2");
-      await act(async () => d.resolve());
-      expect(screen.getByTestId("parent")).toHaveTextContent("2");
-      expect(input().value).toBe("2");
-      expectNotPending(root());
     });
   });
 });
