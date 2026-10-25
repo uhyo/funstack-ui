@@ -145,6 +145,26 @@ export interface OverlaySuiteHarnessProps<D> extends OverlayHarnessProps<D> {
 
 type User = ReturnType<typeof setupUser>;
 
+/** A library-owned close through a part of the overlay, by a click. */
+export interface PartClose {
+  /** Names the rows where a component has more than one (`"an item"`, `"the Trigger"`). */
+  readonly name: string;
+  readonly close: (user: User) => Promise<void>;
+  /**
+   * The click is cancelled: the part is an invoker whose native close command the library
+   * replaces (Dialog's Close, a `popovertarget` Trigger); `false` for Menu's item, which has none.
+   */
+  readonly cancelsClick: boolean;
+  /** The arguments of the library's close call (Dialog: the Close's `"x"`). */
+  readonly closeArgs: readonly unknown[];
+  /**
+   * The close moves focus back to the Trigger from where the click left it inside the popup
+   * (Dialog: the platform's dialog close; Menu: the library, also after a Trigger click, which
+   * moves no focus). `false` for Popover's Trigger, which takes focus itself.
+   */
+  readonly returnsFocus: boolean;
+}
+
 /** How a row renders the Trigger: the default `<button>`, or a link `render` (no invoker). */
 type TriggerKind = "button" | "link";
 
@@ -174,23 +194,11 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
   /** The `type` of the event a dismissal's notification carries (`"close"`, `"toggle"`). */
   readonly dismissEvent: string;
   /**
-   * A library-owned close through a part, by a click (Dialog: the default content's Close part;
-   * Popover: the Trigger; Menu: an action-less item).
+   * The library-owned closes through a part, by a click (Dialog: the default content's Close part;
+   * Popover: the Trigger; Menu: an action-less item and the Trigger). Every part-initiated close
+   * row runs once per entry.
    */
-  readonly partClose: (user: User) => Promise<void>;
-  /**
-   * `partClose`'s click is cancelled: the part is an invoker whose native close command the
-   * library replaces (Dialog's Close, Popover's Trigger); `false` for Menu's item, which has none.
-   */
-  readonly partCloseCancelsClick: boolean;
-  /** The arguments of the library's close call after `partClose` (Dialog: the Close's `"x"`). */
-  readonly partCloseArgs: readonly unknown[];
-  /**
-   * `partClose`'s part is inside the popup, so the close moves focus back to the Trigger (Dialog:
-   * the platform's dialog close; Menu: the library). `false` for Popover, whose part is the
-   * Trigger itself.
-   */
-  readonly partCloseReturnsFocus: boolean;
+  readonly partCloses: readonly [PartClose, ...PartClose[]];
   /**
    * The sorted keys of a Trigger click's `details` (`event` is virtual, conventions 2.2). With
    * `"returnValue"` (Dialog), `details.returnValue` is asserted (undefined for an open, the part's
@@ -239,13 +247,7 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
 /** The driver fields Popover and Menu share: a `popover` popup opened by a toggling Trigger. */
 export function popoverLikeDriver<D extends OverlayDetailsLike>(): Omit<
   OverlayOpenStateConfig<D>,
-  | "name"
-  | "Harness"
-  | "partClose"
-  | "partCloseCancelsClick"
-  | "partCloseArgs"
-  | "partCloseReturnsFocus"
-  | "closeIntents"
+  "name" | "Harness" | "partCloses" | "closeIntents"
 > {
   const popup = () => screen.getByTestId("popup");
   return {
@@ -279,7 +281,9 @@ export function popoverLikeDriver<D extends OverlayDetailsLike>(): Omit<
 export function describeOverlayOpenState<D extends OverlayDetailsLike>(
   config: OverlayOpenStateConfig<D>,
 ): void {
-  const { Harness, isOpen, spyOpen, spyClose, dismiss, partClose } = config;
+  const { Harness, isOpen, spyOpen, spyClose, dismiss, partCloses } = config;
+  /** The row-name suffix of a part close, where the component has more than one. */
+  const partName = (part: PartClose) => (partCloses.length > 1 ? ` [${part.name}]` : "");
   const hasReturnValue = config.detailsKeys.includes("returnValue");
   type Action = OpenChangeFn<D>;
 
@@ -445,52 +449,53 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           expectNotPending(trigger());
         });
 
-      for (const kind of triggerKinds)
-        it(`part-initiated close: library-owned, open while openChangeAction(false) runs, closed on resolve${kindName(kind)}`, async () => {
-          const user = setupUser();
-          const action = vi.fn<Action>();
-          render(<Harness mode={mode} {...triggerProps(kind)} action={action} />);
-          await openThroughTrigger(user);
-          const d = deferred();
-          action.mockImplementation(() => d.promise);
-          const close = spyClose();
-          await partClose(user);
-          // The Root dispatched (a part with a native close command: its click was cancelled).
-          expect(action).toHaveBeenCalledTimes(2);
-          const [next, details] = action.mock.calls[1]!;
-          expect(next).toBe(false);
-          expect(details.reason).toBe("activate");
-          if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
-          expect(details.event!.type).toBe("click");
-          expect(details.event!.defaultPrevented).toBe(config.partCloseCancelsClick);
-          // Still open while the action runs; the Trigger shows the Root's pending.
-          expect(isOpen()).toBe(true);
-          expect(close).not.toHaveBeenCalled();
-          expect(content()).toBeInTheDocument();
-          expectPending(trigger());
-          expect(trigger()).not.toHaveAttribute("data-open");
-          // Still shown, so still expanded until the close commits (#118).
-          expectShown(kind, true);
-          if (config.partCloseReturnsFocus) expect(trigger()).not.toHaveFocus();
-          await flushTasks(2);
-          expect(isOpen()).toBe(true);
-          expect(close).not.toHaveBeenCalled();
-          expect(content()).toBeInTheDocument();
-          expectPending(trigger());
-          await act(async () => d.resolve());
-          expect(close).toHaveBeenCalledTimes(1);
-          expect(close).toHaveBeenCalledWith(...config.partCloseArgs);
-          expect(isOpen()).toBe(false);
-          if (hasReturnValue) expect((popup() as HTMLDialogElement).returnValue).toBe("x");
-          expect(committedText()).toBe("false");
-          expectNotPending(trigger());
-          await flushTasks(2);
-          expect(content()).toBeNull();
-          // The close event is an echo: no second notification.
-          expect(action).toHaveBeenCalledTimes(2);
-          // Focus moved back from the part to the Trigger.
-          if (config.partCloseReturnsFocus) expect(trigger()).toHaveFocus();
-        });
+      for (const part of partCloses)
+        for (const kind of triggerKinds)
+          it(`part-initiated close: library-owned, open while openChangeAction(false) runs, closed on resolve${kindName(kind)}${partName(part)}`, async () => {
+            const user = setupUser();
+            const action = vi.fn<Action>();
+            render(<Harness mode={mode} {...triggerProps(kind)} action={action} />);
+            await openThroughTrigger(user);
+            const d = deferred();
+            action.mockImplementation(() => d.promise);
+            const close = spyClose();
+            await part.close(user);
+            // The Root dispatched (a part with a native close command: its click was cancelled).
+            expect(action).toHaveBeenCalledTimes(2);
+            const [next, details] = action.mock.calls[1]!;
+            expect(next).toBe(false);
+            expect(details.reason).toBe("activate");
+            if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
+            expect(details.event!.type).toBe("click");
+            expect(details.event!.defaultPrevented).toBe(part.cancelsClick);
+            // Still open while the action runs; the Trigger shows the Root's pending.
+            expect(isOpen()).toBe(true);
+            expect(close).not.toHaveBeenCalled();
+            expect(content()).toBeInTheDocument();
+            expectPending(trigger());
+            expect(trigger()).not.toHaveAttribute("data-open");
+            // Still shown, so still expanded until the close commits (#118).
+            expectShown(kind, true);
+            if (part.returnsFocus) expect(trigger()).not.toHaveFocus();
+            await flushTasks(2);
+            expect(isOpen()).toBe(true);
+            expect(close).not.toHaveBeenCalled();
+            expect(content()).toBeInTheDocument();
+            expectPending(trigger());
+            await act(async () => d.resolve());
+            expect(close).toHaveBeenCalledTimes(1);
+            expect(close).toHaveBeenCalledWith(...part.closeArgs);
+            expect(isOpen()).toBe(false);
+            if (hasReturnValue) expect((popup() as HTMLDialogElement).returnValue).toBe("x");
+            expect(committedText()).toBe("false");
+            expectNotPending(trigger());
+            await flushTasks(2);
+            expect(content()).toBeNull();
+            // The close event is an echo: no second notification.
+            expect(action).toHaveBeenCalledTimes(2);
+            // Focus moved back from the part to the Trigger.
+            if (part.returnsFocus) expect(trigger()).toHaveFocus();
+          });
 
       for (const kind of triggerKinds)
         it(`dismissal: notified as (false, 'dismiss') with the platform's event; pending meanwhile${kindName(kind)}`, async () => {
@@ -544,33 +549,34 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(action).toHaveBeenLastCalledWith(false, expect.anything());
       });
 
-      it("a dismissal during a pending part-initiated close notifies nothing more (walkthrough 11.13)", async () => {
-        const user = setupUser();
-        const action = vi.fn<Action>();
-        render(<Harness mode={mode} action={action} />);
-        await openThroughTrigger(user);
-        const closing = deferred();
-        action.mockImplementation(() => closing.promise);
-        const close = spyClose();
-        await partClose(user);
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(isOpen()).toBe(true);
-        // Escape while openChangeAction(false) runs: the platform closes at once.
-        await act(async () => dismiss());
-        await flushTasks(2);
-        expect(isOpen()).toBe(false);
-        close.mockClear();
-        await act(async () => closing.resolve());
-        await flushTasks(2);
-        expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
-          [true, "activate"],
-          [false, "activate"],
-        ]);
-        // The apply effect found the popup closed: no second close.
-        expect(close).not.toHaveBeenCalled();
-        expect(isOpen()).toBe(false);
-        expect(content()).toBeNull();
-      });
+      for (const part of partCloses)
+        it(`a dismissal during a pending part-initiated close notifies nothing more (walkthrough 11.13)${partName(part)}`, async () => {
+          const user = setupUser();
+          const action = vi.fn<Action>();
+          render(<Harness mode={mode} action={action} />);
+          await openThroughTrigger(user);
+          const closing = deferred();
+          action.mockImplementation(() => closing.promise);
+          const close = spyClose();
+          await part.close(user);
+          expect(action).toHaveBeenCalledTimes(2);
+          expect(isOpen()).toBe(true);
+          // Escape while openChangeAction(false) runs: the platform closes at once.
+          await act(async () => dismiss());
+          await flushTasks(2);
+          expect(isOpen()).toBe(false);
+          close.mockClear();
+          await act(async () => closing.resolve());
+          await flushTasks(2);
+          expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+            [true, "activate"],
+            [false, "activate"],
+          ]);
+          // The apply effect found the popup closed: no second close.
+          expect(close).not.toHaveBeenCalled();
+          expect(isOpen()).toBe(false);
+          expect(content()).toBeNull();
+        });
     });
 
     renderBoth("rejection", (mode) => {
@@ -609,39 +615,41 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         else expect(trigger()).not.toHaveAttribute("data-open");
       });
 
-      it("part-initiated close rejects: the boundary gets it, the library never closed the popup", async () => {
-        const user = setupUser();
-        silenceErrors();
-        const caught = vi.fn();
-        const action = vi.fn<Action>();
-        render(<Harness mode={mode} action={action} boundary={caught} />);
-        await openThroughTrigger(user);
-        const close = spyClose();
-        const d = deferred();
-        action.mockImplementation(() => d.promise);
-        await partClose(user);
-        expect(isOpen()).toBe(true);
-        await act(async () => d.reject(new Error("save failed")));
-        await flushTasks(2);
-        expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
-        expect(close).not.toHaveBeenCalled();
-        // The boundary replaced the whole component (removing the popup closed it).
-        expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
-        expect(screen.queryByTestId("popup")).toBeNull();
-      });
-
-      it("part-initiated close rejects, caught inside: uncontrolled closes, controlled stays", async () => {
-        const user = setupUser();
-        const action = vi.fn<Action>();
-        render(<Harness mode={mode} action={action} catchErrors />);
-        await openThroughTrigger(user);
-        action.mockImplementation(async () => {
-          throw new Error("handled");
+      for (const part of partCloses)
+        it(`part-initiated close rejects: the boundary gets it, the library never closed the popup${partName(part)}`, async () => {
+          const user = setupUser();
+          silenceErrors();
+          const caught = vi.fn();
+          const action = vi.fn<Action>();
+          render(<Harness mode={mode} action={action} boundary={caught} />);
+          await openThroughTrigger(user);
+          const close = spyClose();
+          const d = deferred();
+          action.mockImplementation(() => d.promise);
+          await part.close(user);
+          expect(isOpen()).toBe(true);
+          await act(async () => d.reject(new Error("save failed")));
+          await flushTasks(2);
+          expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
+          expect(close).not.toHaveBeenCalled();
+          // The boundary replaced the whole component (removing the popup closed it).
+          expect(screen.getByTestId("error-catcher")).toBeInTheDocument();
+          expect(screen.queryByTestId("popup")).toBeNull();
         });
-        await partClose(user);
-        await flushTasks(2);
-        expect(isOpen()).toBe(mode === "controlled");
-      });
+
+      for (const part of partCloses)
+        it(`part-initiated close rejects, caught inside: uncontrolled closes, controlled stays${partName(part)}`, async () => {
+          const user = setupUser();
+          const action = vi.fn<Action>();
+          render(<Harness mode={mode} action={action} catchErrors />);
+          await openThroughTrigger(user);
+          action.mockImplementation(async () => {
+            throw new Error("handled");
+          });
+          await part.close(user);
+          await flushTasks(2);
+          expect(isOpen()).toBe(mode === "controlled");
+        });
 
       it("dismissal notification rejects: the boundary gets it (the popup was already closed)", async () => {
         const user = setupUser();
@@ -707,30 +715,33 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           expectNotPending(trigger());
         });
 
-      for (const kind of triggerKinds)
-        it(`a refused part-initiated close is a real veto: never closed, data-open snaps back (11.14)${kindName(kind)}`, async () => {
-          const user = setupUser();
-          const action = vi.fn<Action>();
-          const open = spyOpen();
-          render(<Harness mode="controlled" {...triggerProps(kind)} action={action} refuseClose />);
-          await openThroughTrigger(user);
-          open.mockClear();
-          const close = spyClose();
-          const d = deferred();
-          action.mockImplementation(() => d.promise);
-          await partClose(user);
-          expect(trigger()).not.toHaveAttribute("data-open");
-          expectShown(kind, true);
-          await act(async () => d.resolve());
-          await flushTasks(2);
-          expect(close).not.toHaveBeenCalled();
-          expect(open).not.toHaveBeenCalled(); // never blinked
-          expect(isOpen()).toBe(true);
-          expect(content()).toBeInTheDocument();
-          expect(trigger()).toHaveAttribute("data-open", "");
-          expectShown(kind, true);
-          expectNotPending(trigger());
-        });
+      for (const part of partCloses)
+        for (const kind of triggerKinds)
+          it(`a refused part-initiated close is a real veto: never closed, data-open snaps back (11.14)${kindName(kind)}${partName(part)}`, async () => {
+            const user = setupUser();
+            const action = vi.fn<Action>();
+            const open = spyOpen();
+            render(
+              <Harness mode="controlled" {...triggerProps(kind)} action={action} refuseClose />,
+            );
+            await openThroughTrigger(user);
+            open.mockClear();
+            const close = spyClose();
+            const d = deferred();
+            action.mockImplementation(() => d.promise);
+            await part.close(user);
+            expect(trigger()).not.toHaveAttribute("data-open");
+            expectShown(kind, true);
+            await act(async () => d.resolve());
+            await flushTasks(2);
+            expect(close).not.toHaveBeenCalled();
+            expect(open).not.toHaveBeenCalled(); // never blinked
+            expect(isOpen()).toBe(true);
+            expect(content()).toBeInTheDocument();
+            expect(trigger()).toHaveAttribute("data-open", "");
+            expectShown(kind, true);
+            expectNotPending(trigger());
+          });
 
       it("a vetoed open snaps back and the popup never opens", async () => {
         const user = setupUser();
@@ -1074,24 +1085,25 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
 
     describe("close intents", () => {
       renderBoth("a part-initiated close, then a dismissal", (mode) => {
-        it("the dismissal is reported as 'dismiss' (no stale intent from the part's close)", async () => {
-          const user = setupUser();
-          const action = vi.fn<Action>();
-          render(<Harness mode={mode} action={action} />);
-          await openThroughTrigger(user);
-          await partClose(user);
-          await flushTasks(2);
-          expect(isOpen()).toBe(false);
-          await openThroughTrigger(user);
-          await act(async () => dismiss());
-          await flushTasks(2);
-          expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
-            [true, "activate"],
-            [false, "activate"],
-            [true, "activate"],
-            [false, "dismiss"],
-          ]);
-        });
+        for (const part of partCloses)
+          it(`the dismissal is reported as 'dismiss' (no stale intent from the part's close)${partName(part)}`, async () => {
+            const user = setupUser();
+            const action = vi.fn<Action>();
+            render(<Harness mode={mode} action={action} />);
+            await openThroughTrigger(user);
+            await part.close(user);
+            await flushTasks(2);
+            expect(isOpen()).toBe(false);
+            await openThroughTrigger(user);
+            await act(async () => dismiss());
+            await flushTasks(2);
+            expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+              [true, "activate"],
+              [false, "activate"],
+              [true, "activate"],
+              [false, "dismiss"],
+            ]);
+          });
       });
 
       const intents = config.closeIntents;

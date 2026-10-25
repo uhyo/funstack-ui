@@ -120,10 +120,15 @@ describeOverlayOpenState<PopoverOpenChangeDetails>({
   ...popoverLikeDriver(),
   name: "Popover",
   Harness,
-  partClose: (user) => user.click(trigger()),
-  partCloseCancelsClick: true,
-  partCloseArgs: [],
-  partCloseReturnsFocus: false,
+  partCloses: [
+    {
+      name: "the Trigger",
+      close: (user) => user.click(trigger()),
+      cancelsClick: true,
+      closeArgs: [],
+      returnsFocus: false,
+    },
+  ],
   closeIntents: {
     render: (probe) => (
       <Popover.Root>

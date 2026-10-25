@@ -178,10 +178,24 @@ describeOverlayOpenState<MenuOpenChangeDetails>({
   ...popoverLikeDriver(),
   name: "Menu",
   Harness: OpenStateHarness,
-  partClose: (user) => user.click(screen.getByTestId("close")),
-  partCloseCancelsClick: false,
-  partCloseArgs: [],
-  partCloseReturnsFocus: true,
+  partCloses: [
+    {
+      name: "an item",
+      close: (user) => user.click(screen.getByTestId("close")),
+      cancelsClick: false,
+      closeArgs: [],
+      returnsFocus: true,
+    },
+    {
+      // Menu's Trigger prevents its mousedown while open: the click is the only close and focus
+      // stays in the menu until the library returns it (design/components/menu.md 2.2, #110).
+      name: "the Trigger",
+      close: (user) => user.click(screen.getByTestId("trigger")),
+      cancelsClick: true,
+      closeArgs: [],
+      returnsFocus: true,
+    },
+  ],
   closeIntents: {
     // Library mode (Menu has no JS-free mode): `defaultOpen`; the popup's content is mounted only
     // while open, so the probe is a child of the Root.
@@ -2351,57 +2365,6 @@ describe("submenus", () => {
       expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
       foreign.setAttribute("popovertarget", other.id);
       expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(true);
-    });
-  });
-
-  // #110
-  describe("a Trigger click while open closes through the action", () => {
-    async function setup(boundary?: (error: unknown) => void) {
-      const user = setupUser();
-      const work = deferred();
-      const action = vi.fn<OpenAction>((next) => (next ? undefined : work.promise));
-      render(<Harness root={{ openChangeAction: action }} boundary={boundary} />);
-      await openMenu(user);
-      expect(item("rename")).toHaveFocus();
-      const hide = spyHide();
-      await user.click(trigger());
-      // The click is the only close: shown, item focused, optimistic feedback on the Trigger;
-      // the browser exposes the shown menu on the invoker, no `aria-expanded` (#121).
-      expect(isOpen()).toBe(true);
-      expect(item("rename")).toHaveFocus();
-      expect(trigger()).not.toHaveAttribute("data-open");
-      expect(trigger()).toHaveAttribute("popovertarget", popup().id);
-      expect(trigger()).not.toHaveAttribute("aria-expanded");
-      expect(trigger()).toHaveAttribute("data-pending", "");
-      expect(hide).not.toHaveBeenCalled();
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
-      expect(next).toBe(false);
-      expect(details.reason).toBe("activate");
-      expect(details.event!.type).toBe("click");
-      return { work, action, hide };
-    }
-
-    it("resolved: hides in the commit, once, with no further dispatch", async () => {
-      const { work, action, hide } = await setup();
-      await act(async () => work.resolve());
-      await flushTasks(2);
-      expect(isOpen()).toBe(false);
-      expect(hide).toHaveBeenCalledTimes(1);
-      expect(trigger()).not.toHaveAttribute("aria-expanded");
-      expect(trigger()).not.toHaveAttribute("data-pending");
-      expect(action).toHaveBeenCalledTimes(2);
-    });
-
-    it("rejected: the boundary gets it; the library never hid the menu", async () => {
-      silenceErrors();
-      const caught = vi.fn();
-      const { work, hide } = await setup(caught);
-      await act(async () => work.reject(new Error("save failed")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
-      expect(hide).not.toHaveBeenCalled();
-      expect(screen.getByTestId("error-catcher")).toHaveTextContent("save failed");
     });
   });
 
