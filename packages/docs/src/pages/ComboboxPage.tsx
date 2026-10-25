@@ -340,10 +340,10 @@ export function ComboboxPage() {
       <PartFacts
         state={"`ComboboxInputState` is `{ value, inputValue, open, pending, stale, disabled }`."}
         owned={
-          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
         }
         note={
-          "`placeholder`, `name` (a second field with the raw text), `aria-describedby` and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
+          "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
         }
       />
 
@@ -371,7 +371,7 @@ export function ComboboxPage() {
           "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, inputValue, disabled }`."
         }
         owned={
-          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (only on a non-button `render`), `aria-controls`, `popovertarget` (written as an attribute after hydration, only on a `<button>`, also while disabled), `data-open`, `data-pending`. Owned on the Trigger and never written as props: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`; these and `aria-expanded` are not in its props type."
+          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (only when it is no invoker: a non-button `render`, or while `aria-disabled`), `aria-controls`, `popovertarget` (written as an attribute after hydration, only on a `<button>`, while enabled or natively disabled; not while `aria-disabled`), `data-open`, `data-pending`. Owned on the Trigger and never written as props: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`; these and `aria-expanded` are not in its props type."
         }
         note={
           "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). A Trigger rendered as another element is light-dismissed before its click and warns in development ([Triggers of a popup](/concepts/browser-owned-state#popup-triggers)). Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
@@ -678,6 +678,12 @@ export function ComboboxPage() {
         <code>fsui-combobox-select</code>; opens and closes add <code>fsui-combobox-open</code> /{" "}
         <code>fsui-combobox-close</code>.
       </p>
+      <p>
+        With both the CSS exit above and <code>transition</code>, turn the CSS exit off while a view
+        transition runs (
+        <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>):
+      </p>
+      <CodeBlock language="css">{`html:active-view-transition .listbox { transition: none; }`}</CodeBlock>
 
       <h3 id="browser-notes">Browser notes</h3>
       <ul>

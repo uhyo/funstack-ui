@@ -212,9 +212,9 @@ export function BrowserOwnedStatePage() {
         the above: it renders <code>aria-expanded</code> itself, from whether the popup is shown;
         and a press on it while the popup is open counts as a click outside, so light dismiss closes
         the popup before the click arrives. That close is not awaited, a controlled parent cannot
-        refuse it, and there is no exit transition. A development warning says so. In Popover and
-        Menu, a disabled Trigger that stays focusable (it renders <code>aria-disabled</code>) is no
-        invoker either, so that nothing native can open the popup.
+        refuse it, and there is no exit transition. A development warning says so. A disabled
+        Trigger that stays focusable (it renders <code>aria-disabled</code>) is no invoker either,
+        so that nothing native can open the popup.
       </p>
       <p>
         <strong>Two kinds of open state on a Trigger.</strong> What assistive technology hears is
