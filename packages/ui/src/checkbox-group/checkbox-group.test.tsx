@@ -618,7 +618,8 @@ describe("CheckboxGroup", () => {
   });
 
   describe("value model", () => {
-    describe("controlled value compared by content (#108)", () => {
+    // #108
+    describe("controlled value compared by content", () => {
       /** Renders the Root under a parent that re-renders on "tick" and sets `next` on "change". */
       function setup(next: string[]) {
         const rootStates: CheckboxGroupRootState[] = [];

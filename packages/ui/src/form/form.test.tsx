@@ -696,7 +696,8 @@ describe("Form: function props and render", () => {
     await act(async () => d.resolve());
   });
 
-  it("Form.Submit disabled with a component render stays natively disabled, no aria-disabled (#83)", async () => {
+  // #83
+  it("Form.Submit disabled with a component render stays natively disabled, no aria-disabled", async () => {
     const action = vi.fn();
     render(
       <Form.Root action={action}>

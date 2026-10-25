@@ -397,7 +397,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
       // running on a hidden element in every engine, so without the baseline all three would
       // hold the content for the bar's 10 s.
       it.each(closes)(
-        "%s ignores a finite animation that was already running inside (#64)",
+        "%s ignores a finite animation that was already running inside",
         async (_, close) => {
           addExitStyle("fade", "300ms", { openPseudo });
           let bar: Animation | undefined;
@@ -434,7 +434,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
     // #117: real presses with real timing. React's act environment is left for the press, so the
     // engine's focus, light dismiss and `toggle` tasks interleave with React's work as they do on
     // a page; the close action is held open so the pending window can be inspected.
-    describe("a real press while open (#117)", () => {
+    describe("a real press while open", () => {
       let restoreAct: (() => void) | undefined;
 
       afterEach(async () => {

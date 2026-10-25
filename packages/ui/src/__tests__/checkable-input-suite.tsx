@@ -149,7 +149,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
 
   describe(name, () => {
     describe("roles and ARIA", () => {
-      it("renders the checkbox input with its role and never aria-checked (row 1, C1)", () => {
+      // C1
+      it("renders the checkbox input with its role and never aria-checked (row 1)", () => {
         const plain = render(<Control aria-label="Wi-Fi" />);
         const el = screen.getByRole(role, { name: "Wi-Fi" }) as HTMLInputElement;
         expect(el.tagName).toBe("INPUT");
@@ -213,7 +214,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         expect(onBlur).toHaveBeenCalledTimes(1);
       });
 
-      it("type is owned; role is owned by Switch and passes through on Checkbox (row 2, C1)", () => {
+      // C1
+      it("type is owned; role is owned by Switch and passes through on Checkbox (row 2)", () => {
         const forced = { type: "radio", role: "menuitemcheckbox" } as object;
         const viaProps = render(<Control aria-label="Wi-Fi" {...forced} />);
         const el = screen.getByLabelText("Wi-Fi");

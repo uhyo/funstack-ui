@@ -101,7 +101,8 @@ describe.each([
     await expect.poll(focused).toBe(button("Cut"));
   });
 
-  it("first entry lands on an aria-disabled first item (review finding 1)", async () => {
+  // review finding 1
+  it("first entry lands on an aria-disabled first item", async () => {
     render(
       <>
         <button type="button">before</button>
@@ -197,10 +198,11 @@ describe.each([
   );
 });
 
+// #74
 describe.each([
   ["with experimental_focusgroup", true],
   ["without the flag (JS path everywhere)", false],
-] as const)("native radios inside a Toolbar %s (#74, row 27)", (_label, flag) => {
+] as const)("native radios inside a Toolbar %s (row 27)", (_label, flag) => {
   function Radios() {
     return (
       <>

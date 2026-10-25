@@ -700,7 +700,8 @@ describe("Hover", () => {
   });
 });
 
-describe("Skip-delay (wave 11, #21)", () => {
+// wave 11, #21
+describe("Skip-delay", () => {
   // Design section 6: while any `[role="tooltip"]:popover-open` exists in the document, a hover or
   // keyboard focus opens the next tooltip at once and hides the showing one. Global, stateless.
   function Pair({ flag = false }: { flag?: boolean }) {
@@ -953,7 +954,8 @@ describe("Skip-delay (wave 11, #21)", () => {
   });
 });
 
-describe("Warm open attribute (wave 12, #93)", () => {
+// wave 12, #93
+describe("Warm open attribute", () => {
   // Design amendment for #93: `data-instant` on the Popup, written by presence from its own
   // `beforetoggle` (the shim dispatches it synchronously, before `:popover-open` matches, like
   // browsers): present iff another `[role="tooltip"]:popover-open` exists at that moment, removed
@@ -1397,7 +1399,8 @@ describe("Positioning", () => {
   });
 });
 
-describe("Resolved placement (wave 11)", () => {
+// wave 11
+describe("Resolved placement", () => {
   // Conventions 13.2: while shown, data-side / data-align and the state are where the browser
   // placed the popup (the computed position-area); otherwise the requested values. jsdom has no
   // layout, so `getComputedStyle` is stubbed for the popup; the shim's `toggle` drives the hook
@@ -1865,7 +1868,8 @@ describe("Dev warnings", () => {
     expect(notFocusable()).toHaveLength(1);
   });
 
-  describe("inside a roving container whose engine writes tabindex (#75, toggle-group.md 18)", () => {
+  // #75
+  describe("inside a roving container whose engine writes tabindex (toggle-group.md 18)", () => {
     /** Two tooltip Items; the second gets the engine's `tabindex="-1"`. */
     function Group({ remount }: { remount: number }) {
       return (
@@ -1920,7 +1924,8 @@ describe("Dev warnings", () => {
     });
   });
 
-  it("accepts a roving-tabindex Menu.Item (#57)", () => {
+  // #57
+  it("accepts a roving-tabindex Menu.Item", () => {
     render(
       <Menu.Root defaultOpen>
         <Menu.Trigger>Actions</Menu.Trigger>
@@ -1937,7 +1942,8 @@ describe("Dev warnings", () => {
     expect(notFocusable()).toHaveLength(0);
   });
 
-  it("accepts an unselected Tabs.Tab (#57)", () => {
+  // #57
+  it("accepts an unselected Tabs.Tab", () => {
     render(
       <Tabs.Root defaultValue="a">
         <Tabs.List aria-label="Sections">

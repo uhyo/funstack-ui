@@ -284,12 +284,13 @@ describe("Popover", () => {
       expect(closed).not.toContain("secret content");
     });
 
+    // #121
     it.each([
       ["JS-free", "static"],
       ["library mode", "uncontrolled"],
       ["library mode, defaultOpen", "uncontrolled"],
     ] as const)(
-      "%s: the server HTML's Trigger names the popup with popoverTarget, no aria-expanded; hydrates cleanly (#121)",
+      "%s: the server HTML's Trigger names the popup with popoverTarget, no aria-expanded; hydrates cleanly",
       async (label, mode) => {
         const error = silenceErrors();
         const ui = <Harness mode={mode} initialOpen={label.endsWith("defaultOpen")} />;
@@ -307,7 +308,8 @@ describe("Popover", () => {
       },
     );
 
-    it("library mode: a link Trigger's aria-expanded is the shown popup, data-open the intent (#118)", async () => {
+    // #118
+    it("library mode: a link Trigger's aria-expanded is the shown popup, data-open the intent", async () => {
       // A non-button Trigger is no invoker, so it renders the mirror (#121). `defaultOpen`: not
       // shown before hydration, so not expanded in the server HTML nor on hydration; expanded
       // with the `toggle` of the apply effect's `showPopover()`.
@@ -354,7 +356,8 @@ describe("Popover", () => {
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("library mode: a refused controlled close keeps a link Trigger's aria-expanded true throughout (#118)", async () => {
+    // #118
+    it("library mode: a refused controlled close keeps a link Trigger's aria-expanded true throughout", async () => {
       silenceErrors(); // the non-button warning
       const user = setupUser();
       const action = vi.fn<ActionFn>();
@@ -379,7 +382,8 @@ describe("Popover", () => {
       expect(trigger()).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("library mode: a Popup unmounted while open leaves a link Trigger not expanded (#118)", async () => {
+    // #118
+    it("library mode: a Popup unmounted while open leaves a link Trigger not expanded", async () => {
       silenceErrors(); // the non-button warning
       function Removable() {
         const [mounted, setMounted] = useState(true);
@@ -409,7 +413,8 @@ describe("Popover", () => {
       expect(trigger()).toHaveAttribute("data-open", "");
     });
 
-    it("library mode: the mirror costs one render per show and per hide, none otherwise (#118)", async () => {
+    // #118
+    it("library mode: the mirror costs one render per show and per hide, none otherwise", async () => {
       const user = setupUser();
       // [committed, pending, shown] per render of a Root context consumer.
       const seen: [boolean, boolean, boolean][] = [];
@@ -520,7 +525,8 @@ describe("Popover", () => {
       expect(trigger()).not.toHaveAttribute("popovertarget");
     });
 
-    it("a render element's commandfor / command are dropped: the Trigger opens its own popup (#121 review F1)", async () => {
+    // #121 review F1
+    it("a render element's commandfor / command are dropped: the Trigger opens its own popup", async () => {
       const user = setupUser();
       render(
         <>
@@ -556,7 +562,8 @@ describe("Popover", () => {
       expect(trigger()).toHaveAttribute("data-disabled", "");
     });
 
-    it("keeps data-open current on the Trigger element without a React render (#121)", async () => {
+    // #121
+    it("keeps data-open current on the Trigger element without a React render", async () => {
       const user = setupUser();
       let renders = 0;
       render(
@@ -594,7 +601,8 @@ describe("Popover", () => {
       expect(renders).toBe(before);
     });
 
-    it("a Trigger that mounts while the popup is shown picks up data-open (#121)", async () => {
+    // #121
+    it("a Trigger that mounts while the popup is shown picks up data-open", async () => {
       function Late() {
         const [mounted, setMounted] = useState(false);
         return (
@@ -648,7 +656,7 @@ describe("Popover", () => {
     });
   });
 
-  renderBoth("sync action", (mode) => {
+  renderBoth("foreign invokers", (mode) => {
     it("a foreign show-popover invoker is routed through the library", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
@@ -682,7 +690,8 @@ describe("Popover", () => {
       expect(details.event!.type).toBe("command");
     });
 
-    it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent (#125)", async () => {
+    // #125
+    it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);
@@ -700,7 +709,8 @@ describe("Popover", () => {
       expect((details.event as ToggleEvent & { source?: unknown }).source).toBe(foreign);
     });
 
-    it("a close whose source is no popovertarget invoker of the popup stays 'dismiss' (#125 review F1)", async () => {
+    // #125 review F1
+    it("a close whose source is no popovertarget invoker of the popup stays 'dismiss'", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);
@@ -732,7 +742,8 @@ describe("Popover", () => {
       }
     });
 
-    it("a commandfor toggle-popover close keeps the CommandEvent though its toggle names the button (#125)", async () => {
+    // #125
+    it("a commandfor toggle-popover close keeps the CommandEvent though its toggle names the button", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);
@@ -751,7 +762,8 @@ describe("Popover", () => {
       expect(details.event!.type).toBe("command");
     });
 
-    it("the Trigger's and Close's closes keep their click; a script hide stays 'dismiss' (#125)", async () => {
+    // #125
+    it("the Trigger's and Close's closes keep their click; a script hide stays 'dismiss'", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);
@@ -776,7 +788,8 @@ describe("Popover", () => {
       expect(action.mock.calls[5]![1].event!.type).toBe("toggle");
     });
 
-    it("a hide-popover command at a closed popup leaves no intent for a later close (#125 review F2)", async () => {
+    // #125 review F2
+    it("a hide-popover command at a closed popup leaves no intent for a later close", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
       render(<Harness mode={mode} action={action} />);
@@ -818,7 +831,8 @@ describe("Popover", () => {
     });
   });
 
-  renderBoth("interestfor (#127)", (mode) => {
+  // #127
+  renderBoth("interestfor", (mode) => {
     // Chromium's interest show and lost interest, emulated (`__tests__/interest-shim.ts`).
     const foreignButton = () => {
       const foreign = screen.getByTestId("elsewhere");
@@ -1051,7 +1065,8 @@ describe("Popover", () => {
     });
   });
 
-  describe("interestfor without a Trigger (#127)", () => {
+  // #127
+  describe("interestfor without a Trigger", () => {
     it("a controlled Trigger-less Popup hides on lost interest and cancels a pending open", async () => {
       const opening = deferred();
       const closing = deferred();
@@ -1298,7 +1313,8 @@ describe("Popover", () => {
       expect(messages.some((m) => m.includes("Popover.Close: rendered a <span>"))).toBe(true);
     });
 
-    it("warns for a non-button Trigger in library mode: its close while open is a light dismiss (#115)", () => {
+    // #115
+    it("warns for a non-button Trigger in library mode: its close while open is a light dismiss", () => {
       const error = silenceErrors();
       render(<Harness mode="uncontrolled" trigger={{ render: <a href="#x" /> }} />);
       const messages = error.mock.calls.map(([message]) => String(message));
@@ -1372,7 +1388,8 @@ describe("Popover", () => {
         flush: null,
       });
 
-    it("JS-free mode syncs data-open for a pre-hydration open (#121)", async () => {
+    // #121
+    it("JS-free mode syncs data-open for a pre-hydration open", async () => {
       await act(async () => {
         await hydrate(<Harness mode="static" />);
       });
@@ -1380,7 +1397,8 @@ describe("Popover", () => {
       expect(trigger()).not.toHaveAttribute("aria-expanded");
     });
 
-    it("library mode: a link Trigger is expanded from the first commit while the 'platform' dispatch is pending (#118)", async () => {
+    // #118
+    it("library mode: a link Trigger is expanded from the first commit while the 'platform' dispatch is pending", async () => {
       silenceErrors(); // the non-button warning
       const d = deferred();
       const action = vi.fn<ActionFn>(() => d.promise);
@@ -1506,7 +1524,8 @@ describe("Popover", () => {
         expect(isOpen()).toBe(true);
       });
 
-      it("P3: a rejection reaches the boundary; after a reset the Close runs again", async () => {
+      // P3
+      it("a rejection reaches the boundary; after a reset the Close runs again", async () => {
         const user = setupUser();
         silenceErrors();
         const action = vi.fn<ActionFn>();
@@ -1543,7 +1562,8 @@ describe("Popover", () => {
         expect(isOpen()).toBe(false);
       });
 
-      it("P1: a second click, Enter and Space while pending are ignored and cancelled", async () => {
+      // P1
+      it("a second click, Enter and Space while pending are ignored and cancelled", async () => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
         const work = deferred();
@@ -1580,7 +1600,8 @@ describe("Popover", () => {
         expectNotPending(close);
       });
 
-      it("P2: two clicks in one task call the action once", async () => {
+      // P2
+      it("two clicks in one task call the action once", async () => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
         const work = deferred();
@@ -1599,7 +1620,8 @@ describe("Popover", () => {
       });
     });
 
-    it("P1: JS-free mode with action, a second click while pending is ignored; one hidePopover()", async () => {
+    // P1
+    it("JS-free mode with action, a second click while pending is ignored; one hidePopover()", async () => {
       const user = setupUser();
       const work = deferred();
       const closeAction = vi.fn(() => work.promise);
@@ -1626,7 +1648,8 @@ describe("Popover", () => {
       expect(close).not.toHaveAttribute("aria-disabled");
     });
 
-    it("P4: a render element's aria-disabled is removed while the Close is idle (owned)", () => {
+    // P4
+    it("a render element's aria-disabled is removed while the Close is idle (owned)", () => {
       render(
         <Harness
           mode="static"
@@ -2069,7 +2092,8 @@ describe("Popover", () => {
     });
   });
 
-  describe("resolved placement (wave 11)", () => {
+  // wave 11
+  describe("resolved placement", () => {
     // Conventions 13.2: `getComputedStyle` is stubbed for the popup (jsdom has no layout); the
     // shim's `toggle` drives the hook (no ResizeObserver in jsdom).
     const stub = (positionArea: string, direction = "ltr") =>

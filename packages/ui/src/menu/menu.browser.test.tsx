@@ -516,7 +516,7 @@ describe("submenus (browser)", () => {
   // #117: real presses with real timing while a submenu is open (design 2.2, the SubmenuTrigger
   // row of 1). The pointer is parked on the target first, so the hover rules (focus follows the
   // pointer, 6.2) have run before the press.
-  describe("a real press while a submenu is open (#117)", () => {
+  describe("a real press while a submenu is open", () => {
     let restoreAct: (() => void) | undefined;
 
     afterEach(async () => {
@@ -730,7 +730,8 @@ describe("submenus (browser)", () => {
   );
 });
 
-describe("resolved side and direction (browser, wave 11)", () => {
+// wave 11
+describe("resolved side and direction", () => {
   const side = (element: Element = popup()) => element.getAttribute("data-side");
 
   it("a Trigger at the viewport bottom: the open menu reports data-side top and state.side top", async () => {
@@ -890,7 +891,7 @@ describe("checkbox and radio items (browser)", () => {
 
   // #117: the same by real presses, with real timing: a checkable item, and a plain item with
   // closeOnActivate={false}, keep the menu open (2.3); nothing closes or dispatches a close.
-  it("a real press on a checkbox, a radio or a closeOnActivate={false} item keeps the menu open (#117)", async () => {
+  it("a real press on a checkbox, a radio or a closeOnActivate={false} item keeps the menu open", async () => {
     const action = vi.fn<OpenAction>();
     const onKeep = vi.fn();
     render(
@@ -1015,7 +1016,8 @@ describe("light dismiss and layering (browser)", () => {
   });
 });
 
-describe("foreign popovertarget invoker (browser, #125)", () => {
+// #125
+describe("foreign popovertarget invoker", () => {
   it("a press that keeps focus in the menu closes it with 'activate' and the ToggleEvent", async () => {
     const action = vi.fn<OpenAction>();
     render(
@@ -1057,7 +1059,7 @@ describe("foreign popovertarget invoker (browser, #125)", () => {
 // Popup's focusout never hides the menu first; the click is the single source of the close
 // (design/components/menu.md 2.2, "A press on the Trigger is not a focus-out"). One outcome on
 // every engine.
-describe("Trigger click while open (browser, #110)", () => {
+describe("Trigger click while open", () => {
   afterEach(async () => {
     // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
     await mouse.releaseHeld();
@@ -1194,7 +1196,7 @@ describe("Trigger click while open (browser, #110)", () => {
 // 2.2, conventions 3.5). Without the guard Chromium and Firefox (and Playwright's Linux WebKit,
 // which focuses a clicked button) hid the menu at the press as "dismiss", and the click's toggle
 // re-showed it on Firefox. One outcome on every engine.
-describe("a press on a foreign invoker while open (browser, #126)", () => {
+describe("a press on a foreign invoker while open", () => {
   afterEach(async () => {
     await mouse.releaseHeld();
   });
@@ -1303,7 +1305,7 @@ describe("a press on a foreign invoker while open (browser, #126)", () => {
 // #121: the Triggers are `popovertarget` invokers with no `aria-expanded`; on Chromium the
 // accessibility tree is the state assertion (the `menuitem` role included). Firefox and WebKit
 // run the DOM assertions (review F5).
-describe("the exposed state of the Triggers (browser, #121)", () => {
+describe("the exposed state of the Triggers", () => {
   it("SubmenuTrigger: collapsed, expanded while the submenu is shown, collapsed after ArrowLeft", async () => {
     render(
       <Basic>

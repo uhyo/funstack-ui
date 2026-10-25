@@ -623,7 +623,7 @@ describe("Select (browser)", () => {
 // closed. Only where the in-page picker exists (`supportsBaseSelect`): Firefox's native popup is
 // not in the page and a headless click does not open it (the header). The option pick is the
 // "a pick through the picker" row above.
-describe.runIf(supportsBaseSelect)("a real press while the picker is open (#117, browser)", () => {
+describe.runIf(supportsBaseSelect)("a real press while the picker is open", () => {
   afterEach(async () => {
     await mouse.releaseHeld();
   });

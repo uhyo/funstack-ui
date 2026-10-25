@@ -412,7 +412,8 @@ const cases: Case[] = [
   },
 ];
 
-describe("context stability (#48)", () => {
+// #48
+describe("context stability", () => {
   describe.each([
     ["concurrent root", false],
     ["StrictMode", true],
@@ -480,7 +481,8 @@ describe("context stability (#48)", () => {
   });
 });
 
-describe("useLatest concurrency guarantee (#48)", () => {
+// #48
+describe("useLatest concurrency guarantee", () => {
   // The stable callbacks read the props of the last COMMITTED render. A transition render that
   // suspends (the old UI stays on screen) must not leak its props into them: the user acts on the
   // UI they see, so a click calls the action that UI was rendered with. Assigning the latest props

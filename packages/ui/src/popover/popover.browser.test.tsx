@@ -217,7 +217,8 @@ describeOverlayInBrowser<PopoverOpenChangeDetails>({
 });
 
 describe("JS-free mode (browser)", () => {
-  it("a render element's commandfor / command are dropped: a real click opens the Trigger's own popup (#121 review F1)", async () => {
+  // #121 review F1
+  it("a render element's commandfor / command are dropped: a real click opens the Trigger's own popup", async () => {
     render(
       <>
         <div id="other" popover="auto" data-testid="other" style={box(100, 50)} />
@@ -279,7 +280,8 @@ describe("library mode (browser)", () => {
   // Chromium-only; Firefox and WebKit run the DOM assertions.
   const expectExpanded = (expanded: boolean) => expectInvokerExpanded(trigger(), popup(), expanded);
 
-  it("the exposed state is the shown popup during a deferred open and a deferred Trigger close (#118, #121)", async () => {
+  // #118, #121
+  it("the exposed state is the shown popup during a deferred open and a deferred Trigger close", async () => {
     let work = deferred();
     const action = vi.fn<ActionFn>(() => work.promise);
     render(<Library action={action} />);
@@ -301,7 +303,8 @@ describe("library mode (browser)", () => {
     await expectExpanded(false);
   });
 
-  it("the exposed state is collapsed right after an Escape, while a slow dismissal notification runs (#118, #121)", async () => {
+  // #118, #121
+  it("the exposed state is collapsed right after an Escape, while a slow dismissal notification runs", async () => {
     const work = deferred();
     const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
     render(<Library action={action} />);
@@ -376,7 +379,8 @@ describe("library mode (browser)", () => {
     await settle(() => expect(isOpen()).toBe(true));
   });
 
-  it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent; Escape and light dismiss stay 'dismiss' (#125)", async () => {
+  // #125
+  it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent; Escape and light dismiss stay 'dismiss'", async () => {
     const action = vi.fn<ActionFn>();
     render(
       <Library
@@ -417,7 +421,8 @@ describe("library mode (browser)", () => {
     expect(action.mock.calls[5]![1].event!.type).toBe("toggle");
   });
 
-  it("a foreign commandfor hide-popover close keeps the CommandEvent though its beforetoggle names the button (#125)", async () => {
+  // #125
+  it("a foreign commandfor hide-popover close keeps the CommandEvent though its beforetoggle names the button", async () => {
     const action = vi.fn<ActionFn>();
     render(
       <Library
@@ -443,7 +448,8 @@ describe("library mode (browser)", () => {
     expect(action.mock.calls[1]![1].event!.type).toBe("command");
   });
 
-  it("a foreign hide-popover command while closed leaves no intent: a later Escape is 'dismiss' (#125 review F2)", async () => {
+  // #125 review F2
+  it("a foreign hide-popover command while closed leaves no intent: a later Escape is 'dismiss'", async () => {
     const action = vi.fn<ActionFn>();
     render(
       <Library
@@ -474,8 +480,9 @@ describe("library mode (browser)", () => {
     expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
   });
 
+  // #125 review F1
   it.runIf(supportsInterestFor)(
-    "an interestfor button's hide stays 'dismiss' though its ToggleEvent names the button (#125 review F1)",
+    "an interestfor button's hide stays 'dismiss' though its ToggleEvent names the button",
     async () => {
       const action = vi.fn<ActionFn>();
       render(
@@ -701,7 +708,7 @@ describe("nested popovers (browser)", () => {
 
   // #117: real presses with real timing while both are open (design 7: a press inside the outer
   // popup is outside the inner one; the inner Trigger is the inner popup's invoker).
-  describe("a real press while both are open (#117)", () => {
+  describe("a real press while both are open", () => {
     let restoreAct: (() => void) | undefined;
 
     afterEach(async () => {
@@ -1001,7 +1008,8 @@ async function closePlaced(): Promise<void> {
   await flushFor();
 }
 
-describe("resolved side (wave 11, #20)", () => {
+// wave 11, #20
+describe("resolved side", () => {
   it("near the viewport bottom the popup flips above: data-side top, the gap faces the Trigger", async () => {
     render(<Placed top={window.innerHeight - 40} gap />);
     expect(side()).toBe("bottom");
@@ -1120,7 +1128,8 @@ describe("resolved side (wave 11, #20)", () => {
   });
 });
 
-describe("direction (wave 11, #53)", () => {
+// wave 11, #53
+describe("direction", () => {
   async function expectMirrored(): Promise<void> {
     const t = trigger().getBoundingClientRect();
     const p = popup().getBoundingClientRect();
@@ -1192,7 +1201,7 @@ describe("direction (wave 11, #53)", () => {
 // right direction, but the close is browser-shaped: not awaited (hidden while the action is still
 // pending), no veto, no exit transition. The degraded shape is the same on every engine; the
 // `<button>` Trigger's awaited close is Menu's #110 rows and "a Trigger click while open" above.
-describe("non-button Trigger click while open (browser, #115)", () => {
+describe("non-button Trigger click while open", () => {
   afterEach(async () => {
     // A row that failed between `mouse.down` and `mouse.up` must not leave the button down.
     await mouse.releaseHeld();
@@ -1264,7 +1273,7 @@ describe("non-button Trigger click while open (browser, #115)", () => {
 // `toggle-popover` invoker is a browser-owned close the Popup records as `"activate"` and
 // notifies with the `CommandEvent`). The invoker is exempt from light dismiss, so the command is
 // the single source of the close. Real press, real timing.
-describe("a real press on a foreign invoker while open (browser, #117)", () => {
+describe("a real press on a foreign invoker while open", () => {
   let restoreAct: (() => void) | undefined;
 
   afterEach(async () => {
@@ -1323,7 +1332,7 @@ describe("a real press on a foreign invoker while open (browser, #117)", () => {
 
 // #117: Popover.Close with `action` (design 2.3 row 2): the press runs the Close's own action in
 // its transition (`data-pending` on the Close) with the popup shown; the close dispatch follows it.
-describe("a real press on a Close with action (browser, #117)", () => {
+describe("a real press on a Close with action", () => {
   let restoreAct: (() => void) | undefined;
 
   afterEach(async () => {
@@ -1377,7 +1386,8 @@ describe("a real press on a Close with action (browser, #117)", () => {
   });
 });
 
-describe("interestfor naming a library Popover (browser, #127)", () => {
+// #127
+describe("interestfor naming a library Popover", () => {
   /** Renders `Library` with a foreign button before the Root; `interestfor` on `on`. */
   function setUp(action: ActionFn, on: "foreign" | "trigger" = "foreign") {
     render(

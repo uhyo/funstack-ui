@@ -86,7 +86,8 @@ function MixedHarness({
 }
 
 describe("Checkbox indeterminate", () => {
-  it("aria-checked, including mixed, is removed through props and render (C1)", () => {
+  // C1
+  it("aria-checked, including mixed, is removed through props and render", () => {
     const forced = { "aria-checked": "mixed" } as object;
     const viaProps = render(<Checkbox aria-label="All" indeterminate {...forced} />);
     expect(box()).not.toHaveAttribute("aria-checked");
@@ -95,7 +96,8 @@ describe("Checkbox indeterminate", () => {
     expect(box()).not.toHaveAttribute("aria-checked");
   });
 
-  it("sets the property and data-indeterminate, and follows the prop (C2)", () => {
+  // C2
+  it("sets the property and data-indeterminate, and follows the prop", () => {
     const { rerender } = render(<Checkbox aria-label="All" checked={false} indeterminate />);
     expect(box().indeterminate).toBe(true);
     expect(box()).toHaveAttribute("data-indeterminate", "");
@@ -114,7 +116,8 @@ describe("Checkbox indeterminate", () => {
     expect(box()).not.toHaveAttribute("data-indeterminate");
   });
 
-  it("server-renders data-indeterminate and sets the property on hydration (C3)", async () => {
+  // C3
+  it("server-renders data-indeterminate and sets the property on hydration", async () => {
     const consoleError = silenceErrors();
     const ui = <Checkbox aria-label="All" indeterminate />;
     const html = renderToString(ui);
@@ -142,7 +145,8 @@ describe("Checkbox indeterminate", () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  renderBoth("click on a mixed box (C4)", (mode) => {
+  // C4
+  renderBoth("click on a mixed box", (mode) => {
     it("dispatches true; mixed is suspended while pending and cleared by the parent", async () => {
       const d = deferred();
       const action = vi.fn<ActionFn>(() => d.promise);
@@ -169,7 +173,8 @@ describe("Checkbox indeterminate", () => {
     });
   });
 
-  renderBoth("rollback to mixed (C5)", (mode) => {
+  // C5
+  renderBoth("rollback to mixed", (mode) => {
     it("the dash returns after a rejection caught inside the action", async () => {
       const d = deferred();
       render(<MixedHarness mode={mode} action={() => d.promise} catchErrors />);
@@ -190,7 +195,8 @@ describe("Checkbox indeterminate", () => {
     });
   });
 
-  it("a mixed uncontrolled box commits true and shows the dash again while the prop says so (C5)", async () => {
+  // C5
+  it("a mixed uncontrolled box commits true and shows the dash again while the prop says so", async () => {
     render(<Checkbox aria-label="All" indeterminate checkedChangeAction={() => {}} />);
     const user = setupUser();
     await user.click(box());
@@ -200,7 +206,8 @@ describe("Checkbox indeterminate", () => {
     expect(box()).toHaveAttribute("data-indeterminate", "");
   });
 
-  it("does not affect what the form submits (C7)", async () => {
+  // C7
+  it("does not affect what the form submits", async () => {
     render(
       <form data-testid="form">
         <Checkbox aria-label="All" name="all" checked indeterminate />
@@ -211,7 +218,8 @@ describe("Checkbox indeterminate", () => {
     expect([...new FormData(form)]).toEqual([["all", "on"]]);
   });
 
-  renderBoth("form reset while mixed (C8)", (mode) => {
+  // C8
+  renderBoth("form reset while mixed", (mode) => {
     it("dispatches platform; mixed is suspended while pending and re-applied after", async () => {
       let resolveReset: (() => void) | undefined;
       const actions: [boolean, string][] = [];
@@ -256,7 +264,8 @@ describe("Checkbox indeterminate", () => {
     });
   });
 
-  it("function props see indeterminate: false in the pending render (C9)", async () => {
+  // C9
+  it("function props see indeterminate: false in the pending render", async () => {
     const d = deferred();
     const className = vi.fn((s: CheckboxState) => (s.indeterminate ? "mixed" : "plain"));
     const style = vi.fn((_s: CheckboxState) => undefined);

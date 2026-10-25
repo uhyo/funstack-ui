@@ -254,7 +254,8 @@ describe("useRovingFocus", () => {
     expect(screen.getByText("b")).not.toHaveAttribute("tabindex");
   });
 
-  it("switching to native restores a tabindex the consumer rendered (review finding 2)", () => {
+  // review finding 2
+  it("switching to native restores a tabindex the consumer rendered", () => {
     // The hydration render runs the JS path (server snapshot), then the native path takes over.
     // React will not re-write `tabIndex={0}`, so the engine must put the original value back.
     const items = (

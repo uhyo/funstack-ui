@@ -78,7 +78,8 @@ function inputButton(type: string, form?: HTMLFormElement) {
   return element;
 }
 
-describe("isPopoverInvoker: HTML's invoker relationship (#126 review)", () => {
+// #126 review
+describe("isPopoverInvoker: HTML's invoker relationship", () => {
   it("an <input> of a button type is one; another <input> is not", () => {
     const { popup } = setup();
     for (const type of ["button", "reset", "submit", "image"]) {

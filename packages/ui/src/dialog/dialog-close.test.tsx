@@ -108,7 +108,8 @@ describe("Dialog", () => {
       expect(popup().open).toBe(true);
     });
 
-    it("with action: a rejection reaches the boundary; after a reset the Close runs again (D4)", async () => {
+    // D4
+    it("with action: a rejection reaches the boundary; after a reset the Close runs again", async () => {
       const user = setupUser();
       silenceErrors();
       const caught = vi.fn();
@@ -147,8 +148,10 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
     });
 
-    describe("re-entry (#81, design/components/button.md 16.4)", () => {
-      it("D1: library mode, a second click, Enter and Space while pending are ignored and cancelled", async () => {
+    // #81
+    describe("re-entry (design/components/button.md 16.4)", () => {
+      // D1
+      it("library mode, a second click, Enter and Space while pending are ignored and cancelled", async () => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
         const work = deferred();
@@ -201,7 +204,8 @@ describe("Dialog", () => {
         expectNotPending(button);
       });
 
-      it("D1: JS-free mode with action, a second click while pending is ignored; one close(value)", async () => {
+      // D1
+      it("JS-free mode with action, a second click while pending is ignored; one close(value)", async () => {
         const user = setupUser();
         const work = deferred();
         const closeAction = vi.fn(() => work.promise);
@@ -239,7 +243,8 @@ describe("Dialog", () => {
         expect(button).not.toHaveAttribute("aria-disabled");
       });
 
-      it("D2: two clicks in one task call the action once", async () => {
+      // D2
+      it("two clicks in one task call the action once", async () => {
         const user = setupUser();
         const work = deferred();
         const closeAction = vi.fn(() => work.promise);
@@ -264,7 +269,8 @@ describe("Dialog", () => {
         expect(popup().open).toBe(false);
       });
 
-      it("D3: without action, a second click while the Root's close is pending changes nothing", async () => {
+      // D3
+      it("without action, a second click while the Root's close is pending changes nothing", async () => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
         render(<Harness mode="uncontrolled" action={action} />);
@@ -284,7 +290,8 @@ describe("Dialog", () => {
         expect(close).toHaveBeenCalledTimes(1);
       });
 
-      it("D6: a render element's aria-disabled is removed while the Close is idle (owned)", async () => {
+      // D6
+      it("a render element's aria-disabled is removed while the Close is idle (owned)", async () => {
         const user = setupUser();
         render(
           <Harness

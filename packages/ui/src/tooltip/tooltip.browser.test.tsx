@@ -388,7 +388,7 @@ describe.skipIf(!supportsInterestFor)(
 // re-open it while the pointer stays put (design 2.2, "nothing reopens the tooltip until the
 // pointer leaves and re-enters"). The outside press is "a pointerdown outside" above. The native
 // path's "a click on the trigger does not close" (2.1) is Chromium-only (`supportsInterestFor`).
-describe("a real press while open (#117)", () => {
+describe("a real press while open", () => {
   let restoreAct: (() => void) | undefined;
 
   beforeEach(() => {
@@ -557,7 +557,8 @@ async function show(): Promise<void> {
   await actPoll(isOpen, true);
 }
 
-describe("resolved side (wave 11, #20)", () => {
+// wave 11, #20
+describe("resolved side", () => {
   it("a tooltip flipped below the viewport top reports bottom on Popup, Arrow and state", async () => {
     const states: TooltipPopupState[] = [];
     render(<Placed top={0} onPopupRender={(s) => states.push(s)} />);
@@ -694,7 +695,8 @@ describe("resolved side (wave 11, #20)", () => {
   });
 });
 
-describe("inline sides and direction (wave 11, #53)", () => {
+// wave 11, #53
+describe("inline sides and direction", () => {
   /** inline-end: beside the trigger's inline-end edge; checks the edges that should meet. */
   async function expectInlineEnd(rtl: boolean): Promise<void> {
     await show();
@@ -769,7 +771,8 @@ describe("inline sides and direction (wave 11, #53)", () => {
     }
   });
 });
-describe("skip-delay (wave 11, #21)", () => {
+// wave 11, #21
+describe("skip-delay", () => {
   // Design section 6: while a tooltip is showing, the next one opens at once and the showing one
   // is hidden. The rows assert conditions, not wall-clock bounds: a skipped open happens in the
   // same task as the other tooltip's close (the JS path hides it and shows the next; `hint`
@@ -915,7 +918,8 @@ describe("skip-delay (wave 11, #21)", () => {
   });
 });
 
-describe("warm opens carry data-instant (wave 12, #93)", () => {
+// wave 12, #93
+describe("warm opens carry data-instant", () => {
   // Design amendment for #93 and section 8: the attribute is written from the popup's synchronous
   // `beforetoggle`, before the open's first style recalc, so `.tip[data-instant]` suppresses the
   // entry transition outright. The oracle is the event count, not `getAnimations()`: a late write

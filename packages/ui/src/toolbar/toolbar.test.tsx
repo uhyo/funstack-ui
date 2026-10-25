@@ -557,7 +557,8 @@ describe("Toolbar", () => {
     });
   });
 
-  describe("popups inside a Toolbar reset its context (review finding 4)", () => {
+  // review finding 4
+  describe("popups inside a Toolbar reset its context", () => {
     it("Popover.Popup: a ToggleGroup runs its own engine, a Separator and a Menu.Trigger see no Toolbar", async () => {
       render(
         <Toolbar.Root aria-label="T" orientation="vertical">
@@ -654,7 +655,8 @@ describe("Toolbar", () => {
     });
   });
 
-  describe("native radios inside a Toolbar (#74, design 17)", () => {
+  // #74
+  describe("native radios inside a Toolbar (design 17)", () => {
     /** Row 25/26 fixture: b1, a checked `align` group, b2, an unchecked `size` group, b3. */
     function Radios({ loop }: { loop?: boolean }) {
       return (

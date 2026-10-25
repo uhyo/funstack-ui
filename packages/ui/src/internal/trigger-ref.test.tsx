@@ -103,7 +103,8 @@ const secondTriggerWarnings = (spy: { mock: { calls: unknown[][] } }, part: stri
       typeof message === "string" && message.startsWith(`${part}: a second ${part} mounted`),
   );
 
-describe.each(cases)("$name: one Trigger per Root (#113 API3)", ({ part, root }) => {
+// #113 API3
+describe.each(cases)("$name: one Trigger per Root", ({ part, root }) => {
   it("warns once when a second Trigger mounts", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const { rerender } = render(root(2));

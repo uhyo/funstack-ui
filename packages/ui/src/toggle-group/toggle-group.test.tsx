@@ -661,7 +661,8 @@ describe("ToggleGroup", () => {
     });
   });
 
-  describe("disabled on link and component renders (#83, design/components/button.md 17.3)", () => {
+  // #83
+  describe("disabled on link and component renders (design/components/button.md 17.3)", () => {
     it.each([
       ["a link", <a key="link" href="#b" />],
       ["a component", <PlainButton key="component" />],

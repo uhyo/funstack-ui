@@ -26,7 +26,8 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("invoker shim: popovertarget (#121)", () => {
+// #121
+describe("invoker shim: popovertarget", () => {
   it("toggles by default with the button as source, and fires no command event", () => {
     const { popover, button, commands } = setup({ popovertarget: "target" });
     button.click();
@@ -37,7 +38,8 @@ describe("invoker shim: popovertarget (#121)", () => {
     expect(commands).toEqual([]);
   });
 
-  it("passes the button as the toggle events' source, open and close; hidePopover() passes null (#125)", async () => {
+  // #125
+  it("passes the button as the toggle events' source, open and close; hidePopover() passes null", async () => {
     const { popover, button } = setup({ popovertarget: "target" });
     const events: [string, string, unknown][] = [];
     for (const type of ["beforetoggle", "toggle"]) {
@@ -69,7 +71,8 @@ describe("invoker shim: popovertarget (#121)", () => {
     ]);
   });
 
-  it("popoverTargetElement reflects popovertarget (#125)", () => {
+  // #125
+  it("popoverTargetElement reflects popovertarget", () => {
     const { popover, button } = setup({ popovertarget: "target" });
     expect(button.popoverTargetElement).toBe(popover);
     button.setAttribute("popovertarget", "missing");
@@ -135,7 +138,8 @@ describe("invoker shim: popovertarget (#121)", () => {
   });
 });
 
-describe("invoker shim: IDL (#126)", () => {
+// #126
+describe("invoker shim: IDL", () => {
   it("reflects popoverTargetElement, commandForElement and command", () => {
     const { popover, button } = setup({
       popovertarget: "target",

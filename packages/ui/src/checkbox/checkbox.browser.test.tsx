@@ -13,7 +13,8 @@ describeCheckableInputInBrowser({ name: "Checkbox", Control: Checkbox, role: "ch
 describe("Checkbox indeterminate (browser)", () => {
   const box = () => screen.getByRole("checkbox") as HTMLInputElement;
 
-  it(":indeterminate matches after mount, not while pending, and again after a rollback (C6)", async () => {
+  // C6
+  it(":indeterminate matches after mount, not while pending, and again after a rollback", async () => {
     const d = deferred();
     render(
       <Checkbox

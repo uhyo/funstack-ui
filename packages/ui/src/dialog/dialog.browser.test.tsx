@@ -366,7 +366,8 @@ describe("library mode (browser)", () => {
     await settle(() => expect(popup().open).toBe(true));
   });
 
-  it("a foreign request-close invoker is intercepted; its value arrives through event.source (#46)", async () => {
+  // #46
+  it("a foreign request-close invoker is intercepted; its value arrives through event.source", async () => {
     const action = vi.fn<ActionFn>();
     render(
       <Library action={action}>
@@ -707,7 +708,8 @@ describe("nested confirm (browser)", () => {
 
 // A fade whose exit outlasts any test (#71): the row ends the exit itself with `finish()`.
 describe("exit animation and the deferred unmount (browser)", () => {
-  it("a controlled close without transition keeps the content through the fade, mounted once (#46)", async () => {
+  // #46
+  it("a controlled close without transition keeps the content through the fade, mounted once", async () => {
     addExitStyle("held-exit", "60s", { openPseudo: ":open", instantEnter: true });
     let mounts = 0;
     function Content() {
@@ -829,7 +831,7 @@ describe("scroll lock recipe (browser)", () => {
 // Trigger is no invoker), so a Trigger click on an open non-modal `lightDismiss` dialog is a
 // dismissal on every engine and path: native `closedby="any"` where supported with the flag, the
 // JS baseline otherwise. Only the mechanism is branched on; the outcome is the same.
-describe("non-modal lightDismiss: a Trigger click while open (browser, #116)", () => {
+describe("non-modal lightDismiss: a Trigger click while open", () => {
   it.each([
     ["without experimental_closedBy", false],
     ["with experimental_closedBy", true],
@@ -978,7 +980,7 @@ describe("non-modal lightDismiss: a Trigger click while open (browser, #116)", (
 // reach. A foreign `request-close` / `close` invoker is library-owned (design 2.3: the command is
 // cancelled, the same awaited dispatch as the Close part); a non-modal dialog without
 // `lightDismiss` ignores an outside press (7); its Close part is awaited like the modal one.
-describe("a real press while open: foreign invokers and non-modal (browser, #117)", () => {
+describe("a real press while open: foreign invokers and non-modal", () => {
   let restoreAct: (() => void) | undefined;
 
   afterEach(async () => {

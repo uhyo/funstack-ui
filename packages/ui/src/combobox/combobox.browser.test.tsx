@@ -279,7 +279,8 @@ describe("Combobox (browser)", () => {
       expect(input()).not.toHaveAttribute("aria-activedescendant");
     });
 
-    it("aria-expanded on the Input is false right after Escape, while a slow notification runs (#118)", async () => {
+    // #118
+    it("aria-expanded on the Input is false right after Escape, while a slow notification runs", async () => {
       const work = deferred();
       const openAction = vi.fn<OpenAction>(async (next) => {
         if (!next) await work.promise;
@@ -385,7 +386,7 @@ describe("Combobox (browser)", () => {
   // `pointerup` (the click runs in the same task), so the typed text survives on every engine
   // however long the press is held. The listbox itself closes by light dismiss (browser-owned):
   // the label is outside the popup.
-  describe("a press on a label is not focus loss (#111)", () => {
+  describe("a press on a label is not focus loss", () => {
     function InField({ root }: HarnessProps) {
       return (
         <Field.Root>
@@ -1011,7 +1012,7 @@ describe("ViewTransition (browser)", () => {
 // not a light dismiss; the click's `requestClose` is the single source of the close. Real mouse
 // input (`mouse.down` / `mouse.up`), outside React's act environment so the timing is real. No
 // engine branch: WebKit is verified by its CI job.
-describe("Trigger close (#112, browser)", () => {
+describe("Trigger close", () => {
   let restoreAct: () => void;
 
   beforeEach(() => {
@@ -1252,7 +1253,7 @@ describe("Trigger close (#112, browser)", () => {
 // nesting, touch and the drag-selection (whose Firefox cost the design documents). The plain
 // press is #117's row ("a real press while open", below). Outside React's act environment, as
 // #117's rows.
-describe("Input press (#123, browser)", () => {
+describe("Input press", () => {
   let restoreAct: (() => void) | undefined;
 
   afterEach(async () => {
@@ -1365,7 +1366,8 @@ describe("Input press (#123, browser)", () => {
   // and the selection collapses at the press point. Chromium's selection drag ignores pointer
   // capture; WebKit is expected to behave like Chromium. No feature check fits a drag, hence the
   // engine name. If this branch starts failing, Gecko changed: re-check the amendment.
-  it("a drag from the second to the eighth character: selects [2, 8] (Firefox: [2, 2], #123's cost); the listbox stays", async () => {
+  // Firefox's [2, 2] is #123's cost
+  it("a drag from the second to the eighth character: selects [2, 8] (Firefox: [2, 2]); the listbox stays", async () => {
     const openAction = vi.fn<OpenAction>();
     await openWithText({ openChangeAction: openAction });
     openAction.mockClear();
@@ -1418,7 +1420,7 @@ describe("Input press (#123, browser)", () => {
   // frame, so the frame branch is what runs here; it asserts the documented close, and fails the
   // day Chromium changes.
   it.runIf(browserName === "chromium")(
-    "a touch tap on the input (CDP): the listbox stays (Chromium in a frame: dismissed, #124), focus and text kept",
+    "a touch tap on the input (CDP): the listbox stays (Chromium in a frame: dismissed), focus and text kept",
     async () => {
       const openAction = vi.fn<OpenAction>();
       const valueAction = vi.fn<ValueAction>();
@@ -1532,7 +1534,7 @@ function createSearch() {
 // #117: a real press on each part of design 5.4's closing table while the listbox is open, outside
 // React's act environment so the engine's focus, light dismiss and `toggle` tasks interleave with
 // React's work as on a page. The Trigger is #112's describe above and the labels #111's.
-describe("a real press while open (#117, browser)", () => {
+describe("a real press while open", () => {
   let restoreAct: (() => void) | undefined;
 
   afterEach(async () => {
@@ -1720,7 +1722,7 @@ describe("a real press while open (#117, browser)", () => {
 // listbox as `"activate"` with the text untouched (design 5.4, conventions 3.5). Without the guard
 // Chromium and Firefox (and Playwright's Linux WebKit, which focuses a clicked button) hid it at
 // the press as `"dismiss"`, reverted the text, and the click's toggle re-showed it.
-describe("a press on a foreign invoker while shown (#126, browser)", () => {
+describe("a press on a foreign invoker while shown", () => {
   let restoreAct: (() => void) | undefined;
 
   afterEach(async () => {

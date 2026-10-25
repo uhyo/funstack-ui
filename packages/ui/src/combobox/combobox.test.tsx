@@ -1459,7 +1459,7 @@ describe("Combobox", () => {
 
     // #111: focus moving to <body> during a press is decided one task after the release, when
     // the click has run (a `<label for>` refocuses the input there).
-    describe("focus to nowhere during a press (#111)", () => {
+    describe("focus to nowhere during a press", () => {
       it("waits for the release: a press that refocuses the input keeps the text", async () => {
         const action = vi.fn<ValueAction>();
         const user = setupUser();
@@ -1975,7 +1975,8 @@ describe("Combobox", () => {
     });
   });
 
-  describe("disabled on component renders (#83, design/components/button.md 17.3)", () => {
+  // #83
+  describe("disabled on component renders (design/components/button.md 17.3)", () => {
     function Box({
       disabled,
       render: element,
@@ -2047,7 +2048,7 @@ describe("Combobox", () => {
 
   // Design 12.1 Trigger row (#112). The popover shim never light-dismisses, so the browser rows
   // ("Trigger close") are the ones that prove a press is not a light dismiss.
-  describe("Trigger close (#112)", () => {
+  describe("Trigger close", () => {
     it("a <button> Trigger names the Popup as its invoker after mount, never in the server HTML", () => {
       const html = renderToString(<Harness />);
       const server = document.createElement("div");
@@ -2254,7 +2255,8 @@ describe("Combobox", () => {
       expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[true, "activate"]]);
     });
 
-    it("a dismissal: not expanded once the listbox is hidden, while the notification runs (#118)", async () => {
+    // #118
+    it("a dismissal: not expanded once the listbox is hidden, while the notification runs", async () => {
       const close = deferred();
       const openAction = vi.fn<OpenAction>((next) => (next ? undefined : close.promise));
       render(<Harness root={{ openChangeAction: openAction }} />);
@@ -2278,7 +2280,8 @@ describe("Combobox", () => {
       expect(trigger()).not.toHaveAttribute("aria-expanded");
     });
 
-    it("a dismissal entangled with an unrelated pending action: not expanded meanwhile (#118)", async () => {
+    // #118
+    it("a dismissal entangled with an unrelated pending action: not expanded meanwhile", async () => {
       const save = deferred();
       const openAction = vi.fn<OpenAction>();
       render(<Harness root={{ openChangeAction: openAction }} />);
@@ -2328,7 +2331,8 @@ describe("Combobox", () => {
     });
   });
 
-  describe("foreign popovertarget invoker (#125)", () => {
+  // #125
+  describe("foreign popovertarget invoker", () => {
     it("a close that moves no focus is 'activate' with the ToggleEvent", async () => {
       const openAction = vi.fn<OpenAction>();
       const user = setupUser();
@@ -2351,7 +2355,8 @@ describe("Combobox", () => {
     });
   });
 
-  describe("a press on a foreign invoker of the shown listbox (#126)", () => {
+  // #126
+  describe("a press on a foreign invoker of the shown listbox", () => {
     // The Popup's document capture `mousedown` guard: the input keeps focus, so its focusout never
     // pre-empts the click's own toggle and the text is left alone (design 5.4, conventions 3.5).
     it("a popovertarget or commandfor button: prevented while shown, the input keeps focus", async () => {
@@ -2450,7 +2455,8 @@ describe("Combobox", () => {
     });
   });
 
-  describe("Input press (#123)", () => {
+  // #123
+  describe("Input press", () => {
     // `source` is no light-dismiss exemption: a primary press on the field while the listbox is
     // shown captures the pointer to the Popup, so the release is not a light dismiss (design 5.4).
     // The real-pointer outcome is in combobox.browser.test.tsx; these rows pin the call.

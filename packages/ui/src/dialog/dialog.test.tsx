@@ -240,7 +240,8 @@ describe("Dialog", () => {
       expect(isModal(popup())).toBe(false);
     });
 
-    it("a foreign close command at a closed dialog leaves no close intent (#125 review F2)", async () => {
+    // #125 review F2
+    it("a foreign close command at a closed dialog leaves no close intent", async () => {
       const user = setupUser();
       let ctx: { takeCloseIntent: () => unknown } | null = null;
       function Probe() {
@@ -678,7 +679,7 @@ describe("Dialog", () => {
       ["without experimental_closedBy", false],
       ["with experimental_closedBy (JS fallback)", true],
     ])(
-      "non-modal: a Trigger click while open is a dismissal (%s, #116)",
+      "non-modal: a Trigger click while open is a dismissal (%s)",
       async (_label, experimental_closedBy) => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
@@ -714,7 +715,7 @@ describe("Dialog", () => {
       ["without experimental_closedBy", false],
       ["with experimental_closedBy (JS fallback)", true],
     ])(
-      "non-modal JS-free: a Trigger click while open closes it and does not re-open (%s, #116)",
+      "non-modal JS-free: a Trigger click while open closes it and does not re-open (%s)",
       async (_label, experimental_closedBy) => {
         const user = setupUser();
         render(
@@ -741,7 +742,8 @@ describe("Dialog", () => {
       },
     );
 
-    it("non-modal JS-free: keyboard activation of the Trigger while open does nothing (#116)", async () => {
+    // #116
+    it("non-modal JS-free: keyboard activation of the Trigger while open does nothing", async () => {
       const user = setupUser();
       render(<Harness mode="static" modal={false} popup={{ lightDismiss: true }} />);
       await user.click(trigger());
@@ -755,7 +757,8 @@ describe("Dialog", () => {
       expect(show).not.toHaveBeenCalled();
     });
 
-    it("non-modal JS-free: a press on the open dialog's Trigger released elsewhere swallows no later keyboard open (#116)", async () => {
+    // #116
+    it("non-modal JS-free: a press on the open dialog's Trigger released elsewhere swallows no later keyboard open", async () => {
       const user = setupUser();
       render(<Harness mode="static" modal={false} />);
       await user.click(trigger());

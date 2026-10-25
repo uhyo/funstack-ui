@@ -322,7 +322,8 @@ describe("placement (browser)", () => {
   });
 });
 
-describe("direction (browser, wave 11, #88)", () => {
+// wave 11, #88
+describe("direction", () => {
   // The popup's computed direction picks the edge at the point (context-menu.md 4.6): in RTL the
   // menu's right edge sits at the point and the fallbacks mirror. Insets, so Mozilla 2019601
   // does not apply: no engine branch.
@@ -935,7 +936,8 @@ function watchGestureTime() {
   };
 }
 
-describe("press-drag-release (browser, wave 11, #88)", () => {
+// wave 11, #88
+describe("press-drag-release", () => {
   // context-menu.md 2.6. Linux CI fires `contextmenu` on the right-button press, so the menu
   // opens with the button down and the popup holds the capture for the rest of the gesture.
   function DragItems({ archive }: { archive: () => void }) {
@@ -1130,7 +1132,8 @@ describe("press-drag-release (browser, wave 11, #88)", () => {
   );
 });
 
-describe("touch offset (browser, wave 11, #88)", () => {
+// wave 11, #88
+describe("touch offset", () => {
   async function longPressAt(x: number, y: number) {
     await act(async () => {
       region().dispatchEvent(
@@ -1178,7 +1181,8 @@ describe("touch offset (browser, wave 11, #88)", () => {
   });
 });
 
-describe("scrolling (browser, wave 11, #88)", () => {
+// wave 11, #88
+describe("scrolling", () => {
   // A page taller than the viewport; the region is fixed, so a wheel over it scrolls the document.
   function ScrollPage(props: HarnessProps) {
     return (

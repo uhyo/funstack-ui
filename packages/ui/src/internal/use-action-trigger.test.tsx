@@ -94,7 +94,8 @@ describe("useActionTrigger: ignoreWhilePending: false (the continuous controls)"
     expect(pending()).toBe("false");
   });
 
-  it("a superseded rejection still reaches the boundary (moved from the Close / Item rows, #81)", async () => {
+  // moved from the Close / Item rows, #81
+  it("a superseded rejection still reaches the boundary", async () => {
     silenceErrors();
     const caught = vi.fn();
     const { hook } = setup({ ignoreWhilePending: false }, caught);

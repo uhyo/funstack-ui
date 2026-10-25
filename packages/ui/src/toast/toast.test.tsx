@@ -249,7 +249,8 @@ describe("Toast", () => {
       expect(region()).toHaveAttribute("data-empty", "");
     });
 
-    it("a dismissed toast that never rendered leaves at once, never as an ending Root (#63 L5)", async () => {
+    // #63 L5
+    it("a dismissed toast that never rendered leaves at once, never as an ending Root", async () => {
       const seen = new Set<string>();
       const closeAction = vi.fn();
       render(
@@ -846,7 +847,8 @@ describe("Toast", () => {
   // Action never has two of its own runs in flight (#79, #81). These rows replace them
   // (design/components/button.md 16.4 T1, T2, T4).
   describe("re-entry", () => {
-    it("T1: a second Undo click while pending is ignored and cancelled; one dispatch, one close", async () => {
+    // T1
+    it("a second Undo click while pending is ignored and cancelled; one dispatch, one close", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
       const d = deferred();
       const undo = vi.fn(() => d.promise);
@@ -888,7 +890,8 @@ describe("Toast", () => {
       expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
 
-    it("T2: two clicks in one task dispatch once; its rejection reaches the boundary, the toast stays", async () => {
+    // T2
+    it("two clicks in one task dispatch once; its rejection reaches the boundary, the toast stays", async () => {
       silenceErrors();
       const errors: unknown[] = [];
       const d = deferred();
@@ -922,7 +925,8 @@ describe("Toast", () => {
       expect(last?.toasts.map((t) => [t.id, t.ending])).toEqual([[id, false]]);
     });
 
-    it("T2: closeOnSettle={false}, an ignored second click, then a rejection: one error", async () => {
+    // T2
+    it("closeOnSettle={false}, an ignored second click, then a rejection: one error", async () => {
       silenceErrors();
       const errors: unknown[] = [];
       const d = deferred();
@@ -955,7 +959,8 @@ describe("Toast", () => {
       expect(errors).toEqual([failure]);
     });
 
-    it("T4: a render element's aria-disabled is removed while the Action is idle (owned)", async () => {
+    // T4
+    it("a render element's aria-disabled is removed while the Action is idle (owned)", async () => {
       render(
         <Harness
           manager={manager}
@@ -1249,7 +1254,8 @@ describe("Toast", () => {
       expect(queryRoot(id)).toBeNull();
     });
 
-    it("a hover pause ends when the region empties under the pointer (#63 L3)", async () => {
+    // #63 L3
+    it("a hover pause ends when the region empties under the pointer", async () => {
       render(<Harness manager={manager} />);
       const a = await call(() => manager({ title: "A", duration: 1000 }));
       act(() => {
@@ -1393,7 +1399,8 @@ describe("Toast", () => {
       expect(root(ids[0]!)).toHaveFocus();
     });
 
-    it("leaves ArrowDown / ArrowUp to an element inside a toast that uses them itself (#113 A3)", async () => {
+    // #113 A3
+    it("leaves ArrowDown / ArrowUp to an element inside a toast that uses them itself", async () => {
       const user = setupUser();
       const list = ({ toasts }: ToastViewportState) =>
         toasts.map((t) =>
@@ -2048,7 +2055,8 @@ describe("Toast", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("another Toast.Viewport"));
     });
 
-    it("two Viewports mounted in one commit: the second region is never shown (#63 L8)", async () => {
+    // #63 L8
+    it("two Viewports mounted in one commit: the second region is never shown", async () => {
       silenceErrors();
       await call(() => manager({ title: "Early", duration: null }));
       const show = vi.spyOn(HTMLElement.prototype, "showPopover");
@@ -2068,7 +2076,8 @@ describe("Toast", () => {
       expect(show.mock.contexts).toEqual([screen.getByTestId("one")]);
     });
 
-    it("a manager prop change swaps the queues without mixing them (#63 L2)", async () => {
+    // #63 L2
+    it("a manager prop change swaps the queues without mixing them", async () => {
       const other = createToastManager();
       // `other` holds a toast retained from an earlier Viewport.
       const earlier = render(<Harness manager={other} />);
@@ -2258,7 +2267,8 @@ describe("Toast", () => {
       expect(region().matches(":popover-open")).toBe(true);
     });
 
-    it("a move into a modal Dialog ends the hover pause (#63 L3)", async () => {
+    // #63 L3
+    it("a move into a modal Dialog ends the hover pause", async () => {
       const user = setupUser();
       render(<Harness manager={manager} before={<WithDialog />} />);
       await call(() => manager({ title: "A", duration: null }));

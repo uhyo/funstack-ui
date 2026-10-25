@@ -929,7 +929,8 @@ describe("Menu.Item actions", () => {
     });
   });
 
-  describe("re-entry (#81, design/components/button.md 16.4)", () => {
+  // #81
+  describe("re-entry (design/components/button.md 16.4)", () => {
     it("a second Enter, Space and click while pending are ignored and cancelled; one close", async () => {
       const user = setupUser();
       const work = deferred();
@@ -1422,7 +1423,8 @@ describe("Menu.RadioGroup", () => {
       );
     }
 
-    it("RadioItem state carries the item's value (#113 API2)", () => {
+    // #113 API2
+    it("RadioItem state carries the item's value", () => {
       const className = vi.fn((s: MenuRadioItemState) => `radio-${s.value}`);
       render(
         <Harness
@@ -1757,7 +1759,8 @@ describe("Menu.Root", () => {
     expect(isOpen()).toBe(true);
   });
 
-  it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent (#125)", async () => {
+  // #125
+  it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent", async () => {
     const action = vi.fn<OpenAction>();
     render(<Harness root={{ openChangeAction: action }} />);
     fireEvent.click(trigger());
@@ -1865,7 +1868,8 @@ describe("Menu.Root", () => {
     );
   });
 
-  it("warns for a non-button Trigger: its close while open is a light dismiss (#115)", () => {
+  // #115
+  it("warns for a non-button Trigger: its close while open is a light dismiss", () => {
     const error = silenceErrors();
     render(
       <Menu.Root>
@@ -1881,7 +1885,8 @@ describe("Menu.Root", () => {
     expect(warning).toContain("closes it through light dismiss before the click");
   });
 
-  it("warns for a non-button SubmenuTrigger: a press while open dismisses the submenu (#115)", async () => {
+  // #115
+  it("warns for a non-button SubmenuTrigger: a press while open dismisses the submenu", async () => {
     const user = setupUser();
     const error = silenceErrors();
     render(
@@ -1918,7 +1923,8 @@ describe("submenus", () => {
   }
   const sub = () => screen.getByTestId("subpopup");
 
-  describe("resolved placement (wave 11)", () => {
+  // wave 11
+  describe("resolved placement", () => {
     // Conventions 13.2: `getComputedStyle` stubbed for one popup (jsdom has no layout); the
     // shim's `toggle` drives the hook.
     it("the top-level popup: requested while closed, the stubbed pair while shown, requested after", async () => {
@@ -2300,7 +2306,8 @@ describe("submenus", () => {
     expect(isOpen()).toBe(true);
   });
 
-  describe("a press on a foreign invoker of the open menu (#126)", () => {
+  // #126
+  describe("a press on a foreign invoker of the open menu", () => {
     // The root Popup's document capture `mousedown` guard: the press moves no focus, so the
     // focusout never pre-empts the click's own toggle (design 2.2, conventions 3.5).
     function foreignInvoker(attributes: Record<string, string>) {
@@ -2357,7 +2364,8 @@ describe("submenus", () => {
     });
   });
 
-  describe("a Trigger click while open closes through the action (#110)", () => {
+  // #110
+  describe("a Trigger click while open closes through the action", () => {
     async function setup(boundary?: (error: unknown) => void) {
       const user = setupUser();
       const work = deferred();

@@ -1232,7 +1232,8 @@ describe("Menu.ContextTrigger", () => {
     });
   });
 
-  describe("direction (wave 11, #88)", () => {
+  // wave 11, #88
+  describe("direction", () => {
     // The popup's computed direction, read by `openAt` once per open and per move, picks the
     // edge at the point (context-menu.md 4.6). jsdom computes `direction` from `dir` for nothing,
     // so it is stubbed for the popup.
@@ -1382,7 +1383,8 @@ describe("Menu.ContextTrigger", () => {
     });
   });
 
-  describe("touch offset (wave 11, #88)", () => {
+  // wave 11, #88
+  describe("touch offset", () => {
     // A touch or pen open is placed above the point with `--menu-point-gap` (4.7).
     const ABOVE = "calc(100% - var(--menu-point-y) + var(--menu-point-gap))";
     const BELOW = "calc(var(--menu-point-y) + var(--menu-point-gap))";
@@ -1486,7 +1488,8 @@ describe("Menu.ContextTrigger", () => {
     });
   });
 
-  describe("press-drag-release (wave 11, #88)", () => {
+  // wave 11, #88
+  describe("press-drag-release", () => {
     // context-menu.md 2.6. jsdom has no `elementFromPoint` and no pointer capture: the hit is
     // stubbed per test, and the events the captured pointer would deliver are dispatched at the
     // popup. The clock is `performance.now()`.
@@ -1918,7 +1921,8 @@ describe("Menu.ContextTrigger", () => {
     });
   });
 
-  describe("close-on-scroll and the wheel guard (wave 11, #88)", () => {
+  // wave 11, #88
+  describe("close-on-scroll and the wheel guard", () => {
     const scroll = (target: EventTarget) => {
       act(() => {
         // `scroll` does not bubble; the library listens in the capture phase.
@@ -2065,7 +2069,8 @@ describe("Menu.ContextTrigger", () => {
     });
   });
 
-  describe("CSP (wave 11, #88)", () => {
+  // wave 11, #88
+  describe("CSP", () => {
     // React records a hoisted style per document and never removes it: each row renders into a
     // document of its own (renderFresh).
 

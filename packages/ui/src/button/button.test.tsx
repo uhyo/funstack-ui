@@ -93,7 +93,8 @@ describe("Button", () => {
       expect(button("E")).toHaveAttribute("type", "submit");
     });
 
-    it("a component render element gets type=button and does not submit a form (review item 2)", async () => {
+    // review item 2
+    it("a component render element gets type=button and does not submit a form", async () => {
       function MyButton(props: ComponentPropsWithRef<"button">) {
         return <button {...props} className="my" />;
       }
@@ -116,7 +117,8 @@ describe("Button", () => {
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
-    it("disabled on a component render element: aria-disabled, no disabled (review fold F1)", async () => {
+    // review fold F1
+    it("disabled on a component render element: aria-disabled, no disabled", async () => {
       const action = vi.fn();
       render(
         <Button disabled action={action} render={<PlainButton />}>

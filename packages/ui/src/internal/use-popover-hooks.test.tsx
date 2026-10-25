@@ -125,7 +125,8 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
   });
 
-  it("a non-button render is no invoker and renders aria-expanded from the shown popup (#121)", async () => {
+  // #121
+  it("a non-button render is no invoker and renders aria-expanded from the shown popup", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {}); // the non-button warning
     const user = setupUser();
     render(<Mini link />);
@@ -219,7 +220,8 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
-  it("useOverlayRoot returns the same value across re-renders with unchanged state (#48)", async () => {
+  // #48
+  it("useOverlayRoot returns the same value across re-renders with unchanged state", async () => {
     const user = setupUser();
     const values: PopoverRootValue[] = [];
     const first = vi.fn();

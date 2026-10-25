@@ -297,11 +297,12 @@ describe("Toggle", () => {
       expect(action).toHaveBeenCalledTimes(1);
     });
 
+    // #83
     it.each([
       ["a link", <a key="link" href="#x" />],
       ["a component", <MyButton key="component" />],
     ] as const)(
-      "disabled with %s render: aria-disabled, no native disabled, the click is cancelled (#83)",
+      "disabled with %s render: aria-disabled, no native disabled, the click is cancelled",
       async (_, element) => {
         const action = vi.fn();
         render(
@@ -321,7 +322,8 @@ describe("Toggle", () => {
       },
     );
 
-    it("disabled with a host <button> render or none: native disabled, no aria-disabled (#83)", () => {
+    // #83
+    it("disabled with a host <button> render or none: native disabled, no aria-disabled", () => {
       render(
         <>
           <Toggle disabled render={<button />}>
@@ -337,7 +339,8 @@ describe("Toggle", () => {
       }
     });
 
-    it("a host <button> render keeps its own aria-disabled: the key is not owned there (#83)", () => {
+    // #83
+    it("a host <button> render keeps its own aria-disabled: the key is not owned there", () => {
       render(
         <>
           <Toggle render={<button aria-disabled="true" />}>A</Toggle>
@@ -350,7 +353,8 @@ describe("Toggle", () => {
       expect(screen.getByRole("button", { name: "B" })).toHaveAttribute("aria-disabled", "true");
     });
 
-    it("a component render gets `disabled` owned as absent: an own undefined key (#83)", () => {
+    // #83
+    it("a component render gets `disabled` owned as absent: an own undefined key", () => {
       const received: ComponentPropsWithRef<"button">[] = [];
       function Spy(props: ComponentPropsWithRef<"button">) {
         received.push(props);
