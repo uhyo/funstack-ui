@@ -62,4 +62,7 @@ addendum below for their status.
 - 3c058ee: Select page splits `Select.Separator` into its own table (`stylingProps` +
   `renderProp("hr")`, "Takes no children"); GroupLabel uses `renderProp("legend")`. Docs
   typecheck and format check pass.
-- Findings 1-3 above were sent to dev-137 after 2f5ee32; not yet addressed at 9ce77c8.
+- Findings 1-3 above: fixed in 2bdfedf (comment-only diff, re-reviewed): Field.Control
+  `@defaultValue \`false\`` with the "explicit `false` does not override the Field" note; Toast
+  title/description wording; `SliderLabelProps` "Props of" + `@see`. Final verdict at 2bdfedf:
+  **acceptable**, no open items.
