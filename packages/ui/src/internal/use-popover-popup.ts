@@ -37,8 +37,8 @@ export interface UsePopoverPopupOptions {
   /**
    * Installs listeners that live while the popup is shown (Menu: the outside right-click
    * listeners; Menu and Combobox: the foreign invoker press guard) and returns their cleanup.
-   * Called at the `toggle` that finds the popup shown; the cleanup runs at the `toggle` of the
-   * close and when the element detaches.
+   * Called at the `toggle` that finds the popup shown, and again when the ref attaches to a
+   * shown popup; the cleanup runs at the `toggle` of the close and when the element detaches.
    */
   readonly whileShown?: ((popup: HTMLElement) => () => void) | undefined;
   /**
@@ -394,6 +394,7 @@ export function usePopoverPopup(
   // effect publishes them before refs attach and before any layout effect (whose
   // `hidePopover()` dispatches `beforetoggle` synchronously).
   const handlers = useLatest({ onBeforeToggle, onToggle, onCommand, onInterest, onLoseInterest });
+  const latestWhileShown = useLatest(options.whileShown);
 
   // --- Element ------------------------------------------------------------------------------
 
@@ -425,6 +426,11 @@ export function usePopoverPopup(
       // A pre-hydration open is shown from the first commit; a popup removed while open fires no
       // `toggle`, so the detach clears the mirror.
       if (isLibrary) setShown(isPopoverOpen(element));
+      // The ref re-runs whenever the merged ref changes (an inline consumer `ref`), and its detach
+      // stopped the listeners: a popup that is still shown gets them back, as no `toggle` comes.
+      if (isPopoverOpen(element)) {
+        stopWhileShown.current ??= latestWhileShown.current?.(element) ?? null;
+      }
 
       let autofocused: HTMLElement | null = null;
       if (!isLibrary && initialFocus !== undefined) {
@@ -448,7 +454,7 @@ export function usePopoverPopup(
         if (popupRef.current === element) popupRef.current = null;
       };
     },
-    [checkElement, popupRef, setShown, handlers, isLibrary, initialFocus],
+    [checkElement, popupRef, setShown, handlers, latestWhileShown, isLibrary, initialFocus],
   );
 
   // Development check (design 9): a `dialog`, `alertdialog` or `menu` role needs a name once the

@@ -2455,6 +2455,23 @@ describe("right- and middle-click (context-menu.md 5, every menu)", () => {
     ]);
   });
 
+  it("an inline Popup ref re-run by a re-render while open keeps the outside listeners and the invoker guard", async () => {
+    const user = setupUser();
+    // A fresh callback ref every render: React detaches and re-attaches the Popup's ref.
+    const popupProps = (): MenuPopupProps => ({ ref: (element) => void element });
+    const { rerender } = render(<Harness popup={popupProps()} />);
+    await openMenu(user);
+    rerender(<Harness popup={popupProps()} />);
+    expect(isOpen()).toBe(true);
+    const foreign = screen.getByTestId("elsewhere");
+    foreign.setAttribute("popovertarget", popup().id);
+    expect(fireEvent.mouseDown(foreign, { button: 0 })).toBe(false);
+    act(() => {
+      foreign.dispatchEvent(contextMenuEvent());
+    });
+    expect(isOpen()).toBe(false);
+  });
+
   it("a Trigger-opened menu closes on a middle-button pointerdown outside", async () => {
     const user = setupUser();
     render(<Harness />);

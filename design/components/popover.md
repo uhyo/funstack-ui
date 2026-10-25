@@ -1503,7 +1503,8 @@ library open, no `cause` argument since the open cause is Menu's own ref; it ret
 `null`, or a `QuietFocusTarget` `{ element, focusVisible: false }` that is focused with
 `focus({ focusVisible: false })` after `showPopover()` where the option is implemented (6.1);
 `whileShown(popup)` installs listeners that live while the popup is shown and returns their
-cleanup: called at the `toggle` that finds the popup shown, cleaned up at the closing `toggle` and
+cleanup: called at the `toggle` that finds the popup shown, and reinstalled when the ref attaches to
+a shown popup (a ref re-run, an inline consumer `ref`), cleaned up at the closing `toggle` and
 when the element detaches (Menu: the outside listeners and the foreign-invoker press guard;
 Combobox: the guard; #129, replacing the `onToggle` / `onBeforeToggle` callbacks). The
 `focusVisible` probe behind `QuietFocusTarget` lives in `internal/focus-visible.ts` (#129); event

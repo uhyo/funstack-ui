@@ -1,7 +1,8 @@
 // The extension points of the shared popover hooks that Menu (#39, design/components/menu.md 14)
 // uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, a
 // `<div popover>` popup (no dialog focusing steps), `renderContent` with a Menu-style
-// `requestClose`, and `whileShown` (Menu and Combobox). Popover's own behaviour is covered by src/popover/popover.test.tsx.
+// `requestClose`, and `whileShown` (Menu and Combobox). Popover's own behaviour is covered by
+// src/popover/popover.test.tsx.
 import { render, screen } from "@testing-library/react";
 import type { ComponentPropsWithRef, Ref, ViewTransitionClass } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -17,12 +18,15 @@ function Mini({
   resolve,
   transition,
   whileShown,
+  inlineRef = false,
   link = false,
 }: {
   onDispatch?: (next: boolean, details: OverlayDetails) => void;
   resolve?: (popup: HTMLElement) => HTMLElement | null;
   transition?: ViewTransitionClass;
   whileShown?: (popup: HTMLElement) => () => void;
+  /** Pass the Popup a fresh callback ref every render (an inline consumer `ref`). */
+  inlineRef?: boolean;
   /** Render the Trigger as a link (no invoker) instead of a `<button>`. */
   link?: boolean;
 }) {
@@ -72,7 +76,7 @@ function Mini({
         popover="auto"
         role="menu"
         aria-label="Mini"
-        ref={setElement as Ref<HTMLDivElement>}
+        ref={inlineRef ? (element: HTMLDivElement) => setElement(element) : setElement}
         data-testid="popup"
       >
         {renderContent(() => (
@@ -178,6 +182,29 @@ describe("shared popover hooks: Menu's extension points", () => {
     await flushTasks();
     expect(stop).toHaveBeenCalledTimes(1);
     expect(whileShown).toHaveBeenCalledTimes(1);
+  });
+
+  it("whileShown is reinstalled when an inline ref re-runs on a shown popup", async () => {
+    const user = setupUser();
+    // How many installs are live: every ref re-run stops and reinstalls, so only the balance and
+    // the growth of the install count are fixed.
+    let active = 0;
+    const whileShown = vi.fn((_popup: HTMLElement) => {
+      active++;
+      return () => void active--;
+    });
+    const { rerender } = render(<Mini whileShown={whileShown} inlineRef />);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(active).toBe(1);
+    const installs = whileShown.mock.calls.length;
+    rerender(<Mini whileShown={whileShown} inlineRef />);
+    // The detach stopped the listeners and the attach installed them again.
+    expect(whileShown.mock.calls.length).toBe(installs + 1);
+    expect(active).toBe(1);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(active).toBe(0);
   });
 
   it("whileShown cleans up when the popup unmounts while shown", async () => {
