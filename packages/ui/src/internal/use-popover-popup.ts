@@ -210,14 +210,13 @@ export function usePopoverPopup(
     if (!isLibrary || element === null || !isPopoverOpen(element)) return false;
     // The hide half's `beforetoggle` records `awaitingClose` / `focusWasInside`; the coalesced
     // `toggle` finds the popup open again, so it clears `awaitingClose`, returns no focus and
-    // notifies nothing. The opening flag covers both halves (conventions 3.5, the move).
-    opening.current = true;
+    // notifies nothing. The show half runs under `showPopup`'s opening flag (conventions 3.5, the
+    // move); the hide half needs none, only an opening `beforetoggle` reads it.
     reshowing.current = true;
     try {
       element.hidePopover();
       showPopup(element);
     } finally {
-      opening.current = false;
       reshowing.current = false;
     }
     // Whether or not the engine fires the coalesced `toggle`, the close bookkeeping of the hide
