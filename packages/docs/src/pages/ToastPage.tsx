@@ -254,7 +254,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
           {
             name: "duration",
             type: "number | null",
-            default: "Viewport `duration`; `null` with an `action`",
+            default: "Viewport duration; null with an action",
             description:
               'Milliseconds until the toast closes with `reason: "timeout"`; `null` never. A toast with an `action` is persistent unless you set it; if you do, keep the action reachable elsewhere too (WCAG 2.2.1).',
           },

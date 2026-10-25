@@ -18,6 +18,13 @@ npm install @funstack/ui@alpha
 
 React 19.3 or later is required (`react` and `react-dom` are peer dependencies).
 
+## Using with AI agents
+
+`@funstack/ui` ships an agent skill and its documentation as Markdown. Install the skill with
+`npx -p @funstack/ui@alpha funstack-ui-skill-installer`. The site also serves
+[llms.txt](https://ui.funstack.work/llms.txt), [llms-full.txt](https://ui.funstack.work/llms-full.txt)
+and a `.md` version of every page.
+
 ## Packages
 
 - `packages/ui` — the `@funstack/ui` library

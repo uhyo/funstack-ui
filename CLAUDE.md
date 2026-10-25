@@ -40,6 +40,7 @@ All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and 
 - `pnpm --filter @funstack/ui test:browser:dev` - Browser tests in watch mode with a visible Chromium window
 - `pnpm --filter @funstack/ui exec playwright install chromium firefox webkit` - One-time download of the engine builds the browser tests use (add `--with-deps` to install their system libraries; WebKit needs it on most Linux machines)
 - `pnpm --filter funstack-ui-example dev` - Run the playground dev server
+- `pnpm --filter @funstack/ui pack:check` - Check that the npm tarball has the agent skill (`skills/funstack-ui-knowledge`), the `funstack-ui-skill-installer` bin and the bundled Markdown docs (`dist/docs`); needs a docs build first (also run in CI)
 
 ### Docs site
 
@@ -49,6 +50,8 @@ All of `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test:run`, and 
 - `pnpm --filter docs build` - Static build into `packages/docs/dist/public` (root `pnpm build` includes it)
 - Live examples are files in `src/examples/` that render the real `@funstack/ui` (`workspace:*`) with fake async actions; pages show their source through Vite `?raw` imports, so the code shown is the code running. Examples without `"use client"` (the JS-free Accordion, the Tooltip toolbar) are deliberately Server Components.
 - Props tables are written by hand from the TypeScript declarations in `packages/ui`: update the component page whenever a public prop, state field, data attribute or default changes.
+- Markdown edition (for AI agents): after rendering, `src/build.ts` converts every page with `src/markdown/` (hast/mdast) into `<page>.md` next to its HTML, `llms.txt` and `llms-full.txt` (demo stylesheets left out), plus a copy of the `.md` set in `dist/markdown`. The home page's `index.md` ends with an index of all pages. The build fails on a page without content or description. The converter knows the markup of `src/components` (CodeBlock, Callout, Example, tables): keep them in sync.
+- `pnpm --filter docs test:run` runs the converter's tests (vitest, `vitest.config.ts`; `test:jsdom` is the same, so CI runs them).
 - Deployed to Cloudflare Workers, following the other FUNSTACK repositories:
   - Production: worker `funstack-ui` (`packages/docs/wrangler.toml`) at https://ui.funstack.work, deployed by `.github/workflows/deploy-docs.yml` when a GitHub release is created (or by manual `workflow_dispatch`). It runs `pnpm turbo run build --filter=docs`, then `pnpm wrangler deploy` in `packages/docs`, using the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
   - Dev: worker `funstack-ui-dev` (`packages/docs/wrangler-dev.toml`), deployed on every push by Cloudflare's own Git integration (Workers Builds), configured on the Cloudflare side. Build command (from the repository root): `pnpm install --frozen-lockfile && pnpm turbo run build --filter=docs`; deploy command: `cd packages/docs && npx wrangler deploy -c wrangler-dev.toml`.
@@ -64,7 +67,7 @@ Engine selection: `FUNSTACK_BROWSERS=chromium,firefox,webkit` (any subset) picks
 
 Releases are made with the `release-funstack` skill (`.claude/skills/release-funstack/SKILL.md`): bump `version` in `packages/ui/package.json`, commit `chore: bump version to x.y.z`, then create a GitHub release with tag `x.y.z` (no `v` prefix). Creating the release triggers two workflows:
 
-- `.github/workflows/publish.yml` builds and publishes `@funstack/ui` to npm. Versions containing `-` (for example `0.1.0-alpha.0`) are published under the prerelease name as the dist-tag; others under `latest`.
+- `.github/workflows/publish.yml` builds the docs (and with them `@funstack/ui`), runs `pack:check`, and publishes `@funstack/ui` to npm; `prepack` copies the docs' Markdown edition (`packages/docs/dist/markdown`) into the package as `dist/docs`. Versions containing `-` (for example `0.1.0-alpha.0`) are published under the prerelease name as the dist-tag; others under `latest`.
 - `.github/workflows/deploy-docs.yml` deploys the docs site to the production worker (see Docs site).
 
 Never publish or deploy from a local machine. One-time setup outside the repo:

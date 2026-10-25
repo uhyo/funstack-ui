@@ -27,6 +27,8 @@ export default defineConfig({
     "src/toggle-group/index.ts",
     "src/toolbar/index.ts",
     "src/csp/index.ts",
+    // The `funstack-ui-skill-installer` bin, not a module of the package.
+    "src/bin/skill-installer.ts",
   ],
   format: ["esm"],
   // One output file per source file so that each file's "use client" directive survives
@@ -34,8 +36,12 @@ export default defineConfig({
   unbundle: true,
   dts: true,
   clean: true,
-  // Generates the `exports` map (root entry plus per-component subpaths) from `entry`.
-  exports: true,
+  // Generates the `exports` map (root entry plus per-component subpaths) from `entry`, and the
+  // `bin` field. Without the explicit name, the bin would be named after the package ("ui").
+  exports: {
+    exclude: ["bin/skill-installer"],
+    bin: { "funstack-ui-skill-installer": "./src/bin/skill-installer.ts" },
+  },
   // The directive is preserved in unbundle mode (verified by src/__tests__/directives.test.ts);
   // rolldown's generic "may not be preserved" warning is noise here.
   checks: { moduleLevelDirective: false },

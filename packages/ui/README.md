@@ -32,7 +32,28 @@ import { Toggle } from "@funstack/ui/toggle";
 <Toggle pressedChangeAction={async (pressed) => await saveFavorite(pressed)}>Favorite</Toggle>;
 ```
 
-Components: `Toggle`, `Tabs`, `Accordion`, `Tooltip`.
+Every component is imported from its own subpath (`@funstack/ui/dialog`, `@funstack/ui/tabs`, …).
+The [documentation](https://ui.funstack.work/) lists every component.
+
+## Using with AI agents
+
+The package ships an agent skill, `funstack-ui-knowledge`, and the full documentation as Markdown
+in `node_modules/@funstack/ui/dist/docs/` (start at `index.md`). Install the skill into your
+project for Claude Code, Cursor, Copilot, Codex and other agents:
+
+```sh
+npx -p @funstack/ui@alpha funstack-ui-skill-installer
+# or
+pnpm dlx --package @funstack/ui@alpha funstack-ui-skill-installer
+# or
+yarn dlx -p @funstack/ui@alpha funstack-ui-skill-installer
+```
+
+Set `SKILL_INSTALL_PATH` (for example `.claude/skills`) to skip the interactive prompt.
+
+The documentation site has the same Markdown at https://ui.funstack.work/llms.txt,
+https://ui.funstack.work/llms-full.txt (every page in one file), and at every page URL with `.md`
+appended (https://ui.funstack.work/components/dialog.md).
 
 ## Browser support
 

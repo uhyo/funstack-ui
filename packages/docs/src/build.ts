@@ -4,6 +4,7 @@ import path from "node:path";
 import type { BuildEntryFunction } from "@funstack/static/server";
 import { checkInternalLinks } from "./checkLinks.js";
 import { collectSitePaths } from "./entries.js";
+import { writeMarkdownEdition } from "./markdown/write.js";
 import { SITE_URL } from "./site.js";
 
 function generateSitemap(): string {
@@ -22,6 +23,8 @@ export default (async ({ build, outDir }) => {
   // Render errors (RSC, deferred components, prerendering) fail the build in @funstack/static
   // itself: `failOnRenderError` is on by default since 1.3.3 (#72).
   await Promise.all([build(), writeFile(path.join(outDir, "sitemap.xml"), generateSitemap())]);
+  // Next to dist/public: the copy that @funstack/ui bundles as dist/docs.
+  await writeMarkdownEdition(outDir, path.join(outDir, "..", "markdown"));
   const brokenLinks = await checkInternalLinks(outDir);
   if (brokenLinks.length > 0) {
     throw new Error(`Broken internal links:\n${brokenLinks.join("\n")}`);

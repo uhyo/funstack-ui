@@ -21,8 +21,12 @@
     "url": "git+https://github.com/uhyo/funstack-ui.git",
     "directory": "packages/ui"
   },
+  "bin": {
+    "funstack-ui-skill-installer": "./dist/bin/skill-installer.mjs"
+  },
   "files": [
     "dist",
+    "skills",
     "README.md"
   ],
   "type": "module",
@@ -58,12 +62,17 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "prepack": "node scripts/copy-docs.mjs",
+    "pack:check": "node scripts/check-pack.mjs",
     "test": "vitest",
     "test:run": "vitest run",
     "test:jsdom": "vitest run --project jsdom --project jsdom-isolated",
     "test:browser": "vitest run --project browser",
     "test:browser:dev": "vitest --project browser --browser.headless=false",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@funstack/skill-installer": "^1.1.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",
