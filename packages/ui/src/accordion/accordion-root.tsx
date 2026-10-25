@@ -25,7 +25,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { useValueSet } from "../internal/use-value-set.js";
-import { EMPTY_SET, setsEqual, toSet } from "../internal/value-set.js";
+import { EMPTY_SET, setsEqual } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
 import { AccordionRootContext } from "./accordion-context.js";
 import type { AccordionMode, AccordionRootContextValue } from "./accordion-context.js";
@@ -216,6 +216,7 @@ export function AccordionRoot(props: AccordionRootProps) {
     | undefined;
 
   const controlledSet = useValueSet(value);
+  const defaultSet = useValueSet(defaultValue);
 
   const items = useRef(new Map<HTMLDetailsElement, string>());
   const triggers = useRef(new Set<HTMLElement>());
@@ -226,7 +227,7 @@ export function AccordionRoot(props: AccordionRootProps) {
     AccordionValueChangeDetails
   >({
     controlled: controlledSet,
-    defaultValue: defaultValue === undefined ? undefined : toSet(defaultValue),
+    defaultValue: defaultSet,
     initialValue: EMPTY_SET,
     action:
       action && ((next, details) => action(fromSet(next, exclusive, registeredValues()), details)),

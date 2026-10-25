@@ -77,20 +77,12 @@ export interface CommitActionDriver<
   /** Elements that carry `data-pending` while gesture `i`'s commit is in flight. */
   pendingOn(i: number): readonly Element[];
   /** The details field naming the part a gesture came from (`null` for platform dispatches). */
-  readonly sourceKey: string;
+  readonly sourceKey: keyof C & keyof M;
   /** Before hydration: makes the server HTML's control hold `v`, as a user would. */
   setPlatformValue(container: HTMLElement, v: V): void;
   /** Leaves an uncommitted edit that a form reset discards (NumberField: a typed draft). */
   openDraft?(): void;
 }
-
-// The suite's rows hold the driver behind this alias so the generic parameters stay internal.
-type AnyDriver<V, C extends ChannelDetails, M extends ChannelDetails, P> = CommitActionDriver<
-  V,
-  C,
-  M,
-  P
->;
 
 export type CommitMode = "uncontrolled" | "adopt" | "commit";
 const modes: readonly CommitMode[] = ["uncontrolled", "adopt", "commit"];
@@ -150,7 +142,9 @@ export function CommitFixture<V, C extends ChannelDetails, M extends ChannelDeta
   boundary,
   retry,
   props: suiteProps,
-}: CommitFixtureProps<V, C, M, P> & { readonly driver: AnyDriver<V, C, M, P> }): ReactNode {
+}: CommitFixtureProps<V, C, M, P> & {
+  readonly driver: CommitActionDriver<V, C, M, P>;
+}): ReactNode {
   const [value, setValue] = useState<V>(initial);
   let props: CommitRootProps<V, C, M>;
   if (mode === "uncontrolled") {
@@ -187,15 +181,14 @@ export function CommitFixture<V, C extends ChannelDetails, M extends ChannelDeta
 }
 
 export function describeCommitAction<V, C extends ChannelDetails, M extends ChannelDetails, P>(
-  driver: AnyDriver<V, C, M, P>,
+  driver: CommitActionDriver<V, C, M, P>,
 ): void {
   type ChangeFn = (next: V, details: C) => unknown;
   type CommitFn = (next: V, details: M) => unknown;
   const { values } = driver;
   const root = () => screen.getByTestId("root");
   const parent = () => screen.getByTestId("parent");
-  const source = (details: ChannelDetails) =>
-    (details as unknown as Record<string, unknown>)[driver.sourceKey];
+  const source = (details: C | M) => details[driver.sourceKey];
 
   function Fixture(props: CommitFixtureProps<V, C, M, P>) {
     return <CommitFixture driver={driver} {...props} />;
@@ -230,7 +223,7 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
     return { first, second, onCommit };
   }
 
-  describe(driver.name, () => {
+  describe(`${driver.name}: commit action conformance`, () => {
     eachCommitMode("steps run in transitions", (mode) => {
       it("an async valueChangeAction is awaited in the step transition: data-pending until it settles", async () => {
         const d = deferred();
