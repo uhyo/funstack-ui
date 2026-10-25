@@ -12,8 +12,14 @@
 // shims stand in for the platform: a dismissal is driven with `requestClose()` / `hidePopover()`,
 // which is what Escape or a light dismiss does.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, useState } from "react";
-import type { ComponentPropsWithRef, ComponentType, ReactElement, ReactNode } from "react";
+import { StrictMode, Suspense, startTransition, useEffect, useState } from "react";
+import type {
+  ComponentPropsWithRef,
+  ComponentType,
+  ReactElement,
+  ReactNode,
+  ViewTransitionClass,
+} from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
 import type { OverlayCloseIntent } from "../internal/use-overlay-root.js";
@@ -138,7 +144,7 @@ export interface OverlaySuiteHarnessProps<D> extends OverlayHarnessProps<D> {
   trigger?:
     | { disabled?: boolean; render?: ReactElement<Partial<ComponentPropsWithRef<"button">>> }
     | false;
-  popup?: { className?: string; keepMounted?: boolean };
+  popup?: { className?: string; keepMounted?: boolean; transition?: ViewTransitionClass };
   /** Popup content; the default renders `data-testid="content"` (and Dialog's Close, value "x"). */
   content?: ReactNode;
 }
@@ -1081,6 +1087,120 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           await flushTasks(2);
           expectShown(kind, true);
         });
+    });
+
+    // The popup's children stay mounted through the close commit unless a `transition` animates
+    // them out (design/components/popover.md 4.4): without one the content is released once the
+    // close event found no exit animation; with one, the old snapshot carries it out.
+    describe("held content (design 4.4)", () => {
+      /**
+       * Reads the DOM when the popup starts to close: its closing `beforetoggle`, which the shims
+       * dispatch synchronously inside the library's close call in the close commit.
+       */
+      function atClose<T>(read: () => T): { readonly value: () => T | undefined } {
+        let value: T | undefined;
+        let seen = false;
+        popup().addEventListener("beforetoggle", (event) => {
+          if (seen || (event as ToggleEvent).newState !== "closed") return;
+          seen = true;
+          value = read();
+        });
+        return { value: () => value };
+      }
+      const committedAndContent = () => [committedText(), content() !== null] as const;
+
+      for (const part of partCloses) {
+        it(`without transition a part-initiated close keeps the children through the close commit${partName(part)}`, async () => {
+          const user = setupUser();
+          render(<Harness mode="uncontrolled" />);
+          await openThroughTrigger(user);
+          const seen = atClose(committedAndContent);
+          await part.close(user);
+          await flushTasks(2);
+          expect(seen.value()).toEqual(["false", true]);
+          expect(isOpen()).toBe(false);
+          // Released after the close event found no exit animation.
+          expect(content()).toBeNull();
+        });
+
+        it(`with transition the children are gone in the close commit${partName(part)}`, async () => {
+          const user = setupUser();
+          render(<Harness mode="uncontrolled" popup={{ transition: "pop" }} />);
+          await openThroughTrigger(user);
+          expect(content()).toBeInTheDocument();
+          const seen = atClose(committedAndContent);
+          await part.close(user);
+          await flushTasks(2);
+          expect(seen.value()).toEqual(["false", false]);
+          expect(isOpen()).toBe(false);
+        });
+
+        it(`keepMounted: the Activity stays visible through the close commit, hidden after${partName(part)}`, async () => {
+          const user = setupUser();
+          render(<Harness mode="uncontrolled" popup={{ keepMounted: true }} />);
+          await openThroughTrigger(user);
+          const seen = atClose(() => content()!.style.display);
+          await part.close(user);
+          await flushTasks(2);
+          expect(seen.value()).not.toBe("none");
+          expect(content()!.style.display).toBe("none");
+        });
+      }
+
+      it("without transition a controlled close keeps the children through the close commit, mounted once", async () => {
+        let setOpen!: (open: boolean) => void;
+        const mounts = vi.fn();
+        function Content() {
+          useEffect(() => mounts(), []);
+          return <span data-testid="content" />;
+        }
+        render(
+          <Harness
+            mode="controlled"
+            initialOpen
+            content={<Content />}
+            outside={(set) => {
+              setOpen = set;
+              return null;
+            }}
+          />,
+        );
+        await flushTasks(2);
+        expect(isOpen()).toBe(true);
+        const seen = atClose(committedAndContent);
+        await act(async () => setOpen(false));
+        expect(seen.value()).toEqual(["false", true]);
+        await flushTasks(2);
+        expect(content()).toBeNull();
+        expect(mounts).toHaveBeenCalledTimes(1);
+      });
+
+      it("a dismissal's notification commit unmounts the children (no exit animation); a re-open mounts them again", async () => {
+        const user = setupUser();
+        render(<Harness mode="uncontrolled" />);
+        await openThroughTrigger(user);
+        await act(async () => dismiss());
+        await flushTasks(2);
+        await flushTasks(2);
+        expect(content()).toBeNull();
+        await openThroughTrigger(user);
+        expect(content()).toBeInTheDocument();
+      });
+
+      it("renders with a `transition` type map", async () => {
+        const user = setupUser();
+        render(
+          <Harness
+            mode="uncontrolled"
+            popup={{ transition: { "fsui-open": "pop-in", default: "none" } }}
+          />,
+        );
+        await openThroughTrigger(user);
+        expect(content()).toBeInTheDocument();
+        await partCloses[0].close(user);
+        await flushTasks(2);
+        expect(isOpen()).toBe(false);
+      });
     });
 
     describe("close intents", () => {

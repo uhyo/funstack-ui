@@ -2445,34 +2445,3 @@ describe("right- and middle-click (context-menu.md 5, every menu)", () => {
     expect(isOpen()).toBe(false);
   });
 });
-
-describe("transition (smoke)", () => {
-  it("with transition the items are gone in the close commit after an activation", async () => {
-    const user = setupUser();
-    render(<Harness popup={{ transition: "menu" }} />);
-    await openMenu(user);
-    let seenItems = -1;
-    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(function (this: HTMLElement) {
-      seenItems = this.querySelectorAll('[role="menuitem"]').length;
-    });
-    await user.click(item("duplicate"));
-    await flushTasks(2);
-    expect(seenItems).toBe(0);
-  });
-
-  it("without transition the items are held through the close commit", async () => {
-    const user = setupUser();
-    render(<Harness />);
-    await openMenu(user);
-    let seenItems = -1;
-    const original = HTMLElement.prototype.hidePopover;
-    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(function (this: HTMLElement) {
-      seenItems = this.querySelectorAll('[role="menuitem"]').length;
-      original.call(this);
-    });
-    await user.click(item("duplicate"));
-    await flushTasks(2);
-    expect(seenItems).toBe(4);
-    expect(popup().children).toHaveLength(0);
-  });
-});

@@ -2,7 +2,7 @@
 // 2.3, 3.4, 4.4, 13.2). The shims and the browser-only rows are described in dialog.test.tsx; the
 // open-state rows every overlay shares are in src/__tests__/overlay-open-state-suite.tsx.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { dispatchCommand } from "../__tests__/dialog-shim.js";
@@ -866,83 +866,9 @@ describe("Dialog", () => {
     });
   });
 
+  // The shared rows are in the open-state suite (overlay-open-state-suite.tsx, "held content");
+  // these need Dialog's `requestClose()` and a stubbed exit animation.
   describe("held content (design 4.4)", () => {
-    /** Records what the DOM looks like when the library calls `close()` in the close commit. */
-    function atClose<T>(read: () => T): { readonly value: () => T | undefined } {
-      let value: T | undefined;
-      const original = HTMLDialogElement.prototype.close;
-      vi.spyOn(HTMLDialogElement.prototype, "close").mockImplementation(function (
-        this: HTMLDialogElement,
-        returnValue?: string,
-      ) {
-        value = read();
-        original.call(this, returnValue);
-      });
-      return { value: () => value };
-    }
-
-    it("without transition a controlled close keeps the children through the close commit", async () => {
-      let setOpen!: (open: boolean) => void;
-      const mounts = vi.fn();
-      function Content() {
-        useEffect(() => mounts(), []);
-        return <span data-testid="content" />;
-      }
-      render(
-        <Harness
-          mode="controlled"
-          initialOpen
-          content={<Content />}
-          outside={(set) => {
-            setOpen = set;
-            return null;
-          }}
-        />,
-      );
-      await flushTasks(2);
-      expect(popup().open).toBe(true);
-      const seen = atClose(() => [committedText(), content() !== null] as const);
-      await act(async () => setOpen(false));
-      expect(seen.value()).toEqual(["false", true]);
-      await flushTasks(2);
-      // Released after the `close` event found no exit animation; never re-mounted.
-      expect(content()).toBeNull();
-      expect(mounts).toHaveBeenCalledTimes(1);
-    });
-
-    it("without transition a Close part's close keeps the children through the close commit", async () => {
-      const user = setupUser();
-      render(<Harness mode="uncontrolled" />);
-      await openThroughTrigger(user);
-      const seen = atClose(() => [committedText(), content() !== null] as const);
-      await user.click(screen.getByTestId("close"));
-      await flushTasks(2);
-      expect(seen.value()).toEqual(["false", true]);
-      expect(content()).toBeNull();
-    });
-
-    it("with transition the children are gone in the close commit", async () => {
-      const user = setupUser();
-      render(<Harness mode="uncontrolled" popup={{ transition: "none" }} />);
-      await openThroughTrigger(user);
-      const seen = atClose(() => [committedText(), content() !== null] as const);
-      await user.click(screen.getByTestId("close"));
-      await flushTasks(2);
-      expect(seen.value()).toEqual(["false", false]);
-      expect(popup().open).toBe(false);
-    });
-
-    it("keepMounted: the Activity stays visible through the close commit, hidden after", async () => {
-      const user = setupUser();
-      render(<Harness mode="uncontrolled" popup={{ keepMounted: true }} />);
-      await openThroughTrigger(user);
-      const seen = atClose(() => content()!.style.display);
-      await user.click(screen.getByTestId("close"));
-      await flushTasks(2);
-      expect(seen.value()).not.toBe("none");
-      expect(content()!.style.display).toBe("none");
-    });
-
     it("a dismissal held for an exit animation is released by a normal update, not a view transition", async () => {
       const calls = vi.fn<() => never>(() => {
         throw new Error("startViewTransition stub");
