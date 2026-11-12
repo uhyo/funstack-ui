@@ -19,7 +19,7 @@
     "@funstack/ui": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "shiki": "^4.5.0"
+    "shiki": "^4.6.0"
   },
   "devDependencies": {
     "@types/hast": "^3.0.5",
