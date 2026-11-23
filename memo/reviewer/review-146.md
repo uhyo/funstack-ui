@@ -66,3 +66,38 @@ documented lifetime). Browser row 24 also polls only the end.
   only when all runs finish, stated), Roadmap breaking entry, SKILL.md, playground. CSS
   `[aria-disabled]:not([data-pending])` in menu.css / menu-demo.css is right (a disabled item never
   pends).
+
+## Re-review of the fixes (803cadc code, d474397 docs), 2026-11-24
+
+Verdict: **merge.** F1 to F4 resolved; one cosmetic stale test comment (below, optional).
+
+- F1 resolved in every mode. `useActionTrigger` keeps only the latest run's continuation
+  (`resolvedThen`, set on resolve only when `id === latest`, cleared by every new run) and runs
+  it from `settled()` when `inFlight` reaches 0. Library Close, JS-free Close (native
+  `close()`/`hidePopover()` now deferred to the last settle), closing Menu.Item and Toast.Action
+  with closeOnSettle all go through it. A rejected latest run leaves `resolvedThen` null, so
+  nothing closes and the fallback renders in the still-open overlay. Pinned: overlay suite
+  (library + JS-free "latest rejects: no close"), menu.test, toast.test, hook row "`then` is the
+  latest run's ...".
+- Older run rejecting after the latest resolved: `reportDropped`, then `settled()` runs the
+  latest's continuation (close) from inside the older run's transition callback. Correct, and
+  pinned (menu.test new row; overlay suite "after the newer run resolved" row asserts reported +
+  closed).
+- Open generation: the guard is inside the stored continuation with the latest run's
+  `generation`, so a dismiss + re-open during the burst still drops it (stale-open row passes).
+- "ignore" mode: one run in flight, so `settled()` drops to 0 at once and runs that run's `then`
+  on resolve exactly as before; rejection path unchanged (rethrow after `settled()`). No regression
+  (all ignore rows pass).
+- Slider / NumberField: their `runStep` calls pass no `then`; only the counter and the error routing
+  are shared, which are unchanged. Suites pass.
+- Mutations: continuation for any resolved run (not only the latest) -> 9 failures; continuation
+  without waiting for inFlight 0 -> 1 failure. The rows pin the rule.
+- Full jsdom run on the branch: all pass except `directives.test.ts` (built-files rows, needs
+  `dist`; environmental in my scratch worktree, unrelated).
+- Docs/design accurate: Dialog/Popover/Menu/Toast rows, Pending & optimistic paragraph, Button
+  held-Enter note, conventions 2.5.1/3.4/item 44, dialog/popover/menu/toast design sections;
+  the "Found in implementation" entanglement text is replaced (kept only as history in
+  parentheses). F2 Toast row fixed; F3 `data-pending` between the two submissions asserted.
+- Nit (optional): `packages/ui/src/__tests__/overlay-close-part-suite.tsx:314` comment "The close
+  the first resolved run requested commits with the end of every run" is stale; the latest run's
+  continuation runs when the last run settles.
