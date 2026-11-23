@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useTransition } from "react";
-import { useSupersededRejection } from "./use-superseded-rejection.js";
+import { reportSuperseded } from "./report-superseded.js";
 
 export interface ActionTriggerOptions {
   /**
@@ -17,13 +17,6 @@ export interface ActionTriggerOptions {
    * pass `false`, because a step is not a re-entry: every step must run.
    */
   readonly ignoreWhilePending?: boolean | undefined;
-  /**
-   * A component with two transition channels (Slider, NumberField) passes one
-   * `useSupersededRejection()` called before both hooks, so a superseded rejection of either
-   * channel is thrown before both `useTransition`s and never waits for the other channel's
-   * pending action. Stable. Default: the hook's own.
-   */
-  readonly captureSuperseded?: ((error: unknown) => void) | undefined;
 }
 
 export interface ActionTrigger {
@@ -32,7 +25,8 @@ export interface ActionTrigger {
   /**
    * Runs `work` inside the part's own transition and, once it resolves, `then` (still inside the
    * transition: a Close part's close, a menu item's close). A rejection skips `then` and reaches
-   * the nearest Error Boundary above the part, also when a later run superseded this one. With
+   * the nearest Error Boundary above the part; a run that a later run superseded passes its
+   * rejection to `reportError` instead (conventions 2.4). With
    * `openGeneration`, `then` is skipped when a newer open of the overlay started after the run
    * began. Returns `false` when the run was ignored (a run is in flight and `ignoreWhilePending`
    * is on, the default), so the part can
@@ -47,17 +41,13 @@ export interface ActionTrigger {
  * while one is in flight is ignored by default (conventions 2.5, design/components/button.md 16).
  *
  * With `ignoreWhilePending: false` (the continuous controls' steps) runs overlap, and the hook
- * surfaces superseded rejections as `useControllableAction` does: React keeps only the newest
- * thenable per `useTransition`, so the rejection of a run that a later run superseded would be
- * dropped. The hook catches it and throws it from render, so it reaches the same boundary as the
- * latest run's rejection does.
+ * handles superseded rejections as `useControllableAction` does: React keeps only the newest
+ * thenable per `useTransition`, so the rejection of a run that a later run superseded reaches no
+ * boundary. The hook passes it to `reportError` (`reportSuperseded`); the latest run's rejection
+ * is rethrown inside the transition and reaches the boundary.
  */
 export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrigger {
   const { openGeneration, ignoreWhilePending = true } = options;
-
-  // Before `useTransition` on purpose (see the hook). Unused (never throws) with an external one.
-  const ownCapture = useSupersededRejection();
-  const captureSuperseded = options.captureSuperseded ?? ownCapture;
 
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
@@ -81,7 +71,7 @@ export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrig
         inFlight.current--;
         // The latest run's rejection takes React's own route to the boundary.
         if (id === latest.current) throw error;
-        captureSuperseded(error);
+        reportSuperseded(error);
         return;
       }
       inFlight.current--;

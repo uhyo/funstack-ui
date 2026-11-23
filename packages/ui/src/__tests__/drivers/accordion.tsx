@@ -94,6 +94,7 @@ export const accordionDriver: ValueActionDriver<string[], AccordionValueChangeDe
     </Accordion.Root>
   ),
   values: [[], ["a"], ["a", "b"], ["b"]],
+  withoutFirstGesture: ["b"],
   gesture: (user, i) => user.click(trigger(MULTIPLE_CLICKS[i]!)),
   detailsFields: (i) => ({ reason: "activate", item: MULTIPLE_CLICKS[i], open: i !== 2 }),
   expectShown,

@@ -1353,9 +1353,10 @@ describe("Menu.CheckboxItem", () => {
     expect(isOpen()).toBe(true);
   });
 
-  it("an older toggle rejecting while a newer one is pending reaches the boundary", async () => {
+  it("an older toggle rejecting while a newer one is pending is reported, not thrown", async () => {
     const user = setupUser();
-    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
     const caught = vi.fn();
     const runs = [deferred(), deferred()];
     let call = 0;
@@ -1374,9 +1375,14 @@ describe("Menu.CheckboxItem", () => {
     await user.click(item("box"));
     await user.click(item("box"));
     expect(item("box")).toHaveAttribute("aria-checked", "false");
-    await act(async () => runs[0]!.reject(new Error("older failed")));
+    const err = new Error("older failed");
+    await act(async () => runs[0]!.reject(err));
     await flushTasks(2);
-    expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older failed" }));
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+    await act(async () => runs[1]!.resolve());
+    await flushTasks(2);
+    expect(caught).not.toHaveBeenCalled();
+    expect(item("box")).toHaveAttribute("aria-checked", "false");
   });
 });
 
@@ -1593,9 +1599,10 @@ describe("Menu.RadioGroup", () => {
     expect(isOpen()).toBe(true);
   });
 
-  it("a superseded rejection reaches the boundary", async () => {
+  it("a superseded rejection is reported, not thrown", async () => {
     const user = setupUser();
-    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
     const caught = vi.fn();
     const runs = [deferred(), deferred()];
     let call = 0;
@@ -1619,9 +1626,13 @@ describe("Menu.RadioGroup", () => {
     await user.click(item("b"));
     await user.click(item("a"));
     await act(async () => runs[1]!.resolve());
-    await act(async () => runs[0]!.reject(new Error("older failed")));
+    const err = new Error("older failed");
+    await act(async () => runs[0]!.reject(err));
     await flushTasks(2);
-    expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older failed" }));
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+    expect(caught).not.toHaveBeenCalled();
+    expect(item("a")).toHaveAttribute("aria-checked", "true");
+    expect(item("b")).toHaveAttribute("aria-checked", "false");
   });
 
   it("a RadioItem outside a RadioGroup throws", () => {

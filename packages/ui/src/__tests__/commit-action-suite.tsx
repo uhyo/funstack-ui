@@ -421,68 +421,49 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
         if (mode !== "uncontrolled") expect(parent()).toHaveTextContent(String(values[4]));
       });
 
-      it("surfaces the superseded commit's rejection", async () => {
-        silenceErrors();
-        const { first, second, onCommit } = sequencedCommits();
-        const caught = vi.fn();
-        const onChange = vi.fn<ChangeFn>();
-        render(
-          <Fixture
-            mode={mode}
-            initial={values[1]}
-            onChange={onChange}
-            onCommit={onCommit}
-            boundary={caught}
-          />,
-        );
-        await gesture(1);
-        await gesture(2);
-        await act(async () => first.reject(new Error("older")));
-        if (mode === "adopt") {
-          // The adopting parent's step updates are entangled with the pending save (React holds a
-          // transition update until every async action in its scope settles), so the boundary's
-          // retry render waits for the newer commit too: the error arrives once it settles.
+      it.each([
+        ["while the newer is pending", false],
+        ["after the newer resolved", true],
+      ] as const)(
+        "reports the superseded commit's rejection %s, not thrown",
+        async (_label, newerFirst) => {
+          const reportError = vi.fn();
+          vi.stubGlobal("reportError", reportError);
+          const { first, second, onCommit } = sequencedCommits();
+          const caught = vi.fn();
+          const onChange = vi.fn<ChangeFn>();
+          render(
+            <Fixture
+              mode={mode}
+              initial={values[1]}
+              onChange={onChange}
+              onCommit={onCommit}
+              boundary={caught}
+            />,
+          );
+          await gesture(1);
+          await gesture(2);
+          if (newerFirst) await act(async () => second.resolve());
+          const err = new Error("older");
+          await act(async () => first.reject(err));
+          expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+          if (!newerFirst) await act(async () => second.resolve());
           expect(caught).not.toHaveBeenCalled();
-        } else {
-          expect(caught).toHaveBeenCalledTimes(1);
-        }
-        await act(async () => second.resolve());
-        expect(caught).toHaveBeenCalledTimes(1);
-        expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
-        // A superseded commit's rejection is no "dismiss" step: only the latest one reverts.
-        expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(0);
-      });
-
-      it("the older rejects after the newer resolved", async () => {
-        silenceErrors();
-        const { first, second, onCommit } = sequencedCommits();
-        const caught = vi.fn();
-        const onChange = vi.fn<ChangeFn>();
-        render(
-          <Fixture
-            mode={mode}
-            initial={values[1]}
-            onChange={onChange}
-            onCommit={onCommit}
-            boundary={caught}
-          />,
-        );
-        await gesture(1);
-        await gesture(2);
-        await act(async () => second.resolve());
-        await act(async () => first.reject(new Error("older")));
-        expect(caught).toHaveBeenCalledTimes(1);
-        expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
-        // A superseded commit's rejection is no "dismiss" step: only the latest one reverts.
-        expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(0);
-      });
+          expect(reportError).toHaveBeenCalledTimes(1);
+          expectNotPending(root());
+          driver.expectShown(values[3]);
+          // A superseded commit's rejection is no "dismiss" step: only the latest one reverts.
+          expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(0);
+        },
+      );
     });
 
     describe("superseded rejection across channels", () => {
-      // Each channel (steps, commits) surfaces the rejection of a superseded run by throwing it
-      // from render. That must not wait for the other channel's pending action (#105).
+      // Each channel (steps, commits) reports the rejection of its superseded run while the other
+      // channel's action is still pending (#105: it once waited for the other channel).
       function setup() {
-        silenceErrors();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
         const steps = [deferred(), deferred()];
         const commits = [deferred(), deferred()];
         const caught = vi.fn();
@@ -503,27 +484,39 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
             boundary={caught}
           />,
         );
-        return { steps, commits, caught, onChange, onCommit };
+        const settleRest = async () => {
+          await act(async () => {
+            for (const d of [...steps, ...commits]) d.resolve();
+          });
+          expect(caught).not.toHaveBeenCalled();
+          expectNotPending(root());
+          driver.expectShown(values[3]);
+        };
+        return { steps, commits, caught, reportError, onChange, onCommit, settleRest };
       }
 
-      it("a superseded step's rejection reaches the boundary while commits are pending", async () => {
-        const { steps, caught, onChange, onCommit } = setup();
+      it("a superseded step's rejection is reported while commits are pending", async () => {
+        const { steps, caught, reportError, onChange, onCommit, settleRest } = setup();
         await gesture(1);
         await gesture(2);
         expect(onChange).toHaveBeenCalledTimes(2);
         expect(onCommit).toHaveBeenCalledTimes(2);
-        await act(async () => steps[0]!.reject(new Error("older step")));
-        expect(caught).toHaveBeenCalledTimes(1);
-        expect((caught.mock.calls[0]![0] as Error).message).toBe("older step");
+        const err = new Error("older step");
+        await act(async () => steps[0]!.reject(err));
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(caught).not.toHaveBeenCalled();
+        await settleRest();
       });
 
-      it("a superseded commit's rejection reaches the boundary while a step is pending", async () => {
-        const { commits, caught } = setup();
+      it("a superseded commit's rejection is reported while a step is pending", async () => {
+        const { commits, caught, reportError, settleRest } = setup();
         await gesture(1);
         await gesture(2);
-        await act(async () => commits[0]!.reject(new Error("older commit")));
-        expect(caught).toHaveBeenCalledTimes(1);
-        expect((caught.mock.calls[0]![0] as Error).message).toBe("older commit");
+        const err = new Error("older commit");
+        await act(async () => commits[0]!.reject(err));
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(caught).not.toHaveBeenCalled();
+        await settleRest();
       });
     });
 

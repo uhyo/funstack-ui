@@ -269,6 +269,51 @@ describe("ToggleGroup", () => {
         expect(action.mock.calls[0]?.[0]).toBe("list");
       });
 
+      // #150: the uncontrolled commit folds the resolved dispatches; an exclusive one replaces
+      // the value, so a rejected press in between never leaves two Items pressed.
+      it.each([
+        ["the rejection first", [0, 1]],
+        ["the resolution first", [1, 0]],
+      ] as const)(
+        "uncontrolled: a rejected press, then a resolved one, ends with one Item (%s)",
+        async (_label, order) => {
+          const reportError = vi.fn();
+          vi.stubGlobal("reportError", reportError);
+          const ds = sequencedDeferreds(2);
+          const caught = vi.fn();
+          render(
+            <ErrorCatcher onError={caught}>
+              <ToggleGroup.Root
+                exclusive
+                aria-label="Alignment"
+                defaultValue="left"
+                valueChangeAction={() => ds.next()}
+              >
+                <ToggleGroup.Item value="left">Left</ToggleGroup.Item>
+                <ToggleGroup.Item value="center">Center</ToggleGroup.Item>
+                <ToggleGroup.Item value="right">Right</ToggleGroup.Item>
+              </ToggleGroup.Root>
+            </ErrorCatcher>,
+          );
+          const user = setupUser();
+          await user.click(item("Center"));
+          await user.click(item("Right"));
+          const err = new Error("center failed");
+          for (const i of order) {
+            await act(async () => {
+              if (i === 0) ds[0]!.reject(err);
+              else ds[1]!.resolve();
+            });
+          }
+          expect(caught).not.toHaveBeenCalled();
+          expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+          expect(item("Left")).toHaveAttribute("aria-pressed", "false");
+          expect(item("Center")).toHaveAttribute("aria-pressed", "false");
+          expect(item("Right")).toHaveAttribute("aria-pressed", "true");
+          expectNotPending(root());
+        },
+      );
+
       it("controlled null presses nothing", () => {
         render(
           <ToggleGroup.Root exclusive aria-label="x" value={null}>

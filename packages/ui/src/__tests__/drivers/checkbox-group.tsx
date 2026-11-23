@@ -109,6 +109,7 @@ export const checkboxGroupDriver: NativeGroupPlatformDriver<
     ...details.added.filter((v) => !prev.includes(v)),
   ],
   orderIndependentCommit: true,
+  withoutFirstGesture: [],
   format: (v) => [...v].sort().join(","),
   transitionTypes: [
     ["fsui-checkbox-group", "fsui-checkbox-group-check"],

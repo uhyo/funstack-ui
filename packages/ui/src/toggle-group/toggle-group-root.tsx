@@ -297,7 +297,12 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
       ...(details.added.length > 0 ? ["fsui-toggle-group-press"] : []),
       ...(details.removed.length > 0 ? ["fsui-toggle-group-release"] : []),
     ],
-    reducer: (prev, _next, details) => applyPatch(prev, details),
+    // Also the uncontrolled commit (folded over the resolved dispatches, #150): an exclusive press
+    // replaces the value, whatever its `removed` (computed from the optimistic value) says.
+    reducer: (prev, _next, details) =>
+      mountExclusive && details.added.length > 0
+        ? new Set(details.added)
+        : applyPatch(prev, details),
     warn: { component: "ToggleGroup.Root", prop: "value" },
   });
 

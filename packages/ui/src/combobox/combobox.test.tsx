@@ -1176,8 +1176,12 @@ describe("Combobox", () => {
       }
     });
 
-    it("an older rejection reaches the boundary after the newer resolved", async () => {
-      silenceErrors();
+    it.each([
+      ["after the newer resolved", true],
+      ["while the newer is pending", false],
+    ] as const)("an older rejection %s is reported, not thrown", async (_label, newerFirst) => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
       const first = deferred();
       const second = deferred();
       const queue = [first, second];
@@ -1194,38 +1198,23 @@ describe("Combobox", () => {
       await typeText(user, "j");
       await user.click(option("jp"));
       await user.click(option("jm"));
-      await act(async () => second.resolve());
+      if (newerFirst) {
+        await act(async () => second.resolve());
+        await flushTasks(2);
+      }
+      const err = new Error("older");
+      await act(async () => first.reject(err));
       await flushTasks(2);
-      await act(async () => first.reject(new Error("older")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledTimes(1);
-      expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
-    });
-
-    it("an older rejection reaches the boundary while the newer is pending", async () => {
-      silenceErrors();
-      const first = deferred();
-      const second = deferred();
-      const queue = [first, second];
-      const caught = vi.fn();
-      const user = setupUser();
-      render(
-        <ValueHarness
-          mode={mode}
-          action={() => queue.shift()!.promise}
-          boundary={caught}
-          results={() => <Options query="" />}
-        />,
-      );
-      await typeText(user, "j");
-      await user.click(option("jp"));
-      await user.click(option("jm"));
-      await act(async () => first.reject(new Error("older")));
-      await flushTasks(2);
-      expect(caught).toHaveBeenCalledTimes(1);
-      expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
-      await act(async () => second.resolve());
-      await flushTasks(2);
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+      if (!newerFirst) {
+        await act(async () => second.resolve());
+        await flushTasks(2);
+      }
+      expect(caught).not.toHaveBeenCalled();
+      expect(reportError).toHaveBeenCalledTimes(1);
+      // The newer accept stands: the older one never reached the parent.
+      expect(input().value).toBe("Jamaica");
+      expect(input()).toHaveAttribute("data-selected", "");
     });
   });
 
