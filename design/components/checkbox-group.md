@@ -245,10 +245,28 @@ DOM structure.
 ```
 
 This is the reason `details` carries `added` / `removed` rather than `item` / `checked`: the same
-recipe covers an Item, a Parent and a reset without a branch. Uncontrolled mode needs none of
-this: the Root commits the changes whose actions resolved (5.4). In either mode an action should
+recipe covers an Item and a Parent without a branch. Uncontrolled mode needs none of this: the
+Root commits the changes whose actions resolved (5.4). In either mode an action should
 **persist `details.added` / `details.removed`, not `next`**: `next` is the intended set, computed
 on top of earlier in-flight clicks, and one of those can still fail (conventions 2.5).
+
+**Exception: a form reset is absolute.** For `reason: "platform"` with
+`details.event?.type === "reset"`, `next` is the whole value the reset leaves (the default) and
+the group adopts it whole (5.2, 5.4); `added` / `removed` are only the diff from the intended
+value and can be empty (uncontrolled, a reset to the value already intended is still dispatched
+while a change is in flight, #151). Persist a reset's `next` whole:
+
+```tsx
+valueChangeAction={async (next, details) => {
+  if (details.reason === "platform" && details.event?.type === "reset") await saveAll(next);
+  else await save(details.added, details.removed);
+}}
+```
+
+Otherwise a reset behind an in-flight uncheck that later fails leaves the server with the value
+the UI no longer shows. When saves must not overlap at all (each one applied after the previous
+one finished, in order), queue them with React's `useActionState` and call its dispatch from
+`valueChangeAction` (conventions 2.5, "No queueing in the library").
 
 ### 2.7 Styling
 
@@ -594,7 +612,9 @@ renders committed state in the DOM, but Items and the Parent compare against it.
   that rejects later would bring its box back checked after the reset. Not when the latest
   dispatch is itself a reset (repeated resets stay one dispatch), not with nothing in flight
   (8.2: nothing to do), and not controlled (no replay; the parent decides). Implemented through
-  `useNativeGroupReconciliation`'s `dispatchEqualReset` option.
+  `useNativeGroupReconciliation`'s `dispatchEqualReset` option. Such a reset has empty
+  `added` / `removed`, so an action that persists the patch must persist a reset's `next` whole
+  (2.6).
 - **Controlled, sync prefix** (`setToppings(next)`): writes land in dispatch order; correct.
 - **Controlled, update on success**: whole-value writes land in *completion* order and can lose a
   change; use the functional update of 2.6. Documented next to every such example.

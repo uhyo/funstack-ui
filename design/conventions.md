@@ -579,10 +579,12 @@ boundary for: it reports it. The UI stays up and shows the latest intent; the fa
 Contract:
 
 - The **latest** dispatch's rejection propagates through React's own path while its owner is
-  mounted and visible: the hook rethrows it inside the transition. It reaches the boundary only **after every older overlapping dispatch
-  has settled**: React holds the boundary's commit while the entangled action lane is still
-  pending (section 2.3 item 5). React behaviour, documented so a test that rejects the newest of
-  two dispatches does not expect the fallback before the older one resolves.
+  mounted and visible (not hidden by `<Activity>`, `keepMounted` or a Suspense fallback): the
+  hook rethrows it inside the transition. It reaches the boundary only **after every older
+  overlapping dispatch has settled**: React holds the boundary's commit while the entangled
+  action lane is still pending (section 2.3 item 5). React behaviour, documented so a test that
+  rejects the newest of two dispatches does not expect the fallback before the older one
+  resolves.
 - "Latest" is judged **when the rejection arrives**: a dispatch is superseded when another
   dispatch of the same hook instance was made after it, whether that one is still pending or has
   already settled.
@@ -601,12 +603,20 @@ Contract:
   it to `reportDropped` and returns. Why: React routes a transition's rejection only through a
   render of the component that owns it; with that component unmounted nothing reads it (probed
   2026-11-23 on 19.3.1 with `useActionTrigger`: no boundary, no `reportError`, no
-  `unhandledrejection`). Effect cleanup also runs when an `<Activity>` hides the component, so a
-  rejection that arrives while it is hidden is reported as well and does **not** reach the
-  boundary when the component is shown again (React would deliver it then); each rejection goes
-  one route, exactly once. Reachable: a `Toast.Action` whose toast is closed while its action runs
-  (toast.md walkthrough 6), a `Menu.Item` or Close part whose overlay is dismissed and unmounts it
-  meanwhile, any state owner removed while its action is pending.
+  `unhandledrejection`). Effect cleanup also runs when the component is **hidden**: by an
+  `<Activity mode="hidden">` (the consumer's, or the library's own: a closed overlay with
+  `keepMounted`, `internal/overlay-popup.tsx`), or by a shown Suspense boundary that re-suspends
+  and shows its fallback (probed; Toast's Suspense guard around the Root's content is one). A
+  rejection that arrives while hidden is reported as well and does **not** reach the boundary
+  when the component is shown again, where React would deliver it: a deliberate deviation from
+  React, pending user confirmation (resolved question 43). Each rejection goes one route, exactly
+  once. Reachable: a `Toast.Action` whose toast is closed while its action runs (toast.md
+  walkthrough 6) or whose content an urgent `toast.update` made suspend; a `Menu.Item`, menu
+  checkable item or Close part whose overlay is dismissed meanwhile, unmounting it or (with
+  `keepMounted`) hiding it (menu.md walkthrough 4); any state owner removed while its action is
+  pending. Not covered, React behaviour: a latest rejection that arrives while the owner is
+  connected is rethrown, and if the owner unmounts in the same commit, before React renders it
+  again, React still drops it (a tiny window; not handled).
 - A consumer who catches inside the action is unaffected, as before.
 - Both hooks (`useControllableAction`, `useActionTrigger`) do this themselves, per instance. A
   component with **two transition channels** (Slider and NumberField: steps through
@@ -3105,11 +3115,22 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     Applied: 2.4, 2.5, 3.3, 3.4, 9.1, 10.1, decision 3; the component designs edited in place.
 43. **The latest rejection after its owner left is reported (#152); an equal reset joins a burst
     (#151)**, 2026-11-23, implementation fixes of the gaps recorded with 42. #152: a latest
-    rejection that arrives after the owning component unmounted or was hidden by `<Activity>`
-    went nowhere (React routes it only through a render of the owner); both hooks now pass it to
-    `reportError` (`reportSuperseded` renamed `reportDropped`, `report-dropped.ts`). #151:
+    rejection that arrives after the owning component unmounted went nowhere (React routes it
+    only through a render of the owner); both hooks now pass it to `reportError`
+    (`reportSuperseded` renamed `reportDropped`, `report-dropped.ts`). **Deliberate deviation
+    from React, pending user / product-owner confirmation:** a component that is *hidden*
+    (`<Activity>`, `keepMounted` overlays, a Suspense fallback) counts as gone, because no React
+    API tells hiding from unmounting when the rejection arrives (both run the effect cleanups).
+    The rejection is reported only, once; React itself would deliver it to the boundary when the
+    component is shown again. The alternative is **report and throw**: closer to React (the
+    boundary on re-show) but the error is reported twice when the component comes back, and for
+    the library's `keepMounted` overlays a boundary fallback would appear on reopening, possibly
+    long after and out of context. Chosen: report only (exactly once, simple test contract;
+    reviewer agreed, `memo/reviewer/review-151-152.md`). #151:
     uncontrolled CheckboxGroup dispatches a form reset with an empty diff while a dispatch is in
-    flight (unless the latest dispatch is a reset), so the absolute reset enters the replay.
+    flight (unless the latest dispatch is a reset), so the absolute reset enters the replay; its
+    `added` / `removed` can be empty, so a consumer persists a reset's `next` whole
+    (`checkbox-group.md` 2.6).
     Applied: 2.4, 3.3, 3.4, 9.1, 10.1; `checkbox-group.md` 5.4, `toast.md` walkthrough 6.
 
 ## Open questions

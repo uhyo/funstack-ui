@@ -912,7 +912,9 @@ It is not set while content is merely suspended (that is the guard's job, and no
    transition whose component has unmounted (probed 2026-11-23 on 19.3.1: no boundary, no
    `reportError`, no `unhandledrejection`), so `useActionTrigger` reports a latest rejection
    itself once the part's effects are disconnected. The boundary above the Viewport is not
-   involved. Until #152 the rejection went nowhere.
+   involved. Until #152 the rejection went nowhere. The same holds while the Action is hidden by
+   the Root's Suspense guard (an urgent `toast.update` whose new content suspends): an Undo that
+   rejects then is reported, not thrown.
 7. **Promise toast whose promise never settles.** Stays `pending`, persistent; `toast.dismiss(id)`
    removes it; the returned promise is as unsettled as the input.
 8. **`toast.update` on an ending or unknown id.** Ignored (dev warning for unknown).

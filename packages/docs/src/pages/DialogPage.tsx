@@ -240,7 +240,10 @@ export function DialogPage() {
                 <code>&lt;Activity mode="hidden"&gt;</code> (state kept, effects stopped,
                 pre-rendered at low priority; not in the server HTML). Either way, unmounting waits
                 for the dialog's CSS exit animation, or happens inside the close's view transition
-                when <code>transition</code> is set. Ignored in JS-free mode (always mounted).
+                when <code>transition</code> is set. Ignored in JS-free mode (always mounted). An
+                action of a part inside that rejects while it is hidden goes to{" "}
+                <code>reportError</code>, not to an Error Boundary (see{" "}
+                <a href="/concepts/action-props">Action props</a>).
               </>
             ),
           },

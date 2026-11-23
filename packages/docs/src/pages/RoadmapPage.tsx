@@ -30,8 +30,9 @@ export function RoadmapPage() {
       <ul>
         <li>
           An action that rejects after its component unmounted (a <code>Toast.Action</code> whose
-          toast was closed meanwhile, a <code>Menu.Item</code> whose menu closed) or while an{" "}
-          <code>&lt;Activity&gt;</code> hides it is passed to the global <code>reportError</code>{" "}
+          toast was closed meanwhile, a <code>Menu.Item</code> whose menu closed) or while it is
+          hidden (an <code>&lt;Activity&gt;</code>, a closed <code>keepMounted</code> overlay, a
+          Suspense boundary showing its fallback) is passed to the global <code>reportError</code>{" "}
           instead of being lost (<a href={issue(152)}>#152</a>).
         </li>
         <li>

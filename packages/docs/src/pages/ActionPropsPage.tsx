@@ -242,9 +242,12 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         <code>reportError</code> instead (see{" "}
         <a href="/concepts/action-props#overlapping-actions">Overlapping actions</a>), and so does a
         rejection that arrives after the component unmounted (a toast or menu closed while its
-        action ran) or while an <code>&lt;Activity&gt;</code> hides it, since React has no render
-        left to deliver it through. The optimistic state reverts automatically, and uncontrolled
-        state is only written after success, so a failed action leaves it untouched.
+        action ran) or while it is hidden (an <code>&lt;Activity&gt;</code>, a closed overlay with{" "}
+        <code>keepMounted</code>, or a Suspense boundary showing its fallback), since React has no
+        render left to deliver it through. A hidden component's error is reported once and does not
+        show the Error Boundary when the component reappears. The optimistic state reverts
+        automatically, and uncontrolled state is only written after success, so a failed action
+        leaves it untouched.
       </p>
       <p>
         For inline error UI instead, catch inside the action. A caught error makes the action
