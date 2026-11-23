@@ -54,10 +54,8 @@ export function Settings() {
         context module and the parts reach the browser.
       </p>
       <p>
-        Server-rendered ids inside FUNSTACK Static <code>defer()</code> need{" "}
-        <code>@funstack/static</code> 1.3.4 or later; other frameworks that render several server
-        payloads into one page must give each its own <code>identifierPrefix</code>, or ids from
-        different payloads can collide.
+        A framework that renders several server payloads into one page must give each its own{" "}
+        <code>identifierPrefix</code>, or server-rendered ids from different payloads can collide.
       </p>
 
       <h3 id="js-free">What "JS-free" means</h3>

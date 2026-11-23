@@ -83,8 +83,9 @@ export function TransitionsPage() {
 }`}</CodeBlock>
       </ConceptExample>
       <p>
-        The library ships no animation, so there is nothing to turn off for reduced motion; keep the
-        media query above in your own stylesheet.
+        Every animation comes from your stylesheet, so reduced motion is yours to handle: when you
+        write an animation (a view transition or plain CSS), add a{" "}
+        <code>prefers-reduced-motion</code> rule like the one above.
       </p>
       <p>
         If you want only your own named animations, you can opt out of the page cross-fade with the

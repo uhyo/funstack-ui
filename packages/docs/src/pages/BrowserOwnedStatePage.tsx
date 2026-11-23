@@ -101,11 +101,12 @@ export function BrowserOwnedStatePage() {
       <p>
         The library never mirrors browser-owned state into React state. It reads the DOM when it
         needs to, and it does not duplicate a pseudo-class with a data attribute. State that nobody
-        persists or awaits (whether a hint is showing) is left to the browser entirely, with no prop
-        and no action. One read is mirrored: whether a popup is shown, where no native element
-        exposes it to assistive technology: on a Trigger that is no invoker, and on the Combobox
-        input (see <a href="#popup-triggers">Triggers of a popup</a>). Each component page says what
-        it leaves to the browser in its <strong>Browser-owned state</strong> section.
+        persists or awaits is left to the browser entirely, with no prop and no action. Whether a
+        hint popup (such as a tooltip) is showing is one example. One read is mirrored: whether a
+        popup is shown, where no native element exposes it to assistive technology: on a Trigger
+        that is no invoker, and on the Combobox input (see{" "}
+        <a href="#popup-triggers">Triggers of a popup</a>). Each component page says what it leaves
+        to the browser in its <strong>Browser-owned state</strong> section.
       </p>
       <ConceptExample component="Tooltip" href="/components/tooltip">
         <p>

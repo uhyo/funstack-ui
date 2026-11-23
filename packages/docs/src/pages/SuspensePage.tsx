@@ -58,9 +58,10 @@ export function SuspensePage() {
       <ConceptExample component="Accordion" href="/components/accordion#suspense">
         <p>
           <code>Accordion.Panel</code> is always mounted; its function child receives the committed{" "}
-          <code>open</code> state, which is how content is mounted lazily. In library mode, if that
-          content suspends, the item stays closed with the trigger pending until the content is
-          ready, then opens.
+          <code>open</code> state, which is how content is mounted lazily. In{" "}
+          <a href="/concepts/browser-owned-state#two-modes">library mode</a>, if that content
+          suspends, the item stays closed with the trigger pending until the content is ready, then
+          opens.
         </p>
       </ConceptExample>
       <ConceptExample component="Combobox" href="/components/combobox#suspense">
@@ -92,16 +93,28 @@ export function SuspensePage() {
         </p>
       </ConceptExample>
 
-      <h3>What must not suspend</h3>
+      <h3 id="triggers">Keep triggers from suspending</h3>
       <p>
-        <a href="/concepts/pending-and-optimistic#trigger">Trigger</a> content is rendered from{" "}
-        <a href="/concepts/pending-and-optimistic#optimistic">optimistic state</a>, which updates
-        synchronously, and a synchronous render that suspends shows a fallback. A{" "}
-        <code>children</code> function on a trigger must not suspend, or must have its own boundary
-        inside the trigger. The props tables mark these props "must not suspend". Content that a
-        component renders ahead of time, before it is shown, follows the same rule: keep it static
-        or put the boundary inside the part that shows it.
+        A <a href="/concepts/pending-and-optimistic#trigger">trigger</a> should answer a click at
+        once. Its content is rendered from{" "}
+        <a href="/concepts/pending-and-optimistic#optimistic">optimistic state</a>, which React
+        renders right away rather than in the transition. React shows a fallback when such a render
+        suspends, so if a trigger's content suspends, the nearest Suspense boundary above it
+        replaces the trigger (and everything else inside that boundary) with its fallback. That is
+        React working as designed, but rarely what you want.
       </p>
+      <p>To keep the trigger on screen:</p>
+      <ul>
+        <li>
+          Don't suspend in a trigger's <code>children</code> function, or give the part that
+          suspends its own Suspense boundary inside the trigger. The props tables mark these props
+          "must not suspend".
+        </li>
+        <li>
+          Do the same for content that a component renders ahead of time, before it is shown: keep
+          it static, or put the boundary inside the part that shows it.
+        </li>
+      </ul>
     </DocPage>
   );
 }
