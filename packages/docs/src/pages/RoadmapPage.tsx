@@ -35,12 +35,13 @@ export function RoadmapPage() {
           <code>Dialog.Root</code>:
           <ul>
             <li>
-              <code>openChangeAction</code> no longer runs for dismissals: Escape, a click outside,
-              Android back, an assistive-technology dismiss, focus leaving a menu or combobox, a
-              right-click outside a menu, another top-layer element, script{" "}
-              <code>hidePopover()</code> / <code>close()</code>, a consumer's own invoker button
-              closing a popover, lost interest. They are reported to the new{" "}
-              <code>onOpenChange</code> instead.
+              <code>openChangeAction</code> is no longer called for a close the library did not
+              perform on request: Escape, a click outside, focus leaving the popup, a parent menu
+              closing its submenu, your own invoker button closing the popup, script{" "}
+              <code>hidePopover()</code> / <code>close()</code>, and so on. These closes are{" "}
+              <a href="/concepts/action-props#fact">facts</a>, reported to the new{" "}
+              <code>onOpenChange</code> instead. Code that checks <code>reason === "dismiss"</code>{" "}
+              inside <code>openChangeAction</code> must move to <code>onOpenChange</code>.
             </li>
             <li>
               A controlled Root needs <code>onOpenChange</code> as well:{" "}
@@ -82,15 +83,15 @@ export function RoadmapPage() {
               pass it to <code>onOpenChange</code> too.
             </li>
             <li>
-              A submenu closed by its parent menu reports through <code>onOpenChange</code>.
-            </li>
-            <li>
               JS-free mode (Popover, Dialog): <code>onOpenChange</code> on the Root selects library
               mode.
             </li>
           </ul>
-          Not changing: a popup opened before hydration is still reported through{" "}
-          <code>openChangeAction(true, {'{ reason: "platform" }'})</code>.
+          Not changing: a popup opened before hydration is still a request,{" "}
+          <code>openChangeAction(true, {'{ reason: "platform" }'})</code>. Two closes keep{" "}
+          <code>reason: "dismiss"</code> and stay requests to <code>openChangeAction</code>: the
+          pointer leaving a hover-opened submenu, and lost interest while an{" "}
+          <code>interestfor</code> open is still pending.
         </li>
         <li>
           <strong>Breaking:</strong> <code>toast({"{ closeAction }"})</code> is renamed{" "}

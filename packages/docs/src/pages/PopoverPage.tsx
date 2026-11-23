@@ -276,7 +276,7 @@ export function PopoverPage() {
       />
       <PartFacts
         state={
-          "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open or a part's close (never a dismissal)."
+          "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open or a part's close, never a dismissal (a request still running when a dismissal superseded it keeps `pending` until that request settles)."
         }
         owned={
           "`type` (only on a `<button>`), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
@@ -456,7 +456,7 @@ export function PopoverPage() {
           [
             "`data-pending`",
             "Trigger",
-            "An open or a part-initiated close is in flight (library mode only). A dismissal never pends.",
+            "An open or a part-initiated close is in flight (library mode only). A dismissal never pends, but a request still running when a dismissal superseded it keeps it until that request settles.",
           ],
           ["`data-pending`", "Close", "Its `action` is in flight."],
           [

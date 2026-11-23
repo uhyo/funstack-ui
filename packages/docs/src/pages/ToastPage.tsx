@@ -164,8 +164,8 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </p>
       </Callout>
       <p>
-        A toast's <code>onClose</code> is called once when it leaves, synchronously where the close
-        happens, after the toast is already marked as leaving: <code>"activate"</code> (its Action
+        A toast's <code>onClose</code> is called once, synchronously, in the moment the toast is
+        closed (its exit animation, if any, has not run yet): <code>"activate"</code> (its Action
         settled), <code>"dismiss"</code> (Close, Escape, <code>toast.dismiss()</code>, a promise
         toast with no message for its outcome) or <code>"timeout"</code>. That is the "do later,
         unless undone" pattern:
@@ -175,8 +175,8 @@ toast({ title: "Link copied" });`}</CodeBlock>
       </Example>
       <p>
         <code>onClose</code> is a{" "}
-        <a href="/concepts/action-props#handlers">handler, not an action</a>: it is not awaited, so
-        a slow <code>deleteForReal</code> holds no other transition in the app, and it may be a
+        <a href="/concepts/action-props#on-handler">handler, not an action</a>: it is not awaited,
+        so a slow <code>deleteForReal</code> holds no other transition in the app, and it may be a
         Server Function. A rejection, or a throw, goes to <code>reportError</code>; it never reaches
         an Error Boundary (the toast has already left). To show the user a failure, catch it
         yourself:
@@ -298,7 +298,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
             name: "onClose",
             type: "UrgentHandler<ToastCloseDetails>",
             description:
-              'A handler (`closeAction` up to 0.1.0-alpha.16, #148): called once when the toast leaves, synchronously, outside any transition, and not awaited; `details.reason` is `"activate"`, `"dismiss"` or `"timeout"`. May return a promise (a Server Function); a rejection or a throw goes to `reportError`. Not called when the Viewport unmounts.',
+              'A [handler](/concepts/action-props#on-handler), not an action: called once when the toast leaves, synchronously, outside any transition, and not awaited; `details.reason` is `"activate"`, `"dismiss"` or `"timeout"`. May return a promise (a Server Function); a rejection or a throw goes to `reportError`. Not called when the Viewport unmounts.',
           },
           {
             name: "announce",

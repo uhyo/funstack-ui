@@ -238,7 +238,7 @@ export function DialogPage() {
       />
       <PartFacts
         state={
-          "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends."
+          "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends, but a request still running when a dismissal superseded it keeps `pending` until that request settles."
         }
         owned={
           "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
@@ -486,7 +486,7 @@ export function DialogPage() {
           [
             "`data-pending`",
             "Trigger",
-            "An open or a part's close is in flight (library mode only). A dismissal never pends.",
+            "An open or a part's close is in flight (library mode only). A dismissal never pends, but a request still running when a dismissal superseded it keeps it until that request settles.",
           ],
           ["`data-pending`", "Close", "Its `action` is in flight."],
           [
@@ -791,7 +791,8 @@ html:active-view-transition .dialog { transition: none; }
         are independent, and both usable from a Server Component:
       </p>
       <CodeBlock>{`// Persist "seen" when the user closes an announcement: a Close button is a request,
-// Escape a fact, so pass the Server Function to both.
+// Escape a fact, so pass the Server Function to both. It receives (open, details): with a
+// Trigger inside, the action is also called with true when the dialog opens.
 <Dialog.Root
   defaultOpen={!user.seenAnnouncement}
   openChangeAction={markAnnouncementSeen}

@@ -234,14 +234,18 @@ export function MenuPage() {
                 Facts only: the menu was closed without the library closing it on request. Always{" "}
                 <code>false</code>. <code>details.reason</code>: <code>"dismiss"</code> (Escape, a
                 click outside, Tab or focus leaving the menu, a right- or middle-click outside, the
-                parent menu closing a submenu, script) or <code>"activate"</code> (a{" "}
-                <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a>;
-                pressing one does not move focus out of the menu). Called synchronously in the
-                browser's <code>toggle</code> event and not awaited: nothing is pending and no view
+                parent menu closing a submenu, a scroll or a release outside under a{" "}
+                <a href="/components/context-menu">context menu</a>, script) or{" "}
+                <code>"activate"</code> (a{" "}
+                <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a>, whose
+                press does not move focus out of the menu; a Trigger rendered as another element,
+                pressed while open). Called synchronously in the browser's <code>toggle</code>{" "}
+                event, outside any transition, and not awaited: nothing is pending and no view
                 transition runs. In controlled mode set state directly here (
-                <code>onOpenChange={"{setOpen}"}</code>); a parent that keeps <code>open</code> gets
-                the menu shown again at once. Each submenu's Root has its own. May return a promise;
-                a rejection or a throw goes to <code>reportError</code>.
+                <code>onOpenChange={"{setOpen}"}</code>), never in <code>startTransition</code> or
+                after an <code>await</code>; a parent that keeps <code>open</code> gets the menu
+                shown again at once. Each submenu's Root has its own. May return a promise (a Server
+                Function); a rejection or a throw goes to <code>reportError</code>.
               </>
             ),
           },

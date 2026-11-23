@@ -14,7 +14,8 @@ const initial = ["Groceries", "Dentist", "Call Ada"];
 export function ToastUndoWindow() {
   const [items, setItems] = useState(initial);
   const [log, setLog] = useState<readonly string[]>([]);
-  const note = (line: string) => startTransition(() => setLog((l) => [line, ...l].slice(0, 3)));
+  // Called from onClose, a handler: a plain setState there is an urgent update, even after an await.
+  const note = (line: string) => setLog((l) => [line, ...l].slice(0, 3));
 
   const remove = (name: string) => {
     setItems((list) => list.filter((item) => item !== name));
