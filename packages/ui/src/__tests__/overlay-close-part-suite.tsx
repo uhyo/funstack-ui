@@ -311,7 +311,7 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         expectPending(button);
         await act(async () => runs[1]!.resolve());
         await flushTasks(2);
-        // The close the first resolved run requested commits with the end of every run.
+        // The latest run resolved, but an older run is still in flight: nothing closes yet.
         expectPending(button);
         expect(button).not.toHaveAttribute("aria-disabled");
         await act(async () => runs[0]!.resolve());
