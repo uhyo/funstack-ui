@@ -649,7 +649,7 @@ export interface PopoverCloseProps
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the popover
    * still closes once. No effect without `action`. Conventions 2.5.1 (#146).
-   * Default `"ignore"` (recommended; open question 1 in the conventions).
+   * Default `"ignore"` (user decision; conventions resolved question 44).
    */
   whilePending?: WhilePending;
   /** Native `disabled`; owned, so a `render` element cannot re-enable the button. */
@@ -679,18 +679,22 @@ won. The action runs through the shared `useActionTrigger({ openGeneration })` (
 landed with #41); its superseded-rejection path is no longer reachable from a Close (the row in
 the test plan becomes the single-run rejection row, `button.md` 16.4 P3).
 
-**Amended 2026-11-23 (#146, conventions 2.5.1; design only, not implemented).** The guard of #81
+**Amended 2026-11-23 (#146, conventions 2.5.1; implemented 2026-11-24).** The guard of #81
 is now the prop `whilePending`. `Popover.Close` is a part whose activation the library owns (it
 hides the popover with no user code), so it keeps ignoring by default: the #81 text above describes
 `whilePending="ignore"`. That default is a **user decision** for the Close as such; for a Close
 that is given an `action` (mixed ownership: the consumer's function, then the library's close)
-it is the architect's **recommendation, open** (conventions "Open questions" 1). With
+it is a **user decision** as well (conventions resolved question 44, question 1). With
 `whilePending="run"` every click runs the action again in the part's transition: `data-pending`
 until every run has settled, **no** `aria-disabled` from pending, and each run that resolves
 requests the close, which happens once (idempotent, and dropped for a stale open as below). An
-older run's rejection goes to `reportError`, the latest one's to the boundary above the Close,
-and a run that rejects after an earlier run closed the overlay and unmounted the part is
-reported too (conventions 2.4, #145, #152). Without `action` the prop has no effect: nothing of
+older run's rejection goes to `reportError`, the latest one's to the boundary above the Close
+(conventions 2.4, #145). **Found in implementation:** in library mode the first resolved run's
+close is entangled with the Close's still-pending runs and commits only when every run has
+settled, so the part never leaves before its last run: a latest rejection then reaches the
+boundary and the close commits with it. In JS-free mode the native close happens at the first
+resolved run; the content stays mounted (JS-free mode always is), so a later run's rejection
+takes the usual route. Conventions 2.5.1. Without `action` the prop has no effect: nothing of
 the part's own is pending, and a repeated click finds the close already intended.
 
 **A stale close is dropped.** The action's continuation runs after an `await`; if the user

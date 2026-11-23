@@ -1358,12 +1358,13 @@ accepted; the review's items decided as follows and folded into 16 and 17 above.
 
 ## 18. #146: `whilePending` (the guard becomes a prop)
 
-Status: **design amendment, 2026-11-23.** The prop, its `"ignore"` value and Button's default
-(every activation runs) are a **user decision, accepted** (issue #146). The opt-out value
-`"run"` and the `formAction` consequence are recommendations, open in
-`design/conventions.md` "Open questions" (5 and 4). Not implemented. The library-wide rule and
-the classification of every pure trigger are conventions 2.5.1; this section is Button's share
-and the developer's work list. It supersedes decisions 3 to 5, sections 5.2 to 5.5 where they
+Status: **design amendment, 2026-11-23; user decision, accepted in full; implemented
+2026-11-24** (branch `feat/146-while-pending`). The prop, its `"ignore"` value and Button's
+default (every activation runs) were decided first; the opt-out value `"run"` and the
+`formAction` default (`"run"`, the dropped older rejection documented) followed
+(`design/conventions.md` resolved question 44). The library-wide rule and the classification of
+every pure trigger are conventions 2.5.1; this section is Button's share and the developer's
+work list. It supersedes decisions 3 to 5, sections 5.2 to 5.5 where they
 say "always", and the defaults of section 16.
 
 ### 18.1 The prop
@@ -1438,8 +1439,8 @@ Trigger dispatches on every click.
 Under `"run"` a `Button formAction={fn}` is React's submitter with per-submitter pending (6.2)
 and nothing more: a second click submits again, `pending` stays until React's form status
 clears. Overlapping submissions are React's form channel, where **React drops the rejection of
-an older overlapping submission** and the library cannot see it (conventions 2.5.1, open
-question 4). Under `"ignore"` the guard is `formPending` as in 5.2, with its documented
+an older overlapping submission** and the library cannot see it (conventions 2.5.1, question
+4, accepted). Under `"ignore"` the guard is `formPending` as in 5.2, with its documented
 difference (a render value: a click in a held-commit window is ignored). 6.5 (implicit
 submission): Enter in a field submits again under `"run"`, is cancelled under `"ignore"`.
 
@@ -1448,8 +1449,8 @@ submission): Enter in a field submits again under `"run"`, is cancelled under `"
 Conventions 2.5.1 has the table. For the developer: `Dialog.Close`, `Popover.Close`
 (`useOverlayClose`), `Menu.Item` and `Toast.Action` each gain `whilePending?: WhilePending`,
 compute their default, pass `ignoreWhilePending` to the hook and render `aria-disabled` from
-`pending && ignoring`. Recommended defaults, **open** until the user answers questions 1 to 3:
-Close parts `"ignore"`; `Menu.Item` `closeOnActivate ? "ignore" : "run"`; `Toast.Action`
+`pending && ignoring`. Defaults (user decision, questions 1 to 3): Close parts `"ignore"`;
+`Menu.Item` `closeOnActivate ? "ignore" : "run"`; `Toast.Action`
 `closeOnSettle ? "ignore" : "run"`. `useActionTrigger`'s own default becomes `false`
 (conventions 3.4); Slider and NumberField are unaffected. The branch `fix/151-152` merges first;
 nothing here depends on its internals, only on its public behaviour (a latest rejection after
@@ -1477,7 +1478,7 @@ the part left is reported).
 | 24 Implicit submission (browser) | `"ignore"`: unchanged. Default: the second Enter submits again. |
 | 26 Accessibility tree (browser) | Under `"ignore"`; default: no disabled state on the pending Button. |
 
-Other suites (section 16.4 rows), with the recommended defaults:
+Other suites (section 16.4 rows), with the decided defaults:
 
 | Suite | Change |
 | --- | --- |
@@ -1510,5 +1511,27 @@ About sixty guard assertions exist today (most in `button.test.tsx` and
   agent skill (`packages/ui/skills/funstack-ui-knowledge/SKILL.md`); JSDoc of the five parts
   and of `useActionTrigger`; the playground (`button-demo.tsx`, `toolbar-demo.tsx`).
 - **Release notes: breaking for `Button`** (a pending Button no longer ignores clicks or
-  renders `aria-disabled` unless `whilePending="ignore"`), and for keep-open Items / Actions if
-  questions 2 and 3 are answered (a).
+  renders `aria-disabled` unless `whilePending="ignore"`), and for keep-open Items / Actions
+  (questions 2 and 3 were answered (a)).
+
+### 18.7 Implementation notes (2026-11-24)
+
+- As designed: `WhilePending` in `internal/types.ts`, exported from the root entry only (like
+  the other shared types); `useActionTrigger`'s `ignoreWhilePending` defaults to `false`;
+  Button, `useOverlayClose` (Dialog.Close, Popover.Close), `Menu.Item` and `Toast.Action`
+  compute `ignoring` per render and render `aria-disabled` from `pending && ignoring`. The
+  `Menu.CheckboxItem` props type now also omits `whilePending` (it extends `MenuItemProps`; the
+  type test caught the leak), so `Menu.RadioItem` does too.
+- `ToastActionOptions` gets no `whilePending` (conventions 2.5.1, the sub-question of 3).
+- **Deviation from the walkthrough (not from the rules):** with `"run"` on a library-mode Close
+  or a closing `Menu.Item`, the first resolved run's close is entangled with the part's
+  still-pending runs and commits only when every run has settled, so "a run that rejects after
+  the part left" is not reachable there: the latest run's rejection reaches the boundary above
+  the part and the close commits with it. A `Toast.Action` (its close is not a transition) does
+  leave at the first resolved run, and the later rejection is reported (#152); a JS-free Close
+  closes natively at the first resolved run but its content stays mounted. Conventions 2.5.1 amended; tests pin both.
+- Tests: 18.5 rows in `button.test.tsx` (5b, 5c, 5d added; 3, 5, 6, 9, 10, 11, 15, 18 split by
+  mode), `button.browser.test.tsx` (21, 22, 24, 26 split by mode); D7 / P5 as shared rows of
+  `src/__tests__/overlay-close-part-suite.tsx` (library and JS-free mode);
+  `menu.test.tsx` "whilePending (#146)"; `toast.test.tsx` "whilePending (#146)";
+  `use-action-trigger.test.tsx` H1 flipped; type rows in `internal/types.test.ts`.
